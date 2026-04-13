@@ -44,17 +44,17 @@ pnpm seed or equivalent runs clean; default agent queryable; documented in READM
    `git fetch origin && git checkout task/agent-platform-j9x.2 && git pull` then `git checkout -b task/agent-platform-j9x.3`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-j9x.3` shows expected upstream Beads issues **closed** where applicable.
-5. **Not the segment tip:** push **`task/agent-platform-j9x.3`** to `origin`. **Do not** PR to `feature/agent-platform-mvp` yet. The next task in this segment branches from **`task/agent-platform-j9x.3`**.
+5. **Not the segment tip:** push **`task/agent-platform-j9x.3`** to `origin`. **Do not** PR to `feature/agent-platform-persistence` yet. The next task in this segment branches from **`task/agent-platform-j9x.3`**.
 
 ## Git workflow (mandatory)
 
-**Segment:** Persistence + API (j9x.1–j9x.4). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-j9x.4`** → `feature/agent-platform-mvp`.
+**Segment:** Persistence + API (j9x.1–j9x.4). **Chained branches:** first task in segment from `feature/agent-platform-persistence`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-j9x.4`** → `feature/agent-platform-persistence`.
 
 | | |
 |---|---|
 | **Parent for this branch** | **`task/agent-platform-j9x.2`** |
 | **This task’s branch** | **`task/agent-platform-j9x.3`** |
-| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-j9x.4`** |
+| **Segment tip (opens PR to `feature/agent-platform-persistence`)** | **`task/agent-platform-j9x.4`** |
 | **This task is segment tip?** | **No — merge only after `task/agent-platform-j9x.4`** |
 
 | Rule | Detail |
@@ -62,8 +62,8 @@ pnpm seed or equivalent runs clean; default agent queryable; documented in READM
 | **No `main`** | Never push commits directly to **`main`**. |
 | **Chain** | Branch **`task/agent-platform-j9x.3`** from **`task/agent-platform-j9x.2`**. |
 | **Intermediate tasks** | Push **`task/agent-platform-j9x.3`**; next task checks out from **`task/agent-platform-j9x.3`** (or from remote `origin/task/agent-platform-j9x.3`). |
-| **Segment tip** | One PR **`task/agent-platform-j9x.4` → `feature/agent-platform-mvp`**. |
-| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
+| **Segment tip** | One PR **`task/agent-platform-j9x.4` → `feature/agent-platform-persistence`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-persistence`. |
 
 ## Tests (required before sign-off)
 
@@ -76,7 +76,7 @@ pnpm seed or equivalent runs clean; default agent queryable; documented in READM
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-j9x.3`** pushed; next task branches from here (**no** PR to `feature/agent-platform-mvp` until **`task/agent-platform-j9x.4`**)
+- [ ] **Branch** **`task/agent-platform-j9x.3`** pushed; next task branches from here (**no** PR to `feature/agent-platform-persistence` until **`task/agent-platform-j9x.4`**)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off

@@ -44,17 +44,17 @@ New developer can follow doc without tribal knowledge; decisions.md link for ADR
    `git fetch origin && git checkout task/agent-platform-o36.1 && git pull` then `git checkout -b task/agent-platform-o36.2`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-o36.2` shows expected upstream Beads issues **closed** where applicable.
-5. **Segment tip:** open **one PR** **`task/agent-platform-o36.2` → `feature/agent-platform-mvp`** to merge this entire segment (**MVP E2E (o36.1–o36.2)**) into the feature branch.
+5. **Segment tip:** open **one PR** **`task/agent-platform-o36.2` → `feature/<feature-name>`** to merge this entire segment (**MVP E2E (o36.1–o36.2)**) into the feature branch.
 
 ## Git workflow (mandatory)
 
-**Segment:** MVP E2E (o36.1–o36.2). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-o36.2`** → `feature/agent-platform-mvp`.
+**Segment:** MVP E2E (o36.1–o36.2). **Chained branches:** first task in segment from `feature/<feature-name>`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-o36.2`** → `feature/<feature-name>`.
 
 | | |
 |---|---|
 | **Parent for this branch** | **`task/agent-platform-o36.1`** |
 | **This task’s branch** | **`task/agent-platform-o36.2`** |
-| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-o36.2`** |
+| **Segment tip (opens PR to `feature/<feature-name>`)** | **`task/agent-platform-o36.2`** |
 | **This task is segment tip?** | **Yes — merge whole segment here** |
 
 | Rule | Detail |
@@ -62,8 +62,8 @@ New developer can follow doc without tribal knowledge; decisions.md link for ADR
 | **No `main`** | Never push commits directly to **`main`**. |
 | **Chain** | Branch **`task/agent-platform-o36.2`** from **`task/agent-platform-o36.1`**. |
 | **Intermediate tasks** | Push **`task/agent-platform-o36.2`**; next task checks out from **`task/agent-platform-o36.2`** (or from remote `origin/task/agent-platform-o36.2`). |
-| **Segment tip** | One PR **`task/agent-platform-o36.2` → `feature/agent-platform-mvp`**. |
-| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
+| **Segment tip** | One PR **`task/agent-platform-o36.2` → `feature/<feature-name>`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/<feature-name>`. |
 
 ## Tests (required before sign-off)
 
@@ -76,7 +76,7 @@ New developer can follow doc without tribal knowledge; decisions.md link for ADR
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **PR** merged: **`task/agent-platform-o36.2` → `feature/agent-platform-mvp`** (segment **MVP E2E (o36.1–o36.2)** complete)
+- [ ] **PR** merged: **`task/agent-platform-o36.2` → `feature/<feature-name>`** (segment **MVP E2E (o36.1–o36.2)** complete)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
@@ -86,7 +86,7 @@ Complete after work is on **`task/agent-platform-o36.2`** and tests are green
 - [ ] **Task branch** **`task/agent-platform-o36.2`** created from **`task/agent-platform-o36.1`** before implementation
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR** merged **`task/agent-platform-o36.2` → `feature/agent-platform-mvp`** (link: _________________)
+- [ ] **PR** merged **`task/agent-platform-o36.2` → `feature/<feature-name>`** (link: _________________)
 - [ ] `bd close agent-platform-o36.2 --reason "…"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed

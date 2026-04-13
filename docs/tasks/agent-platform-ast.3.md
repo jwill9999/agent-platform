@@ -44,17 +44,17 @@ Integration tests or Playwright for critical flows; a11y baseline on forms.
    `git fetch origin && git checkout task/agent-platform-ast.2 && git pull` then `git checkout -b task/agent-platform-ast.3`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-ast.3` shows expected upstream Beads issues **closed** where applicable.
-5. **Segment tip:** open **one PR** **`task/agent-platform-ast.3` → `feature/agent-platform-mvp`** to merge this entire segment (**Frontend (ast.1–ast.3)**) into the feature branch.
+5. **Segment tip:** open **one PR** **`task/agent-platform-ast.3` → `feature/<feature-name>`** to merge this entire segment (**Frontend (ast.1–ast.3)**) into the feature branch.
 
 ## Git workflow (mandatory)
 
-**Segment:** Frontend (ast.1–ast.3). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-ast.3`** → `feature/agent-platform-mvp`.
+**Segment:** Frontend (ast.1–ast.3). **Chained branches:** first task in segment from `feature/<feature-name>`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-ast.3`** → `feature/<feature-name>`.
 
 | | |
 |---|---|
 | **Parent for this branch** | **`task/agent-platform-ast.2`** |
 | **This task’s branch** | **`task/agent-platform-ast.3`** |
-| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-ast.3`** |
+| **Segment tip (opens PR to `feature/<feature-name>`)** | **`task/agent-platform-ast.3`** |
 | **This task is segment tip?** | **Yes — merge whole segment here** |
 
 | Rule | Detail |
@@ -62,8 +62,8 @@ Integration tests or Playwright for critical flows; a11y baseline on forms.
 | **No `main`** | Never push commits directly to **`main`**. |
 | **Chain** | Branch **`task/agent-platform-ast.3`** from **`task/agent-platform-ast.2`**. |
 | **Intermediate tasks** | Push **`task/agent-platform-ast.3`**; next task checks out from **`task/agent-platform-ast.3`** (or from remote `origin/task/agent-platform-ast.3`). |
-| **Segment tip** | One PR **`task/agent-platform-ast.3` → `feature/agent-platform-mvp`**. |
-| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
+| **Segment tip** | One PR **`task/agent-platform-ast.3` → `feature/<feature-name>`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/<feature-name>`. |
 
 ## Tests (required before sign-off)
 
@@ -76,7 +76,7 @@ Integration tests or Playwright for critical flows; a11y baseline on forms.
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **PR** merged: **`task/agent-platform-ast.3` → `feature/agent-platform-mvp`** (segment **Frontend (ast.1–ast.3)** complete)
+- [ ] **PR** merged: **`task/agent-platform-ast.3` → `feature/<feature-name>`** (segment **Frontend (ast.1–ast.3)** complete)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
@@ -86,7 +86,7 @@ Complete after work is on **`task/agent-platform-ast.3`** and tests are green
 - [ ] **Task branch** **`task/agent-platform-ast.3`** created from **`task/agent-platform-ast.2`** before implementation
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR** merged **`task/agent-platform-ast.3` → `feature/agent-platform-mvp`** (link: _________________)
+- [ ] **PR** merged **`task/agent-platform-ast.3` → `feature/<feature-name>`** (link: _________________)
 - [ ] `bd close agent-platform-ast.3 --reason "…"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed

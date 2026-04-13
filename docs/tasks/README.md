@@ -17,7 +17,7 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
    - Beads `bd ready` / dependency graph agrees (if not, fix Beads first).
 
 5. **Git (mandatory)** — **Never commit directly to `main`.**
-   - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-mvp`, `task/agent-platform-mov.1`).
+   - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-persistence`, `task/agent-platform-mov.1`).
    - **Chained segments (default):** tasks run **in order** on Git. The **first** task in a segment branches from **`feature/<feature-name>`**. **Each following** task branches from the **previous task’s branch** (after that task is complete and pushed). **Intermediate** tasks do **not** get their own PR to `feature`—only the **last task in the segment** opens **one PR** from **`task/<tip>` → `feature/<feature-name>`**, merging the whole chain. Then the **next** segment’s first task branches from the **updated** `feature` branch.
    - **Sign-off:** **unit tests** pass; checklist complete; **`bd close`** per task when its work is done. **PR to `feature`** only on the **segment tip** (unless a spec explicitly says otherwise).
    - **Release:** when ready, **`feature/<feature-name>` → `main`** via one PR.

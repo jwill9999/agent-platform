@@ -45,17 +45,17 @@ CRUD covered by integration tests; OpenAPI or route table in README; auth stub s
    `git fetch origin && git checkout task/agent-platform-j9x.3 && git pull` then `git checkout -b task/agent-platform-j9x.4`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-j9x.4` shows expected upstream Beads issues **closed** where applicable.
-5. **Segment tip:** open **one PR** **`task/agent-platform-j9x.4` → `feature/agent-platform-mvp`** to merge this entire segment (**Persistence + API (j9x.1–j9x.4)**) into the feature branch.
+5. **Segment tip:** open **one PR** **`task/agent-platform-j9x.4` → `feature/agent-platform-persistence`** to merge this entire segment (**Persistence + API (j9x.1–j9x.4)**) into the feature branch.
 
 ## Git workflow (mandatory)
 
-**Segment:** Persistence + API (j9x.1–j9x.4). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-j9x.4`** → `feature/agent-platform-mvp`.
+**Segment:** Persistence + API (j9x.1–j9x.4). **Chained branches:** first task in segment from `feature/agent-platform-persistence`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-j9x.4`** → `feature/agent-platform-persistence`.
 
 | | |
 |---|---|
 | **Parent for this branch** | **`task/agent-platform-j9x.3`** |
 | **This task’s branch** | **`task/agent-platform-j9x.4`** |
-| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-j9x.4`** |
+| **Segment tip (opens PR to `feature/agent-platform-persistence`)** | **`task/agent-platform-j9x.4`** |
 | **This task is segment tip?** | **Yes — merge whole segment here** |
 
 | Rule | Detail |
@@ -63,8 +63,8 @@ CRUD covered by integration tests; OpenAPI or route table in README; auth stub s
 | **No `main`** | Never push commits directly to **`main`**. |
 | **Chain** | Branch **`task/agent-platform-j9x.4`** from **`task/agent-platform-j9x.3`**. |
 | **Intermediate tasks** | Push **`task/agent-platform-j9x.4`**; next task checks out from **`task/agent-platform-j9x.4`** (or from remote `origin/task/agent-platform-j9x.4`). |
-| **Segment tip** | One PR **`task/agent-platform-j9x.4` → `feature/agent-platform-mvp`**. |
-| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
+| **Segment tip** | One PR **`task/agent-platform-j9x.4` → `feature/agent-platform-persistence`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-persistence`. |
 
 ## Tests (required before sign-off)
 
@@ -77,7 +77,7 @@ CRUD covered by integration tests; OpenAPI or route table in README; auth stub s
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **PR** merged: **`task/agent-platform-j9x.4` → `feature/agent-platform-mvp`** (segment **Persistence + API (j9x.1–j9x.4)** complete)
+- [ ] **PR** merged: **`task/agent-platform-j9x.4` → `feature/agent-platform-persistence`** (segment **Persistence + API (j9x.1–j9x.4)** complete)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
@@ -87,7 +87,7 @@ Complete after work is on **`task/agent-platform-j9x.4`** and tests are green
 - [ ] **Task branch** **`task/agent-platform-j9x.4`** created from **`task/agent-platform-j9x.3`** before implementation
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR** merged **`task/agent-platform-j9x.4` → `feature/agent-platform-mvp`** (link: _________________)
+- [ ] **PR** merged **`task/agent-platform-j9x.4` → `feature/agent-platform-persistence`** (link: _________________)
 - [ ] `bd close agent-platform-j9x.4 --reason "…"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed

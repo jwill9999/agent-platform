@@ -44,17 +44,17 @@ Unit tests with fixtures; rejects disallowed tools; integration with graph behin
    `git fetch origin && git checkout task/agent-platform-dx3.1 && git pull` then `git checkout -b task/agent-platform-dx3.2`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-dx3.2` shows expected upstream Beads issues **closed** where applicable.
-5. **Not the segment tip:** push **`task/agent-platform-dx3.2`** to `origin`. **Do not** PR to `feature/agent-platform-mvp` yet. The next task in this segment branches from **`task/agent-platform-dx3.2`**.
+5. **Not the segment tip:** push **`task/agent-platform-dx3.2`** to `origin`. **Do not** PR to `feature/<feature-name>` yet. The next task in this segment branches from **`task/agent-platform-dx3.2`**.
 
 ## Git workflow (mandatory)
 
-**Segment:** Planner + plugins (dx3.1–dx3.4). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-dx3.4`** → `feature/agent-platform-mvp`.
+**Segment:** Planner + plugins (dx3.1–dx3.4). **Chained branches:** first task in segment from `feature/<feature-name>`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-dx3.4`** → `feature/<feature-name>`.
 
 | | |
 |---|---|
 | **Parent for this branch** | **`task/agent-platform-dx3.1`** |
 | **This task’s branch** | **`task/agent-platform-dx3.2`** |
-| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-dx3.4`** |
+| **Segment tip (opens PR to `feature/<feature-name>`)** | **`task/agent-platform-dx3.4`** |
 | **This task is segment tip?** | **No — merge only after `task/agent-platform-dx3.4`** |
 
 | Rule | Detail |
@@ -62,8 +62,8 @@ Unit tests with fixtures; rejects disallowed tools; integration with graph behin
 | **No `main`** | Never push commits directly to **`main`**. |
 | **Chain** | Branch **`task/agent-platform-dx3.2`** from **`task/agent-platform-dx3.1`**. |
 | **Intermediate tasks** | Push **`task/agent-platform-dx3.2`**; next task checks out from **`task/agent-platform-dx3.2`** (or from remote `origin/task/agent-platform-dx3.2`). |
-| **Segment tip** | One PR **`task/agent-platform-dx3.4` → `feature/agent-platform-mvp`**. |
-| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
+| **Segment tip** | One PR **`task/agent-platform-dx3.4` → `feature/<feature-name>`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/<feature-name>`. |
 
 ## Tests (required before sign-off)
 
@@ -76,7 +76,7 @@ Unit tests with fixtures; rejects disallowed tools; integration with graph behin
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-dx3.2`** pushed; next task branches from here (**no** PR to `feature/agent-platform-mvp` until **`task/agent-platform-dx3.4`**)
+- [ ] **Branch** **`task/agent-platform-dx3.2`** pushed; next task branches from here (**no** PR to `feature/<feature-name>` until **`task/agent-platform-dx3.4`**)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off

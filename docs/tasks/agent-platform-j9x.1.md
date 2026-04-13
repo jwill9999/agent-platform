@@ -40,30 +40,30 @@ migrate up on clean DB; migrate test in CI; schema matches contracts v0; no secr
 ## Implementation plan
 
 1. Read Beads acceptance criteria and this spec.
-2. Create **`task/agent-platform-j9x.1`** from **`feature/agent-platform-mvp`** (chained Git):  
-   `git fetch origin && git checkout feature/agent-platform-mvp && git pull` then `git checkout -b task/agent-platform-j9x.1`.
+2. Create **`task/agent-platform-j9x.1`** from **`feature/agent-platform-persistence`** (chained Git):  
+   `git fetch origin && git checkout feature/agent-platform-persistence && git pull` then `git checkout -b task/agent-platform-j9x.1`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-j9x.1` shows expected upstream Beads issues **closed** where applicable.
-5. **Not the segment tip:** push **`task/agent-platform-j9x.1`** to `origin`. **Do not** PR to `feature/agent-platform-mvp` yet. The next task in this segment branches from **`task/agent-platform-j9x.1`**.
+5. **Not the segment tip:** push **`task/agent-platform-j9x.1`** to `origin`. **Do not** PR to `feature/agent-platform-persistence` yet. The next task in this segment branches from **`task/agent-platform-j9x.1`**.
 
 ## Git workflow (mandatory)
 
-**Segment:** Persistence + API (j9x.1–j9x.4). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-j9x.4`** → `feature/agent-platform-mvp`.
+**Segment:** Persistence + API (j9x.1–j9x.4). **Chained branches:** first task in segment from `feature/agent-platform-persistence`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-j9x.4`** → `feature/agent-platform-persistence`.
 
 | | |
 |---|---|
-| **Parent for this branch** | **`feature/agent-platform-mvp`** |
+| **Parent for this branch** | **`feature/agent-platform-persistence`** |
 | **This task’s branch** | **`task/agent-platform-j9x.1`** |
-| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-j9x.4`** |
+| **Segment tip (opens PR to `feature/agent-platform-persistence`)** | **`task/agent-platform-j9x.4`** |
 | **This task is segment tip?** | **No — merge only after `task/agent-platform-j9x.4`** |
 
 | Rule | Detail |
 |------|--------|
 | **No `main`** | Never push commits directly to **`main`**. |
-| **Chain** | Branch **`task/agent-platform-j9x.1`** from **`feature/agent-platform-mvp`**. |
+| **Chain** | Branch **`task/agent-platform-j9x.1`** from **`feature/agent-platform-persistence`**. |
 | **Intermediate tasks** | Push **`task/agent-platform-j9x.1`**; next task checks out from **`task/agent-platform-j9x.1`** (or from remote `origin/task/agent-platform-j9x.1`). |
-| **Segment tip** | One PR **`task/agent-platform-j9x.4` → `feature/agent-platform-mvp`**. |
-| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
+| **Segment tip** | One PR **`task/agent-platform-j9x.4` → `feature/agent-platform-persistence`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-persistence`. |
 
 ## Tests (required before sign-off)
 
@@ -76,14 +76,14 @@ migrate up on clean DB; migrate test in CI; schema matches contracts v0; no secr
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-j9x.1`** pushed; next task branches from here (**no** PR to `feature/agent-platform-mvp` until **`task/agent-platform-j9x.4`**)
+- [ ] **Branch** **`task/agent-platform-j9x.1`** pushed; next task branches from here (**no** PR to `feature/agent-platform-persistence` until **`task/agent-platform-j9x.4`**)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
 Complete after work is on **`task/agent-platform-j9x.1`** and tests are green (PR to `feature` only at segment tip).
 
-- [ ] **Task branch** **`task/agent-platform-j9x.1`** created from **`feature/agent-platform-mvp`** before implementation
+- [ ] **Task branch** **`task/agent-platform-j9x.1`** created from **`feature/agent-platform-persistence`** before implementation
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
 - [ ] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-j9x.4`**
