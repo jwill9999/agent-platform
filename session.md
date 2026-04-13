@@ -24,7 +24,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Current state
 
-- **Branch:** **`task/agent-platform-j9x.1`** — push and continue with **`agent-platform-j9x.2`** (encrypted secrets) from this branch after **`bd close`** for **`j9x.1`**.
+- **Branch:** **`task/agent-platform-j9x.1`** pushed to **`origin`**; **`bd close agent-platform-j9x.1`** done. Next: **`task/agent-platform-j9x.2`** branched from **`task/agent-platform-j9x.1`**.
 - **Integration:** **`feature/agent-platform-persistence`** — segment PR still from **`task/agent-platform-j9x.4`** → feature (not yet).
 
 ---
