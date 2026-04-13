@@ -17,10 +17,10 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
    - Beads `bd ready` / dependency graph agrees (if not, fix Beads first).
 
 5. **Git (mandatory)** — **Never commit directly to `main`.**
-   - **Branch naming:** **`feature/<feature-name>`** (integration for that feature); **`task/<task-name>`** (one branch per task). *Example names for this MVP:* `feature/agent-platform-mvp`, `task/agent-platform-mov.1` (often the Beads issue id is the task name).
-   - **Per task:** create **`task/<task-name>`** from **latest** **`feature/<feature-name>`** **before** starting work; open PR **`task/<task-name>` → `feature/<feature-name>`** when done; merge via PR only.
-   - **Sign-off:** checklist in the spec is complete, **unit tests** have been run and pass (minimum), PR merged into **`feature/<feature-name>`**, then close the Beads issue.
-   - **Feature complete:** when all tasks for that feature are merged on **`feature/<feature-name>`**, open **one** PR **`feature/<feature-name>` → `main`**.
+   - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-mvp`, `task/agent-platform-mov.1`).
+   - **Chained segments (default):** tasks run **in order** on Git. The **first** task in a segment branches from **`feature/<feature-name>`**. **Each following** task branches from the **previous task’s branch** (after that task is complete and pushed). **Intermediate** tasks do **not** get their own PR to `feature`—only the **last task in the segment** opens **one PR** from **`task/<tip>` → `feature/<feature-name>`**, merging the whole chain. Then the **next** segment’s first task branches from the **updated** `feature` branch.
+   - **Sign-off:** **unit tests** pass; checklist complete; **`bd close`** per task when its work is done. **PR to `feature`** only on the **segment tip** (unless a spec explicitly says otherwise).
+   - **Release:** when ready, **`feature/<feature-name>` → `main`** via one PR.
 
 6. **Template** — Copy [`_template.md`](./_template.md) when creating a new task spec; then wire the Beads issue.
 

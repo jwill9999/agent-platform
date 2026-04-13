@@ -134,10 +134,10 @@ Each **task** issue includes `Spec: docs/tasks/<issue-id>.md` at the start of it
 
 ### Git branches (mandatory)
 
-- **Naming:** **`feature/<feature-name>`** for the integration branch; **`task/<task-name>`** for each task branch (e.g. MVP: `feature/agent-platform-mvp`, `task/agent-platform-mov.1`).
-- **Never commit directly to `main`.** Implementation work happens on **`task/<task-name>`** branches only.
-- **Integration:** open PRs from each **`task/<task-name>`** into **`feature/<feature-name>`**. When the feature is complete, open **one** PR **`feature/<feature-name>` → `main`**.
-- **Before sign-off:** unit tests run and pass (minimum); task spec checklist complete; PR merged to **`feature/<feature-name>`**; then **`bd close`**.
+- **Naming:** **`feature/<feature-name>`** (integration); **`task/<task-name>`** (each task).
+- **Chaining (default):** the **first** task in a segment branches from **`feature/<feature-name>`**. **Each next** task branches from the **previous `task/<task-name>`** branch (linear chain). **One PR per segment** from **`task/<segment-tip>` → `feature/<feature-name>`** when that segment’s tasks are done—not a PR per task. Next segment starts from **updated** `feature/<feature-name>`.
+- **Never commit directly to `main`.** When the feature is ready on **`feature/<feature-name>`**, open **one** PR **`feature/<feature-name>` → `main`**.
+- **Before sign-off:** unit tests pass (minimum); checklist complete; **`bd close`**; **PR to `feature`** only on **segment tip** (see `docs/tasks/<issue-id>.md`).
 
 For more details, see `docs/tasks/README.md` and `decisions.md`.
 
@@ -153,19 +153,19 @@ For more details, see `docs/tasks/README.md` and `decisions.md`.
 4. **PUSH THE TASK BRANCH** - This is MANDATORY when commits exist:
    ```bash
    git fetch origin
-   git rebase origin/feature/<feature-name>   # e.g. origin/feature/agent-platform-mvp
+   # Rebase onto parent: previous task branch or feature (see task spec)
    git push -u origin HEAD
    git status
    ```
-   Do **not** push to `main`. If using `bd` with git export, run your usual **`bd` sync** workflow if the project documents it.
+   Do **not** push to `main`. If this task is the **segment tip**, open **one** PR **`task/<tip> → feature/<feature-name>`**. If using `bd` with git export, run your usual **`bd` sync** workflow if the project documents it.
 5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed to the **task branch**; open PR to **`feature/<feature-name>`** if the task is ready for review
+6. **Verify** - All changes committed AND pushed to the **task branch**; next task branches from here, **or** open segment PR if this is the tip
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 - Work is NOT complete until the **task branch** is pushed when there are commits
 - NEVER commit directly to **`main`**
-- NEVER merge a task PR to **`main`**; merge to **`feature/<feature-name>`** only until the final feature PR
+- NEVER merge a task PR to **`main`**; merge **segment tip** to **`feature/<feature-name>`**; merge **`feature` → `main`** only at release
 - If push fails, resolve and retry until it succeeds
 
 <!-- END BEADS INTEGRATION -->

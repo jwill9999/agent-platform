@@ -18,7 +18,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - Initialized **bd (beads)** in this repo for epics/tasks; `AGENTS.md` documents workflow.
 - Added **`decisions.md`** (this log + DoD) and **`session.md`** (this file).
 - Broke each epic into **child tasks** in bd with **description + acceptance**; **blocks** dependencies between tasks (fixed one inverted CI edge). **`docs/tasks/<issue-id>.md`** per task: requirements, plan, dependency tables, DoD; Beads description starts with `Spec: …`.
-- **Git workflow:** No commits to **`main`** except via PR. Branches: **`feature/<feature-name>`** (integration) and **`task/<task-name>`** (per task). Example MVP names: `feature/agent-platform-mvp`, `task/agent-platform-mov.1`. Merge **`task/<task-name>` → `feature/<feature-name>`**; when the feature is done, **`feature/<feature-name>` → `main`**. Sign-off: **unit tests** (minimum) + **complete spec checklist** before **`bd close`**.
+- **Git workflow:** No commits to **`main`** except via PR. **`feature/<feature-name>`** and **`task/<task-name>`**. **Chained segments:** task 2 branches from task 1, …, **one PR** from **segment tip** (e.g. `task/agent-platform-mov.5`) **→ `feature/agent-platform-mvp`**. Example: `feature/agent-platform-mvp`, `task/agent-platform-mov.1` … `task/agent-platform-mov.5`. Sign-off: **unit tests** + checklist + **`bd close`**; **PR to `feature`** on segment tip only.
 
 ---
 
