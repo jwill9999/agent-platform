@@ -17,6 +17,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - Confirmed product decisions: single user, Docker, SQLite volume first, secrets, OpenAI-first router with user-supplied model + key, filesystem MCP inside container boundary, tests required per task, bd for tasks.
 - Initialized **bd (beads)** in this repo for epics/tasks; `AGENTS.md` documents workflow.
 - Added **`decisions.md`** (this log + DoD) and **`session.md`** (this file).
+- Broke each epic into **child tasks** in bd with **description + acceptance**; **blocks** dependencies between tasks (fixed one inverted CI edge). Added **`docs/tasks/README.md`** — Beads is canonical; optional linked Markdown for long specs only.
 
 ---
 
@@ -31,9 +32,9 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Next (priority order)
 
-1. **Phase 0 — Foundation:** pnpm workspaces, `packages/contracts` (Zod + stream types including `thinking`), one Dockerfile + `docker-compose.yml`, SQLite volume, minimal CI.
-2. **Phase 1:** DB schema + migrations + seed default agent; `apps/api` CRUD; encrypted secrets storage.
-3. Continue per `agent_platform_mvp_be346e14.plan.md` critical path (MCP adapter → harness → stream → web).
+1. **`bd update agent-platform-mov.1 --claim`** then implement **Foundation: scaffold pnpm monorepo** (`agent-platform-mov.1`). Run `bd ready` after closing each task.
+2. Then **contracts** (`mov.2`) and **Docker** (`mov.3`) in parallel after `mov.1`; then **API health** (`mov.4`); then **CI** (`mov.5`).
+3. Longer horizon unchanged: Persistence → Harness → Planner+plugins → Frontend → E2E (see bd graph).
 
 ---
 

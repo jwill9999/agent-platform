@@ -9,6 +9,7 @@ Single source of truth for **architectural and product decisions** agreed with t
 
 - **`session.md`** — short narrative of last session, current focus, and next steps (update at end of each agent session when work stops).
 - **`AGENTS.md`** — project rules for agents (includes bd workflow).
+- **`docs/tasks/README.md`** — how we track tasks (Beads vs optional Markdown supplements); epic→task index snapshot.
 
 ---
 
