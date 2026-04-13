@@ -121,8 +121,16 @@ export const pluginCatalogRefs = sqliteTable('plugin_catalog_refs', {
   checksum: text('checksum'),
 });
 
-/** Secret references only (id + label); ciphertext lands in j9x.2+. */
+/**
+ * Secret registry: label + optional **ciphertext-only** material (AES-256-GCM envelope).
+ * Plaintext must never be persisted.
+ */
 export const secretRefs = sqliteTable('secret_refs', {
   id: text('id').primaryKey(),
   label: text('label'),
+  ciphertextB64: text('ciphertext_b64'),
+  ivB64: text('iv_b64'),
+  authTagB64: text('auth_tag_b64'),
+  keyVersion: integer('key_version', { mode: 'number' }),
+  algorithm: text('algorithm'),
 });
