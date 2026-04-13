@@ -8,34 +8,35 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-13
-- **Session:** Planning + repo bootstrap (decisions, beads, git)
+- **Session:** Foundation epic implementation (mov.1–mov.5) merged to `feature/agent-platform-mvp`
 
 ---
 
 ## What happened (recent)
 
-- Confirmed product decisions: single user, Docker, SQLite volume first, secrets, OpenAI-first router with user-supplied model + key, filesystem MCP inside container boundary, tests required per task, bd for tasks.
-- Initialized **bd (beads)** in this repo for epics/tasks; `AGENTS.md` documents workflow.
-- Added **`decisions.md`** (this log + DoD) and **`session.md`** (this file).
-- Broke each epic into **child tasks** in bd with **description + acceptance**; **blocks** dependencies between tasks (fixed one inverted CI edge). **`docs/tasks/<issue-id>.md`** per task: requirements, plan, dependency tables, DoD; Beads description starts with `Spec: …`.
-- **Git workflow:** No commits to **`main`** except via PR. **`feature/<feature-name>`** and **`task/<task-name>`**. **Chained segments:** task 2 branches from task 1, …, **one PR** from **segment tip** (e.g. `task/agent-platform-mov.5`) **→ `feature/agent-platform-mvp`**. Example: `feature/agent-platform-mvp`, `task/agent-platform-mov.1` … `task/agent-platform-mov.5`. Sign-off: **unit tests** + checklist + **`bd close`**; **PR to `feature`** on segment tip only.
+- **Foundation epic (mov.1–mov.5)** implemented as a **chained branch**, merged in **one PR** to **`feature/agent-platform-mvp`**: [PR #7](https://github.com/jwill9999/agent-platform/pull/7).
+- **mov.1:** pnpm monorepo, strict TS, ESLint/Prettier, `apps/api` + `packages/contracts` stubs.
+- **mov.2:** Zod contracts (`Output`, `Agent`, `Plan`, `HealthResponse`, etc.) + Vitest round-trips.
+- **mov.3:** Dockerfile, `docker-compose.yml`, SQLite named volume, `/health` in image.
+- **mov.4:** Express + clean-arch layers (`application/`, `infrastructure/http`, `GET /health`), supertest.
+- **mov.5:** GitHub Actions CI (format, lint, typecheck, build, test) + Docker image build job.
+- Beads issues **`agent-platform-mov.1` … `mov.5`** closed after merge.
 
 ---
 
 ## Current state
 
-- **Codebase:** No application monorepo yet—only ADR/plan markdown and project metadata.
-- **Tracking:** Beads (**bd**) initialized with six epics (blocked chain: Foundation → Persistence → Harness; Planner after Harness; Frontend after Harness; E2E after Frontend + Planner). Run `bd ready --json` for next work.
-- **Epic IDs (bd):** `agent-platform-mov` (foundation), `agent-platform-j9x` (persistence + API), `agent-platform-2tw` (harness), `agent-platform-dx3` (planner + plugins), `agent-platform-ast` (frontend), `agent-platform-o36` (MVP E2E).
-- **Git:** Remote `origin` on GitHub; naming **`feature/<feature-name>`** and **`task/<task-name>`** per `decisions.md` / `docs/tasks/README.md` (e.g. `feature/agent-platform-mvp`).
+- **Codebase:** Monorepo on **`feature/agent-platform-mvp`** with `apps/api`, `packages/contracts`, Docker, CI.
+- **`main`:** Still behind feature (merge **`feature/agent-platform-mvp` → `main`** when you want to publish).
+- **Tracking:** Next unblocked epic start: **`bd ready`** → should offer **`agent-platform-j9x.1`** (Persistence: DB schema) after **`agent-platform-mov.5`** closed (deps satisfied).
 
 ---
 
 ## Next (priority order)
 
-1. **`bd update agent-platform-mov.1 --claim`** then implement **Foundation: scaffold pnpm monorepo** (`agent-platform-mov.1`). Run `bd ready` after closing each task.
-2. Then **contracts** (`mov.2`) and **Docker** (`mov.3`) in parallel after `mov.1`; then **API health** (`mov.4`); then **CI** (`mov.5`).
-3. Longer horizon unchanged: Persistence → Harness → Planner+plugins → Frontend → E2E (see bd graph).
+1. **`bd ready --json`** — confirm **`agent-platform-j9x.1`** is next; claim with **`bd update agent-platform-j9x.1 --claim`**.
+2. Branch **`task/agent-platform-j9x.1`** from **`feature/agent-platform-mvp`** (new segment after Foundation merge).
+3. Implement Persistence segment per **`docs/tasks/agent-platform-j9x.*.md`** (chain through **`j9x.4`**, then one PR tip → `feature`).
 
 ---
 
@@ -48,6 +49,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Quick commands
 
 ```bash
-bd ready --json          # Next unblocked work
-bd show <id>             # Issue detail
+bd ready --json
+bd show <id>
+pnpm install && pnpm run build && pnpm run test
+docker compose up --build
 ```
