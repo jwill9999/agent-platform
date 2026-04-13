@@ -33,23 +33,24 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 ## Implementation plan
 
 1. Read Beads acceptance criteria and this spec.
-2. Follow **Git workflow (mandatory)** below: create **`task/<task-name>`** from **`feature/<feature-name>`** before writing implementation commits (use the real feature branch name for this initiative).
+2. Follow **Git workflow (mandatory)** below: branch from the **parent branch** listed there (**`feature/<feature-name>`** for the first task in a segment, or **`task/<previous-task-name>`** when chaining).
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
-4. Ensure `bd dep list <issue-id>` shows expected upstream issues **closed** before your PR.
-5. Open PR **`task/<task-name>` → `feature/<feature-name>`**; merge when reviewed. Do **not** merge individual tasks to `main`.
+4. Ensure `bd dep list <issue-id>` shows expected upstream Beads issues **closed** before you finish (unless this spec says otherwise for parallel planning).
+5. If this is the **last task in a segment**, open **one PR** **`task/<tip> → feature/<feature-name>`**. If **not** the last, hand off: the **next** task branches from **`task/<this-task-name>`**.
 
 ## Git workflow (mandatory)
 
-**Naming:** integration branches are **`feature/<feature-name>`**; task branches are **`task/<task-name>`** (see `decisions.md`). Substitute the actual names for your initiative.
+**Chained tasks:** **`feature/<feature-name>`** → **`task/<task-1>`** → **`task/<task-2>`** → … → **one PR** from **`task/<last>`** → **`feature/<feature-name>`**.
 
 | Rule | Detail |
 |------|--------|
 | **No `main`** | Never push commits directly to **`main`**. |
-| **Feature branch** | Pattern **`feature/<feature-name>`**. *Example (Agent Platform MVP):* **`feature/agent-platform-mvp`**. Task PRs target the active feature branch. |
-| **Task branch** | Pattern **`task/<task-name>`**. *This task:* **`task/<issue-id>`** (e.g. `task/agent-platform-mov.1`). Before starting: `git fetch origin && git checkout feature/<feature-name> && git pull` then `git checkout -b task/<task-name>`. |
-| **PR** | Push **`task/<task-name>`** to `origin`; open a PR into **`feature/<feature-name>`**. |
-| **After merge** | Delete the remote/local task branch when done. |
-| **Feature complete** | When all tasks for **`feature/<feature-name>`** are merged, open **one** PR **`feature/<feature-name>` → `main`**. |
+| **First task in segment** | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-mvp`). |
+| **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed. |
+| **Intermediate tasks** | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch. |
+| **Last task in segment** | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment. |
+| **Next segment** | First task branches from **updated** **`feature/<feature-name>`** after the segment PR is merged. |
+| **Release** | When the feature is ready: **`feature/<feature-name>` → `main`** via one PR. |
 
 ## Tests (required before sign-off)
 
@@ -60,19 +61,17 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 
 - [ ] Beads **description** and **acceptance_criteria** satisfied.
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
-- [ ] All **upstream** Beads issues are **closed**.
+- [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **PR** merged: **`task/<task-name>` → `feature/<feature-name>`** (not `main`).
+- [ ] **Git:** branch pushed; **if this is the segment tip**, **PR** merged **`task/<tip> → feature/<feature-name>`**; if **not** tip, next task can branch from **`task/<this-task-name>`**.
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
-Complete **only after** the PR for this task is merged into **`feature/<feature-name>`** and tests are green.
-
-- [ ] **Task branch** **`task/<task-name>`** was created **before** implementation work
+- [ ] **Task branch** created from the correct **parent** (`feature/...` or previous **`task/...`**) **before** implementation work
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR** merged into **`feature/<feature-name>`** (link: _________________________________)
+- [ ] If **segment tip:** **PR** merged **`task/<tip> → feature/<feature-name>`** (link: _________________) — *if not tip, write “N/A — merge at segment end”*
 - [ ] `bd close <issue-id> --reason "…"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed

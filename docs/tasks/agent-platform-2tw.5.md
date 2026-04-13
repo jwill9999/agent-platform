@@ -40,22 +40,30 @@ Automated test green in CI; documented setup for local MCP.
 ## Implementation plan
 
 1. Read Beads acceptance criteria and this spec.
-2. Follow **Git workflow (mandatory)** below: create **`task/<task-name>`** for this task (here: **`task/agent-platform-2tw.5`**) from **`feature/<feature-name>`** before implementation commits. *Active MVP feature branch:* **`feature/agent-platform-mvp`**.
+2. Create **`task/agent-platform-2tw.5`** from **`task/agent-platform-2tw.4`** (chained Git):  
+   `git fetch origin && git checkout task/agent-platform-2tw.4 && git pull` then `git checkout -b task/agent-platform-2tw.5`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
-4. Ensure `bd dep list agent-platform-2tw.5` shows expected upstream issues **closed** before your PR.
-5. Open PR **`task/agent-platform-2tw.5` → `feature/<feature-name>`** (use **`feature/agent-platform-mvp`** for this MVP); merge when reviewed. Do **not** merge this task to `main`.
+4. Ensure `bd dep list agent-platform-2tw.5` shows expected upstream Beads issues **closed** where applicable.
+5. **Segment tip:** open **one PR** **`task/agent-platform-2tw.5` → `feature/agent-platform-mvp`** to merge this entire segment (**Harness (2tw.1–2tw.5)**) into the feature branch.
 
 ## Git workflow (mandatory)
 
-**Naming:** **`feature/<feature-name>`** for integration; **`task/<task-name>`** for each task (`decisions.md`).
+**Segment:** Harness (2tw.1–2tw.5). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-2tw.5`** → `feature/agent-platform-mvp`.
+
+| | |
+|---|---|
+| **Parent for this branch** | **`task/agent-platform-2tw.4`** |
+| **This task’s branch** | **`task/agent-platform-2tw.5`** |
+| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-2tw.5`** |
+| **This task is segment tip?** | **Yes — merge whole segment here** |
 
 | Rule | Detail |
 |------|--------|
 | **No `main`** | Never push commits directly to **`main`**. |
-| **Feature branch** | Pattern **`feature/<feature-name>`**. *This initiative (MVP):* **`feature/agent-platform-mvp`**. |
-| **Task branch** | Pattern **`task/<task-name>`**. *This task:* **`task/agent-platform-2tw.5`**. Before starting: `git fetch origin && git checkout feature/agent-platform-mvp && git pull` then `git checkout -b task/agent-platform-2tw.5`. |
-| **PR** | Push **`task/agent-platform-2tw.5`** to `origin`; PR into **`feature/agent-platform-mvp`**. |
-| **Feature complete** | Final PR **`feature/agent-platform-mvp` → `main`** only after all tasks for this feature are merged on the feature branch. |
+| **Chain** | Branch **`task/agent-platform-2tw.5`** from **`task/agent-platform-2tw.4`**. |
+| **Intermediate tasks** | Push **`task/agent-platform-2tw.5`**; next task checks out from **`task/agent-platform-2tw.5`** (or from remote `origin/task/agent-platform-2tw.5`). |
+| **Segment tip** | One PR **`task/agent-platform-2tw.5` → `feature/agent-platform-mvp`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
 
 ## Tests (required before sign-off)
 
@@ -66,19 +74,19 @@ Automated test green in CI; documented setup for local MCP.
 
 - [ ] Beads **description** and **acceptance_criteria** satisfied.
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
-- [ ] All **upstream** Beads issues are **closed**.
+- [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **PR** merged: **`task/agent-platform-2tw.5` → `feature/agent-platform-mvp`** (not `main`).
+- [ ] **PR** merged: **`task/agent-platform-2tw.5` → `feature/agent-platform-mvp`** (segment **Harness (2tw.1–2tw.5)** complete)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
-Complete **only after** the PR for this task is merged into **`feature/agent-platform-mvp`** and tests are green.
+Complete after work is on **`task/agent-platform-2tw.5`** and tests are green
 
-- [ ] **Task branch** **`task/agent-platform-2tw.5`** was created **before** implementation work
+- [ ] **Task branch** **`task/agent-platform-2tw.5`** created from **`task/agent-platform-2tw.4`** before implementation
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR** merged into **`feature/agent-platform-mvp`** (link: _________________________________)
+- [ ] **PR** merged **`task/agent-platform-2tw.5` → `feature/agent-platform-mvp`** (link: _________________)
 - [ ] `bd close agent-platform-2tw.5 --reason "…"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
