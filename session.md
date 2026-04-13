@@ -18,6 +18,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - Initialized **bd (beads)** in this repo for epics/tasks; `AGENTS.md` documents workflow.
 - Added **`decisions.md`** (this log + DoD) and **`session.md`** (this file).
 - Broke each epic into **child tasks** in bd with **description + acceptance**; **blocks** dependencies between tasks (fixed one inverted CI edge). **`docs/tasks/<issue-id>.md`** per task: requirements, plan, dependency tables, DoD; Beads description starts with `Spec: …`.
+- **Git workflow:** No commits to **`main`** except via PR. Work on **`task/<issue-id>`** → PR → **`feature/agent-platform-mvp`**; final MVP merge **`feature/agent-platform-mvp` → `main`**. Sign-off requires **unit tests** (minimum) and **complete spec checklist** before **`bd close`**.
 
 ---
 
@@ -26,7 +27,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Codebase:** No application monorepo yet—only ADR/plan markdown and project metadata.
 - **Tracking:** Beads (**bd**) initialized with six epics (blocked chain: Foundation → Persistence → Harness; Planner after Harness; Frontend after Harness; E2E after Frontend + Planner). Run `bd ready --json` for next work.
 - **Epic IDs (bd):** `agent-platform-mov` (foundation), `agent-platform-j9x` (persistence + API), `agent-platform-2tw` (harness), `agent-platform-dx3` (planner + plugins), `agent-platform-ast` (frontend), `agent-platform-o36` (MVP E2E).
-- **Git:** Repository initialized by bd bootstrap (add `git remote` when you use a host).
+- **Git:** Remote `origin` on GitHub; use **`feature/agent-platform-mvp`** + **`task/<issue-id>`** per `decisions.md` / `docs/tasks/README.md`.
 
 ---
 

@@ -51,8 +51,11 @@ Plugins **cannot** bypass harness validation or tool allowlists.
 | **Model router** | **OpenAI first** in the UI and router implementation; design the interface so **provider + model id + API key** can be supplied for the **default** agent and for specialists. **No hardcoded single model id**—user-configurable model string for MVP. Later: additional providers behind the same abstraction. |
 | **Filesystem / MCP** | **Core default agent** must be able to use the **filesystem** via **MCP**. Running in Docker, the **container filesystem** is the boundary—no access to the host OS except what is explicitly **mounted** into the container (document mounts in compose). |
 | **MCP** | Standard MCP; users supply **API keys when a server requires them**. |
-| **Tests** | Before a task is considered done: **unit tests** and **E2E tests** as **required** for that task’s scope (no blanket boilerplate—each bd issue should state what tests apply). |
+| **Tests** | Before a task is considered done: **unit tests** and **E2E tests** as **required** for that task’s scope (no blanket boilerplate—each bd issue should state what tests apply). **Minimum before sign-off:** unit tests run and pass for the code touched by the task. |
+| **Git / branches** | **No direct commits to `main`.** Each task uses a dedicated **`task/<issue-id>`** branch (created **before** starting work). When the task is complete, open a **PR into `feature/agent-platform-mvp`** (the long-running MVP integration branch), merge there, then delete the task branch. When **all** MVP tasks are merged on `feature/agent-platform-mvp`, open **one** PR **`feature/agent-platform-mvp` → `main`**. Documentation-only changes follow the same rule (task branch → feature → main via PRs). |
 | **Token budget** | Use tokens minimally; if the budget is exhausted, the owner decides whether to increase it. |
+
+**Bootstrap (once):** create and push `feature/agent-platform-mvp` from `main` without changing `main` (e.g. `git checkout main && git pull && git checkout -b feature/agent-platform-mvp && git push -u origin feature/agent-platform-mvp`). All task branches are cut from the **latest** `feature/agent-platform-mvp`.
 
 ---
 
@@ -61,10 +64,12 @@ Plugins **cannot** bypass harness validation or tool allowlists.
 Unless an issue states otherwise, **done** means:
 
 1. **Acceptance criteria** in the issue are met.
-2. **Tests:** new or updated **unit** tests for new logic; **E2E** (or integration) tests when the change crosses API, DB, or Docker boundaries.
-3. **Quality:** typecheck passes; linters clean for touched files.
-4. **Documentation:** `decisions.md` updated if a **new** architectural decision was made; `session.md` updated at session end.
-5. **Tracking:** issue **closed** in bd with a short reason; discovered follow-ups filed as new issues.
+2. **This task’s spec checklist** in `docs/tasks/<issue-id>.md` is **fully checked** (including Git workflow and tests).
+3. **Tests:** **Unit tests** run and pass at minimum; **E2E** (or integration) tests when the change crosses API, DB, or Docker boundaries.
+4. **Quality:** typecheck passes; linters clean for touched files.
+5. **Git:** work merged via **PR** from `task/<issue-id>` → **`feature/agent-platform-mvp`** (not direct to `main`). Task branch created before implementation started.
+6. **Documentation:** `decisions.md` updated if a **new** architectural decision was made; `session.md` updated at session end.
+7. **Tracking:** issue **closed** in bd with a short reason **after** PR merge and checklist completion; discovered follow-ups filed as new issues.
 
 ---
 
