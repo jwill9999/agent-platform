@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AgentSchema,
   ExecutionLimitsSchema,
+  HealthResponseSchema,
   OutputSchema,
   PlanSchema,
   SecretRefSchema,
@@ -44,6 +45,11 @@ describe('contracts round-trip', () => {
       executionLimits: limits,
     });
     expect(AgentSchema.parse(JSON.parse(JSON.stringify(agent)))).toEqual(agent);
+  });
+
+  it('HealthResponseSchema', () => {
+    const h = HealthResponseSchema.parse({ ok: true });
+    expect(HealthResponseSchema.parse(JSON.parse(JSON.stringify(h)))).toEqual(h);
   });
 
   it('PlanSchema + SecretRefSchema', () => {

@@ -6,6 +6,7 @@ Zod schemas and exported TypeScript types for API, streaming, and harness bounda
 
 | Export                                     | Description                                                                 |
 | ------------------------------------------ | --------------------------------------------------------------------------- |
+| `HealthResponseSchema`, `HealthResponse`   | Shared HTTP health JSON (`{ ok: true }`).                                   |
 | `ExecutionLimitsSchema`, `ExecutionLimits` | Per-run caps (steps, parallelism, timeout, optional token/cost).            |
 | `OutputSchema`, `Output`                   | Chat/tool stream union: `text`, `code`, `tool_result`, `error`, `thinking`. |
 | `SkillSchema`, `Skill`                     | Normalized skill definition.                                                |
