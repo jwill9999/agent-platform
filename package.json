@@ -9,7 +9,8 @@
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "format": "prettier --write \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
-    "format:check": "prettier --check \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\""
+    "format:check": "prettier --check \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
+    "seed": "pnpm --filter @agent-platform/db run seed"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",

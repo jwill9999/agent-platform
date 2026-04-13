@@ -9,15 +9,16 @@ Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and dec
 
 ## Commands
 
-| Command             | Description                          |
-| ------------------- | ------------------------------------ |
-| `pnpm install`      | Install workspace dependencies       |
-| `pnpm typecheck`    | Typecheck all packages (`pnpm -r`)   |
-| `pnpm build`        | Build all packages                   |
-| `pnpm lint`         | ESLint across workspaces             |
-| `pnpm test`         | Run tests (stubs until suites exist) |
-| `pnpm format`       | Prettier write                       |
-| `pnpm format:check` | Prettier check                       |
+| Command             | Description                                                                                           |
+| ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `pnpm install`      | Install workspace dependencies                                                                        |
+| `pnpm typecheck`    | Typecheck all packages (`pnpm -r`)                                                                    |
+| `pnpm build`        | Build all packages                                                                                    |
+| `pnpm lint`         | ESLint across workspaces                                                                              |
+| `pnpm test`         | Run tests (stubs until suites exist)                                                                  |
+| `pnpm format`       | Prettier write                                                                                        |
+| `pnpm format:check` | Prettier check                                                                                        |
+| `pnpm seed`         | After **`pnpm build`**: run idempotent DB seed (needs **`SQLITE_PATH`**) — default agent + demo skill |
 
 ## Layout
 
@@ -28,6 +29,7 @@ Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and dec
 
 - Copy `.env.example` to `.env` and adjust `HOST_PORT` / `SQLITE_PATH` as needed.
 - `docker compose up --build` builds the API image, maps `HOST_PORT` → container `3000`, mounts a **named volume** at `/data` for SQLite (`SQLITE_PATH` defaults to `/data/agent.sqlite` in Compose), and runs a **health check** on `GET /health`.
+- To load the **default agent** into that database, run `pnpm build` and `pnpm seed` with **`SQLITE_PATH`** pointing at the SQLite file (same value as the API). The seed is idempotent.
 - **Future filesystem MCP:** see commented volume examples in `docker-compose.yml` (e.g. bind-mount a host directory to `/workspace` for tooling).
 
 ## Git workflow

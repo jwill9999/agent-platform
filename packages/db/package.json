@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
+    "seed": "node ./dist/seed/run.js",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

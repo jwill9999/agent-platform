@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "feature/**"
+      - "task/**"
   pull_request:
 
 concurrency:
@@ -47,6 +48,11 @@ jobs:
 
       - name: Test
         run: pnpm run test
+
+      - name: Seed (idempotent)
+        run: |
+          SQLITE_PATH=/tmp/agent-ci.sqlite pnpm run seed
+          SQLITE_PATH=/tmp/agent-ci.sqlite pnpm run seed
 
   docker:
     runs-on: ubuntu-latest

@@ -8,30 +8,30 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-13
-- **Session:** **`agent-platform-j9x.2`** — encrypted secrets at rest (AES-256-GCM envelope)
+- **Session:** **`agent-platform-j9x.3`** — idempotent seed + default agent
 
 ---
 
 ## What happened (recent)
 
-- **`packages/db`:** **`SECRETS_ALGORITHM_V1`** (`aes-256-gcm-v1`) envelope encryption (`crypto` AES-256-GCM); **`parseMasterKeyFromBase64`**, **`encryptUtf8`**, **`decryptUtf8`**; DB columns on **`secret_refs`** for ciphertext + IV + auth tag + **`key_version`** + **`algorithm`**; **`putSecretUtf8`** / **`getSecretUtf8`** helpers.
-- **Migration:** **`drizzle/0001_secret_crypto.sql`** adds crypto columns to **`secret_refs`**.
-- **Tests:** envelope round-trip, wrong key, tampered ciphertext, invalid master key length; DB test asserts SQLite file bytes do **not** contain plaintext substring.
-- **`decisions.md`:** secrets + rotation notes; **`docker-compose.yml`** comment for **`SECRETS_MASTER_KEY`** (base64 / 32 bytes).
+- **`packages/db`:** **`runSeed`**, **`DEFAULT_AGENT_ID`** (`default`), **`DEMO_SKILL_ID`** (`demo-skill`); idempotent inserts (`onConflictDoNothing`) for demo skill, default agent, and allowlist link.
+- **CLI:** **`pnpm seed`** (root) → **`@agent-platform/db`** `node dist/seed/run.js` — requires **`SQLITE_PATH`** (runs migrations via **`openDatabase`** then seed).
+- **Tests:** `seed.test.ts` — idempotency + **`loadAgentById`** / **`AgentSchema`** for default agent.
+- **CI:** `task/**` push branches; **Seed (idempotent)** step runs **`pnpm run seed`** twice against `/tmp/agent-ci.sqlite`.
+- **`README`:** documents **`pnpm seed`** and Docker note for same **`SQLITE_PATH`** as API.
 
 ---
 
 ## Current state
 
-- **Branch:** **`task/agent-platform-j9x.2`** pushed to **`origin`**; **`bd close agent-platform-j9x.2`** done. Next: **`task/agent-platform-j9x.3`** from **`task/agent-platform-j9x.2`**.
-- **Integration:** **`feature/agent-platform-persistence`** — segment PR from **`task/agent-platform-j9x.4`** when **`j9x.3`–`j9x.4`** are done.
+- **Branch:** **`task/agent-platform-j9x.3`** — push **`origin`**, **`bd close agent-platform-j9x.3`**. Next: **`task/agent-platform-j9x.4`** (CRUD API) from **`task/agent-platform-j9x.3`**.
 
 ---
 
 ## Next (priority order)
 
-1. Branch **`task/agent-platform-j9x.3`** from **`origin/task/agent-platform-j9x.2`**.
-2. Implement **`docs/tasks/agent-platform-j9x.3.md`** (seed + default agent).
+1. Branch **`task/agent-platform-j9x.4`** from **`origin/task/agent-platform-j9x.3`**.
+2. Implement **`docs/tasks/agent-platform-j9x.4.md`**.
 
 ---
 
@@ -47,5 +47,6 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 bd ready --json
 bd show <id>
 pnpm install && pnpm run build && pnpm run test
+SQLITE_PATH=/path/to/db.sqlite pnpm run seed
 docker compose up --build
 ```
