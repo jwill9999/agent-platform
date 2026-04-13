@@ -15,10 +15,23 @@ Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and dec
 | `pnpm typecheck`    | Typecheck all packages (`pnpm -r`)                                                                    |
 | `pnpm build`        | Build all packages                                                                                    |
 | `pnpm lint`         | ESLint across workspaces                                                                              |
-| `pnpm test`         | Run tests (stubs until suites exist)                                                                  |
+| `pnpm test`         | Run Vitest suites (contracts, db, api integration)                                                    |
 | `pnpm format`       | Prettier write                                                                                        |
 | `pnpm format:check` | Prettier check                                                                                        |
 | `pnpm seed`         | After **`pnpm build`**: run idempotent DB seed (needs **`SQLITE_PATH`**) — default agent + demo skill |
+
+## HTTP API (`/v1`)
+
+Requires **`SQLITE_PATH`** at process start (same DB file as migrations/seed). JSON request/response bodies; errors: `{ "error": { "code", "message", "details?" } }`. **Single-user** — no auth yet (stub middleware).
+
+| Resource    | Endpoints                                                                                                                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Health      | `GET /health` (no DB)                                                                                                                           |
+| Skills      | `GET/POST /v1/skills`, `GET/PUT/DELETE /v1/skills/:id` — body **`SkillSchema`**                                                                 |
+| Tools       | `GET/POST /v1/tools`, `GET/PUT/DELETE /v1/tools/:id` — **`ToolSchema`**                                                                         |
+| MCP servers | `GET/POST /v1/mcp-servers`, `GET/PUT/DELETE /v1/mcp-servers/:id` — **`McpServerSchema`**                                                        |
+| Agents      | `GET/POST /v1/agents`, `GET/PUT/DELETE /v1/agents/:id` — **`AgentSchema`** (allowlists via `replaceAgent`)                                      |
+| Sessions    | `GET /v1/sessions?agentId=`, `POST /v1/sessions`, `GET/PUT/DELETE /v1/sessions/:id` — **`SessionCreateBodySchema`** / **`SessionRecordSchema`** |
 
 ## Layout
 

@@ -17,6 +17,7 @@ export function openDatabase(sqlitePath: string): { db: DrizzleDb; sqlite: Datab
   const dir = path.dirname(sqlitePath);
   mkdirSync(dir, { recursive: true });
   const sqlite = new Database(sqlitePath);
+  sqlite.pragma('foreign_keys = ON');
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: path.join(packageRoot, 'drizzle') });
   return { db, sqlite };

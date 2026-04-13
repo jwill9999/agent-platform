@@ -8,30 +8,30 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-13
-- **Session:** **`agent-platform-j9x.3`** — idempotent seed + default agent
+- **Session:** **`agent-platform-j9x.4`** — CRUD REST API (`/v1`) + integration tests; Persistence segment ready to merge
 
 ---
 
 ## What happened (recent)
 
-- **`packages/db`:** **`runSeed`**, **`DEFAULT_AGENT_ID`** (`default`), **`DEMO_SKILL_ID`** (`demo-skill`); idempotent inserts (`onConflictDoNothing`) for demo skill, default agent, and allowlist link.
-- **CLI:** **`pnpm seed`** (root) → **`@agent-platform/db`** `node dist/seed/run.js` — requires **`SQLITE_PATH`** (runs migrations via **`openDatabase`** then seed).
-- **Tests:** `seed.test.ts` — idempotency + **`loadAgentById`** / **`AgentSchema`** for default agent.
-- **CI:** `task/**` push branches; **Seed (idempotent)** step runs **`pnpm run seed`** twice against `/tmp/agent-ci.sqlite`.
-- **`README`:** documents **`pnpm seed`** and Docker note for same **`SQLITE_PATH`** as API.
+- **`packages/contracts`:** **`ToolSchema`**, **`McpServerSchema`**, **`SessionRecordSchema`**, **`SessionCreateBodySchema`**.
+- **`packages/db`:** row mappers + **`repositories/registry.ts`** (CRUD + **`replaceAgent`** / sessions).
+- **`apps/api`:** **`createApp({ db })`**, **`/v1`** router (skills, tools, mcp-servers, agents, sessions), **Zod** validation, **`HttpError`** + global error middleware (incl. SQLite constraint); persistent DB in **`index.ts`** with graceful shutdown.
+- **Tests:** **`crud.integration.test.ts`** (supertest + temp SQLite + seed).
+- **`README`:** route table; **`decisions.md`:** REST row.
 
 ---
 
 ## Current state
 
-- **Branch:** **`task/agent-platform-j9x.3`** pushed; **`bd close agent-platform-j9x.3`** done. Next: **`task/agent-platform-j9x.4`** from **`task/agent-platform-j9x.3`**.
+- **Branch:** **`task/agent-platform-j9x.4`** — open **PR** **`task/agent-platform-j9x.4` → `feature/agent-platform-persistence`**, merge, then **`bd close agent-platform-j9x.4`**.
 
 ---
 
 ## Next (priority order)
 
-1. Branch **`task/agent-platform-j9x.4`** from **`origin/task/agent-platform-j9x.3`**.
-2. Implement **`docs/tasks/agent-platform-j9x.4.md`**.
+1. Merge PR (**Persistence** segment complete on `feature/agent-platform-persistence`).
+2. Next epic: branch from updated **`feature/agent-platform-persistence`** or **`main`** per your release process — e.g. Harness **`agent-platform-2tw.1`**.
 
 ---
 
@@ -45,8 +45,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ```bash
 bd ready --json
-bd show <id>
 pnpm install && pnpm run build && pnpm run test
-SQLITE_PATH=/path/to/db.sqlite pnpm run seed
-docker compose up --build
+SQLITE_PATH=./local.sqlite pnpm run seed
+SQLITE_PATH=./local.sqlite node apps/api/dist/index.js
 ```

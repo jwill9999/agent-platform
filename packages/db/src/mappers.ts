@@ -1,9 +1,26 @@
-import type { Agent, ExecutionLimits, Skill } from '@agent-platform/contracts';
-import { AgentSchema, ExecutionLimitsSchema, SkillSchema } from '@agent-platform/contracts';
+import type { Agent, ExecutionLimits, McpServer, Skill, Tool } from '@agent-platform/contracts';
+import {
+  AgentSchema,
+  ExecutionLimitsSchema,
+  McpServerSchema,
+  SessionRecordSchema,
+  SkillSchema,
+  ToolSchema,
+} from '@agent-platform/contracts';
 import { eq } from 'drizzle-orm';
 
 import type { DrizzleDb } from './database.js';
 import * as schema from './schema.js';
+
+export function skillToRow(skill: Skill): typeof schema.skills.$inferInsert {
+  return {
+    id: skill.id,
+    goal: skill.goal,
+    constraintsJson: JSON.stringify(skill.constraints),
+    toolIdsJson: JSON.stringify(skill.tools),
+    outputSchemaJson: skill.outputSchema ? JSON.stringify(skill.outputSchema) : null,
+  };
+}
 
 export function skillRowToContract(row: typeof schema.skills.$inferSelect): Skill {
   return SkillSchema.parse({
@@ -60,5 +77,58 @@ export function loadAgentById(db: DrizzleDb, id: string): Agent | undefined {
     modelOverride,
     pluginAllowlist: pluginAllowlist ?? undefined,
     pluginDenylist: pluginDenylist ?? undefined,
+  });
+}
+
+export function toolRowToContract(row: typeof schema.tools.$inferSelect): Tool {
+  return ToolSchema.parse({
+    id: row.id,
+    name: row.name,
+    description: row.description ?? undefined,
+    config: row.configJson ? (JSON.parse(row.configJson) as Record<string, unknown>) : undefined,
+  });
+}
+
+export function toolToRow(tool: Tool): typeof schema.tools.$inferInsert {
+  return {
+    id: tool.id,
+    name: tool.name,
+    description: tool.description ?? null,
+    configJson: tool.config ? JSON.stringify(tool.config) : null,
+  };
+}
+
+export function mcpRowToContract(row: typeof schema.mcpServers.$inferSelect): McpServer {
+  return McpServerSchema.parse({
+    id: row.id,
+    name: row.name,
+    transport: row.transport,
+    command: row.command ?? undefined,
+    args: row.argsJson ? (JSON.parse(row.argsJson) as string[]) : undefined,
+    url: row.url ?? undefined,
+    metadata: row.metadataJson
+      ? (JSON.parse(row.metadataJson) as Record<string, unknown>)
+      : undefined,
+  });
+}
+
+export function mcpToRow(m: McpServer): typeof schema.mcpServers.$inferInsert {
+  return {
+    id: m.id,
+    name: m.name,
+    transport: m.transport,
+    command: m.command ?? null,
+    argsJson: m.args ? JSON.stringify(m.args) : null,
+    url: m.url ?? null,
+    metadataJson: m.metadata ? JSON.stringify(m.metadata) : null,
+  };
+}
+
+export function sessionRowToContract(row: typeof schema.sessions.$inferSelect) {
+  return SessionRecordSchema.parse({
+    id: row.id,
+    agentId: row.agentId,
+    createdAtMs: row.createdAtMs,
+    updatedAtMs: row.updatedAtMs,
   });
 }

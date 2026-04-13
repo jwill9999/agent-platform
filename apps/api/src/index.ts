@@ -5,17 +5,31 @@ import { createLogger } from './infrastructure/logging/logger.js';
 
 const log = createLogger('api');
 
-const sqlitePath = process.env.SQLITE_PATH;
+const sqlitePath = process.env.SQLITE_PATH?.trim();
+let dbHandle: ReturnType<typeof openDatabase> | null = null;
+
 if (sqlitePath) {
-  const { sqlite } = openDatabase(sqlitePath);
-  closeDatabase(sqlite);
-  log.info('db.migrations_applied', { sqlitePath });
+  dbHandle = openDatabase(sqlitePath);
+  log.info('db.ready', { sqlitePath });
 }
 
-const app = createApp();
+const app = createApp({ db: dbHandle?.db ?? null });
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '0.0.0.0';
 
-app.listen(port, host, () => {
+const server = app.listen(port, host, () => {
   log.info('api.listen', { host, port });
 });
+
+function shutdown() {
+  server.close(() => {
+    if (dbHandle) {
+      closeDatabase(dbHandle.sqlite);
+      log.info('db.closed');
+    }
+    process.exit(0);
+  });
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
