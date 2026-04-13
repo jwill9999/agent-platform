@@ -10,6 +10,8 @@ services:
       HOST: "0.0.0.0"
       # SQLite file path inside the container; persisted on named volume below.
       SQLITE_PATH: "/data/agent.sqlite"
+      # Base64-encoded 32-byte key for AES-256-GCM secret storage (required when writing secrets).
+      # SECRETS_MASTER_KEY: ""
     volumes:
       - sqlite_data:/data
       # Future filesystem MCP: bind-mount a host workspace for tooling, e.g.
