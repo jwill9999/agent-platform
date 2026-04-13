@@ -2,6 +2,8 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+**Beads = task state** (next task, open/done, dependencies). **Git = code history** (branches, commits). When picking or finishing work, use **`bd ready`** / **`bd show`** / **`bd close`**—do not rely on Git alone. See **`decisions.md`** → *Task management: Beads vs Git*.
+
 ## Quick Reference
 
 ```bash
@@ -132,32 +134,40 @@ Do not replace bd issues with these; keep tasks, acceptance criteria, and closur
 
 Each **task** issue includes `Spec: docs/tasks/<issue-id>.md` at the start of its **description**. Those Markdown files hold detailed implementation plans and sign-off checklists; **bd** still owns ordering via **`blocks`** dependencies. When planning discovers new cross-task dependencies, add **`bd dep add`** first, then update the spec tables.
 
-For more details, see README.md and docs/QUICKSTART.md.
+### Git branches (mandatory)
+
+- **Naming:** **`feature/<feature-name>`** (integration); **`task/<task-name>`** (each task).
+- **Chaining (default):** the **first** task in a segment branches from **`feature/<feature-name>`**. **Each next** task branches from the **previous `task/<task-name>`** branch (linear chain). **One PR per segment** from **`task/<segment-tip>` → `feature/<feature-name>`** when that segment’s tasks are done—not a PR per task. Next segment starts from **updated** `feature/<feature-name>`.
+- **Never commit directly to `main`.** When the feature is ready on **`feature/<feature-name>`**, open **one** PR **`feature/<feature-name>` → `main`**.
+- **Before sign-off:** unit tests pass (minimum); checklist complete; **`bd close`**; **PR to `feature`** only on **segment tip** (see `docs/tasks/<issue-id>.md`).
+
+For more details, see `docs/tasks/README.md` and `decisions.md`.
 
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until the **current task branch** is pushed to `origin` (unless nothing was implemented).
 
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+2. **Run quality gates** (if code changed) - **Unit tests** (minimum), linters, builds
+3. **Update issue status** - Close finished work only after **PR merged** and checklist in `docs/tasks/<issue-id>.md` is complete
+4. **PUSH THE TASK BRANCH** - This is MANDATORY when commits exist:
    ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
+   git fetch origin
+   # Rebase onto parent: previous task branch or feature (see task spec)
+   git push -u origin HEAD
+   git status
    ```
+   Do **not** push to `main`. If this task is the **segment tip**, open **one** PR **`task/<tip> → feature/<feature-name>`**. If using `bd` with git export, run your usual **`bd` sync** workflow if the project documents it.
 5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
+6. **Verify** - All changes committed AND pushed to the **task branch**; next task branches from here, **or** open segment PR if this is the tip
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
+- Work is NOT complete until the **task branch** is pushed when there are commits
+- NEVER commit directly to **`main`**
+- NEVER merge a task PR to **`main`**; merge **segment tip** to **`feature/<feature-name>`**; merge **`feature` → `main`** only at release
 - If push fails, resolve and retry until it succeeds
 
 <!-- END BEADS INTEGRATION -->
