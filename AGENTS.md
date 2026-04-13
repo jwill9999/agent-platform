@@ -134,9 +134,10 @@ Each **task** issue includes `Spec: docs/tasks/<issue-id>.md` at the start of it
 
 ### Git branches (mandatory)
 
-- **Never commit directly to `main`.** Implementation work happens on **`task/<issue-id>`** branches only.
-- **Integration branch:** **`feature/agent-platform-mvp`**. Open PRs from each task branch **into `feature/agent-platform-mvp`**. When the MVP is complete, open **one** PR **`feature/agent-platform-mvp` → `main`**.
-- **Before sign-off:** unit tests run and pass (minimum); task spec checklist complete; PR merged to `feature/agent-platform-mvp`; then **`bd close`**.
+- **Naming:** **`feature/<feature-name>`** for the integration branch; **`task/<task-name>`** for each task branch (e.g. MVP: `feature/agent-platform-mvp`, `task/agent-platform-mov.1`).
+- **Never commit directly to `main`.** Implementation work happens on **`task/<task-name>`** branches only.
+- **Integration:** open PRs from each **`task/<task-name>`** into **`feature/<feature-name>`**. When the feature is complete, open **one** PR **`feature/<feature-name>` → `main`**.
+- **Before sign-off:** unit tests run and pass (minimum); task spec checklist complete; PR merged to **`feature/<feature-name>`**; then **`bd close`**.
 
 For more details, see `docs/tasks/README.md` and `decisions.md`.
 
@@ -152,19 +153,19 @@ For more details, see `docs/tasks/README.md` and `decisions.md`.
 4. **PUSH THE TASK BRANCH** - This is MANDATORY when commits exist:
    ```bash
    git fetch origin
-   git rebase origin/feature/agent-platform-mvp   # or pull --rebase if configured
+   git rebase origin/feature/<feature-name>   # e.g. origin/feature/agent-platform-mvp
    git push -u origin HEAD
    git status
    ```
    Do **not** push to `main`. If using `bd` with git export, run your usual **`bd` sync** workflow if the project documents it.
 5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed to the **task branch**; open PR to **`feature/agent-platform-mvp`** if the task is ready for review
+6. **Verify** - All changes committed AND pushed to the **task branch**; open PR to **`feature/<feature-name>`** if the task is ready for review
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 - Work is NOT complete until the **task branch** is pushed when there are commits
 - NEVER commit directly to **`main`**
-- NEVER merge a task PR to **`main`**; merge to **`feature/agent-platform-mvp`** only until the final MVP PR
+- NEVER merge a task PR to **`main`**; merge to **`feature/<feature-name>`** only until the final feature PR
 - If push fails, resolve and retry until it succeeds
 
 <!-- END BEADS INTEGRATION -->

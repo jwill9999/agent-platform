@@ -33,21 +33,23 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 ## Implementation plan
 
 1. Read Beads acceptance criteria and this spec.
-2. Follow **Git workflow (mandatory)** below: create **`task/<issue-id>`** from **`feature/agent-platform-mvp`** before writing implementation commits.
+2. Follow **Git workflow (mandatory)** below: create **`task/<task-name>`** from **`feature/<feature-name>`** before writing implementation commits (use the real feature branch name for this initiative).
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list <issue-id>` shows expected upstream issues **closed** before your PR.
-5. Open PR **`task/<issue-id>` → `feature/agent-platform-mvp`**; merge when reviewed. Do **not** merge individual tasks to `main`.
+5. Open PR **`task/<task-name>` → `feature/<feature-name>`**; merge when reviewed. Do **not** merge individual tasks to `main`.
 
 ## Git workflow (mandatory)
+
+**Naming:** integration branches are **`feature/<feature-name>`**; task branches are **`task/<task-name>`** (see `decisions.md`). Substitute the actual names for your initiative.
 
 | Rule | Detail |
 |------|--------|
 | **No `main`** | Never push commits directly to **`main`**. |
-| **Feature branch** | Long-running integration branch: **`feature/agent-platform-mvp`**. All task PRs target this branch. |
-| **Task branch** | Before starting work: `git fetch origin && git checkout feature/agent-platform-mvp && git pull` then `git checkout -b task/<issue-id>` (use this Beads id, e.g. `task/agent-platform-mov.1`). |
-| **PR** | Push **`task/<issue-id>`** to `origin` and open a PR into **`feature/agent-platform-mvp`**. Merge via PR (squash or merge commit per team preference). |
+| **Feature branch** | Pattern **`feature/<feature-name>`**. *Example (Agent Platform MVP):* **`feature/agent-platform-mvp`**. Task PRs target the active feature branch. |
+| **Task branch** | Pattern **`task/<task-name>`**. *This task:* **`task/<issue-id>`** (e.g. `task/agent-platform-mov.1`). Before starting: `git fetch origin && git checkout feature/<feature-name> && git pull` then `git checkout -b task/<task-name>`. |
+| **PR** | Push **`task/<task-name>`** to `origin`; open a PR into **`feature/<feature-name>`**. |
 | **After merge** | Delete the remote/local task branch when done. |
-| **MVP complete** | When all tasks are merged on **`feature/agent-platform-mvp`**, open **one** PR **`feature/agent-platform-mvp` → `main`**. |
+| **Feature complete** | When all tasks for **`feature/<feature-name>`** are merged, open **one** PR **`feature/<feature-name>` → `main`**. |
 
 ## Tests (required before sign-off)
 
@@ -60,17 +62,17 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed**.
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **PR** merged: **`task/<issue-id>` → `feature/agent-platform-mvp`** (not `main`).
+- [ ] **PR** merged: **`task/<task-name>` → `feature/<feature-name>`** (not `main`).
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
-Complete **only after** the PR for this task is merged into **`feature/agent-platform-mvp`** and tests are green.
+Complete **only after** the PR for this task is merged into **`feature/<feature-name>`** and tests are green.
 
-- [ ] **Task branch** `task/<issue-id>` was created **before** implementation work
+- [ ] **Task branch** **`task/<task-name>`** was created **before** implementation work
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR** merged into **`feature/agent-platform-mvp`** (link: _________________________________)
+- [ ] **PR** merged into **`feature/<feature-name>`** (link: _________________________________)
 - [ ] `bd close <issue-id> --reason "…"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
