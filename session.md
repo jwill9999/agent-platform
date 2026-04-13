@@ -17,7 +17,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - Confirmed product decisions: single user, Docker, SQLite volume first, secrets, OpenAI-first router with user-supplied model + key, filesystem MCP inside container boundary, tests required per task, bd for tasks.
 - Initialized **bd (beads)** in this repo for epics/tasks; `AGENTS.md` documents workflow.
 - Added **`decisions.md`** (this log + DoD) and **`session.md`** (this file).
-- Broke each epic into **child tasks** in bd with **description + acceptance**; **blocks** dependencies between tasks (fixed one inverted CI edge). Added **`docs/tasks/README.md`** — Beads is canonical; optional linked Markdown for long specs only.
+- Broke each epic into **child tasks** in bd with **description + acceptance**; **blocks** dependencies between tasks (fixed one inverted CI edge). **`docs/tasks/<issue-id>.md`** per task: requirements, plan, dependency tables, DoD; Beads description starts with `Spec: …`.
 
 ---
 

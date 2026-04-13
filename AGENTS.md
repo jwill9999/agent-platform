@@ -128,6 +128,10 @@ These files are **not** task trackers; they complement bd:
 
 Do not replace bd issues with these; keep tasks, acceptance criteria, and closure in bd.
 
+### Task specification files (`docs/tasks/`)
+
+Each **task** issue includes `Spec: docs/tasks/<issue-id>.md` at the start of its **description**. Those Markdown files hold detailed implementation plans and sign-off checklists; **bd** still owns ordering via **`blocks`** dependencies. When planning discovers new cross-task dependencies, add **`bd dep add`** first, then update the spec tables.
+
 For more details, see README.md and docs/QUICKSTART.md.
 
 ## Landing the Plane (Session Completion)

@@ -9,7 +9,7 @@ Single source of truth for **architectural and product decisions** agreed with t
 
 - **`session.md`** — short narrative of last session, current focus, and next steps (update at end of each agent session when work stops).
 - **`AGENTS.md`** — project rules for agents (includes bd workflow).
-- **`docs/tasks/README.md`** — how we track tasks (Beads vs optional Markdown supplements); epic→task index snapshot.
+- **`docs/tasks/README.md`** — task workflow: **each Beads task** links to **`docs/tasks/<issue-id>.md`** (requirements, implementation plan, dependency tables, definition of done, sign-off). **Beads `blocks` edges** are the schedule of record; specs document the same order and capture planning-only dependencies.
 
 ---
 
