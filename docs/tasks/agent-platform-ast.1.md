@@ -40,30 +40,30 @@ Manual or E2E smoke: message sends and streams; types imported from contracts wh
 ## Implementation plan
 
 1. Read Beads acceptance criteria and this spec.
-2. Create **`task/agent-platform-ast.1`** from **`feature/agent-platform-mvp`** (chained Git):  
-   `git fetch origin && git checkout feature/agent-platform-mvp && git pull` then `git checkout -b task/agent-platform-ast.1`.
+2. Create **`task/agent-platform-ast.1`** from **`feature/<feature-name>`** (chained Git):  
+   `git fetch origin && git checkout feature/<feature-name> && git pull` then `git checkout -b task/agent-platform-ast.1`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-ast.1` shows expected upstream Beads issues **closed** where applicable.
-5. **Not the segment tip:** push **`task/agent-platform-ast.1`** to `origin`. **Do not** PR to `feature/agent-platform-mvp` yet. The next task in this segment branches from **`task/agent-platform-ast.1`**.
+5. **Not the segment tip:** push **`task/agent-platform-ast.1`** to `origin`. **Do not** PR to `feature/<feature-name>` yet. The next task in this segment branches from **`task/agent-platform-ast.1`**.
 
 ## Git workflow (mandatory)
 
-**Segment:** Frontend (ast.1–ast.3). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-ast.3`** → `feature/agent-platform-mvp`.
+**Segment:** Frontend (ast.1–ast.3). **Chained branches:** first task in segment from `feature/<feature-name>`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-ast.3`** → `feature/<feature-name>`.
 
 | | |
 |---|---|
-| **Parent for this branch** | **`feature/agent-platform-mvp`** |
+| **Parent for this branch** | **`feature/<feature-name>`** |
 | **This task’s branch** | **`task/agent-platform-ast.1`** |
-| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-ast.3`** |
+| **Segment tip (opens PR to `feature/<feature-name>`)** | **`task/agent-platform-ast.3`** |
 | **This task is segment tip?** | **No — merge only after `task/agent-platform-ast.3`** |
 
 | Rule | Detail |
 |------|--------|
 | **No `main`** | Never push commits directly to **`main`**. |
-| **Chain** | Branch **`task/agent-platform-ast.1`** from **`feature/agent-platform-mvp`**. |
+| **Chain** | Branch **`task/agent-platform-ast.1`** from **`feature/<feature-name>`**. |
 | **Intermediate tasks** | Push **`task/agent-platform-ast.1`**; next task checks out from **`task/agent-platform-ast.1`** (or from remote `origin/task/agent-platform-ast.1`). |
-| **Segment tip** | One PR **`task/agent-platform-ast.3` → `feature/agent-platform-mvp`**. |
-| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
+| **Segment tip** | One PR **`task/agent-platform-ast.3` → `feature/<feature-name>`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/<feature-name>`. |
 
 ## Tests (required before sign-off)
 
@@ -76,14 +76,14 @@ Manual or E2E smoke: message sends and streams; types imported from contracts wh
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-ast.1`** pushed; next task branches from here (**no** PR to `feature/agent-platform-mvp` until **`task/agent-platform-ast.3`**)
+- [ ] **Branch** **`task/agent-platform-ast.1`** pushed; next task branches from here (**no** PR to `feature/<feature-name>` until **`task/agent-platform-ast.3`**)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
 Complete after work is on **`task/agent-platform-ast.1`** and tests are green (PR to `feature` only at segment tip).
 
-- [ ] **Task branch** **`task/agent-platform-ast.1`** created from **`feature/agent-platform-mvp`** before implementation
+- [ ] **Task branch** **`task/agent-platform-ast.1`** created from **`feature/<feature-name>`** before implementation
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
 - [ ] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-ast.3`**

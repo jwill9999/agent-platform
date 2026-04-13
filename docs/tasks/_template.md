@@ -45,7 +45,7 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 | Rule | Detail |
 |------|--------|
 | **No `main`** | Never push commits directly to **`main`**. |
-| **First task in segment** | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-mvp`). |
+| **First task in segment** | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-persistence`). |
 | **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed. |
 | **Intermediate tasks** | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch. |
 | **Last task in segment** | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment. |

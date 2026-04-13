@@ -45,17 +45,17 @@ Integration test streams tokens; router unit tests with mocked fetch; no key in 
    `git fetch origin && git checkout task/agent-platform-2tw.3 && git pull` then `git checkout -b task/agent-platform-2tw.4`.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-2tw.4` shows expected upstream Beads issues **closed** where applicable.
-5. **Not the segment tip:** push **`task/agent-platform-2tw.4`** to `origin`. **Do not** PR to `feature/agent-platform-mvp` yet. The next task in this segment branches from **`task/agent-platform-2tw.4`**.
+5. **Not the segment tip:** push **`task/agent-platform-2tw.4`** to `origin`. **Do not** PR to `feature/<feature-name>` yet. The next task in this segment branches from **`task/agent-platform-2tw.4`**.
 
 ## Git workflow (mandatory)
 
-**Segment:** Harness (2tw.1–2tw.5). **Chained branches:** first task in segment from `feature/agent-platform-mvp`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-2tw.5`** → `feature/agent-platform-mvp`.
+**Segment:** Harness (2tw.1–2tw.5). **Chained branches:** first task in segment from `feature/<feature-name>`; each later task from **previous** `task/...`. **One PR per segment** from **`task/agent-platform-2tw.5`** → `feature/<feature-name>`.
 
 | | |
 |---|---|
 | **Parent for this branch** | **`task/agent-platform-2tw.3`** |
 | **This task’s branch** | **`task/agent-platform-2tw.4`** |
-| **Segment tip (opens PR to `feature/agent-platform-mvp`)** | **`task/agent-platform-2tw.5`** |
+| **Segment tip (opens PR to `feature/<feature-name>`)** | **`task/agent-platform-2tw.5`** |
 | **This task is segment tip?** | **No — merge only after `task/agent-platform-2tw.5`** |
 
 | Rule | Detail |
@@ -63,8 +63,8 @@ Integration test streams tokens; router unit tests with mocked fetch; no key in 
 | **No `main`** | Never push commits directly to **`main`**. |
 | **Chain** | Branch **`task/agent-platform-2tw.4`** from **`task/agent-platform-2tw.3`**. |
 | **Intermediate tasks** | Push **`task/agent-platform-2tw.4`**; next task checks out from **`task/agent-platform-2tw.4`** (or from remote `origin/task/agent-platform-2tw.4`). |
-| **Segment tip** | One PR **`task/agent-platform-2tw.5` → `feature/agent-platform-mvp`**. |
-| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/agent-platform-mvp`. |
+| **Segment tip** | One PR **`task/agent-platform-2tw.5` → `feature/<feature-name>`**. |
+| **Next segment** | After merge, branch **`task/<first-of-next>`** from **updated** `feature/<feature-name>`. |
 
 ## Tests (required before sign-off)
 
@@ -77,7 +77,7 @@ Integration test streams tokens; router unit tests with mocked fetch; no key in 
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-2tw.4`** pushed; next task branches from here (**no** PR to `feature/agent-platform-mvp` until **`task/agent-platform-2tw.5`**)
+- [ ] **Branch** **`task/agent-platform-2tw.4`** pushed; next task branches from here (**no** PR to `feature/<feature-name>` until **`task/agent-platform-2tw.5`**)
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
