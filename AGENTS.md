@@ -119,6 +119,15 @@ bd automatically syncs with git:
 - ❌ Do NOT use external issue trackers
 - ❌ Do NOT duplicate tracking systems
 
+### Exception: decision log and session handoff
+
+These files are **not** task trackers; they complement bd:
+
+- **`decisions.md`** — Architectural and product decisions (see also Definition of Done there).
+- **`session.md`** — Short narrative: what changed, current focus, next steps; update at session end.
+
+Do not replace bd issues with these; keep tasks, acceptance criteria, and closure in bd.
+
 For more details, see README.md and docs/QUICKSTART.md.
 
 ## Landing the Plane (Session Completion)
