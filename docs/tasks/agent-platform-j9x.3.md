@@ -76,7 +76,7 @@ pnpm seed or equivalent runs clean; default agent queryable; documented in READM
 - [x] **Every checkbox** in this spec (including **Sign-off**) is complete.
 - [x] All **upstream** Beads issues are **closed** (per Beads).
 - [x] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-j9x.3`** pushed; next task branches from here (**no** PR to `feature/agent-platform-persistence` until **`task/agent-platform-j9x.4`**)
+- [x] **Branch** **`task/agent-platform-j9x.3`** pushed; next task branches from here (**no** PR to `feature/agent-platform-persistence` until **`task/agent-platform-j9x.4`**)
 - [x] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
@@ -87,7 +87,7 @@ Complete after work is on **`task/agent-platform-j9x.3`** and tests are green (P
 - [x] **Unit tests** executed and passing (minimum gate)
 - [x] **Checklists** in this document (Definition of done + Sign-off) are complete
 - [x] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-j9x.4`**
-- [ ] `bd close agent-platform-j9x.3` (after push)
+- [x] `bd close agent-platform-j9x.3`
 - [x] `decisions.md` updated only if architectural decision changed
 - [x] `session.md` updated if handoff needed
 

@@ -24,7 +24,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Current state
 
-- **Branch:** **`task/agent-platform-j9x.3`** — push **`origin`**, **`bd close agent-platform-j9x.3`**. Next: **`task/agent-platform-j9x.4`** (CRUD API) from **`task/agent-platform-j9x.3`**.
+- **Branch:** **`task/agent-platform-j9x.3`** pushed; **`bd close agent-platform-j9x.3`** done. Next: **`task/agent-platform-j9x.4`** from **`task/agent-platform-j9x.3`**.
 
 ---
 
