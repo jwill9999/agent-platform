@@ -10,7 +10,7 @@
 
 ### From Beads (description)
 
-Minimal HTTP server (framework per ADR); GET /health returns JSON ok; imports types from contracts; Dockerfile CMD matches compose; logs structured minimally.
+**Express** (`apps/api`), **TypeScript**, **clean architecture** (thin HTTP layer, domain/use-cases separate from infra—see `decisions.md`). GET /health returns JSON ok; imports types from contracts; Dockerfile CMD matches compose; logs structured minimally.
 
 ### From Beads (acceptance criteria)
 
