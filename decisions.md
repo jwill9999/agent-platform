@@ -26,6 +26,8 @@ Single source of truth for **architectural and product decisions** agreed with t
 
 **`.beads/` in this repo:** Beads stores issues in a **local Dolt-backed database** (see `.beads/metadata.json`). The **`dolt/`** directory and **`backup/`** JSONL exports are typically **gitignored**—the **live issue state** is maintained by the **`bd`** CLI and hooks, not by hand-editing JSONL. Tracked files under `.beads/` include **config**, **hooks**, and **`README.md`** (upstream template). Use **`bd`** commands to create/update/close issues; commit code changes in Git as usual. For moving work between machines, follow your Beads version’s sync/backup guidance (`bd` help / project hooks).
 
+**Task spec files (`docs/tasks/<issue-id>.md`):** Leave them **where they are** after a feature or task is done—**no** archiving or deletion for now. If the folder becomes unwieldy later, we can introduce an archiving scheme then; until then, keep the workflow simple.
+
 ---
 
 ## Thinking stream (MVP recommendation)
