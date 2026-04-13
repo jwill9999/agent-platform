@@ -52,10 +52,10 @@ Plugins **cannot** bypass harness validation or tool allowlists.
 | **Filesystem / MCP** | **Core default agent** must be able to use the **filesystem** via **MCP**. Running in Docker, the **container filesystem** is the boundary—no access to the host OS except what is explicitly **mounted** into the container (document mounts in compose). |
 | **MCP** | Standard MCP; users supply **API keys when a server requires them**. |
 | **Tests** | Before a task is considered done: **unit tests** and **E2E tests** as **required** for that task’s scope (no blanket boilerplate—each bd issue should state what tests apply). **Minimum before sign-off:** unit tests run and pass for the code touched by the task. |
-| **Git / branches** | **No direct commits to `main`.** Each task uses a dedicated **`task/<issue-id>`** branch (created **before** starting work). When the task is complete, open a **PR into `feature/agent-platform-mvp`** (the long-running MVP integration branch), merge there, then delete the task branch. When **all** MVP tasks are merged on `feature/agent-platform-mvp`, open **one** PR **`feature/agent-platform-mvp` → `main`**. Documentation-only changes follow the same rule (task branch → feature → main via PRs). |
+| **Git / branches** | **Naming:** integration branches are **`feature/<feature-name>`** (the feature’s name after `feature/`). Task branches are **`task/<task-name>`** (the task’s name after `task/`). **No direct commits to `main`.** Create the **task** branch **before** starting work; open a **PR** from **`task/<task-name>` → `feature/<feature-name>`**; merge there, then delete the task branch. When **all** tasks for that feature are merged on **`feature/<feature-name>`**, open **one** PR **`feature/<feature-name>` → `main`**. *Example (Agent Platform MVP):* `feature/agent-platform-mvp` and `task/agent-platform-mov.1`. Documentation-only changes follow the same rule. |
 | **Token budget** | Use tokens minimally; if the budget is exhausted, the owner decides whether to increase it. |
 
-**Bootstrap (once):** create and push `feature/agent-platform-mvp` from `main` without changing `main` (e.g. `git checkout main && git pull && git checkout -b feature/agent-platform-mvp && git push -u origin feature/agent-platform-mvp`). All task branches are cut from the **latest** `feature/agent-platform-mvp`.
+**Bootstrap (once):** create and push **`feature/<feature-name>`** from `main` without changing `main` (substitute the real feature name, e.g. `git checkout -b feature/agent-platform-mvp && git push -u origin feature/agent-platform-mvp`). All **task** branches are cut from the **latest** matching **`feature/<feature-name>`**.
 
 ---
 
@@ -67,7 +67,7 @@ Unless an issue states otherwise, **done** means:
 2. **This task’s spec checklist** in `docs/tasks/<issue-id>.md` is **fully checked** (including Git workflow and tests).
 3. **Tests:** **Unit tests** run and pass at minimum; **E2E** (or integration) tests when the change crosses API, DB, or Docker boundaries.
 4. **Quality:** typecheck passes; linters clean for touched files.
-5. **Git:** work merged via **PR** from `task/<issue-id>` → **`feature/agent-platform-mvp`** (not direct to `main`). Task branch created before implementation started.
+5. **Git:** work merged via **PR** from **`task/<task-name>` → `feature/<feature-name>`** (not direct to `main`). Task branch created before implementation started.
 6. **Documentation:** `decisions.md` updated if a **new** architectural decision was made; `session.md` updated at session end.
 7. **Tracking:** issue **closed** in bd with a short reason **after** PR merge and checklist completion; discovered follow-ups filed as new issues.
 

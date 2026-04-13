@@ -41,20 +41,22 @@ Integration test: two agents different memory policy; session reset behavior doc
 ## Implementation plan
 
 1. Read Beads acceptance criteria and this spec.
-2. Follow **Git workflow (mandatory)** below: create **`task/agent-platform-dx3.4`** from **`feature/agent-platform-mvp`** before implementation commits.
+2. Follow **Git workflow (mandatory)** below: create **`task/<task-name>`** for this task (here: **`task/agent-platform-dx3.4`**) from **`feature/<feature-name>`** before implementation commits. *Active MVP feature branch:* **`feature/agent-platform-mvp`**.
 3. Implement with tests per **Tests** section; **unit tests must pass** before sign-off.
 4. Ensure `bd dep list agent-platform-dx3.4` shows expected upstream issues **closed** before your PR.
-5. Open PR **`task/agent-platform-dx3.4` → `feature/agent-platform-mvp`**; merge when reviewed. Do **not** merge this task to `main`.
+5. Open PR **`task/agent-platform-dx3.4` → `feature/<feature-name>`** (use **`feature/agent-platform-mvp`** for this MVP); merge when reviewed. Do **not** merge this task to `main`.
 
 ## Git workflow (mandatory)
+
+**Naming:** **`feature/<feature-name>`** for integration; **`task/<task-name>`** for each task (`decisions.md`).
 
 | Rule | Detail |
 |------|--------|
 | **No `main`** | Never push commits directly to **`main`**. |
-| **Feature branch** | **`feature/agent-platform-mvp`**. Task PRs target this branch. |
-| **Task branch** | Before starting: `git fetch origin && git checkout feature/agent-platform-mvp && git pull` then `git checkout -b task/agent-platform-dx3.4`. |
+| **Feature branch** | Pattern **`feature/<feature-name>`**. *This initiative (MVP):* **`feature/agent-platform-mvp`**. |
+| **Task branch** | Pattern **`task/<task-name>`**. *This task:* **`task/agent-platform-dx3.4`**. Before starting: `git fetch origin && git checkout feature/agent-platform-mvp && git pull` then `git checkout -b task/agent-platform-dx3.4`. |
 | **PR** | Push **`task/agent-platform-dx3.4`** to `origin`; PR into **`feature/agent-platform-mvp`**. |
-| **MVP complete** | Final PR **`feature/agent-platform-mvp` → `main`** only after all MVP tasks are merged on the feature branch. |
+| **Feature complete** | Final PR **`feature/agent-platform-mvp` → `main`** only after all tasks for this feature are merged on the feature branch. |
 
 ## Tests (required before sign-off)
 
@@ -74,7 +76,7 @@ Integration test: two agents different memory policy; session reset behavior doc
 
 Complete **only after** the PR for this task is merged into **`feature/agent-platform-mvp`** and tests are green.
 
-- [ ] **Task branch** `task/agent-platform-dx3.4` was created **before** implementation work
+- [ ] **Task branch** **`task/agent-platform-dx3.4`** was created **before** implementation work
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
 - [ ] **PR** merged into **`feature/agent-platform-mvp`** (link: _________________________________)
