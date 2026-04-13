@@ -1,15 +1,16 @@
 # syntax=docker/dockerfile:1
 FROM node:20-alpine AS build
-RUN apk add --no-cache curl && corepack enable && corepack prepare pnpm@9.15.4 --activate
+RUN apk add --no-cache curl python3 make g++ && corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/contracts packages/contracts
+COPY packages/db packages/db
 COPY apps/api apps/api
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @agent-platform/contracts build && pnpm --filter @agent-platform/api build
+RUN pnpm --filter @agent-platform/contracts build && pnpm --filter @agent-platform/db build && pnpm --filter @agent-platform/api build
 
 FROM node:20-alpine AS runner
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl python3 make g++
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -17,8 +18,11 @@ ENV HOST=0.0.0.0
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=build /app/packages/contracts/package.json packages/contracts/
+COPY --from=build /app/packages/db/package.json packages/db/
 COPY --from=build /app/apps/api/package.json apps/api/
 COPY --from=build /app/packages/contracts/dist packages/contracts/dist
+COPY --from=build /app/packages/db/dist packages/db/dist
+COPY --from=build /app/packages/db/drizzle packages/db/drizzle
 COPY --from=build /app/apps/api/dist apps/api/dist
 RUN pnpm install --frozen-lockfile --prod
 EXPOSE 3000

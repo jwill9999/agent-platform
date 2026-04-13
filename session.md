@@ -8,32 +8,32 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-13
-- **Session:** Foundation merged to `main`; integration branch rotated for Persistence epic
+- **Session:** **`agent-platform-j9x.1`** (DB schema + Drizzle + migrations) implemented on **`task/agent-platform-j9x.1`**
 
 ---
 
 ## What happened (recent)
 
-- **Foundation epic (mov.1–mov.5)** was implemented as a **chained branch**, merged in **one PR** to **`feature/agent-platform-mvp`**, then **`feature/agent-platform-mvp` → `main`**: [PR #7](https://github.com/jwill9999/agent-platform/pull/7), [PR #9](https://github.com/jwill9999/agent-platform/pull/9).
-- **Remote branch** **`feature/agent-platform-mvp`** was **deleted** after merge; **`main`** is the long-lived default line.
-- **New integration branch** for the **Persistence** epic: **`feature/agent-platform-persistence`** (created from current `main`, pushed to `origin`).
-- Task specs for **`agent-platform-j9x.*`** now reference **`feature/agent-platform-persistence`** for PR targets and branch-from instructions. Other future epics use the placeholder **`feature/<feature-name>`** in specs until each epic’s integration branch is created.
+- **`packages/db`:** Drizzle ORM + **better-sqlite3**; schema for skills, tools, MCP servers, agents + allowlist join tables, sessions, chat metadata, plans, plugin catalog refs, secret refs (labels only); **SQL migrations** under **`packages/db/drizzle`**; **`openDatabase`** runs **`migrate()`** on first open.
+- **API:** **`apps/api`** applies migrations when **`SQLITE_PATH`** is set (same compose env as before).
+- **Tests:** `packages/db` Vitest — migrate-on-clean DB + **Zod contracts** round-trip for Skill, Agent, Plan.
+- **Docker:** **`Dockerfile`** builds `packages/db`, copies **`dist`** + **`drizzle/`** migrations; Alpine build deps for native module.
+- **`decisions.md`:** ORM + migrations row added.
 
 ---
 
 ## Current state
 
-- **Codebase:** Monorepo on **`main`** with `apps/api`, `packages/contracts`, Docker, CI.
-- **Active integration branch (Persistence):** **`feature/agent-platform-persistence`** (for **`task/agent-platform-j9x.1` … `j9x.4`** segment).
-- **Tracking:** Next unblocked work: **`bd ready`** → **`agent-platform-j9x.1`** (Persistence: DB schema) when dependencies allow.
+- **Branch:** **`task/agent-platform-j9x.1`** — push and continue with **`agent-platform-j9x.2`** (encrypted secrets) from this branch after **`bd close`** for **`j9x.1`**.
+- **Integration:** **`feature/agent-platform-persistence`** — segment PR still from **`task/agent-platform-j9x.4`** → feature (not yet).
 
 ---
 
 ## Next (priority order)
 
-1. **`bd ready --json`** — confirm **`agent-platform-j9x.1`** is next; claim with **`bd update agent-platform-j9x.1 --claim`**.
-2. Branch **`task/agent-platform-j9x.1`** from **`feature/agent-platform-persistence`** (first task in Persistence segment).
-3. Implement Persistence segment per **`docs/tasks/agent-platform-j9x.*.md`** (chain through **`j9x.4`**, then one PR from **`task/agent-platform-j9x.4` → `feature/agent-platform-persistence`**).
+1. **`bd close agent-platform-j9x.1`** with reason pointing at this commit (after review).
+2. Branch **`task/agent-platform-j9x.2`** from **`task/agent-platform-j9x.1`** (or from **`origin/task/agent-platform-j9x.1`** once pushed).
+3. Implement **`docs/tasks/agent-platform-j9x.2.md`**.
 
 ---
 
