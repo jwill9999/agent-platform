@@ -1,0 +1,25 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      # SQLite file path inside the container; persisted on named volume below.
+      SQLITE_PATH: "/data/agent.sqlite"
+    volumes:
+      - sqlite_data:/data
+      # Future filesystem MCP: bind-mount a host workspace for tooling, e.g.
+      # - ${MCP_HOST_WORKSPACE:-./mcp-workspace}:/workspace:rw
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  sqlite_data:

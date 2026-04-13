@@ -24,6 +24,12 @@ Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and dec
 - `apps/*` — applications (e.g. `apps/api`)
 - `packages/*` — shared libraries (e.g. `packages/contracts`)
 
+## Docker
+
+- Copy `.env.example` to `.env` and adjust `HOST_PORT` / `SQLITE_PATH` as needed.
+- `docker compose up --build` builds the API image, maps `HOST_PORT` → container `3000`, mounts a **named volume** at `/data` for SQLite (`SQLITE_PATH` defaults to `/data/agent.sqlite` in Compose), and runs a **health check** on `GET /health`.
+- **Future filesystem MCP:** see commented volume examples in `docker-compose.yml` (e.g. bind-mount a host directory to `/workspace` for tooling).
+
 ## Git workflow
 
 See `decisions.md` and `AGENTS.md`: work on `task/<task-name>` branches from `feature/<feature-name>`; Beads (`bd`) tracks task state.
