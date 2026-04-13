@@ -63,6 +63,7 @@ Plugins **cannot** bypass harness validation or tool allowlists.
 |------|----------|
 | **Users / auth** | Single user, local-only; no multi-tenant product requirement. |
 | **Deployment** | **Docker** (Dockerfile + **Docker Compose** preferred for MVP). App runs locally; optional extra services (e.g. Postgres) added as separate compose services later. |
+| **Backend (`apps/api`)** | **Node.js** + **TypeScript**. HTTP server: **Express**. **Clean architecture:** separate **domain** and **application** (use cases) from **infrastructure** (DB, MCP, external APIs) and **interface** (HTTP routes/controllers stay thin). Use TypeScript **interfaces/types** and domain models at each boundary; align payloads with **`packages/contracts`** where they cross the API. |
 | **Database (MVP)** | **SQLite** on a **Docker volume**. Optional later: **Postgres** (or other) as an expansion path—may be presented as “plug-in” or compose profile when you implement it. |
 | **Secrets** | Support **storing secrets** (LLM API keys, MCP server keys, etc.) with **encryption at rest**; never log secret material. |
 | **Model router** | **OpenAI first** in the UI and router implementation; design the interface so **provider + model id + API key** can be supplied for the **default** agent and for specialists. **No hardcoded single model id**—user-configurable model string for MVP. Later: additional providers behind the same abstraction. |
