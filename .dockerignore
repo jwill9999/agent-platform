@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+**/dist
+**/tsconfig.tsbuildinfo
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+!README.md
+.cursor
+.vscode
+coverage
+.DS_Store
