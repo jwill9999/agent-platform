@@ -16,7 +16,13 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
    - Every **upstream** task in the spec’s table is done **and**
    - Beads `bd ready` / dependency graph agrees (if not, fix Beads first).
 
-5. **Template** — Copy [`_template.md`](./_template.md) when creating a new task spec; then wire the Beads issue.
+5. **Git (mandatory)** — **Never commit directly to `main`.**
+   - **Integration branch:** `feature/agent-platform-mvp` (long-running; all task PRs merge here).
+   - **Per task:** create **`task/<issue-id>`** from **latest** `feature/agent-platform-mvp` **before** starting work; open PR **`task/<issue-id>` → `feature/agent-platform-mvp`** when done; merge via PR only.
+   - **Sign-off:** checklist in the spec is complete, **unit tests** have been run and pass (minimum), PR merged into `feature/agent-platform-mvp`, then close the Beads issue.
+   - **MVP finish:** when all tasks are on `feature/agent-platform-mvp`, open **one** PR **`feature/agent-platform-mvp` → `main`**.
+
+6. **Template** — Copy [`_template.md`](./_template.md) when creating a new task spec; then wire the Beads issue.
 
 ## Epic index (task spec files)
 

@@ -132,32 +132,39 @@ Do not replace bd issues with these; keep tasks, acceptance criteria, and closur
 
 Each **task** issue includes `Spec: docs/tasks/<issue-id>.md` at the start of its **description**. Those Markdown files hold detailed implementation plans and sign-off checklists; **bd** still owns ordering via **`blocks`** dependencies. When planning discovers new cross-task dependencies, add **`bd dep add`** first, then update the spec tables.
 
-For more details, see README.md and docs/QUICKSTART.md.
+### Git branches (mandatory)
+
+- **Never commit directly to `main`.** Implementation work happens on **`task/<issue-id>`** branches only.
+- **Integration branch:** **`feature/agent-platform-mvp`**. Open PRs from each task branch **into `feature/agent-platform-mvp`**. When the MVP is complete, open **one** PR **`feature/agent-platform-mvp` → `main`**.
+- **Before sign-off:** unit tests run and pass (minimum); task spec checklist complete; PR merged to `feature/agent-platform-mvp`; then **`bd close`**.
+
+For more details, see `docs/tasks/README.md` and `decisions.md`.
 
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until the **current task branch** is pushed to `origin` (unless nothing was implemented).
 
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+2. **Run quality gates** (if code changed) - **Unit tests** (minimum), linters, builds
+3. **Update issue status** - Close finished work only after **PR merged** and checklist in `docs/tasks/<issue-id>.md` is complete
+4. **PUSH THE TASK BRANCH** - This is MANDATORY when commits exist:
    ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
+   git fetch origin
+   git rebase origin/feature/agent-platform-mvp   # or pull --rebase if configured
+   git push -u origin HEAD
+   git status
    ```
+   Do **not** push to `main`. If using `bd` with git export, run your usual **`bd` sync** workflow if the project documents it.
 5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
+6. **Verify** - All changes committed AND pushed to the **task branch**; open PR to **`feature/agent-platform-mvp`** if the task is ready for review
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
+- Work is NOT complete until the **task branch** is pushed when there are commits
+- NEVER commit directly to **`main`**
+- NEVER merge a task PR to **`main`**; merge to **`feature/agent-platform-mvp`** only until the final MVP PR
 - If push fails, resolve and retry until it succeeds
 
 <!-- END BEADS INTEGRATION -->
