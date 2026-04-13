@@ -13,6 +13,21 @@ Single source of truth for **architectural and product decisions** agreed with t
 
 ---
 
+## Task management: Beads vs Git (single source of truth)
+
+| Concern | Source of truth | How to check |
+|--------|-----------------|--------------|
+| **What is the next task?** | **Beads** | `bd ready --json` (unblocked work) |
+| **What is open / in progress / done?** | **Beads** | `bd list`, `bd show <id>`; close with `bd close <id>` when the task spec + Git workflow are satisfied |
+| **Dependencies (order)** | **Beads** | `bd dep list <id>`; `blocks` edges |
+| **Commits, branches, merges** | **Git** | Normal Git workflow (`feature/…`, `task/…`); **do not** infer Beads status from branch names alone |
+
+**For you and the agent:** when you say “move on to the next task,” the agent should **`bd ready`** (or **`bd show`** on the agreed next id)—**not** guess from Git alone.
+
+**`.beads/` in this repo:** Beads stores issues in a **local Dolt-backed database** (see `.beads/metadata.json`). The **`dolt/`** directory and **`backup/`** JSONL exports are typically **gitignored**—the **live issue state** is maintained by the **`bd`** CLI and hooks, not by hand-editing JSONL. Tracked files under `.beads/` include **config**, **hooks**, and **`README.md`** (upstream template). Use **`bd`** commands to create/update/close issues; commit code changes in Git as usual. For moving work between machines, follow your Beads version’s sync/backup guidance (`bd` help / project hooks).
+
+---
+
 ## Thinking stream (MVP recommendation)
 
 **What it is:** A separate channel in the chat stream for **model reasoning** (sometimes exposed by providers as “reasoning tokens”, “thinking”, or extended chain-of-thought). The UI can show it collapsed, behind a toggle, or in a secondary panel so it does not clutter the main answer.

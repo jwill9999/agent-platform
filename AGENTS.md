@@ -2,6 +2,8 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+**Beads = task state** (next task, open/done, dependencies). **Git = code history** (branches, commits). When picking or finishing work, use **`bd ready`** / **`bd show`** / **`bd close`**—do not rely on Git alone. See **`decisions.md`** → *Task management: Beads vs Git*.
+
 ## Quick Reference
 
 ```bash
