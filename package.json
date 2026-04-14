@@ -6,7 +6,7 @@
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
-    "typecheck": "pnpm --filter @agent-platform/contracts build && pnpm --filter @agent-platform/agent-validation build && pnpm --filter @agent-platform/db build && pnpm --filter @agent-platform/mcp-adapter build && pnpm -r run typecheck",
+    "typecheck": "pnpm --filter @agent-platform/contracts build && pnpm --filter @agent-platform/agent-validation build && pnpm --filter @agent-platform/db build && pnpm --filter @agent-platform/mcp-adapter build && pnpm --filter @agent-platform/harness build && pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "format": "prettier --write \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
     "format:check": "prettier --check \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
