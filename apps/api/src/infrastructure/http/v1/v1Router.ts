@@ -7,7 +7,7 @@ import {
   ToolSchema,
 } from '@agent-platform/contracts';
 import {
-  openAiLegacyBlockedMessage,
+  gateOpenAiKeyResolution,
   resolveOpenAiKeyForRequest,
   streamOpenAiChat,
 } from '@agent-platform/model-router';
@@ -321,17 +321,14 @@ export function createV1Router(db: DrizzleDb): Router {
         preferredEnvVar: 'AGENT_OPENAI_API_KEY',
         headerKey: req.header('x-openai-key'),
       });
-      if (resolved.status === 'legacy_blocked') {
-        throw new HttpError(
-          400,
-          'LEGACY_ENV_BLOCKED',
-          openAiLegacyBlockedMessage('AGENT_OPENAI_API_KEY'),
-        );
+      const gated = gateOpenAiKeyResolution(resolved, 'AGENT_OPENAI_API_KEY');
+      if (gated.outcome === 'legacy_blocked') {
+        throw new HttpError(400, 'LEGACY_ENV_BLOCKED', gated.message);
       }
-      if (resolved.status !== 'ok') {
+      if (gated.outcome === 'missing') {
         throw new HttpError(400, 'MISSING_KEY', 'Set AGENT_OPENAI_API_KEY or x-openai-key header');
       }
-      const apiKey = resolved.key;
+      const apiKey = gated.key;
       const result = streamOpenAiChat({
         apiKey,
         model: body.model,

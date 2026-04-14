@@ -1,5 +1,5 @@
 import {
-  openAiLegacyBlockedMessage,
+  gateOpenAiKeyResolution,
   resolveOpenAiKeyForRequest,
   streamOpenAiChat,
   type ChatMessage,
@@ -35,22 +35,20 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 
 export async function POST(req: Request) {
   const resolved = resolveOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' });
-  if (resolved.status === 'legacy_blocked') {
-    return new Response(
-      JSON.stringify({ error: openAiLegacyBlockedMessage('NEXT_OPENAI_API_KEY') }),
-      {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      },
-    );
+  const gated = gateOpenAiKeyResolution(resolved, 'NEXT_OPENAI_API_KEY');
+  if (gated.outcome === 'legacy_blocked') {
+    return new Response(JSON.stringify({ error: gated.message }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
-  const apiKey = resolved.status === 'ok' ? resolved.key : null;
-  if (!apiKey) {
+  if (gated.outcome === 'missing') {
     return new Response(JSON.stringify({ error: 'NEXT_OPENAI_API_KEY is not set' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  const apiKey = gated.key;
 
   let body: unknown;
   try {

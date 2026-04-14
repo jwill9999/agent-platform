@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  gateOpenAiKeyResolution,
   openAiLegacyBlockedMessage,
   resolveOpenAiApiKeyFromEnv,
   resolveOpenAiKeyForRequest,
@@ -83,5 +84,25 @@ describe('resolveOpenAiApiKeyFromEnv', () => {
         headerKey: ' sk-header ',
       }),
     ).toEqual({ status: 'ok', key: 'sk-header' });
+  });
+});
+
+describe('gateOpenAiKeyResolution', () => {
+  it('maps legacy_blocked to message', () => {
+    const g = gateOpenAiKeyResolution({ status: 'legacy_blocked' }, 'NEXT_OPENAI_API_KEY');
+    expect(g.outcome).toBe('legacy_blocked');
+    if (g.outcome === 'legacy_blocked') {
+      expect(g.message).toContain('NEXT_OPENAI_API_KEY');
+    }
+  });
+
+  it('passes through ok and missing', () => {
+    expect(gateOpenAiKeyResolution({ status: 'ok', key: 'k' }, 'AGENT_OPENAI_API_KEY')).toEqual({
+      outcome: 'ok',
+      key: 'k',
+    });
+    expect(gateOpenAiKeyResolution({ status: 'missing' }, 'AGENT_OPENAI_API_KEY')).toEqual({
+      outcome: 'missing',
+    });
   });
 });

@@ -44,3 +44,22 @@ export function resolveOpenAiKeyForRequest(options: {
   if (header) return { status: 'ok', key: header };
   return resolveOpenAiApiKeyFromEnv(options.preferredEnvVar);
 }
+
+/** Normalizes resolution into a single branch tree (reduces duplicated handlers in apps). */
+export type OpenAiKeyGateResult =
+  | { outcome: 'ok'; key: string }
+  | { outcome: 'legacy_blocked'; message: string }
+  | { outcome: 'missing' };
+
+export function gateOpenAiKeyResolution(
+  resolved: OpenAiKeyResolveResult,
+  preferredEnvVar: PreferredOpenAiEnvVar,
+): OpenAiKeyGateResult {
+  if (resolved.status === 'legacy_blocked') {
+    return { outcome: 'legacy_blocked', message: openAiLegacyBlockedMessage(preferredEnvVar) };
+  }
+  if (resolved.status === 'ok') {
+    return { outcome: 'ok', key: resolved.key };
+  }
+  return { outcome: 'missing' };
+}
