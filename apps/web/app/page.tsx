@@ -23,7 +23,8 @@ export default function HomePage() {
       <h1 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Chat</h1>
       <p style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.75rem' }}>
         Uses the same OpenAI streaming stack as the API (<code>/v1/chat/stream</code>). Set{' '}
-        <code>NEXT_OPENAI_API_KEY</code> for this Next.js server (see <code>apps/web/.env.example</code>
+        <code>NEXT_OPENAI_API_KEY</code> for this Next.js server (see{' '}
+        <code>apps/web/.env.example</code>
         ).
       </p>
 
@@ -120,6 +121,17 @@ export default function HomePage() {
 
 function formatChatError(error: unknown): string {
   const fallback = 'Request failed';
+  if (typeof error === 'string') {
+    return error || fallback;
+  }
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof (error as { message: unknown }).message === 'string'
+  ) {
+    return (error as { message: string }).message || fallback;
+  }
   if (!(error instanceof Error)) {
     return fallback;
   }
@@ -135,7 +147,8 @@ function formatChatError(error: unknown): string {
   const statusPart = cause?.statusCode ? `HTTP ${cause.statusCode}` : '';
   const bodyMessage = extractErrorMessage(cause?.body);
   const baseMessage =
-    bodyMessage || (error.message && error.message !== 'An error occurred.' ? error.message : fallback);
+    bodyMessage ||
+    (error.message && error.message !== 'An error occurred.' ? error.message : fallback);
 
   return statusPart ? `${baseMessage} (${statusPart})` : baseMessage;
 }
