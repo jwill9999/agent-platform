@@ -1,6 +1,6 @@
 import {
   openAiLegacyBlockedMessage,
-  resolveOpenAiApiKeyFromEnv,
+  resolveOpenAiKeyForRequest,
   streamOpenAiChat,
   type ChatMessage,
 } from '@agent-platform/model-router';
@@ -34,7 +34,7 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 }
 
 export async function POST(req: Request) {
-  const resolved = resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY');
+  const resolved = resolveOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' });
   if (resolved.status === 'legacy_blocked') {
     return new Response(
       JSON.stringify({ error: openAiLegacyBlockedMessage('NEXT_OPENAI_API_KEY') }),
