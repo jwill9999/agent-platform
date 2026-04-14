@@ -1,5 +1,5 @@
 import {
-  OpenAiLegacyEnvBlockedError,
+  openAiLegacyBlockedMessage,
   resolveOpenAiApiKeyFromEnv,
   streamOpenAiChat,
   type ChatMessage,
@@ -34,18 +34,17 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 }
 
 export async function POST(req: Request) {
-  let apiKey: string | null = null;
-  try {
-    apiKey = resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY');
-  } catch (error) {
-    if (error instanceof OpenAiLegacyEnvBlockedError) {
-      return new Response(JSON.stringify({ error: error.message }), {
+  const resolved = resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY');
+  if (resolved.status === 'legacy_blocked') {
+    return new Response(
+      JSON.stringify({ error: openAiLegacyBlockedMessage('NEXT_OPENAI_API_KEY') }),
+      {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
-      });
-    }
-    throw error;
+      },
+    );
   }
+  const apiKey = resolved.status === 'ok' ? resolved.key : null;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'NEXT_OPENAI_API_KEY is not set' }), {
       status: 500,

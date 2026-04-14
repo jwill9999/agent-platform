@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  OpenAiLegacyEnvBlockedError,
+  openAiLegacyBlockedMessage,
   resolveOpenAiApiKeyFromEnv,
 } from '../src/resolveOpenAiApiKey.js';
 
@@ -31,39 +31,46 @@ describe('resolveOpenAiApiKeyFromEnv', () => {
     for (const k of keys) delete process.env[k];
   });
 
-  it('returns preferred AGENT_OPENAI_API_KEY when set', () => {
+  it('prefers scoped keys over legacy OPENAI_API_KEY', () => {
     process.env.AGENT_OPENAI_API_KEY = ' sk-agent ';
     process.env.OPENAI_API_KEY = 'sk-legacy';
-    expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toBe('sk-agent');
-  });
+    expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toEqual({
+      status: 'ok',
+      key: 'sk-agent',
+    });
 
-  it('returns preferred NEXT_OPENAI_API_KEY when set', () => {
     process.env.NEXT_OPENAI_API_KEY = 'sk-next';
-    process.env.OPENAI_API_KEY = 'sk-legacy';
-    expect(resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY')).toBe('sk-next');
+    expect(resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY')).toEqual({
+      status: 'ok',
+      key: 'sk-next',
+    });
   });
 
-  it('returns null when no keys are set', () => {
-    expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toBeNull();
+  it('returns missing when no keys are set', () => {
+    expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toEqual({ status: 'missing' });
   });
 
-  it('throws OpenAiLegacyEnvBlockedError when only OPENAI_API_KEY is set', () => {
+  it('returns legacy_blocked when only OPENAI_API_KEY is set', () => {
     const snap = snapshotEnv();
     try {
       process.env.OPENAI_API_KEY = 'sk-legacy';
       delete process.env.AGENT_OPENAI_API_KEY;
       delete process.env.OPENAI_ALLOW_LEGACY_ENV;
-      expect(() => resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toThrow(
-        OpenAiLegacyEnvBlockedError,
-      );
+      expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toEqual({
+        status: 'legacy_blocked',
+      });
+      expect(openAiLegacyBlockedMessage('AGENT_OPENAI_API_KEY')).toContain('AGENT_OPENAI_API_KEY');
     } finally {
       restoreEnv(snap);
     }
   });
 
-  it('uses OPENAI_API_KEY when OPENAI_ALLOW_LEGACY_ENV=1', () => {
+  it('allows OPENAI_API_KEY when OPENAI_ALLOW_LEGACY_ENV=1', () => {
     process.env.OPENAI_API_KEY = 'sk-legacy';
     process.env.OPENAI_ALLOW_LEGACY_ENV = '1';
-    expect(resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY')).toBe('sk-legacy');
+    expect(resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY')).toEqual({
+      status: 'ok',
+      key: 'sk-legacy',
+    });
   });
 });
