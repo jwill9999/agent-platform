@@ -6,6 +6,7 @@ import { SessionMemoryStore, createSessionMemoryPlugin } from '../src/index.js';
 const agent: Agent = {
   id: 'a1',
   name: 'A',
+  systemPrompt: 'Test agent',
   allowedSkillIds: [],
   allowedToolIds: [],
   allowedMcpServerIds: [],

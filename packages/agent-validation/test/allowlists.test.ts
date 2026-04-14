@@ -11,6 +11,7 @@ const limits = {
 const baseAgent: Agent = {
   id: 'a1',
   name: 'Test',
+  systemPrompt: 'Test agent',
   allowedSkillIds: ['s1'],
   allowedToolIds: ['t-plain'],
   allowedMcpServerIds: ['mcp-fs'],

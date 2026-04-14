@@ -70,6 +70,8 @@ export function loadAgentById(db: DrizzleDb, id: string): Agent | undefined {
   return AgentSchema.parse({
     id: row.id,
     name: row.name,
+    systemPrompt: row.systemPrompt,
+    description: row.description ?? undefined,
     allowedSkillIds: skillRows.map((r) => r.skillId),
     allowedToolIds: toolRows.map((r) => r.toolId),
     allowedMcpServerIds: mcpRows.map((r) => r.mcpServerId),

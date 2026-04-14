@@ -58,6 +58,7 @@ describe('contracts v0 alignment', () => {
       .values({
         id: 'agent-1',
         name: 'Default',
+        systemPrompt: 'Test agent for contracts alignment',
         executionLimitsJson: JSON.stringify({
           maxSteps: 10,
           maxParallelTasks: 2,
