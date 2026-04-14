@@ -48,6 +48,12 @@ importers:
       '@agent-platform/harness':
         specifier: workspace:*
         version: link:../../packages/harness
+      '@agent-platform/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../packages/plugin-sdk
+      '@agent-platform/plugin-session':
+        specifier: workspace:*
+        version: link:../../packages/plugin-session
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25
@@ -230,6 +236,25 @@ importers:
       '@agent-platform/contracts':
         specifier: workspace:*
         version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.17
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.17)
+
+  packages/plugin-session:
+    dependencies:
+      '@agent-platform/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@agent-platform/plugin-sdk':
+        specifier: workspace:*
+        version: link:../plugin-sdk
     devDependencies:
       '@types/node':
         specifier: ^22.10.2
