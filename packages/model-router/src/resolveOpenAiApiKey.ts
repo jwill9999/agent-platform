@@ -63,3 +63,30 @@ export function gateOpenAiKeyResolution(
   }
   return { outcome: 'missing' };
 }
+
+/** Single entry point: resolve from header/env and apply legacy guard (for callers that should not duplicate gate logic). */
+export function resolveGatedOpenAiKeyForRequest(options: {
+  preferredEnvVar: PreferredOpenAiEnvVar;
+  headerKey?: string | null;
+}): OpenAiKeyGateResult {
+  return gateOpenAiKeyResolution(resolveOpenAiKeyForRequest(options), options.preferredEnvVar);
+}
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
+
+/** Next.js `/api/chat`: returns a JSON error Response or the resolved key (no duplicated branch trees in the route). */
+export function getOpenAiKeyOrNextJsonResponse(gated: OpenAiKeyGateResult): Response | string {
+  if (gated.outcome === 'legacy_blocked') {
+    return new Response(JSON.stringify({ error: gated.message }), {
+      status: 400,
+      headers: JSON_HEADERS,
+    });
+  }
+  if (gated.outcome === 'missing') {
+    return new Response(JSON.stringify({ error: 'NEXT_OPENAI_API_KEY is not set' }), {
+      status: 500,
+      headers: JSON_HEADERS,
+    });
+  }
+  return gated.key;
+}

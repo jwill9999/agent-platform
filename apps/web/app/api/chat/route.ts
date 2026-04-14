@@ -1,6 +1,6 @@
 import {
-  gateOpenAiKeyResolution,
-  resolveOpenAiKeyForRequest,
+  getOpenAiKeyOrNextJsonResponse,
+  resolveGatedOpenAiKeyForRequest,
   streamOpenAiChat,
   type ChatMessage,
 } from '@agent-platform/model-router';
@@ -34,21 +34,10 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 }
 
 export async function POST(req: Request) {
-  const resolved = resolveOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' });
-  const gated = gateOpenAiKeyResolution(resolved, 'NEXT_OPENAI_API_KEY');
-  if (gated.outcome === 'legacy_blocked') {
-    return new Response(JSON.stringify({ error: gated.message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-  if (gated.outcome === 'missing') {
-    return new Response(JSON.stringify({ error: 'NEXT_OPENAI_API_KEY is not set' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-  const apiKey = gated.key;
+  const gated = resolveGatedOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' });
+  const keyOrError = getOpenAiKeyOrNextJsonResponse(gated);
+  if (keyOrError instanceof Response) return keyOrError;
+  const apiKey = keyOrError;
 
   let body: unknown;
   try {

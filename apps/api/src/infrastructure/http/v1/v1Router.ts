@@ -6,11 +6,7 @@ import {
   SkillSchema,
   ToolSchema,
 } from '@agent-platform/contracts';
-import {
-  gateOpenAiKeyResolution,
-  resolveOpenAiKeyForRequest,
-  streamOpenAiChat,
-} from '@agent-platform/model-router';
+import { resolveGatedOpenAiKeyForRequest, streamOpenAiChat } from '@agent-platform/model-router';
 import type { DrizzleDb } from '@agent-platform/db';
 import {
   createSession,
@@ -317,11 +313,10 @@ export function createV1Router(db: DrizzleDb): Router {
     '/chat/stream',
     asyncHandler(async (req, res) => {
       const body = parseBody(ChatStreamBodySchema, req.body);
-      const resolved = resolveOpenAiKeyForRequest({
+      const gated = resolveGatedOpenAiKeyForRequest({
         preferredEnvVar: 'AGENT_OPENAI_API_KEY',
         headerKey: req.header('x-openai-key'),
       });
-      const gated = gateOpenAiKeyResolution(resolved, 'AGENT_OPENAI_API_KEY');
       if (gated.outcome === 'legacy_blocked') {
         throw new HttpError(400, 'LEGACY_ENV_BLOCKED', gated.message);
       }

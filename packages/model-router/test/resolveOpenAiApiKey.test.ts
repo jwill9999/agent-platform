@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   gateOpenAiKeyResolution,
+  getOpenAiKeyOrNextJsonResponse,
   openAiLegacyBlockedMessage,
+  resolveGatedOpenAiKeyForRequest,
   resolveOpenAiApiKeyFromEnv,
   resolveOpenAiKeyForRequest,
 } from '../src/resolveOpenAiApiKey.js';
@@ -104,5 +106,40 @@ describe('gateOpenAiKeyResolution', () => {
     expect(gateOpenAiKeyResolution({ status: 'missing' }, 'AGENT_OPENAI_API_KEY')).toEqual({
       outcome: 'missing',
     });
+  });
+});
+
+describe('resolveGatedOpenAiKeyForRequest + getOpenAiKeyOrNextJsonResponse', () => {
+  afterEach(() => {
+    for (const k of keys) delete process.env[k];
+  });
+
+  it('matches gateOpenAiKeyResolution(resolveOpenAiKeyForRequest(...))', () => {
+    process.env.OPENAI_API_KEY = 'sk-legacy';
+    const a = resolveGatedOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' });
+    const b = gateOpenAiKeyResolution(
+      resolveOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' }),
+      'NEXT_OPENAI_API_KEY',
+    );
+    expect(a).toEqual(b);
+  });
+
+  it('returns JSON Response for legacy_blocked and missing', async () => {
+    const blocked = getOpenAiKeyOrNextJsonResponse({
+      outcome: 'legacy_blocked',
+      message: 'msg',
+    });
+    expect(blocked).toBeInstanceOf(Response);
+    expect((blocked as Response).status).toBe(400);
+    expect(await (blocked as Response).json()).toEqual({ error: 'msg' });
+
+    const missing = getOpenAiKeyOrNextJsonResponse({ outcome: 'missing' });
+    expect(missing).toBeInstanceOf(Response);
+    expect((missing as Response).status).toBe(500);
+    expect(await (missing as Response).json()).toEqual({ error: 'NEXT_OPENAI_API_KEY is not set' });
+  });
+
+  it('returns key string when ok', () => {
+    expect(getOpenAiKeyOrNextJsonResponse({ outcome: 'ok', key: 'sk' })).toBe('sk');
   });
 });
