@@ -25,6 +25,20 @@ function jsonError(status: number, code: string, message: string, details?: unkn
   );
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Chat request failed';
+  }
+}
+
 function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessages>): ChatMessage[] {
   return core.map((m) => {
     const role = m.role;
@@ -68,9 +82,11 @@ export async function POST(req: Request) {
     const core = convertToCoreMessages(parsed.data.messages as UIMessage[]);
     const messages = coreMessagesToChatMessages(core);
     const result = streamOpenAiChat({ apiKey, model, messages });
-    return result.toDataStreamResponse();
+    return result.toDataStreamResponse({
+      getErrorMessage: (error) => `CHAT_STREAM_ERROR: ${getErrorMessage(error)}`,
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Chat request failed';
+    const message = getErrorMessage(error);
     return jsonError(502, 'CHAT_STREAM_ERROR', message);
   }
 }
