@@ -71,3 +71,61 @@ jobs:
           tags: agent-platform-api:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start API + web (compose profile services)
+        run: docker compose --profile services up -d --build
+
+      - name: Wait for web
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3001/ >/dev/null; then
+              echo "web ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "web did not become ready"
+          docker compose --profile services ps
+          exit 1
+
+      - name: E2E seed (default + specialist/MCP/skill)
+        run: docker compose exec -T api sh -c 'E2E_SEED=1 SQLITE_PATH=/data/agent.sqlite node packages/db/dist/seed/run.js'
+
+      - name: E2E tests
+        env:
+          BASE_URL: http://127.0.0.1:3001
+          API_URL: http://127.0.0.1:3000
+        run: pnpm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886fe486c0d22 # v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+      - name: Stop compose
+        if: always()
+        run: docker compose --profile services down -v

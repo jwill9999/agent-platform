@@ -14,8 +14,8 @@ services:
       # SECRETS_MASTER_KEY: ""
     volumes:
       - sqlite_data:/data
-      # Future filesystem MCP: bind-mount a host workspace for tooling, e.g.
-      # - ${MCP_HOST_WORKSPACE:-./mcp-workspace}:/workspace:rw
+      # E2E filesystem MCP seed expects a mount at /workspace (see packages/db e2e seed).
+      - e2e_workspace:/workspace:rw
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
       interval: 10s
@@ -23,5 +23,27 @@ services:
       retries: 5
       start_period: 15s
 
+  web:
+    profiles: ["services"]
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "${WEB_HOST_PORT:-3001}:3001"
+    environment:
+      PORT: "3001"
+      HOSTNAME: "0.0.0.0"
+      API_PROXY_URL: "http://api:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
 volumes:
   sqlite_data:
+  e2e_workspace:
