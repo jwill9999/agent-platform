@@ -72,23 +72,23 @@ pnpm seed or equivalent runs clean; default agent queryable; documented in READM
 
 ## Definition of done
 
-- [ ] Beads **description** and **acceptance_criteria** satisfied.
-- [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
-- [ ] All **upstream** Beads issues are **closed** (per Beads).
-- [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-j9x.3`** pushed; next task branches from here (**no** PR to `feature/agent-platform-persistence` until **`task/agent-platform-j9x.4`**)
-- [ ] This spec file updated if scope or dependencies changed during implementation.
+- [x] Beads **description** and **acceptance_criteria** satisfied.
+- [x] **Every checkbox** in this spec (including **Sign-off**) is complete.
+- [x] All **upstream** Beads issues are **closed** (per Beads).
+- [x] **Unit tests** run and pass (minimum); integration/E2E as required above.
+- [x] **Branch** **`task/agent-platform-j9x.3`** pushed; next task branches from here (**no** PR to `feature/agent-platform-persistence` until **`task/agent-platform-j9x.4`**)
+- [x] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
 Complete after work is on **`task/agent-platform-j9x.3`** and tests are green (PR to `feature` only at segment tip).
 
-- [ ] **Task branch** **`task/agent-platform-j9x.3`** created from **`task/agent-platform-j9x.2`** before implementation
-- [ ] **Unit tests** executed and passing (minimum gate)
-- [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-j9x.4`**
-- [ ] `bd close agent-platform-j9x.3 --reason "…"`
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] **Task branch** **`task/agent-platform-j9x.3`** created from **`task/agent-platform-j9x.2`** before implementation
+- [x] **Unit tests** executed and passing (minimum gate)
+- [x] **Checklists** in this document (Definition of done + Sign-off) are complete
+- [x] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-j9x.4`**
+- [x] `bd close agent-platform-j9x.3`
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** _____________________ **Date:** _____________

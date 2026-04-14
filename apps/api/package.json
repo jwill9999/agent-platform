@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@agent-platform/contracts": "workspace:*",
-    "express": "^4.21.2"
+    "@agent-platform/db": "workspace:*",
+    "express": "^4.21.2",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
