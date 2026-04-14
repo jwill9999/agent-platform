@@ -74,38 +74,49 @@ export function resolveGatedOpenAiKeyForRequest(options: {
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' } as const;
 
-/** Next.js `/api/chat`: returns a JSON error Response or the resolved key (no duplicated branch trees in the route). */
+/**
+ * Single switch over gated outcomes (avoids duplicated if-chains across Next/API callers).
+ */
+export function foldOpenAiKeyGate<T>(
+  gated: OpenAiKeyGateResult,
+  handlers: {
+    legacyBlocked: (message: string) => T;
+    missing: () => T;
+    ok: (key: string) => T;
+  },
+): T {
+  if (gated.outcome === 'legacy_blocked') return handlers.legacyBlocked(gated.message);
+  if (gated.outcome === 'missing') return handlers.missing();
+  return handlers.ok(gated.key);
+}
+
+/** Next.js `/api/chat`: JSON error Response or resolved key string. */
 export function getOpenAiKeyOrNextJsonResponse(gated: OpenAiKeyGateResult): Response | string {
-  if (gated.outcome === 'legacy_blocked') {
-    return new Response(JSON.stringify({ error: gated.message }), {
-      status: 400,
-      headers: JSON_HEADERS,
-    });
-  }
-  if (gated.outcome === 'missing') {
-    return new Response(JSON.stringify({ error: 'NEXT_OPENAI_API_KEY is not set' }), {
-      status: 500,
-      headers: JSON_HEADERS,
-    });
-  }
-  return gated.key;
+  return foldOpenAiKeyGate<Response | string>(gated, {
+    legacyBlocked: (message) =>
+      new Response(JSON.stringify({ error: message }), { status: 400, headers: JSON_HEADERS }),
+    missing: () =>
+      new Response(JSON.stringify({ error: 'NEXT_OPENAI_API_KEY is not set' }), {
+        status: 500,
+        headers: JSON_HEADERS,
+      }),
+    ok: (key) => key,
+  });
 }
 
 export type ApiOpenAiKeyOutcome =
   | { kind: 'ok'; key: string }
   | { kind: 'error'; code: 'LEGACY_ENV_BLOCKED' | 'MISSING_KEY'; message: string };
 
-/** Express `/v1/chat/stream`: map gated result to HTTP error codes or key (no duplicated outcome branches in the router). */
+/** Express `/v1/chat/stream`: map to HttpError payload shape. */
 export function openAiKeyGateToApiOutcome(gated: OpenAiKeyGateResult): ApiOpenAiKeyOutcome {
-  if (gated.outcome === 'legacy_blocked') {
-    return { kind: 'error', code: 'LEGACY_ENV_BLOCKED', message: gated.message };
-  }
-  if (gated.outcome === 'missing') {
-    return {
+  return foldOpenAiKeyGate<ApiOpenAiKeyOutcome>(gated, {
+    legacyBlocked: (message) => ({ kind: 'error', code: 'LEGACY_ENV_BLOCKED', message }),
+    missing: () => ({
       kind: 'error',
       code: 'MISSING_KEY',
       message: 'Set AGENT_OPENAI_API_KEY or x-openai-key header',
-    };
-  }
-  return { kind: 'ok', key: gated.key };
+    }),
+    ok: (key) => ({ kind: 'ok', key }),
+  });
 }

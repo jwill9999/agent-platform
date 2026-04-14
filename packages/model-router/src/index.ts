@@ -1,5 +1,6 @@
 export { streamOpenAiChat, type ChatMessage } from './openai.js';
 export {
+  foldOpenAiKeyGate,
   gateOpenAiKeyResolution,
   getOpenAiKeyOrNextJsonResponse,
   openAiKeyGateToApiOutcome,

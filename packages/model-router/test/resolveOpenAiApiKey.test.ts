@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  foldOpenAiKeyGate,
   gateOpenAiKeyResolution,
   getOpenAiKeyOrNextJsonResponse,
   openAiKeyGateToApiOutcome,
@@ -162,5 +163,40 @@ describe('openAiKeyGateToApiOutcome', () => {
       kind: 'ok',
       key: 'k',
     });
+  });
+});
+
+describe('foldOpenAiKeyGate', () => {
+  it('dispatches all three outcomes', () => {
+    expect(
+      foldOpenAiKeyGate(
+        { outcome: 'legacy_blocked', message: 'x' },
+        {
+          legacyBlocked: (m) => m,
+          missing: () => 'm',
+          ok: () => 'o',
+        },
+      ),
+    ).toBe('x');
+    expect(
+      foldOpenAiKeyGate(
+        { outcome: 'missing' },
+        {
+          legacyBlocked: () => 'l',
+          missing: () => 'm',
+          ok: () => 'o',
+        },
+      ),
+    ).toBe('m');
+    expect(
+      foldOpenAiKeyGate(
+        { outcome: 'ok', key: 'k' },
+        {
+          legacyBlocked: () => 'l',
+          missing: () => 'm',
+          ok: (k) => k,
+        },
+      ),
+    ).toBe('k');
   });
 });
