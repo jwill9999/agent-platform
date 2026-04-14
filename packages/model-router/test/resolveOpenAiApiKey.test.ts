@@ -53,7 +53,9 @@ describe('resolveOpenAiApiKeyFromEnv', () => {
       process.env.OPENAI_API_KEY = 'sk-legacy';
       delete process.env.AGENT_OPENAI_API_KEY;
       delete process.env.OPENAI_ALLOW_LEGACY_ENV;
-      expect(() => resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toThrow(OpenAiLegacyEnvBlockedError);
+      expect(() => resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toThrow(
+        OpenAiLegacyEnvBlockedError,
+      );
     } finally {
       restoreEnv(snap);
     }
