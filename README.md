@@ -29,6 +29,9 @@ make dev
 # Seed DB, then start both services
 make dev-seed
 
+# Reset local sqlite DB, seed it, then start both services
+make dev-reset-seed
+
 # Override ports/path when needed
 make dev-seed PORT=3000 WEB_PORT=3001 SQLITE_PATH=/workspace/data/dev.sqlite
 ```
