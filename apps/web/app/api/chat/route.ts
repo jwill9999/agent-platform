@@ -9,6 +9,22 @@ const ChatPostBodySchema = z.object({
   model: z.string().optional(),
 });
 
+function jsonError(status: number, code: string, message: string, details?: unknown): Response {
+  return new Response(
+    JSON.stringify({
+      error: {
+        code,
+        message,
+        ...(details === undefined ? {} : { details }),
+      },
+    }),
+    {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+}
+
 function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessages>): ChatMessage[] {
   return core.map((m) => {
     const role = m.role;
@@ -31,34 +47,30 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'OPENAI_API_KEY is not set' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError(500, 'MISSING_KEY', 'OPENAI_API_KEY is not set');
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError(400, 'INVALID_JSON', 'Invalid JSON');
   }
 
   const parsed = ChatPostBodySchema.safeParse(body);
   if (!parsed.success) {
-    return new Response(JSON.stringify({ error: 'Invalid body: expected { messages, model? }' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError(400, 'INVALID_BODY', 'Invalid body: expected { messages, model? }');
   }
 
   const model = parsed.data.model ?? 'gpt-4o-mini';
 
-  const core = convertToCoreMessages(parsed.data.messages as UIMessage[]);
-  const messages = coreMessagesToChatMessages(core);
-  const result = streamOpenAiChat({ apiKey, model, messages });
-  return result.toDataStreamResponse();
+  try {
+    const core = convertToCoreMessages(parsed.data.messages as UIMessage[]);
+    const messages = coreMessagesToChatMessages(core);
+    const result = streamOpenAiChat({ apiKey, model, messages });
+    return result.toDataStreamResponse();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Chat request failed';
+    return jsonError(502, 'CHAT_STREAM_ERROR', message);
+  }
 }

@@ -14,6 +14,7 @@ export default function HomePage() {
     api: '/api/chat',
     body: { model: defaultModel },
   });
+  const errorMessage = formatChatError(error);
 
   const busy = status === 'streaming' || status === 'submitted';
 
@@ -48,7 +49,7 @@ export default function HomePage() {
       {error ? (
         <OutputRenderer
           showThinking={showThinking}
-          output={{ type: 'error', message: error.message ?? 'Request failed' }}
+          output={{ type: 'error', message: errorMessage }}
         />
       ) : null}
 
@@ -115,4 +116,51 @@ export default function HomePage() {
       </form>
     </div>
   );
+}
+
+function formatChatError(error: unknown): string {
+  const fallback = 'Request failed';
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+
+  // ai-sdk wraps API error metadata in `cause` where available.
+  const cause = error.cause as
+    | {
+        statusCode?: number;
+        body?: unknown;
+      }
+    | undefined;
+
+  const statusPart = cause?.statusCode ? `HTTP ${cause.statusCode}` : '';
+  const bodyMessage = extractErrorMessage(cause?.body);
+  const baseMessage =
+    bodyMessage || (error.message && error.message !== 'An error occurred.' ? error.message : fallback);
+
+  return statusPart ? `${baseMessage} (${statusPart})` : baseMessage;
+}
+
+function extractErrorMessage(body: unknown): string | null {
+  if (!body || typeof body !== 'object') {
+    return null;
+  }
+  const payload = body as { error?: unknown; message?: unknown };
+  if (typeof payload.message === 'string' && payload.message.trim()) {
+    return payload.message;
+  }
+  if (payload.error && typeof payload.error === 'object') {
+    const err = payload.error as { code?: unknown; message?: unknown };
+    const msg = typeof err.message === 'string' ? err.message : '';
+    const code = typeof err.code === 'string' ? err.code : '';
+    if (msg && code) {
+      return `${code}: ${msg}`;
+    }
+    if (msg) {
+      return msg;
+    }
+    if (code) {
+      return code;
+    }
+  }
+  return null;
 }
