@@ -7,6 +7,8 @@ Single source of truth for **architectural and product decisions** agreed with t
 
 ## Session continuity
 
+- **2026-04-14 (a.m.):** Beads backlog checked against **`main`** (Frontend and Planner epics closed; next executable task **`agent-platform-o36.1`**). No change to **Locked decisions** this review.
+- **2026-04-14 (p.m.):** Epic **`agent-platform-o36`** and tasks **`o36.1`**, **`o36.2`** closed in Beads (MVP E2E + operator docs). **Locked decisions** unchanged.
 - **`session.md`** — short narrative of last session, current focus, and next steps (update at end of each agent session when work stops).
 - **`AGENTS.md`** — project rules for agents (includes bd workflow).
 - **`docs/tasks/README.md`** — task workflow: **each Beads task** links to **`docs/tasks/<issue-id>.md`** (requirements, implementation plan, dependency tables, definition of done, sign-off). **Beads `blocks` edges** are the schedule of record; specs document the same order and capture planning-only dependencies.

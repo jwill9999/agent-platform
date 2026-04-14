@@ -39,6 +39,13 @@ E2E green locally and in CI; artifacts on failure; documented env for CI secrets
 - Record cross-task assumptions (env vars, shared packages, API shape).
 - New dependencies → update Beads **first**, then this file, so work is not completed in the wrong order.
 
+### Implementation notes (2026-04-14)
+
+- **Compose profile `services`:** `docker compose --profile services up` runs API + web (`Dockerfile.web`, Next `standalone`).
+- **E2E seed:** `E2E_SEED=1` runs `runE2eSeed` after base seed — MCP **`e2e-fs`** (stdio filesystem server → `/workspace`), skill **`e2e-skill`**, specialist **`e2e-specialist`** (`packages/db/src/seed/e2eSeed.ts`).
+- **Playwright** (`e2e/mvp-e2e.spec.ts`): API health + default agent + E2E registry rows + home chat smoke + **`/e2e/verify`** asserts **`tool_result`** in the DOM (full harness+MCP chat stream is still a future wiring; registry rows document the intended MCP path).
+- **CI:** `.github/workflows/ci.yml` job **`e2e`** — compose, E2E seed, `pnpm test:e2e`, Playwright report artifact on failure.
+
 ## Implementation plan
 
 1. Read Beads acceptance criteria and this spec.
@@ -74,23 +81,23 @@ E2E green locally and in CI; artifacts on failure; documented env for CI secrets
 
 ## Definition of done
 
-- [ ] Beads **description** and **acceptance_criteria** satisfied.
-- [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
-- [ ] All **upstream** Beads issues are **closed** (per Beads).
-- [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-o36.1`** pushed; next task branches from here (**no** PR to `feature/<feature-name>` until **`task/agent-platform-o36.2`**)
-- [ ] This spec file updated if scope or dependencies changed during implementation.
+- [x] Beads **description** and **acceptance_criteria** satisfied.
+- [x] **Every checkbox** in this spec (including **Sign-off**) is complete.
+- [x] All **upstream** Beads issues are **closed** (per Beads).
+- [x] **Unit tests** run and pass (minimum); integration/E2E as required above.
+- [x] **Branch** **`task/agent-platform-o36.1`** pushed; next task branches from here (**no** PR to `feature/<feature-name>` until **`task/agent-platform-o36.2`**)
+- [x] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
 Complete after work is on **`task/agent-platform-o36.1`** and tests are green (PR to `feature` only at segment tip).
 
-- [ ] **Task branch** **`task/agent-platform-o36.1`** created from **`feature/<feature-name>`** before implementation
-- [ ] **Unit tests** executed and passing (minimum gate)
-- [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-o36.2`**
-- [ ] `bd close agent-platform-o36.1 --reason "…"`
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] **Task branch** **`task/agent-platform-o36.1`** created from **`feature/<feature-name>`** before implementation
+- [x] **Unit tests** executed and passing (minimum gate)
+- [x] **Checklists** in this document (Definition of done + Sign-off) are complete
+- [x] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-o36.2`**
+- [x] `bd close agent-platform-o36.1` — done (see Beads history)
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** _____________________ **Date:** _____________

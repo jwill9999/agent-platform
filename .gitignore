@@ -9,5 +9,8 @@ dist/
 
 # Dolt database files (added by bd init)
 .dolt/
+.beads/*.pid.lock
 *.db
 *.sqlite
+playwright-report/
+test-results/
