@@ -26,9 +26,9 @@ export default function SessionsPage() {
         apiGet<SessionRecord[]>(apiPath('sessions')),
         apiGet<Agent[]>(apiPath('agents')),
       ]);
-      setSessions(sData);
-      setAgents(aData);
-      setAgentId((prev) => (prev ? prev : aData[0]?.id ?? ''));
+      setSessions(sData ?? []);
+      setAgents(aData ?? []);
+      setAgentId((prev) => (prev ? prev : (aData ?? [])[0]?.id ?? ''));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

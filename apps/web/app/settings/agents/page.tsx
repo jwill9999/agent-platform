@@ -31,7 +31,7 @@ export default function AgentsPage() {
     setError(null);
     try {
       const data = await apiGet<Agent[]>(apiPath('agents'));
-      setRows(data);
+      setRows(data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

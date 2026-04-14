@@ -21,7 +21,7 @@ export default function ToolsPage() {
     setError(null);
     try {
       const data = await apiGet<Tool[]>(apiPath('tools'));
-      setRows(data);
+      setRows(data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

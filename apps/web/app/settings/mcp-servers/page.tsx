@@ -26,7 +26,7 @@ export default function McpServersPage() {
     setError(null);
     try {
       const data = await apiGet<McpServer[]>(apiPath('mcp-servers'));
-      setRows(data);
+      setRows(data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

@@ -22,7 +22,7 @@ export default function SkillsPage() {
     setError(null);
     try {
       const data = await apiGet<Skill[]>(apiPath('skills'));
-      setRows(data);
+      setRows(data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

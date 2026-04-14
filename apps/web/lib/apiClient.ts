@@ -34,20 +34,20 @@ function parseErrorBody(status: number, body: string): ApiRequestError {
   }
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
+export async function apiGet<T>(path: string): Promise<T | undefined> {
   const res = await fetch(path, { cache: 'no-store' });
   const text = await res.text();
   if (!res.ok) {
     throw parseErrorBody(res.status, text);
   }
   if (!text.trim()) {
-    return undefined as T;
+    return undefined;
   }
   const json = JSON.parse(text) as Envelope<T>;
   return json.data;
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+export async function apiPost<T>(path: string, body: unknown): Promise<T | undefined> {
   const res = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -58,13 +58,13 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     throw parseErrorBody(res.status, text);
   }
   if (!text.trim()) {
-    return undefined as T;
+    return undefined;
   }
   const json = JSON.parse(text) as Envelope<T>;
   return json.data;
 }
 
-export async function apiPut<T>(path: string, body: unknown): Promise<T> {
+export async function apiPut<T>(path: string, body: unknown): Promise<T | undefined> {
   const res = await fetch(path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -75,7 +75,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
     throw parseErrorBody(res.status, text);
   }
   if (!text.trim()) {
-    return undefined as T;
+    return undefined;
   }
   const json = JSON.parse(text) as Envelope<T>;
   return json.data;
