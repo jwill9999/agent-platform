@@ -1,4 +1,9 @@
-import { streamOpenAiChat, type ChatMessage } from '@agent-platform/model-router';
+import {
+  getOpenAiKeyOrNextJsonResponse,
+  resolveGatedOpenAiKeyForRequest,
+  streamOpenAiChat,
+  type ChatMessage,
+} from '@agent-platform/model-router';
 import { convertToCoreMessages, type UIMessage } from 'ai';
 import { z } from 'zod';
 
@@ -78,10 +83,10 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 }
 
 export async function POST(req: Request) {
-  const keyValidation = validateOpenAiApiKey(process.env.OPENAI_API_KEY);
-  if (!keyValidation.ok) {
-    return jsonError(500, 'INVALID_OPENAI_API_KEY_FORMAT', keyValidation.reason);
-  }
+  const gated = resolveGatedOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' });
+  const keyOrError = getOpenAiKeyOrNextJsonResponse(gated);
+  if (keyOrError instanceof Response) return keyOrError;
+  const apiKey = keyOrError;
 
   let body: unknown;
   try {
