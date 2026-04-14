@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   foldOpenAiKeyGate,
-  gateOpenAiKeyResolution,
   getOpenAiKeyOrNextJsonResponse,
   openAiKeyGateToApiOutcome,
   openAiLegacyBlockedMessage,
@@ -41,19 +40,19 @@ describe('resolveOpenAiApiKeyFromEnv', () => {
     process.env.AGENT_OPENAI_API_KEY = ' sk-agent ';
     process.env.OPENAI_API_KEY = 'sk-legacy';
     expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toEqual({
-      status: 'ok',
+      outcome: 'ok',
       key: 'sk-agent',
     });
 
     process.env.NEXT_OPENAI_API_KEY = 'sk-next';
     expect(resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY')).toEqual({
-      status: 'ok',
+      outcome: 'ok',
       key: 'sk-next',
     });
   });
 
   it('returns missing when no keys are set', () => {
-    expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toEqual({ status: 'missing' });
+    expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toEqual({ outcome: 'missing' });
   });
 
   it('returns legacy_blocked when only OPENAI_API_KEY is set', () => {
@@ -62,9 +61,11 @@ describe('resolveOpenAiApiKeyFromEnv', () => {
       process.env.OPENAI_API_KEY = 'sk-legacy';
       delete process.env.AGENT_OPENAI_API_KEY;
       delete process.env.OPENAI_ALLOW_LEGACY_ENV;
-      expect(resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY')).toEqual({
-        status: 'legacy_blocked',
-      });
+      const r = resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY');
+      expect(r.outcome).toBe('legacy_blocked');
+      if (r.outcome === 'legacy_blocked') {
+        expect(r.message).toContain('AGENT_OPENAI_API_KEY');
+      }
       expect(openAiLegacyBlockedMessage('AGENT_OPENAI_API_KEY')).toContain('AGENT_OPENAI_API_KEY');
     } finally {
       restoreEnv(snap);
@@ -75,7 +76,7 @@ describe('resolveOpenAiApiKeyFromEnv', () => {
     process.env.OPENAI_API_KEY = 'sk-legacy';
     process.env.OPENAI_ALLOW_LEGACY_ENV = '1';
     expect(resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY')).toEqual({
-      status: 'ok',
+      outcome: 'ok',
       key: 'sk-legacy',
     });
   });
@@ -87,45 +88,24 @@ describe('resolveOpenAiApiKeyFromEnv', () => {
         preferredEnvVar: 'AGENT_OPENAI_API_KEY',
         headerKey: ' sk-header ',
       }),
-    ).toEqual({ status: 'ok', key: 'sk-header' });
+    ).toEqual({ outcome: 'ok', key: 'sk-header' });
   });
 });
 
-describe('gateOpenAiKeyResolution', () => {
-  it('maps legacy_blocked to message', () => {
-    const g = gateOpenAiKeyResolution({ status: 'legacy_blocked' }, 'NEXT_OPENAI_API_KEY');
-    expect(g.outcome).toBe('legacy_blocked');
-    if (g.outcome === 'legacy_blocked') {
-      expect(g.message).toContain('NEXT_OPENAI_API_KEY');
-    }
-  });
-
-  it('passes through ok and missing', () => {
-    expect(gateOpenAiKeyResolution({ status: 'ok', key: 'k' }, 'AGENT_OPENAI_API_KEY')).toEqual({
-      outcome: 'ok',
-      key: 'k',
-    });
-    expect(gateOpenAiKeyResolution({ status: 'missing' }, 'AGENT_OPENAI_API_KEY')).toEqual({
-      outcome: 'missing',
-    });
-  });
-});
-
-describe('resolveGatedOpenAiKeyForRequest + getOpenAiKeyOrNextJsonResponse', () => {
+describe('resolveGatedOpenAiKeyForRequest', () => {
   afterEach(() => {
     for (const k of keys) delete process.env[k];
   });
 
-  it('matches gateOpenAiKeyResolution(resolveOpenAiKeyForRequest(...))', () => {
+  it('matches resolveOpenAiKeyForRequest', () => {
     process.env.OPENAI_API_KEY = 'sk-legacy';
-    const a = resolveGatedOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' });
-    const b = gateOpenAiKeyResolution(
+    expect(resolveGatedOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' })).toEqual(
       resolveOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' }),
-      'NEXT_OPENAI_API_KEY',
     );
-    expect(a).toEqual(b);
   });
+});
 
+describe('getOpenAiKeyOrNextJsonResponse', () => {
   it('returns JSON Response for legacy_blocked and missing', async () => {
     const blocked = getOpenAiKeyOrNextJsonResponse({
       outcome: 'legacy_blocked',
