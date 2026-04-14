@@ -42,7 +42,9 @@ Requires **`SQLITE_PATH`** at process start (same DB file as migrations/seed). J
 
 - Copy `.env.example` to `.env` and adjust `HOST_PORT` / `SQLITE_PATH` as needed.
 - `docker compose up --build` builds the API image, maps `HOST_PORT` → container `3000`, mounts a **named volume** at `/data` for SQLite (`SQLITE_PATH` defaults to `/data/agent.sqlite` in Compose), and runs a **health check** on `GET /health`.
-- To load the **default agent** into that database, run `pnpm build` and `pnpm seed` with **`SQLITE_PATH`** pointing at the SQLite file (same value as the API). The seed is idempotent.
+- To load the **default agent** into that database: **(a)** on the host, run `pnpm build` and `pnpm seed` with **`SQLITE_PATH`** pointing at the same SQLite file the API uses; **(b)** in Docker, after the image has been built with the entrypoint that `chown`s `/data` to the app user, run  
+  `docker compose run --rm api node packages/db/dist/seed/run.js`  
+  (or stop the API first if you prefer: `docker compose stop api`, then that command, then `docker compose start api`). The seed is idempotent.
 - **Future filesystem MCP:** see commented volume examples in `docker-compose.yml` (e.g. bind-mount a host directory to `/workspace` for tooling).
 
 ## Git workflow

@@ -14,7 +14,7 @@ RUN pnpm --filter @agent-platform/contracts build \
   && pnpm --filter @agent-platform/api build
 
 FROM node:20-alpine AS runner
-RUN apk add --no-cache curl python3 make g++ \
+RUN apk add --no-cache curl python3 make g++ su-exec \
   && addgroup -g 10001 -S appuser \
   && adduser -S -u 10001 -G appuser appuser
 WORKDIR /app
@@ -22,6 +22,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=build /app/packages/contracts/package.json packages/contracts/
 COPY --from=build /app/packages/db/package.json packages/db/
@@ -34,8 +36,9 @@ COPY --from=build /app/packages/model-router/dist packages/model-router/dist
 COPY --from=build /app/apps/api/dist apps/api/dist
 RUN pnpm install --frozen-lockfile --prod \
   && chown -R appuser:appuser /app
-USER appuser
+USER root
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null || exit 1
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "apps/api/dist/index.js"]
