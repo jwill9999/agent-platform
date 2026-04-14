@@ -43,10 +43,10 @@ describe('POST /v1/chat/stream', () => {
         .expect(400);
       expect(res.body.error?.code).toBe('MISSING_KEY');
     } finally {
-      if (prevLegacy !== undefined) process.env.OPENAI_API_KEY = prevLegacy;
-      else delete process.env.OPENAI_API_KEY;
-      if (prevPreferred !== undefined) process.env.AGENT_OPENAI_API_KEY = prevPreferred;
-      else delete process.env.AGENT_OPENAI_API_KEY;
+      if (prevLegacy === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = prevLegacy;
+      if (prevPreferred === undefined) delete process.env.AGENT_OPENAI_API_KEY;
+      else process.env.AGENT_OPENAI_API_KEY = prevPreferred;
       closeDatabase(sqlite);
     }
   });
@@ -74,12 +74,12 @@ describe('POST /v1/chat/stream', () => {
         .expect(400);
       expect(res.body.error?.code).toBe('LEGACY_ENV_BLOCKED');
     } finally {
-      if (prevLegacy !== undefined) process.env.OPENAI_API_KEY = prevLegacy;
-      else delete process.env.OPENAI_API_KEY;
-      if (prevPreferred !== undefined) process.env.AGENT_OPENAI_API_KEY = prevPreferred;
-      else delete process.env.AGENT_OPENAI_API_KEY;
-      if (prevAllowLegacy !== undefined) process.env.OPENAI_ALLOW_LEGACY_ENV = prevAllowLegacy;
-      else delete process.env.OPENAI_ALLOW_LEGACY_ENV;
+      if (prevLegacy === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = prevLegacy;
+      if (prevPreferred === undefined) delete process.env.AGENT_OPENAI_API_KEY;
+      else process.env.AGENT_OPENAI_API_KEY = prevPreferred;
+      if (prevAllowLegacy === undefined) delete process.env.OPENAI_ALLOW_LEGACY_ENV;
+      else process.env.OPENAI_ALLOW_LEGACY_ENV = prevAllowLegacy;
       closeDatabase(sqlite);
     }
   });
