@@ -6,6 +6,7 @@ import {
   SkillSchema,
   ToolSchema,
 } from '@agent-platform/contracts';
+import { streamOpenAiChat } from '@agent-platform/model-router';
 import type { DrizzleDb } from '@agent-platform/db';
 import {
   createSession,
@@ -294,6 +295,41 @@ export function createV1Router(db: DrizzleDb): Router {
       const ok = deleteSession(db, req.params.id!);
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
       res.status(204).send();
+    }),
+  );
+
+  const ChatStreamBodySchema = z.object({
+    model: z.string().min(1),
+    messages: z.array(
+      z.object({
+        role: z.enum(['user', 'assistant', 'system']),
+        content: z.string(),
+      }),
+    ),
+  });
+
+  /** Streaming text (OpenAI via Vercel AI SDK). Key from env or `x-openai-key` (never logged). */
+  router.post(
+    '/chat/stream',
+    asyncHandler(async (req, res) => {
+      const body = parseBody(ChatStreamBodySchema, req.body);
+      const apiKey = req.header('x-openai-key') ?? process.env.OPENAI_API_KEY;
+      if (!apiKey?.trim()) {
+        throw new HttpError(400, 'MISSING_KEY', 'Set OPENAI_API_KEY or x-openai-key header');
+      }
+      const result = streamOpenAiChat({
+        apiKey,
+        model: body.model,
+        messages: body.messages,
+      });
+      res.status(200);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      for await (const chunk of result.textStream) {
+        res.write(chunk);
+      }
+      res.end();
     }),
   );
 
