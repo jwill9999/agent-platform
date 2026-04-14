@@ -2,10 +2,12 @@ export { streamOpenAiChat, type ChatMessage } from './openai.js';
 export {
   gateOpenAiKeyResolution,
   getOpenAiKeyOrNextJsonResponse,
+  openAiKeyGateToApiOutcome,
   openAiLegacyBlockedMessage,
   resolveOpenAiApiKeyFromEnv,
   resolveGatedOpenAiKeyForRequest,
   resolveOpenAiKeyForRequest,
+  type ApiOpenAiKeyOutcome,
   type OpenAiKeyGateResult,
   type OpenAiKeyResolveResult,
   type PreferredOpenAiEnvVar,

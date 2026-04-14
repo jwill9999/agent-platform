@@ -90,3 +90,22 @@ export function getOpenAiKeyOrNextJsonResponse(gated: OpenAiKeyGateResult): Resp
   }
   return gated.key;
 }
+
+export type ApiOpenAiKeyOutcome =
+  | { kind: 'ok'; key: string }
+  | { kind: 'error'; code: 'LEGACY_ENV_BLOCKED' | 'MISSING_KEY'; message: string };
+
+/** Express `/v1/chat/stream`: map gated result to HTTP error codes or key (no duplicated outcome branches in the router). */
+export function openAiKeyGateToApiOutcome(gated: OpenAiKeyGateResult): ApiOpenAiKeyOutcome {
+  if (gated.outcome === 'legacy_blocked') {
+    return { kind: 'error', code: 'LEGACY_ENV_BLOCKED', message: gated.message };
+  }
+  if (gated.outcome === 'missing') {
+    return {
+      kind: 'error',
+      code: 'MISSING_KEY',
+      message: 'Set AGENT_OPENAI_API_KEY or x-openai-key header',
+    };
+  }
+  return { kind: 'ok', key: gated.key };
+}

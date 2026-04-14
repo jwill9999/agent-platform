@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   gateOpenAiKeyResolution,
   getOpenAiKeyOrNextJsonResponse,
+  openAiKeyGateToApiOutcome,
   openAiLegacyBlockedMessage,
   resolveGatedOpenAiKeyForRequest,
   resolveOpenAiApiKeyFromEnv,
@@ -141,5 +142,25 @@ describe('resolveGatedOpenAiKeyForRequest + getOpenAiKeyOrNextJsonResponse', () 
 
   it('returns key string when ok', () => {
     expect(getOpenAiKeyOrNextJsonResponse({ outcome: 'ok', key: 'sk' })).toBe('sk');
+  });
+});
+
+describe('openAiKeyGateToApiOutcome', () => {
+  it('maps outcomes for Express handlers', () => {
+    expect(
+      openAiKeyGateToApiOutcome({
+        outcome: 'legacy_blocked',
+        message: 'blocked',
+      }),
+    ).toEqual({ kind: 'error', code: 'LEGACY_ENV_BLOCKED', message: 'blocked' });
+    expect(openAiKeyGateToApiOutcome({ outcome: 'missing' })).toEqual({
+      kind: 'error',
+      code: 'MISSING_KEY',
+      message: 'Set AGENT_OPENAI_API_KEY or x-openai-key header',
+    });
+    expect(openAiKeyGateToApiOutcome({ outcome: 'ok', key: 'k' })).toEqual({
+      kind: 'ok',
+      key: 'k',
+    });
   });
 });
