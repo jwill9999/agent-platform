@@ -9,7 +9,9 @@ const ChatPostBodySchema = z.object({
   model: z.string().optional(),
 });
 
-function validateOpenAiApiKey(raw: string | undefined): { ok: true; key: string } | { ok: false; reason: string } {
+function validateOpenAiApiKey(
+  raw: string | undefined,
+): { ok: true; key: string } | { ok: false; reason: string } {
   const key = raw?.trim() ?? '';
   if (!key) {
     return { ok: false, reason: 'OPENAI_API_KEY is not set' };
