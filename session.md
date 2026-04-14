@@ -8,37 +8,35 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-13
-- **Session:** Persistence epic **merged** to **`feature/agent-platform-persistence`** ([PR #11](https://github.com/jwill9999/agent-platform/pull/11))
+- **Session:** Frontend epic **`agent-platform-ast`** — task **`agent-platform-ast.1`** complete on **`task/agent-platform-ast.1`** (pushed)
 
 ---
 
 ## What happened (recent)
 
-- **`packages/contracts`:** **`ToolSchema`**, **`McpServerSchema`**, **`SessionRecordSchema`**, **`SessionCreateBodySchema`**.
-- **`packages/db`:** row mappers + **`repositories/registry.ts`** (CRUD + **`replaceAgent`** / sessions).
-- **`apps/api`:** **`createApp({ db })`**, **`/v1`** router (skills, tools, mcp-servers, agents, sessions), **Zod** validation, **`HttpError`** + global error middleware; persistent SQLite in **`index.ts`** with graceful shutdown.
-- **Tests:** **`crud.integration.test.ts`** (supertest + temp SQLite + seed).
-- **`README`:** route table; **`decisions.md`:** REST row.
+- **`apps/web` (`@agent-platform/web`):** Next.js App Router, **`useChat`** → **`POST /api/chat`**, streams via **`streamOpenAiChat`** from **`@agent-platform/model-router`**; body validated with **Zod**; **`OPENAI_API_KEY`** on the Next server (see **`apps/web/.env.example`**).
+- **Repo tooling:** ESLint ignores **`.next`**, **`next-env.d.ts`**; Prettier ignores **`.next`**; **`.gitignore`** includes **`.next/`**.
+- **Tests:** **`apps/web/test/textFromUiMessage.test.ts`**; root **`typecheck` / `lint` / `test` / `format:check`** green.
+- **Beads:** **`agent-platform-ast.1`** closed.
 
 ---
 
 ## Current state
 
-- **Integration branch:** **`feature/agent-platform-persistence`** — includes full **Persistence j9x.1–j9x.4** line (merge **#11**).
-- **Beads:** **`agent-platform-j9x.4`** closed; epic **`agent-platform-j9x`** auto-closed.
+- **Feature branch:** **`feature/agent-platform-ast`** (or your naming — confirm on remote).
+- **Task branch pushed:** **`origin/task/agent-platform-ast.1`** — base for **`task/agent-platform-ast.2`** (chained segment; **no PR to feature** until **`task/agent-platform-ast.3`**).
 
 ---
 
 ## Next (priority order)
 
-1. Optional: **`feature/agent-platform-persistence` → `main`** when you want the Persistence line on default branch.
-2. Next epic (e.g. Harness): branch **`task/agent-platform-2tw.1`** from **`feature/agent-platform-persistence`** (or **`main`** after merge) per `docs/tasks/`.
+1. Branch **`task/agent-platform-ast.2`** from **`task/agent-platform-ast.1`** (or `origin/task/agent-platform-ast.1`) per **`docs/tasks/agent-platform-ast.2.md`** — output renderers (text, code, tool_result, error, thinking).
 
 ---
 
 ## Blockers / questions for owner
 
-- (none)
+- **Manual smoke:** run **`pnpm --filter @agent-platform/web dev`** (port **3001**), set **`OPENAI_API_KEY`**, confirm send + stream in the browser.
 
 ---
 
@@ -46,7 +44,6 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ```bash
 bd ready --json
-pnpm install && pnpm run build && pnpm run test
-SQLITE_PATH=./local.sqlite pnpm run seed
-SQLITE_PATH=./local.sqlite node apps/api/dist/index.js
+pnpm install && pnpm run typecheck && pnpm run lint && pnpm run test
+pnpm --filter @agent-platform/web dev
 ```

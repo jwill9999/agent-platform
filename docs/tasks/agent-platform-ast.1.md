@@ -72,23 +72,23 @@ Manual or E2E smoke: message sends and streams; types imported from contracts wh
 
 ## Definition of done
 
-- [ ] Beads **description** and **acceptance_criteria** satisfied.
-- [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
-- [ ] All **upstream** Beads issues are **closed** (per Beads).
-- [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **Branch** **`task/agent-platform-ast.1`** pushed; next task branches from here (**no** PR to `feature/<feature-name>` until **`task/agent-platform-ast.3`**)
-- [ ] This spec file updated if scope or dependencies changed during implementation.
+- [x] Beads **description** and **acceptance_criteria** satisfied.
+- [x] **Every checkbox** in this spec (including **Sign-off**) is complete.
+- [x] All **upstream** Beads issues are **closed** (per Beads).
+- [x] **Unit tests** run and pass (minimum); integration/E2E as required above.
+- [x] **Branch** **`task/agent-platform-ast.1`** pushed; next task branches from here (**no** PR to `feature/<feature-name>` until **`task/agent-platform-ast.3`**)
+- [x] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
 Complete after work is on **`task/agent-platform-ast.1`** and tests are green (PR to `feature` only at segment tip).
 
-- [ ] **Task branch** **`task/agent-platform-ast.1`** created from **`feature/<feature-name>`** before implementation
-- [ ] **Unit tests** executed and passing (minimum gate)
-- [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-ast.3`**
-- [ ] `bd close agent-platform-ast.1 --reason "…"`
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] **Task branch** **`task/agent-platform-ast.1`** created from **`feature/<feature-name>`** before implementation
+- [x] **Unit tests** executed and passing (minimum gate)
+- [x] **Checklists** in this document (Definition of done + Sign-off) are complete
+- [x] **PR to `feature`:** N/A — segment merges on **`task/agent-platform-ast.3`**
+- [x] `bd close agent-platform-ast.1 --reason "…"`
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** _____________________ **Date:** _____________
