@@ -6,7 +6,11 @@ import {
   SkillSchema,
   ToolSchema,
 } from '@agent-platform/contracts';
-import { streamOpenAiChat } from '@agent-platform/model-router';
+import {
+  OpenAiLegacyEnvBlockedError,
+  resolveOpenAiApiKeyFromEnv,
+  streamOpenAiChat,
+} from '@agent-platform/model-router';
 import type { DrizzleDb } from '@agent-platform/db';
 import {
   createSession,
@@ -43,24 +47,6 @@ function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
     throw new HttpError(400, 'VALIDATION_ERROR', 'Invalid request body', r.error.flatten());
   }
   return r.data;
-}
-
-function resolveOpenAiApiKeyFromEnv(): string | null {
-  const preferred = process.env.AGENT_OPENAI_API_KEY?.trim();
-  if (preferred) return preferred;
-
-  const legacy = process.env.OPENAI_API_KEY?.trim();
-  if (!legacy) return null;
-
-  const allowLegacy = process.env.OPENAI_ALLOW_LEGACY_ENV === '1';
-  if (!allowLegacy) {
-    throw new HttpError(
-      400,
-      'LEGACY_ENV_BLOCKED',
-      'OPENAI_API_KEY is set but blocked. Use AGENT_OPENAI_API_KEY, or set OPENAI_ALLOW_LEGACY_ENV=1 to allow legacy env fallback.',
-    );
-  }
-  return legacy;
 }
 
 export function createV1Router(db: DrizzleDb): Router {
@@ -331,7 +317,15 @@ export function createV1Router(db: DrizzleDb): Router {
     '/chat/stream',
     asyncHandler(async (req, res) => {
       const body = parseBody(ChatStreamBodySchema, req.body);
-      const apiKey = req.header('x-openai-key') ?? resolveOpenAiApiKeyFromEnv();
+      let apiKey: string | null = null;
+      try {
+        apiKey = req.header('x-openai-key') ?? resolveOpenAiApiKeyFromEnv('AGENT_OPENAI_API_KEY');
+      } catch (e) {
+        if (e instanceof OpenAiLegacyEnvBlockedError) {
+          throw new HttpError(400, 'LEGACY_ENV_BLOCKED', e.message);
+        }
+        throw e;
+      }
       if (!apiKey?.trim()) {
         throw new HttpError(400, 'MISSING_KEY', 'Set AGENT_OPENAI_API_KEY or x-openai-key header');
       }

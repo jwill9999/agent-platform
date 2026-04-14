@@ -1,4 +1,9 @@
-import { streamOpenAiChat, type ChatMessage } from '@agent-platform/model-router';
+import {
+  OpenAiLegacyEnvBlockedError,
+  resolveOpenAiApiKeyFromEnv,
+  streamOpenAiChat,
+  type ChatMessage,
+} from '@agent-platform/model-router';
 import { convertToCoreMessages, type UIMessage } from 'ai';
 import { z } from 'zod';
 
@@ -8,22 +13,6 @@ const ChatPostBodySchema = z.object({
   messages: z.array(z.any()),
   model: z.string().optional(),
 });
-
-function resolveOpenAiApiKeyFromEnv(): string | null {
-  const preferred = process.env.NEXT_OPENAI_API_KEY?.trim();
-  if (preferred) return preferred;
-
-  const legacy = process.env.OPENAI_API_KEY?.trim();
-  if (!legacy) return null;
-
-  const allowLegacy = process.env.OPENAI_ALLOW_LEGACY_ENV === '1';
-  if (!allowLegacy) {
-    throw new Error(
-      'OPENAI_API_KEY is set but blocked. Use NEXT_OPENAI_API_KEY, or set OPENAI_ALLOW_LEGACY_ENV=1 to allow legacy env fallback.',
-    );
-  }
-  return legacy;
-}
 
 function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessages>): ChatMessage[] {
   return core.map((m) => {
@@ -47,12 +36,15 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 export async function POST(req: Request) {
   let apiKey: string | null = null;
   try {
-    apiKey = resolveOpenAiApiKeyFromEnv();
+    apiKey = resolveOpenAiApiKeyFromEnv('NEXT_OPENAI_API_KEY');
   } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (error instanceof OpenAiLegacyEnvBlockedError) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    throw error;
   }
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'NEXT_OPENAI_API_KEY is not set' }), {
