@@ -42,6 +42,12 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@agent-platform/agent-validation':
+        specifier: workspace:*
+        version: link:../../packages/agent-validation
+      '@agent-platform/harness':
+        specifier: workspace:*
+        version: link:../../packages/harness
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25
