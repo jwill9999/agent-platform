@@ -19,6 +19,16 @@ describe('uiMessageToOutputs', () => {
     expect(uiMessageToOutputs(msg)).toEqual([{ type: 'thinking', content: 'step one' }]);
   });
 
+  it('falls back to legacy content when parts is empty', () => {
+    const msg = {
+      id: '1',
+      role: 'user',
+      parts: [],
+      content: 'Hello world',
+    } as unknown as UIMessage;
+    expect(uiMessageToOutputs(msg)).toEqual([{ type: 'text', content: 'Hello world' }]);
+  });
+
   it('maps tool result to tool_result output', () => {
     const msg = {
       id: '1',

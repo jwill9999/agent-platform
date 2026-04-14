@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  SessionCreateBodySchema,
-  type Agent,
-  type SessionRecord,
-} from '@agent-platform/contracts';
+import { SessionCreateBodySchema, type Agent, type SessionRecord } from '@agent-platform/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 import { FormError } from '../../../components/settings/FormError';
@@ -28,7 +24,7 @@ export default function SessionsPage() {
       ]);
       setSessions(sData ?? []);
       setAgents(aData ?? []);
-      setAgentId((prev) => (prev ? prev : (aData ?? [])[0]?.id ?? ''));
+      setAgentId((prev) => (prev ? prev : ((aData ?? [])[0]?.id ?? '')));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -42,6 +38,9 @@ export default function SessionsPage() {
 
   async function createSession(e: React.FormEvent) {
     e.preventDefault();
+    if (agents.length === 0) {
+      return;
+    }
     setError(null);
     const body = SessionCreateBodySchema.safeParse({
       agentId: agentId.trim(),
@@ -67,7 +66,9 @@ export default function SessionsPage() {
   return (
     <div>
       <h2 style={{ fontSize: '1.1rem' }}>Sessions</h2>
-      <p style={{ fontSize: '0.875rem', color: '#64748b' }}>List persisted sessions; create ties a new session to an agent.</p>
+      <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
+        List persisted sessions; create ties a new session to an agent.
+      </p>
       <FormError message={error} />
       {loading ? <p>Loading…</p> : null}
       <ul style={{ listStyle: 'none', padding: 0 }}>
@@ -92,8 +93,16 @@ export default function SessionsPage() {
 
       <form onSubmit={(e) => void createSession(e)} style={{ maxWidth: 480, marginTop: '1rem' }}>
         <h3 style={{ fontSize: '1rem' }}>Create session</h3>
+        {agents.length === 0 && !loading ? (
+          <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.75rem' }}>
+            No agents available. Create an agent on the Agents page before starting a session.
+          </p>
+        ) : null}
         <div style={{ marginBottom: '0.75rem' }}>
-          <label htmlFor="sess-agent" style={{ display: 'block', fontSize: '0.875rem', marginBottom: 4 }}>
+          <label
+            htmlFor="sess-agent"
+            style={{ display: 'block', fontSize: '0.875rem', marginBottom: 4 }}
+          >
             Agent
           </label>
           <select
@@ -102,6 +111,7 @@ export default function SessionsPage() {
             onChange={(e) => setAgentId(e.target.value)}
             required
             aria-required
+            disabled={agents.length === 0}
             style={{ width: '100%', padding: '0.35rem 0.5rem' }}
           >
             {agents.map((a) => (
@@ -112,7 +122,10 @@ export default function SessionsPage() {
           </select>
         </div>
         <div style={{ marginBottom: '0.75rem' }}>
-          <label htmlFor="sess-id" style={{ display: 'block', fontSize: '0.875rem', marginBottom: 4 }}>
+          <label
+            htmlFor="sess-id"
+            style={{ display: 'block', fontSize: '0.875rem', marginBottom: 4 }}
+          >
             Session id (optional)
           </label>
           <input
@@ -123,7 +136,9 @@ export default function SessionsPage() {
             style={{ width: '100%', padding: '0.35rem 0.5rem' }}
           />
         </div>
-        <button type="submit">Create</button>
+        <button type="submit" disabled={agents.length === 0}>
+          Create
+        </button>
       </form>
     </div>
   );

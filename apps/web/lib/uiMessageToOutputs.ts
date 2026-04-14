@@ -3,6 +3,23 @@ import type { UIMessage } from 'ai';
 
 import { expandFencedCodeToOutputs } from './expandFencedCode';
 
+type UiPart = UIMessage['parts'][number];
+
+/**
+ * Prefer structured `parts`; if empty, fall back to legacy `content` string so we never iterate `undefined`
+ * and user-only-text messages still render (Sourcery / runtime-safety).
+ */
+function partsForRendering(message: UIMessage): UiPart[] {
+  if (message.parts.length > 0) {
+    return message.parts;
+  }
+  const c = message.content;
+  if (typeof c === 'string' && c.trim()) {
+    return [{ type: 'text', text: c }];
+  }
+  return [];
+}
+
 function reasoningToText(part: {
   reasoning: string;
   details: Array<
@@ -23,7 +40,7 @@ function reasoningToText(part: {
  */
 export function uiMessageToOutputs(message: UIMessage): Output[] {
   const out: Output[] = [];
-  for (const part of message.parts) {
+  for (const part of partsForRendering(message)) {
     if (part.type === 'text') {
       out.push(...expandFencedCodeToOutputs(part.text));
     } else if (part.type === 'reasoning') {
