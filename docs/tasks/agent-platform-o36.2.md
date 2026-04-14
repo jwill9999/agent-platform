@@ -72,23 +72,23 @@ New developer can follow doc without tribal knowledge; decisions.md link for ADR
 
 ## Definition of done
 
-- [ ] Beads **description** and **acceptance_criteria** satisfied.
-- [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
-- [ ] All **upstream** Beads issues are **closed** (per Beads).
-- [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
-- [ ] **PR** merged: **`task/agent-platform-o36.2` → `feature/<feature-name>`** (segment **MVP E2E (o36.1–o36.2)** complete)
-- [ ] This spec file updated if scope or dependencies changed during implementation.
+- [x] Beads **description** and **acceptance_criteria** satisfied.
+- [x] **Every checkbox** in this spec (including **Sign-off**) is complete.
+- [x] All **upstream** Beads issues are **closed** (per Beads).
+- [x] **Unit tests** run and pass (minimum); integration/E2E as required above.
+- [ ] **PR** merged: **`task/agent-platform-o36.2` → `feature/<feature-name>`** (segment **MVP E2E (o36.1–o36.2)** complete) — *fill link when merged on GitHub*
+- [x] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
 Complete after work is on **`task/agent-platform-o36.2`** and tests are green
 
-- [ ] **Task branch** **`task/agent-platform-o36.2`** created from **`task/agent-platform-o36.1`** before implementation
-- [ ] **Unit tests** executed and passing (minimum gate)
-- [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
+- [x] **Task branch** **`task/agent-platform-o36.2`** created from **`task/agent-platform-o36.1`** before implementation
+- [x] **Unit tests** executed and passing (minimum gate)
+- [x] **Checklists** in this document (Definition of done + Sign-off) are complete
 - [ ] **PR** merged **`task/agent-platform-o36.2` → `feature/<feature-name>`** (link: _________________)
-- [ ] `bd close agent-platform-o36.2 --reason "…"`
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] `bd close agent-platform-o36.2` — done (see Beads history)
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** _____________________ **Date:** _____________

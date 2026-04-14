@@ -9,16 +9,18 @@ Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and dec
 
 ## Commands
 
-| Command             | Description                                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------------------------- |
-| `pnpm install`      | Install workspace dependencies                                                                        |
-| `pnpm typecheck`    | Typecheck all packages (`pnpm -r`)                                                                    |
-| `pnpm build`        | Build all packages                                                                                    |
-| `pnpm lint`         | ESLint across workspaces                                                                              |
-| `pnpm test`         | Run Vitest suites (contracts, db, api integration)                                                    |
-| `pnpm format`       | Prettier write                                                                                        |
-| `pnpm format:check` | Prettier check                                                                                        |
-| `pnpm seed`         | After **`pnpm build`**: run idempotent DB seed (needs **`SQLITE_PATH`**) — default agent + demo skill |
+| Command                 | Description                                                                                                                      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`          | Install workspace dependencies                                                                                                   |
+| `pnpm typecheck`        | Typecheck all packages (`pnpm -r`)                                                                                               |
+| `pnpm build`            | Build all packages                                                                                                               |
+| `pnpm lint`             | ESLint across workspaces                                                                                                         |
+| `pnpm test`             | Run Vitest suites (contracts, db, api integration)                                                                               |
+| `pnpm format`           | Prettier write                                                                                                                   |
+| `pnpm format:check`     | Prettier check                                                                                                                   |
+| `pnpm seed`             | After **`pnpm build`**: run idempotent DB seed (needs **`SQLITE_PATH`**) — default agent + demo skill                            |
+| `pnpm test:e2e`         | Playwright against **`BASE_URL`** (web) and **`API_URL`** (API); use with compose profile **`services`** + **`E2E_SEED=1`** seed |
+| `pnpm test:e2e:install` | One-time Playwright browser install (Chromium + deps)                                                                            |
 
 ### Unified run lifecycle (API + web)
 
@@ -61,11 +63,14 @@ Requires **`SQLITE_PATH`** at process start (same DB file as migrations/seed). J
 - Copy `.env.example` to `.env` and adjust `HOST_PORT` / `SQLITE_PATH` as needed.
 - For API chat streaming, set `AGENT_OPENAI_API_KEY` (preferred). `OPENAI_API_KEY` is intentionally blocked by default to prevent stale exported keys from taking precedence; allow it only with `OPENAI_ALLOW_LEGACY_ENV=1`.
 - For the Next.js chat route (`apps/web/app/api/chat/route.ts`), set `NEXT_OPENAI_API_KEY` in `apps/web/.env` (legacy `OPENAI_API_KEY` fallback is also blocked by default unless `OPENAI_ALLOW_LEGACY_ENV=1`).
-- `docker compose up --build` builds the API image, maps `HOST_PORT` → container `3000`, mounts a **named volume** at `/data` for SQLite (`SQLITE_PATH` defaults to `/data/agent.sqlite` in Compose), and runs a **health check** on `GET /health`.
+- `docker compose up --build` builds the API image, maps `HOST_PORT` → container `3000`, mounts a **named volume** at `/data` for SQLite (`SQLITE_PATH` defaults to `/data/agent.sqlite` in Compose), mounts **`e2e_workspace` → `/workspace`** for the E2E filesystem MCP seed, and runs a **health check** on `GET /health`.
+- **API + web together:** `docker compose --profile services up --build` also builds **`Dockerfile.web`**, maps **`WEB_HOST_PORT`** (default **3001**) → web container **3001**, and sets **`API_PROXY_URL=http://api:3000`** for the Next.js BFF.
 - To load the **default agent** into that database: **(a)** on the host, run `pnpm build` and `pnpm seed` with **`SQLITE_PATH`** pointing at the same SQLite file the API uses; **(b)** in Docker, after the image has been built with the entrypoint that `chown`s `/data` to the app user, run  
   `docker compose run --rm api node packages/db/dist/seed/run.js`  
   (or stop the API first if you prefer: `docker compose stop api`, then that command, then `docker compose start api`). The seed is idempotent.
-- **Future filesystem MCP:** see commented volume examples in `docker-compose.yml` (e.g. bind-mount a host directory to `/workspace` for tooling).
+- **E2E (Playwright):** install browsers once with `pnpm test:e2e:install`. With the **`services`** profile running, apply the E2E registry seed:  
+  `docker compose exec -T api sh -c 'E2E_SEED=1 SQLITE_PATH=/data/agent.sqlite node packages/db/dist/seed/run.js'`  
+  then `pnpm test:e2e` (override **`BASE_URL`** / **`API_URL`** if ports differ). CI runs the same flow; on failure, the **Playwright HTML report** is uploaded as an artifact. The suite does **not** call OpenAI today; optional keys for chat (`AGENT_OPENAI_API_KEY`, `NEXT_OPENAI_API_KEY`) are documented above for manual runs.
 
 ## Git workflow
 

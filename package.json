@@ -8,13 +8,16 @@
     "test": "pnpm -r run test",
     "typecheck": "pnpm --filter @agent-platform/contracts build && pnpm --filter @agent-platform/agent-validation build && pnpm --filter @agent-platform/db build && pnpm --filter @agent-platform/mcp-adapter build && pnpm --filter @agent-platform/harness build && pnpm --filter @agent-platform/model-router build && pnpm --filter @agent-platform/plugin-sdk build && pnpm --filter @agent-platform/planner build && pnpm --filter @agent-platform/plugin-observability build && pnpm --filter @agent-platform/plugin-session build && pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
-    "format": "prettier --write \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
-    "format:check": "prettier --check \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
-    "seed": "pnpm --filter @agent-platform/db run seed"
+    "format": "prettier --write \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"e2e/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
+    "format:check": "prettier --check \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"e2e/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
+    "seed": "pnpm --filter @agent-platform/db run seed",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
     "eslint": "^9.16.0",
+    "@playwright/test": "^1.49.1",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.0"
