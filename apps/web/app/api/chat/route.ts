@@ -1,4 +1,9 @@
-import { streamOpenAiChat, type ChatMessage } from '@agent-platform/model-router';
+import {
+  getOpenAiKeyOrNextJsonResponse,
+  resolveGatedOpenAiKeyForRequest,
+  streamOpenAiChat,
+  type ChatMessage,
+} from '@agent-platform/model-router';
 import { convertToCoreMessages, type UIMessage } from 'ai';
 import { z } from 'zod';
 
@@ -29,13 +34,10 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'OPENAI_API_KEY is not set' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const gated = resolveGatedOpenAiKeyForRequest({ preferredEnvVar: 'NEXT_OPENAI_API_KEY' });
+  const keyOrError = getOpenAiKeyOrNextJsonResponse(gated);
+  if (keyOrError instanceof Response) return keyOrError;
+  const apiKey = keyOrError;
 
   let body: unknown;
   try {

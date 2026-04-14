@@ -22,7 +22,7 @@ export default function HomePage() {
       <h1 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Chat</h1>
       <p style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.75rem' }}>
         Uses the same OpenAI streaming stack as the API (<code>/v1/chat/stream</code>). Set{' '}
-        <code>OPENAI_API_KEY</code> for this Next.js server (see <code>apps/web/.env.example</code>
+        <code>NEXT_OPENAI_API_KEY</code> for this Next.js server (see <code>apps/web/.env.example</code>
         ).
       </p>
 

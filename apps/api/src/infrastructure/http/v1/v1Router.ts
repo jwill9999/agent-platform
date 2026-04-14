@@ -6,7 +6,11 @@ import {
   SkillSchema,
   ToolSchema,
 } from '@agent-platform/contracts';
-import { streamOpenAiChat } from '@agent-platform/model-router';
+import {
+  openAiKeyGateToApiOutcome,
+  resolveGatedOpenAiKeyForRequest,
+  streamOpenAiChat,
+} from '@agent-platform/model-router';
 import type { DrizzleDb } from '@agent-platform/db';
 import {
   createSession,
@@ -313,10 +317,15 @@ export function createV1Router(db: DrizzleDb): Router {
     '/chat/stream',
     asyncHandler(async (req, res) => {
       const body = parseBody(ChatStreamBodySchema, req.body);
-      const apiKey = req.header('x-openai-key') ?? process.env.OPENAI_API_KEY;
-      if (!apiKey?.trim()) {
-        throw new HttpError(400, 'MISSING_KEY', 'Set OPENAI_API_KEY or x-openai-key header');
+      const gated = resolveGatedOpenAiKeyForRequest({
+        preferredEnvVar: 'AGENT_OPENAI_API_KEY',
+        headerKey: req.header('x-openai-key'),
+      });
+      const apiOutcome = openAiKeyGateToApiOutcome(gated);
+      if (apiOutcome.kind === 'error') {
+        throw new HttpError(400, apiOutcome.code, apiOutcome.message);
       }
+      const apiKey = apiOutcome.key;
       const result = streamOpenAiChat({
         apiKey,
         model: body.model,

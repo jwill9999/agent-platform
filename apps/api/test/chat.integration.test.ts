@@ -4,9 +4,42 @@ import path from 'node:path';
 
 import { closeDatabase, openDatabase, runSeed } from '@agent-platform/db';
 import request from 'supertest';
+import type { Application } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/infrastructure/http/createApp.js';
+
+const CHAT_ENV_KEYS = [
+  'OPENAI_API_KEY',
+  'AGENT_OPENAI_API_KEY',
+  'OPENAI_ALLOW_LEGACY_ENV',
+] as const;
+
+function snapshotChatEnv(): Map<string, string | undefined> {
+  const snap = new Map<string, string | undefined>();
+  for (const k of CHAT_ENV_KEYS) snap.set(k, process.env[k]);
+  return snap;
+}
+
+function restoreChatEnv(snap: Map<string, string | undefined>) {
+  for (const k of CHAT_ENV_KEYS) {
+    const v = snap.get(k);
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+}
+
+function createSeededChatApp(dirs: string[]): {
+  app: Application;
+  sqlite: ReturnType<typeof openDatabase>['sqlite'];
+} {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-chat-'));
+  dirs.push(dir);
+  const sqlitePath = path.join(dir, 'db.sqlite');
+  const { db, sqlite } = openDatabase(sqlitePath);
+  runSeed(db);
+  return { app: createApp({ db }), sqlite };
+}
 
 describe('POST /v1/chat/stream', () => {
   const dirs: string[] = [];
@@ -23,15 +56,12 @@ describe('POST /v1/chat/stream', () => {
   });
 
   it('returns 400 when no API key is configured', async () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-chat-'));
-    dirs.push(dir);
-    const sqlitePath = path.join(dir, 'db.sqlite');
-    const { db, sqlite } = openDatabase(sqlitePath);
-    runSeed(db);
-    const app = createApp({ db });
-    const prev = process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_API_KEY;
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = createSeededChatApp(dirs);
     try {
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.AGENT_OPENAI_API_KEY;
+      delete process.env.OPENAI_ALLOW_LEGACY_ENV;
       const res = await request(app)
         .post('/v1/chat/stream')
         .send({
@@ -41,7 +71,28 @@ describe('POST /v1/chat/stream', () => {
         .expect(400);
       expect(res.body.error?.code).toBe('MISSING_KEY');
     } finally {
-      if (prev !== undefined) process.env.OPENAI_API_KEY = prev;
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('returns 400 when only legacy OPENAI_API_KEY is set', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = createSeededChatApp(dirs);
+    try {
+      delete process.env.AGENT_OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'sk-legacy';
+      delete process.env.OPENAI_ALLOW_LEGACY_ENV;
+      const res = await request(app)
+        .post('/v1/chat/stream')
+        .send({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'hello' }],
+        })
+        .expect(400);
+      expect(res.body.error?.code).toBe('LEGACY_ENV_BLOCKED');
+    } finally {
+      restoreChatEnv(envSnap);
       closeDatabase(sqlite);
     }
   });
