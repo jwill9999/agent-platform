@@ -41,6 +41,8 @@ Requires **`SQLITE_PATH`** at process start (same DB file as migrations/seed). J
 ## Docker
 
 - Copy `.env.example` to `.env` and adjust `HOST_PORT` / `SQLITE_PATH` as needed.
+- For API chat streaming, set `AGENT_OPENAI_API_KEY` (preferred). `OPENAI_API_KEY` is intentionally blocked by default to prevent stale exported keys from taking precedence; allow it only with `OPENAI_ALLOW_LEGACY_ENV=1`.
+- For the Next.js chat route (`apps/web/app/api/chat/route.ts`), set `NEXT_OPENAI_API_KEY` in `apps/web/.env` (legacy `OPENAI_API_KEY` fallback is also blocked by default unless `OPENAI_ALLOW_LEGACY_ENV=1`).
 - `docker compose up --build` builds the API image, maps `HOST_PORT` → container `3000`, mounts a **named volume** at `/data` for SQLite (`SQLITE_PATH` defaults to `/data/agent.sqlite` in Compose), and runs a **health check** on `GET /health`.
 - To load the **default agent** into that database: **(a)** on the host, run `pnpm build` and `pnpm seed` with **`SQLITE_PATH`** pointing at the same SQLite file the API uses; **(b)** in Docker, after the image has been built with the entrypoint that `chown`s `/data` to the app user, run  
   `docker compose run --rm api node packages/db/dist/seed/run.js`  

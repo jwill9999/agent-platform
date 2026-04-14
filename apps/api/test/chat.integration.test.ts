@@ -29,8 +29,10 @@ describe('POST /v1/chat/stream', () => {
     const { db, sqlite } = openDatabase(sqlitePath);
     runSeed(db);
     const app = createApp({ db });
-    const prev = process.env.OPENAI_API_KEY;
+    const prevLegacy = process.env.OPENAI_API_KEY;
+    const prevPreferred = process.env.AGENT_OPENAI_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.AGENT_OPENAI_API_KEY;
     try {
       const res = await request(app)
         .post('/v1/chat/stream')
@@ -41,7 +43,43 @@ describe('POST /v1/chat/stream', () => {
         .expect(400);
       expect(res.body.error?.code).toBe('MISSING_KEY');
     } finally {
-      if (prev !== undefined) process.env.OPENAI_API_KEY = prev;
+      if (prevLegacy !== undefined) process.env.OPENAI_API_KEY = prevLegacy;
+      else delete process.env.OPENAI_API_KEY;
+      if (prevPreferred !== undefined) process.env.AGENT_OPENAI_API_KEY = prevPreferred;
+      else delete process.env.AGENT_OPENAI_API_KEY;
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('returns 400 when only legacy OPENAI_API_KEY is set', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-chat-'));
+    dirs.push(dir);
+    const sqlitePath = path.join(dir, 'db.sqlite');
+    const { db, sqlite } = openDatabase(sqlitePath);
+    runSeed(db);
+    const app = createApp({ db });
+    const prevLegacy = process.env.OPENAI_API_KEY;
+    const prevPreferred = process.env.AGENT_OPENAI_API_KEY;
+    const prevAllowLegacy = process.env.OPENAI_ALLOW_LEGACY_ENV;
+    delete process.env.AGENT_OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = 'sk-legacy';
+    delete process.env.OPENAI_ALLOW_LEGACY_ENV;
+    try {
+      const res = await request(app)
+        .post('/v1/chat/stream')
+        .send({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'hello' }],
+        })
+        .expect(400);
+      expect(res.body.error?.code).toBe('LEGACY_ENV_BLOCKED');
+    } finally {
+      if (prevLegacy !== undefined) process.env.OPENAI_API_KEY = prevLegacy;
+      else delete process.env.OPENAI_API_KEY;
+      if (prevPreferred !== undefined) process.env.AGENT_OPENAI_API_KEY = prevPreferred;
+      else delete process.env.AGENT_OPENAI_API_KEY;
+      if (prevAllowLegacy !== undefined) process.env.OPENAI_ALLOW_LEGACY_ENV = prevAllowLegacy;
+      else delete process.env.OPENAI_ALLOW_LEGACY_ENV;
       closeDatabase(sqlite);
     }
   });

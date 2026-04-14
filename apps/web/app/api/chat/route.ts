@@ -9,6 +9,22 @@ const ChatPostBodySchema = z.object({
   model: z.string().optional(),
 });
 
+function resolveOpenAiApiKeyFromEnv(): string | null {
+  const preferred = process.env.NEXT_OPENAI_API_KEY?.trim();
+  if (preferred) return preferred;
+
+  const legacy = process.env.OPENAI_API_KEY?.trim();
+  if (!legacy) return null;
+
+  const allowLegacy = process.env.OPENAI_ALLOW_LEGACY_ENV === '1';
+  if (!allowLegacy) {
+    throw new Error(
+      'OPENAI_API_KEY is set but blocked. Use NEXT_OPENAI_API_KEY, or set OPENAI_ALLOW_LEGACY_ENV=1 to allow legacy env fallback.',
+    );
+  }
+  return legacy;
+}
+
 function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessages>): ChatMessage[] {
   return core.map((m) => {
     const role = m.role;
@@ -29,9 +45,17 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  let apiKey: string | null = null;
+  try {
+    apiKey = resolveOpenAiApiKeyFromEnv();
+  } catch (error) {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'OPENAI_API_KEY is not set' }), {
+    return new Response(JSON.stringify({ error: 'NEXT_OPENAI_API_KEY is not set' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
