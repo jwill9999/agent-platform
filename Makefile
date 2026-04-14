@@ -20,7 +20,7 @@ web:
 	pnpm --filter @agent-platform/web run dev
 
 stop-ports:
-	@bash -lc 'set -euo pipefail; for port in "$(PORT)" "$(WEB_PORT)"; do pids="$$(lsof -tiTCP:$$port -sTCP:LISTEN || true)"; if [ -n "$$pids" ]; then echo "Stopping processes on port $$port: $$pids"; kill $$pids; fi; done'
+	@bash -lc 'set -euo pipefail; for port in "$(PORT)" "$(WEB_PORT)"; do pids="$$(lsof -tiTCP:$$port || true)"; if [ -n "$$pids" ]; then echo "Stopping processes on port $$port: $$pids"; kill $$pids || true; sleep 0.5; remaining="$$(lsof -tiTCP:$$port || true)"; if [ -n "$$remaining" ]; then echo "Force killing processes on port $$port: $$remaining"; kill -9 $$remaining || true; fi; fi; done'
 
 stop-sessions:
 	@bash -lc 'set -euo pipefail; tmux -f /exec-daemon/tmux.portal.conf has-session -t "=web-dev-server" 2>/dev/null && tmux -f /exec-daemon/tmux.portal.conf send-keys -t "web-dev-server:0.0" C-c || true; tmux -f /exec-daemon/tmux.portal.conf has-session -t "=api-server-run" 2>/dev/null && tmux -f /exec-daemon/tmux.portal.conf send-keys -t "api-server-run:0.0" C-c || true; tmux -f /exec-daemon/tmux.portal.conf has-session -t "=api-dev-server" 2>/dev/null && tmux -f /exec-daemon/tmux.portal.conf send-keys -t "api-dev-server:0.0" C-c || true'
