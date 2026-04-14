@@ -9,6 +9,23 @@ const ChatPostBodySchema = z.object({
   model: z.string().optional(),
 });
 
+function validateOpenAiApiKey(raw: string | undefined): { ok: true; key: string } | { ok: false; reason: string } {
+  const key = raw?.trim() ?? '';
+  if (!key) {
+    return { ok: false, reason: 'OPENAI_API_KEY is not set' };
+  }
+  if (!key.startsWith('sk-')) {
+    return { ok: false, reason: 'OPENAI_API_KEY must start with "sk-"' };
+  }
+  if (/\s|\\/.test(key)) {
+    return { ok: false, reason: 'OPENAI_API_KEY contains whitespace or escape characters' };
+  }
+  if (key.length < 40) {
+    return { ok: false, reason: 'OPENAI_API_KEY appears too short' };
+  }
+  return { ok: true, key };
+}
+
 function jsonError(status: number, code: string, message: string, details?: unknown): Response {
   return new Response(
     JSON.stringify({
@@ -59,9 +76,9 @@ function coreMessagesToChatMessages(core: ReturnType<typeof convertToCoreMessage
 }
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    return jsonError(500, 'MISSING_KEY', 'OPENAI_API_KEY is not set');
+  const keyValidation = validateOpenAiApiKey(process.env.OPENAI_API_KEY);
+  if (!keyValidation.ok) {
+    return jsonError(500, 'INVALID_OPENAI_API_KEY_FORMAT', keyValidation.reason);
   }
 
   let body: unknown;
@@ -81,7 +98,7 @@ export async function POST(req: Request) {
   try {
     const core = convertToCoreMessages(parsed.data.messages as UIMessage[]);
     const messages = coreMessagesToChatMessages(core);
-    const result = streamOpenAiChat({ apiKey, model, messages });
+    const result = streamOpenAiChat({ apiKey: keyValidation.key, model, messages });
     return result.toDataStreamResponse({
       getErrorMessage: (error) => `CHAT_STREAM_ERROR: ${getErrorMessage(error)}`,
     });

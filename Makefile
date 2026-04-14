@@ -1,4 +1,4 @@
-.PHONY: install build seed api web stop-sessions stop-ports reset-db start restart dev dev-seed dev-reset
+.PHONY: install build seed api web stop-sessions stop-ports reset-db up down reset start restart dev dev-seed dev-reset
 
 PORT ?= 3000
 WEB_PORT ?= 3001
@@ -28,14 +28,22 @@ stop-sessions:
 reset-db:
 	@bash -lc 'set -euo pipefail; if [ -f "$(SQLITE_PATH)" ]; then echo "Removing $(SQLITE_PATH)"; rm -f "$(SQLITE_PATH)"; fi'
 
-start: dev
+up: build down
+	@bash -lc 'set -euo pipefail; trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
 
-restart: dev-seed
+down: stop-sessions stop-ports
+
+reset: down reset-db build seed
+	@bash -lc 'set -euo pipefail; trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
+
+start: up
+
+restart: reset
 
 dev: build
-	@bash -lc 'set -euo pipefail; for port in "$(PORT)" "$(WEB_PORT)"; do pids="$$(lsof -tiTCP:$$port -sTCP:LISTEN || true)"; if [ -n "$$pids" ]; then echo "Stopping processes on port $$port: $$pids"; kill $$pids; fi; done; trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --port "$(WEB_PORT)"'
+	@$(MAKE) up
 
 dev-seed: stop-sessions stop-ports reset-db seed
-	@bash -lc 'set -euo pipefail; trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --port "$(WEB_PORT)"'
+	@$(MAKE) reset
 
 dev-reset: dev-seed

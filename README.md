@@ -20,20 +20,22 @@ Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and dec
 | `pnpm format:check` | Prettier check                                                                                        |
 | `pnpm seed`         | After **`pnpm build`**: run idempotent DB seed (needs **`SQLITE_PATH`**) — default agent + demo skill |
 
-### Make shortcuts (seed + run API/web)
+### Unified run lifecycle (API + web)
 
 ```bash
-# Start API + frontend together (builds first; keeps existing DB)
-make start
+# Start stack (build + run API/web; keeps existing DB)
+make up
 
-# Restart both services (stop old processes/sessions first; keeps DB)
-make restart
+# Stop stack cleanly (sessions + listeners)
+make down
 
-# Restart, reset local sqlite DB, seed, then start both services
-make dev-seed
+# Full reset (down + delete DB + build + seed + run)
+make reset
+
+# Legacy aliases still work: start -> up, restart -> reset
 
 # Override ports/path when needed
-make restart PORT=3000 WEB_PORT=3001 SQLITE_PATH=/workspace/data/dev.sqlite
+make reset PORT=3000 WEB_PORT=3001 SQLITE_PATH=/workspace/data/dev.sqlite
 ```
 
 ## HTTP API (`/v1`)
