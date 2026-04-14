@@ -26,7 +26,16 @@ export function createTransportForMcpServer(mcp: McpServer): Transport {
     if (!url) {
       throw new McpAdapterError('INVALID_CONFIG', 'sse transport requires url');
     }
-    return new SSEClientTransport(new URL(url));
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new McpAdapterError(
+        'INVALID_CONFIG',
+        `sse transport requires a valid URL (got: "${url}")`,
+      );
+    }
+    return new SSEClientTransport(parsed);
   }
   throw new McpAdapterError(
     'INVALID_CONFIG',

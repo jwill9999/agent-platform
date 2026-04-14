@@ -21,10 +21,11 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
   const resolvePlan = (state: HarnessStateType): Partial<HarnessStateType> => {
     const plan = state.plan ?? options.stubPlan ?? null;
     if (!plan) {
-      const tr: TraceEvent[] = [{ type: 'graph_end' }];
+      const tr: TraceEvent[] = [{ type: 'graph_start', runId: state.runId }, { type: 'graph_end' }];
       return { plan: null, trace: tr, halted: true };
     }
     const tr: TraceEvent[] = [
+      { type: 'graph_start', runId: state.runId },
       { type: 'plan_ready', planId: plan.id, taskCount: plan.tasks.length },
     ];
     if (plan.tasks.length === 0) {
@@ -34,8 +35,11 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
   };
 
   const executeNode = async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
+    if (state.halted) {
+      return {};
+    }
     const plan = state.plan;
-    if (!plan || state.halted) {
+    if (!plan) {
       return { trace: [{ type: 'graph_end' }] };
     }
 

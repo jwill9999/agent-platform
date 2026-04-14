@@ -1,7 +1,5 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import type { Tool as ContractTool } from '@agent-platform/contracts';
-import type { Output } from '@agent-platform/contracts';
-import type { McpServer } from '@agent-platform/contracts';
+import type { McpServer, Output, Tool as ContractTool } from '@agent-platform/contracts';
 import { getConnectTimeoutMs, getRequestTimeoutMs } from './env.js';
 import { callToolResultToOutput } from './callTool.js';
 import { McpAdapterError } from './errors.js';

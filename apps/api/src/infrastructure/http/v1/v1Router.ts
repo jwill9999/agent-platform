@@ -326,10 +326,16 @@ export function createV1Router(db: DrizzleDb): Router {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
-      for await (const chunk of result.textStream) {
-        res.write(chunk);
+      try {
+        for await (const chunk of result.textStream) {
+          if (req.aborted || res.writableEnded) break;
+          res.write(chunk);
+        }
+      } finally {
+        if (!res.writableEnded) {
+          res.end();
+        }
       }
-      res.end();
     }),
   );
 

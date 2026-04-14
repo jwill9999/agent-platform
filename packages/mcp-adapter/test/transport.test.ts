@@ -23,6 +23,17 @@ describe('createTransportForMcpServer', () => {
     ).toThrow(McpAdapterError);
   });
 
+  it('rejects sse with syntactically invalid url', () => {
+    expect(() =>
+      createTransportForMcpServer({
+        id: 'm1',
+        name: 't',
+        transport: 'sse',
+        url: 'not a valid url',
+      }),
+    ).toThrow(McpAdapterError);
+  });
+
   it('rejects unknown transport', () => {
     expect(() =>
       createTransportForMcpServer({

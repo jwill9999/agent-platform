@@ -8,7 +8,10 @@ COPY packages/db packages/db
 COPY packages/model-router packages/model-router
 COPY apps/api apps/api
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @agent-platform/contracts build && pnpm --filter @agent-platform/db build && pnpm --filter @agent-platform/model-router build && pnpm --filter @agent-platform/api build
+RUN pnpm --filter @agent-platform/contracts build \
+  && pnpm --filter @agent-platform/db build \
+  && pnpm --filter @agent-platform/model-router build \
+  && pnpm --filter @agent-platform/api build
 
 FROM node:20-alpine AS runner
 RUN apk add --no-cache curl python3 make g++ \
