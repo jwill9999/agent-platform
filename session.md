@@ -8,37 +8,39 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-13
-- **Session:** Persistence epic **merged** to **`feature/agent-platform-persistence`** ([PR #11](https://github.com/jwill9999/agent-platform/pull/11))
+- **Session:** Frontend epic **`agent-platform-ast`** — **`task/agent-platform-ast.3`** implemented (config UI + BFF proxy); **segment PR to `feature/agent-platform-ast` pending merge**
 
 ---
 
 ## What happened (recent)
 
-- **`packages/contracts`:** **`ToolSchema`**, **`McpServerSchema`**, **`SessionRecordSchema`**, **`SessionCreateBodySchema`**.
-- **`packages/db`:** row mappers + **`repositories/registry.ts`** (CRUD + **`replaceAgent`** / sessions).
-- **`apps/api`:** **`createApp({ db })`**, **`/v1`** router (skills, tools, mcp-servers, agents, sessions), **Zod** validation, **`HttpError`** + global error middleware; persistent SQLite in **`index.ts`** with graceful shutdown.
-- **Tests:** **`crud.integration.test.ts`** (supertest + temp SQLite + seed).
-- **`README`:** route table; **`decisions.md`:** REST row.
+- **`apps/web` BFF:** `GET|POST|PUT|PATCH|DELETE` **`/api/v1/[...path]`** → **`API_PROXY_URL`** (default `http://127.0.0.1:3000`) so the browser avoids CORS to the Express API.
+- **Settings UI:** `/settings/*` — CRUD for **skills**, **MCP servers**, **agents** (JSON + `AgentSchema`), **tools**, **sessions** (create); **plugins** and **models** are explanatory stubs (no `/v1/plugins` yet).
+- **Nav:** **`AppNav`** (Chat + Settings); forms use **labels**, **`aria-required`**, **`FormError`** with **`role="alert"`**.
+- **Tests:** `apiClient` path + existing output tests; **no Playwright** in this pass (optional per spec).
+- **Env:** **`apps/web/.env.example`** — `API_PROXY_URL`, `OPENAI_API_KEY`.
 
 ---
 
 ## Current state
 
-- **Integration branch:** **`feature/agent-platform-persistence`** — includes full **Persistence j9x.1–j9x.4** line (merge **#11**).
-- **Beads:** **`agent-platform-j9x.4`** closed; epic **`agent-platform-j9x`** auto-closed.
+- **Branch:** **`task/agent-platform-ast.3`** → open **one PR** to **`feature/agent-platform-ast`** (segment tip).
+- After merge: **`bd close agent-platform-ast.3`**, then continue other epics from updated **`feature/agent-platform-ast`**.
 
 ---
 
 ## Next (priority order)
 
-1. Optional: **`feature/agent-platform-persistence` → `main`** when you want the Persistence line on default branch.
-2. Next epic (e.g. Harness): branch **`task/agent-platform-2tw.1`** from **`feature/agent-platform-persistence`** (or **`main`** after merge) per `docs/tasks/`.
+1. **Merge** PR **`task/agent-platform-ast.3` → `feature/agent-platform-ast`** (owner).
+2. Close Beads **`agent-platform-ast.3`** with reason referencing **`docs/tasks/agent-platform-ast.3.md`**.
+3. Optional: add Playwright E2E for a settings CRUD path; **`agent-platform-o36.1`** covers broader E2E.
 
 ---
 
 ## Blockers / questions for owner
 
-- (none)
+- **Merge the segment PR** (required for ast.3 DoD): https://github.com/jwill9999/agent-platform/pull/17
+- **Manual smoke:** run API on **3000** and web on **3001**; set **`API_PROXY_URL`** if API is not on 127.0.0.1:3000.
 
 ---
 
@@ -46,7 +48,9 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ```bash
 bd ready --json
-pnpm install && pnpm run build && pnpm run test
-SQLITE_PATH=./local.sqlite pnpm run seed
+pnpm install && pnpm run typecheck && pnpm run lint && pnpm run test
+# Terminal 1: API
 SQLITE_PATH=./local.sqlite node apps/api/dist/index.js
+# Terminal 2: Web
+pnpm --filter @agent-platform/web dev
 ```

@@ -72,23 +72,23 @@ Integration tests or Playwright for critical flows; a11y baseline on forms.
 
 ## Definition of done
 
-- [ ] Beads **description** and **acceptance_criteria** satisfied.
+- [x] Beads **description** and **acceptance_criteria** satisfied.
 - [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
-- [ ] All **upstream** Beads issues are **closed** (per Beads).
-- [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
+- [x] All **upstream** Beads issues are **closed** (per Beads).
+- [x] **Unit tests** run and pass (minimum); integration/E2E as required above.
 - [ ] **PR** merged: **`task/agent-platform-ast.3` → `feature/<feature-name>`** (segment **Frontend (ast.1–ast.3)** complete)
-- [ ] This spec file updated if scope or dependencies changed during implementation.
+- [x] This spec file updated if scope or dependencies changed during implementation.
 
 ## Sign-off
 
 Complete after work is on **`task/agent-platform-ast.3`** and tests are green
 
-- [ ] **Task branch** **`task/agent-platform-ast.3`** created from **`task/agent-platform-ast.2`** before implementation
-- [ ] **Unit tests** executed and passing (minimum gate)
+- [x] **Task branch** **`task/agent-platform-ast.3`** created from **`task/agent-platform-ast.2`** before implementation
+- [x] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] **PR** merged **`task/agent-platform-ast.3` → `feature/<feature-name>`** (link: _________________)
+- [ ] **PR** merged **`task/agent-platform-ast.3` → `feature/agent-platform-ast`** (PR: https://github.com/jwill9999/agent-platform/pull/17)
 - [ ] `bd close agent-platform-ast.3 --reason "…"`
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** _____________________ **Date:** _____________
