@@ -28,5 +28,8 @@ export function createTransportForMcpServer(mcp: McpServer): Transport {
     }
     return new SSEClientTransport(new URL(url));
   }
-  throw new McpAdapterError('INVALID_CONFIG', `Unsupported MCP transport "${mcp.transport}" (use stdio or sse)`);
+  throw new McpAdapterError(
+    'INVALID_CONFIG',
+    `Unsupported MCP transport "${mcp.transport}" (use stdio or sse)`,
+  );
 }

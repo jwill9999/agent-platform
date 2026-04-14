@@ -43,11 +43,9 @@ export async function openMcpSession(mcp: McpServer): Promise<McpSession> {
 
     async callToolAsOutput(name: string, args: Record<string, unknown>) {
       try {
-        const result = await client.callTool(
-          { name, arguments: args },
-          undefined,
-          { timeout: requestMs },
-        );
+        const result = await client.callTool({ name, arguments: args }, undefined, {
+          timeout: requestMs,
+        });
         return callToolResultToOutput(mcp.id, name, result);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);

@@ -48,7 +48,9 @@ describe('Harness + validation path', () => {
       { configurable: { thread_id: 'harness-path-1' } },
     );
 
-    const dones = out.trace.filter((e): e is Extract<typeof e, { type: 'task_done' }> => e.type === 'task_done');
+    const dones = out.trace.filter(
+      (e): e is Extract<typeof e, { type: 'task_done' }> => e.type === 'task_done',
+    );
     expect(dones).toHaveLength(2);
     expect(dones[0]?.ok).toBe(true);
     expect(dones[1]?.ok).toBe(false);

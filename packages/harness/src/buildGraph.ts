@@ -24,7 +24,9 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
       const tr: TraceEvent[] = [{ type: 'graph_end' }];
       return { plan: null, trace: tr, halted: true };
     }
-    const tr: TraceEvent[] = [{ type: 'plan_ready', planId: plan.id, taskCount: plan.tasks.length }];
+    const tr: TraceEvent[] = [
+      { type: 'plan_ready', planId: plan.id, taskCount: plan.tasks.length },
+    ];
     if (plan.tasks.length === 0) {
       tr.push({ type: 'graph_end' });
     }
