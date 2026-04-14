@@ -6,6 +6,8 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 
 ## Quick Reference
 
+**Frontend UI / design pause:** Do not treat **`agent-platform-ntf`** as ready to implement until product planning completes — see **`docs/planning/frontend-ui-phases.md`**.
+
 ```bash
 bd ready              # Find available work
 bd show <id>          # View issue details
