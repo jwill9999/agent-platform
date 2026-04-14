@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   openAiLegacyBlockedMessage,
   resolveOpenAiApiKeyFromEnv,
+  resolveOpenAiKeyForRequest,
 } from '../src/resolveOpenAiApiKey.js';
 
 const keys = [
@@ -72,5 +73,15 @@ describe('resolveOpenAiApiKeyFromEnv', () => {
       status: 'ok',
       key: 'sk-legacy',
     });
+  });
+
+  it('prefers header key over env', () => {
+    process.env.AGENT_OPENAI_API_KEY = 'sk-env';
+    expect(
+      resolveOpenAiKeyForRequest({
+        preferredEnvVar: 'AGENT_OPENAI_API_KEY',
+        headerKey: ' sk-header ',
+      }),
+    ).toEqual({ status: 'ok', key: 'sk-header' });
   });
 });

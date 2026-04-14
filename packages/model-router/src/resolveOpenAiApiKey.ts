@@ -32,3 +32,15 @@ export function resolveOpenAiApiKeyFromEnv(
   }
   return { status: 'legacy_blocked' };
 }
+
+/**
+ * Prefer an explicit header key (e.g. `x-openai-key`) when present, otherwise resolve from env.
+ */
+export function resolveOpenAiKeyForRequest(options: {
+  preferredEnvVar: PreferredOpenAiEnvVar;
+  headerKey?: string | null;
+}): OpenAiKeyResolveResult {
+  const header = options.headerKey?.trim();
+  if (header) return { status: 'ok', key: header };
+  return resolveOpenAiApiKeyFromEnv(options.preferredEnvVar);
+}
