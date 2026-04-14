@@ -39,7 +39,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Blockers / questions for owner
 
-- **Merge the segment PR** (required for ast.3 DoD).
+- **Merge the segment PR** (required for ast.3 DoD): https://github.com/jwill9999/agent-platform/pull/17
 - **Manual smoke:** run API on **3000** and web on **3001**; set **`API_PROXY_URL`** if API is not on 127.0.0.1:3000.
 
 ---
