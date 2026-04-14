@@ -23,17 +23,17 @@ Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and dec
 ### Make shortcuts (seed + run API/web)
 
 ```bash
-# Start API + frontend together (builds first)
-make dev
+# Start API + frontend together (builds first; keeps existing DB)
+make start
 
-# Seed DB, then start both services
+# Restart both services (stop old processes/sessions first; keeps DB)
+make restart
+
+# Restart, reset local sqlite DB, seed, then start both services
 make dev-seed
 
-# Reset local sqlite DB, seed it, then start both services
-make dev-reset-seed
-
 # Override ports/path when needed
-make dev-seed PORT=3000 WEB_PORT=3001 SQLITE_PATH=/workspace/data/dev.sqlite
+make restart PORT=3000 WEB_PORT=3001 SQLITE_PATH=/workspace/data/dev.sqlite
 ```
 
 ## HTTP API (`/v1`)
