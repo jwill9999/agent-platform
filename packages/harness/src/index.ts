@@ -13,3 +13,14 @@ export {
   type BuildAgentContextOptions,
   type ModelConfig,
 } from './factory.js';
+export type {
+  ChatMessage,
+  ToolDefinition,
+  LlmOutput,
+  LlmTextOutput,
+  LlmToolCallsOutput,
+  ToolCallIntent,
+  LlmModelConfig,
+} from './types.js';
+export { contractToolsToDefinitions } from './types.js';
+export { llmReasonNode } from './nodes/llmReason.js';

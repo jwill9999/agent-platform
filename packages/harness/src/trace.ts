@@ -4,5 +4,10 @@ export type TraceEvent =
   | { type: 'plan_ready'; planId: string; taskCount: number }
   | { type: 'task_start'; taskId: string; step: number }
   | { type: 'task_done'; taskId: string; step: number; ok: boolean }
+  | {
+      type: 'llm_call';
+      step: number;
+      tokenUsage?: { promptTokens: number; completionTokens: number };
+    }
   | { type: 'limit_hit'; kind: 'max_steps' }
   | { type: 'graph_end' };
