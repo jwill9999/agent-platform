@@ -7,8 +7,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-15 (p.m.)
-- **Session:** Full code review completed. Beads updated with 8 new issues (4 MVP prerequisites + 4 post-MVP backlog). Existing tasks `9v1` and `40r` updated with review findings. No code changes — planning-only session.
+- **Date:** 2026-04-15 (late p.m.)
+- **Session:** All epics complete. Both feature branches merged to main. SonarCloud quality gate issues resolved. All branches cleaned up.
 
 ---
 
@@ -20,47 +20,72 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-- **Code review (`docs/reviews/2026-04-15-api-harness-review.md`)**
-  - Deep review of all 10 packages + API app against Architecture ADR
-  - 8 areas of success identified (contract-first design, factory composition, MCP robustness, etc.)
-  - 13 areas requiring improvement (3 High, 7 Medium, 3 Low)
-  - 114 tests passing across 12 packages; 1 deprecation warning (SSEClientTransport)
-- **Beads planning — 8 new issues created:**
-  - `agent-platform-oss` (P0 task) — Fix error middleware info leakage → blocks `9v1`
-  - `agent-platform-pe4` (P1 chore) — Replace deprecated SSEClientTransport
-  - `agent-platform-ptj` (P2 task) — Decompose v1Router → blocks `5pe`
-  - `agent-platform-qhe` (P2 chore) — Structured logger replacement → depends on `oss`
-  - `agent-platform-fcm` (P4 feature) — HITL pause/resume → depends on `xk3`
-  - `agent-platform-bto` (P3 feature) — Multi-provider routing → depends on `icb`
-  - `agent-platform-nqn` (P3 feature) — Rate limiting / cost guardrails → depends on `9yb`
-  - `agent-platform-hnx` (P3 task) — Correlation IDs for structured logging
-- **Existing tasks updated:**
-  - `agent-platform-9v1`: pre-allocate `totalTokensUsed`/`totalCostUnits` in HarnessState; new dep on `oss`
-  - `agent-platform-40r`: design graph mode selector with `PLANNER_GRAPH_INTEGRATION_ENABLED` flag
-- **Total: 21 issues** (up from 13). `bd ready` shows 7 unblocked.
+### Epic 1: Agent Runtime Loop (`agent-platform-n0l`) — COMPLETE
+
+- 8 tasks implemented across `feature/agent-platform-runtime`
+- Error middleware, LLM reasoning node, tool dispatch, streaming output, model override resolution, planner-graph integration, execution limits, and more
+- PR #25 merged → main
+
+### Epic 2: Harness Hardening (`agent-platform-qlp`) — COMPLETE
+
+- 4 tasks: plugin dispatch (`k7m`), execution limits (`9yb`), planner integration (`dtc`), conversation history (`xk3`)
+- PR #26 merged → main
+
+### SonarCloud quality gate fixes
+
+- Cognitive complexity refactoring: `chatRouter.ts` (33→~10), `llmReason.ts` (19→~8)
+- Nested ternary elimination: `planGenerate.ts`, `buildGraph.ts`, `toolDispatch.ts`
+- 23 SonarCloud issues resolved across 11 files:
+  - S4325: Replaced `req.params.id!` non-null assertions with `requireParam()` runtime helper (5 router files)
+  - S3358: Nested ternaries → if/else chains
+  - S6582: Optional chaining in `toolDispatch.ts`
+  - S3863: Merged duplicate imports in `types.ts`
+  - S1874: Migrated deprecated `llmReasonNode` → `createLlmReasonNode()` in tests
+  - S3696: NOSONAR suppression for intentional non-Error throw in test
+  - S2871: `localeCompare` in `buildGraph.ts` sort
+  - S5443: Replaced `/tmp` paths with `/workspace` in test fixtures
+- PR #27 (`feature/agent-platform-hardening` → `main`) merged
+
+### Branch cleanup
+
+- All 17 local feature/task branches deleted
+- All remote feature/task branches deleted
+- Only `main` remains (local + remote)
 
 ---
 
 ## Current state
 
-### Epics (in dependency order)
+### Epics
 
-| Epic                       | ID                   | Tasks                                         | Status                           |
-| -------------------------- | -------------------- | --------------------------------------------- | -------------------------------- |
-| **Agent Schema & Factory** | `agent-platform-nzq` | 3 (~~4wm~~ → ~~2zy~~ → ~~yvd~~)               | **Complete** — merged to feature |
-| **Agent Runtime Loop**     | `agent-platform-n0l` | 6 (9v1 → 6d5 → 40r → 16f → 5pe; icb parallel) | Open — `9v1` blocked by `oss`    |
-| **Harness Hardening**      | `agent-platform-qlp` | 4 (k7m → 9yb → dtc → xk3)                     | Open — blocked on Epic 2         |
+| Epic                       | ID                   | Status                | PR     |
+| -------------------------- | -------------------- | --------------------- | ------ |
+| **Agent Schema & Factory** | `agent-platform-nzq` | **Complete** — merged | —      |
+| **Agent Runtime Loop**     | `agent-platform-n0l` | **Complete** — merged | PR #25 |
+| **Harness Hardening**      | `agent-platform-qlp` | **Complete** — merged | PR #26 |
+| SonarCloud fixes           | —                    | **Complete** — merged | PR #27 |
 
-### New MVP prerequisites (from code review)
+### Quality
 
-| ID                   | Priority | Title                                 | Blocks       |
-| -------------------- | -------- | ------------------------------------- | ------------ |
-| `agent-platform-oss` | P0       | Fix error middleware info leakage     | `9v1`, `qhe` |
-| `agent-platform-pe4` | P1       | Replace deprecated SSEClientTransport | —            |
-| `agent-platform-ptj` | P2       | Decompose v1Router                    | `5pe`        |
-| `agent-platform-qhe` | P2       | Structured logger replacement         | —            |
+- 157+ tests passing (73 harness + 17 API + others)
+- Build, typecheck, lint all clean
+- SonarCloud issues resolved
 
-### Post-MVP backlog (from code review)
+### Git
+
+- `main` — up to date, all work merged
+- No stale branches (local or remote)
+
+### Remaining MVP prerequisites (from earlier code review)
+
+| ID                   | Priority | Title                                 | Status |
+| -------------------- | -------- | ------------------------------------- | ------ |
+| `agent-platform-oss` | P0       | Fix error middleware info leakage     | Open   |
+| `agent-platform-pe4` | P1       | Replace deprecated SSEClientTransport | Open   |
+| `agent-platform-ptj` | P2       | Decompose v1Router                    | Open   |
+| `agent-platform-qhe` | P2       | Structured logger replacement         | Open   |
+
+### Post-MVP backlog
 
 | ID                   | Priority | Title                           | Depends On |
 | -------------------- | -------- | ------------------------------- | ---------- |
@@ -69,27 +94,15 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 | `agent-platform-nqn` | P3       | Rate limiting / cost guardrails | `9yb`      |
 | `agent-platform-fcm` | P4       | HITL pause/resume               | `xk3`      |
 
-### Ready tasks (`bd ready`)
-
-1. **`agent-platform-oss`** (P0) — Fix error middleware. **Start here.**
-2. `agent-platform-pe4` (P1) — SSE transport. Can parallel with `oss`.
-3. `agent-platform-ptj` (P2) — Router decomposition. Independent.
-4. `agent-platform-hnx` (P3) — Correlation IDs. Independent.
-
-### Git
-
-- `feature/agent-platform-runtime` — contains all Epic 1 work, PR to main pending
-- Task branches: `4wm`, `2zy`, `yvd` — all merged, can be cleaned up
-
 ---
 
 ## Next (priority order)
 
-1. Merge `feature/agent-platform-runtime` → `main`.
-2. **`agent-platform-oss`** — Fix error middleware info leakage (P0, security). Small task, can be done on a standalone branch or as first task in next segment.
-3. **`agent-platform-pe4`** — Replace deprecated SSEClientTransport (P1, independent chore). Can parallel with `oss`.
-4. **`agent-platform-9v1`** — LLM reasoning node (P1, critical path). Blocked until `oss` is closed. Branch from `feature/agent-platform-runtime`. Follow spec at `docs/tasks/agent-platform-n0l.1.md`.
-5. Continue Epic 2 chain: `6d5` → `40r` → `16f` → `ptj` → `5pe` (segment tip).
+1. **`agent-platform-oss`** — Fix error middleware info leakage (P0, security)
+2. **`agent-platform-pe4`** — Replace deprecated SSEClientTransport (P1, independent)
+3. **`agent-platform-ptj`** — Decompose v1Router (P2)
+4. **`agent-platform-qhe`** — Structured logger replacement (P2, depends on `oss`)
+5. Post-MVP backlog items as capacity allows
 
 ---
 
@@ -112,6 +125,5 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ```bash
 bd ready --json
 bd show agent-platform-oss
-bd show agent-platform-9v1
 pnpm install && pnpm build && pnpm typecheck && pnpm lint && pnpm test
 ```
