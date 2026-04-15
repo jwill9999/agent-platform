@@ -1,1 +1,4 @@
 pnpm exec lint-staged
+
+# Session handoff reminder — non-blocking, informational only
+.github/hooks/check-session-update.sh || true
