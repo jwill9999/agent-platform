@@ -7,6 +7,7 @@ import type { ObservabilityEvent } from '../src/events.js';
 const agent: Agent = {
   id: 'a1',
   name: 'A',
+  systemPrompt: 'Test agent',
   allowedSkillIds: [],
   allowedToolIds: ['t'],
   allowedMcpServerIds: [],

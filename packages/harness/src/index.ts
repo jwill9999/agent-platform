@@ -5,3 +5,11 @@ export {
   type BuildHarnessGraphOptions,
   type ToolExecutor,
 } from './buildGraph.js';
+export {
+  buildAgentContext,
+  destroyAgentContext,
+  AgentNotFoundError,
+  type AgentContext,
+  type BuildAgentContextOptions,
+  type ModelConfig,
+} from './factory.js';

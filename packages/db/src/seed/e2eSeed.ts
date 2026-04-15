@@ -34,6 +34,7 @@ export function runE2eSeed(db: DrizzleDb): void {
   const specialist: Agent = {
     id: E2E_SPECIALIST_ID,
     name: 'E2E specialist',
+    systemPrompt: 'You are an E2E test agent with filesystem access via MCP.',
     allowedSkillIds: [E2E_SKILL_ID],
     allowedToolIds: [],
     allowedMcpServerIds: [E2E_MCP_ID],

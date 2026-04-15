@@ -15,6 +15,13 @@
       "when": 1776123356517,
       "tag": "0001_secret_crypto",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1776209325145,
+      "tag": "0002_keen_owl",
+      "breakpoints": true
     }
   ]
 }

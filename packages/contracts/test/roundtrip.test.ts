@@ -39,6 +39,7 @@ describe('contracts round-trip', () => {
     const agent = AgentSchema.parse({
       id: 'agent-1',
       name: 'Default',
+      systemPrompt: 'Test agent',
       allowedSkillIds: [skill.id],
       allowedToolIds: ['tool-a'],
       allowedMcpServerIds: [],

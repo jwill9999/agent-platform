@@ -32,6 +32,8 @@ export const mcpServers = sqliteTable('mcp_servers', {
 export const agents = sqliteTable('agents', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  systemPrompt: text('system_prompt').notNull().default('You are a helpful assistant.'),
+  description: text('description'),
   executionLimitsJson: text('execution_limits_json').notNull(),
   modelOverrideJson: text('model_override_json'),
   pluginAllowlistJson: text('plugin_allowlist_json'),
