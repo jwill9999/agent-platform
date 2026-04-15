@@ -151,6 +151,22 @@ describe('McpSessionManager', () => {
       expect(manager.getSession('srv-1')).toBe(newSession);
     });
 
+    it('swallows close error on existing session and still reconnects', async () => {
+      const oldSession = createMockSession();
+      (oldSession.close as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('close exploded'));
+      const newSession = createMockSession();
+      mockOpen.mockResolvedValueOnce(oldSession).mockResolvedValueOnce(newSession);
+
+      const manager = new McpSessionManager();
+      await manager.openSessions([server1]);
+
+      const success = await manager.reconnect(server1);
+
+      expect(success).toBe(true);
+      expect(oldSession.close).toHaveBeenCalledOnce();
+      expect(manager.getSession('srv-1')).toBe(newSession);
+    });
+
     it('returns false on reconnect failure', async () => {
       mockOpen.mockRejectedValue(new Error('Still down'));
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
