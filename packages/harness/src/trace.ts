@@ -11,5 +11,5 @@ export type TraceEvent =
     }
   | { type: 'tool_dispatch'; toolId: string; step: number; ok: boolean }
   | { type: 'loop_detected'; toolSignature: string; repeats: number }
-  | { type: 'limit_hit'; kind: 'max_steps' }
+  | { type: 'limit_hit'; kind: 'max_steps' | 'timeout' | 'max_tokens' | 'max_cost' }
   | { type: 'graph_end' };

@@ -168,12 +168,30 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const step = state.taskIndex ?? 0;
     const traceEvent: TraceEvent = { type: 'llm_call', step, tokenUsage };
     const tokenDelta = tokenUsage ? tokenUsage.promptTokens + tokenUsage.completionTokens : 0;
+    const newTotalTokens = state.totalTokensUsed + tokenDelta;
+
+    const traceEvents: TraceEvent[] = [traceEvent];
+
+    // Check maxTokens limit
+    const maxTokens = state.limits?.maxTokens;
+    const tokenLimitExceeded = maxTokens != null && newTotalTokens >= maxTokens;
+    if (tokenLimitExceeded) {
+      traceEvents.push({ type: 'limit_hit', kind: 'max_tokens' });
+      if (emitter) {
+        emitter.emit({
+          type: 'error',
+          code: 'MAX_TOKENS',
+          message: `Token limit exceeded (${newTotalTokens}/${maxTokens})`,
+        });
+      }
+    }
 
     return {
       llmOutput: output,
       messages: [assistantMessage],
-      trace: [traceEvent],
-      totalTokensUsed: state.totalTokensUsed + tokenDelta,
+      trace: traceEvents,
+      totalTokensUsed: newTotalTokens,
+      ...(tokenLimitExceeded ? { halted: true } : {}),
     };
   };
 }

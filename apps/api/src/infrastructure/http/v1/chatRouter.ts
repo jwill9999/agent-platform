@@ -149,17 +149,31 @@ export function createChatRouter(db: DrizzleDb): Router {
           totalCostUnits: 0,
         };
 
-        // 8. Invoke graph
-        await graph.invoke(initialState, {
+        // 8. Invoke graph with timeout enforcement
+        const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
+        const graphPromise = graph.invoke(initialState, {
           configurable: { thread_id: sessionId },
         });
+
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('__TIMEOUT__')), timeoutMs);
+        });
+
+        try {
+          await Promise.race([graphPromise, timeoutPromise]);
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
+        }
       } catch (err) {
+        const isTimeout = err instanceof Error && err.message === '__TIMEOUT__';
+
         // Fire onError plugin hook
         try {
           await agentCtx.pluginDispatcher.onError({
             sessionId,
             runId: 'unknown',
-            phase: 'unknown',
+            phase: isTimeout ? 'session' : 'unknown',
             error: err,
           });
         } catch {
@@ -168,10 +182,16 @@ export function createChatRouter(db: DrizzleDb): Router {
 
         // Emit error event if stream is still writable
         if (!res.writableEnded) {
-          const errorEvent = {
-            type: 'error' as const,
-            message: err instanceof Error ? err.message : 'Graph execution failed',
-          };
+          const errorEvent = isTimeout
+            ? {
+                type: 'error' as const,
+                code: 'TIMEOUT',
+                message: `Execution timeout exceeded (${agentCtx.agent.executionLimits.timeoutMs}ms)`,
+              }
+            : {
+                type: 'error' as const,
+                message: err instanceof Error ? err.message : 'Graph execution failed',
+              };
           res.write(JSON.stringify(errorEvent) + '\n');
         }
       } finally {
