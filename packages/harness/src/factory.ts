@@ -96,6 +96,41 @@ function resolveModelConfig(agent: Agent, override?: ModelConfig): ModelConfig {
 }
 
 // ---------------------------------------------------------------------------
+// DB loading helpers (reduce cognitive complexity of main factory fn)
+// ---------------------------------------------------------------------------
+
+function loadAllowedSkills(db: DrizzleDb, ids: readonly string[]): Skill[] {
+  return ids.map((id) => getSkill(db, id)).filter((s): s is Skill => s != null);
+}
+
+function loadAllowedTools(db: DrizzleDb, ids: readonly string[]): ContractTool[] {
+  return ids.map((id) => getTool(db, id)).filter((t): t is ContractTool => t != null);
+}
+
+function loadAllowedMcpConfigs(db: DrizzleDb, ids: readonly string[]): McpServer[] {
+  return ids.map((id) => getMcpServer(db, id)).filter((m): m is McpServer => m != null);
+}
+
+async function discoverMcpTools(
+  manager: McpSessionManager,
+  configs: McpServer[],
+): Promise<ContractTool[]> {
+  const tools: ContractTool[] = [];
+  for (const config of configs) {
+    const session = manager.getSession(config.id);
+    if (!session) continue;
+    try {
+      const discovered = await session.listContractTools();
+      tools.push(...discovered);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[factory] Tool discovery failed for server "${config.id}": ${message}`);
+    }
+  }
+  return tools;
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -113,56 +148,21 @@ export async function buildAgentContext(
   agentId: string,
   options: BuildAgentContextOptions = {},
 ): Promise<AgentContext> {
-  // 1. Load agent
   const agent = loadAgentById(db, agentId);
   if (!agent) throw new AgentNotFoundError(agentId);
 
-  // 2. Load skills
-  const skills: Skill[] = [];
-  for (const sid of agent.allowedSkillIds) {
-    const skill = getSkill(db, sid);
-    if (skill) skills.push(skill);
-  }
+  const skills = loadAllowedSkills(db, agent.allowedSkillIds);
+  const registryTools = loadAllowedTools(db, agent.allowedToolIds);
+  const mcpConfigs = loadAllowedMcpConfigs(db, agent.allowedMcpServerIds);
 
-  // 3. Load registry tools
-  const registryTools: ContractTool[] = [];
-  for (const tid of agent.allowedToolIds) {
-    const tool = getTool(db, tid);
-    if (tool) registryTools.push(tool);
-  }
-
-  // 4. Load MCP configs
-  const mcpConfigs: McpServer[] = [];
-  for (const mid of agent.allowedMcpServerIds) {
-    const mcp = getMcpServer(db, mid);
-    if (mcp) mcpConfigs.push(mcp);
-  }
-
-  // 5. Open MCP sessions in parallel via manager
   const mcpManager = new McpSessionManager();
   await mcpManager.openSessions(mcpConfigs);
 
-  // 6. Discover tools from healthy sessions only
-  const mcpTools: ContractTool[] = [];
-  for (const config of mcpConfigs) {
-    const session = mcpManager.getSession(config.id);
-    if (session) {
-      try {
-        const discovered = await session.listContractTools();
-        mcpTools.push(...discovered);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.warn(`[factory] Tool discovery failed for server "${config.id}": ${message}`);
-      }
-    }
-  }
-
+  const mcpTools = await discoverMcpTools(mcpManager, mcpConfigs);
   const allTools = [...registryTools, ...mcpTools];
 
-  // 7. Build augmented system prompt
   const systemPrompt = buildAugmentedPrompt(agent.systemPrompt, skills, allTools);
 
-  // 8. Resolve plugin chain
   const hooks = resolveEffectivePluginHooks({
     global: options.globalPlugins ?? [],
     user: options.userPlugins ?? [],
@@ -170,7 +170,6 @@ export async function buildAgentContext(
   });
   const pluginDispatcher = createPluginDispatcher(hooks);
 
-  // 9. Resolve model config
   const modelConfig = resolveModelConfig(agent, options.modelConfig);
 
   return {

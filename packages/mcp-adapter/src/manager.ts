@@ -101,7 +101,7 @@ export class McpSessionManager {
     const entries = [...this.sessions.entries()];
     this.sessions.clear();
 
-    const settled = await Promise.allSettled(
+    await Promise.allSettled(
       entries.map(async ([serverId, session]) => {
         try {
           await session.close();
@@ -111,8 +111,5 @@ export class McpSessionManager {
         }
       }),
     );
-
-    // All errors are already handled inside the map, but allSettled ensures we wait for all
-    void settled;
   }
 }
