@@ -97,9 +97,7 @@ describe('plugin dispatch: llmReason', () => {
 
   it('does not crash when dispatcher.onPromptBuild throws', async () => {
     const dispatcher = mockDispatcher();
-    (dispatcher.onPromptBuild as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error('plugin boom'),
-    );
+    vi.mocked(dispatcher.onPromptBuild).mockRejectedValue(new Error('plugin boom'));
     const node = createLlmReasonNode({ dispatcher });
     const result = await node(baseState);
 
@@ -183,7 +181,7 @@ describe('plugin dispatch: toolDispatch', () => {
 
   it('does not crash when dispatcher.onToolCall throws', async () => {
     const dispatcher = mockDispatcher();
-    (dispatcher.onToolCall as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('plugin boom'));
+    vi.mocked(dispatcher.onToolCall).mockRejectedValue(new Error('plugin boom'));
 
     const node = createToolDispatchNode({
       agent: stubAgent,
@@ -260,10 +258,8 @@ describe('plugin dispatch: execute node (plan mode)', () => {
 
   it('does not crash when dispatcher hooks throw', async () => {
     const dispatcher = mockDispatcher();
-    (dispatcher.onTaskStart as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error('plugin boom'),
-    );
-    (dispatcher.onTaskEnd as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('plugin boom'));
+    vi.mocked(dispatcher.onTaskStart).mockRejectedValue(new Error('plugin boom'));
+    vi.mocked(dispatcher.onTaskEnd).mockRejectedValue(new Error('plugin boom'));
     const executeTool = vi.fn().mockResolvedValue({ ok: true });
 
     const graph = buildHarnessGraph({

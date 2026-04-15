@@ -81,13 +81,13 @@ describe('toolDispatchNode', () => {
     const state = makeState({
       llmOutput: {
         kind: 'tool_calls',
-        calls: [{ id: 'tc-1', name: 'mcp-fs:readFile', args: { path: '/tmp/x' } }],
+        calls: [{ id: 'tc-1', name: 'mcp-fs:readFile', args: { path: '/workspace/x' } }],
       },
     });
 
     const result = await node(state);
 
-    expect(callFn).toHaveBeenCalledWith('readFile', { path: '/tmp/x' });
+    expect(callFn).toHaveBeenCalledWith('readFile', { path: '/workspace/x' });
     expect(result.messages).toHaveLength(1);
     expect(result.messages![0]).toMatchObject({
       role: 'tool',

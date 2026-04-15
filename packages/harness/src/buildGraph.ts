@@ -34,7 +34,10 @@ const LOOP_DETECTION_THRESHOLD = 3;
 // ---------------------------------------------------------------------------
 
 function hashToolCall(name: string, args: Record<string, unknown>): string {
-  return `${name}:${JSON.stringify(args, Object.keys(args).sort())}`;
+  return `${name}:${JSON.stringify(
+    args,
+    Object.keys(args).sort((a, b) => a.localeCompare(b)),
+  )}`;
 }
 
 // ---------------------------------------------------------------------------

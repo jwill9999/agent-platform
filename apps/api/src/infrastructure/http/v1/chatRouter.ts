@@ -190,10 +190,10 @@ export function createChatRouter(db: DrizzleDb): Router {
         const messages = buildConversationMessages(db, sessionId, message, agentCtx.systemPrompt);
         const initialState = buildInitialState(sessionId, messages, agentCtx, modelCfg);
 
-        const finalState = (await invokeWithTimeout(
+        const finalState: { messages?: ChatMessage[] } = await invokeWithTimeout(
           graph.invoke(initialState, { configurable: { thread_id: sessionId } }),
           agentCtx.agent.executionLimits.timeoutMs,
-        )) as { messages?: ChatMessage[] };
+        );
 
         persistNewMessages(db, sessionId, finalState?.messages, messages.length);
       } catch (err) {

@@ -152,8 +152,8 @@ function checkTokenLimit(
 /** Normalise the old (OutputEmitter) and new (LlmReasonNodeOptions) signatures. */
 function normaliseOptions(options?: OutputEmitter | LlmReasonNodeOptions): LlmReasonNodeOptions {
   if (!options || typeof options !== 'object') return {};
-  if ('emit' in options) return { emitter: options as OutputEmitter };
-  return options as LlmReasonNodeOptions;
+  if ('emit' in options) return { emitter: options };
+  return options;
 }
 
 /**
