@@ -18,13 +18,17 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@agent-platform/agent-validation": "workspace:^",
     "@agent-platform/contracts": "workspace:*",
     "@agent-platform/db": "workspace:*",
     "@agent-platform/mcp-adapter": "workspace:*",
+    "@agent-platform/planner": "workspace:*",
     "@agent-platform/plugin-sdk": "workspace:*",
     "@agent-platform/plugin-session": "workspace:*",
+    "@ai-sdk/openai": "^1.3.0",
     "@langchain/core": "^0.3.0",
-    "@langchain/langgraph": "^0.2.0"
+    "@langchain/langgraph": "^0.2.0",
+    "ai": "^4.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

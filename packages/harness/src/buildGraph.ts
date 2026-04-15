@@ -1,24 +1,51 @@
 import { END, MemorySaver, START, StateGraph } from '@langchain/langgraph';
 import type { Plan } from '@agent-platform/contracts';
+import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { HarnessState, type HarnessStateType } from './graphState.js';
 import type { TraceEvent } from './trace.js';
 
 export type ToolExecutor = (toolId: string) => Promise<{ ok: boolean; detail?: string }>;
 
+/**
+ * Node function signature for LLM reasoning and tool dispatch.
+ * These are created externally (factory) and passed in.
+ */
+export type GraphNodeFn = (state: HarnessStateType) => Promise<Partial<HarnessStateType>>;
+
 export type BuildHarnessGraphOptions = {
   /** Stub planner: if `plan` in initial state is null, use this fixed plan. */
   stubPlan?: Plan;
   executeTool: ToolExecutor;
+  /** LLM reasoning node (ReAct path). Required for mode='react'. */
+  llmReasonNode?: GraphNodeFn;
+  /** Tool dispatch node (ReAct path). Required for mode='react'. */
+  toolDispatchNode?: GraphNodeFn;
+  /** Plan generate node (plan path). Optional — if absent, falls back to stubPlan. */
+  planGenerateNode?: GraphNodeFn;
+  /** Plugin dispatcher for lifecycle hooks (plan-mode task start/end). */
+  dispatcher?: PluginDispatcher;
 };
 
-/**
- * Minimal linear graph: plan → execute tasks one step per node until done or limit.
- * Compiled with in-memory checkpointing for bring-up / tests.
- */
-export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
-  const checkpointer = new MemorySaver();
+/** Number of consecutive identical tool calls before loop detection triggers. */
+const LOOP_DETECTION_THRESHOLD = 3;
 
-  const resolvePlan = (state: HarnessStateType): Partial<HarnessStateType> => {
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+function hashToolCall(name: string, args: Record<string, unknown>): string {
+  return `${name}:${JSON.stringify(
+    args,
+    Object.keys(args).sort((a, b) => a.localeCompare(b)),
+  )}`;
+}
+
+// ---------------------------------------------------------------------------
+// Plan path nodes (existing)
+// ---------------------------------------------------------------------------
+
+function createResolvePlanNode(options: BuildHarnessGraphOptions) {
+  return (state: HarnessStateType): Partial<HarnessStateType> => {
     const plan = state.plan ?? options.stubPlan ?? null;
     if (!plan) {
       const tr: TraceEvent[] = [{ type: 'graph_start', runId: state.runId }, { type: 'graph_end' }];
@@ -33,8 +60,10 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
     }
     return { plan, trace: tr, taskIndex: 0, halted: false };
   };
+}
 
-  const executeNode = async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
+function createExecuteNode(options: BuildHarnessGraphOptions) {
+  return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
     if (state.halted) {
       return {};
     }
@@ -61,8 +90,39 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
 
     const toolId = task.toolIds?.[0] ?? 'noop';
     const tr: TraceEvent[] = [{ type: 'task_start', taskId: task.id, step: state.taskIndex }];
+
+    // Fire onTaskStart plugin hook
+    if (options.dispatcher) {
+      try {
+        await options.dispatcher.onTaskStart({
+          sessionId: state.sessionId ?? '',
+          runId: state.runId ?? '',
+          planId: plan.id,
+          taskId: task.id,
+          toolIds: task.toolIds ?? [],
+        });
+      } catch {
+        /* plugin errors must not crash the graph */
+      }
+    }
+
     const result = await options.executeTool(toolId);
     tr.push({ type: 'task_done', taskId: task.id, step: state.taskIndex, ok: result.ok });
+
+    // Fire onTaskEnd plugin hook
+    if (options.dispatcher) {
+      try {
+        await options.dispatcher.onTaskEnd({
+          sessionId: state.sessionId ?? '',
+          runId: state.runId ?? '',
+          taskId: task.id,
+          ok: result.ok,
+          detail: result.detail,
+        });
+      } catch {
+        /* plugin errors must not crash the graph */
+      }
+    }
 
     const nextIndex = state.taskIndex + 1;
     if (nextIndex >= plan.tasks.length) {
@@ -74,22 +134,176 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
       taskIndex: nextIndex,
     };
   };
+}
 
-  const routeAfterExecute = (state: HarnessStateType): typeof END | 'execute' => {
-    if (state.halted) return END;
-    if (!state.plan) return END;
-    /** More tasks may remain; `maxSteps` is enforced inside `execute` (do not short-circuit here). */
-    if (state.taskIndex >= state.plan.tasks.length) return END;
-    return 'execute';
+function routeAfterExecute(state: HarnessStateType): typeof END | 'execute' {
+  if (state.halted) return END;
+  if (!state.plan) return END;
+  if (state.taskIndex >= state.plan.tasks.length) return END;
+  return 'execute';
+}
+
+// ---------------------------------------------------------------------------
+// ReAct path nodes and routing
+// ---------------------------------------------------------------------------
+
+/**
+ * Wraps the external llmReasonNode to:
+ * - Increment stepCount
+ * - Emit graph_start on first step
+ */
+function createReactLlmWrapper(llmReasonNode: GraphNodeFn) {
+  return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
+    const stepCount = (state.stepCount ?? 0) + 1;
+    const result = await llmReasonNode(state);
+
+    const trace: TraceEvent[] = [];
+    if ((state.stepCount ?? 0) === 0) {
+      trace.push({ type: 'graph_start', runId: state.runId });
+    }
+    if (result.trace) {
+      trace.push(...(Array.isArray(result.trace) ? result.trace : [result.trace]));
+    }
+
+    return {
+      ...result,
+      stepCount,
+      trace,
+    };
+  };
+}
+
+/**
+ * Wraps the external toolDispatchNode to add loop detection.
+ * After dispatch, checks recentToolCalls for consecutive identical signatures.
+ */
+function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
+  return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
+    const result = await toolDispatchNode(state);
+
+    // Build tool call signatures from the current llmOutput
+    const newSignatures: string[] = [];
+    if (state.llmOutput?.kind === 'tool_calls') {
+      for (const call of state.llmOutput.calls) {
+        newSignatures.push(hashToolCall(call.name, call.args));
+      }
+    }
+
+    // Append to recent calls window
+    const recent = [...(state.recentToolCalls ?? []), ...newSignatures];
+    // Keep only the last LOOP_DETECTION_THRESHOLD entries
+    const window = recent.slice(-LOOP_DETECTION_THRESHOLD);
+
+    // Check if all entries in the window are identical and we have enough
+    const isLoop =
+      window.length >= LOOP_DETECTION_THRESHOLD && window.every((sig) => sig === window[0]);
+
+    if (isLoop) {
+      let trace: TraceEvent[];
+      if (!result.trace) {
+        trace = [];
+      } else if (Array.isArray(result.trace)) {
+        trace = result.trace;
+      } else {
+        trace = [result.trace];
+      }
+      trace.push({
+        type: 'loop_detected',
+        toolSignature: window[0]!,
+        repeats: LOOP_DETECTION_THRESHOLD,
+      });
+
+      return {
+        ...result,
+        recentToolCalls: window,
+        halted: true,
+        trace,
+      };
+    }
+
+    return {
+      ...result,
+      recentToolCalls: window,
+    };
+  };
+}
+
+function routeAfterLlm(state: HarnessStateType): 'react_tool_dispatch' | typeof END {
+  if (state.halted) return END;
+  if (state.llmOutput?.kind === 'tool_calls') return 'react_tool_dispatch';
+  return END;
+}
+
+function routeAfterReactDispatch(state: HarnessStateType): 'react_llm_reason' | typeof END {
+  if (state.halted) return END;
+  const maxSteps = state.limits?.maxSteps ?? Infinity;
+  if ((state.stepCount ?? 0) >= maxSteps) {
+    return END;
+  }
+  return 'react_llm_reason';
+}
+
+// ---------------------------------------------------------------------------
+// Mode router
+// ---------------------------------------------------------------------------
+
+/**
+ * Route after plan_generate: if planning halted (failed), go to END;
+ * otherwise forward to resolve_plan which sets up taskIndex etc.
+ */
+function routeAfterPlanGenerate(state: HarnessStateType): 'resolve_plan' | typeof END {
+  if (state.halted) return END;
+  return 'resolve_plan';
+}
+
+// ---------------------------------------------------------------------------
+// Graph builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the full harness graph with two execution paths:
+ * - **react** (default): LLM ↔ tool dispatch ReAct loop
+ * - **plan**: existing plan → execute linear path
+ *
+ * The `mode` field in initial state determines the path.
+ * Compiled with in-memory checkpointing for bring-up / tests.
+ */
+export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
+  const checkpointer = new MemorySaver();
+
+  // Determine plan-mode routing based on whether planGenerateNode is provided
+  const planGenNode: GraphNodeFn = options.planGenerateNode ?? (async () => ({}));
+
+  const routeByMode = (state: HarnessStateType): 'react_llm_reason' | 'plan_generate' => {
+    if (state.mode === 'plan') return 'plan_generate';
+    return 'react_llm_reason';
   };
 
+  if (options.llmReasonNode && options.toolDispatchNode) {
+    // Full graph with mode router → (react | plan) paths
+    const graph = new StateGraph(HarnessState)
+      .addNode('plan_generate', planGenNode)
+      .addNode('resolve_plan', createResolvePlanNode(options))
+      .addNode('execute', createExecuteNode(options))
+      .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
+      .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+      .addConditionalEdges(START, routeByMode)
+      .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+      .addEdge('resolve_plan', 'execute')
+      .addConditionalEdges('execute', routeAfterExecute)
+      .addConditionalEdges('react_llm_reason', routeAfterLlm)
+      .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch);
+
+    return graph.compile({ checkpointer });
+  }
+
+  // No ReAct nodes → plan-only path (backwards compatible)
   const graph = new StateGraph(HarnessState)
-    .addNode('resolve_plan', resolvePlan)
-    .addNode('execute', executeNode)
+    .addNode('resolve_plan', createResolvePlanNode(options))
+    .addNode('execute', createExecuteNode(options))
     .addEdge(START, 'resolve_plan')
     .addEdge('resolve_plan', 'execute')
-    .addConditionalEdges('execute', routeAfterExecute)
-    .compile({ checkpointer });
+    .addConditionalEdges('execute', routeAfterExecute);
 
-  return graph;
+  return graph.compile({ checkpointer });
 }
