@@ -1,5 +1,6 @@
 import { END, MemorySaver, START, StateGraph } from '@langchain/langgraph';
 import type { Plan } from '@agent-platform/contracts';
+import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { HarnessState, type HarnessStateType } from './graphState.js';
 import type { TraceEvent } from './trace.js';
 
@@ -19,6 +20,8 @@ export type BuildHarnessGraphOptions = {
   llmReasonNode?: GraphNodeFn;
   /** Tool dispatch node (ReAct path). Required for mode='react'. */
   toolDispatchNode?: GraphNodeFn;
+  /** Plugin dispatcher for lifecycle hooks (plan-mode task start/end). */
+  dispatcher?: PluginDispatcher;
 };
 
 /** Number of consecutive identical tool calls before loop detection triggers. */
@@ -82,8 +85,39 @@ function createExecuteNode(options: BuildHarnessGraphOptions) {
 
     const toolId = task.toolIds?.[0] ?? 'noop';
     const tr: TraceEvent[] = [{ type: 'task_start', taskId: task.id, step: state.taskIndex }];
+
+    // Fire onTaskStart plugin hook
+    if (options.dispatcher) {
+      try {
+        await options.dispatcher.onTaskStart({
+          sessionId: state.sessionId ?? '',
+          runId: state.runId ?? '',
+          planId: plan.id,
+          taskId: task.id,
+          toolIds: task.toolIds ?? [],
+        });
+      } catch {
+        /* plugin errors must not crash the graph */
+      }
+    }
+
     const result = await options.executeTool(toolId);
     tr.push({ type: 'task_done', taskId: task.id, step: state.taskIndex, ok: result.ok });
+
+    // Fire onTaskEnd plugin hook
+    if (options.dispatcher) {
+      try {
+        await options.dispatcher.onTaskEnd({
+          sessionId: state.sessionId ?? '',
+          runId: state.runId ?? '',
+          taskId: task.id,
+          ok: result.ok,
+          detail: result.detail,
+        });
+      } catch {
+        /* plugin errors must not crash the graph */
+      }
+    }
 
     const nextIndex = state.taskIndex + 1;
     if (nextIndex >= plan.tasks.length) {

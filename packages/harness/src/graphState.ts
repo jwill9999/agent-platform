@@ -26,6 +26,7 @@ export const HarnessState = Annotation.Root({
   taskIndex: Annotation<number>(),
   limits: Annotation<ExecutionLimits>(),
   runId: Annotation<string>(),
+  sessionId: Annotation<string>(),
   /** Set when {@link ExecutionLimits.maxSteps} would be exceeded. */
   halted: Annotation<boolean>(),
 

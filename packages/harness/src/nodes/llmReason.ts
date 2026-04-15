@@ -11,6 +11,7 @@ import type {
   ToolCallIntent,
   ToolDefinition,
 } from '../types.js';
+import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -68,6 +69,11 @@ function toSdkTools(
 // LLM reasoning node factory
 // ---------------------------------------------------------------------------
 
+export type LlmReasonNodeOptions = {
+  emitter?: OutputEmitter;
+  dispatcher?: PluginDispatcher;
+};
+
 /**
  * Creates a graph node that invokes the LLM via the Vercel AI SDK using streamText.
  *
@@ -76,8 +82,17 @@ function toSdkTools(
  * Streams text chunks via the emitter in real-time while accumulating the full response.
  * Appends the assistant message to conversation history.
  * Emits an `llm_call` trace event with optional token usage.
+ * Calls `onPromptBuild` plugin hook before each LLM call.
  */
-export function createLlmReasonNode(emitter?: OutputEmitter) {
+export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptions) {
+  // Support both old signature (emitter?) and new options object
+  const opts: LlmReasonNodeOptions =
+    options && typeof options === 'object' && 'emit' in options
+      ? { emitter: options as OutputEmitter }
+      : ((options as LlmReasonNodeOptions) ?? {});
+
+  const { emitter, dispatcher } = opts;
+
   return async function llmReasonNode(state: HarnessStateType): Promise<Partial<HarnessStateType>> {
     const { messages, toolDefinitions, modelConfig } = state;
 
@@ -90,6 +105,20 @@ export function createLlmReasonNode(emitter?: OutputEmitter) {
 
     const coreMessages = toCoreMessages(messages);
     const tools = toolDefinitions.length > 0 ? toSdkTools(toolDefinitions) : undefined;
+
+    // Fire onPromptBuild plugin hook (observer — does not mutate messages)
+    if (dispatcher) {
+      try {
+        await dispatcher.onPromptBuild({
+          sessionId: state.sessionId ?? '',
+          runId: state.runId ?? '',
+          plan: null,
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        });
+      } catch {
+        /* plugin errors must not crash the graph */
+      }
+    }
 
     const result = streamText({
       model,

@@ -1,6 +1,7 @@
 import type { Agent, Output } from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
+import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
@@ -15,6 +16,7 @@ export type ToolDispatchContext = {
   mcpManager: McpSessionManager;
   nativeToolExecutor?: NativeToolExecutor;
   emitter?: OutputEmitter;
+  dispatcher?: PluginDispatcher;
 };
 
 // ---------------------------------------------------------------------------
@@ -112,6 +114,20 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     const traceEvents: TraceEvent[] = [];
 
     for (const call of llmOutput.calls) {
+      // Fire onToolCall plugin hook before execution
+      if (ctx.dispatcher) {
+        try {
+          await ctx.dispatcher.onToolCall({
+            sessionId: state.sessionId ?? '',
+            runId: state.runId ?? '',
+            toolId: call.name,
+            args: call.args,
+          });
+        } catch {
+          /* plugin errors must not crash the graph */
+        }
+      }
+
       const { output, ok } = await dispatchSingleTool(call, ctx);
 
       // Stream the output event to the client

@@ -26,6 +26,10 @@ export type {
   OutputEmitter,
 } from './types.js';
 export { contractToolsToDefinitions } from './types.js';
-export { llmReasonNode, createLlmReasonNode } from './nodes/llmReason.js';
+export {
+  llmReasonNode,
+  createLlmReasonNode,
+  type LlmReasonNodeOptions,
+} from './nodes/llmReason.js';
 export { createToolDispatchNode, type ToolDispatchContext } from './nodes/toolDispatch.js';
 export { createNdjsonEmitter, createNoopEmitter } from './emitters/ndjson.js';

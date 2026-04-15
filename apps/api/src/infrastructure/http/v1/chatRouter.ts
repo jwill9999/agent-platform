@@ -87,29 +87,44 @@ export function createChatRouter(db: DrizzleDb): Router {
       }
 
       try {
-        // 4. Prepare streaming
+        // 4. Fire onSessionStart plugin hook
+        try {
+          await agentCtx.pluginDispatcher.onSessionStart({
+            sessionId,
+            agentId: session.agentId,
+            agent: agentCtx.agent,
+          });
+        } catch {
+          /* plugin errors must not crash the request */
+        }
+
+        // 5. Prepare streaming
         res.status(200);
         res.setHeader('Content-Type', 'application/x-ndjson');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
 
         const emitter: OutputEmitter = createNdjsonEmitter(res);
+        const dispatcher = agentCtx.pluginDispatcher;
 
-        // 5. Build graph nodes
-        const llmReasonNode = createLlmReasonNode(emitter);
+        // 6. Build graph nodes
+        const llmReasonNode = createLlmReasonNode({ emitter, dispatcher });
         const toolDispatchNode = createToolDispatchNode({
           agent: agentCtx.agent,
           mcpManager: agentCtx.mcpManager,
           emitter,
+          dispatcher,
         });
 
         const graph = buildHarnessGraph({
           executeTool: async () => ({ ok: true }),
           llmReasonNode,
           toolDispatchNode,
+          dispatcher,
         });
 
-        // 6. Build initial state
+        // 7. Build initial state
+        const runId = randomUUID();
         const messages: ChatMessage[] = [
           { role: 'system', content: agentCtx.systemPrompt },
           { role: 'user', content: message },
@@ -120,7 +135,8 @@ export function createChatRouter(db: DrizzleDb): Router {
           plan: null,
           taskIndex: 0,
           limits: agentCtx.agent.executionLimits,
-          runId: randomUUID(),
+          runId,
+          sessionId,
           halted: false,
           mode: 'react' as const,
           messages,
@@ -133,11 +149,23 @@ export function createChatRouter(db: DrizzleDb): Router {
           totalCostUnits: 0,
         };
 
-        // 7. Invoke graph
+        // 8. Invoke graph
         await graph.invoke(initialState, {
           configurable: { thread_id: sessionId },
         });
       } catch (err) {
+        // Fire onError plugin hook
+        try {
+          await agentCtx.pluginDispatcher.onError({
+            sessionId,
+            runId: 'unknown',
+            phase: 'unknown',
+            error: err,
+          });
+        } catch {
+          /* plugin errors must not crash the error handler */
+        }
+
         // Emit error event if stream is still writable
         if (!res.writableEnded) {
           const errorEvent = {
