@@ -70,27 +70,27 @@ export class McpSessionManager {
   /**
    * Attempt to re-open a failed or disconnected session.
    * Closes the old session if one exists before opening a new one.
+   * Always keys on `config.id` to avoid serverId/config.id mismatch.
    */
-  async reconnect(serverId: string, config: McpServer): Promise<boolean> {
-    // Close existing session if present
-    const existing = this.sessions.get(serverId);
+  async reconnect(config: McpServer): Promise<boolean> {
+    const existing = this.sessions.get(config.id);
     if (existing) {
       try {
         await existing.close();
       } catch {
         // Ignore close errors during reconnect
       }
-      this.sessions.delete(serverId);
+      this.sessions.delete(config.id);
     }
 
     try {
       const session = await openMcpSession(config);
-      this.sessions.set(serverId, session);
+      this.sessions.set(config.id, session);
       return true;
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       console.warn(
-        `[McpSessionManager] Reconnect failed for "${serverId}" (${config.transport}): ${error}`,
+        `[McpSessionManager] Reconnect failed for "${config.id}" (${config.transport}): ${error}`,
       );
       return false;
     }

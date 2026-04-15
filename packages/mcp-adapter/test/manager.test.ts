@@ -129,7 +129,7 @@ describe('McpSessionManager', () => {
       mockOpen.mockResolvedValue(session);
 
       const manager = new McpSessionManager();
-      const success = await manager.reconnect('srv-1', server1);
+      const success = await manager.reconnect(server1);
 
       expect(success).toBe(true);
       expect(manager.getSession('srv-1')).toBe(session);
@@ -144,7 +144,7 @@ describe('McpSessionManager', () => {
       await manager.openSessions([server1]);
       expect(manager.getSession('srv-1')).toBe(oldSession);
 
-      const success = await manager.reconnect('srv-1', server1);
+      const success = await manager.reconnect(server1);
 
       expect(success).toBe(true);
       expect(oldSession.close).toHaveBeenCalledOnce();
@@ -156,7 +156,7 @@ describe('McpSessionManager', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const manager = new McpSessionManager();
-      const success = await manager.reconnect('srv-1', server1);
+      const success = await manager.reconnect(server1);
 
       expect(success).toBe(false);
       expect(manager.getSession('srv-1')).toBeUndefined();
