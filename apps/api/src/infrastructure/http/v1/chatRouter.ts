@@ -10,8 +10,9 @@ import {
   createNdjsonEmitter,
   contractToolsToDefinitions,
 } from '@agent-platform/harness';
-import type { ChatMessage, LlmModelConfig, OutputEmitter } from '@agent-platform/harness';
+import type { ChatMessage, OutputEmitter } from '@agent-platform/harness';
 import {
+  resolveModelConfig,
   openAiKeyGateToApiOutcome,
   resolveGatedOpenAiKeyForRequest,
   streamOpenAiChat,
@@ -64,17 +65,7 @@ export function createChatRouter(db: DrizzleDb): Router {
         throw new HttpError(404, 'NOT_FOUND', 'Session not found');
       }
 
-      // 2. Resolve API key
-      const gated = resolveGatedOpenAiKeyForRequest({
-        preferredEnvVar: 'AGENT_OPENAI_API_KEY',
-        headerKey: req.header('x-openai-key'),
-      });
-      const apiOutcome = openAiKeyGateToApiOutcome(gated);
-      if (apiOutcome.kind === 'error') {
-        throw new HttpError(400, apiOutcome.code, apiOutcome.message);
-      }
-
-      // 3. Build agent context
+      // 2. Build agent context (needed before model resolution for agent override)
       let agentCtx;
       try {
         agentCtx = await buildAgentContext(db, session.agentId);
@@ -83,6 +74,16 @@ export function createChatRouter(db: DrizzleDb): Router {
           throw new HttpError(404, 'NOT_FOUND', `Agent '${session.agentId}' not found`);
         }
         throw err;
+      }
+
+      // 3. Resolve full model config (agent override → env → system fallback)
+      const resolution = resolveModelConfig({
+        agentOverride: agentCtx.agent.modelOverride ?? null,
+        headerKey: req.header('x-openai-key'),
+      });
+      if (resolution.kind === 'error') {
+        await destroyAgentContext(agentCtx);
+        throw new HttpError(400, resolution.code, resolution.message);
       }
 
       try {
@@ -94,14 +95,7 @@ export function createChatRouter(db: DrizzleDb): Router {
 
         const emitter: OutputEmitter = createNdjsonEmitter(res);
 
-        // 5. Build model config
-        const modelConfig: LlmModelConfig = {
-          provider: agentCtx.modelConfig.provider,
-          model: agentCtx.modelConfig.model,
-          apiKey: apiOutcome.key,
-        };
-
-        // 6. Build graph nodes
+        // 5. Build graph nodes
         const llmReasonNode = createLlmReasonNode(emitter);
         const toolDispatchNode = createToolDispatchNode({
           agent: agentCtx.agent,
@@ -115,7 +109,7 @@ export function createChatRouter(db: DrizzleDb): Router {
           toolDispatchNode,
         });
 
-        // 7. Build initial state
+        // 6. Build initial state
         const messages: ChatMessage[] = [
           { role: 'system', content: agentCtx.systemPrompt },
           { role: 'user', content: message },
@@ -132,14 +126,14 @@ export function createChatRouter(db: DrizzleDb): Router {
           messages,
           toolDefinitions: contractToolsToDefinitions(agentCtx.tools),
           llmOutput: null,
-          modelConfig,
+          modelConfig: resolution.config,
           stepCount: 0,
           recentToolCalls: [],
           totalTokensUsed: 0,
           totalCostUnits: 0,
         };
 
-        // 8. Invoke graph
+        // 7. Invoke graph
         await graph.invoke(initialState, {
           configurable: { thread_id: sessionId },
         });

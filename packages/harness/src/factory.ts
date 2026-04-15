@@ -81,10 +81,10 @@ function buildAugmentedPrompt(base: string, skills: Skill[], tools: ContractTool
 }
 
 // ---------------------------------------------------------------------------
-// Model config resolution
+// Model config resolution (provider + model only; API key resolved separately)
 // ---------------------------------------------------------------------------
 
-function resolveModelConfig(agent: Agent, override?: ModelConfig): ModelConfig {
+function resolveProviderAndModel(agent: Agent, override?: ModelConfig): ModelConfig {
   if (override) return override;
   if (agent.modelOverride) {
     return { provider: agent.modelOverride.provider, model: agent.modelOverride.model };
@@ -170,7 +170,7 @@ export async function buildAgentContext(
   });
   const pluginDispatcher = createPluginDispatcher(hooks);
 
-  const modelConfig = resolveModelConfig(agent, options.modelConfig);
+  const modelConfig = resolveProviderAndModel(agent, options.modelConfig);
 
   return {
     agent,
