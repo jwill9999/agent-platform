@@ -27,7 +27,7 @@ describe('errorMiddleware', () => {
 
   it('returns generic message for non-Error thrown values', async () => {
     const app = appWith(() => {
-      throw 'raw string error';
+      throw 'raw string error'; // NOSONAR: intentionally testing non-Error throw handling
     });
     const res = await request(app).get('/boom');
     expect(res.status).toBe(500);

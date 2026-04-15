@@ -199,11 +199,14 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
       window.length >= LOOP_DETECTION_THRESHOLD && window.every((sig) => sig === window[0]);
 
     if (isLoop) {
-      const trace: TraceEvent[] = result.trace
-        ? Array.isArray(result.trace)
-          ? result.trace
-          : [result.trace]
-        : [];
+      let trace: TraceEvent[];
+      if (!result.trace) {
+        trace = [];
+      } else if (Array.isArray(result.trace)) {
+        trace = result.trace;
+      } else {
+        trace = [result.trace];
+      }
       trace.push({
         type: 'loop_detected',
         toolSignature: window[0]!,

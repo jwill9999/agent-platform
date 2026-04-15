@@ -11,7 +11,7 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
-import { isSqliteConstraint, parseBody } from './routerUtils.js';
+import { isSqliteConstraint, parseBody, requireParam } from './routerUtils.js';
 
 export function createSessionsRouter(db: DrizzleDb): Router {
   const router = Router();
@@ -27,7 +27,7 @@ export function createSessionsRouter(db: DrizzleDb): Router {
   router.get(
     '/:id',
     asyncHandler(async (req, res) => {
-      const session = getSession(db, req.params.id!);
+      const session = getSession(db, requireParam(req.params, 'id'));
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
       res.json({ data: session });
     }),
@@ -71,7 +71,7 @@ export function createSessionsRouter(db: DrizzleDb): Router {
   router.delete(
     '/:id',
     asyncHandler(async (req, res) => {
-      const ok = deleteSession(db, req.params.id!);
+      const ok = deleteSession(db, requireParam(req.params, 'id'));
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
       res.status(204).send();
     }),

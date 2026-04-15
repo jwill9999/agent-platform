@@ -5,7 +5,7 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
-import { parseBody } from './routerUtils.js';
+import { parseBody, requireParam } from './routerUtils.js';
 
 export function createMcpServersRouter(db: DrizzleDb): Router {
   const router = Router();
@@ -20,7 +20,7 @@ export function createMcpServersRouter(db: DrizzleDb): Router {
   router.get(
     '/:id',
     asyncHandler(async (req, res) => {
-      const m = getMcpServer(db, req.params.id!);
+      const m = getMcpServer(db, requireParam(req.params, 'id'));
       if (!m) throw new HttpError(404, 'NOT_FOUND', 'MCP server not found');
       res.json({ data: m });
     }),
@@ -50,7 +50,7 @@ export function createMcpServersRouter(db: DrizzleDb): Router {
   router.delete(
     '/:id',
     asyncHandler(async (req, res) => {
-      const ok = deleteMcpServer(db, req.params.id!);
+      const ok = deleteMcpServer(db, requireParam(req.params, 'id'));
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'MCP server not found');
       res.status(204).send();
     }),

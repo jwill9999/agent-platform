@@ -5,7 +5,7 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
-import { parseBody } from './routerUtils.js';
+import { parseBody, requireParam } from './routerUtils.js';
 
 export function createSkillsRouter(db: DrizzleDb): Router {
   const router = Router();
@@ -20,7 +20,7 @@ export function createSkillsRouter(db: DrizzleDb): Router {
   router.get(
     '/:id',
     asyncHandler(async (req, res) => {
-      const skill = getSkill(db, req.params.id!);
+      const skill = getSkill(db, requireParam(req.params, 'id'));
       if (!skill) throw new HttpError(404, 'NOT_FOUND', 'Skill not found');
       res.json({ data: skill });
     }),
@@ -50,7 +50,7 @@ export function createSkillsRouter(db: DrizzleDb): Router {
   router.delete(
     '/:id',
     asyncHandler(async (req, res) => {
-      const ok = deleteSkill(db, req.params.id!);
+      const ok = deleteSkill(db, requireParam(req.params, 'id'));
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'Skill not found');
       res.status(204).send();
     }),

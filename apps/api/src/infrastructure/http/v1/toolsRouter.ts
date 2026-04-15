@@ -5,7 +5,7 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
-import { parseBody } from './routerUtils.js';
+import { parseBody, requireParam } from './routerUtils.js';
 
 export function createToolsRouter(db: DrizzleDb): Router {
   const router = Router();
@@ -20,7 +20,7 @@ export function createToolsRouter(db: DrizzleDb): Router {
   router.get(
     '/:id',
     asyncHandler(async (req, res) => {
-      const tool = getTool(db, req.params.id!);
+      const tool = getTool(db, requireParam(req.params, 'id'));
       if (!tool) throw new HttpError(404, 'NOT_FOUND', 'Tool not found');
       res.json({ data: tool });
     }),
@@ -50,7 +50,7 @@ export function createToolsRouter(db: DrizzleDb): Router {
   router.delete(
     '/:id',
     asyncHandler(async (req, res) => {
-      const ok = deleteTool(db, req.params.id!);
+      const ok = deleteTool(db, requireParam(req.params, 'id'));
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'Tool not found');
       res.status(204).send();
     }),

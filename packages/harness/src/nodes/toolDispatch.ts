@@ -105,7 +105,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
   return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
     const { llmOutput } = state;
 
-    if (!llmOutput || llmOutput.kind !== 'tool_calls') {
+    if (llmOutput?.kind !== 'tool_calls') {
       return {};
     }
 
@@ -135,12 +135,14 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         ctx.emitter.emit(output);
       }
 
-      const content =
-        output.type === 'tool_result'
-          ? JSON.stringify(output.data)
-          : output.type === 'error'
-            ? JSON.stringify({ error: output.code, message: output.message })
-            : JSON.stringify(output);
+      let content: string;
+      if (output.type === 'tool_result') {
+        content = JSON.stringify(output.data);
+      } else if (output.type === 'error') {
+        content = JSON.stringify({ error: output.code, message: output.message });
+      } else {
+        content = JSON.stringify(output);
+      }
 
       toolMessages.push({
         role: 'tool',

@@ -21,8 +21,9 @@ vi.mock('@ai-sdk/openai', () => ({
   },
 }));
 
-// Import after mocks
-const { llmReasonNode } = await import('../src/nodes/llmReason.js');
+// Import after mocks — use createLlmReasonNode (llmReasonNode is deprecated)
+const { createLlmReasonNode: _createNode } = await import('../src/nodes/llmReason.js');
+const llmReasonNode = _createNode();
 
 // ---------------------------------------------------------------------------
 // Helpers

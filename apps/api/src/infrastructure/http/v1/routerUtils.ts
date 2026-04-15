@@ -10,6 +10,15 @@ export function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
   return r.data;
 }
 
+/** Extract a required route param with runtime validation. */
+export function requireParam(params: Record<string, string | undefined>, name: string): string {
+  const value = params[name];
+  if (value === undefined) {
+    throw new HttpError(400, 'VALIDATION_ERROR', `Missing required param: ${name}`);
+  }
+  return value;
+}
+
 export function isSqliteConstraint(e: unknown): boolean {
   if (typeof e !== 'object' || e === null) return false;
   if (!('code' in e)) return false;

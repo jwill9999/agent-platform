@@ -1,4 +1,4 @@
-import type { Tool as ContractTool } from '@agent-platform/contracts';
+import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
 
 // ---------------------------------------------------------------------------
 // Chat messages (LLM conversation format)
@@ -55,8 +55,6 @@ export type LlmModelConfig = {
 // ---------------------------------------------------------------------------
 // Native tool executor (non-MCP tools)
 // ---------------------------------------------------------------------------
-
-import type { Output } from '@agent-platform/contracts';
 
 /** Pluggable executor for non-MCP (registry/native) tools. */
 export type NativeToolExecutor = (toolId: string, args: Record<string, unknown>) => Promise<Output>;
