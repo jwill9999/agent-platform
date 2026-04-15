@@ -9,6 +9,7 @@ import {
 const baseAgent = (): Agent => ({
   id: 'ag1',
   name: 'Agent',
+  systemPrompt: 'Test agent',
   allowedSkillIds: [],
   allowedToolIds: ['grep', 'lint'],
   allowedMcpServerIds: ['files'],

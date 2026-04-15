@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# Get changed packages by diffing against remote tracking branch
+REMOTE_REF=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "origin/main")
+
+CHANGED_PKGS=$(git diff --name-only "$REMOTE_REF"...HEAD 2>/dev/null | \
+  grep -oE '^(packages/[^/]+|apps/[^/]+)' | sort -u)
+
+if [ -z "$CHANGED_PKGS" ]; then
+  echo "[pre-push] No package changes detected, skipping checks."
+  exit 0
+fi
+
+echo "[pre-push] Changed packages: $(echo "$CHANGED_PKGS" | tr '\n' ' ')"
+
+# Build filter args for pnpm
+FILTERS=""
+for pkg in $CHANGED_PKGS; do
+  PKG_NAME=$(node -e "try{console.log(require('./$pkg/package.json').name)}catch{}" 2>/dev/null)
+  if [ -n "$PKG_NAME" ]; then
+    FILTERS="$FILTERS --filter $PKG_NAME"
+  fi
+done
+
+if [ -z "$FILTERS" ]; then
+  echo "[pre-push] No pnpm packages matched, skipping."
+  exit 0
+fi
+
+echo "[pre-push] Running build, typecheck, and test on affected packages..."
+eval "pnpm $FILTERS run build" && \
+eval "pnpm $FILTERS run typecheck" && \
+eval "pnpm $FILTERS run test"

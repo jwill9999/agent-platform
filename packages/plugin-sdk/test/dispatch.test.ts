@@ -6,6 +6,7 @@ import { createPluginDispatcher } from '../src/dispatch.js';
 const agent: Agent = {
   id: 'a1',
   name: 'Test',
+  systemPrompt: 'Test agent',
   allowedSkillIds: [],
   allowedToolIds: [],
   allowedMcpServerIds: [],

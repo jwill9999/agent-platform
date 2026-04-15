@@ -5,6 +5,7 @@ import { runPlannerRepairLoop } from '../src/repair.js';
 const agent: Agent = {
   id: 'ag1',
   name: 'Agent',
+  systemPrompt: 'Test agent',
   allowedSkillIds: [],
   allowedToolIds: ['ok'],
   allowedMcpServerIds: [],

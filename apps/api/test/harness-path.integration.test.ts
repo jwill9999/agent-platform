@@ -12,6 +12,7 @@ describe('Harness + validation path', () => {
   const agent: Agent = {
     id: 'agent-test',
     name: 'Policy test',
+    systemPrompt: 'Test agent',
     allowedSkillIds: [],
     allowedToolIds: ['plain-t'],
     allowedMcpServerIds: ['mcp-ok'],

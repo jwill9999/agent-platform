@@ -142,6 +142,8 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
       .values({
         id: agent.id,
         name: agent.name,
+        systemPrompt: agent.systemPrompt,
+        description: agent.description ?? null,
         executionLimitsJson: JSON.stringify(agent.executionLimits),
         modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
         pluginAllowlistJson:
@@ -155,6 +157,8 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
         target: schema.agents.id,
         set: {
           name: agent.name,
+          systemPrompt: agent.systemPrompt,
+          description: agent.description ?? null,
           executionLimitsJson: JSON.stringify(agent.executionLimits),
           modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
           pluginAllowlistJson:

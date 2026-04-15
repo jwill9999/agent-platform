@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-15
-- **Session:** Full API + harness + runtime assessment. Three epics and 13 tasks created in Beads with detailed specs in `docs/tasks/`.
+- **Session:** Completed Epic 1 (Agent Schema & Factory) — all 3 tasks done (4wm, 2zy, yvd). 117 tests passing.
 
 ---
 
@@ -20,11 +20,15 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-- **Assessment:** Reviewed every source file across `apps/api`, `packages/harness`, `packages/planner`, `packages/plugin-sdk`, `packages/plugin-session`, `packages/plugin-observability`, `packages/agent-validation`, `packages/mcp-adapter`, `packages/model-router`, and `packages/contracts`.
-- **Finding:** Foundation is solid (contracts, validation, plugins, MCP adapter, DB layer). The gap is the orchestration layer — nothing connects persisted agent config to actual LLM execution. The `/v1/chat/stream` endpoint is a raw OpenAI pass-through that bypasses all governance (allowlists, limits, plugins).
-- **Architecture validation:** Compared against the 5-layer harness/runtime architecture (from project ADR and owner's article). Platform aligns well; the missing piece is specifically the runtime execution engine.
-- **Planning:** Created 3 epics, 13 tasks, 13 spec files. All dependency-chained in Beads with `blocks` edges.
-- **CLAUDE.md** created for future agent context.
+- **Task `agent-platform-4wm`** (completed): Added `systemPrompt` and `description` to Agent schema across contracts, DB, mappers, seeds, UI, tests.
+- **Task `agent-platform-2zy`** (completed): Agent Factory — `buildAgentContext`/`destroyAgentContext` in `packages/harness/src/factory.ts`.
+- **Task `agent-platform-yvd`** (completed): MCP session lifecycle management:
+  - `McpSessionManager` class in `packages/mcp-adapter/src/manager.ts`: `openSessions` (parallel with `Promise.allSettled`), `getSession`, `closeAll`, `isHealthy`, `reconnect`.
+  - Factory updated to use `McpSessionManager` instead of inline try/catch loops.
+  - `AgentContext.mcpSessions` replaced with `AgentContext.mcpManager` (the manager instance).
+  - `destroyAgentContext` now delegates to `mcpManager.closeAll()`.
+  - 13 manager unit tests + 10 updated factory tests.
+- **Epic 1 (`agent-platform-nzq`)** complete. PR opened: `task/agent-platform-yvd` → `feature/agent-platform-runtime`.
 
 ---
 
@@ -34,28 +38,31 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 | Epic | ID | Tasks | Status |
 |------|-----|-------|--------|
-| **Agent Schema & Factory** | `agent-platform-nzq` | 3 (4wm → 2zy → yvd) | Open — first task ready |
-| **Agent Runtime Loop** | `agent-platform-n0l` | 6 (9v1 → 6d5 → 40r → 16f → 5pe; icb parallel) | Open — blocked on Epic 1 |
+| **Agent Schema & Factory** | `agent-platform-nzq` | 3 (~~4wm~~ → ~~2zy~~ → ~~yvd~~) | **Complete** — PR pending |
+| **Agent Runtime Loop** | `agent-platform-n0l` | 6 (9v1 → 6d5 → 40r → 16f → 5pe; icb parallel) | Open — unblocked after Epic 1 merges |
 | **Harness Hardening** | `agent-platform-qlp` | 4 (k7m → 9yb → dtc → xk3) | Open — blocked on Epic 2 |
 
-### Ready task
+### Ready task (after Epic 1 PR merges)
 
-**`agent-platform-4wm`** — Agent schema: add identity fields (`systemPrompt`, `description`).  
-Spec: `docs/tasks/agent-platform-nzq.1.md`
+**`agent-platform-9v1`** — LLM reasoning node in harness graph.  
+Spec: `docs/tasks/agent-platform-n0l.1.md`  
+Branch from: updated `feature/agent-platform-runtime` after Epic 1 merge.
 
 ### Git
 
-- All work goes on **`feature/agent-platform-runtime`** (to be created from `main`).
-- Three segments (one per epic), each with chained task branches and one PR at segment tip → `feature/agent-platform-runtime`.
-- Final: `feature/agent-platform-runtime` → `main`.
+- **`task/agent-platform-4wm`** — committed, pushed
+- **`task/agent-platform-2zy`** — committed, pushed
+- **`task/agent-platform-yvd`** — committed, pushed (segment tip)
+- Branch chain: `main` → `feature/agent-platform-runtime` → `task/agent-platform-4wm` → `task/agent-platform-2zy` → `task/agent-platform-yvd`
+- PR: `task/agent-platform-yvd` → `feature/agent-platform-runtime`
 
 ---
 
 ## Next (priority order)
 
-1. Start **`agent-platform-4wm`**: `git checkout -b feature/agent-platform-runtime main && git checkout -b task/agent-platform-4wm`
-2. Follow spec at `docs/tasks/agent-platform-nzq.1.md`.
-3. After Epic 1 segment lands, start Epic 2 from updated `feature/agent-platform-runtime`.
+1. Merge Epic 1 PR (`task/agent-platform-yvd` → `feature/agent-platform-runtime`).
+2. Start Epic 2: `git checkout -b task/agent-platform-9v1` from updated `feature/agent-platform-runtime`.
+3. Follow spec at `docs/tasks/agent-platform-n0l.1.md`.
 
 ---
 
@@ -69,7 +76,6 @@ Spec: `docs/tasks/agent-platform-nzq.1.md`
 
 ```bash
 bd ready --json
-bd show agent-platform-4wm
+bd show agent-platform-9v1
 pnpm install && pnpm build && pnpm typecheck && pnpm lint && pnpm test
-git checkout main && git pull
 ```

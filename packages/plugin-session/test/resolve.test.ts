@@ -10,6 +10,7 @@ import {
 const baseAgent = (over: Partial<Agent> = {}): Agent => ({
   id: 'ag',
   name: 'A',
+  systemPrompt: 'Test agent',
   allowedSkillIds: [],
   allowedToolIds: [],
   allowedMcpServerIds: [],

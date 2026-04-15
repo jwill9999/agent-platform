@@ -23,6 +23,9 @@ export function runSeed(db: DrizzleDb): void {
     .values({
       id: DEFAULT_AGENT_ID,
       name: 'Default agent',
+      systemPrompt:
+        'You are a helpful assistant. Use available tools to help the user accomplish their tasks. Be concise and accurate.',
+      description: 'Default general-purpose agent with standard tools and limits.',
       executionLimitsJson: JSON.stringify({
         maxSteps: 32,
         maxParallelTasks: 4,
