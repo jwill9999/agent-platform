@@ -74,6 +74,88 @@ export type LlmReasonNodeOptions = {
   dispatcher?: PluginDispatcher;
 };
 
+/** Safely fire the onPromptBuild plugin hook — swallows errors. */
+async function firePromptBuildHook(
+  dispatcher: PluginDispatcher,
+  state: HarnessStateType,
+): Promise<void> {
+  try {
+    await dispatcher.onPromptBuild({
+      sessionId: state.sessionId ?? '',
+      runId: state.runId ?? '',
+      plan: null,
+      messages: state.messages.map((m) => ({ role: m.role, content: m.content })),
+    });
+  } catch {
+    /* plugin errors must not crash the graph */
+  }
+}
+
+/** Stream text from result, emitting chunks, and return the accumulated text. */
+async function streamAndAccumulate(
+  textStream: AsyncIterable<string>,
+  emitter: OutputEmitter | undefined,
+): Promise<string> {
+  let fullText = '';
+  for await (const chunk of textStream) {
+    fullText += chunk;
+    if (emitter && chunk) {
+      emitter.emit({ type: 'text', content: chunk });
+    }
+  }
+  return fullText;
+}
+
+/** Build LlmOutput + assistant ChatMessage from the completed LLM response. */
+function buildLlmOutput(
+  fullText: string,
+  finalToolCalls: Array<{ toolCallId: string; toolName: string; args: unknown }>,
+): { output: LlmOutput; assistantMessage: ChatMessage } {
+  if (finalToolCalls.length > 0) {
+    const calls: ToolCallIntent[] = finalToolCalls.map((tc) => ({
+      id: tc.toolCallId,
+      name: tc.toolName,
+      args: (tc.args as Record<string, unknown>) ?? {},
+    }));
+    return {
+      output: { kind: 'tool_calls', calls },
+      assistantMessage: { role: 'assistant', content: fullText || '', toolCalls: calls },
+    };
+  }
+  return {
+    output: { kind: 'text', content: fullText || '' },
+    assistantMessage: { role: 'assistant', content: fullText || '' },
+  };
+}
+
+/** Check maxTokens limit; appends trace event and emits error if exceeded. */
+function checkTokenLimit(
+  limits: HarnessStateType['limits'],
+  newTotalTokens: number,
+  traceEvents: TraceEvent[],
+  emitter: OutputEmitter | undefined,
+): boolean {
+  const maxTokens = limits?.maxTokens;
+  if (maxTokens == null || newTotalTokens < maxTokens) return false;
+
+  traceEvents.push({ type: 'limit_hit', kind: 'max_tokens' });
+  if (emitter) {
+    emitter.emit({
+      type: 'error',
+      code: 'MAX_TOKENS',
+      message: `Token limit exceeded (${newTotalTokens}/${maxTokens})`,
+    });
+  }
+  return true;
+}
+
+/** Normalise the old (OutputEmitter) and new (LlmReasonNodeOptions) signatures. */
+function normaliseOptions(options?: OutputEmitter | LlmReasonNodeOptions): LlmReasonNodeOptions {
+  if (!options || typeof options !== 'object') return {};
+  if ('emit' in options) return { emitter: options as OutputEmitter };
+  return options as LlmReasonNodeOptions;
+}
+
 /**
  * Creates a graph node that invokes the LLM via the Vercel AI SDK using streamText.
  *
@@ -85,13 +167,7 @@ export type LlmReasonNodeOptions = {
  * Calls `onPromptBuild` plugin hook before each LLM call.
  */
 export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptions) {
-  // Support both old signature (emitter?) and new options object
-  const opts: LlmReasonNodeOptions =
-    options && typeof options === 'object' && 'emit' in options
-      ? { emitter: options as OutputEmitter }
-      : ((options as LlmReasonNodeOptions) ?? {});
-
-  const { emitter, dispatcher } = opts;
+  const { emitter, dispatcher } = normaliseOptions(options);
 
   return async function llmReasonNode(state: HarnessStateType): Promise<Partial<HarnessStateType>> {
     const { messages, toolDefinitions, modelConfig } = state;
@@ -102,41 +178,15 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
 
     const provider = createOpenAI({ apiKey: modelConfig.apiKey });
     const model = provider(modelConfig.model);
-
-    const coreMessages = toCoreMessages(messages);
     const tools = toolDefinitions.length > 0 ? toSdkTools(toolDefinitions) : undefined;
 
-    // Fire onPromptBuild plugin hook (observer — does not mutate messages)
     if (dispatcher) {
-      try {
-        await dispatcher.onPromptBuild({
-          sessionId: state.sessionId ?? '',
-          runId: state.runId ?? '',
-          plan: null,
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        });
-      } catch {
-        /* plugin errors must not crash the graph */
-      }
+      await firePromptBuildHook(dispatcher, state);
     }
 
-    const result = streamText({
-      model,
-      messages: coreMessages,
-      tools,
-      maxSteps: 1,
-    });
+    const result = streamText({ model, messages: toCoreMessages(messages), tools, maxSteps: 1 });
 
-    // Stream text chunks via emitter while accumulating full response
-    let fullText = '';
-    for await (const chunk of result.textStream) {
-      fullText += chunk;
-      if (emitter && chunk) {
-        emitter.emit({ type: 'text', content: chunk });
-      }
-    }
-
-    // Await final result for tool calls and usage
+    const fullText = await streamAndAccumulate(result.textStream, emitter);
     const finalToolCalls = await result.toolCalls;
     const usage = await result.usage;
 
@@ -144,54 +194,20 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       ? { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens }
       : undefined;
 
-    let output: LlmOutput;
-    let assistantMessage: ChatMessage;
+    const { output, assistantMessage } = buildLlmOutput(fullText, finalToolCalls);
 
-    if (finalToolCalls && finalToolCalls.length > 0) {
-      const calls: ToolCallIntent[] = finalToolCalls.map((tc) => ({
-        id: tc.toolCallId,
-        name: tc.toolName,
-        args: (tc.args as Record<string, unknown>) ?? {},
-      }));
-
-      output = { kind: 'tool_calls', calls };
-      assistantMessage = {
-        role: 'assistant',
-        content: fullText || '',
-        toolCalls: calls,
-      };
-    } else {
-      output = { kind: 'text', content: fullText || '' };
-      assistantMessage = { role: 'assistant', content: fullText || '' };
-    }
-
-    const step = state.taskIndex ?? 0;
-    const traceEvent: TraceEvent = { type: 'llm_call', step, tokenUsage };
     const tokenDelta = tokenUsage ? tokenUsage.promptTokens + tokenUsage.completionTokens : 0;
     const newTotalTokens = state.totalTokensUsed + tokenDelta;
-
-    const traceEvents: TraceEvent[] = [traceEvent];
-
-    // Check maxTokens limit
-    const maxTokens = state.limits?.maxTokens;
-    const tokenLimitExceeded = maxTokens != null && newTotalTokens >= maxTokens;
-    if (tokenLimitExceeded) {
-      traceEvents.push({ type: 'limit_hit', kind: 'max_tokens' });
-      if (emitter) {
-        emitter.emit({
-          type: 'error',
-          code: 'MAX_TOKENS',
-          message: `Token limit exceeded (${newTotalTokens}/${maxTokens})`,
-        });
-      }
-    }
+    const step = state.taskIndex ?? 0;
+    const traceEvents: TraceEvent[] = [{ type: 'llm_call', step, tokenUsage }];
+    const halted = checkTokenLimit(state.limits, newTotalTokens, traceEvents, emitter);
 
     return {
       llmOutput: output,
       messages: [assistantMessage],
       trace: traceEvents,
       totalTokensUsed: newTotalTokens,
-      ...(tokenLimitExceeded ? { halted: true } : {}),
+      ...(halted ? { halted: true } : {}),
     };
   };
 }

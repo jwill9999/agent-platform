@@ -1,5 +1,6 @@
 import type { DrizzleDb } from '@agent-platform/db';
 import { getSession, appendMessage, listMessagesBySession } from '@agent-platform/db';
+import type { MessageRecord } from '@agent-platform/contracts';
 import {
   buildAgentContext,
   destroyAgentContext,
@@ -10,14 +11,15 @@ import {
   createNdjsonEmitter,
   contractToolsToDefinitions,
 } from '@agent-platform/harness';
-import type { ChatMessage, OutputEmitter } from '@agent-platform/harness';
+import type { AgentContext, ChatMessage, OutputEmitter } from '@agent-platform/harness';
 import {
   resolveModelConfig,
   openAiKeyGateToApiOutcome,
   resolveGatedOpenAiKeyForRequest,
   streamOpenAiChat,
 } from '@agent-platform/model-router';
-import { Router } from 'express';
+import type { Response, Router } from 'express';
+import { Router as createRouter } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
@@ -45,204 +47,173 @@ const LegacyChatStreamBodySchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Extracted helpers — keep the route handlers flat
+// ---------------------------------------------------------------------------
+
+/** Build agent context; translates AgentNotFoundError to HttpError. */
+async function loadAgentContext(db: DrizzleDb, agentId: string): Promise<AgentContext> {
+  try {
+    return await buildAgentContext(db, agentId);
+  } catch (err) {
+    if (err instanceof AgentNotFoundError) {
+      throw new HttpError(404, 'NOT_FOUND', `Agent '${agentId}' not found`);
+    }
+    throw err;
+  }
+}
+
+/** Resolve model config or throw an HttpError on failure (cleans up agent ctx). */
+function resolveModelOrThrow(
+  agentCtx: AgentContext,
+  headerKey: string | undefined,
+): { provider: string; model: string; apiKey: string } {
+  const resolution = resolveModelConfig({
+    agentOverride: agentCtx.agent.modelOverride ?? null,
+    headerKey,
+  });
+  if (resolution.kind === 'error') {
+    throw new HttpError(400, resolution.code, resolution.message);
+  }
+  return resolution.config;
+}
+
+/** Map persisted MessageRecord rows to ChatMessage objects. */
+function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
+  if (m.role === 'tool' && m.toolCallId) {
+    return { role: 'tool', content: m.content, toolCallId: m.toolCallId, toolName: '' };
+  }
+  return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
+}
+
+/** Invoke graph.invoke wrapped in a timeout race. */
+async function invokeWithTimeout<T>(graphPromise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('__TIMEOUT__')), timeoutMs);
+  });
+  try {
+    return await Promise.race([graphPromise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+/** Persist only the new assistant/tool messages the graph appended. */
+function persistNewMessages(
+  db: DrizzleDb,
+  sessionId: string,
+  allMessages: ChatMessage[] | undefined,
+  initialCount: number,
+): void {
+  if (!allMessages) return;
+  for (const msg of allMessages.slice(initialCount)) {
+    if (msg.role !== 'assistant' && msg.role !== 'tool') continue;
+    appendMessage(db, {
+      sessionId,
+      role: msg.role,
+      content: msg.content,
+      toolCallId: msg.role === 'tool' ? msg.toolCallId : undefined,
+    });
+  }
+}
+
+/** Safely fire a plugin hook, swallowing errors. */
+async function safePluginCall(fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+  } catch {
+    /* plugin errors must not crash the request */
+  }
+}
+
+/** Build and write an NDJSON error event when the stream is still writable. */
+function emitStreamError(res: Response, err: unknown, timeoutMs: number): void {
+  if (res.writableEnded) return;
+  const isTimeout = err instanceof Error && err.message === '__TIMEOUT__';
+  const errorEvent = isTimeout
+    ? {
+        type: 'error' as const,
+        code: 'TIMEOUT',
+        message: `Execution timeout exceeded (${timeoutMs}ms)`,
+      }
+    : {
+        type: 'error' as const,
+        message: err instanceof Error ? err.message : 'Graph execution failed',
+      };
+  res.write(JSON.stringify(errorEvent) + '\n');
+}
+
+// ---------------------------------------------------------------------------
 // Router factory
 // ---------------------------------------------------------------------------
 
 export function createChatRouter(db: DrizzleDb): Router {
-  const router = Router();
+  const router = createRouter();
 
-  // -------------------------------------------------------------------------
-  // NEW: Session-aware agent chat (NDJSON stream of Output events)
-  // -------------------------------------------------------------------------
+  // Session-aware agent chat (NDJSON stream of Output events)
   router.post(
     '/',
     asyncHandler(async (req, res) => {
       const { sessionId, message } = parseBody(ChatBodySchema, req.body);
 
-      // 1. Load session
       const session = getSession(db, sessionId);
-      if (!session) {
-        throw new HttpError(404, 'NOT_FOUND', 'Session not found');
-      }
+      if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
-      // 2. Build agent context (needed before model resolution for agent override)
-      let agentCtx;
-      try {
-        agentCtx = await buildAgentContext(db, session.agentId);
-      } catch (err) {
-        if (err instanceof AgentNotFoundError) {
-          throw new HttpError(404, 'NOT_FOUND', `Agent '${session.agentId}' not found`);
-        }
-        throw err;
-      }
-
-      // 3. Resolve full model config (agent override → env → system fallback)
-      const resolution = resolveModelConfig({
-        agentOverride: agentCtx.agent.modelOverride ?? null,
-        headerKey: req.header('x-openai-key'),
-      });
-      if (resolution.kind === 'error') {
-        await destroyAgentContext(agentCtx);
-        throw new HttpError(400, resolution.code, resolution.message);
-      }
+      const agentCtx = await loadAgentContext(db, session.agentId);
+      const modelCfg = resolveModelOrThrow(agentCtx, req.header('x-openai-key'));
 
       try {
-        // 4. Fire onSessionStart plugin hook
-        try {
-          await agentCtx.pluginDispatcher.onSessionStart({
+        await safePluginCall(() =>
+          agentCtx.pluginDispatcher.onSessionStart({
             sessionId,
             agentId: session.agentId,
             agent: agentCtx.agent,
-          });
-        } catch {
-          /* plugin errors must not crash the request */
-        }
+          }),
+        );
 
-        // 5. Prepare streaming
-        res.status(200);
-        res.setHeader('Content-Type', 'application/x-ndjson');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-
+        prepareNdjsonResponse(res);
         const emitter: OutputEmitter = createNdjsonEmitter(res);
         const dispatcher = agentCtx.pluginDispatcher;
 
-        // 6. Build graph nodes
-        const llmReasonNode = createLlmReasonNode({ emitter, dispatcher });
-        const toolDispatchNode = createToolDispatchNode({
-          agent: agentCtx.agent,
-          mcpManager: agentCtx.mcpManager,
-          emitter,
-          dispatcher,
-        });
-
         const graph = buildHarnessGraph({
           executeTool: async () => ({ ok: true }),
-          llmReasonNode,
-          toolDispatchNode,
+          llmReasonNode: createLlmReasonNode({ emitter, dispatcher }),
+          toolDispatchNode: createToolDispatchNode({
+            agent: agentCtx.agent,
+            mcpManager: agentCtx.mcpManager,
+            emitter,
+            dispatcher,
+          }),
           dispatcher,
         });
 
-        // 7. Build initial state — load prior conversation + append new user message
-        const runId = randomUUID();
-        const priorMessages = listMessagesBySession(db, sessionId);
+        const messages = buildConversationMessages(db, sessionId, message, agentCtx.systemPrompt);
+        const initialState = buildInitialState(sessionId, messages, agentCtx, modelCfg);
 
-        // Append the user's new message to the DB
-        appendMessage(db, { sessionId, role: 'user', content: message });
+        const finalState = (await invokeWithTimeout(
+          graph.invoke(initialState, { configurable: { thread_id: sessionId } }),
+          agentCtx.agent.executionLimits.timeoutMs,
+        )) as { messages?: ChatMessage[] };
 
-        // Build full conversation history for the graph
-        const messages: ChatMessage[] = [
-          { role: 'system', content: agentCtx.systemPrompt },
-          ...priorMessages.map((m) => {
-            if (m.role === 'tool' && m.toolCallId) {
-              return {
-                role: 'tool' as const,
-                content: m.content,
-                toolCallId: m.toolCallId,
-                toolName: '',
-              };
-            }
-            return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
-          }),
-          { role: 'user' as const, content: message },
-        ];
-
-        const initialState = {
-          trace: [],
-          plan: null,
-          taskIndex: 0,
-          limits: agentCtx.agent.executionLimits,
-          runId,
-          sessionId,
-          halted: false,
-          mode: 'react' as const,
-          messages,
-          toolDefinitions: contractToolsToDefinitions(agentCtx.tools),
-          llmOutput: null,
-          modelConfig: resolution.config,
-          stepCount: 0,
-          recentToolCalls: [],
-          totalTokensUsed: 0,
-          totalCostUnits: 0,
-        };
-
-        // 8. Invoke graph with timeout enforcement
-        const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
-        const graphPromise = graph.invoke(initialState, {
-          configurable: { thread_id: sessionId },
-        });
-
-        let timeoutId: ReturnType<typeof setTimeout> | undefined;
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error('__TIMEOUT__')), timeoutMs);
-        });
-
-        let finalState: { messages?: ChatMessage[] } | undefined;
-        try {
-          finalState = (await Promise.race([graphPromise, timeoutPromise])) as {
-            messages?: ChatMessage[];
-          };
-        } finally {
-          if (timeoutId) clearTimeout(timeoutId);
-        }
-
-        // 9. Persist assistant/tool response messages to conversation history
-        // Only persist messages added by the graph (after the initial messages we sent)
-        if (finalState?.messages) {
-          const initialCount = messages.length;
-          const newMessages = finalState.messages.slice(initialCount);
-          for (const msg of newMessages) {
-            if (msg.role === 'assistant' || msg.role === 'tool') {
-              appendMessage(db, {
-                sessionId,
-                role: msg.role,
-                content: msg.content,
-                toolCallId: msg.role === 'tool' ? msg.toolCallId : undefined,
-              });
-            }
-          }
-        }
+        persistNewMessages(db, sessionId, finalState?.messages, messages.length);
       } catch (err) {
-        const isTimeout = err instanceof Error && err.message === '__TIMEOUT__';
-
-        // Fire onError plugin hook
-        try {
-          await agentCtx.pluginDispatcher.onError({
+        await safePluginCall(() =>
+          agentCtx.pluginDispatcher.onError({
             sessionId,
             runId: 'unknown',
-            phase: isTimeout ? 'session' : 'unknown',
+            phase: err instanceof Error && err.message === '__TIMEOUT__' ? 'session' : 'unknown',
             error: err,
-          });
-        } catch {
-          /* plugin errors must not crash the error handler */
-        }
-
-        // Emit error event if stream is still writable
-        if (!res.writableEnded) {
-          const errorEvent = isTimeout
-            ? {
-                type: 'error' as const,
-                code: 'TIMEOUT',
-                message: `Execution timeout exceeded (${agentCtx.agent.executionLimits.timeoutMs}ms)`,
-              }
-            : {
-                type: 'error' as const,
-                message: err instanceof Error ? err.message : 'Graph execution failed',
-              };
-          res.write(JSON.stringify(errorEvent) + '\n');
-        }
+          }),
+        );
+        emitStreamError(res, err, agentCtx.agent.executionLimits.timeoutMs);
       } finally {
         await destroyAgentContext(agentCtx);
-        if (!res.writableEnded) {
-          res.end();
-        }
+        if (!res.writableEnded) res.end();
       }
     }),
   );
 
-  // -------------------------------------------------------------------------
   // LEGACY: Raw OpenAI pass-through (deprecated)
-  // -------------------------------------------------------------------------
   router.post(
     '/stream',
     asyncHandler(async (req, res) => {
@@ -257,9 +228,9 @@ export function createChatRouter(db: DrizzleDb): Router {
       if (apiOutcome.kind === 'error') {
         throw new HttpError(400, apiOutcome.code, apiOutcome.message);
       }
-      const apiKey = apiOutcome.key;
+
       const result = streamOpenAiChat({
-        apiKey,
+        apiKey: apiOutcome.key,
         model: body.model,
         messages: body.messages,
       });
@@ -273,12 +244,62 @@ export function createChatRouter(db: DrizzleDb): Router {
           res.write(chunk);
         }
       } finally {
-        if (!res.writableEnded) {
-          res.end();
-        }
+        if (!res.writableEnded) res.end();
       }
     }),
   );
 
   return router;
+}
+
+// ---------------------------------------------------------------------------
+// State builders (extracted for readability)
+// ---------------------------------------------------------------------------
+
+function prepareNdjsonResponse(res: Response): void {
+  res.status(200);
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+}
+
+function buildConversationMessages(
+  db: DrizzleDb,
+  sessionId: string,
+  newMessage: string,
+  systemPrompt: string,
+): ChatMessage[] {
+  const priorMessages = listMessagesBySession(db, sessionId);
+  appendMessage(db, { sessionId, role: 'user', content: newMessage });
+  return [
+    { role: 'system', content: systemPrompt },
+    ...priorMessages.map(dbRecordToChatMessage),
+    { role: 'user' as const, content: newMessage },
+  ];
+}
+
+function buildInitialState(
+  sessionId: string,
+  messages: ChatMessage[],
+  agentCtx: AgentContext,
+  modelConfig: { provider: string; model: string; apiKey: string },
+) {
+  return {
+    trace: [],
+    plan: null,
+    taskIndex: 0,
+    limits: agentCtx.agent.executionLimits,
+    runId: randomUUID(),
+    sessionId,
+    halted: false,
+    mode: 'react' as const,
+    messages,
+    toolDefinitions: contractToolsToDefinitions(agentCtx.tools),
+    llmOutput: null,
+    modelConfig,
+    stepCount: 0,
+    recentToolCalls: [],
+    totalTokensUsed: 0,
+    totalCostUnits: 0,
+  };
 }

@@ -129,12 +129,14 @@ export function createPlanGenerateNode(options: PlanGenerateNodeOptions) {
     }
 
     // Plan generation failed after all repair attempts
-    const reason =
-      planResult.phase === 'json'
-        ? `JSON parse error: ${planResult.error}`
-        : planResult.phase === 'schema'
-          ? `Schema validation: ${planResult.message}`
-          : `Policy violation: disallowed tools ${planResult.disallowedToolIds.join(', ')}`;
+    let reason: string;
+    if (planResult.phase === 'json') {
+      reason = `JSON parse error: ${planResult.error}`;
+    } else if (planResult.phase === 'schema') {
+      reason = `Schema validation: ${planResult.message}`;
+    } else {
+      reason = `Policy violation: disallowed tools ${planResult.disallowedToolIds.join(', ')}`;
+    }
 
     if (options.emitter) {
       options.emitter.emit({
