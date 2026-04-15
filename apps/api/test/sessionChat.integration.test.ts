@@ -139,4 +139,43 @@ describe('POST /v1/chat (session-aware)', () => {
       closeDatabase(sqlite);
     }
   });
+
+  it('persists user messages to conversation history', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = createSeededApp(dirs);
+    let sessionId = '';
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      // Create a session
+      const sessionRes = await request(app)
+        .post('/v1/sessions')
+        .send({ agentId: DEFAULT_AGENT_ID })
+        .expect(201);
+      sessionId = sessionRes.body.data.id;
+
+      // Send a message — the graph will likely error (no real LLM) but the user
+      // message should already be persisted before graph execution starts.
+      // Use a short response timeout so the test doesn't hang.
+      try {
+        await request(app)
+          .post('/v1/chat')
+          .send({ sessionId, message: 'Hello agent' })
+          .timeout({ response: 2000 });
+      } catch {
+        // Expected: graph invoke fails or times out without a real LLM
+      }
+
+      // Verify user message was persisted
+      const { listMessagesBySession } = await import('@agent-platform/db');
+      const msgs = listMessagesBySession(db, sessionId);
+      const userMsg = msgs.find((m) => m.role === 'user');
+      expect(userMsg).toBeDefined();
+      expect(userMsg!.content).toBe('Hello agent');
+      expect(userMsg!.sessionId).toBe(sessionId);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
 });

@@ -3,6 +3,14 @@ export { ExecutionLimitsSchema, type ExecutionLimits } from './limits.js';
 export { McpServerSchema, type McpServer } from './mcpServer.js';
 export { OutputSchema, type Output } from './output.js';
 export {
+  MessageRecordSchema,
+  MessageCreateBodySchema,
+  MessageRoleSchema,
+  type MessageRecord,
+  type MessageCreateBody,
+  type MessageRole,
+} from './message.js';
+export {
   SessionCreateBodySchema,
   SessionRecordSchema,
   type SessionCreateBody,
