@@ -202,6 +202,9 @@ importers:
       '@agent-platform/mcp-adapter':
         specifier: workspace:*
         version: link:../mcp-adapter
+      '@agent-platform/planner':
+        specifier: workspace:*
+        version: link:../planner
       '@agent-platform/plugin-sdk':
         specifier: workspace:*
         version: link:../plugin-sdk

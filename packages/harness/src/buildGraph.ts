@@ -20,6 +20,8 @@ export type BuildHarnessGraphOptions = {
   llmReasonNode?: GraphNodeFn;
   /** Tool dispatch node (ReAct path). Required for mode='react'. */
   toolDispatchNode?: GraphNodeFn;
+  /** Plan generate node (plan path). Optional — if absent, falls back to stubPlan. */
+  planGenerateNode?: GraphNodeFn;
   /** Plugin dispatcher for lifecycle hooks (plan-mode task start/end). */
   dispatcher?: PluginDispatcher;
 };
@@ -239,9 +241,13 @@ function routeAfterReactDispatch(state: HarnessStateType): 'react_llm_reason' | 
 // Mode router
 // ---------------------------------------------------------------------------
 
-function routeByMode(state: HarnessStateType): 'resolve_plan' | 'react_llm_reason' {
-  if (state.mode === 'plan') return 'resolve_plan';
-  return 'react_llm_reason';
+/**
+ * Route after plan_generate: if planning halted (failed), go to END;
+ * otherwise forward to resolve_plan which sets up taskIndex etc.
+ */
+function routeAfterPlanGenerate(state: HarnessStateType): 'resolve_plan' | typeof END {
+  if (state.halted) return END;
+  return 'resolve_plan';
 }
 
 // ---------------------------------------------------------------------------
@@ -259,18 +265,28 @@ function routeByMode(state: HarnessStateType): 'resolve_plan' | 'react_llm_reaso
 export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
   const checkpointer = new MemorySaver();
 
+  // Determine plan-mode routing based on whether planGenerateNode is provided
+  const planGenNode: GraphNodeFn = options.planGenerateNode ?? (async () => ({}));
+
+  const routeByMode = (state: HarnessStateType): 'react_llm_reason' | 'plan_generate' => {
+    if (state.mode === 'plan') return 'plan_generate';
+    return 'react_llm_reason';
+  };
+
   if (options.llmReasonNode && options.toolDispatchNode) {
     // Full graph with mode router → (react | plan) paths
     const graph = new StateGraph(HarnessState)
+      .addNode('plan_generate', planGenNode)
       .addNode('resolve_plan', createResolvePlanNode(options))
       .addNode('execute', createExecuteNode(options))
       .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
       .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+      .addConditionalEdges(START, routeByMode)
+      .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
       .addEdge('resolve_plan', 'execute')
       .addConditionalEdges('execute', routeAfterExecute)
       .addConditionalEdges('react_llm_reason', routeAfterLlm)
-      .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch)
-      .addConditionalEdges(START, routeByMode);
+      .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch);
 
     return graph.compile({ checkpointer });
   }
