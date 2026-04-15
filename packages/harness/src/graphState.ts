@@ -13,6 +13,9 @@ function appendMessages(left: ChatMessage[], right: ChatMessage | ChatMessage[])
   return [...left, ...next];
 }
 
+/** Graph execution mode: ReAct (LLM↔tool loop) or plan (plan-execute). */
+export type GraphMode = 'react' | 'plan';
+
 /** Harness run state: fixed plan + sequential execution with trace + limits. */
 export const HarnessState = Annotation.Root({
   trace: Annotation<TraceEvent[]>({
@@ -26,6 +29,10 @@ export const HarnessState = Annotation.Root({
   /** Set when {@link ExecutionLimits.maxSteps} would be exceeded. */
   halted: Annotation<boolean>(),
 
+  // -- Graph mode (task n0l.3) --
+  /** Determines which path the graph takes from START. Defaults to 'react'. */
+  mode: Annotation<GraphMode>(),
+
   // -- LLM reasoning fields (task n0l.1) --
   messages: Annotation<ChatMessage[]>({
     reducer: appendMessages,
@@ -34,6 +41,12 @@ export const HarnessState = Annotation.Root({
   toolDefinitions: Annotation<ToolDefinition[]>(),
   llmOutput: Annotation<LlmOutput | null>(),
   modelConfig: Annotation<LlmModelConfig | null>(),
+
+  // -- ReAct loop tracking (task n0l.3) --
+  /** Number of LLM reasoning steps in the current ReAct loop. */
+  stepCount: Annotation<number>(),
+  /** Rolling window of recent tool call signatures for loop detection. */
+  recentToolCalls: Annotation<string[]>(),
 
   // -- Pre-allocated for limits enforcement (task qlp.2) --
   totalTokensUsed: Annotation<number>(),

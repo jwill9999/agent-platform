@@ -1,9 +1,10 @@
 export type { TraceEvent } from './trace.js';
-export { HarnessState, type HarnessStateType } from './graphState.js';
+export { HarnessState, type HarnessStateType, type GraphMode } from './graphState.js';
 export {
   buildHarnessGraph,
   type BuildHarnessGraphOptions,
   type ToolExecutor,
+  type GraphNodeFn,
 } from './buildGraph.js';
 export {
   buildAgentContext,
