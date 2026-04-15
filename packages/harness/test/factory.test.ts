@@ -1,11 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Agent, McpServer, Skill, Tool as ContractTool } from '@agent-platform/contracts';
 import type { McpSession } from '@agent-platform/mcp-adapter';
-import {
-  buildAgentContext,
-  destroyAgentContext,
-  AgentNotFoundError,
-} from '../src/factory.js';
+import { buildAgentContext, destroyAgentContext, AgentNotFoundError } from '../src/factory.js';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -18,18 +14,28 @@ vi.mock('@agent-platform/db', () => ({
   getMcpServer: vi.fn(),
 }));
 
+const mockCloseAll = vi.fn(async () => {});
+const mockGetSession = vi.fn();
+const mockOpenSessions = vi.fn(async () => []);
+const mockGetSessions = vi.fn(() => new Map());
+
 vi.mock('@agent-platform/mcp-adapter', () => ({
-  openMcpSession: vi.fn(),
+  McpSessionManager: vi.fn().mockImplementation(() => ({
+    openSessions: mockOpenSessions,
+    getSession: mockGetSession,
+    closeAll: mockCloseAll,
+    getSessions: mockGetSessions,
+    isHealthy: vi.fn(),
+    reconnect: vi.fn(),
+  })),
 }));
 
 import { loadAgentById, getSkill, getTool, getMcpServer } from '@agent-platform/db';
-import { openMcpSession } from '@agent-platform/mcp-adapter';
 
 const mockLoadAgent = vi.mocked(loadAgentById);
 const mockGetSkill = vi.mocked(getSkill);
 const mockGetTool = vi.mocked(getTool);
 const mockGetMcpServer = vi.mocked(getMcpServer);
-const mockOpenMcpSession = vi.mocked(openMcpSession);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -87,7 +93,10 @@ function createMockSession(tools: ContractTool[] = []): McpSession {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  vi.resetAllMocks();
+  vi.clearAllMocks();
+  mockOpenSessions.mockResolvedValue([]);
+  mockGetSession.mockReturnValue(undefined);
+  mockCloseAll.mockResolvedValue(undefined);
 });
 
 describe('buildAgentContext', () => {
@@ -105,15 +114,15 @@ describe('buildAgentContext', () => {
     mockGetMcpServer.mockReturnValue(mcpServer1);
 
     const session = createMockSession([mcpTool]);
-    mockOpenMcpSession.mockResolvedValue(session);
+    mockGetSession.mockReturnValue(session);
 
     const ctx = await buildAgentContext(fakeDb, 'agent-1');
 
     expect(ctx.agent).toBe(baseAgent);
     expect(ctx.skills).toEqual([skill1]);
     expect(ctx.tools).toEqual([tool1, mcpTool]);
-    expect(ctx.mcpSessions.size).toBe(1);
-    expect(ctx.mcpSessions.get('mcp-1')).toBe(session);
+    expect(ctx.mcpManager).toBeDefined();
+    expect(mockOpenSessions).toHaveBeenCalledWith([mcpServer1]);
     expect(ctx.pluginDispatcher).toBeDefined();
     expect(ctx.modelConfig).toEqual({ provider: 'openai', model: 'gpt-4o' });
   });
@@ -144,7 +153,9 @@ describe('buildAgentContext', () => {
 
     // Skills sorted: s1 before s2
     expect(ctx.systemPrompt).toContain('## Available Skills');
-    const skillSection = ctx.systemPrompt.split('## Available Skills')[1]!.split('## Available Tools')[0]!;
+    const skillSection = ctx.systemPrompt
+      .split('## Available Skills')[1]!
+      .split('## Available Tools')[0]!;
     const s1Pos = skillSection.indexOf('s1');
     const s2Pos = skillSection.indexOf('s2');
     expect(s1Pos).toBeLessThan(s2Pos);
@@ -168,25 +179,19 @@ describe('buildAgentContext', () => {
     expect(ctx.systemPrompt).toContain('Summarizes input text');
   });
 
-  it('gracefully handles MCP session failure', async () => {
+  it('excludes tools from failed MCP sessions', async () => {
     mockLoadAgent.mockReturnValue(baseAgent);
     mockGetSkill.mockReturnValue(skill1);
     mockGetTool.mockReturnValue(tool1);
     mockGetMcpServer.mockReturnValue(mcpServer1);
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    mockOpenMcpSession.mockRejectedValue(new Error('Connection refused'));
+    // Session failed to open — getSession returns undefined
+    mockGetSession.mockReturnValue(undefined);
 
     const ctx = await buildAgentContext(fakeDb, 'agent-1');
 
     // Should still succeed, with only registry tools
     expect(ctx.tools).toEqual([tool1]);
-    expect(ctx.mcpSessions.size).toBe(0);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('MCP session failed for server "mcp-1"'),
-    );
-
-    warnSpy.mockRestore();
   });
 
   it('uses agent modelOverride when present', async () => {
@@ -258,50 +263,19 @@ describe('buildAgentContext', () => {
 });
 
 describe('destroyAgentContext', () => {
-  it('closes all MCP sessions', async () => {
-    const session1 = createMockSession();
-    const session2 = createMockSession();
-
+  it('delegates to mcpManager.closeAll', async () => {
     const ctx = {
       agent: baseAgent,
       systemPrompt: 'test',
       skills: [],
       tools: [],
-      mcpSessions: new Map<string, McpSession>([
-        ['mcp-1', session1],
-        ['mcp-2', session2],
-      ]),
+      mcpManager: { closeAll: mockCloseAll } as never,
       pluginDispatcher: { chain: [] } as never,
       modelConfig: { provider: 'openai', model: 'gpt-4o' },
     };
 
     await destroyAgentContext(ctx);
 
-    expect(session1.close).toHaveBeenCalledOnce();
-    expect(session2.close).toHaveBeenCalledOnce();
-    expect(ctx.mcpSessions.size).toBe(0);
-  });
-
-  it('handles close errors gracefully', async () => {
-    const failingSession = createMockSession();
-    (failingSession.close as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('shutdown error'));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    const ctx = {
-      agent: baseAgent,
-      systemPrompt: 'test',
-      skills: [],
-      tools: [],
-      mcpSessions: new Map<string, McpSession>([['mcp-fail', failingSession]]),
-      pluginDispatcher: { chain: [] } as never,
-      modelConfig: { provider: 'openai', model: 'gpt-4o' },
-    };
-
-    // Should not throw
-    await destroyAgentContext(ctx);
-
-    expect(ctx.mcpSessions.size).toBe(0);
-    expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
+    expect(mockCloseAll).toHaveBeenCalledOnce();
   });
 });

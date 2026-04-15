@@ -1,8 +1,7 @@
 import type { Agent, McpServer, Skill, Tool as ContractTool } from '@agent-platform/contracts';
 import type { DrizzleDb } from '@agent-platform/db';
 import { loadAgentById, getMcpServer, getSkill, getTool } from '@agent-platform/db';
-import type { McpSession } from '@agent-platform/mcp-adapter';
-import { openMcpSession } from '@agent-platform/mcp-adapter';
+import { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
@@ -22,7 +21,7 @@ export type AgentContext = {
   systemPrompt: string;
   skills: Skill[];
   tools: ContractTool[];
-  mcpSessions: Map<string, McpSession>;
+  mcpManager: McpSessionManager;
   pluginDispatcher: PluginDispatcher;
   modelConfig: ModelConfig;
 };
@@ -104,7 +103,8 @@ function resolveModelConfig(agent: Agent, override?: ModelConfig): ModelConfig {
  * Assembles a fully resolved runtime context for an agent.
  *
  * - Loads the agent, skills, tools, and MCP configs from the database.
- * - Opens MCP sessions and discovers remote tools (failures are logged, not fatal).
+ * - Opens MCP sessions via McpSessionManager (parallel, graceful on failure).
+ * - Discovers remote tools from healthy sessions.
  * - Constructs the augmented system prompt with skill/tool descriptions.
  * - Resolves the plugin chain and model config.
  */
@@ -138,20 +138,22 @@ export async function buildAgentContext(
     if (mcp) mcpConfigs.push(mcp);
   }
 
-  // 5–6. Open MCP sessions and discover tools
-  const mcpSessions = new Map<string, McpSession>();
-  const mcpTools: ContractTool[] = [];
+  // 5. Open MCP sessions in parallel via manager
+  const mcpManager = new McpSessionManager();
+  await mcpManager.openSessions(mcpConfigs);
 
+  // 6. Discover tools from healthy sessions only
+  const mcpTools: ContractTool[] = [];
   for (const config of mcpConfigs) {
-    try {
-      const session = await openMcpSession(config);
-      mcpSessions.set(config.id, session);
-      const discovered = await session.listContractTools();
-      mcpTools.push(...discovered);
-    } catch (err) {
-      // Graceful degradation: log warning, skip this server's tools
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[factory] MCP session failed for server "${config.id}": ${message}`);
+    const session = mcpManager.getSession(config.id);
+    if (session) {
+      try {
+        const discovered = await session.listContractTools();
+        mcpTools.push(...discovered);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[factory] Tool discovery failed for server "${config.id}": ${message}`);
+      }
     }
   }
 
@@ -176,30 +178,15 @@ export async function buildAgentContext(
     systemPrompt,
     skills,
     tools: allTools,
-    mcpSessions,
+    mcpManager,
     pluginDispatcher,
     modelConfig,
   };
 }
 
 /**
- * Tears down an agent context by closing all open MCP sessions.
+ * Tears down an agent context by closing all open MCP sessions via the manager.
  */
 export async function destroyAgentContext(ctx: AgentContext): Promise<void> {
-  const errors: Error[] = [];
-  for (const [serverId, session] of ctx.mcpSessions) {
-    try {
-      await session.close();
-    } catch (err) {
-      errors.push(
-        new Error(
-          `Failed to close MCP session "${serverId}": ${err instanceof Error ? err.message : String(err)}`,
-        ),
-      );
-    }
-  }
-  ctx.mcpSessions.clear();
-  if (errors.length > 0) {
-    console.warn(`[factory] ${errors.length} MCP session(s) failed to close:`, errors);
-  }
+  await ctx.mcpManager.closeAll();
 }

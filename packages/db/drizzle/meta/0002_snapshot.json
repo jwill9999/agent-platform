@@ -28,12 +28,8 @@
           "name": "agent_mcp_servers_agent_id_agents_id_fk",
           "tableFrom": "agent_mcp_servers",
           "tableTo": "agents",
-          "columnsFrom": [
-            "agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agent_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -41,22 +37,15 @@
           "name": "agent_mcp_servers_mcp_server_id_mcp_servers_id_fk",
           "tableFrom": "agent_mcp_servers",
           "tableTo": "mcp_servers",
-          "columnsFrom": [
-            "mcp_server_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["mcp_server_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "agent_mcp_servers_agent_id_mcp_server_id_pk": {
-          "columns": [
-            "agent_id",
-            "mcp_server_id"
-          ],
+          "columns": ["agent_id", "mcp_server_id"],
           "name": "agent_mcp_servers_agent_id_mcp_server_id_pk"
         }
       },
@@ -87,12 +76,8 @@
           "name": "agent_skills_agent_id_agents_id_fk",
           "tableFrom": "agent_skills",
           "tableTo": "agents",
-          "columnsFrom": [
-            "agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agent_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -100,22 +85,15 @@
           "name": "agent_skills_skill_id_skills_id_fk",
           "tableFrom": "agent_skills",
           "tableTo": "skills",
-          "columnsFrom": [
-            "skill_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["skill_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "agent_skills_agent_id_skill_id_pk": {
-          "columns": [
-            "agent_id",
-            "skill_id"
-          ],
+          "columns": ["agent_id", "skill_id"],
           "name": "agent_skills_agent_id_skill_id_pk"
         }
       },
@@ -146,12 +124,8 @@
           "name": "agent_tools_agent_id_agents_id_fk",
           "tableFrom": "agent_tools",
           "tableTo": "agents",
-          "columnsFrom": [
-            "agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agent_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -159,22 +133,15 @@
           "name": "agent_tools_tool_id_tools_id_fk",
           "tableFrom": "agent_tools",
           "tableTo": "tools",
-          "columnsFrom": [
-            "tool_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tool_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "agent_tools_agent_id_tool_id_pk": {
-          "columns": [
-            "agent_id",
-            "tool_id"
-          ],
+          "columns": ["agent_id", "tool_id"],
           "name": "agent_tools_agent_id_tool_id_pk"
         }
       },
@@ -297,9 +264,7 @@
       "indexes": {
         "chat_metadata_session_id_unique": {
           "name": "chat_metadata_session_id_unique",
-          "columns": [
-            "session_id"
-          ],
+          "columns": ["session_id"],
           "isUnique": true
         }
       },
@@ -308,12 +273,8 @@
           "name": "chat_metadata_session_id_sessions_id_fk",
           "tableFrom": "chat_metadata",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -412,12 +373,8 @@
           "name": "plans_session_id_sessions_id_fk",
           "tableFrom": "plans",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -568,12 +525,8 @@
           "name": "sessions_agent_id_agents_id_fk",
           "tableFrom": "sessions",
           "tableTo": "agents",
-          "columnsFrom": [
-            "agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["agent_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
