@@ -15,7 +15,7 @@ Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and dec
 | `pnpm typecheck`        | Typecheck all packages (`pnpm -r`)                                                                                               |
 | `pnpm build`            | Build all packages                                                                                                               |
 | `pnpm lint`             | ESLint across workspaces                                                                                                         |
-| `pnpm test`             | Run Vitest suites (contracts, db, api integration)                                                                               |
+| `pnpm test`             | Run Vitest suites (202 tests across all packages)                                                                                |
 | `pnpm format`           | Prettier write                                                                                                                   |
 | `pnpm format:check`     | Prettier check                                                                                                                   |
 | `pnpm seed`             | After **`pnpm build`**: run idempotent DB seed (needs **`SQLITE_PATH`**) — default agent + demo skill                            |

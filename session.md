@@ -7,8 +7,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-15 (late p.m.)
-- **Session:** All epics complete. Both feature branches merged to main. SonarCloud quality gate issues resolved. All branches cleaned up.
+- **Date:** 2026-04-15 (late evening)
+- **Session:** `agent-platform-pe4` (SSEClientTransport replacement) complete — PR #28 merged to main. SonarCloud duplication fix included. All branches cleaned up.
 
 ---
 
@@ -20,36 +20,27 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Epic 1: Agent Runtime Loop (`agent-platform-n0l`) — COMPLETE
+### Epics 1 & 2 — previously completed
 
-- 8 tasks implemented across `feature/agent-platform-runtime`
-- Error middleware, LLM reasoning node, tool dispatch, streaming output, model override resolution, planner-graph integration, execution limits, and more
-- PR #25 merged → main
+- **Agent Runtime Loop** (`agent-platform-n0l`, 8 tasks) — PR #25 merged
+- **Harness Hardening** (`agent-platform-qlp`, 4 tasks) — PR #26 merged
 
-### Epic 2: Harness Hardening (`agent-platform-qlp`) — COMPLETE
-
-- 4 tasks: plugin dispatch (`k7m`), execution limits (`9yb`), planner integration (`dtc`), conversation history (`xk3`)
-- PR #26 merged → main
-
-### SonarCloud quality gate fixes
+### SonarCloud quality gate fixes — PR #27 merged
 
 - Cognitive complexity refactoring: `chatRouter.ts` (33→~10), `llmReason.ts` (19→~8)
-- Nested ternary elimination: `planGenerate.ts`, `buildGraph.ts`, `toolDispatch.ts`
-- 23 SonarCloud issues resolved across 11 files:
-  - S4325: Replaced `req.params.id!` non-null assertions with `requireParam()` runtime helper (5 router files)
-  - S3358: Nested ternaries → if/else chains
-  - S6582: Optional chaining in `toolDispatch.ts`
-  - S3863: Merged duplicate imports in `types.ts`
-  - S1874: Migrated deprecated `llmReasonNode` → `createLlmReasonNode()` in tests
-  - S3696: NOSONAR suppression for intentional non-Error throw in test
-  - S2871: `localeCompare` in `buildGraph.ts` sort
-  - S5443: Replaced `/tmp` paths with `/workspace` in test fixtures
-- PR #27 (`feature/agent-platform-hardening` → `main`) merged
+- 23 issues resolved across 11 files (nested ternaries, non-null assertions, optional chaining, duplicate imports, deprecated API migration, etc.)
+
+### `agent-platform-pe4` — Replace deprecated SSEClientTransport — PR #28 merged
+
+- Replaced `SSEClientTransport` with `StreamableHTTPClientTransport` in `packages/mcp-adapter/src/transport.ts`
+- Added `'streamable-http'` as primary transport type; `'sse'` kept as backward-compatible alias
+- Added 4 new tests (8 total in transport.test.ts), parameterized with `it.each()` to avoid duplication
+- SonarCloud quality gate initially failed due to 19.6% duplicated lines density — fixed by refactoring tests
+- All CI checks green (verify, docker, e2e, CodeQL, Sourcery, SonarCloud, GitGuardian)
 
 ### Branch cleanup
 
-- All 17 local feature/task branches deleted
-- All remote feature/task branches deleted
+- Deleted local `task/agent-platform-pe4` branch after merge
 - Only `main` remains (local + remote)
 
 ---
@@ -64,45 +55,41 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 | **Agent Runtime Loop**     | `agent-platform-n0l` | **Complete** — merged | PR #25 |
 | **Harness Hardening**      | `agent-platform-qlp` | **Complete** — merged | PR #26 |
 | SonarCloud fixes           | —                    | **Complete** — merged | PR #27 |
+| SSEClientTransport replace | `agent-platform-pe4` | **Complete** — merged | PR #28 |
 
 ### Quality
 
-- 157+ tests passing (73 harness + 17 API + others)
+- 202 tests passing across all packages
 - Build, typecheck, lint all clean
-- SonarCloud issues resolved
+- SonarCloud quality gate green
 
 ### Git
 
 - `main` — up to date, all work merged
 - No stale branches (local or remote)
 
-### Remaining MVP prerequisites (from earlier code review)
+### Remaining backlog
 
-| ID                   | Priority | Title                                 | Status |
-| -------------------- | -------- | ------------------------------------- | ------ |
-| `agent-platform-oss` | P0       | Fix error middleware info leakage     | Open   |
-| `agent-platform-pe4` | P1       | Replace deprecated SSEClientTransport | Open   |
-| `agent-platform-ptj` | P2       | Decompose v1Router                    | Open   |
-| `agent-platform-qhe` | P2       | Structured logger replacement         | Open   |
-
-### Post-MVP backlog
-
-| ID                   | Priority | Title                           | Depends On |
-| -------------------- | -------- | ------------------------------- | ---------- |
-| `agent-platform-hnx` | P3       | Correlation IDs                 | —          |
-| `agent-platform-bto` | P3       | Multi-provider routing          | `icb`      |
-| `agent-platform-nqn` | P3       | Rate limiting / cost guardrails | `9yb`      |
-| `agent-platform-fcm` | P4       | HITL pause/resume               | `xk3`      |
+| ID                   | Priority | Title                                              | Status |
+| -------------------- | -------- | -------------------------------------------------- | ------ |
+| `agent-platform-ptj` | P2       | Decompose v1Router                                 | Open   |
+| `agent-platform-qhe` | P2       | Structured logger replacement                      | Open   |
+| `agent-platform-hnx` | P3       | Request-scoped correlation IDs                     | Open   |
+| `agent-platform-nqn` | P3       | Rate limiting and cost guardrails                  | Open   |
+| `agent-platform-bto` | P3       | Provider-agnostic model routing                    | Open   |
+| `agent-platform-ntf` | P3       | Frontend design polish (PAUSED — pending planning) | Open   |
+| `agent-platform-fcm` | P4       | HITL pause/resume                                  | Open   |
 
 ---
 
 ## Next (priority order)
 
-1. **`agent-platform-oss`** — Fix error middleware info leakage (P0, security)
-2. **`agent-platform-pe4`** — Replace deprecated SSEClientTransport (P1, independent)
-3. **`agent-platform-ptj`** — Decompose v1Router (P2)
-4. **`agent-platform-qhe`** — Structured logger replacement (P2, depends on `oss`)
-5. Post-MVP backlog items as capacity allows
+1. **`agent-platform-ptj`** — Decompose v1Router (P2)
+2. **`agent-platform-qhe`** — Replace console.warn with structured logger (P2)
+3. **`agent-platform-hnx`** — Request-scoped correlation IDs (P3)
+4. **`agent-platform-nqn`** — Rate limiting and cost guardrails (P3)
+5. **`agent-platform-bto`** — Provider-agnostic model routing (P3)
+6. Post-MVP backlog items as capacity allows
 
 ---
 
