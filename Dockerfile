@@ -5,6 +5,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/contracts packages/contracts
 COPY packages/db packages/db
+COPY packages/logger packages/logger
 COPY packages/model-router packages/model-router
 COPY packages/harness packages/harness
 COPY packages/mcp-adapter packages/mcp-adapter
