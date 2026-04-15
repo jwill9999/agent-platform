@@ -8,10 +8,10 @@ import type { ChatMessage, LlmModelConfig, ToolDefinition } from '../src/types.j
 // Mock the AI SDK before importing the node
 // ---------------------------------------------------------------------------
 
-const mockGenerateText = vi.fn();
+const mockStreamText = vi.fn();
 
 vi.mock('ai', () => ({
-  generateText: (...args: unknown[]) => mockGenerateText(...args),
+  streamText: (...args: unknown[]) => mockStreamText(...args),
   jsonSchema: (schema: unknown) => ({ type: 'json-schema', jsonSchema: schema }),
 }));
 
@@ -48,17 +48,34 @@ function makeState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Helper: create a mock streamText return value with async iterables. */
+function mockStreamResult(opts: {
+  textChunks?: string[];
+  toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
+  usage?: { promptTokens: number; completionTokens: number };
+}) {
+  const chunks = opts.textChunks ?? [];
+  return {
+    textStream: (async function* () {
+      for (const chunk of chunks) yield chunk;
+    })(),
+    toolCalls: Promise.resolve(opts.toolCalls ?? []),
+    usage: Promise.resolve(opts.usage),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests: llmReasonNode
 // ---------------------------------------------------------------------------
 
 describe('llmReasonNode', () => {
   it('produces text output when LLM returns text (no tool calls)', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'Hello, world!',
-      toolCalls: [],
-      usage: { promptTokens: 10, completionTokens: 5 },
-    });
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['Hello, ', 'world!'],
+        usage: { promptTokens: 10, completionTokens: 5 },
+      }),
+    );
 
     const result = await llmReasonNode(makeState());
 
@@ -75,14 +92,16 @@ describe('llmReasonNode', () => {
   });
 
   it('produces tool_calls output when LLM returns tool calls', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: '',
-      toolCalls: [
-        { toolCallId: 'tc1', toolName: 'search', args: { query: 'hello' } },
-        { toolCallId: 'tc2', toolName: 'read_file', args: { path: '/foo' } },
-      ],
-      usage: { promptTokens: 20, completionTokens: 15 },
-    });
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: [],
+        toolCalls: [
+          { toolCallId: 'tc1', toolName: 'search', args: { query: 'hello' } },
+          { toolCallId: 'tc2', toolName: 'read_file', args: { path: '/foo' } },
+        ],
+        usage: { promptTokens: 20, completionTokens: 15 },
+      }),
+    );
 
     const state = makeState({
       toolDefinitions: [
@@ -104,11 +123,12 @@ describe('llmReasonNode', () => {
   });
 
   it('handles empty text and no tool calls gracefully', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: '',
-      toolCalls: [],
-      usage: undefined,
-    });
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: [],
+        usage: undefined,
+      }),
+    );
 
     const result = await llmReasonNode(makeState());
 
@@ -122,11 +142,12 @@ describe('llmReasonNode', () => {
   });
 
   it('accumulates token usage onto totalTokensUsed', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'ok',
-      toolCalls: [],
-      usage: { promptTokens: 100, completionTokens: 50 },
-    });
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['ok'],
+        usage: { promptTokens: 100, completionTokens: 50 },
+      }),
+    );
 
     const state = makeState({ totalTokensUsed: 200 });
     const result = await llmReasonNode(state);
@@ -134,12 +155,13 @@ describe('llmReasonNode', () => {
     expect(result.totalTokensUsed).toBe(350);
   });
 
-  it('passes tool definitions to generateText when present', async () => {
-    mockGenerateText.mockResolvedValueOnce({
-      text: 'using tools',
-      toolCalls: [],
-      usage: { promptTokens: 5, completionTokens: 3 },
-    });
+  it('passes tool definitions to streamText when present', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['using tools'],
+        usage: { promptTokens: 5, completionTokens: 3 },
+      }),
+    );
 
     const toolDefs: ToolDefinition[] = [
       {
@@ -151,7 +173,7 @@ describe('llmReasonNode', () => {
 
     await llmReasonNode(makeState({ toolDefinitions: toolDefs }));
 
-    expect(mockGenerateText).toHaveBeenCalledWith(
+    expect(mockStreamText).toHaveBeenCalledWith(
       expect.objectContaining({
         tools: expect.objectContaining({
           my_tool: expect.objectContaining({
@@ -160,6 +182,60 @@ describe('llmReasonNode', () => {
         }),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: createLlmReasonNode with emitter
+// ---------------------------------------------------------------------------
+
+const { createLlmReasonNode } = await import('../src/nodes/llmReason.js');
+
+describe('createLlmReasonNode with emitter', () => {
+  it('emits text chunks to emitter during streaming', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['chunk1', 'chunk2', 'chunk3'],
+        usage: { promptTokens: 5, completionTokens: 3 },
+      }),
+    );
+
+    const emitted: { type: string; content?: string }[] = [];
+    const emitter = {
+      emit: (event: { type: string; content?: string }) => emitted.push(event),
+      end: vi.fn(),
+    };
+
+    const node = createLlmReasonNode(emitter);
+    const result = await node(makeState());
+
+    expect(emitted).toEqual([
+      { type: 'text', content: 'chunk1' },
+      { type: 'text', content: 'chunk2' },
+      { type: 'text', content: 'chunk3' },
+    ]);
+    expect(result.llmOutput).toEqual({ kind: 'text', content: 'chunk1chunk2chunk3' });
+  });
+
+  it('does not emit empty chunks', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['', 'text', ''],
+        usage: { promptTokens: 5, completionTokens: 3 },
+      }),
+    );
+
+    const emitted: unknown[] = [];
+    const emitter = {
+      emit: (event: unknown) => emitted.push(event),
+      end: vi.fn(),
+    };
+
+    const node = createLlmReasonNode(emitter);
+    await node(makeState());
+
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]).toEqual({ type: 'text', content: 'text' });
   });
 });
 

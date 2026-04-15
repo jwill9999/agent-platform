@@ -62,6 +62,18 @@ import type { Output } from '@agent-platform/contracts';
 export type NativeToolExecutor = (toolId: string, args: Record<string, unknown>) => Promise<Output>;
 
 // ---------------------------------------------------------------------------
+// Output emitter (streaming interface)
+// ---------------------------------------------------------------------------
+
+/** Streaming event emitter for Output union events. */
+export type OutputEmitter = {
+  /** Emit a single Output event to the client stream. Non-blocking. */
+  emit(event: Output): void;
+  /** Signal stream completion. */
+  end(): void;
+};
+
+// ---------------------------------------------------------------------------
 // Tool definition mapping
 // ---------------------------------------------------------------------------
 

@@ -4,7 +4,7 @@ import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
-import type { ChatMessage, NativeToolExecutor, ToolCallIntent } from '../types.js';
+import type { ChatMessage, NativeToolExecutor, OutputEmitter, ToolCallIntent } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -14,6 +14,7 @@ export type ToolDispatchContext = {
   agent: Agent;
   mcpManager: McpSessionManager;
   nativeToolExecutor?: NativeToolExecutor;
+  emitter?: OutputEmitter;
 };
 
 // ---------------------------------------------------------------------------
@@ -112,6 +113,11 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
     for (const call of llmOutput.calls) {
       const { output, ok } = await dispatchSingleTool(call, ctx);
+
+      // Stream the output event to the client
+      if (ctx.emitter) {
+        ctx.emitter.emit(output);
+      }
 
       const content =
         output.type === 'tool_result'

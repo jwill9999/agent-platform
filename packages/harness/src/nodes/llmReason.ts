@@ -1,10 +1,16 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { generateText, jsonSchema } from 'ai';
+import { streamText, jsonSchema } from 'ai';
 import type { CoreMessage } from 'ai';
 
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
-import type { ChatMessage, LlmOutput, ToolCallIntent, ToolDefinition } from '../types.js';
+import type {
+  ChatMessage,
+  LlmOutput,
+  OutputEmitter,
+  ToolCallIntent,
+  ToolDefinition,
+} from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -58,90 +64,95 @@ function toSdkTools(
   return tools;
 }
 
-/** Parse generateText response into LlmOutput + assistant message. */
-function parseResponse(response: {
-  text: string;
-  toolCalls: Array<{ toolCallId: string; toolName: string; args: unknown }>;
-  usage?: { promptTokens: number; completionTokens: number };
-}): {
-  output: LlmOutput;
-  assistantMessage: ChatMessage;
-  tokenUsage?: { promptTokens: number; completionTokens: number };
-} {
-  const tokenUsage = response.usage
-    ? {
-        promptTokens: response.usage.promptTokens,
-        completionTokens: response.usage.completionTokens,
-      }
-    : undefined;
-
-  if (response.toolCalls.length > 0) {
-    const calls: ToolCallIntent[] = response.toolCalls.map((tc) => ({
-      id: tc.toolCallId,
-      name: tc.toolName,
-      args: (tc.args as Record<string, unknown>) ?? {},
-    }));
-
-    const output: LlmOutput = { kind: 'tool_calls', calls };
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      content: response.text || '',
-      toolCalls: calls,
-    };
-    return { output, assistantMessage, tokenUsage };
-  }
-
-  const output: LlmOutput = { kind: 'text', content: response.text || '' };
-  const assistantMessage: ChatMessage = {
-    role: 'assistant',
-    content: response.text || '',
-  };
-  return { output, assistantMessage, tokenUsage };
-}
-
 // ---------------------------------------------------------------------------
-// LLM reasoning node
+// LLM reasoning node factory
 // ---------------------------------------------------------------------------
 
 /**
- * Graph node that invokes the LLM via the Vercel AI SDK.
+ * Creates a graph node that invokes the LLM via the Vercel AI SDK using streamText.
  *
  * Reads `messages`, `toolDefinitions`, and `modelConfig` from state.
  * Produces `LlmOutput` (text or tool-call intents) — does NOT execute tools.
+ * Streams text chunks via the emitter in real-time while accumulating the full response.
  * Appends the assistant message to conversation history.
  * Emits an `llm_call` trace event with optional token usage.
  */
-export async function llmReasonNode(state: HarnessStateType): Promise<Partial<HarnessStateType>> {
-  const { messages, toolDefinitions, modelConfig } = state;
+export function createLlmReasonNode(emitter?: OutputEmitter) {
+  return async function llmReasonNode(state: HarnessStateType): Promise<Partial<HarnessStateType>> {
+    const { messages, toolDefinitions, modelConfig } = state;
 
-  if (!modelConfig) {
-    throw new Error('llm_reason: modelConfig is required in state');
-  }
+    if (!modelConfig) {
+      throw new Error('llm_reason: modelConfig is required in state');
+    }
 
-  const provider = createOpenAI({ apiKey: modelConfig.apiKey });
-  const model = provider(modelConfig.model);
+    const provider = createOpenAI({ apiKey: modelConfig.apiKey });
+    const model = provider(modelConfig.model);
 
-  const coreMessages = toCoreMessages(messages);
-  const tools = toolDefinitions.length > 0 ? toSdkTools(toolDefinitions) : undefined;
+    const coreMessages = toCoreMessages(messages);
+    const tools = toolDefinitions.length > 0 ? toSdkTools(toolDefinitions) : undefined;
 
-  const response = await generateText({
-    model,
-    messages: coreMessages,
-    tools,
-    maxSteps: 1,
-  });
+    const result = streamText({
+      model,
+      messages: coreMessages,
+      tools,
+      maxSteps: 1,
+    });
 
-  const { output, assistantMessage, tokenUsage } = parseResponse(response);
+    // Stream text chunks via emitter while accumulating full response
+    let fullText = '';
+    for await (const chunk of result.textStream) {
+      fullText += chunk;
+      if (emitter && chunk) {
+        emitter.emit({ type: 'text', content: chunk });
+      }
+    }
 
-  const step = state.taskIndex ?? 0;
-  const traceEvent: TraceEvent = { type: 'llm_call', step, tokenUsage };
+    // Await final result for tool calls and usage
+    const finalToolCalls = await result.toolCalls;
+    const usage = await result.usage;
 
-  const tokenDelta = tokenUsage ? tokenUsage.promptTokens + tokenUsage.completionTokens : 0;
+    const tokenUsage = usage
+      ? { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens }
+      : undefined;
 
-  return {
-    llmOutput: output,
-    messages: [assistantMessage],
-    trace: [traceEvent],
-    totalTokensUsed: state.totalTokensUsed + tokenDelta,
+    let output: LlmOutput;
+    let assistantMessage: ChatMessage;
+
+    if (finalToolCalls && finalToolCalls.length > 0) {
+      const calls: ToolCallIntent[] = finalToolCalls.map((tc) => ({
+        id: tc.toolCallId,
+        name: tc.toolName,
+        args: (tc.args as Record<string, unknown>) ?? {},
+      }));
+
+      output = { kind: 'tool_calls', calls };
+      assistantMessage = {
+        role: 'assistant',
+        content: fullText || '',
+        toolCalls: calls,
+      };
+    } else {
+      output = { kind: 'text', content: fullText || '' };
+      assistantMessage = { role: 'assistant', content: fullText || '' };
+    }
+
+    const step = state.taskIndex ?? 0;
+    const traceEvent: TraceEvent = { type: 'llm_call', step, tokenUsage };
+    const tokenDelta = tokenUsage ? tokenUsage.promptTokens + tokenUsage.completionTokens : 0;
+
+    return {
+      llmOutput: output,
+      messages: [assistantMessage],
+      trace: [traceEvent],
+      totalTokensUsed: state.totalTokensUsed + tokenDelta,
+    };
   };
+}
+
+/**
+ * Backwards-compatible standalone node (no emitter).
+ * @deprecated Use createLlmReasonNode(emitter) instead.
+ */
+export async function llmReasonNode(state: HarnessStateType): Promise<Partial<HarnessStateType>> {
+  return createLlmReasonNode()(state);
 }
