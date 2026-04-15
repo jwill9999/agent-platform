@@ -1,5 +1,5 @@
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { McpServer } from '@agent-platform/contracts';
 import { McpAdapterError } from './errors.js';
@@ -21,10 +21,10 @@ export function createTransportForMcpServer(mcp: McpServer): Transport {
       args: mcp.args ?? [],
     });
   }
-  if (t === 'sse') {
+  if (t === 'sse' || t === 'streamable-http') {
     const url = mcp.url?.trim();
     if (!url) {
-      throw new McpAdapterError('INVALID_CONFIG', 'sse transport requires url');
+      throw new McpAdapterError('INVALID_CONFIG', `${t} transport requires url`);
     }
     let parsed: URL;
     try {
@@ -32,13 +32,13 @@ export function createTransportForMcpServer(mcp: McpServer): Transport {
     } catch {
       throw new McpAdapterError(
         'INVALID_CONFIG',
-        `sse transport requires a valid URL (got: "${url}")`,
+        `${t} transport requires a valid URL (got: "${url}")`,
       );
     }
-    return new SSEClientTransport(parsed);
+    return new StreamableHTTPClientTransport(parsed);
   }
   throw new McpAdapterError(
     'INVALID_CONFIG',
-    `Unsupported MCP transport "${mcp.transport}" (use stdio or sse)`,
+    `Unsupported MCP transport "${mcp.transport}" (use stdio, streamable-http, or sse)`,
   );
 }
