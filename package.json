@@ -12,12 +12,19 @@
     "format:check": "prettier --check \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"e2e/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
     "seed": "pnpm --filter @agent-platform/db run seed",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
-    "test:e2e:install": "playwright install --with-deps chromium"
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,json,md,js}": "prettier --write",
+    "*.ts": "eslint --max-warnings 0 --no-warn-ignored"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
-    "eslint": "^9.16.0",
     "@playwright/test": "^1.49.1",
+    "eslint": "^9.16.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.0"
