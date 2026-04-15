@@ -1,6 +1,9 @@
 import type { McpServer } from '@agent-platform/contracts';
+import { createLogger } from '@agent-platform/logger';
 import type { McpSession } from './session.js';
 import { openMcpSession } from './session.js';
+
+const log = createLogger('mcp-adapter');
 
 export type McpSessionOpenResult = {
   serverId: string;
@@ -47,9 +50,11 @@ export class McpSessionManager {
       } else {
         const error =
           outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
-        console.warn(
-          `[McpSessionManager] Failed to connect to MCP server "${config.id}" (${config.transport}): ${error}`,
-        );
+        log.warn('Failed to connect to MCP server', {
+          serverId: config.id,
+          transport: config.transport,
+          error,
+        });
         results.push({ serverId: config.id, status: 'failed', error });
       }
     }
@@ -89,9 +94,11 @@ export class McpSessionManager {
       return true;
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[McpSessionManager] Reconnect failed for "${config.id}" (${config.transport}): ${error}`,
-      );
+      log.warn('Reconnect failed', {
+        serverId: config.id,
+        transport: config.transport,
+        error,
+      });
       return false;
     }
   }
@@ -107,7 +114,7 @@ export class McpSessionManager {
           await session.close();
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
-          console.warn(`[McpSessionManager] Error closing session "${serverId}": ${error}`);
+          log.warn('Error closing session', { serverId, error });
         }
       }),
     );

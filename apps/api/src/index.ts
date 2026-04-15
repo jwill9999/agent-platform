@@ -1,7 +1,7 @@
 import { closeDatabase, openDatabase } from '@agent-platform/db';
 
 import { createApp } from './infrastructure/http/createApp.js';
-import { createLogger } from './infrastructure/logging/logger.js';
+import { createLogger } from '@agent-platform/logger';
 
 const log = createLogger('api');
 
