@@ -15,14 +15,7 @@ COPY packages/planner packages/planner
 COPY packages/agent-validation packages/agent-validation
 COPY apps/api apps/api
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @agent-platform/contracts build \
-  && pnpm --filter @agent-platform/db build \
-  && pnpm --filter @agent-platform/model-router build \
-  && pnpm --filter @agent-platform/mcp-adapter build \
-  && pnpm --filter @agent-platform/plugin-sdk build \
-  && pnpm --filter @agent-platform/plugin-session build \
-  && pnpm --filter @agent-platform/harness build \
-  && pnpm --filter @agent-platform/api build
+RUN pnpm -r run build
 
 FROM node:20-alpine AS runner
 RUN apk add --no-cache curl python3 make g++ su-exec \
