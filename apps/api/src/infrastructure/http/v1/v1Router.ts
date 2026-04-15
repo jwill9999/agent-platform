@@ -21,7 +21,7 @@ export function createV1Router(db: DrizzleDb): Router {
   router.use('/mcp-servers', createMcpServersRouter(db));
   router.use('/agents', createAgentsRouter(db));
   router.use('/sessions', createSessionsRouter(db));
-  router.use('/chat', createChatRouter());
+  router.use('/chat', createChatRouter(db));
 
   return router;
 }
