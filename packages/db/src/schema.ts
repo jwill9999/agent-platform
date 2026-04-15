@@ -123,6 +123,18 @@ export const pluginCatalogRefs = sqliteTable('plugin_catalog_refs', {
   checksum: text('checksum'),
 });
 
+/** Conversation messages linked to a session. */
+export const messages = sqliteTable('messages', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(), // user | assistant | system | tool
+  content: text('content').notNull(),
+  toolCallId: text('tool_call_id'),
+  createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+});
+
 /**
  * Secret registry: label + optional **ciphertext-only** material (AES-256-GCM envelope).
  * Plaintext must never be persisted.

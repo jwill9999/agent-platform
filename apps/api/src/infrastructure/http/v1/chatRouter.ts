@@ -1,5 +1,5 @@
 import type { DrizzleDb } from '@agent-platform/db';
-import { getSession } from '@agent-platform/db';
+import { getSession, appendMessage, listMessagesBySession } from '@agent-platform/db';
 import {
   buildAgentContext,
   destroyAgentContext,
@@ -123,11 +123,28 @@ export function createChatRouter(db: DrizzleDb): Router {
           dispatcher,
         });
 
-        // 7. Build initial state
+        // 7. Build initial state — load prior conversation + append new user message
         const runId = randomUUID();
+        const priorMessages = listMessagesBySession(db, sessionId);
+
+        // Append the user's new message to the DB
+        appendMessage(db, { sessionId, role: 'user', content: message });
+
+        // Build full conversation history for the graph
         const messages: ChatMessage[] = [
           { role: 'system', content: agentCtx.systemPrompt },
-          { role: 'user', content: message },
+          ...priorMessages.map((m) => {
+            if (m.role === 'tool' && m.toolCallId) {
+              return {
+                role: 'tool' as const,
+                content: m.content,
+                toolCallId: m.toolCallId,
+                toolName: '',
+              };
+            }
+            return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
+          }),
+          { role: 'user' as const, content: message },
         ];
 
         const initialState = {
@@ -160,10 +177,30 @@ export function createChatRouter(db: DrizzleDb): Router {
           timeoutId = setTimeout(() => reject(new Error('__TIMEOUT__')), timeoutMs);
         });
 
+        let finalState: { messages?: ChatMessage[] } | undefined;
         try {
-          await Promise.race([graphPromise, timeoutPromise]);
+          finalState = (await Promise.race([graphPromise, timeoutPromise])) as {
+            messages?: ChatMessage[];
+          };
         } finally {
           if (timeoutId) clearTimeout(timeoutId);
+        }
+
+        // 9. Persist assistant/tool response messages to conversation history
+        // Only persist messages added by the graph (after the initial messages we sent)
+        if (finalState?.messages) {
+          const initialCount = messages.length;
+          const newMessages = finalState.messages.slice(initialCount);
+          for (const msg of newMessages) {
+            if (msg.role === 'assistant' || msg.role === 'tool') {
+              appendMessage(db, {
+                sessionId,
+                role: msg.role,
+                content: msg.content,
+                toolCallId: msg.role === 'tool' ? msg.toolCallId : undefined,
+              });
+            }
+          }
         }
       } catch (err) {
         const isTimeout = err instanceof Error && err.message === '__TIMEOUT__';
