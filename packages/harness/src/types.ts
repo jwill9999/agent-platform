@@ -53,6 +53,15 @@ export type LlmModelConfig = {
 };
 
 // ---------------------------------------------------------------------------
+// Native tool executor (non-MCP tools)
+// ---------------------------------------------------------------------------
+
+import type { Output } from '@agent-platform/contracts';
+
+/** Pluggable executor for non-MCP (registry/native) tools. */
+export type NativeToolExecutor = (toolId: string, args: Record<string, unknown>) => Promise<Output>;
+
+// ---------------------------------------------------------------------------
 // Tool definition mapping
 // ---------------------------------------------------------------------------
 

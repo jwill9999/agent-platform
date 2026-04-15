@@ -21,6 +21,8 @@ export type {
   LlmToolCallsOutput,
   ToolCallIntent,
   LlmModelConfig,
+  NativeToolExecutor,
 } from './types.js';
 export { contractToolsToDefinitions } from './types.js';
 export { llmReasonNode } from './nodes/llmReason.js';
+export { createToolDispatchNode, type ToolDispatchContext } from './nodes/toolDispatch.js';

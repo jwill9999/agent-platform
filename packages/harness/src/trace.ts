@@ -9,5 +9,6 @@ export type TraceEvent =
       step: number;
       tokenUsage?: { promptTokens: number; completionTokens: number };
     }
+  | { type: 'tool_dispatch'; toolId: string; step: number; ok: boolean }
   | { type: 'limit_hit'; kind: 'max_steps' }
   | { type: 'graph_end' };

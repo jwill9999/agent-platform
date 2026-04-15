@@ -190,6 +190,9 @@ importers:
 
   packages/harness:
     dependencies:
+      '@agent-platform/agent-validation':
+        specifier: workspace:^
+        version: link:../agent-validation
       '@agent-platform/contracts':
         specifier: workspace:*
         version: link:../contracts
