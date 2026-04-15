@@ -1,7 +1,10 @@
 import type { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 
+import { createLogger } from '../logging/logger.js';
 import { HttpError } from './httpError.js';
+
+const log = createLogger('error-middleware');
 
 export const errorMiddleware: ErrorRequestHandler = (err, _req, res, next) => {
   if (res.headersSent) {
@@ -40,11 +43,16 @@ export const errorMiddleware: ErrorRequestHandler = (err, _req, res, next) => {
       return;
     }
   }
-  const message = err instanceof Error ? err.message : 'Internal error';
+
+  log.error('Unhandled error', {
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  });
+
   res.status(500).json({
     error: {
       code: 'INTERNAL_ERROR',
-      message,
+      message: 'An unexpected error occurred',
     },
   });
 };
