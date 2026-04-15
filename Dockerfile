@@ -52,7 +52,7 @@ COPY --from=build /app/packages/plugin-observability/dist packages/plugin-observ
 COPY --from=build /app/packages/planner/dist packages/planner/dist
 COPY --from=build /app/packages/agent-validation/dist packages/agent-validation/dist
 COPY --from=build /app/apps/api/dist apps/api/dist
-RUN pnpm install --frozen-lockfile --prod \
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts \
   && chown -R appuser:appuser /app
 USER root
 EXPOSE 3000
