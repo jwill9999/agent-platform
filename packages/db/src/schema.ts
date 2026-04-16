@@ -148,3 +148,10 @@ export const secretRefs = sqliteTable('secret_refs', {
   keyVersion: integer('key_version', { mode: 'number' }),
   algorithm: text('algorithm'),
 });
+
+/** Key-value platform settings (rate limits, cost budgets, etc.). */
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+});

@@ -147,9 +147,9 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
         executionLimitsJson: JSON.stringify(agent.executionLimits),
         modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
         pluginAllowlistJson:
-          agent.pluginAllowlist !== undefined ? JSON.stringify(agent.pluginAllowlist) : null,
+          agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
         pluginDenylistJson:
-          agent.pluginDenylist !== undefined ? JSON.stringify(agent.pluginDenylist) : null,
+          agent.pluginDenylist === undefined ? null : JSON.stringify(agent.pluginDenylist),
         createdAtMs,
         updatedAtMs: now,
       })
@@ -162,9 +162,9 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
           executionLimitsJson: JSON.stringify(agent.executionLimits),
           modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
           pluginAllowlistJson:
-            agent.pluginAllowlist !== undefined ? JSON.stringify(agent.pluginAllowlist) : null,
+            agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
           pluginDenylistJson:
-            agent.pluginDenylist !== undefined ? JSON.stringify(agent.pluginDenylist) : null,
+            agent.pluginDenylist === undefined ? null : JSON.stringify(agent.pluginDenylist),
           updatedAtMs: now,
         },
       })

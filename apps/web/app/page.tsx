@@ -24,8 +24,7 @@ export default function HomePage() {
       <p style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.75rem' }}>
         Uses the same OpenAI streaming stack as the API (<code>/v1/chat/stream</code>). Set{' '}
         <code>NEXT_OPENAI_API_KEY</code> for this Next.js server (see{' '}
-        <code>apps/web/.env.example</code>
-        ).
+        <code>apps/web/.env.example</code>).
       </p>
 
       <label
@@ -43,7 +42,7 @@ export default function HomePage() {
           type="checkbox"
           checked={showThinking}
           onChange={(e) => setShowThinking(e.target.checked)}
-        />
+        />{' '}
         Show thinking (stored in this browser)
       </label>
 
@@ -75,7 +74,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   {uiMessageToOutputs(m).map((o, i) => (
-                    <OutputRenderer key={i} output={o} showThinking={showThinking} />
+                    <OutputRenderer key={`${m.id}-${i}`} output={o} showThinking={showThinking} />
                   ))}
                 </div>
               </li>
@@ -153,6 +152,13 @@ function formatChatError(error: unknown): string {
   return statusPart ? `${baseMessage} (${statusPart})` : baseMessage;
 }
 
+function extractFromErrorObject(err: { code?: unknown; message?: unknown }): string | null {
+  const msg = typeof err.message === 'string' ? err.message : '';
+  const code = typeof err.code === 'string' ? err.code : '';
+  if (msg && code) return `${code}: ${msg}`;
+  return msg || code || null;
+}
+
 function extractErrorMessage(body: unknown): string | null {
   if (!body || typeof body !== 'object') {
     return null;
@@ -162,18 +168,7 @@ function extractErrorMessage(body: unknown): string | null {
     return payload.message;
   }
   if (payload.error && typeof payload.error === 'object') {
-    const err = payload.error as { code?: unknown; message?: unknown };
-    const msg = typeof err.message === 'string' ? err.message : '';
-    const code = typeof err.code === 'string' ? err.code : '';
-    if (msg && code) {
-      return `${code}: ${msg}`;
-    }
-    if (msg) {
-      return msg;
-    }
-    if (code) {
-      return code;
-    }
+    return extractFromErrorObject(payload.error as { code?: unknown; message?: unknown });
   }
   return null;
 }

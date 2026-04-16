@@ -41,7 +41,7 @@ export default function AgentsPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
   function resetForm() {

@@ -4,11 +4,11 @@ import type { Output } from '@agent-platform/contracts';
 
 import { CodeBlock } from './CodeBlock';
 
-type Props = {
+type Props = Readonly<{
   output: Output;
   /** When false, thinking blocks render as a short placeholder (user setting stub). */
   showThinking: boolean;
-};
+}>;
 
 export function OutputRenderer({ output, showThinking }: Props) {
   switch (output.type) {

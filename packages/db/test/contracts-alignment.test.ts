@@ -41,7 +41,7 @@ describe('contracts v0 alignment', () => {
 
     const row = db.select().from(schema.skills).where(eq(schema.skills.id, 'skill-1')).get();
     expect(row).toBeDefined();
-    const skill = skillRowToContract(row!);
+    const skill = skillRowToContract(row);
     expect(skill.id).toBe('skill-1');
     expect(skill.tools).toEqual(['tool-a']);
 

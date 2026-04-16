@@ -1,46 +1,37 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
-// Re-create the limiter with a very small window so tests are fast
-vi.stubEnv('RATE_LIMIT_WINDOW_MS', '60000');
-vi.stubEnv('RATE_LIMIT_MAX', '3');
+import { createDynamicRateLimiter } from '../src/infrastructure/http/dynamicRateLimiter.js';
 
-// Must import AFTER env stubs so the module reads the overridden values
-const { apiRateLimiter } = await import('../src/infrastructure/http/rateLimitMiddleware.js');
-
-function buildApp() {
+function buildApp(max = 3) {
+  const limiter = createDynamicRateLimiter();
+  limiter.reconfigure({ windowMs: 60_000, max });
   const app = express();
-  app.use(apiRateLimiter);
+  app.use(limiter.middleware);
   app.get('/test', (_req, res) => res.json({ ok: true }));
-  return app;
+  return { app, limiter };
 }
 
-describe('apiRateLimiter', () => {
-  let app: express.Express;
-
-  beforeEach(() => {
-    app = buildApp();
-  });
-
+describe('dynamicRateLimiter', () => {
   it('allows requests under the limit', async () => {
+    const { app } = buildApp();
     const res = await request(app).get('/test');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
   });
 
   it('includes standard rate-limit headers', async () => {
+    const { app } = buildApp();
     const res = await request(app).get('/test');
     const headerKeys = Object.keys(res.headers).map((k) => k.toLowerCase());
-    // express-rate-limit with draft-7 uses ratelimit-* headers
     const hasRateHeaders = headerKeys.some((k) => k.startsWith('ratelimit'));
-    // fallback: may use x-ratelimit-* headers depending on version
     const hasXRateHeaders = headerKeys.some((k) => k.startsWith('x-ratelimit'));
     expect(hasRateHeaders || hasXRateHeaders).toBe(true);
   });
 
   it('returns 429 with standard error shape when limit is exceeded', async () => {
-    // 3 allowed, 4th should fail
+    const { app } = buildApp(3);
     await request(app).get('/test');
     await request(app).get('/test');
     await request(app).get('/test');
@@ -53,5 +44,27 @@ describe('apiRateLimiter', () => {
         message: 'Too many requests — please try again later',
       },
     });
+  });
+
+  it('reconfigure changes the active limit', async () => {
+    const { app, limiter } = buildApp(2);
+    // Use 2 of 2 allowed
+    await request(app).get('/test');
+    await request(app).get('/test');
+    const blocked = await request(app).get('/test');
+    expect(blocked.status).toBe(429);
+
+    // Reconfigure to allow 100 — new limiter, fresh counters
+    limiter.reconfigure({ windowMs: 60_000, max: 100 });
+    const allowed = await request(app).get('/test');
+    expect(allowed.status).toBe(200);
+  });
+
+  it('getConfig returns current configuration', async () => {
+    const { limiter } = buildApp(5);
+    expect(limiter.getConfig()).toEqual({ windowMs: 60_000, max: 5 });
+
+    limiter.reconfigure({ windowMs: 30_000, max: 50 });
+    expect(limiter.getConfig()).toEqual({ windowMs: 30_000, max: 50 });
   });
 });

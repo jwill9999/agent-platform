@@ -3,10 +3,10 @@
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-type Props = {
+type Props = Readonly<{
   language: string;
   content: string;
-};
+}>;
 
 export function CodeBlock({ language, content }: Props) {
   const lang = language && language !== 'plaintext' ? language : 'typescript';
