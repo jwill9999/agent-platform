@@ -22,6 +22,7 @@ function buildTestApp() {
   const reconfigureCalls: Array<{ windowMs: number; max: number }> = [];
 
   const app = express();
+  app.disable('x-powered-by');
   app.use(express.json());
   app.use(
     '/v1/settings',
