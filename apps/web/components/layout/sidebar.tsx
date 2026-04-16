@@ -82,16 +82,27 @@ export function Sidebar() {
         collapsed ? 'w-16' : 'w-64',
       )}
     >
-      {/* Logo */}
+      {/* Logo + collapse toggle */}
       <div className="flex items-center gap-3 px-4 py-5 border-b border-border">
         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
           <Sparkles className="h-5 w-5 text-primary" />
         </div>
         {!collapsed && (
-          <div className="overflow-hidden">
-            <h1 className="font-semibold text-foreground truncate">AI Studio</h1>
-            <p className="text-xs text-muted-foreground truncate">Agent Platform</p>
-          </div>
+          <>
+            <div className="overflow-hidden flex-1">
+              <h1 className="font-semibold text-foreground truncate">AI Studio</h1>
+              <p className="text-xs text-muted-foreground truncate">Agent Platform</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggle}
+              className="h-8 w-8 flex-shrink-0"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </>
         )}
       </div>
 
@@ -131,18 +142,25 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-border space-y-2">
-        <div className={cn('flex items-center gap-1', collapsed ? 'flex-col' : 'justify-between')}>
+      <div className="p-3 border-t border-border">
+        <div
+          className={cn(
+            'flex items-center gap-2',
+            collapsed ? 'flex-col' : 'justify-between',
+          )}
+        >
           <ThemeToggle />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggle}
-            className="h-9 w-9"
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
+          {collapsed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggle}
+              className="h-9 w-9"
+              title="Expand sidebar"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </aside>
