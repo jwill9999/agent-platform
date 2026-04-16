@@ -10,7 +10,7 @@ cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
 session_dirty=$(git diff --name-only HEAD -- session.md 2>/dev/null || true)
 session_staged=$(git diff --cached --name-only -- session.md 2>/dev/null || true)
 
-if [ -n "$session_dirty" ] || [ -n "$session_staged" ]; then
+if [[ -n "$session_dirty" ]] || [[ -n "$session_staged" ]]; then
   echo "session.md already updated this session. No further action needed."
   exit 0
 fi
@@ -42,7 +42,7 @@ if echo "$all_changes" | grep -qE '^docs/tasks/'; then
 fi
 
 ahead=$(git rev-list --count '@{upstream}..HEAD' 2>/dev/null || echo "0")
-if [ "$ahead" -gt 0 ]; then
+if [[ "$ahead" -gt 0 ]]; then
   has_new_commits=true
 fi
 
@@ -67,7 +67,5 @@ if $has_code_changes || $has_task_changes || $has_new_commits || $has_beads_chan
   echo "  5. Update 'Next' with prioritised next steps"
   echo "  6. Keep it concise — this is an agent handoff document"
 else
-  echo "No significant changes detected. session.md update not required."
-fi
   echo "No significant changes detected. session.md update not required."
 fi

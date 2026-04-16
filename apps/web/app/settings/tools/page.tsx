@@ -30,7 +30,7 @@ export default function ToolsPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
   function resetForm() {

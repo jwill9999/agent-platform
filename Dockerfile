@@ -32,7 +32,6 @@ ENV HOST=0.0.0.0
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 COPY --from=build /app ./
-USER root
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null || exit 1

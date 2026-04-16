@@ -12,7 +12,7 @@ export function useShowThinkingSetting(): [boolean, (next: boolean) => void] {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY_SHOW_THINKING);
+      const raw = globalThis.localStorage.getItem(STORAGE_KEY_SHOW_THINKING);
       if (raw === '1' || raw === 'true') {
         setValue(true);
       }
@@ -24,7 +24,7 @@ export function useShowThinkingSetting(): [boolean, (next: boolean) => void] {
   const set = useCallback((next: boolean) => {
     setValue(next);
     try {
-      window.localStorage.setItem(STORAGE_KEY_SHOW_THINKING, next ? '1' : '0');
+      globalThis.localStorage.setItem(STORAGE_KEY_SHOW_THINKING, next ? '1' : '0');
     } catch {
       /* ignore */
     }

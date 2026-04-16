@@ -26,7 +26,7 @@ export const errorMiddleware: ErrorRequestHandler = (err, _req, res, next) => {
       error: {
         code: err.code,
         message: err.message,
-        ...(err.details !== undefined ? { details: err.details } : {}),
+        ...(err.details === undefined ? {} : { details: err.details }),
       },
     });
     return;

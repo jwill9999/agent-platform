@@ -31,7 +31,7 @@ export default function SkillsPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
   function resetForm() {

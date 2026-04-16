@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { SettingsNav } from '../../components/settings/SettingsNav';
 
-export default function SettingsLayout({ children }: { children: ReactNode }) {
+export default function SettingsLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <div>
       <h1 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Configuration</h1>
