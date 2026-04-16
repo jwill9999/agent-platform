@@ -46,3 +46,27 @@
 **Practical tip for this project**
 
 - Prefer **Figma links + notes** for key screens, and keep **one** planning doc or bd issue updated so returning sessions pick up the same direction.
+
+---
+
+## Frontend data principles
+
+### API is the single source of truth
+
+The frontend must **never hardcode** default values, labels, or configuration that the backend owns. All display values should be fetched from the API at runtime.
+
+**Key examples:**
+
+| Data              | API source                               | Frontend rule                                                                                                         |
+| ----------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Agent model       | `GET /v1/agents/:id` → `modelOverride`   | If `null`, fetch platform default from `GET /v1/settings` and display it. Never hardcode a model name.                |
+| Context window    | `GET /v1/agents/:id` → `contextWindow`   | If absent, show "Default (8000 tokens, truncate)" — but fetch the actual default from the API, not a hardcoded value. |
+| Execution limits  | `GET /v1/agents/:id` → `executionLimits` | Always display what the API returns.                                                                                  |
+| Platform settings | `GET /v1/settings`                       | Source for all platform-wide defaults (rate limits, cost budgets, default model).                                     |
+
+**Why:** Backend defaults can change across releases (e.g. token budget, model name, strategy). If the frontend hardcodes these, the UI will show stale values after a backend update — creating user confusion and bugs.
+
+**Pattern:** When a field is optional/null on an agent, the frontend should either:
+
+1. Fetch the platform-level default from `/v1/settings` and display it with a "(default)" label, or
+2. Show "Not configured — using platform default" and link to the settings page.
