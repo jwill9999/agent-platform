@@ -14,6 +14,7 @@ import type {
 import { eq, or } from 'drizzle-orm';
 
 import type { DrizzleDb } from '../database.js';
+import { wrapConstraintError } from '../errors.js';
 import {
   loadAgentById,
   mcpRowToContract,
@@ -232,57 +233,65 @@ export function createAgent(db: DrizzleDb, body: AgentCreateBody): Agent {
 
 export function replaceAgent(db: DrizzleDb, agent: Agent): void {
   const now = Date.now();
-  withTransaction(db, (tx) => {
-    const existing = tx.select().from(schema.agents).where(eq(schema.agents.id, agent.id)).get();
-    const createdAtMs = existing?.createdAtMs ?? now;
-    tx.delete(schema.agentSkills).where(eq(schema.agentSkills.agentId, agent.id)).run();
-    tx.delete(schema.agentTools).where(eq(schema.agentTools.agentId, agent.id)).run();
-    tx.delete(schema.agentMcpServers).where(eq(schema.agentMcpServers.agentId, agent.id)).run();
+  wrapConstraintError(
+    () =>
+      withTransaction(db, (tx) => {
+        const existing = tx
+          .select()
+          .from(schema.agents)
+          .where(eq(schema.agents.id, agent.id))
+          .get();
+        const createdAtMs = existing?.createdAtMs ?? now;
+        tx.delete(schema.agentSkills).where(eq(schema.agentSkills.agentId, agent.id)).run();
+        tx.delete(schema.agentTools).where(eq(schema.agentTools.agentId, agent.id)).run();
+        tx.delete(schema.agentMcpServers).where(eq(schema.agentMcpServers.agentId, agent.id)).run();
 
-    tx.insert(schema.agents)
-      .values({
-        id: agent.id,
-        slug: agent.slug,
-        name: agent.name,
-        systemPrompt: agent.systemPrompt,
-        description: agent.description ?? null,
-        executionLimitsJson: JSON.stringify(agent.executionLimits),
-        modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
-        pluginAllowlistJson:
-          agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
-        pluginDenylistJson:
-          agent.pluginDenylist === undefined ? null : JSON.stringify(agent.pluginDenylist),
-        createdAtMs,
-        updatedAtMs: now,
-      })
-      .onConflictDoUpdate({
-        target: schema.agents.id,
-        set: {
-          slug: agent.slug,
-          name: agent.name,
-          systemPrompt: agent.systemPrompt,
-          description: agent.description ?? null,
-          executionLimitsJson: JSON.stringify(agent.executionLimits),
-          modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
-          pluginAllowlistJson:
-            agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
-          pluginDenylistJson:
-            agent.pluginDenylist === undefined ? null : JSON.stringify(agent.pluginDenylist),
-          updatedAtMs: now,
-        },
-      })
-      .run();
+        tx.insert(schema.agents)
+          .values({
+            id: agent.id,
+            slug: agent.slug,
+            name: agent.name,
+            systemPrompt: agent.systemPrompt,
+            description: agent.description ?? null,
+            executionLimitsJson: JSON.stringify(agent.executionLimits),
+            modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
+            pluginAllowlistJson:
+              agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
+            pluginDenylistJson:
+              agent.pluginDenylist === undefined ? null : JSON.stringify(agent.pluginDenylist),
+            createdAtMs,
+            updatedAtMs: now,
+          })
+          .onConflictDoUpdate({
+            target: schema.agents.id,
+            set: {
+              slug: agent.slug,
+              name: agent.name,
+              systemPrompt: agent.systemPrompt,
+              description: agent.description ?? null,
+              executionLimitsJson: JSON.stringify(agent.executionLimits),
+              modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
+              pluginAllowlistJson:
+                agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
+              pluginDenylistJson:
+                agent.pluginDenylist === undefined ? null : JSON.stringify(agent.pluginDenylist),
+              updatedAtMs: now,
+            },
+          })
+          .run();
 
-    for (const skillId of agent.allowedSkillIds) {
-      tx.insert(schema.agentSkills).values({ agentId: agent.id, skillId }).run();
-    }
-    for (const toolId of agent.allowedToolIds) {
-      tx.insert(schema.agentTools).values({ agentId: agent.id, toolId }).run();
-    }
-    for (const mcpServerId of agent.allowedMcpServerIds) {
-      tx.insert(schema.agentMcpServers).values({ agentId: agent.id, mcpServerId }).run();
-    }
-  });
+        for (const skillId of agent.allowedSkillIds) {
+          tx.insert(schema.agentSkills).values({ agentId: agent.id, skillId }).run();
+        }
+        for (const toolId of agent.allowedToolIds) {
+          tx.insert(schema.agentTools).values({ agentId: agent.id, toolId }).run();
+        }
+        for (const mcpServerId of agent.allowedMcpServerIds) {
+          tx.insert(schema.agentMcpServers).values({ agentId: agent.id, mcpServerId }).run();
+        }
+      }),
+    `agent ${agent.id} relationships`,
+  );
 }
 
 export function deleteAgent(db: DrizzleDb, idOrSlug: string): boolean {
@@ -311,42 +320,51 @@ export function getSession(db: DrizzleDb, id: string): SessionRecord | undefined
 export function createSession(db: DrizzleDb, input: { agentId: string }): SessionRecord {
   const now = Date.now();
   const id = randomUUID();
-  db.insert(schema.sessions)
-    .values({
-      id,
-      agentId: input.agentId,
-      createdAtMs: now,
-      updatedAtMs: now,
-    })
-    .run();
+  wrapConstraintError(
+    () =>
+      db
+        .insert(schema.sessions)
+        .values({
+          id,
+          agentId: input.agentId,
+          createdAtMs: now,
+          updatedAtMs: now,
+        })
+        .run(),
+    `agent ${input.agentId}`,
+  );
   const row = db.select().from(schema.sessions).where(eq(schema.sessions.id, id)).get();
   if (!row) throw new Error('session insert failed');
   return sessionRowToContract(row);
 }
 
 export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
-  withTransaction(db, (tx) => {
-    const existing = tx
-      .select()
-      .from(schema.sessions)
-      .where(eq(schema.sessions.id, record.id))
-      .get();
-    tx.insert(schema.sessions)
-      .values({
-        id: record.id,
-        agentId: record.agentId,
-        createdAtMs: existing?.createdAtMs ?? record.createdAtMs,
-        updatedAtMs: record.updatedAtMs,
-      })
-      .onConflictDoUpdate({
-        target: schema.sessions.id,
-        set: {
-          agentId: record.agentId,
-          updatedAtMs: record.updatedAtMs,
-        },
-      })
-      .run();
-  });
+  wrapConstraintError(
+    () =>
+      withTransaction(db, (tx) => {
+        const existing = tx
+          .select()
+          .from(schema.sessions)
+          .where(eq(schema.sessions.id, record.id))
+          .get();
+        tx.insert(schema.sessions)
+          .values({
+            id: record.id,
+            agentId: record.agentId,
+            createdAtMs: existing?.createdAtMs ?? record.createdAtMs,
+            updatedAtMs: record.updatedAtMs,
+          })
+          .onConflictDoUpdate({
+            target: schema.sessions.id,
+            set: {
+              agentId: record.agentId,
+              updatedAtMs: record.updatedAtMs,
+            },
+          })
+          .run();
+      }),
+    `session ${record.id}`,
+  );
 }
 
 export function deleteSession(db: DrizzleDb, id: string): boolean {
