@@ -15,6 +15,11 @@ import {
 
 const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+const DEFAULTS = {
+  rateLimits: { windowMs: 60_000, max: 100 },
+  costBudget: { globalMaxCostUnits: null, warnThreshold: 0.8 },
+};
+
 function openTestDb() {
   const sqlite = new Database(':memory:');
   sqlite.pragma('foreign_keys = ON');
@@ -35,19 +40,13 @@ describe('settings repository', () => {
   });
 
   it('loadSettings returns defaults on empty table', () => {
-    const settings = loadSettings(ctx.db);
-    expect(settings).toEqual({
-      rateLimits: { windowMs: 60_000, max: 100 },
-      costBudget: { globalMaxCostUnits: null, warnThreshold: 0.8 },
-    });
+    expect(loadSettings(ctx.db)).toEqual(DEFAULTS);
   });
 
   it('updateSettings persists and returns merged values', () => {
-    const result = updateSettings(ctx.db, {
-      rateLimits: { max: 50 },
-    });
+    const result = updateSettings(ctx.db, { rateLimits: { max: 50 } });
     expect(result.rateLimits.max).toBe(50);
-    expect(result.rateLimits.windowMs).toBe(60_000);
+    expect(result.rateLimits.windowMs).toBe(DEFAULTS.rateLimits.windowMs);
   });
 
   it('updateSettings handles multiple nested keys', () => {
@@ -58,37 +57,28 @@ describe('settings repository', () => {
     const result = loadSettings(ctx.db);
     expect(result.rateLimits).toEqual({ windowMs: 30_000, max: 200 });
     expect(result.costBudget.globalMaxCostUnits).toBe(1000);
-    expect(result.costBudget.warnThreshold).toBe(0.8);
+    expect(result.costBudget.warnThreshold).toBe(DEFAULTS.costBudget.warnThreshold);
   });
 
   it('updateSettings overwrites previous values', () => {
     updateSettings(ctx.db, { rateLimits: { max: 50 } });
     updateSettings(ctx.db, { rateLimits: { max: 200 } });
-    const result = loadSettings(ctx.db);
-    expect(result.rateLimits.max).toBe(200);
+    expect(loadSettings(ctx.db).rateLimits.max).toBe(200);
   });
 
   it('resetSettings clears all and returns defaults', () => {
-    updateSettings(ctx.db, {
-      rateLimits: { max: 50 },
-      costBudget: { globalMaxCostUnits: 500 },
-    });
+    updateSettings(ctx.db, { rateLimits: { max: 50 }, costBudget: { globalMaxCostUnits: 500 } });
     const result = resetSettings(ctx.db);
-    expect(result).toEqual({
-      rateLimits: { windowMs: 60_000, max: 100 },
-      costBudget: { globalMaxCostUnits: null, warnThreshold: 0.8 },
-    });
-    // Confirm DB is actually empty
+    expect(result).toEqual(DEFAULTS);
     expect(loadSettings(ctx.db)).toEqual(result);
   });
 
   it('deleteSetting removes one key and returns true', () => {
     updateSettings(ctx.db, { rateLimits: { max: 50, windowMs: 30_000 } });
-    const removed = deleteSetting(ctx.db, 'rateLimits.max');
-    expect(removed).toBe(true);
+    expect(deleteSetting(ctx.db, 'rateLimits.max')).toBe(true);
     const result = loadSettings(ctx.db);
-    expect(result.rateLimits.max).toBe(100); // reverted to default
-    expect(result.rateLimits.windowMs).toBe(30_000); // still custom
+    expect(result.rateLimits.max).toBe(DEFAULTS.rateLimits.max);
+    expect(result.rateLimits.windowMs).toBe(30_000);
   });
 
   it('deleteSetting returns false for non-existent key', () => {
