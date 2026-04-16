@@ -21,6 +21,7 @@ export { SecretRefSchema, type SecretRef } from './secrets.js';
 export { AgentSchema, type Agent } from './agent.js';
 export { PlanSchema, TaskSchema, type Plan, type Task } from './plan.js';
 export { ToolSchema, type Tool } from './tool.js';
+export { openApiToToolDefinitions, type OpenApiToolDefinition } from './openapi.js';
 export {
   RateLimitSettingsSchema,
   CostBudgetSettingsSchema,
