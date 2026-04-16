@@ -5,7 +5,8 @@ import {
   listMessagesBySession,
   withTransaction,
 } from '@agent-platform/db';
-import type { MessageRecord } from '@agent-platform/contracts';
+import type { ContextWindow, MessageRecord } from '@agent-platform/contracts';
+import { DEFAULT_CONTEXT_WINDOW } from '@agent-platform/contracts';
 import {
   buildAgentContext,
   destroyAgentContext,
@@ -15,6 +16,8 @@ import {
   createToolDispatchNode,
   createNdjsonEmitter,
   contractToolsToDefinitions,
+  createApproximateCounter,
+  buildWindowedContext,
 } from '@agent-platform/harness';
 import type { AgentContext, ChatMessage, OutputEmitter } from '@agent-platform/harness';
 import {
@@ -198,8 +201,17 @@ export function createChatRouter(db: DrizzleDb): Router {
           dispatcher,
         });
 
-        const messages = buildConversationMessages(db, sessionId, message, agentCtx.systemPrompt);
-        const initialState = buildInitialState(sessionId, messages, agentCtx, modelCfg);
+        const { messages, dropped, contextTokens } = buildConversationMessages(
+          db,
+          sessionId,
+          message,
+          agentCtx.systemPrompt,
+          agentCtx.agent.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+        );
+        const initialState = buildInitialState(sessionId, messages, agentCtx, modelCfg, {
+          dropped,
+          contextTokens,
+        });
 
         const finalState: { messages?: ChatMessage[] } = await graph.invoke(initialState, {
           configurable: { thread_id: sessionId, signal },
@@ -280,15 +292,17 @@ function buildConversationMessages(
   sessionId: string,
   newMessage: string,
   systemPrompt: string,
-): ChatMessage[] {
+  contextWindow: ContextWindow,
+): { messages: ChatMessage[]; dropped: number; contextTokens: number } {
   return withTransaction(db, (tx) => {
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
-    return [
-      { role: 'system', content: systemPrompt },
-      ...priorMessages.map(dbRecordToChatMessage),
-      { role: 'user' as const, content: newMessage },
-    ];
+
+    const history = priorMessages.map(dbRecordToChatMessage);
+    const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
+    const counter = createApproximateCounter();
+
+    return buildWindowedContext(systemPrompt, history, userMsg, contextWindow, counter);
   });
 }
 
@@ -297,9 +311,20 @@ function buildInitialState(
   messages: ChatMessage[],
   agentCtx: AgentContext,
   modelConfig: { provider: string; model: string; apiKey?: string },
+  contextInfo: { dropped: number; contextTokens: number },
 ) {
+  const strategy = agentCtx.agent.contextWindow?.strategy ?? 'truncate';
+  const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
   return {
-    trace: [],
+    trace: [
+      {
+        type: 'context_window' as const,
+        contextTokens: contextInfo.contextTokens,
+        messagesTotal: totalMessages,
+        messagesIncluded: messages.length - 2, // exclude system + new user message
+        strategy,
+      },
+    ],
     plan: null,
     taskIndex: 0,
     limits: agentCtx.agent.executionLimits,
