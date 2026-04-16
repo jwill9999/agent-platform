@@ -1,20 +1,22 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
-import { AppNav } from '../components/AppNav';
+import { ThemeProvider } from 'next-themes';
+import { AppShell } from '../components/layout/app-shell';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Agent Platform',
-  description: 'Chat (dev)',
+  description: 'AI Studio — Agent Platform',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <AppNav />
-        <main style={{ padding: '0 1rem 2rem' }}>{children}</main>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AppShell>{children}</AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );
