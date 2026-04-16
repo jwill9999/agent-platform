@@ -7,8 +7,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-16 (midnight)
-- **Session:** `agent-platform-qhe` (structured logger extraction) complete — PR #29 merged to main. Shared `packages/logger` created, all `console.warn` replaced. Branches cleaned up.
+- **Date:** 2026-04-16
+- **Session:** `agent-platform-nqn` (rate limiting & cost guardrails) complete — PR #31 merged to main. Also merged `agent-platform-hnx` (correlation IDs, PR #30) this session.
 
 ---
 
@@ -28,28 +28,42 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ### SonarCloud quality gate fixes — PR #27 merged
 
 - Cognitive complexity refactoring: `chatRouter.ts` (33→~10), `llmReason.ts` (19→~8)
-- 23 issues resolved across 11 files (nested ternaries, non-null assertions, optional chaining, duplicate imports, deprecated API migration, etc.)
+- 23 issues resolved across 11 files
 
 ### `agent-platform-pe4` — Replace deprecated SSEClientTransport — PR #28 merged
 
-- Replaced `SSEClientTransport` with `StreamableHTTPClientTransport` in `packages/mcp-adapter/src/transport.ts`
-- Added `'streamable-http'` as primary transport type; `'sse'` kept as backward-compatible alias
-- Added 4 new tests (8 total in transport.test.ts), parameterized with `it.each()` to avoid duplication
-- SonarCloud quality gate initially failed due to 19.6% duplicated lines density — fixed by refactoring tests
+- Replaced `SSEClientTransport` with `StreamableHTTPClientTransport`
+- Added `'streamable-http'` as primary transport type
 
 ### `agent-platform-qhe` — Structured logger extraction — PR #29 merged
 
-- Created `packages/logger` — shared workspace package with `createLogger()`, `Logger` interface, `LogLevel` type
-- Extracted from `apps/api/src/infrastructure/logging/logger.ts` (deleted)
-- Replaced 4× `console.warn` calls with structured `log.warn()` in `harness/factory.ts` and `mcp-adapter/manager.ts`
-- Added 4 logger unit tests; updated mcp-adapter test spies
-- Fixed CI: added `packages/logger` to Dockerfile COPY and typecheck build chain
-- Fixed Sourcery review: aligned `workspace:^` → `workspace:*` for consistency
+- Created `packages/logger` — shared workspace package with `createLogger()`, correlation context
+- Replaced `console.warn` calls with structured `log.warn()`
+
+### `agent-platform-hnx` — Request-scoped correlation IDs — PR #30 merged
+
+- `packages/logger/src/context.ts` — AsyncLocalStorage-based correlation store
+- `correlationMiddleware` — reads/generates `x-correlation-id` header, wraps requests
+- Auto-injects `correlationId` into all logger output
+- 9 new tests (context, logger correlation, middleware)
+
+### `agent-platform-nqn` — Rate limiting and cost guardrails — PR #31 merged
+
+- Cost enforcement in `llmReason.ts`: `checkCostLimit()`, `emitBudgetWarnings()` at 80% threshold
+- Cost model: `tokenDelta / 1000` cost units, returned alongside `totalTokensUsed`
+- HTTP rate limiting via `express-rate-limit` on `/v1` routes (configurable via env vars)
+- Safe env parsing (`parsePositiveInt`), consistent maxCost ≤ 0 handling
+- 17 new execution limit + rate limiter tests
+- Addressed Sourcery review: NaN guard, cost ≤ 0 alignment, cost-halt-no-warning test
+
+### Follow-up created
+
+- `agent-platform-16p` — Runtime configuration API for rate limits and cost budgets (P3, discovered from NQN)
 
 ### Branch cleanup
 
-- Deleted local task branches after merge
-- Only `main` remains (local + remote)
+- All task branches deleted after merge
+- Only `main` remains
 
 ---
 
@@ -65,10 +79,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 | SonarCloud fixes           | —                    | **Complete** — merged | PR #27 |
 | SSEClientTransport replace | `agent-platform-pe4` | **Complete** — merged | PR #28 |
 | Structured logger          | `agent-platform-qhe` | **Complete** — merged | PR #29 |
+| Correlation IDs            | `agent-platform-hnx` | **Complete** — merged | PR #30 |
+| Rate limiting & cost       | `agent-platform-nqn` | **Complete** — merged | PR #31 |
 
 ### Quality
 
-- 206 tests passing across all packages (4 new logger tests)
+- 129+ tests passing across all packages
 - Build, typecheck, lint all clean
 - SonarCloud quality gate green
 
@@ -81,8 +97,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 | ID                   | Priority | Title                                              | Status |
 | -------------------- | -------- | -------------------------------------------------- | ------ |
-| `agent-platform-hnx` | P3       | Request-scoped correlation IDs                     | Open   |
-| `agent-platform-nqn` | P3       | Rate limiting and cost guardrails                  | Open   |
+| `agent-platform-16p` | P3       | Runtime config API for rate limits & cost budgets  | Open   |
 | `agent-platform-bto` | P3       | Provider-agnostic model routing                    | Open   |
 | `agent-platform-ntf` | P3       | Frontend design polish (PAUSED — pending planning) | Open   |
 | `agent-platform-fcm` | P4       | HITL pause/resume                                  | Open   |
@@ -91,10 +106,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Next (priority order)
 
-1. **`agent-platform-hnx`** — Request-scoped correlation IDs (P3, natural follow-up to logger)
-2. **`agent-platform-nqn`** — Rate limiting and cost guardrails (P3)
-3. **`agent-platform-bto`** — Provider-agnostic model routing (P3)
-4. Post-MVP backlog items as capacity allows
+1. **`agent-platform-16p`** — Runtime config API for rate limits & cost budgets (P3, discovered from NQN)
+2. **`agent-platform-bto`** — Provider-agnostic model routing (P3, Anthropic/Ollama support)
+3. **`agent-platform-ntf`** — Frontend design polish (PAUSED — owner has design ready)
+4. **`agent-platform-fcm`** — HITL pause/resume (P4)
 
 ---
 
