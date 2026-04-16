@@ -12,7 +12,11 @@ export type McpSession = {
   /** MCP `tools/list` mapped to persisted-style {@link ContractTool} rows (synthetic ids). */
   listContractTools(): Promise<ContractTool[]>;
   /** `tools/call` mapped to streaming/API `Output` union. */
-  callToolAsOutput(mcpToolName: string, args: Record<string, unknown>): Promise<Output>;
+  callToolAsOutput(
+    mcpToolName: string,
+    args: Record<string, unknown>,
+    options?: { timeoutMs?: number },
+  ): Promise<Output>;
   close(): Promise<void>;
 };
 
@@ -39,10 +43,14 @@ export async function openMcpSession(mcp: McpServer): Promise<McpSession> {
       return result.tools.map((t) => mcpToolToContractTool(mcp.id, t));
     },
 
-    async callToolAsOutput(name: string, args: Record<string, unknown>) {
+    async callToolAsOutput(
+      name: string,
+      args: Record<string, unknown>,
+      options?: { timeoutMs?: number },
+    ) {
       try {
         const result = await client.callTool({ name, arguments: args }, undefined, {
-          timeout: requestMs,
+          timeout: options?.timeoutMs ?? requestMs,
         });
         return callToolResultToOutput(mcp.id, name, result);
       } catch (e) {

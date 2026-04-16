@@ -7,6 +7,7 @@ import type { RunnableConfig } from '@langchain/core/runnables';
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, NativeToolExecutor, OutputEmitter, ToolCallIntent } from '../types.js';
+import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTimeout.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -27,6 +28,7 @@ export type ToolDispatchContext = {
 async function dispatchSingleTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
+  options?: { timeoutMs?: number },
 ): Promise<{ output: Output; ok: boolean }> {
   if (!isToolExecutionAllowed(ctx.agent, call.name)) {
     return {
@@ -54,7 +56,9 @@ async function dispatchSingleTool(
       };
     }
     try {
-      const result = await session.callToolAsOutput(parsed.mcpToolName, call.args);
+      const result = await session.callToolAsOutput(parsed.mcpToolName, call.args, {
+        timeoutMs: options?.timeoutMs,
+      });
       const ok = result.type !== 'error';
       return { output: result, ok };
     } catch (err) {
@@ -102,6 +106,7 @@ async function dispatchSingleTool(
  * Dispatches each tool call, appends results to messages, clears llmOutput.
  * Emits `tool_dispatch` trace events per tool call.
  * Supports AbortSignal via `config.configurable.signal` for cancellation.
+ * Enforces per-tool execution timeouts (agent-level / system default / per-tool override).
  */
 export function createToolDispatchNode(ctx: ToolDispatchContext) {
   return async (
@@ -116,6 +121,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     }
 
     const step = state.taskIndex ?? 0;
+    const agentToolTimeoutMs = ctx.agent.executionLimits.toolTimeoutMs;
     const toolMessages: ChatMessage[] = [];
     const traceEvents: TraceEvent[] = [];
 
@@ -136,7 +142,37 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         }
       }
 
-      const { output, ok } = await dispatchSingleTool(call, ctx);
+      const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs);
+
+      let output: Output;
+      let ok: boolean;
+      try {
+        const result = await withToolTimeout(
+          () => dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout }),
+          effectiveTimeout,
+          call.name,
+          signal,
+        );
+        output = result.output;
+        ok = result.ok;
+      } catch (err) {
+        if (err instanceof ToolTimeoutError) {
+          output = {
+            type: 'error',
+            code: 'TOOL_TIMEOUT',
+            message: err.message,
+          };
+          ok = false;
+          traceEvents.push({
+            type: 'tool_timeout',
+            toolId: call.name,
+            step,
+            timeoutMs: err.timeoutMs,
+          });
+        } else {
+          throw err;
+        }
+      }
 
       // Stream the output event to the client (backpressure-aware)
       if (ctx.emitter) {

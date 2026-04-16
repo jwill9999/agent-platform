@@ -10,6 +10,7 @@ export type TraceEvent =
       tokenUsage?: { promptTokens: number; completionTokens: number };
     }
   | { type: 'tool_dispatch'; toolId: string; step: number; ok: boolean }
+  | { type: 'tool_timeout'; toolId: string; step: number; timeoutMs: number }
   | { type: 'loop_detected'; toolSignature: string; repeats: number }
   | { type: 'limit_hit'; kind: 'max_steps' | 'timeout' | 'max_tokens' | 'max_cost' }
   | { type: 'plan_failed'; reason: string }
