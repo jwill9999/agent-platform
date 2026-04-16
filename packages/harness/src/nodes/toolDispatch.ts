@@ -96,6 +96,90 @@ async function dispatchSingleTool(
   };
 }
 
+/**
+ * Fire onToolCall plugin hook (errors silenced).
+ */
+async function fireToolCallHook(
+  ctx: ToolDispatchContext,
+  state: HarnessStateType,
+  call: ToolCallIntent,
+): Promise<void> {
+  if (!ctx.dispatcher) return;
+  try {
+    await ctx.dispatcher.onToolCall({
+      sessionId: state.sessionId ?? '',
+      runId: state.runId ?? '',
+      toolId: call.name,
+      args: call.args,
+    });
+  } catch {
+    /* plugin errors must not crash the graph */
+  }
+}
+
+/**
+ * Execute a single tool call with retry + timeout wrapping.
+ * Returns tool output/ok plus how many retries occurred.
+ */
+async function executeToolWithRetry(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+  step: number,
+  agentToolTimeoutMs: number | undefined,
+  traceEvents: TraceEvent[],
+  signal?: AbortSignal,
+): Promise<{ output: Output; ok: boolean; retryCount: number }> {
+  const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs);
+  let retryCount = 0;
+
+  try {
+    const result = await withRetry(
+      () =>
+        withToolTimeout(
+          () => dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout }),
+          effectiveTimeout,
+          call.name,
+          signal,
+        ),
+      TOOL_RETRY_CONFIG,
+      (attempt, error, delayMs) => {
+        retryCount++;
+        const errMsg = error instanceof Error ? error.message : String(error);
+        traceEvents.push({
+          type: 'tool_retry',
+          toolId: call.name,
+          step,
+          attempt,
+          error: errMsg,
+          delayMs,
+        });
+      },
+    );
+    return { output: result.output, ok: result.ok, retryCount };
+  } catch (err) {
+    if (!(err instanceof ToolTimeoutError)) throw err;
+    traceEvents.push({
+      type: 'tool_timeout',
+      toolId: call.name,
+      step,
+      timeoutMs: err.timeoutMs,
+    });
+    return {
+      output: { type: 'error', code: 'TOOL_TIMEOUT', message: err.message },
+      ok: false,
+      retryCount,
+    };
+  }
+}
+
+/** Serialise a tool output to a string suitable for a tool message. */
+function outputToContent(output: Output): string {
+  if (output.type === 'tool_result') return JSON.stringify(output.data);
+  if (output.type === 'error')
+    return JSON.stringify({ error: output.code, message: output.message });
+  return JSON.stringify(output);
+}
+
 // ---------------------------------------------------------------------------
 // Tool dispatch node factory
 // ---------------------------------------------------------------------------
@@ -130,92 +214,30 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     for (const call of llmOutput.calls) {
       if (signal?.aborted) break;
 
-      // Fire onToolCall plugin hook before execution
-      if (ctx.dispatcher) {
-        try {
-          await ctx.dispatcher.onToolCall({
-            sessionId: state.sessionId ?? '',
-            runId: state.runId ?? '',
-            toolId: call.name,
-            args: call.args,
-          });
-        } catch {
-          /* plugin errors must not crash the graph */
-        }
-      }
+      await fireToolCallHook(ctx, state, call);
 
-      const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs);
-      let toolRetryCount = 0;
+      const { output, ok, retryCount } = await executeToolWithRetry(
+        call,
+        ctx,
+        step,
+        agentToolTimeoutMs,
+        traceEvents,
+        signal,
+      );
 
-      let output: Output;
-      let ok: boolean;
-      try {
-        const result = await withRetry(
-          () =>
-            withToolTimeout(
-              () => dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout }),
-              effectiveTimeout,
-              call.name,
-              signal,
-            ),
-          TOOL_RETRY_CONFIG,
-          (attempt, error, delayMs) => {
-            toolRetryCount++;
-            const errMsg = error instanceof Error ? error.message : String(error);
-            traceEvents.push({
-              type: 'tool_retry',
-              toolId: call.name,
-              step,
-              attempt,
-              error: errMsg,
-              delayMs,
-            });
-          },
-        );
-        output = result.output;
-        ok = result.ok;
-      } catch (err) {
-        if (err instanceof ToolTimeoutError) {
-          output = {
-            type: 'error',
-            code: 'TOOL_TIMEOUT',
-            message: err.message,
-          };
-          ok = false;
-          traceEvents.push({
-            type: 'tool_timeout',
-            toolId: call.name,
-            step,
-            timeoutMs: err.timeoutMs,
-          });
-        } else {
-          throw err;
-        }
-      }
-
-      // Stream the output event to the client (backpressure-aware)
       if (ctx.emitter) {
         await ctx.emitter.emit(output);
-      }
-
-      let content: string;
-      if (output.type === 'tool_result') {
-        content = JSON.stringify(output.data);
-      } else if (output.type === 'error') {
-        content = JSON.stringify({ error: output.code, message: output.message });
-      } else {
-        content = JSON.stringify(output);
       }
 
       toolMessages.push({
         role: 'tool',
         toolCallId: call.id,
         toolName: call.name,
-        content,
+        content: outputToContent(output),
       });
 
       traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok });
-      totalToolRetries += toolRetryCount;
+      totalToolRetries += retryCount;
     }
 
     return {

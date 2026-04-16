@@ -59,7 +59,7 @@ export async function withToolTimeout<T>(
       })
     : undefined;
 
-  const racers: Promise<T | never>[] = [fn(controller.signal), timeoutPromise];
+  const racers: Promise<T>[] = [fn(controller.signal), timeoutPromise];
   if (parentPromise) racers.push(parentPromise);
 
   try {

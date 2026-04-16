@@ -22,7 +22,7 @@ function makeAgent(overrides?: { toolTimeoutMs?: number }) {
       maxSteps: 10,
       maxParallelTasks: 1,
       timeoutMs: 120_000,
-      ...(overrides?.toolTimeoutMs !== undefined ? { toolTimeoutMs: overrides.toolTimeoutMs } : {}),
+      ...(overrides?.toolTimeoutMs === undefined ? {} : { toolTimeoutMs: overrides.toolTimeoutMs }),
     },
   };
 }
