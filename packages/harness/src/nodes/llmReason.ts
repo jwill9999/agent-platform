@@ -1,4 +1,4 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
 import { streamText, jsonSchema } from 'ai';
 import type { CoreMessage } from 'ai';
 
@@ -234,8 +234,11 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       throw new Error('llm_reason: modelConfig is required in state');
     }
 
-    const provider = createOpenAI({ apiKey: modelConfig.apiKey });
-    const model = provider(modelConfig.model);
+    const model = createLanguageModel({
+      provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
+      model: modelConfig.model,
+      apiKey: modelConfig.apiKey,
+    });
     const tools = toolDefinitions.length > 0 ? toSdkTools(toolDefinitions) : undefined;
 
     if (dispatcher) {

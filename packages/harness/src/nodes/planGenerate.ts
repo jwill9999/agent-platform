@@ -1,4 +1,4 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
 import { generateText } from 'ai';
 import type { Agent } from '@agent-platform/contracts';
 import { runPlannerRepairLoop, type PlannerResult } from '@agent-platform/planner';
@@ -96,8 +96,11 @@ export function createPlanGenerateNode(options: PlanGenerateNodeOptions) {
       toolDefinitions,
     );
 
-    const provider = createOpenAI({ apiKey: modelConfig.apiKey });
-    const model = provider(modelConfig.model);
+    const model = createLanguageModel({
+      provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
+      model: modelConfig.model,
+      apiKey: modelConfig.apiKey,
+    });
 
     async function generatePlan(): Promise<string> {
       const result = await generateText({

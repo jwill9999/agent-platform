@@ -16,7 +16,7 @@ import {
   resolveModelConfig,
   openAiKeyGateToApiOutcome,
   resolveGatedOpenAiKeyForRequest,
-  streamOpenAiChat,
+  streamChat,
 } from '@agent-platform/model-router';
 import type { Response, Router } from 'express';
 import { Router as createRouter } from 'express';
@@ -66,7 +66,7 @@ async function loadAgentContext(db: DrizzleDb, agentId: string): Promise<AgentCo
 function resolveModelOrThrow(
   agentCtx: AgentContext,
   headerKey: string | undefined,
-): { provider: string; model: string; apiKey: string } {
+): { provider: string; model: string; apiKey?: string } {
   const resolution = resolveModelConfig({
     agentOverride: agentCtx.agent.modelOverride ?? null,
     headerKey,
@@ -229,7 +229,8 @@ export function createChatRouter(db: DrizzleDb): Router {
         throw new HttpError(400, apiOutcome.code, apiOutcome.message);
       }
 
-      const result = streamOpenAiChat({
+      const result = streamChat({
+        provider: 'openai',
         apiKey: apiOutcome.key,
         model: body.model,
         messages: body.messages,
@@ -282,7 +283,7 @@ function buildInitialState(
   sessionId: string,
   messages: ChatMessage[],
   agentCtx: AgentContext,
-  modelConfig: { provider: string; model: string; apiKey: string },
+  modelConfig: { provider: string; model: string; apiKey?: string },
 ) {
   return {
     trace: [],
