@@ -21,7 +21,7 @@
     "@agent-platform/agent-validation": "workspace:^",
     "@agent-platform/contracts": "workspace:*",
     "@agent-platform/db": "workspace:*",
-    "@agent-platform/logger": "workspace:^",
+    "@agent-platform/logger": "workspace:*",
     "@agent-platform/mcp-adapter": "workspace:*",
     "@agent-platform/planner": "workspace:*",
     "@agent-platform/plugin-sdk": "workspace:*",

@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@agent-platform/contracts": "workspace:*",
-    "@agent-platform/logger": "workspace:^",
+    "@agent-platform/logger": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.12.0"
   },
   "devDependencies": {

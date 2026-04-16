@@ -42,7 +42,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/db
       '@agent-platform/logger':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../../packages/logger
       '@agent-platform/model-router':
         specifier: workspace:*
@@ -203,7 +203,7 @@ importers:
         specifier: workspace:*
         version: link:../db
       '@agent-platform/logger':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../logger
       '@agent-platform/mcp-adapter':
         specifier: workspace:*
@@ -258,7 +258,7 @@ importers:
         specifier: workspace:*
         version: link:../contracts
       '@agent-platform/logger':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../logger
       '@modelcontextprotocol/sdk':
         specifier: ^1.12.0
