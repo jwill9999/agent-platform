@@ -24,7 +24,7 @@ export function Chat({ messages, onSend, isLoading }: ChatProps) {
   }, [messages, scrollToBottom]);
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-background to-secondary/20">
+    <div className="flex flex-col flex-1 min-h-0 bg-gradient-to-b from-background to-secondary/20">
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4">

@@ -13,7 +13,7 @@ export function AppShell({ children }: AppShellProps) {
     <SidebarProvider>
       <div className="flex h-screen bg-background">
         <Sidebar />
-        <main className="flex-1 overflow-hidden relative">
+        <main className="flex-1 flex flex-col overflow-hidden relative">
           <SidebarExpandTrigger />
           {children}
         </main>
