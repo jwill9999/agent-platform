@@ -5,23 +5,19 @@ import type { Output } from '@agent-platform/contracts';
 import type { HarnessStateType } from '../src/graphState.js';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { ToolDispatchContext } from '../src/nodes/toolDispatch.js';
+import {
+  mockStreamText,
+  setupAiMock,
+  setupOpenAiProviderMock,
+  mockStreamResult,
+} from './helpers/aiMock.js';
 
 // ---------------------------------------------------------------------------
-// Mock AI SDK before importing nodes
+// Mock AI SDK before importing nodes (delegates to shared helper)
 // ---------------------------------------------------------------------------
 
-const mockStreamText = vi.fn();
-
-vi.mock('ai', () => ({
-  streamText: (...args: unknown[]) => mockStreamText(...args),
-  jsonSchema: (schema: unknown) => ({ type: 'json-schema', jsonSchema: schema }),
-}));
-
-vi.mock('@ai-sdk/openai', () => ({
-  createOpenAI: ({ apiKey }: { apiKey: string }) => {
-    return (model: string) => ({ provider: 'openai', modelId: model, apiKey });
-  },
-}));
+vi.mock('ai', () => setupAiMock());
+vi.mock('@ai-sdk/openai', () => setupOpenAiProviderMock());
 
 const { createLlmReasonNode } = await import('../src/nodes/llmReason.js');
 const { createToolDispatchNode } = await import('../src/nodes/toolDispatch.js');
@@ -30,18 +26,25 @@ const { createToolDispatchNode } = await import('../src/nodes/toolDispatch.js');
 // Helpers
 // ---------------------------------------------------------------------------
 
-function mockStreamResult(opts: {
-  textChunks?: string[];
-  toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
-  usage?: { promptTokens: number; completionTokens: number };
-}) {
-  const chunks = opts.textChunks ?? [];
+function makeAgent(overrides?: Partial<Record<string, unknown>>) {
   return {
-    textStream: (async function* () {
-      for (const chunk of chunks) yield chunk;
-    })(),
-    toolCalls: Promise.resolve(opts.toolCalls ?? []),
-    usage: Promise.resolve(opts.usage),
+    id: 'a1',
+    name: 'test',
+    description: '',
+    systemPrompt: '',
+    allowedSkillIds: [],
+    allowedToolIds: ['echo'],
+    allowedMcpServerIds: [],
+    executionLimits: { maxSteps: 10 },
+    ...overrides,
+  };
+}
+
+function makeToolDispatchCtx(executorFn: ReturnType<typeof vi.fn>): ToolDispatchContext {
+  return {
+    agent: makeAgent(),
+    mcpManager: { getSession: () => undefined } as unknown as McpSessionManager,
+    nativeToolExecutor: executorFn,
   };
 }
 
@@ -206,22 +209,7 @@ describe('AbortSignal in toolDispatchNode', () => {
       data: 'ok',
     });
 
-    const ctx: ToolDispatchContext = {
-      agent: {
-        id: 'a1',
-        name: 'test',
-        description: '',
-        systemPrompt: '',
-        allowedSkillIds: [],
-        allowedToolIds: ['echo'],
-        allowedMcpServerIds: [],
-        executionLimits: { maxSteps: 10 },
-      },
-      mcpManager: { getSession: () => undefined } as unknown as McpSessionManager,
-      nativeToolExecutor: executorFn,
-    };
-
-    const node = createToolDispatchNode(ctx);
+    const node = createToolDispatchNode(makeToolDispatchCtx(executorFn));
 
     // Abort after first call
     executorFn.mockImplementationOnce(async () => {
@@ -254,22 +242,7 @@ describe('AbortSignal in toolDispatchNode', () => {
       data: 'ok',
     });
 
-    const ctx: ToolDispatchContext = {
-      agent: {
-        id: 'a1',
-        name: 'test',
-        description: '',
-        systemPrompt: '',
-        allowedSkillIds: [],
-        allowedToolIds: ['echo'],
-        allowedMcpServerIds: [],
-        executionLimits: { maxSteps: 10 },
-      },
-      mcpManager: { getSession: () => undefined } as unknown as McpSessionManager,
-      nativeToolExecutor: executorFn,
-    };
-
-    const node = createToolDispatchNode(ctx);
+    const node = createToolDispatchNode(makeToolDispatchCtx(executorFn));
     const state = makeState({
       llmOutput: {
         kind: 'tool_calls',
