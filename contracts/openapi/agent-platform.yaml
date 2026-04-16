@@ -43,15 +43,42 @@ paths:
   /health:
     get:
       operationId: getHealth
-      summary: Health check
+      summary: Liveness check
+      description: Fast liveness probe for load balancers and orchestrators.
       tags: [health]
       responses:
         '200':
-          description: Service is healthy
+          description: Service is alive
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+
+  /health/ready:
+    get:
+      operationId: getReadiness
+      summary: Deep readiness check
+      description: |
+        Verifies all critical subsystems: database connectivity, disk
+        writability, and free space. Returns per-subsystem status with
+        latency measurements.
+
+        - **200** — healthy or degraded (non-critical issue)
+        - **503** — unhealthy (critical subsystem failure)
+      tags: [health]
+      responses:
+        '200':
+          description: Healthy or degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Unhealthy — critical subsystem failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
 
   # ── Agents ───────────────────────────────────────────────────────────────
   /v1/agents:
@@ -719,6 +746,37 @@ components:
         ok:
           type: boolean
           enum: [true]
+
+    SubsystemCheck:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        latencyMs:
+          type: number
+        details:
+          type: object
+          additionalProperties:
+            type: string
+        error:
+          type: string
+
+    ReadinessResponse:
+      type: object
+      required: [status, checks, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        checks:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SubsystemCheck'
+        timestamp:
+          type: string
+          format: date-time
 
     # -- Error --
     ErrorResponse:
