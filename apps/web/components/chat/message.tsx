@@ -25,7 +25,7 @@ function getMessageText(message: UIMessage): string {
   return '';
 }
 
-export function Message({ message }: MessageProps) {
+export function Message({ message }: Readonly<MessageProps>) {
   const isUser = message.role === 'user';
   const text = getMessageText(message);
 
@@ -45,15 +45,11 @@ export function Message({ message }: MessageProps) {
             : 'bg-card border border-border rounded-bl-md',
         )}
       >
-        {text ? (
-          isUser ? (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
-          ) : (
-            <Markdown content={text} />
-          )
-        ) : (
-          <p className="text-sm text-muted-foreground italic">Empty message</p>
+        {!text && <p className="text-sm text-muted-foreground italic">Empty message</p>}
+        {text && isUser && (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
         )}
+        {text && !isUser && <Markdown content={text} />}
       </div>
 
       {isUser && (

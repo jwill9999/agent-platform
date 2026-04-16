@@ -8,7 +8,7 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children }: Readonly<AppShellProps>) {
   return (
     <SidebarProvider>
       <div className="flex h-screen bg-background">
