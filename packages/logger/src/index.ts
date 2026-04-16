@@ -1,3 +1,8 @@
+import { getCorrelationId } from './context.js';
+
+export type { CorrelationContext } from './context.js';
+export { correlationStorage, runWithCorrelation, getCorrelationId } from './context.js';
+
 export type LogLevel = 'info' | 'warn' | 'error';
 
 export interface Logger {
@@ -8,11 +13,13 @@ export interface Logger {
 
 export function createLogger(service: string): Logger {
   const line = (level: LogLevel, msg: string, fields?: Record<string, unknown>) => {
+    const correlationId = getCorrelationId();
     console.log(
       JSON.stringify({
         ts: new Date().toISOString(),
         level,
         service,
+        ...(correlationId ? { correlationId } : {}),
         msg,
         ...fields,
       }),
