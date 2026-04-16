@@ -1,5 +1,10 @@
 import type { DrizzleDb } from '@agent-platform/db';
-import { getSession, appendMessage, listMessagesBySession } from '@agent-platform/db';
+import {
+  getSession,
+  appendMessage,
+  listMessagesBySession,
+  withTransaction,
+} from '@agent-platform/db';
 import type { MessageRecord } from '@agent-platform/contracts';
 import {
   buildAgentContext,
@@ -106,15 +111,17 @@ function persistNewMessages(
   initialCount: number,
 ): void {
   if (!allMessages) return;
-  for (const msg of allMessages.slice(initialCount)) {
-    if (msg.role !== 'assistant' && msg.role !== 'tool') continue;
-    appendMessage(db, {
-      sessionId,
-      role: msg.role,
-      content: msg.content,
-      toolCallId: msg.role === 'tool' ? msg.toolCallId : undefined,
-    });
-  }
+  withTransaction(db, (tx) => {
+    for (const msg of allMessages.slice(initialCount)) {
+      if (msg.role !== 'assistant' && msg.role !== 'tool') continue;
+      appendMessage(tx, {
+        sessionId,
+        role: msg.role,
+        content: msg.content,
+        toolCallId: msg.role === 'tool' ? msg.toolCallId : undefined,
+      });
+    }
+  });
 }
 
 /** Safely fire a plugin hook, swallowing errors. */
@@ -270,13 +277,15 @@ function buildConversationMessages(
   newMessage: string,
   systemPrompt: string,
 ): ChatMessage[] {
-  const priorMessages = listMessagesBySession(db, sessionId);
-  appendMessage(db, { sessionId, role: 'user', content: newMessage });
-  return [
-    { role: 'system', content: systemPrompt },
-    ...priorMessages.map(dbRecordToChatMessage),
-    { role: 'user' as const, content: newMessage },
-  ];
+  return withTransaction(db, (tx) => {
+    const priorMessages = listMessagesBySession(tx, sessionId);
+    appendMessage(tx, { sessionId, role: 'user', content: newMessage });
+    return [
+      { role: 'system', content: systemPrompt },
+      ...priorMessages.map(dbRecordToChatMessage),
+      { role: 'user' as const, content: newMessage },
+    ];
+  });
 }
 
 function buildInitialState(
