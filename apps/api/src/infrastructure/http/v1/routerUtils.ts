@@ -18,10 +18,3 @@ export function requireParam(params: Record<string, string | undefined>, name: s
   }
   return value;
 }
-
-export function isSqliteConstraint(e: unknown): boolean {
-  if (typeof e !== 'object' || e === null) return false;
-  if (!('code' in e)) return false;
-  const code = String((e as { code: unknown }).code);
-  return code.includes('SQLITE_CONSTRAINT');
-}

@@ -12,27 +12,27 @@ test.describe('MVP E2E (compose-backed)', () => {
     const res = await request.get(`${apiURL}/v1/agents`);
     expect(res.ok()).toBeTruthy();
     const body = (await res.json()) as { data: unknown };
-    const agents = body.data as { id: string }[];
+    const agents = body.data as { slug: string }[];
     expect(Array.isArray(agents)).toBeTruthy();
-    expect(agents.some((a) => a.id === 'default')).toBeTruthy();
+    expect(agents.some((a) => a.slug === 'default-agent')).toBeTruthy();
   });
 
   test('E2E seed: specialist, MCP, skill', async ({ request }) => {
     const res = await request.get(`${apiURL}/v1/agents`);
     expect(res.ok()).toBeTruthy();
     const body = (await res.json()) as { data: unknown };
-    const agents = body.data as { id: string }[];
-    expect(agents.some((a) => a.id === 'e2e-specialist')).toBeTruthy();
+    const agents = body.data as { slug: string }[];
+    expect(agents.some((a) => a.slug === 'e2e-specialist')).toBeTruthy();
 
     const mcpRes = await request.get(`${apiURL}/v1/mcp-servers`);
     expect(mcpRes.ok()).toBeTruthy();
-    const mcpBody = (await mcpRes.json()) as { data: { id: string }[] };
-    expect(mcpBody.data.some((m) => m.id === 'e2e-fs')).toBeTruthy();
+    const mcpBody = (await mcpRes.json()) as { data: { slug: string }[] };
+    expect(mcpBody.data.some((m) => m.slug === 'e2e-filesystem-mcp')).toBeTruthy();
 
     const skillRes = await request.get(`${apiURL}/v1/skills`);
     expect(skillRes.ok()).toBeTruthy();
-    const skillBody = (await skillRes.json()) as { data: { id: string }[] };
-    expect(skillBody.data.some((s) => s.id === 'e2e-skill')).toBeTruthy();
+    const skillBody = (await skillRes.json()) as { data: { slug: string }[] };
+    expect(skillBody.data.some((s) => s.slug === 'e2e-skill')).toBeTruthy();
   });
 
   test('home page chat smoke', async ({ page }) => {

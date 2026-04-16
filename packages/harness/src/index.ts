@@ -32,5 +32,14 @@ export {
   type LlmReasonNodeOptions,
 } from './nodes/llmReason.js';
 export { createToolDispatchNode, type ToolDispatchContext } from './nodes/toolDispatch.js';
+export { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from './toolTimeout.js';
+export {
+  withRetry,
+  isRetryableLlmError,
+  isRetryableToolError,
+  LLM_RETRY_CONFIG,
+  TOOL_RETRY_CONFIG,
+  type RetryConfig,
+} from './retry.js';
 export { createPlanGenerateNode, type PlanGenerateNodeOptions } from './nodes/planGenerate.js';
 export { createNdjsonEmitter, createNoopEmitter } from './emitters/ndjson.js';

@@ -11,7 +11,7 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
-import { isSqliteConstraint, parseBody, requireParam } from './routerUtils.js';
+import { parseBody, requireParam } from './routerUtils.js';
 
 export function createSessionsRouter(db: DrizzleDb): Router {
   const router = Router();
@@ -37,15 +37,8 @@ export function createSessionsRouter(db: DrizzleDb): Router {
     '/',
     asyncHandler(async (req, res) => {
       const body = parseBody(SessionCreateBodySchema, req.body);
-      try {
-        const session = createSession(db, body);
-        res.status(201).json({ data: session });
-      } catch (e) {
-        if (isSqliteConstraint(e)) {
-          throw new HttpError(409, 'CONFLICT', 'Session id already exists or foreign key failed');
-        }
-        throw e;
-      }
+      const session = createSession(db, body);
+      res.status(201).json({ data: session });
     }),
   );
 
@@ -56,15 +49,8 @@ export function createSessionsRouter(db: DrizzleDb): Router {
       if (record.id !== req.params.id) {
         throw new HttpError(400, 'VALIDATION_ERROR', 'Body id must match path');
       }
-      try {
-        replaceSession(db, record);
-        res.json({ data: record });
-      } catch (e) {
-        if (isSqliteConstraint(e)) {
-          throw new HttpError(400, 'CONSTRAINT_VIOLATION', 'Invalid session update');
-        }
-        throw e;
-      }
+      replaceSession(db, record);
+      res.json({ data: record });
     }),
   );
 

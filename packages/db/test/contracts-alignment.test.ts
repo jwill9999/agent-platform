@@ -32,6 +32,8 @@ describe('contracts v0 alignment', () => {
     db.insert(schema.skills)
       .values({
         id: 'skill-1',
+        slug: 'skill-1',
+        name: 'Skill 1',
         goal: 'Do the thing',
         constraintsJson: JSON.stringify(['c1']),
         toolIdsJson: JSON.stringify(['tool-a']),
@@ -57,6 +59,7 @@ describe('contracts v0 alignment', () => {
     db.insert(schema.agents)
       .values({
         id: 'agent-1',
+        slug: 'agent-1',
         name: 'Default',
         systemPrompt: 'Test agent for contracts alignment',
         executionLimitsJson: JSON.stringify({
@@ -76,15 +79,18 @@ describe('contracts v0 alignment', () => {
     db.insert(schema.skills)
       .values({
         id: 's1',
+        slug: 's1',
+        name: 'Skill S1',
         goal: 'g',
         constraintsJson: '[]',
         toolIdsJson: '[]',
       })
       .run();
-    db.insert(schema.tools).values({ id: 't1', name: 'Tool' }).run();
+    db.insert(schema.tools).values({ id: 't1', slug: 't1', name: 'Tool' }).run();
     db.insert(schema.mcpServers)
       .values({
         id: 'm1',
+        slug: 'm1',
         name: 'MCP',
         transport: 'stdio',
       })

@@ -8,6 +8,7 @@ import { ApiRequestError, apiDelete, apiGet, apiPath, apiPost, apiPut } from '..
 
 const template: Agent = {
   id: 'new-agent',
+  slug: 'new-agent',
   name: 'New agent',
   systemPrompt: 'You are a helpful assistant.',
   allowedSkillIds: [],

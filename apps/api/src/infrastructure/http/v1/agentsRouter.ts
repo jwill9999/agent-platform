@@ -1,5 +1,5 @@
-import { AgentSchema } from '@agent-platform/contracts';
-import { deleteAgent, listAgents, loadAgentById, replaceAgent } from '@agent-platform/db';
+import { AgentCreateBodySchema, AgentSchema } from '@agent-platform/contracts';
+import { createAgent, deleteAgent, getAgent, listAgents, replaceAgent } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
 
@@ -18,9 +18,9 @@ export function createAgentsRouter(db: DrizzleDb): Router {
   );
 
   router.get(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const agent = loadAgentById(db, requireParam(req.params, 'id'));
+      const agent = getAgent(db, requireParam(req.params, 'idOrSlug'));
       if (!agent) throw new HttpError(404, 'NOT_FOUND', 'Agent not found');
       res.json({ data: agent });
     }),
@@ -29,28 +29,27 @@ export function createAgentsRouter(db: DrizzleDb): Router {
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const agent = parseBody(AgentSchema, req.body);
-      replaceAgent(db, agent);
+      const body = parseBody(AgentCreateBodySchema, req.body);
+      const agent = createAgent(db, body);
       res.status(201).json({ data: agent });
     }),
   );
 
   router.put(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const agent = parseBody(AgentSchema, req.body);
-      if (agent.id !== req.params.id) {
-        throw new HttpError(400, 'VALIDATION_ERROR', 'Body id must match path');
-      }
+      const existing = getAgent(db, requireParam(req.params, 'idOrSlug'));
+      if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Agent not found');
+      const agent = parseBody(AgentSchema, { ...req.body, id: existing.id, slug: existing.slug });
       replaceAgent(db, agent);
-      res.json({ data: agent });
+      res.json({ data: getAgent(db, existing.id) });
     }),
   );
 
   router.delete(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const ok = deleteAgent(db, requireParam(req.params, 'id'));
+      const ok = deleteAgent(db, requireParam(req.params, 'idOrSlug'));
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'Agent not found');
       res.status(204).send();
     }),

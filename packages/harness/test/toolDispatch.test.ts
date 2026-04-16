@@ -11,6 +11,7 @@ import type { NativeToolExecutor } from '../src/types.js';
 
 const makeAgent = (overrides?: Partial<Agent>): Agent => ({
   id: 'agent-1',
+  slug: 'agent-1',
   name: 'test-agent',
   description: 'test',
   systemPrompt: '',
@@ -87,7 +88,7 @@ describe('toolDispatchNode', () => {
 
     const result = await node(state);
 
-    expect(callFn).toHaveBeenCalledWith('readFile', { path: '/workspace/x' });
+    expect(callFn).toHaveBeenCalledWith('readFile', { path: '/workspace/x' }, { timeoutMs: 30000 });
     expect(result.messages).toHaveLength(1);
     expect(result.messages![0]).toMatchObject({
       role: 'tool',

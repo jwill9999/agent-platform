@@ -1,5 +1,11 @@
-import { McpServerSchema } from '@agent-platform/contracts';
-import { deleteMcpServer, getMcpServer, listMcpServers, upsertMcpServer } from '@agent-platform/db';
+import { McpServerCreateBodySchema, McpServerSchema } from '@agent-platform/contracts';
+import {
+  createMcpServer,
+  deleteMcpServer,
+  getMcpServer,
+  listMcpServers,
+  upsertMcpServer,
+} from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
 
@@ -18,9 +24,9 @@ export function createMcpServersRouter(db: DrizzleDb): Router {
   );
 
   router.get(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const m = getMcpServer(db, requireParam(req.params, 'id'));
+      const m = getMcpServer(db, requireParam(req.params, 'idOrSlug'));
       if (!m) throw new HttpError(404, 'NOT_FOUND', 'MCP server not found');
       res.json({ data: m });
     }),
@@ -29,28 +35,27 @@ export function createMcpServersRouter(db: DrizzleDb): Router {
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const m = parseBody(McpServerSchema, req.body);
-      upsertMcpServer(db, m);
+      const body = parseBody(McpServerCreateBodySchema, req.body);
+      const m = createMcpServer(db, body);
       res.status(201).json({ data: m });
     }),
   );
 
   router.put(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const m = parseBody(McpServerSchema, req.body);
-      if (m.id !== req.params.id) {
-        throw new HttpError(400, 'VALIDATION_ERROR', 'Body id must match path');
-      }
+      const existing = getMcpServer(db, requireParam(req.params, 'idOrSlug'));
+      if (!existing) throw new HttpError(404, 'NOT_FOUND', 'MCP server not found');
+      const m = parseBody(McpServerSchema, { ...req.body, id: existing.id, slug: existing.slug });
       upsertMcpServer(db, m);
       res.json({ data: m });
     }),
   );
 
   router.delete(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const ok = deleteMcpServer(db, requireParam(req.params, 'id'));
+      const ok = deleteMcpServer(db, requireParam(req.params, 'idOrSlug'));
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'MCP server not found');
       res.status(204).send();
     }),

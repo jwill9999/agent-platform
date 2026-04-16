@@ -11,14 +11,13 @@ import type { OutputEmitter } from '../src/types.js';
 function makeAgent(overrides?: Partial<Agent>): Agent {
   return {
     id: 'agent-1',
+    slug: 'agent-1',
     name: 'Test Agent',
     systemPrompt: 'You are a helpful assistant.',
     allowedSkillIds: [],
     allowedToolIds: ['tool_a', 'tool_b'],
     allowedMcpServerIds: [],
     executionLimits: { maxSteps: 10, maxParallelTasks: 1, timeoutMs: 30_000 },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
     ...overrides,
   } as Agent;
 }

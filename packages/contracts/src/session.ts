@@ -10,10 +10,9 @@ export const SessionRecordSchema = z.object({
 
 export type SessionRecord = z.infer<typeof SessionRecordSchema>;
 
-/** POST /v1/sessions body — `id` optional (server generates if omitted). */
+/** POST /v1/sessions body — id is always system-generated. */
 export const SessionCreateBodySchema = z.object({
   agentId: z.string().min(1),
-  id: z.string().min(1).optional(),
 });
 
 export type SessionCreateBody = z.infer<typeof SessionCreateBodySchema>;

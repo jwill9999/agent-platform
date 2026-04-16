@@ -1,5 +1,11 @@
-/** Stable id for the seeded default agent (queryable after `pnpm seed`). */
-export const DEFAULT_AGENT_ID = 'default';
+/** Stable slug for the seeded default agent (queryable after `pnpm seed`). */
+export const DEFAULT_AGENT_SLUG = 'default-agent';
+
+/** Stable UUID for the seeded default agent. */
+export const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
 
 /** Optional demo skill linked to the default agent for empty-registry UX. */
-export const DEMO_SKILL_ID = 'demo-skill';
+export const DEMO_SKILL_SLUG = 'demo-skill';
+
+/** Stable UUID for the demo skill. */
+export const DEMO_SKILL_ID = '00000000-0000-4000-8000-000000000002';

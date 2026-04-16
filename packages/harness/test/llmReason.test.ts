@@ -3,23 +3,19 @@ import type { Tool as ContractTool } from '@agent-platform/contracts';
 
 import { contractToolsToDefinitions } from '../src/types.js';
 import type { ChatMessage, LlmModelConfig, ToolDefinition } from '../src/types.js';
+import {
+  mockStreamText,
+  setupAiMock,
+  setupOpenAiProviderMock,
+  mockStreamResult,
+} from './helpers/aiMock.js';
 
 // ---------------------------------------------------------------------------
-// Mock the AI SDK before importing the node
+// Mock the AI SDK before importing the node (delegates to shared helper)
 // ---------------------------------------------------------------------------
 
-const mockStreamText = vi.fn();
-
-vi.mock('ai', () => ({
-  streamText: (...args: unknown[]) => mockStreamText(...args),
-  jsonSchema: (schema: unknown) => ({ type: 'json-schema', jsonSchema: schema }),
-}));
-
-vi.mock('@ai-sdk/openai', () => ({
-  createOpenAI: ({ apiKey }: { apiKey: string }) => {
-    return (model: string) => ({ provider: 'openai', modelId: model, apiKey });
-  },
-}));
+vi.mock('ai', () => setupAiMock());
+vi.mock('@ai-sdk/openai', () => setupOpenAiProviderMock());
 
 // Import after mocks — use createLlmReasonNode (llmReasonNode is deprecated)
 const { createLlmReasonNode: _createNode } = await import('../src/nodes/llmReason.js');
@@ -46,22 +42,6 @@ function makeState(overrides: Record<string, unknown> = {}) {
     totalTokensUsed: 0,
     totalCostUnits: 0,
     ...overrides,
-  };
-}
-
-/** Helper: create a mock streamText return value with async iterables. */
-function mockStreamResult(opts: {
-  textChunks?: string[];
-  toolCalls?: Array<{ toolCallId: string; toolName: string; args: unknown }>;
-  usage?: { promptTokens: number; completionTokens: number };
-}) {
-  const chunks = opts.textChunks ?? [];
-  return {
-    textStream: (async function* () {
-      for (const chunk of chunks) yield chunk;
-    })(),
-    toolCalls: Promise.resolve(opts.toolCalls ?? []),
-    usage: Promise.resolve(opts.usage),
   };
 }
 
@@ -270,7 +250,9 @@ describe('contractToolsToDefinitions', () => {
   });
 
   it('maps registry tools without schema to empty parameters', () => {
-    const tools: ContractTool[] = [{ id: 'my-tool', name: 'my-tool', description: 'Does stuff' }];
+    const tools: ContractTool[] = [
+      { id: 'my-tool', slug: 'my-tool', name: 'my-tool', description: 'Does stuff' },
+    ];
 
     const defs = contractToolsToDefinitions(tools);
 
@@ -282,7 +264,7 @@ describe('contractToolsToDefinitions', () => {
   });
 
   it('uses name as description fallback when description is missing', () => {
-    const tools: ContractTool[] = [{ id: 'tool-a', name: 'tool-a' }];
+    const tools: ContractTool[] = [{ id: 'tool-a', slug: 'tool-a', name: 'tool-a' }];
 
     const defs = contractToolsToDefinitions(tools);
 

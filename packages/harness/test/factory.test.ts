@@ -45,6 +45,7 @@ const fakeDb = {} as Parameters<typeof loadAgentById>[0];
 
 const baseAgent: Agent = {
   id: 'agent-1',
+  slug: 'agent-1',
   name: 'Test Agent',
   systemPrompt: 'You are a test assistant.',
   allowedSkillIds: ['s1'],
@@ -55,6 +56,8 @@ const baseAgent: Agent = {
 
 const skill1: Skill = {
   id: 's1',
+  slug: 's1',
+  name: 'Summarize text',
   goal: 'Summarize text',
   constraints: ['max 100 words'],
   tools: ['t1'],
@@ -62,12 +65,14 @@ const skill1: Skill = {
 
 const tool1: ContractTool = {
   id: 't1',
+  slug: 't1',
   name: 'TextSummarizer',
   description: 'Summarizes input text',
 };
 
 const mcpServer1: McpServer = {
   id: 'mcp-1',
+  slug: 'mcp-1',
   name: 'Filesystem',
   transport: 'stdio',
   command: 'node',
@@ -76,6 +81,7 @@ const mcpServer1: McpServer = {
 
 const mcpTool: ContractTool = {
   id: 'mcp-1:read_file',
+  slug: 'mcp-1--read-file',
   name: 'read_file',
   description: 'Read a file from disk',
 };
@@ -134,8 +140,15 @@ describe('buildAgentContext', () => {
       allowedToolIds: ['t2', 't1'],
       allowedMcpServerIds: [],
     };
-    const skill2: Skill = { id: 's2', goal: 'Translate text', constraints: [], tools: [] };
-    const tool2: ContractTool = { id: 't2', name: 'Translator' };
+    const skill2: Skill = {
+      id: 's2',
+      slug: 's2',
+      name: 'Translate text',
+      goal: 'Translate text',
+      constraints: [],
+      tools: [],
+    };
+    const tool2: ContractTool = { id: 't2', slug: 't2', name: 'Translator' };
 
     mockLoadAgent.mockReturnValue(agent);
     mockGetSkill.mockImplementation((_db, id) => {
