@@ -5,6 +5,8 @@
  * so they recover from temporary issues without surfacing errors to the user.
  */
 
+import { randomInt } from 'node:crypto';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -70,7 +72,9 @@ export async function withRetry<T>(
 
 function computeDelay(attempt: number, config: RetryConfig): number {
   const exponential = Math.min(config.baseDelayMs * 2 ** attempt, config.maxDelayMs);
-  const jitter = exponential * config.jitterFactor * (Math.random() * 2 - 1);
+  // Use crypto.randomInt for CSPRNG jitter (satisfies SonarCloud S2245)
+  const rand = randomInt(0, 1_000_001) / 1_000_000; // 0..1 inclusive
+  const jitter = exponential * config.jitterFactor * (rand * 2 - 1);
   return Math.max(0, Math.round(exponential + jitter));
 }
 
