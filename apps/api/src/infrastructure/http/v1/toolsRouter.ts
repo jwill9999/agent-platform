@@ -1,5 +1,5 @@
-import { ToolSchema } from '@agent-platform/contracts';
-import { deleteTool, getTool, listTools, upsertTool } from '@agent-platform/db';
+import { ToolCreateBodySchema, ToolSchema } from '@agent-platform/contracts';
+import { createTool, deleteTool, getTool, listTools, upsertTool } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
 
@@ -18,9 +18,9 @@ export function createToolsRouter(db: DrizzleDb): Router {
   );
 
   router.get(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const tool = getTool(db, requireParam(req.params, 'id'));
+      const tool = getTool(db, requireParam(req.params, 'idOrSlug'));
       if (!tool) throw new HttpError(404, 'NOT_FOUND', 'Tool not found');
       res.json({ data: tool });
     }),
@@ -29,28 +29,27 @@ export function createToolsRouter(db: DrizzleDb): Router {
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const tool = parseBody(ToolSchema, req.body);
-      upsertTool(db, tool);
+      const body = parseBody(ToolCreateBodySchema, req.body);
+      const tool = createTool(db, body);
       res.status(201).json({ data: tool });
     }),
   );
 
   router.put(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const tool = parseBody(ToolSchema, req.body);
-      if (tool.id !== req.params.id) {
-        throw new HttpError(400, 'VALIDATION_ERROR', 'Body id must match path');
-      }
+      const existing = getTool(db, requireParam(req.params, 'idOrSlug'));
+      if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Tool not found');
+      const tool = parseBody(ToolSchema, { ...req.body, id: existing.id, slug: existing.slug });
       upsertTool(db, tool);
       res.json({ data: tool });
     }),
   );
 
   router.delete(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const ok = deleteTool(db, requireParam(req.params, 'id'));
+      const ok = deleteTool(db, requireParam(req.params, 'idOrSlug'));
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'Tool not found');
       res.status(204).send();
     }),

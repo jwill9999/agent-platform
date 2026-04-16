@@ -42,15 +42,15 @@ describe('REST /v1 (integration)', () => {
     const agentsRes = await request(app).get('/v1/agents').expect(200);
     expect(agentsRes.body.data.some((a: { id: string }) => a.id === DEFAULT_AGENT_ID)).toBe(true);
 
-    await request(app)
+    const createToolRes = await request(app)
       .post('/v1/tools')
       .send({
-        id: 'tool-x',
         name: 'Extra tool',
       })
       .expect(201);
 
-    const toolGet = await request(app).get('/v1/tools/tool-x').expect(200);
+    const toolSlug = createToolRes.body.data.slug as string;
+    const toolGet = await request(app).get(`/v1/tools/${toolSlug}`).expect(200);
     expect(toolGet.body.data.name).toBe('Extra tool');
 
     const sessionRes = await request(app)

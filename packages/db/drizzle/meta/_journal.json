@@ -36,6 +36,13 @@
       "when": 1776473968000,
       "tag": "0004_add_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1776325757959,
+      "tag": "0005_add_slugs",
+      "breakpoints": true
     }
   ]
 }

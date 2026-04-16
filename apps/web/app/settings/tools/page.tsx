@@ -63,6 +63,7 @@ export default function ToolsPage() {
     }
     const draft: Tool = {
       id: id.trim(),
+      slug: id.trim(),
       name: name.trim(),
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(config ? { config } : {}),

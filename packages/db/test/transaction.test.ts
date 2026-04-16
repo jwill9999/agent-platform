@@ -25,6 +25,7 @@ describe('withTransaction', () => {
 
     replaceAgent(db, {
       id: 'agent-tx',
+      slug: 'agent-tx',
       name: 'TX Test Agent',
       systemPrompt: 'sys',
       allowedSkillIds: [],

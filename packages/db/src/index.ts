@@ -1,6 +1,7 @@
 export * from './crypto/envelope.js';
 export * from './crypto/errors.js';
 export * from './database.js';
+export * from './errors.js';
 export * from './mappers.js';
 export * from './schema.js';
 export * from './secrets/store.js';
@@ -10,3 +11,4 @@ export * from './transaction.js';
 export * from './repositories/messages.js';
 export * from './repositories/registry.js';
 export * from './repositories/settings.js';
+export * from './slug.js';

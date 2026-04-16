@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 
+import { ForeignKeyViolationError, UniqueConstraintError } from '@agent-platform/db';
 import { createLogger } from '@agent-platform/logger';
 import { HttpError } from './httpError.js';
 
@@ -27,6 +28,24 @@ export const errorMiddleware: ErrorRequestHandler = (err, _req, res, next) => {
         code: err.code,
         message: err.message,
         ...(err.details === undefined ? {} : { details: err.details }),
+      },
+    });
+    return;
+  }
+  if (err instanceof ForeignKeyViolationError) {
+    res.status(404).json({
+      error: {
+        code: 'FOREIGN_KEY_VIOLATION',
+        message: err.message,
+      },
+    });
+    return;
+  }
+  if (err instanceof UniqueConstraintError) {
+    res.status(409).json({
+      error: {
+        code: 'CONFLICT',
+        message: err.message,
       },
     });
     return;

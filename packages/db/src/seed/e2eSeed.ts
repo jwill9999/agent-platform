@@ -4,9 +4,9 @@ import type { DrizzleDb } from '../database.js';
 import { replaceAgent, upsertMcpServer, upsertSkill } from '../repositories/registry.js';
 
 /** Stable ids for E2E registry rows (API + Playwright assertions). */
-export const E2E_MCP_ID = 'e2e-fs';
-export const E2E_SKILL_ID = 'e2e-skill';
-export const E2E_SPECIALIST_ID = 'e2e-specialist';
+export const E2E_MCP_ID = '00000000-0000-4000-8000-e2e000000001';
+export const E2E_SKILL_ID = '00000000-0000-4000-8000-e2e000000002';
+export const E2E_SPECIALIST_ID = '00000000-0000-4000-8000-e2e000000003';
 
 /**
  * Idempotent seed: filesystem MCP (stdio), skill referencing MCP tools, specialist agent.
@@ -15,6 +15,7 @@ export const E2E_SPECIALIST_ID = 'e2e-specialist';
 export function runE2eSeed(db: DrizzleDb): void {
   const mcp: McpServer = {
     id: E2E_MCP_ID,
+    slug: 'e2e-filesystem-mcp',
     name: 'E2E filesystem MCP',
     transport: 'stdio',
     command: 'npx',
@@ -25,6 +26,8 @@ export function runE2eSeed(db: DrizzleDb): void {
 
   const skill: Skill = {
     id: E2E_SKILL_ID,
+    slug: 'e2e-skill',
+    name: 'E2E filesystem skill',
     goal: 'E2E: use filesystem MCP for list/read within the mounted workspace.',
     constraints: [],
     tools: [`${E2E_MCP_ID}:read_file`, `${E2E_MCP_ID}:list_directory`],
@@ -33,6 +36,7 @@ export function runE2eSeed(db: DrizzleDb): void {
 
   const specialist: Agent = {
     id: E2E_SPECIALIST_ID,
+    slug: 'e2e-specialist',
     name: 'E2E specialist',
     systemPrompt: 'You are an E2E test agent with filesystem access via MCP.',
     allowedSkillIds: [E2E_SKILL_ID],

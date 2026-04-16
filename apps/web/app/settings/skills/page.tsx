@@ -74,6 +74,8 @@ export default function SkillsPage() {
     }
     const draft: Skill = {
       id: id.trim(),
+      slug: id.trim(),
+      name: id.trim(),
       goal,
       constraints,
       tools,

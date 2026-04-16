@@ -15,6 +15,8 @@ import * as schema from './schema.js';
 export function skillToRow(skill: Skill): typeof schema.skills.$inferInsert {
   return {
     id: skill.id,
+    slug: skill.slug,
+    name: skill.name,
     goal: skill.goal,
     constraintsJson: JSON.stringify(skill.constraints),
     toolIdsJson: JSON.stringify(skill.tools),
@@ -25,6 +27,8 @@ export function skillToRow(skill: Skill): typeof schema.skills.$inferInsert {
 export function skillRowToContract(row: typeof schema.skills.$inferSelect): Skill {
   return SkillSchema.parse({
     id: row.id,
+    slug: row.slug,
+    name: row.name,
     goal: row.goal,
     constraints: JSON.parse(row.constraintsJson) as string[],
     tools: JSON.parse(row.toolIdsJson) as string[],
@@ -69,6 +73,7 @@ export function loadAgentById(db: DrizzleDb, id: string): Agent | undefined {
 
   return AgentSchema.parse({
     id: row.id,
+    slug: row.slug,
     name: row.name,
     systemPrompt: row.systemPrompt,
     description: row.description ?? undefined,
@@ -85,6 +90,7 @@ export function loadAgentById(db: DrizzleDb, id: string): Agent | undefined {
 export function toolRowToContract(row: typeof schema.tools.$inferSelect): Tool {
   return ToolSchema.parse({
     id: row.id,
+    slug: row.slug,
     name: row.name,
     description: row.description ?? undefined,
     config: row.configJson ? (JSON.parse(row.configJson) as Record<string, unknown>) : undefined,
@@ -94,6 +100,7 @@ export function toolRowToContract(row: typeof schema.tools.$inferSelect): Tool {
 export function toolToRow(tool: Tool): typeof schema.tools.$inferInsert {
   return {
     id: tool.id,
+    slug: tool.slug,
     name: tool.name,
     description: tool.description ?? null,
     configJson: tool.config ? JSON.stringify(tool.config) : null,
@@ -103,6 +110,7 @@ export function toolToRow(tool: Tool): typeof schema.tools.$inferInsert {
 export function mcpRowToContract(row: typeof schema.mcpServers.$inferSelect): McpServer {
   return McpServerSchema.parse({
     id: row.id,
+    slug: row.slug,
     name: row.name,
     transport: row.transport,
     command: row.command ?? undefined,
@@ -117,6 +125,7 @@ export function mcpRowToContract(row: typeof schema.mcpServers.$inferSelect): Mc
 export function mcpToRow(m: McpServer): typeof schema.mcpServers.$inferInsert {
   return {
     id: m.id,
+    slug: m.slug,
     name: m.name,
     transport: m.transport,
     command: m.command ?? null,

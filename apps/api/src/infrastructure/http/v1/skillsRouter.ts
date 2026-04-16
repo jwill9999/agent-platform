@@ -1,5 +1,5 @@
-import { SkillSchema } from '@agent-platform/contracts';
-import { deleteSkill, getSkill, listSkills, upsertSkill } from '@agent-platform/db';
+import { SkillCreateBodySchema, SkillSchema } from '@agent-platform/contracts';
+import { createSkill, deleteSkill, getSkill, listSkills, upsertSkill } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
 
@@ -18,9 +18,9 @@ export function createSkillsRouter(db: DrizzleDb): Router {
   );
 
   router.get(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const skill = getSkill(db, requireParam(req.params, 'id'));
+      const skill = getSkill(db, requireParam(req.params, 'idOrSlug'));
       if (!skill) throw new HttpError(404, 'NOT_FOUND', 'Skill not found');
       res.json({ data: skill });
     }),
@@ -29,28 +29,27 @@ export function createSkillsRouter(db: DrizzleDb): Router {
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const skill = parseBody(SkillSchema, req.body);
-      upsertSkill(db, skill);
+      const body = parseBody(SkillCreateBodySchema, req.body);
+      const skill = createSkill(db, body);
       res.status(201).json({ data: skill });
     }),
   );
 
   router.put(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const skill = parseBody(SkillSchema, req.body);
-      if (skill.id !== req.params.id) {
-        throw new HttpError(400, 'VALIDATION_ERROR', 'Body id must match path');
-      }
+      const existing = getSkill(db, requireParam(req.params, 'idOrSlug'));
+      if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Skill not found');
+      const skill = parseBody(SkillSchema, { ...req.body, id: existing.id, slug: existing.slug });
       upsertSkill(db, skill);
       res.json({ data: skill });
     }),
   );
 
   router.delete(
-    '/:id',
+    '/:idOrSlug',
     asyncHandler(async (req, res) => {
-      const ok = deleteSkill(db, requireParam(req.params, 'id'));
+      const ok = deleteSkill(db, requireParam(req.params, 'idOrSlug'));
       if (!ok) throw new HttpError(404, 'NOT_FOUND', 'Skill not found');
       res.status(204).send();
     }),

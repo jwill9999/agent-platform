@@ -11,6 +11,7 @@ import type { NativeToolExecutor } from '../src/types.js';
 
 const makeAgent = (overrides?: Partial<Agent>): Agent => ({
   id: 'agent-1',
+  slug: 'agent-1',
   name: 'test-agent',
   description: 'test',
   systemPrompt: '',

@@ -32,12 +32,15 @@ describe('contracts round-trip', () => {
     });
     const skill = SkillSchema.parse({
       id: 'skill-1',
+      slug: 'skill-1',
+      name: 'Skill 1',
       goal: 'Do X',
       constraints: ['c1'],
       tools: ['tool-a'],
     });
     const agent = AgentSchema.parse({
       id: 'agent-1',
+      slug: 'agent-1',
       name: 'Default',
       systemPrompt: 'Test agent',
       allowedSkillIds: [skill.id],

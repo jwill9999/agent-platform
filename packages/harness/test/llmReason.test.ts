@@ -250,7 +250,9 @@ describe('contractToolsToDefinitions', () => {
   });
 
   it('maps registry tools without schema to empty parameters', () => {
-    const tools: ContractTool[] = [{ id: 'my-tool', name: 'my-tool', description: 'Does stuff' }];
+    const tools: ContractTool[] = [
+      { id: 'my-tool', slug: 'my-tool', name: 'my-tool', description: 'Does stuff' },
+    ];
 
     const defs = contractToolsToDefinitions(tools);
 
@@ -262,7 +264,7 @@ describe('contractToolsToDefinitions', () => {
   });
 
   it('uses name as description fallback when description is missing', () => {
-    const tools: ContractTool[] = [{ id: 'tool-a', name: 'tool-a' }];
+    const tools: ContractTool[] = [{ id: 'tool-a', slug: 'tool-a', name: 'tool-a' }];
 
     const defs = contractToolsToDefinitions(tools);
 
