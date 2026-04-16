@@ -23,10 +23,10 @@
     "@agent-platform/db": "workspace:*",
     "@agent-platform/logger": "workspace:*",
     "@agent-platform/mcp-adapter": "workspace:*",
+    "@agent-platform/model-router": "workspace:*",
     "@agent-platform/planner": "workspace:*",
     "@agent-platform/plugin-sdk": "workspace:*",
     "@agent-platform/plugin-session": "workspace:*",
-    "@ai-sdk/openai": "^1.3.0",
     "@langchain/core": "^0.3.0",
     "@langchain/langgraph": "^0.2.0",
     "ai": "^4.3.0"

@@ -1,7 +1,7 @@
 import {
   getOpenAiKeyOrNextJsonResponse,
   resolveGatedOpenAiKeyForRequest,
-  streamOpenAiChat,
+  streamChat,
   type ChatMessage,
 } from '@agent-platform/model-router';
 import { convertToCoreMessages, type UIMessage } from 'ai';
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   try {
     const core = convertToCoreMessages(parsed.data.messages as UIMessage[]);
     const messages = coreMessagesToChatMessages(core);
-    const result = streamOpenAiChat({ apiKey, model, messages });
+    const result = streamChat({ provider: 'openai', apiKey, model, messages });
     return result.toDataStreamResponse({
       getErrorMessage: (error) => `CHAT_STREAM_ERROR: ${getErrorMessage(error)}`,
     });

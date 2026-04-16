@@ -50,18 +50,19 @@ describe('resolveModelConfig', () => {
   });
 
   it('uses env DEFAULT_MODEL_PROVIDER and DEFAULT_MODEL when set', () => {
-    process.env.AGENT_OPENAI_API_KEY = 'sk-test';
+    process.env.AGENT_ANTHROPIC_API_KEY = 'sk-ant-test';
     process.env.DEFAULT_MODEL_PROVIDER = 'anthropic';
     process.env.DEFAULT_MODEL = 'claude-3-sonnet';
     const result = resolveModelConfig();
     expect(result).toEqual({
       kind: 'ok',
-      config: { provider: 'anthropic', model: 'claude-3-sonnet', apiKey: 'sk-test' },
+      config: { provider: 'anthropic', model: 'claude-3-sonnet', apiKey: 'sk-ant-test' },
     });
   });
 
   it('agent override takes precedence over env defaults', () => {
     process.env.AGENT_OPENAI_API_KEY = 'sk-test';
+    process.env.AGENT_ANTHROPIC_API_KEY = 'sk-ant-test';
     process.env.DEFAULT_MODEL_PROVIDER = 'anthropic';
     process.env.DEFAULT_MODEL = 'claude-3-sonnet';
     const result = resolveModelConfig({

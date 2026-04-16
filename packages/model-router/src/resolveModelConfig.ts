@@ -1,3 +1,5 @@
+import { isSupportedProvider, type SupportedProvider } from './providers.js';
+import { resolveApiKeyForProvider, apiKeyResultToOutcome } from './resolveApiKey.js';
 import type { ApiOpenAiKeyOutcome, OpenAiKeyGateResult } from './resolveOpenAiApiKey.js';
 import {
   openAiKeyGateToApiOutcome,
@@ -31,6 +33,16 @@ export type ResolveModelConfigOptions = {
 };
 
 // ---------------------------------------------------------------------------
+// Default models per provider
+// ---------------------------------------------------------------------------
+
+const DEFAULT_MODELS: Record<SupportedProvider, string> = {
+  openai: 'gpt-4o',
+  anthropic: 'claude-sonnet-4-20250514',
+  ollama: 'llama3.2',
+};
+
+// ---------------------------------------------------------------------------
 // Resolution chain
 // ---------------------------------------------------------------------------
 
@@ -41,8 +53,10 @@ export type ResolveModelConfigOptions = {
  *   2. **Environment default** — `DEFAULT_MODEL_PROVIDER` / `DEFAULT_MODEL`
  *   3. **System fallback** — `openai` / `gpt-4o`
  *
- * API key resolution uses the existing gated key logic:
- *   header → AGENT_OPENAI_API_KEY → OPENAI_API_KEY (if legacy allowed)
+ * API key resolution is provider-aware:
+ *   - OpenAI: header → AGENT_OPENAI_API_KEY → OPENAI_API_KEY (if legacy allowed)
+ *   - Anthropic: header → AGENT_ANTHROPIC_API_KEY → ANTHROPIC_API_KEY (if legacy allowed)
+ *   - Ollama: no key required (local)
  */
 export function resolveModelConfig(options: ResolveModelConfigOptions = {}): ModelConfigResolution {
   const { agentOverride, headerKey } = options;
@@ -50,9 +64,20 @@ export function resolveModelConfig(options: ResolveModelConfigOptions = {}): Mod
   // --- Provider + model ---
   const provider = agentOverride?.provider ?? process.env.DEFAULT_MODEL_PROVIDER ?? 'openai';
 
-  const model = agentOverride?.model ?? process.env.DEFAULT_MODEL ?? 'gpt-4o';
+  const defaultModel = isSupportedProvider(provider) ? DEFAULT_MODELS[provider] : 'gpt-4o';
+  const model = agentOverride?.model ?? process.env.DEFAULT_MODEL ?? defaultModel;
 
-  // --- API key ---
+  // --- API key (provider-aware) ---
+  if (isSupportedProvider(provider)) {
+    const keyResult = resolveApiKeyForProvider({ provider, headerKey });
+    const outcome = apiKeyResultToOutcome(keyResult);
+    if (outcome.kind === 'error') {
+      return { kind: 'error', code: outcome.code, message: outcome.message };
+    }
+    return { kind: 'ok', config: { provider, model, apiKey: outcome.key } };
+  }
+
+  // Fallback: unknown provider — try OpenAI key resolution for backward compat
   const gated: OpenAiKeyGateResult = resolveGatedOpenAiKeyForRequest({
     preferredEnvVar: 'AGENT_OPENAI_API_KEY',
     headerKey,
