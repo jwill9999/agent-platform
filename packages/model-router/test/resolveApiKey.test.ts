@@ -122,8 +122,8 @@ describe('apiKeyResultToOutcome', () => {
     expect(apiKeyResultToOutcome({ outcome: 'ok', key: 'k' })).toEqual({ kind: 'ok', key: 'k' });
   });
 
-  it('maps not_required to ok with empty key', () => {
-    expect(apiKeyResultToOutcome({ outcome: 'not_required' })).toEqual({ kind: 'ok', key: '' });
+  it('maps not_required to ok with no key', () => {
+    expect(apiKeyResultToOutcome({ outcome: 'not_required' })).toEqual({ kind: 'ok' });
   });
 
   it('maps legacy_blocked to error', () => {

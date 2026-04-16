@@ -63,7 +63,7 @@ describe('providers', () => {
 
     it('throws for unsupported provider', () => {
       expect(() =>
-        createLanguageModel({ provider: 'google', model: 'gemini', apiKey: 'key' }),
+        createLanguageModel({ provider: 'google' as never, model: 'gemini', apiKey: 'key' }),
       ).toThrow('Unsupported model provider "google"');
     });
   });

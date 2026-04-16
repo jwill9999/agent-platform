@@ -77,12 +77,12 @@ export function resolveApiKeyForProvider(options: {
 /** Convert ApiKeyResult to the outcome shape used by resolveModelConfig. */
 export function apiKeyResultToOutcome(
   result: ApiKeyResult,
-): { kind: 'ok'; key: string } | { kind: 'error'; code: string; message: string } {
+): { kind: 'ok'; key?: string } | { kind: 'error'; code: string; message: string } {
   switch (result.outcome) {
     case 'ok':
       return { kind: 'ok', key: result.key };
     case 'not_required':
-      return { kind: 'ok', key: '' };
+      return { kind: 'ok' };
     case 'legacy_blocked':
       return { kind: 'error', code: 'LEGACY_ENV_BLOCKED', message: result.message };
     case 'missing':

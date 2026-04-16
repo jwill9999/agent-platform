@@ -1,4 +1,4 @@
-import { createLanguageModel } from '@agent-platform/model-router';
+import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
 import { streamText, jsonSchema } from 'ai';
 import type { CoreMessage } from 'ai';
 
@@ -235,7 +235,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     }
 
     const model = createLanguageModel({
-      provider: modelConfig.provider ?? 'openai',
+      provider: (modelConfig.provider ?? 'openai') as SupportedProvider,
       model: modelConfig.model,
       apiKey: modelConfig.apiKey,
     });

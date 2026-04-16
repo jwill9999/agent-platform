@@ -49,7 +49,7 @@ export type LlmOutput = LlmTextOutput | LlmToolCallsOutput;
 export type LlmModelConfig = {
   provider: string;
   model: string;
-  apiKey: string;
+  apiKey?: string;
 };
 
 // ---------------------------------------------------------------------------

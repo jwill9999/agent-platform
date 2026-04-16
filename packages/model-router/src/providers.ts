@@ -19,7 +19,7 @@ export function isSupportedProvider(value: string): value is SupportedProvider {
 // ---------------------------------------------------------------------------
 
 export type ProviderConfig = {
-  provider: string;
+  provider: SupportedProvider;
   model: string;
   apiKey?: string;
   /** Base URL override (required for Ollama, optional for others). */

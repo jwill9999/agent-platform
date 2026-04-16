@@ -18,7 +18,7 @@ export type ModelOverride = {
 export type ResolvedModelConfig = {
   provider: string;
   model: string;
-  apiKey: string;
+  apiKey?: string;
 };
 
 export type ModelConfigResolution =

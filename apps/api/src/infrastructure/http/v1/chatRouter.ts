@@ -66,7 +66,7 @@ async function loadAgentContext(db: DrizzleDb, agentId: string): Promise<AgentCo
 function resolveModelOrThrow(
   agentCtx: AgentContext,
   headerKey: string | undefined,
-): { provider: string; model: string; apiKey: string } {
+): { provider: string; model: string; apiKey?: string } {
   const resolution = resolveModelConfig({
     agentOverride: agentCtx.agent.modelOverride ?? null,
     headerKey,
@@ -283,7 +283,7 @@ function buildInitialState(
   sessionId: string,
   messages: ChatMessage[],
   agentCtx: AgentContext,
-  modelConfig: { provider: string; model: string; apiKey: string },
+  modelConfig: { provider: string; model: string; apiKey?: string },
 ) {
   return {
     trace: [],
