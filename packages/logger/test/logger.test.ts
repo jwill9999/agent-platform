@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { createLogger } from '../src/index.js';
+import { createLogger, runWithCorrelation } from '../src/index.js';
 import type { LogLevel } from '../src/index.js';
 
 describe('createLogger', () => {
@@ -35,5 +35,28 @@ describe('createLogger', () => {
       serverId: 'mcp-1',
       transport: 'stdio',
     });
+  });
+
+  it('includes correlationId when running inside correlation context', () => {
+    const log = createLogger('svc');
+    runWithCorrelation('req-123', () => {
+      log.info('inside context');
+    });
+
+    const parsed = JSON.parse(consoleSpy.mock.calls[0]![0] as string);
+    expect(parsed).toMatchObject({
+      level: 'info',
+      service: 'svc',
+      msg: 'inside context',
+      correlationId: 'req-123',
+    });
+  });
+
+  it('omits correlationId when no context is active', () => {
+    const log = createLogger('svc');
+    log.info('no context');
+
+    const parsed = JSON.parse(consoleSpy.mock.calls[0]![0] as string);
+    expect(parsed.correlationId).toBeUndefined();
   });
 });
