@@ -8,6 +8,7 @@ import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, NativeToolExecutor, OutputEmitter, ToolCallIntent } from '../types.js';
 import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTimeout.js';
+import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -124,6 +125,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     const agentToolTimeoutMs = ctx.agent.executionLimits.toolTimeoutMs;
     const toolMessages: ChatMessage[] = [];
     const traceEvents: TraceEvent[] = [];
+    let totalToolRetries = 0;
 
     for (const call of llmOutput.calls) {
       if (signal?.aborted) break;
@@ -143,15 +145,32 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
 
       const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs);
+      let toolRetryCount = 0;
 
       let output: Output;
       let ok: boolean;
       try {
-        const result = await withToolTimeout(
-          () => dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout }),
-          effectiveTimeout,
-          call.name,
-          signal,
+        const result = await withRetry(
+          () =>
+            withToolTimeout(
+              () => dispatchSingleTool(call, ctx, { timeoutMs: effectiveTimeout }),
+              effectiveTimeout,
+              call.name,
+              signal,
+            ),
+          TOOL_RETRY_CONFIG,
+          (attempt, error, delayMs) => {
+            toolRetryCount++;
+            const errMsg = error instanceof Error ? error.message : String(error);
+            traceEvents.push({
+              type: 'tool_retry',
+              toolId: call.name,
+              step,
+              attempt,
+              error: errMsg,
+              delayMs,
+            });
+          },
         );
         output = result.output;
         ok = result.ok;
@@ -196,12 +215,14 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       });
 
       traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok });
+      totalToolRetries += toolRetryCount;
     }
 
     return {
       llmOutput: null,
       messages: toolMessages,
       trace: traceEvents,
+      totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
     };
   };
 }

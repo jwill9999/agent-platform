@@ -52,6 +52,10 @@ export const HarnessState = Annotation.Root({
   // -- Pre-allocated for limits enforcement (task qlp.2) --
   totalTokensUsed: Annotation<number>(),
   totalCostUnits: Annotation<number>(),
+
+  // -- Retry budget (task 426) --
+  /** Total retries consumed across all operations in this run. */
+  totalRetries: Annotation<number>(),
 });
 
 export type HarnessStateType = typeof HarnessState.State;

@@ -13,6 +13,7 @@ import type {
   ToolDefinition,
 } from '../types.js';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
+import { withRetry, LLM_RETRY_CONFIG } from '../retry.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -259,17 +260,48 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       await firePromptBuildHook(dispatcher, state);
     }
 
-    const result = streamText({
-      model,
-      messages: toCoreMessages(messages),
-      tools,
-      maxSteps: 1,
-      abortSignal: signal,
-    });
+    const step = state.taskIndex ?? 0;
+    const retryTraceEvents: TraceEvent[] = [];
+    let retryCount = 0;
 
-    const fullText = await streamAndAccumulate(result.textStream, emitter);
-    const finalToolCalls = await result.toolCalls;
-    const usage = await result.usage;
+    const { fullText, finalToolCalls, usage } = await withRetry(
+      async () => {
+        const res = streamText({
+          model,
+          messages: toCoreMessages(messages),
+          tools,
+          maxSteps: 1,
+          abortSignal: signal,
+        });
+
+        const text = await streamAndAccumulate(res.textStream, emitter);
+        const toolCalls = await res.toolCalls;
+        const usageInfo = await res.usage;
+        return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo };
+      },
+      LLM_RETRY_CONFIG,
+      (attempt, error, delayMs) => {
+        retryCount++;
+        const errMsg = error instanceof Error ? error.message : String(error);
+        retryTraceEvents.push({ type: 'llm_retry', step, attempt, error: errMsg, delayMs });
+
+        if (dispatcher) {
+          dispatcher
+            .onError({
+              sessionId: state.sessionId ?? '',
+              runId: state.runId ?? '',
+              phase: 'prompt',
+              error,
+              retryAttempt: attempt,
+              willRetry: attempt < LLM_RETRY_CONFIG.maxAttempts - 1,
+              maxRetries: LLM_RETRY_CONFIG.maxAttempts - 1,
+            })
+            .catch(() => {
+              /* plugin errors must not crash the graph */
+            });
+        }
+      },
+    );
 
     const tokenUsage = usage
       ? { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens }
@@ -281,8 +313,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const newTotalTokens = state.totalTokensUsed + tokenDelta;
     const costDelta = tokenDelta / 1000;
     const newTotalCost = (state.totalCostUnits ?? 0) + costDelta;
-    const step = state.taskIndex ?? 0;
-    const traceEvents: TraceEvent[] = [{ type: 'llm_call', step, tokenUsage }];
+    const traceEvents: TraceEvent[] = [...retryTraceEvents, { type: 'llm_call', step, tokenUsage }];
 
     const tokenHalted = await checkTokenLimit(state.limits, newTotalTokens, traceEvents, emitter);
     const costHalted =
@@ -299,6 +330,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       trace: traceEvents,
       totalTokensUsed: newTotalTokens,
       totalCostUnits: newTotalCost,
+      totalRetries: (state.totalRetries ?? 0) + retryCount,
       ...(halted ? { halted: true } : {}),
     };
   };
