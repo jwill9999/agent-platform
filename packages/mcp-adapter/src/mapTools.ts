@@ -10,8 +10,10 @@ export type McpToolDescriptor = {
 /** Map one MCP tool to the persisted `Tool` contract (`id` is namespaced per server). */
 export function mcpToolToContractTool(mcpServerId: string, tool: McpToolDescriptor): ContractTool {
   const id = `${mcpServerId}:${tool.name}`;
+  const slug = `${mcpServerId}--${tool.name}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   return {
     id,
+    slug,
     name: tool.name,
     description: tool.description,
     config: {

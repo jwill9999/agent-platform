@@ -5,6 +5,7 @@ import { resolveEffectivePluginHooks, type RegisteredPlugin } from '@agent-platf
 
 const base = (): Agent => ({
   id: 'agent',
+  slug: 'agent',
   name: 'Agent',
   systemPrompt: 'Test agent',
   allowedSkillIds: [],

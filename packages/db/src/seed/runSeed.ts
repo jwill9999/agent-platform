@@ -1,7 +1,12 @@
 import type { DrizzleDb } from '../database.js';
 import * as schema from '../schema.js';
 import { withTransaction } from '../transaction.js';
-import { DEFAULT_AGENT_ID, DEMO_SKILL_ID } from './constants.js';
+import {
+  DEFAULT_AGENT_ID,
+  DEFAULT_AGENT_SLUG,
+  DEMO_SKILL_ID,
+  DEMO_SKILL_SLUG,
+} from './constants.js';
 
 /**
  * Idempotent seed: demo skill (optional registry row) + default agent + allowlist link.
@@ -14,6 +19,8 @@ export function runSeed(db: DrizzleDb): void {
     tx.insert(schema.skills)
       .values({
         id: DEMO_SKILL_ID,
+        slug: DEMO_SKILL_SLUG,
+        name: 'Demo skill',
         goal: 'Demo skill placeholder (replace with real skills in production).',
         constraintsJson: '[]',
         toolIdsJson: '[]',
@@ -24,6 +31,7 @@ export function runSeed(db: DrizzleDb): void {
     tx.insert(schema.agents)
       .values({
         id: DEFAULT_AGENT_ID,
+        slug: DEFAULT_AGENT_SLUG,
         name: 'Default agent',
         systemPrompt:
           'You are a helpful assistant. Use available tools to help the user accomplish their tasks. Be concise and accurate.',

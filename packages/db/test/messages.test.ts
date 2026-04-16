@@ -29,6 +29,7 @@ describe('message repository', () => {
     // Create a minimal agent + session for FK constraints
     replaceAgent(db, {
       id: 'agent-1',
+      slug: 'agent-1',
       name: 'Test Agent',
       systemPrompt: 'sys',
       allowedSkillIds: [],

@@ -81,7 +81,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Agent'
+              $ref: '#/components/schemas/AgentCreateBody'
       responses:
         '201':
           description: Agent created
@@ -96,9 +96,9 @@ paths:
         '400':
           $ref: '#/components/responses/ValidationError'
 
-  /v1/agents/{id}:
+  /v1/agents/{idOrSlug}:
     parameters:
-      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/IdOrSlug'
     get:
       operationId: getAgent
       summary: Get agent by ID
@@ -177,7 +177,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Skill'
+              $ref: '#/components/schemas/SkillCreateBody'
       responses:
         '201':
           description: Skill created
@@ -192,9 +192,9 @@ paths:
         '400':
           $ref: '#/components/responses/ValidationError'
 
-  /v1/skills/{id}:
+  /v1/skills/{idOrSlug}:
     parameters:
-      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/IdOrSlug'
     get:
       operationId: getSkill
       summary: Get skill by ID
@@ -273,7 +273,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Tool'
+              $ref: '#/components/schemas/ToolCreateBody'
       responses:
         '201':
           description: Tool created
@@ -288,9 +288,9 @@ paths:
         '400':
           $ref: '#/components/responses/ValidationError'
 
-  /v1/tools/{id}:
+  /v1/tools/{idOrSlug}:
     parameters:
-      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/IdOrSlug'
     get:
       operationId: getTool
       summary: Get tool by ID
@@ -369,7 +369,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/McpServer'
+              $ref: '#/components/schemas/McpServerCreateBody'
       responses:
         '201':
           description: MCP server created
@@ -384,9 +384,9 @@ paths:
         '400':
           $ref: '#/components/responses/ValidationError'
 
-  /v1/mcp-servers/{id}:
+  /v1/mcp-servers/{idOrSlug}:
     parameters:
-      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/IdOrSlug'
     get:
       operationId: getMcpServer
       summary: Get MCP server by ID
@@ -653,6 +653,14 @@ components:
       schema:
         type: string
         minLength: 1
+    IdOrSlug:
+      name: idOrSlug
+      in: path
+      required: true
+      description: Resource UUID or slug
+      schema:
+        type: string
+        minLength: 1
 
   # ── Shared Responses ─────────────────────────────────────────────────────
   responses:
@@ -726,11 +734,54 @@ components:
     # -- Agent --
     Agent:
       type: object
-      required: [id, name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
+      required: [id, slug, name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
       properties:
         id:
           type: string
           minLength: 1
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        systemPrompt:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        allowedSkillIds:
+          type: array
+          items:
+            type: string
+        allowedToolIds:
+          type: array
+          items:
+            type: string
+        allowedMcpServerIds:
+          type: array
+          items:
+            type: string
+        executionLimits:
+          $ref: '#/components/schemas/ExecutionLimits'
+        modelOverride:
+          $ref: '#/components/schemas/ModelOverride'
+        pluginAllowlist:
+          type: array
+          items:
+            type: string
+          nullable: true
+        pluginDenylist:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    AgentCreateBody:
+      description: POST body for creating an agent — id and slug are system-generated.
+      type: object
+      required: [name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
+      properties:
         name:
           type: string
           minLength: 1
@@ -800,9 +851,38 @@ components:
     # -- Skill --
     Skill:
       type: object
-      required: [id, goal, constraints, tools]
+      required: [id, slug, name, goal, constraints, tools]
       properties:
         id:
+          type: string
+          minLength: 1
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        goal:
+          type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        tools:
+          type: array
+          items:
+            type: string
+        outputSchema:
+          type: object
+          additionalProperties: true
+          description: Optional JSON Schema for skill output
+
+    SkillCreateBody:
+      description: POST body for creating a skill — id and slug are system-generated.
+      type: object
+      required: [name, goal, constraints, tools]
+      properties:
+        name:
           type: string
           minLength: 1
         goal:
@@ -823,11 +903,28 @@ components:
     # -- Tool --
     Tool:
       type: object
-      required: [id, name]
+      required: [id, slug, name]
       properties:
         id:
           type: string
           minLength: 1
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        config:
+          type: object
+          description: Arbitrary tool configuration
+
+    ToolCreateBody:
+      description: POST body for creating a tool — id and slug are system-generated.
+      type: object
+      required: [name]
+      properties:
         name:
           type: string
           minLength: 1
@@ -840,11 +937,37 @@ components:
     # -- MCP Server --
     McpServer:
       type: object
-      required: [id, name, transport]
+      required: [id, slug, name, transport]
       properties:
         id:
           type: string
           minLength: 1
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        transport:
+          type: string
+          minLength: 1
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        url:
+          type: string
+        metadata:
+          type: object
+          description: Arbitrary metadata
+
+    McpServerCreateBody:
+      description: POST body for creating an MCP server — id and slug are system-generated.
+      type: object
+      required: [name, transport]
+      properties:
         name:
           type: string
           minLength: 1
@@ -888,10 +1011,6 @@ components:
         agentId:
           type: string
           minLength: 1
-        id:
-          type: string
-          minLength: 1
-          description: Optional — server generates a UUID if omitted
 
     # -- Chat --
     ChatRequest:

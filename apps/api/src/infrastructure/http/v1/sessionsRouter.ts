@@ -42,7 +42,7 @@ export function createSessionsRouter(db: DrizzleDb): Router {
         res.status(201).json({ data: session });
       } catch (e) {
         if (isSqliteConstraint(e)) {
-          throw new HttpError(409, 'CONFLICT', 'Session id already exists or foreign key failed');
+          throw new HttpError(409, 'CONFLICT', 'Foreign key constraint failed (invalid agentId)');
         }
         throw e;
       }

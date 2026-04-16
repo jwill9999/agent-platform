@@ -1,46 +1,75 @@
-import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /** Normalized skill row; arrays stored as JSON (matches @agent-platform/contracts Skill). */
-export const skills = sqliteTable('skills', {
-  id: text('id').primaryKey(),
-  goal: text('goal').notNull(),
-  constraintsJson: text('constraints_json').notNull(),
-  toolIdsJson: text('tool_ids_json').notNull(),
-  outputSchemaJson: text('output_schema_json'),
-});
+export const skills = sqliteTable(
+  'skills',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull().default(''),
+    slug: text('slug').notNull().default(''),
+    goal: text('goal').notNull(),
+    constraintsJson: text('constraints_json').notNull(),
+    toolIdsJson: text('tool_ids_json').notNull(),
+    outputSchemaJson: text('output_schema_json'),
+  },
+  (t) => ({
+    slugIdx: uniqueIndex('skills_slug_idx').on(t.slug),
+  }),
+);
 
-export const tools = sqliteTable('tools', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  description: text('description'),
-  /** Non-secret tool configuration (JSON). */
-  configJson: text('config_json'),
-});
+export const tools = sqliteTable(
+  'tools',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull().default(''),
+    name: text('name').notNull(),
+    description: text('description'),
+    /** Non-secret tool configuration (JSON). */
+    configJson: text('config_json'),
+  },
+  (t) => ({
+    slugIdx: uniqueIndex('tools_slug_idx').on(t.slug),
+  }),
+);
 
 /** MCP server registry; no secret values — only non-sensitive metadata (JSON). */
-export const mcpServers = sqliteTable('mcp_servers', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  transport: text('transport').notNull(),
-  command: text('command'),
-  argsJson: text('args_json'),
-  url: text('url'),
-  metadataJson: text('metadata_json'),
-});
+export const mcpServers = sqliteTable(
+  'mcp_servers',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull().default(''),
+    name: text('name').notNull(),
+    transport: text('transport').notNull(),
+    command: text('command'),
+    argsJson: text('args_json'),
+    url: text('url'),
+    metadataJson: text('metadata_json'),
+  },
+  (t) => ({
+    slugIdx: uniqueIndex('mcp_servers_slug_idx').on(t.slug),
+  }),
+);
 
 /** Persisted agent profile (matches Agent contract shape via JSON + join tables). */
-export const agents = sqliteTable('agents', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  systemPrompt: text('system_prompt').notNull().default('You are a helpful assistant.'),
-  description: text('description'),
-  executionLimitsJson: text('execution_limits_json').notNull(),
-  modelOverrideJson: text('model_override_json'),
-  pluginAllowlistJson: text('plugin_allowlist_json'),
-  pluginDenylistJson: text('plugin_denylist_json'),
-  createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
-  updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
-});
+export const agents = sqliteTable(
+  'agents',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull().default(''),
+    name: text('name').notNull(),
+    systemPrompt: text('system_prompt').notNull().default('You are a helpful assistant.'),
+    description: text('description'),
+    executionLimitsJson: text('execution_limits_json').notNull(),
+    modelOverrideJson: text('model_override_json'),
+    pluginAllowlistJson: text('plugin_allowlist_json'),
+    pluginDenylistJson: text('plugin_denylist_json'),
+    createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+    updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+  },
+  (t) => ({
+    slugIdx: uniqueIndex('agents_slug_idx').on(t.slug),
+  }),
+);
 
 export const agentSkills = sqliteTable(
   'agent_skills',

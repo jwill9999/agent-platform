@@ -1,7 +1,17 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Agent, McpServer, SessionRecord, Skill, Tool } from '@agent-platform/contracts';
-import { eq } from 'drizzle-orm';
+import type {
+  Agent,
+  AgentCreateBody,
+  McpServer,
+  McpServerCreateBody,
+  SessionRecord,
+  Skill,
+  SkillCreateBody,
+  Tool,
+  ToolCreateBody,
+} from '@agent-platform/contracts';
+import { eq, or } from 'drizzle-orm';
 
 import type { DrizzleDb } from '../database.js';
 import {
@@ -15,7 +25,22 @@ import {
   toolToRow,
 } from '../mappers.js';
 import * as schema from '../schema.js';
+import { slugify } from '../slug.js';
 import { withTransaction } from '../transaction.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
+// ---------------------------------------------------------------------------
+// Skills
+// ---------------------------------------------------------------------------
 
 export function listSkills(db: DrizzleDb): Skill[] {
   return db
@@ -25,9 +50,21 @@ export function listSkills(db: DrizzleDb): Skill[] {
     .map((row) => skillRowToContract(row));
 }
 
-export function getSkill(db: DrizzleDb, id: string): Skill | undefined {
-  const row = db.select().from(schema.skills).where(eq(schema.skills.id, id)).get();
+export function getSkill(db: DrizzleDb, idOrSlug: string): Skill | undefined {
+  const cond = isUuid(idOrSlug)
+    ? eq(schema.skills.id, idOrSlug)
+    : or(eq(schema.skills.id, idOrSlug), eq(schema.skills.slug, idOrSlug));
+  const row = db.select().from(schema.skills).where(cond).get();
   return row ? skillRowToContract(row) : undefined;
+}
+
+export function createSkill(db: DrizzleDb, body: SkillCreateBody): Skill {
+  const id = randomUUID();
+  const slug = slugify(body.name);
+  const skill: Skill = { ...body, id, slug };
+  const row = skillToRow(skill);
+  db.insert(schema.skills).values(row).run();
+  return skill;
 }
 
 export function upsertSkill(db: DrizzleDb, skill: Skill): void {
@@ -37,6 +74,8 @@ export function upsertSkill(db: DrizzleDb, skill: Skill): void {
     .onConflictDoUpdate({
       target: schema.skills.id,
       set: {
+        name: row.name,
+        slug: row.slug,
         goal: row.goal,
         constraintsJson: row.constraintsJson,
         toolIdsJson: row.toolIdsJson,
@@ -46,10 +85,16 @@ export function upsertSkill(db: DrizzleDb, skill: Skill): void {
     .run();
 }
 
-export function deleteSkill(db: DrizzleDb, id: string): boolean {
-  const r = db.delete(schema.skills).where(eq(schema.skills.id, id)).run();
+export function deleteSkill(db: DrizzleDb, idOrSlug: string): boolean {
+  const existing = getSkill(db, idOrSlug);
+  if (!existing) return false;
+  const r = db.delete(schema.skills).where(eq(schema.skills.id, existing.id)).run();
   return r.changes > 0;
 }
+
+// ---------------------------------------------------------------------------
+// Tools
+// ---------------------------------------------------------------------------
 
 export function listTools(db: DrizzleDb): Tool[] {
   return db
@@ -59,9 +104,21 @@ export function listTools(db: DrizzleDb): Tool[] {
     .map((row) => toolRowToContract(row));
 }
 
-export function getTool(db: DrizzleDb, id: string): Tool | undefined {
-  const row = db.select().from(schema.tools).where(eq(schema.tools.id, id)).get();
+export function getTool(db: DrizzleDb, idOrSlug: string): Tool | undefined {
+  const cond = isUuid(idOrSlug)
+    ? eq(schema.tools.id, idOrSlug)
+    : or(eq(schema.tools.id, idOrSlug), eq(schema.tools.slug, idOrSlug));
+  const row = db.select().from(schema.tools).where(cond).get();
   return row ? toolRowToContract(row) : undefined;
+}
+
+export function createTool(db: DrizzleDb, body: ToolCreateBody): Tool {
+  const id = randomUUID();
+  const slug = slugify(body.name);
+  const tool: Tool = { ...body, id, slug };
+  const row = toolToRow(tool);
+  db.insert(schema.tools).values(row).run();
+  return tool;
 }
 
 export function upsertTool(db: DrizzleDb, tool: Tool): void {
@@ -72,6 +129,7 @@ export function upsertTool(db: DrizzleDb, tool: Tool): void {
       target: schema.tools.id,
       set: {
         name: row.name,
+        slug: row.slug,
         description: row.description,
         configJson: row.configJson,
       },
@@ -79,10 +137,16 @@ export function upsertTool(db: DrizzleDb, tool: Tool): void {
     .run();
 }
 
-export function deleteTool(db: DrizzleDb, id: string): boolean {
-  const r = db.delete(schema.tools).where(eq(schema.tools.id, id)).run();
+export function deleteTool(db: DrizzleDb, idOrSlug: string): boolean {
+  const existing = getTool(db, idOrSlug);
+  if (!existing) return false;
+  const r = db.delete(schema.tools).where(eq(schema.tools.id, existing.id)).run();
   return r.changes > 0;
 }
+
+// ---------------------------------------------------------------------------
+// MCP Servers
+// ---------------------------------------------------------------------------
 
 export function listMcpServers(db: DrizzleDb): McpServer[] {
   return db
@@ -92,9 +156,21 @@ export function listMcpServers(db: DrizzleDb): McpServer[] {
     .map((row) => mcpRowToContract(row));
 }
 
-export function getMcpServer(db: DrizzleDb, id: string): McpServer | undefined {
-  const row = db.select().from(schema.mcpServers).where(eq(schema.mcpServers.id, id)).get();
+export function getMcpServer(db: DrizzleDb, idOrSlug: string): McpServer | undefined {
+  const cond = isUuid(idOrSlug)
+    ? eq(schema.mcpServers.id, idOrSlug)
+    : or(eq(schema.mcpServers.id, idOrSlug), eq(schema.mcpServers.slug, idOrSlug));
+  const row = db.select().from(schema.mcpServers).where(cond).get();
   return row ? mcpRowToContract(row) : undefined;
+}
+
+export function createMcpServer(db: DrizzleDb, body: McpServerCreateBody): McpServer {
+  const id = randomUUID();
+  const slug = slugify(body.name);
+  const server: McpServer = { ...body, id, slug };
+  const row = mcpToRow(server);
+  db.insert(schema.mcpServers).values(row).run();
+  return server;
 }
 
 export function upsertMcpServer(db: DrizzleDb, m: McpServer): void {
@@ -105,6 +181,7 @@ export function upsertMcpServer(db: DrizzleDb, m: McpServer): void {
       target: schema.mcpServers.id,
       set: {
         name: row.name,
+        slug: row.slug,
         transport: row.transport,
         command: row.command,
         argsJson: row.argsJson,
@@ -115,10 +192,16 @@ export function upsertMcpServer(db: DrizzleDb, m: McpServer): void {
     .run();
 }
 
-export function deleteMcpServer(db: DrizzleDb, id: string): boolean {
-  const r = db.delete(schema.mcpServers).where(eq(schema.mcpServers.id, id)).run();
+export function deleteMcpServer(db: DrizzleDb, idOrSlug: string): boolean {
+  const existing = getMcpServer(db, idOrSlug);
+  if (!existing) return false;
+  const r = db.delete(schema.mcpServers).where(eq(schema.mcpServers.id, existing.id)).run();
   return r.changes > 0;
 }
+
+// ---------------------------------------------------------------------------
+// Agents
+// ---------------------------------------------------------------------------
 
 export function listAgents(db: DrizzleDb): Agent[] {
   const ids = db.select({ id: schema.agents.id }).from(schema.agents).all();
@@ -128,6 +211,23 @@ export function listAgents(db: DrizzleDb): Agent[] {
     if (a) out.push(a);
   }
   return out;
+}
+
+export function getAgent(db: DrizzleDb, idOrSlug: string): Agent | undefined {
+  const cond = isUuid(idOrSlug)
+    ? eq(schema.agents.id, idOrSlug)
+    : or(eq(schema.agents.id, idOrSlug), eq(schema.agents.slug, idOrSlug));
+  const row = db.select().from(schema.agents).where(cond).get();
+  if (!row) return undefined;
+  return loadAgentById(db, row.id);
+}
+
+export function createAgent(db: DrizzleDb, body: AgentCreateBody): Agent {
+  const id = randomUUID();
+  const slug = slugify(body.name);
+  const agent: Agent = { ...body, id, slug };
+  replaceAgent(db, agent);
+  return getAgent(db, id)!;
 }
 
 export function replaceAgent(db: DrizzleDb, agent: Agent): void {
@@ -142,6 +242,7 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
     tx.insert(schema.agents)
       .values({
         id: agent.id,
+        slug: agent.slug,
         name: agent.name,
         systemPrompt: agent.systemPrompt,
         description: agent.description ?? null,
@@ -157,6 +258,7 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
       .onConflictDoUpdate({
         target: schema.agents.id,
         set: {
+          slug: agent.slug,
           name: agent.name,
           systemPrompt: agent.systemPrompt,
           description: agent.description ?? null,
@@ -183,10 +285,16 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
   });
 }
 
-export function deleteAgent(db: DrizzleDb, id: string): boolean {
-  const r = db.delete(schema.agents).where(eq(schema.agents.id, id)).run();
+export function deleteAgent(db: DrizzleDb, idOrSlug: string): boolean {
+  const existing = getAgent(db, idOrSlug);
+  if (!existing) return false;
+  const r = db.delete(schema.agents).where(eq(schema.agents.id, existing.id)).run();
   return r.changes > 0;
 }
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
 
 export function listSessions(db: DrizzleDb, agentId?: string): SessionRecord[] {
   const rows = agentId
@@ -200,12 +308,9 @@ export function getSession(db: DrizzleDb, id: string): SessionRecord | undefined
   return row ? sessionRowToContract(row) : undefined;
 }
 
-export function createSession(
-  db: DrizzleDb,
-  input: { agentId: string; id?: string },
-): SessionRecord {
+export function createSession(db: DrizzleDb, input: { agentId: string }): SessionRecord {
   const now = Date.now();
-  const id = input.id ?? randomUUID();
+  const id = randomUUID();
   db.insert(schema.sessions)
     .values({
       id,

@@ -46,6 +46,7 @@ const baseState: HarnessStateType = {
 
 const stubAgent: Agent = {
   id: 'agent-1',
+  slug: 'agent-1',
   name: 'Test Agent',
   systemPrompt: 'You are helpful.',
   allowedSkillIds: [],

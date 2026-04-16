@@ -100,6 +100,7 @@ export default function McpServersPage() {
     }
     const draft: McpServer = {
       id: form.id.trim(),
+      slug: form.id.trim(),
       name: form.name.trim(),
       transport: form.transport.trim(),
       ...(form.command.trim() ? { command: form.command.trim() } : {}),

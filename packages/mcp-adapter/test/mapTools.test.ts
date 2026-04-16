@@ -9,6 +9,7 @@ describe('mcpToolToContractTool', () => {
       inputSchema: { type: 'object' },
     });
     expect(t.id).toBe('srv-1:echo');
+    expect(t.slug).toBe('srv-1--echo');
     expect(t.name).toBe('echo');
     expect(t.description).toBe('Echo input');
     expect(t.config).toEqual({
