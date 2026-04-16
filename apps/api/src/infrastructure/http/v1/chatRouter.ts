@@ -33,6 +33,7 @@ import { z } from 'zod';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
+import { createInProcessSessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
 // ---------------------------------------------------------------------------
@@ -150,6 +151,7 @@ function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): voi
 
 export function createChatRouter(db: DrizzleDb): Router {
   const router = createRouter();
+  const sessionLock = createInProcessSessionLock();
 
   // Session-aware agent chat (NDJSON stream of Output events)
   router.post(
@@ -163,9 +165,11 @@ export function createChatRouter(db: DrizzleDb): Router {
       const agentCtx = await loadAgentContext(db, session.agentId);
       const modelCfg = resolveModelOrThrow(agentCtx, req.header('x-openai-key'));
 
+      const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
+      const release = await sessionLock.acquire(sessionId, timeoutMs);
+
       const controller = new AbortController();
       const { signal } = controller;
-      const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
       try {
@@ -230,6 +234,7 @@ export function createChatRouter(db: DrizzleDb): Router {
         emitStreamError(res, err, signal);
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
+        release();
         await destroyAgentContext(agentCtx);
         if (!res.writableEnded) res.end();
       }
