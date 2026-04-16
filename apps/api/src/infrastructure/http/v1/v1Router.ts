@@ -7,9 +7,12 @@ import { createMcpServersRouter } from './mcpServersRouter.js';
 import { createSessionsRouter } from './sessionsRouter.js';
 import { createSkillsRouter } from './skillsRouter.js';
 import { createToolsRouter } from './toolsRouter.js';
+import { apiRateLimiter } from '../rateLimitMiddleware.js';
 
 export function createV1Router(db: DrizzleDb): Router {
   const router = Router();
+
+  router.use(apiRateLimiter);
 
   /** Single-user local stub (no auth yet). */
   router.use((_req, _res, next) => {

@@ -149,6 +149,64 @@ function checkTokenLimit(
   return true;
 }
 
+/** Check maxCostUnits limit; appends trace event and emits error if exceeded. */
+function checkCostLimit(
+  limits: HarnessStateType['limits'],
+  newTotalCost: number,
+  traceEvents: TraceEvent[],
+  emitter: OutputEmitter | undefined,
+): boolean {
+  const maxCost = limits?.maxCostUnits;
+  if (maxCost == null || newTotalCost < maxCost) return false;
+
+  traceEvents.push({ type: 'limit_hit', kind: 'max_cost' });
+  if (emitter) {
+    emitter.emit({
+      type: 'error',
+      code: 'MAX_COST',
+      message: `Cost limit exceeded (${newTotalCost}/${maxCost})`,
+    });
+  }
+  return true;
+}
+
+const BUDGET_WARN_THRESHOLD = 0.8;
+
+/** Emit warnings when approaching token or cost limits (80% threshold). */
+function emitBudgetWarnings(
+  limits: HarnessStateType['limits'],
+  newTotalTokens: number,
+  newTotalCost: number,
+  emitter: OutputEmitter | undefined,
+): void {
+  if (!emitter) return;
+
+  const maxTokens = limits?.maxTokens;
+  if (
+    maxTokens != null &&
+    newTotalTokens >= maxTokens * BUDGET_WARN_THRESHOLD &&
+    newTotalTokens < maxTokens
+  ) {
+    emitter.emit({
+      type: 'text',
+      content: `[warning] Token usage at ${Math.round((newTotalTokens / maxTokens) * 100)}% of limit (${newTotalTokens}/${maxTokens})`,
+    });
+  }
+
+  const maxCost = limits?.maxCostUnits;
+  if (
+    maxCost != null &&
+    maxCost > 0 &&
+    newTotalCost >= maxCost * BUDGET_WARN_THRESHOLD &&
+    newTotalCost < maxCost
+  ) {
+    emitter.emit({
+      type: 'text',
+      content: `[warning] Cost usage at ${Math.round((newTotalCost / maxCost) * 100)}% of limit (${newTotalCost}/${maxCost})`,
+    });
+  }
+}
+
 /** Normalise the old (OutputEmitter) and new (LlmReasonNodeOptions) signatures. */
 function normaliseOptions(options?: OutputEmitter | LlmReasonNodeOptions): LlmReasonNodeOptions {
   if (!options || typeof options !== 'object') return {};
@@ -198,15 +256,26 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
 
     const tokenDelta = tokenUsage ? tokenUsage.promptTokens + tokenUsage.completionTokens : 0;
     const newTotalTokens = state.totalTokensUsed + tokenDelta;
+    const costDelta = tokenDelta / 1000;
+    const newTotalCost = state.totalCostUnits + costDelta;
     const step = state.taskIndex ?? 0;
     const traceEvents: TraceEvent[] = [{ type: 'llm_call', step, tokenUsage }];
-    const halted = checkTokenLimit(state.limits, newTotalTokens, traceEvents, emitter);
+
+    const tokenHalted = checkTokenLimit(state.limits, newTotalTokens, traceEvents, emitter);
+    const costHalted =
+      !tokenHalted && checkCostLimit(state.limits, newTotalCost, traceEvents, emitter);
+    const halted = tokenHalted || costHalted;
+
+    if (!halted) {
+      emitBudgetWarnings(state.limits, newTotalTokens, newTotalCost, emitter);
+    }
 
     return {
       llmOutput: output,
       messages: [assistantMessage],
       trace: traceEvents,
       totalTokensUsed: newTotalTokens,
+      totalCostUnits: newTotalCost,
       ...(halted ? { halted: true } : {}),
     };
   };
