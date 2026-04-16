@@ -61,7 +61,7 @@ describe('McpSessionManager', () => {
         .mockResolvedValueOnce(session1)
         .mockRejectedValueOnce(new Error('Connection refused'));
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const manager = new McpSessionManager();
       const results = await manager.openSessions([server1, server2]);
 
@@ -75,24 +75,29 @@ describe('McpSessionManager', () => {
 
       expect(manager.getSession('srv-1')).toBe(session1);
       expect(manager.getSession('srv-2')).toBeUndefined();
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to connect to MCP server "srv-2"'),
-      );
 
-      warnSpy.mockRestore();
+      const logged = JSON.parse(logSpy.mock.calls[0]![0] as string);
+      expect(logged).toMatchObject({
+        level: 'warn',
+        service: 'mcp-adapter',
+        msg: 'Failed to connect to MCP server',
+        serverId: 'srv-2',
+      });
+
+      logSpy.mockRestore();
     });
 
     it('handles all failures gracefully', async () => {
       mockOpen.mockRejectedValue(new Error('Network error'));
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const manager = new McpSessionManager();
       const results = await manager.openSessions([server1, server2]);
 
       expect(results.every((r) => r.status === 'failed')).toBe(true);
       expect(manager.getSessions().size).toBe(0);
 
-      warnSpy.mockRestore();
+      logSpy.mockRestore();
     });
 
     it('returns empty array for empty configs', async () => {
@@ -169,7 +174,7 @@ describe('McpSessionManager', () => {
 
     it('returns false on reconnect failure', async () => {
       mockOpen.mockRejectedValue(new Error('Still down'));
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const manager = new McpSessionManager();
       const success = await manager.reconnect(server1);
@@ -177,7 +182,7 @@ describe('McpSessionManager', () => {
       expect(success).toBe(false);
       expect(manager.getSession('srv-1')).toBeUndefined();
 
-      warnSpy.mockRestore();
+      logSpy.mockRestore();
     });
   });
 
@@ -203,7 +208,7 @@ describe('McpSessionManager', () => {
       (session.close as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('close failed'));
       mockOpen.mockResolvedValue(session);
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const manager = new McpSessionManager();
       await manager.openSessions([server1]);
 
@@ -211,7 +216,7 @@ describe('McpSessionManager', () => {
       await manager.closeAll();
 
       expect(manager.getSessions().size).toBe(0);
-      warnSpy.mockRestore();
+      logSpy.mockRestore();
     });
 
     it('is safe to call on empty manager', async () => {

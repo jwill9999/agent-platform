@@ -1,7 +1,7 @@
 import type { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 
-import { createLogger } from '../logging/logger.js';
+import { createLogger } from '@agent-platform/logger';
 import { HttpError } from './httpError.js';
 
 const log = createLogger('error-middleware');

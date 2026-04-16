@@ -1,11 +1,14 @@
 import type { Agent, McpServer, Skill, Tool as ContractTool } from '@agent-platform/contracts';
 import type { DrizzleDb } from '@agent-platform/db';
 import { loadAgentById, getMcpServer, getSkill, getTool } from '@agent-platform/db';
+import { createLogger } from '@agent-platform/logger';
 import { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import { resolveEffectivePluginHooks } from '@agent-platform/plugin-session';
+
+const log = createLogger('harness');
 
 // ---------------------------------------------------------------------------
 // Types
@@ -124,7 +127,7 @@ async function discoverMcpTools(
       tools.push(...discovered);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[factory] Tool discovery failed for server "${config.id}": ${message}`);
+      log.warn('Tool discovery failed', { serverId: config.id, error: message });
     }
   }
   return tools;

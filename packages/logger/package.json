@@ -1,5 +1,5 @@
 {
-  "name": "@agent-platform/mcp-adapter",
+  "name": "@agent-platform/logger",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -16,11 +16,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run"
-  },
-  "dependencies": {
-    "@agent-platform/contracts": "workspace:*",
-    "@agent-platform/logger": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.12.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
