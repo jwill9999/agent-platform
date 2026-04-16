@@ -47,7 +47,7 @@ function buildInitialState(agent?: Agent): FormState {
   };
 }
 
-export function AgentEditor({ agent, onCancel, onSaved }: AgentEditorProps) {
+export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorProps>) {
   const [form, setForm] = useState<FormState>(() => buildInitialState(agent));
   const [skills, setSkills] = useState<Skill[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
@@ -135,7 +135,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: AgentEditorProps) {
             {agent ? `Editing ${agent.name}` : 'Create a new AI agent'}
           </p>
         </div>
-        <Button onClick={() => void handleSave()} disabled={saving}>
+        <Button onClick={() => { handleSave(); }} disabled={saving}>
           {saving ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
@@ -243,7 +243,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: AgentEditorProps) {
                   min={1}
                   max={100}
                   value={form.maxSteps}
-                  onChange={(e) => setField('maxSteps', parseInt(e.target.value, 10) || 10)}
+                  onChange={(e) => setField('maxSteps', Number.parseInt(e.target.value, 10) || 10)}
                 />
               </div>
 
@@ -255,7 +255,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: AgentEditorProps) {
                   min={1}
                   max={10}
                   value={form.maxParallelTasks}
-                  onChange={(e) => setField('maxParallelTasks', parseInt(e.target.value, 10) || 2)}
+                  onChange={(e) => setField('maxParallelTasks', Number.parseInt(e.target.value, 10) || 2)}
                 />
               </div>
 
@@ -267,7 +267,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: AgentEditorProps) {
                   min={1000}
                   step={1000}
                   value={form.timeoutMs}
-                  onChange={(e) => setField('timeoutMs', parseInt(e.target.value, 10) || 60_000)}
+                  onChange={(e) => setField('timeoutMs', Number.parseInt(e.target.value, 10) || 60_000)}
                 />
               </div>
             </div>
@@ -281,6 +281,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: AgentEditorProps) {
                 {skills.map((skill) => (
                   <label
                     key={skill.id}
+                    aria-label={skill.name}
                     className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 cursor-pointer transition-colors"
                   >
                     <input
@@ -307,6 +308,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: AgentEditorProps) {
                 {mcpServers.map((server) => (
                   <label
                     key={server.id}
+                    aria-label={server.name}
                     className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 cursor-pointer transition-colors"
                   >
                     <input

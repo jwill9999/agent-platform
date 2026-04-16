@@ -83,7 +83,7 @@ export default function SessionsPage() {
                 <a href="/settings/agents" className="text-primary hover:underline">Create an agent</a> first.
               </p>
             ) : (
-              <form onSubmit={(e) => void createSession(e)} className="space-y-4">
+              <form onSubmit={(e) => { createSession(e); }} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="sess-agent">Agent</Label>
@@ -123,16 +123,18 @@ export default function SessionsPage() {
               Active Sessions {!loading && <span className="text-muted-foreground text-sm font-normal">({sessions.length})</span>}
             </h2>
 
-            {loading ? (
+            {loading && (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : sessions.length === 0 ? (
+            )}
+            {!loading && sessions.length === 0 && (
               <div className="flex flex-col items-center justify-center h-32 text-center">
                 <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-3" />
                 <p className="text-sm text-muted-foreground">No sessions yet</p>
               </div>
-            ) : (
+            )}
+            {!loading && sessions.length > 0 && (
               <div className="space-y-2">
                 {sessions.map((s) => (
                   <div key={s.id} className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">

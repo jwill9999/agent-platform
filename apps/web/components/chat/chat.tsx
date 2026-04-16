@@ -12,7 +12,7 @@ export interface ChatProps {
   isLoading: boolean;
 }
 
-export function Chat({ messages, onSend, isLoading }: ChatProps) {
+export function Chat({ messages, onSend, isLoading }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {

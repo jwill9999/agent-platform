@@ -75,7 +75,7 @@ export function ToolsDashboard() {
       <ToolEditor
         tool={editing === 'new' ? undefined : editing}
         onCancel={() => setEditing(null)}
-        onSaved={() => { setEditing(null); void load(); }}
+        onSaved={() => { setEditing(null); load(); }}
       />
     );
   }
@@ -112,11 +112,12 @@ export function ToolsDashboard() {
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : filtered.length === 0 ? (
+        )}
+        {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <Wrench className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="font-medium text-foreground mb-1">No tools found</h3>
@@ -130,7 +131,8 @@ export function ToolsDashboard() {
               </Button>
             )}
           </div>
-        ) : (
+        )}
+        {!loading && filtered.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((tool) => (
               <div
@@ -151,11 +153,11 @@ export function ToolsDashboard() {
                       <DropdownMenuItem onClick={() => setEditing(tool)}>
                         <Pencil className="h-4 w-4 mr-2" /> Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => void handleDuplicate(tool)}>
+                      <DropdownMenuItem onClick={() => { handleDuplicate(tool); }}>
                         <Copy className="h-4 w-4 mr-2" /> Duplicate
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => void handleDelete(tool.id)} className="text-destructive focus:text-destructive">
+                      <DropdownMenuItem onClick={() => { handleDelete(tool.id); }} className="text-destructive focus:text-destructive">
                         <Trash2 className="h-4 w-4 mr-2" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -185,7 +187,7 @@ interface ToolEditorProps {
   onSaved: () => void;
 }
 
-function ToolEditor({ tool, onCancel, onSaved }: ToolEditorProps) {
+function ToolEditor({ tool, onCancel, onSaved }: Readonly<ToolEditorProps>) {
   const [name, setName] = useState(tool?.name ?? '');
   const [description, setDescription] = useState(tool?.description ?? '');
   const [configText, setConfigText] = useState(
@@ -240,7 +242,7 @@ function ToolEditor({ tool, onCancel, onSaved }: ToolEditorProps) {
             {tool ? 'Edit Tool' : 'New Tool'}
           </h1>
         </div>
-        <Button onClick={() => void handleSave()} disabled={saving}>
+        <Button onClick={() => { handleSave(); }} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           {tool ? 'Update' : 'Create'}
         </Button>

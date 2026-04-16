@@ -78,7 +78,7 @@ export function SkillsDashboard() {
       <SkillEditor
         skill={editing === 'new' ? undefined : editing}
         onCancel={() => setEditing(null)}
-        onSaved={() => { setEditing(null); void load(); }}
+        onSaved={() => { setEditing(null); load(); }}
       />
     );
   }
@@ -115,11 +115,12 @@ export function SkillsDashboard() {
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : filtered.length === 0 ? (
+        )}
+        {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <Zap className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="font-medium text-foreground mb-1">No skills found</h3>
@@ -133,7 +134,8 @@ export function SkillsDashboard() {
               </Button>
             )}
           </div>
-        ) : (
+        )}
+        {!loading && filtered.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((skill) => (
               <div
@@ -154,11 +156,11 @@ export function SkillsDashboard() {
                       <DropdownMenuItem onClick={() => setEditing(skill)}>
                         <Pencil className="h-4 w-4 mr-2" /> Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => void handleDuplicate(skill)}>
+                      <DropdownMenuItem onClick={() => { handleDuplicate(skill); }}>
                         <Copy className="h-4 w-4 mr-2" /> Duplicate
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => void handleDelete(skill.id)} className="text-destructive focus:text-destructive">
+                      <DropdownMenuItem onClick={() => { handleDelete(skill.id); }} className="text-destructive focus:text-destructive">
                         <Trash2 className="h-4 w-4 mr-2" /> Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -171,12 +173,12 @@ export function SkillsDashboard() {
                   <div className="flex flex-wrap gap-1.5">
                     {skill.tools.length > 0 && (
                       <Badge variant="outline" className="text-xs">
-                        {skill.tools.length} tool{skill.tools.length !== 1 ? 's' : ''}
+                        {skill.tools.length} tool{skill.tools.length === 1 ? '' : 's'}
                       </Badge>
                     )}
                     {skill.constraints.length > 0 && (
                       <Badge variant="outline" className="text-xs">
-                        {skill.constraints.length} constraint{skill.constraints.length !== 1 ? 's' : ''}
+                        {skill.constraints.length} constraint{skill.constraints.length === 1 ? '' : 's'}
                       </Badge>
                     )}
                   </div>
@@ -198,7 +200,7 @@ interface SkillEditorProps {
   onSaved: () => void;
 }
 
-function SkillEditor({ skill, onCancel, onSaved }: SkillEditorProps) {
+function SkillEditor({ skill, onCancel, onSaved }: Readonly<SkillEditorProps>) {
   const [name, setName] = useState(skill?.name ?? '');
   const [goal, setGoal] = useState(skill?.goal ?? '');
   const [constraintsText, setConstraintsText] = useState(skill?.constraints.join('\n') ?? '');
@@ -258,7 +260,7 @@ function SkillEditor({ skill, onCancel, onSaved }: SkillEditorProps) {
             {skill ? 'Edit Skill' : 'New Skill'}
           </h1>
         </div>
-        <Button onClick={() => void handleSave()} disabled={saving}>
+        <Button onClick={() => { handleSave(); }} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           {skill ? 'Update' : 'Create'}
         </Button>

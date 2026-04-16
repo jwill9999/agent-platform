@@ -79,7 +79,7 @@ export function McpDashboard() {
       <McpEditor
         server={editing === 'new' ? undefined : editing}
         onCancel={() => setEditing(null)}
-        onSaved={() => { setEditing(null); void load(); }}
+        onSaved={() => { setEditing(null); load(); }}
       />
     );
   }
@@ -116,11 +116,12 @@ export function McpDashboard() {
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : filtered.length === 0 ? (
+        )}
+        {!loading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <Server className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="font-medium text-foreground mb-1">No MCP servers found</h3>
@@ -134,7 +135,8 @@ export function McpDashboard() {
               </Button>
             )}
           </div>
-        ) : (
+        )}
+        {!loading && filtered.length > 0 && (
           <div className="space-y-3">
             {filtered.map((server) => (
               <div
@@ -163,11 +165,11 @@ export function McpDashboard() {
                     <DropdownMenuItem onClick={() => setEditing(server)}>
                       <Pencil className="h-4 w-4 mr-2" /> Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => void handleDuplicate(server)}>
+                    <DropdownMenuItem onClick={() => { handleDuplicate(server); }}>
                       <Copy className="h-4 w-4 mr-2" /> Duplicate
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => void handleDelete(server.id)} className="text-destructive focus:text-destructive">
+                    <DropdownMenuItem onClick={() => { handleDelete(server.id); }} className="text-destructive focus:text-destructive">
                       <Trash2 className="h-4 w-4 mr-2" /> Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -189,7 +191,31 @@ interface McpEditorProps {
   onSaved: () => void;
 }
 
-function McpEditor({ server, onCancel, onSaved }: McpEditorProps) {
+function parseJsonArgs(text: string): { ok: true; value: string[] | undefined } | { ok: false; error: string } {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed === '[]') return { ok: true, value: undefined };
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === 'string')) {
+      return { ok: false, error: 'Args must be a JSON array of strings' };
+    }
+    return { ok: true, value: parsed };
+  } catch {
+    return { ok: false, error: 'Args must be valid JSON' };
+  }
+}
+
+function parseJsonMetadata(text: string): { ok: true; value: Record<string, unknown> | undefined } | { ok: false; error: string } {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, value: undefined };
+  try {
+    return { ok: true, value: JSON.parse(trimmed) as Record<string, unknown> };
+  } catch {
+    return { ok: false, error: 'Metadata must be valid JSON' };
+  }
+}
+
+function McpEditor({ server, onCancel, onSaved }: Readonly<McpEditorProps>) {
   const [name, setName] = useState(server?.name ?? '');
   const [transport, setTransport] = useState(server?.transport ?? 'stdio');
   const [command, setCommand] = useState(server?.command ?? '');
@@ -208,30 +234,11 @@ function McpEditor({ server, onCancel, onSaved }: McpEditorProps) {
     if (!name.trim()) { setError('Name is required'); return; }
     if (!transport.trim()) { setError('Transport is required'); return; }
 
-    let args: string[] | undefined;
-    if (argsText.trim() && argsText.trim() !== '[]') {
-      try {
-        const parsed = JSON.parse(argsText) as unknown;
-        if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === 'string')) {
-          setError('Args must be a JSON array of strings');
-          return;
-        }
-        args = parsed;
-      } catch {
-        setError('Args must be valid JSON');
-        return;
-      }
-    }
+    const argsResult = parseJsonArgs(argsText);
+    if (!argsResult.ok) { setError(argsResult.error); return; }
 
-    let metadata: Record<string, unknown> | undefined;
-    if (metadataText.trim()) {
-      try {
-        metadata = JSON.parse(metadataText) as Record<string, unknown>;
-      } catch {
-        setError('Metadata must be valid JSON');
-        return;
-      }
-    }
+    const metadataResult = parseJsonMetadata(metadataText);
+    if (!metadataResult.ok) { setError(metadataResult.error); return; }
 
     setSaving(true);
     try {
@@ -239,9 +246,9 @@ function McpEditor({ server, onCancel, onSaved }: McpEditorProps) {
         name: name.trim(),
         transport: transport.trim(),
         ...(command.trim() ? { command: command.trim() } : {}),
-        ...(args?.length ? { args } : {}),
+        ...(argsResult.value?.length ? { args: argsResult.value } : {}),
         ...(url.trim() ? { url: url.trim() } : {}),
-        ...(metadata ? { metadata } : {}),
+        ...(metadataResult.value ? { metadata: metadataResult.value } : {}),
       };
 
       if (server) {
@@ -268,7 +275,7 @@ function McpEditor({ server, onCancel, onSaved }: McpEditorProps) {
             {server ? 'Edit MCP Server' : 'New MCP Server'}
           </h1>
         </div>
-        <Button onClick={() => void handleSave()} disabled={saving}>
+        <Button onClick={() => { handleSave(); }} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           {server ? 'Update' : 'Create'}
         </Button>

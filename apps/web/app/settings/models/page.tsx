@@ -52,7 +52,7 @@ export default function ModelsSettingsPage() {
   );
 }
 
-function InfoCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function InfoCard({ icon, title, children }: Readonly<{ icon: React.ReactNode; title: string; children: React.ReactNode }>) {
   return (
     <div className="flex gap-4 p-4 rounded-xl border border-border bg-card">
       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">

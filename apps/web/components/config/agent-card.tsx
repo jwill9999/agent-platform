@@ -19,7 +19,7 @@ interface AgentCardProps {
   onDuplicate: () => void;
 }
 
-export function AgentCard({ agent, onEdit, onDelete, onDuplicate }: AgentCardProps) {
+export function AgentCard({ agent, onEdit, onDelete, onDuplicate }: Readonly<AgentCardProps>) {
   return (
     <div className="group relative bg-card border border-border rounded-xl p-5 hover:border-primary/50 hover:shadow-md transition-all">
       <div className="flex items-start justify-between mb-3">
@@ -69,7 +69,7 @@ export function AgentCard({ agent, onEdit, onDelete, onDuplicate }: AgentCardPro
           {agent.allowedSkillIds.length > 0 && (
             <Badge variant="outline" className="text-xs">
               {agent.allowedSkillIds.length} skill
-              {agent.allowedSkillIds.length !== 1 ? 's' : ''}
+              {agent.allowedSkillIds.length === 1 ? '' : 's'}
             </Badge>
           )}
           {agent.allowedMcpServerIds.length > 0 && (
@@ -79,7 +79,7 @@ export function AgentCard({ agent, onEdit, onDelete, onDuplicate }: AgentCardPro
           )}
           {agent.allowedToolIds.length > 0 && (
             <Badge variant="outline" className="text-xs">
-              {agent.allowedToolIds.length} tool{agent.allowedToolIds.length !== 1 ? 's' : ''}
+              {agent.allowedToolIds.length} tool{agent.allowedToolIds.length === 1 ? '' : 's'}
             </Badge>
           )}
         </div>

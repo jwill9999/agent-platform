@@ -118,11 +118,12 @@ export function AgentsDashboard() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
+        {loading && (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : filteredAgents.length === 0 ? (
+        )}
+        {!loading && filteredAgents.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <Bot className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="font-medium text-foreground mb-1">No agents found</h3>
@@ -138,15 +139,16 @@ export function AgentsDashboard() {
               </Button>
             )}
           </div>
-        ) : (
+        )}
+        {!loading && filteredAgents.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredAgents.map((agent) => (
               <AgentCard
                 key={agent.id}
                 agent={agent}
                 onEdit={() => setEditing(agent)}
-                onDelete={() => void handleDelete(agent.id)}
-                onDuplicate={() => void handleDuplicate(agent)}
+                onDelete={() => { handleDelete(agent.id); }}
+                onDuplicate={() => { handleDuplicate(agent); }}
               />
             ))}
           </div>
