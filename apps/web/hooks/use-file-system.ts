@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -130,10 +130,14 @@ export function useFileSystem(): UseFileSystemReturn {
   const [error, setError] = useState<string | null>(null);
   const [rootName, setRootName] = useState<string | null>(null);
   const [isDirectoryOpen, setIsDirectoryOpen] = useState(false);
+  const [isSupported, setIsSupported] = useState(false);
 
   const rootHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
 
-  const isSupported = isFileSystemAccessSupported();
+  // Detect FS Access API support only on the client (avoids SSR hydration mismatch)
+  useEffect(() => {
+    setIsSupported(isFileSystemAccessSupported());
+  }, []);
 
   const loadTree = useCallback(async (handle: FileSystemDirectoryHandle) => {
     setIsLoading(true);

@@ -356,7 +356,7 @@ function IDEToolbar({
         <Dialog open={isPathDialogOpen} onOpenChange={setIsPathDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2">
-              <FolderOpen className="h-4 w-4" />
+              <FileText className="h-4 w-4" />
               Open File
             </Button>
           </DialogTrigger>
@@ -524,7 +524,7 @@ function EditorPanel({
           <p className="text-lg font-medium mb-2">No file open</p>
           <p className="text-sm mb-4">Select a file from the explorer or open a file by path</p>
           <Button variant="outline" onClick={onOpenPathDialog} className="gap-2">
-            <FolderOpen className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             Open File
           </Button>
         </div>
