@@ -21,3 +21,13 @@ export { SecretRefSchema, type SecretRef } from './secrets.js';
 export { AgentSchema, type Agent } from './agent.js';
 export { PlanSchema, TaskSchema, type Plan, type Task } from './plan.js';
 export { ToolSchema, type Tool } from './tool.js';
+export {
+  RateLimitSettingsSchema,
+  CostBudgetSettingsSchema,
+  PlatformSettingsSchema,
+  PlatformSettingsUpdateSchema,
+  type RateLimitSettings,
+  type CostBudgetSettings,
+  type PlatformSettings,
+  type PlatformSettingsUpdate,
+} from './settings.js';
