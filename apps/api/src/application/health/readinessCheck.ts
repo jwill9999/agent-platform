@@ -1,7 +1,7 @@
 import type { DrizzleDb } from '@agent-platform/db';
 import type { SubsystemCheck, ReadinessResponse } from '@agent-platform/contracts';
 import { statSync, accessSync, constants as fsConstants } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 const CHECK_TIMEOUT_MS = 5_000;
 
@@ -144,11 +144,14 @@ async function withTimeout<T>(
 function getFreeDiskSpace(filePath: string): number | null {
   try {
     if (process.platform === 'win32') return null;
-    const output = execSync(`df -k "${filePath}" | tail -1 | awk '{print $4}'`, {
+    // execFileSync avoids shell interpolation — no injection risk (S4721)
+    const output = execFileSync('df', ['-k', filePath], {
       encoding: 'utf-8',
       timeout: 2000,
     }).trim();
-    const kb = parseInt(output, 10);
+    const lastLine = output.split('\n').pop() ?? '';
+    const columns = lastLine.split(/\s+/);
+    const kb = parseInt(columns[3] ?? '', 10);
     return isNaN(kb) ? null : kb * 1024;
   } catch {
     return null;
