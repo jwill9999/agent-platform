@@ -1,77 +1,43 @@
-# Agent Platform (MVP)
+# Agent Platform
 
-Composable agent harness (Node.js, TypeScript, LangGraph, MCP). Planning and decisions live in `decisions.md` and `docs/tasks/`.
+Composable agent harness for building, configuring, and running AI agents. Built with Node.js, TypeScript, LangGraph, and the Model Context Protocol (MCP).
 
-## Prerequisites
-
-- [Node.js](https://nodejs.org/) 20+
-- [pnpm](https://pnpm.io/) 9+ (`corepack enable` then `corepack prepare pnpm@9.15.4 --activate`)
-
-## Commands
-
-| Command                 | Description                                                                                                                      |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install`          | Install workspace dependencies                                                                                                   |
-| `pnpm typecheck`        | Typecheck all packages (`pnpm -r`)                                                                                               |
-| `pnpm build`            | Build all packages                                                                                                               |
-| `pnpm lint`             | ESLint across workspaces                                                                                                         |
-| `pnpm test`             | Run Vitest suites (202 tests across all packages)                                                                                |
-| `pnpm format`           | Prettier write                                                                                                                   |
-| `pnpm format:check`     | Prettier check                                                                                                                   |
-| `pnpm seed`             | After **`pnpm build`**: run idempotent DB seed (needs **`SQLITE_PATH`**) — default agent + demo skill                            |
-| `pnpm test:e2e`         | Playwright against **`BASE_URL`** (web) and **`API_URL`** (API); use with compose profile **`services`** + **`E2E_SEED=1`** seed |
-| `pnpm test:e2e:install` | One-time Playwright browser install (Chromium + deps)                                                                            |
-
-### Unified run lifecycle (API + web)
+## Quick Start
 
 ```bash
-# Start stack (build + run API/web; keeps existing DB)
-make up
-
-# Stop stack cleanly (sessions + listeners)
-make down
-
-# Full reset (down + delete DB + build + seed + run)
-make reset
-
-# Legacy aliases still work: start -> up, restart -> reset
-
-# Override ports/path when needed
-make reset PORT=3000 WEB_PORT=3001 SQLITE_PATH=/workspace/data/dev.sqlite
+pnpm install          # Install dependencies
+pnpm build            # Build all packages
+make up               # Start API (:3000) + Web (:3001)
 ```
 
-## HTTP API (`/v1`)
+See [Development Guide](docs/development.md) for prerequisites and detailed setup.
 
-Requires **`SQLITE_PATH`** at process start (same DB file as migrations/seed). JSON request/response bodies; errors: `{ "error": { "code", "message", "details?" } }`. **Single-user** — no auth yet (stub middleware).
+## Documentation
 
-| Resource    | Endpoints                                                                                                                                       |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Health      | `GET /health` (no DB)                                                                                                                           |
-| Skills      | `GET/POST /v1/skills`, `GET/PUT/DELETE /v1/skills/:id` — body **`SkillSchema`**                                                                 |
-| Tools       | `GET/POST /v1/tools`, `GET/PUT/DELETE /v1/tools/:id` — **`ToolSchema`**                                                                         |
-| MCP servers | `GET/POST /v1/mcp-servers`, `GET/PUT/DELETE /v1/mcp-servers/:id` — **`McpServerSchema`**                                                        |
-| Agents      | `GET/POST /v1/agents`, `GET/PUT/DELETE /v1/agents/:id` — **`AgentSchema`** (allowlists via `replaceAgent`)                                      |
-| Sessions    | `GET /v1/sessions?agentId=`, `POST /v1/sessions`, `GET/PUT/DELETE /v1/sessions/:id` — **`SessionCreateBodySchema`** / **`SessionRecordSchema`** |
+| Guide                                  | Description                               |
+| -------------------------------------- | ----------------------------------------- |
+| [Architecture](docs/architecture.md)   | System design, package roles, data flow   |
+| [API Reference](docs/api-reference.md) | REST endpoints, error shapes, schemas     |
+| [Database](docs/database.md)           | Schema, migrations, secret storage        |
+| [Development](docs/development.md)     | Local setup, build, test, lint commands   |
+| [Deployment](docs/deployment.md)       | Docker, environment variables, production |
+| [Configuration](docs/configuration.md) | Model routing, MCP servers, agent setup   |
+| [Plugin Guide](docs/plugin-guide.md)   | Plugin hooks and authoring                |
 
-## Layout
+## Project Layout
 
-- `apps/*` — applications (e.g. `apps/api`)
-- `packages/*` — shared libraries (e.g. `packages/contracts`)
+```
+apps/api          Express REST API (port 3000)
+apps/web          Next.js chat UI (port 3001)
+packages/         Shared libraries (contracts, db, harness, model-router, etc.)
+docs/             Documentation
+e2e/              Playwright E2E tests
+```
 
-## Docker
+See [Architecture](docs/architecture.md) for the full package dependency graph.
 
-- Copy `.env.example` to `.env` and adjust `HOST_PORT` / `SQLITE_PATH` as needed.
-- For API chat streaming, set `AGENT_OPENAI_API_KEY` (preferred). `OPENAI_API_KEY` is intentionally blocked by default to prevent stale exported keys from taking precedence; allow it only with `OPENAI_ALLOW_LEGACY_ENV=1`.
-- For the Next.js chat route (`apps/web/app/api/chat/route.ts`), set `NEXT_OPENAI_API_KEY` in `apps/web/.env` (legacy `OPENAI_API_KEY` fallback is also blocked by default unless `OPENAI_ALLOW_LEGACY_ENV=1`).
-- `docker compose up --build` builds the API image, maps `HOST_PORT` → container `3000`, mounts a **named volume** at `/data` for SQLite (`SQLITE_PATH` defaults to `/data/agent.sqlite` in Compose), mounts **`e2e_workspace` → `/workspace`** for the E2E filesystem MCP seed, and runs a **health check** on `GET /health`.
-- **API + web together:** `docker compose --profile services up --build` also builds **`Dockerfile.web`**, maps **`WEB_HOST_PORT`** (default **3001**) → web container **3001**, and sets **`API_PROXY_URL=http://api:3000`** for the Next.js BFF.
-- To load the **default agent** into that database: **(a)** on the host, run `pnpm build` and `pnpm seed` with **`SQLITE_PATH`** pointing at the same SQLite file the API uses; **(b)** in Docker, after the image has been built with the entrypoint that `chown`s `/data` to the app user, run  
-  `docker compose run --rm api node packages/db/dist/seed/run.js`  
-  (or stop the API first if you prefer: `docker compose stop api`, then that command, then `docker compose start api`). The seed is idempotent.
-- **E2E (Playwright):** install browsers once with `pnpm test:e2e:install`. With the **`services`** profile running, apply the E2E registry seed:  
-  `docker compose exec -T api sh -c 'E2E_SEED=1 SQLITE_PATH=/data/agent.sqlite node packages/db/dist/seed/run.js'`  
-  then `pnpm test:e2e` (override **`BASE_URL`** / **`API_URL`** if ports differ). CI runs the same flow; on failure, the **Playwright HTML report** is uploaded as an artifact. The suite does **not** call OpenAI today; optional keys for chat (`AGENT_OPENAI_API_KEY`, `NEXT_OPENAI_API_KEY`) are documented above for manual runs.
+## Contributing
 
-## Git workflow
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, and [AGENTS.md](AGENTS.md) for AI agent workflow instructions.
 
-See `decisions.md` and `AGENTS.md`: work on `task/<task-name>` branches from `feature/<feature-name>`; Beads (`bd`) tracks task state.
+Task tracking uses **bd (beads)** — see `AGENTS.md` for commands. Architectural decisions are recorded in [decisions.md](decisions.md).
