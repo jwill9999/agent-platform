@@ -130,21 +130,21 @@ Add `/health/ready` endpoint with response schema.
 
 ## Definition of done
 
-- [ ] Beads **description** and **acceptance_criteria** satisfied
-- [ ] **Every checkbox** in this spec is complete
-- [ ] All **upstream** Beads issues are **closed**
-- [ ] **Unit tests** run and pass
-- [ ] **Git:** branch pushed; if segment tip, PR merged
-- [ ] This spec file updated if scope changed
+- [x] Beads **description** and **acceptance_criteria** satisfied
+- [x] **Every checkbox** in this spec is complete
+- [x] All **upstream** Beads issues are **closed**
+- [x] **Unit tests** run and pass (12 tests)
+- [x] **Git:** branch pushed; if segment tip, PR merged
+- [x] This spec file updated if scope changed
 
 ## Sign-off
 
-- [ ] **Task branch** created from correct parent
-- [ ] **Unit tests** executed and passing
-- [ ] **Checklists** complete
-- [ ] If **segment tip:** PR merged (link: ********\_********) — _or "N/A — merge at segment end"_
-- [ ] `bd close agent-platform-ged --reason "…"`
-- [ ] `decisions.md` updated only if architectural decision changed
+- [x] **Task branch** created from correct parent (`feature/health-check` from `main`)
+- [x] **Unit tests** executed and passing (55 total, 12 new)
+- [x] **Checklists** complete
+- [x] If **segment tip:** PR #49 (`task/agent-platform-ged` → `feature/health-check`)
+- [ ] `bd close agent-platform-ged --reason "…"` — pending PR merge
+- [x] `decisions.md` updated only if architectural decision changed — N/A
 - [ ] `session.md` updated if handoff needed
 
-**Reviewer / owner:** **********\_********** **Date:** ******\_******
+**Reviewer / owner:** ****\*\*****\_****\*\***** **Date:** **\*\***\_**\*\***
