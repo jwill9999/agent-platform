@@ -1,6 +1,6 @@
 'use client';
 
-export function FormError({ message }: { message: string | null }) {
+export function FormError({ message }: Readonly<{ message: string | null }>) {
   if (!message) return null;
   return (
     <div

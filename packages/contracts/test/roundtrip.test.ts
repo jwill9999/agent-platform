@@ -20,7 +20,7 @@ describe('contracts round-trip', () => {
     ];
     for (const s of samples) {
       const parsed = OutputSchema.parse(s);
-      expect(OutputSchema.parse(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
+      expect(OutputSchema.parse(structuredClone(parsed))).toEqual(parsed);
     }
   });
 
@@ -45,12 +45,12 @@ describe('contracts round-trip', () => {
       allowedMcpServerIds: [],
       executionLimits: limits,
     });
-    expect(AgentSchema.parse(JSON.parse(JSON.stringify(agent)))).toEqual(agent);
+    expect(AgentSchema.parse(structuredClone(agent))).toEqual(agent);
   });
 
   it('HealthResponseSchema', () => {
     const h = HealthResponseSchema.parse({ ok: true });
-    expect(HealthResponseSchema.parse(JSON.parse(JSON.stringify(h)))).toEqual(h);
+    expect(HealthResponseSchema.parse(structuredClone(h))).toEqual(h);
   });
 
   it('PlanSchema + SecretRefSchema', () => {
@@ -59,7 +59,7 @@ describe('contracts round-trip', () => {
       id: 'plan-1',
       tasks: [{ id: 'task-1', description: 'step', toolIds: ['t'] }],
     });
-    expect(SecretRefSchema.parse(JSON.parse(JSON.stringify(ref)))).toEqual(ref);
-    expect(PlanSchema.parse(JSON.parse(JSON.stringify(plan)))).toEqual(plan);
+    expect(SecretRefSchema.parse(structuredClone(ref))).toEqual(ref);
+    expect(PlanSchema.parse(structuredClone(plan))).toEqual(plan);
   });
 });

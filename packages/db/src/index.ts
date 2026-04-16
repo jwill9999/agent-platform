@@ -8,3 +8,4 @@ export * from './seed/constants.js';
 export * from './seed/runSeed.js';
 export * from './repositories/messages.js';
 export * from './repositories/registry.js';
+export * from './repositories/settings.js';

@@ -11,8 +11,8 @@ export default function ModelsSettingsPage() {
           <strong>Per-agent override:</strong> edit <code>modelOverride</code> on an agent (provider + model) in{' '}
           <a href="/settings/agents" style={{ color: '#2563eb' }}>
             Agents
-          </a>
-          . Keys are not stored in the agent row — use environment / provider defaults.
+          </a>.{' '}
+          Keys are not stored in the agent row — use environment / provider defaults.
         </li>
         <li>
           <strong>API streaming:</strong> <code>POST /v1/chat/stream</code> accepts <code>x-openai-key</code> or{' '}

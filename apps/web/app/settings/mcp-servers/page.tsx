@@ -35,7 +35,7 @@ export default function McpServersPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
   function resetForm() {
@@ -64,28 +64,39 @@ export default function McpServersPage() {
     });
   }
 
+  function parseArgsJson(json: string): string[] | string {
+    try {
+      const parsed = JSON.parse(json || '[]') as unknown;
+      if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === 'string')) {
+        return 'Args must be a JSON array of strings';
+      }
+      return parsed;
+    } catch (err) {
+      return err instanceof Error ? err.message : 'Invalid args JSON';
+    }
+  }
+
+  function parseOptionalJson(json: string): Record<string, unknown> | undefined | string {
+    if (!json.trim()) return undefined;
+    try {
+      return JSON.parse(json) as Record<string, unknown>;
+    } catch {
+      return 'Metadata must be valid JSON';
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    let args: string[] | undefined;
-    try {
-      const parsed = JSON.parse(form.argsJson || '[]') as unknown;
-      if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === 'string')) {
-        throw new Error('Args must be a JSON array of strings');
-      }
-      args = parsed;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid args JSON');
+    const args = parseArgsJson(form.argsJson);
+    if (typeof args === 'string') {
+      setError(args);
       return;
     }
-    let metadata: Record<string, unknown> | undefined;
-    if (form.metadataJson.trim()) {
-      try {
-        metadata = JSON.parse(form.metadataJson) as Record<string, unknown>;
-      } catch {
-        setError('Metadata must be valid JSON');
-        return;
-      }
+    const metadata = parseOptionalJson(form.metadataJson);
+    if (typeof metadata === 'string') {
+      setError(metadata);
+      return;
     }
     const draft: McpServer = {
       id: form.id.trim(),

@@ -24,7 +24,7 @@ export default function SessionsPage() {
       ]);
       setSessions(sData ?? []);
       setAgents(aData ?? []);
-      setAgentId((prev) => (prev ? prev : ((aData ?? [])[0]?.id ?? '')));
+      setAgentId((prev) => prev || ((aData ?? [])[0]?.id ?? ''));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -33,7 +33,7 @@ export default function SessionsPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    load();
   }, [load]);
 
   async function createSession(e: React.FormEvent) {

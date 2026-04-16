@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: 'Chat (dev)',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
       <body>

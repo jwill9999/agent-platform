@@ -237,19 +237,19 @@ describe('execution limits: maxCostUnits', () => {
     mockTokenUsage = { promptTokens: 2000, completionTokens: 2000 };
     const node = createLlmReasonNode();
 
-    // First: 0 + 4.0 = 4.0 < 10
+    // First: 0 + 4 = 4 < 10
     const result1 = await node(makeState({ totalCostUnits: 0, limits: HIGH_TOKEN_LIMITS }));
-    expect(result1.totalCostUnits).toBeCloseTo(4.0);
+    expect(result1.totalCostUnits).toBeCloseTo(4);
     expect(result1.halted).toBeUndefined();
 
-    // Second: 4.0 + 4.0 = 8.0 < 10
-    const result2 = await node(makeState({ totalCostUnits: 4.0, limits: HIGH_TOKEN_LIMITS }));
-    expect(result2.totalCostUnits).toBeCloseTo(8.0);
+    // Second: 4 + 4 = 8 < 10
+    const result2 = await node(makeState({ totalCostUnits: 4, limits: HIGH_TOKEN_LIMITS }));
+    expect(result2.totalCostUnits).toBeCloseTo(8);
     expect(result2.halted).toBeUndefined();
 
-    // Third: 8.0 + 4.0 = 12.0 >= 10
-    const result3 = await node(makeState({ totalCostUnits: 8.0, limits: HIGH_TOKEN_LIMITS }));
-    expect(result3.totalCostUnits).toBeCloseTo(12.0);
+    // Third: 8 + 4 = 12 >= 10
+    const result3 = await node(makeState({ totalCostUnits: 8, limits: HIGH_TOKEN_LIMITS }));
+    expect(result3.totalCostUnits).toBeCloseTo(12);
     expect(result3.halted).toBe(true);
   });
 });
@@ -274,8 +274,8 @@ describe('execution limits: budget warnings', () => {
     mockTokenUsage = { promptTokens: 500, completionTokens: 500 };
     const emitter = { emit: vi.fn() };
     const node = createLlmReasonNode({ emitter });
-    // existing 7.0 + 1.0 delta = 8.0 = 80% of 10
-    const state = makeState({ totalCostUnits: 7.0, limits: HIGH_TOKEN_LIMITS });
+    // existing 7 + 1 delta = 8 = 80% of 10
+    const state = makeState({ totalCostUnits: 7, limits: HIGH_TOKEN_LIMITS });
 
     await node(state);
 
@@ -308,8 +308,8 @@ describe('execution limits: budget warnings', () => {
     mockTokenUsage = { promptTokens: 30, completionTokens: 20 };
     const emitter = { emit: vi.fn() };
     const node = createLlmReasonNode({ emitter });
-    // existing 10.0 + 0.05 delta = 10.05 >= 10, cost-halted
-    const state = makeState({ totalCostUnits: 10.0, limits: HIGH_TOKEN_LIMITS });
+    // existing 10 + 0.05 delta = 10.05 >= 10, cost-halted
+    const state = makeState({ totalCostUnits: 10, limits: HIGH_TOKEN_LIMITS });
 
     await node(state);
 
