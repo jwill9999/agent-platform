@@ -15,6 +15,7 @@ import {
   toolToRow,
 } from '../mappers.js';
 import * as schema from '../schema.js';
+import { withTransaction } from '../transaction.js';
 
 export function listSkills(db: DrizzleDb): Skill[] {
   return db
@@ -131,7 +132,7 @@ export function listAgents(db: DrizzleDb): Agent[] {
 
 export function replaceAgent(db: DrizzleDb, agent: Agent): void {
   const now = Date.now();
-  db.transaction((tx) => {
+  withTransaction(db, (tx) => {
     const existing = tx.select().from(schema.agents).where(eq(schema.agents.id, agent.id)).get();
     const createdAtMs = existing?.createdAtMs ?? now;
     tx.delete(schema.agentSkills).where(eq(schema.agentSkills.agentId, agent.id)).run();
@@ -219,22 +220,28 @@ export function createSession(
 }
 
 export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
-  const existing = db.select().from(schema.sessions).where(eq(schema.sessions.id, record.id)).get();
-  db.insert(schema.sessions)
-    .values({
-      id: record.id,
-      agentId: record.agentId,
-      createdAtMs: existing?.createdAtMs ?? record.createdAtMs,
-      updatedAtMs: record.updatedAtMs,
-    })
-    .onConflictDoUpdate({
-      target: schema.sessions.id,
-      set: {
+  withTransaction(db, (tx) => {
+    const existing = tx
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.id, record.id))
+      .get();
+    tx.insert(schema.sessions)
+      .values({
+        id: record.id,
         agentId: record.agentId,
+        createdAtMs: existing?.createdAtMs ?? record.createdAtMs,
         updatedAtMs: record.updatedAtMs,
-      },
-    })
-    .run();
+      })
+      .onConflictDoUpdate({
+        target: schema.sessions.id,
+        set: {
+          agentId: record.agentId,
+          updatedAtMs: record.updatedAtMs,
+        },
+      })
+      .run();
+  });
 }
 
 export function deleteSession(db: DrizzleDb, id: string): boolean {

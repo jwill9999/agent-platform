@@ -142,7 +142,7 @@ export function createPlanGenerateNode(options: PlanGenerateNodeOptions) {
     }
 
     if (options.emitter) {
-      options.emitter.emit({
+      await options.emitter.emit({
         type: 'error',
         code: 'PLAN_FAILED',
         message: `Plan generation failed: ${reason}`,

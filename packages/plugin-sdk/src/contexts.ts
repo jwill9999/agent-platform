@@ -61,4 +61,7 @@ export type ErrorContext = Readonly<{
   runId: string;
   phase: 'session' | 'task' | 'prompt' | 'tool' | 'unknown';
   error: unknown;
+  retryAttempt?: number;
+  willRetry?: boolean;
+  maxRetries?: number;
 }>;

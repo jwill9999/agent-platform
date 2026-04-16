@@ -65,8 +65,8 @@ export type NativeToolExecutor = (toolId: string, args: Record<string, unknown>)
 
 /** Streaming event emitter for Output union events. */
 export type OutputEmitter = {
-  /** Emit a single Output event to the client stream. Non-blocking. */
-  emit(event: Output): void;
+  /** Emit a single Output event to the client stream. May be async for backpressure. */
+  emit(event: Output): void | Promise<void>;
   /** Signal stream completion. */
   end(): void;
 };

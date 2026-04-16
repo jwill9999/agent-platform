@@ -1,4 +1,5 @@
 import { END, MemorySaver, START, StateGraph } from '@langchain/langgraph';
+import type { RunnableConfig } from '@langchain/core/runnables';
 import type { Plan } from '@agent-platform/contracts';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { HarnessState, type HarnessStateType } from './graphState.js';
@@ -9,8 +10,12 @@ export type ToolExecutor = (toolId: string) => Promise<{ ok: boolean; detail?: s
 /**
  * Node function signature for LLM reasoning and tool dispatch.
  * These are created externally (factory) and passed in.
+ * The optional `config` parameter carries runtime context like AbortSignal.
  */
-export type GraphNodeFn = (state: HarnessStateType) => Promise<Partial<HarnessStateType>>;
+export type GraphNodeFn = (
+  state: HarnessStateType,
+  config?: RunnableConfig,
+) => Promise<Partial<HarnessStateType>>;
 
 export type BuildHarnessGraphOptions = {
   /** Stub planner: if `plan` in initial state is null, use this fixed plan. */
@@ -151,11 +156,15 @@ function routeAfterExecute(state: HarnessStateType): typeof END | 'execute' {
  * Wraps the external llmReasonNode to:
  * - Increment stepCount
  * - Emit graph_start on first step
+ * - Forward RunnableConfig (carries AbortSignal) to the inner node
  */
 function createReactLlmWrapper(llmReasonNode: GraphNodeFn) {
-  return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
+  return async (
+    state: HarnessStateType,
+    config?: RunnableConfig,
+  ): Promise<Partial<HarnessStateType>> => {
     const stepCount = (state.stepCount ?? 0) + 1;
-    const result = await llmReasonNode(state);
+    const result = await llmReasonNode(state, config);
 
     const trace: TraceEvent[] = [];
     if ((state.stepCount ?? 0) === 0) {
@@ -176,10 +185,14 @@ function createReactLlmWrapper(llmReasonNode: GraphNodeFn) {
 /**
  * Wraps the external toolDispatchNode to add loop detection.
  * After dispatch, checks recentToolCalls for consecutive identical signatures.
+ * Forwards RunnableConfig (carries AbortSignal) to the inner node.
  */
 function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
-  return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
-    const result = await toolDispatchNode(state);
+  return async (
+    state: HarnessStateType,
+    config?: RunnableConfig,
+  ): Promise<Partial<HarnessStateType>> => {
+    const result = await toolDispatchNode(state, config);
 
     // Build tool call signatures from the current llmOutput
     const newSignatures: string[] = [];

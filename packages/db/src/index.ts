@@ -6,6 +6,7 @@ export * from './schema.js';
 export * from './secrets/store.js';
 export * from './seed/constants.js';
 export * from './seed/runSeed.js';
+export * from './transaction.js';
 export * from './repositories/messages.js';
 export * from './repositories/registry.js';
 export * from './repositories/settings.js';
