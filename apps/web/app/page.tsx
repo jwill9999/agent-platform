@@ -4,7 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { useCallback } from 'react';
 import { Chat } from '../components/chat/chat';
 
-const defaultModel = 'gpt-4o-mini';
+const defaultModel = process.env.NEXT_PUBLIC_DEFAULT_MODEL || 'gpt-4o-mini';
 
 export default function HomePage() {
   const { messages, append, status, error } = useChat({
