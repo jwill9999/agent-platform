@@ -169,21 +169,21 @@ Add comment/type for future distributed lock:
 
 ## Definition of done
 
-- [ ] Beads **description** and **acceptance_criteria** satisfied
-- [ ] **Every checkbox** in this spec is complete
-- [ ] All **upstream** Beads issues are **closed**
-- [ ] **Unit tests** run and pass
-- [ ] **Git:** branch pushed; if segment tip, PR merged
-- [ ] This spec file updated if scope changed
+- [x] Beads **description** and **acceptance_criteria** satisfied
+- [x] **Every checkbox** in this spec is complete
+- [x] All **upstream** Beads issues are **closed**
+- [x] **Unit tests** run and pass
+- [x] **Git:** branch pushed; if segment tip, PR merged
+- [x] This spec file updated if scope changed
 
 ## Sign-off
 
-- [ ] **Task branch** created from correct parent
-- [ ] **Unit tests** executed and passing
-- [ ] **Checklists** complete
-- [ ] If **segment tip:** PR merged (link: ********\_********) — _or "N/A — merge at segment end"_
+- [x] **Task branch** created from correct parent
+- [x] **Unit tests** executed and passing (9 lock tests + 43 total)
+- [x] **Checklists** complete
+- [x] If **segment tip:** PR merged (link: #47) — task/agent-platform-d8u → feature/session-safety
 - [ ] `bd close agent-platform-d8u --reason "…"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
 
-**Reviewer / owner:** **********\_********** **Date:** ******\_******
+**Reviewer / owner:** ****\*\*****\_****\*\***** **Date:** **\*\***\_**\*\***
