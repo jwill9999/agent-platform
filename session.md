@@ -7,8 +7,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-15 (late evening)
-- **Session:** `agent-platform-pe4` (SSEClientTransport replacement) complete — PR #28 merged to main. SonarCloud duplication fix included. All branches cleaned up.
+- **Date:** 2026-04-16 (midnight)
+- **Session:** `agent-platform-qhe` (structured logger extraction) complete — PR #29 merged to main. Shared `packages/logger` created, all `console.warn` replaced. Branches cleaned up.
 
 ---
 
@@ -36,11 +36,19 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - Added `'streamable-http'` as primary transport type; `'sse'` kept as backward-compatible alias
 - Added 4 new tests (8 total in transport.test.ts), parameterized with `it.each()` to avoid duplication
 - SonarCloud quality gate initially failed due to 19.6% duplicated lines density — fixed by refactoring tests
-- All CI checks green (verify, docker, e2e, CodeQL, Sourcery, SonarCloud, GitGuardian)
+
+### `agent-platform-qhe` — Structured logger extraction — PR #29 merged
+
+- Created `packages/logger` — shared workspace package with `createLogger()`, `Logger` interface, `LogLevel` type
+- Extracted from `apps/api/src/infrastructure/logging/logger.ts` (deleted)
+- Replaced 4× `console.warn` calls with structured `log.warn()` in `harness/factory.ts` and `mcp-adapter/manager.ts`
+- Added 4 logger unit tests; updated mcp-adapter test spies
+- Fixed CI: added `packages/logger` to Dockerfile COPY and typecheck build chain
+- Fixed Sourcery review: aligned `workspace:^` → `workspace:*` for consistency
 
 ### Branch cleanup
 
-- Deleted local `task/agent-platform-pe4` branch after merge
+- Deleted local task branches after merge
 - Only `main` remains (local + remote)
 
 ---
@@ -56,10 +64,11 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 | **Harness Hardening**      | `agent-platform-qlp` | **Complete** — merged | PR #26 |
 | SonarCloud fixes           | —                    | **Complete** — merged | PR #27 |
 | SSEClientTransport replace | `agent-platform-pe4` | **Complete** — merged | PR #28 |
+| Structured logger          | `agent-platform-qhe` | **Complete** — merged | PR #29 |
 
 ### Quality
 
-- 202 tests passing across all packages
+- 206 tests passing across all packages (4 new logger tests)
 - Build, typecheck, lint all clean
 - SonarCloud quality gate green
 
@@ -72,8 +81,6 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 | ID                   | Priority | Title                                              | Status |
 | -------------------- | -------- | -------------------------------------------------- | ------ |
-| `agent-platform-ptj` | P2       | Decompose v1Router                                 | Open   |
-| `agent-platform-qhe` | P2       | Structured logger replacement                      | Open   |
 | `agent-platform-hnx` | P3       | Request-scoped correlation IDs                     | Open   |
 | `agent-platform-nqn` | P3       | Rate limiting and cost guardrails                  | Open   |
 | `agent-platform-bto` | P3       | Provider-agnostic model routing                    | Open   |
@@ -84,12 +91,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Next (priority order)
 
-1. **`agent-platform-ptj`** — Decompose v1Router (P2)
-2. **`agent-platform-qhe`** — Replace console.warn with structured logger (P2)
-3. **`agent-platform-hnx`** — Request-scoped correlation IDs (P3)
-4. **`agent-platform-nqn`** — Rate limiting and cost guardrails (P3)
-5. **`agent-platform-bto`** — Provider-agnostic model routing (P3)
-6. Post-MVP backlog items as capacity allows
+1. **`agent-platform-hnx`** — Request-scoped correlation IDs (P3, natural follow-up to logger)
+2. **`agent-platform-nqn`** — Rate limiting and cost guardrails (P3)
+3. **`agent-platform-bto`** — Provider-agnostic model routing (P3)
+4. Post-MVP backlog items as capacity allows
 
 ---
 
