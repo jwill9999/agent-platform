@@ -11,7 +11,7 @@ const HEADER = 'x-correlation-id';
  * so all downstream logger calls automatically include it.
  */
 export const correlationMiddleware: RequestHandler = (req, res, next) => {
-  const correlationId = (req.header(HEADER) as string | undefined) || randomUUID();
+  const correlationId = req.header(HEADER) || randomUUID();
   res.setHeader(HEADER, correlationId);
   runWithCorrelation(correlationId, next);
 };
