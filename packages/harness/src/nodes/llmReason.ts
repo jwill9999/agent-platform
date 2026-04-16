@@ -157,7 +157,7 @@ function checkCostLimit(
   emitter: OutputEmitter | undefined,
 ): boolean {
   const maxCost = limits?.maxCostUnits;
-  if (maxCost == null || newTotalCost < maxCost) return false;
+  if (maxCost == null || maxCost <= 0 || newTotalCost < maxCost) return false;
 
   traceEvents.push({ type: 'limit_hit', kind: 'max_cost' });
   if (emitter) {
@@ -257,7 +257,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const tokenDelta = tokenUsage ? tokenUsage.promptTokens + tokenUsage.completionTokens : 0;
     const newTotalTokens = state.totalTokensUsed + tokenDelta;
     const costDelta = tokenDelta / 1000;
-    const newTotalCost = state.totalCostUnits + costDelta;
+    const newTotalCost = (state.totalCostUnits ?? 0) + costDelta;
     const step = state.taskIndex ?? 0;
     const traceEvents: TraceEvent[] = [{ type: 'llm_call', step, tokenUsage }];
 

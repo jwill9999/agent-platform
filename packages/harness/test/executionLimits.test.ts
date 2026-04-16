@@ -28,18 +28,26 @@ vi.mock('@ai-sdk/openai', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
+const DEFAULT_LIMITS: ExecutionLimits = {
+  maxSteps: 10,
+  maxParallelTasks: 1,
+  timeoutMs: 30_000,
+  maxTokens: 200,
+  maxCostUnits: 10,
+} as ExecutionLimits;
+
+/** Limits where maxTokens is very high so cost limits are tested in isolation. */
+const HIGH_TOKEN_LIMITS: ExecutionLimits = {
+  ...DEFAULT_LIMITS,
+  maxTokens: 100_000,
+} as ExecutionLimits;
+
 function makeState(overrides: Partial<HarnessStateType> = {}): HarnessStateType {
   return {
     trace: [],
     plan: null,
     taskIndex: 0,
-    limits: {
-      maxSteps: 10,
-      maxParallelTasks: 1,
-      timeoutMs: 30_000,
-      maxTokens: 200,
-      maxCostUnits: 10,
-    } as ExecutionLimits,
+    limits: DEFAULT_LIMITS,
     runId: 'run-1',
     sessionId: 'sess-1',
     halted: false,
@@ -54,6 +62,15 @@ function makeState(overrides: Partial<HarnessStateType> = {}): HarnessStateType 
     totalCostUnits: 0,
     ...overrides,
   };
+}
+
+/** Extract warning emissions from an emitter spy. */
+function getWarnings(emitter: { emit: ReturnType<typeof vi.fn> }, keyword?: string) {
+  return emitter.emit.mock.calls.filter((c: unknown[]) => {
+    const evt = c[0] as { type: string; content?: string };
+    if (evt.type !== 'text' || !evt.content?.includes('[warning]')) return false;
+    return keyword ? evt.content.includes(keyword) : true;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -178,16 +195,8 @@ describe('execution limits: maxCostUnits', () => {
   it('halts and emits limit_hit when cost exceeds maxCostUnits', async () => {
     mockTokenUsage = { promptTokens: 500, completionTokens: 500 };
     const node = createLlmReasonNode();
-    // Use high maxTokens so token limit is not reached first
-    const limits = {
-      maxSteps: 10,
-      maxParallelTasks: 1,
-      timeoutMs: 30_000,
-      maxTokens: 100_000,
-      maxCostUnits: 10,
-    } as ExecutionLimits;
     // 9.5 existing + 1.0 delta (1000/1000) = 10.5 > 10
-    const state = makeState({ totalCostUnits: 9.5, limits });
+    const state = makeState({ totalCostUnits: 9.5, limits: HIGH_TOKEN_LIMITS });
 
     const result = await node(state);
 
@@ -200,14 +209,7 @@ describe('execution limits: maxCostUnits', () => {
     mockTokenUsage = { promptTokens: 5000, completionTokens: 5000 };
     const emitter = { emit: vi.fn() };
     const node = createLlmReasonNode({ emitter });
-    const limits = {
-      maxSteps: 10,
-      maxParallelTasks: 1,
-      timeoutMs: 30_000,
-      maxTokens: 100_000,
-      maxCostUnits: 10,
-    } as ExecutionLimits;
-    const state = makeState({ totalCostUnits: 0, limits }); // 10000/1000 = 10 >= 10
+    const state = makeState({ totalCostUnits: 0, limits: HIGH_TOKEN_LIMITS }); // 10000/1000 = 10 >= 10
 
     await node(state);
 
@@ -224,12 +226,7 @@ describe('execution limits: maxCostUnits', () => {
     const node = createLlmReasonNode();
     const state = makeState({
       totalCostUnits: 0,
-      limits: {
-        maxSteps: 10,
-        maxParallelTasks: 1,
-        timeoutMs: 30_000,
-        maxTokens: 100_000,
-      } as ExecutionLimits,
+      limits: { ...HIGH_TOKEN_LIMITS, maxCostUnits: undefined } as ExecutionLimits,
     });
 
     const result = await node(state);
@@ -239,26 +236,19 @@ describe('execution limits: maxCostUnits', () => {
   it('accumulates cost across multiple calls', async () => {
     mockTokenUsage = { promptTokens: 2000, completionTokens: 2000 };
     const node = createLlmReasonNode();
-    const limits = {
-      maxSteps: 10,
-      maxParallelTasks: 1,
-      timeoutMs: 30_000,
-      maxTokens: 100_000,
-      maxCostUnits: 10,
-    } as ExecutionLimits;
 
     // First: 0 + 4.0 = 4.0 < 10
-    const result1 = await node(makeState({ totalCostUnits: 0, limits }));
+    const result1 = await node(makeState({ totalCostUnits: 0, limits: HIGH_TOKEN_LIMITS }));
     expect(result1.totalCostUnits).toBeCloseTo(4.0);
     expect(result1.halted).toBeUndefined();
 
     // Second: 4.0 + 4.0 = 8.0 < 10
-    const result2 = await node(makeState({ totalCostUnits: 4.0, limits }));
+    const result2 = await node(makeState({ totalCostUnits: 4.0, limits: HIGH_TOKEN_LIMITS }));
     expect(result2.totalCostUnits).toBeCloseTo(8.0);
     expect(result2.halted).toBeUndefined();
 
     // Third: 8.0 + 4.0 = 12.0 >= 10
-    const result3 = await node(makeState({ totalCostUnits: 8.0, limits }));
+    const result3 = await node(makeState({ totalCostUnits: 8.0, limits: HIGH_TOKEN_LIMITS }));
     expect(result3.totalCostUnits).toBeCloseTo(12.0);
     expect(result3.halted).toBe(true);
   });
@@ -270,7 +260,6 @@ describe('execution limits: maxCostUnits', () => {
 
 describe('execution limits: budget warnings', () => {
   it('emits token budget warning at 80% threshold', async () => {
-    // maxTokens=200, 160 is exactly 80%
     mockTokenUsage = { promptTokens: 80, completionTokens: 80 };
     const emitter = { emit: vi.fn() };
     const node = createLlmReasonNode({ emitter });
@@ -278,39 +267,19 @@ describe('execution limits: budget warnings', () => {
 
     await node(state);
 
-    const warns = emitter.emit.mock.calls.filter(
-      (c: unknown[]) =>
-        (c[0] as { type: string }).type === 'text' &&
-        (c[0] as { content: string }).content.includes('[warning]') &&
-        (c[0] as { content: string }).content.includes('Token'),
-    );
-    expect(warns.length).toBe(1);
+    expect(getWarnings(emitter, 'Token').length).toBe(1);
   });
 
   it('emits cost budget warning at 80% threshold', async () => {
-    // maxCostUnits=10, need 8.0 to hit 80%
     mockTokenUsage = { promptTokens: 500, completionTokens: 500 };
     const emitter = { emit: vi.fn() };
     const node = createLlmReasonNode({ emitter });
-    const limits = {
-      maxSteps: 10,
-      maxParallelTasks: 1,
-      timeoutMs: 30_000,
-      maxTokens: 100_000,
-      maxCostUnits: 10,
-    } as ExecutionLimits;
     // existing 7.0 + 1.0 delta = 8.0 = 80% of 10
-    const state = makeState({ totalCostUnits: 7.0, limits });
+    const state = makeState({ totalCostUnits: 7.0, limits: HIGH_TOKEN_LIMITS });
 
     await node(state);
 
-    const warns = emitter.emit.mock.calls.filter(
-      (c: unknown[]) =>
-        (c[0] as { type: string }).type === 'text' &&
-        (c[0] as { content: string }).content.includes('[warning]') &&
-        (c[0] as { content: string }).content.includes('Cost'),
-    );
-    expect(warns.length).toBe(1);
+    expect(getWarnings(emitter, 'Cost').length).toBe(1);
   });
 
   it('does not emit warning below 80% threshold', async () => {
@@ -321,15 +290,10 @@ describe('execution limits: budget warnings', () => {
 
     await node(state);
 
-    const warns = emitter.emit.mock.calls.filter(
-      (c: unknown[]) =>
-        (c[0] as { type: string }).type === 'text' &&
-        (c[0] as { content: string }).content.includes('[warning]'),
-    );
-    expect(warns.length).toBe(0);
+    expect(getWarnings(emitter).length).toBe(0);
   });
 
-  it('does not emit warning when limit is already exceeded', async () => {
+  it('does not emit warning when token limit is already exceeded', async () => {
     mockTokenUsage = { promptTokens: 200, completionTokens: 200 };
     const emitter = { emit: vi.fn() };
     const node = createLlmReasonNode({ emitter });
@@ -337,11 +301,18 @@ describe('execution limits: budget warnings', () => {
 
     await node(state);
 
-    const warns = emitter.emit.mock.calls.filter(
-      (c: unknown[]) =>
-        (c[0] as { type: string }).type === 'text' &&
-        (c[0] as { content: string }).content.includes('[warning]'),
-    );
-    expect(warns.length).toBe(0);
+    expect(getWarnings(emitter).length).toBe(0);
+  });
+
+  it('does not emit warning when cost limit is already exceeded', async () => {
+    mockTokenUsage = { promptTokens: 30, completionTokens: 20 };
+    const emitter = { emit: vi.fn() };
+    const node = createLlmReasonNode({ emitter });
+    // existing 10.0 + 0.05 delta = 10.05 >= 10, cost-halted
+    const state = makeState({ totalCostUnits: 10.0, limits: HIGH_TOKEN_LIMITS });
+
+    await node(state);
+
+    expect(getWarnings(emitter).length).toBe(0);
   });
 });
