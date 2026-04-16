@@ -103,6 +103,15 @@ Unless an issue states otherwise, **done** means:
 
 ---
 
+## Pending decisions (return to later)
+
+| Topic                         | Summary                                                                                                                                                                                                         | Status         |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| **Plugin authoring guide**    | Plugins can override built-in features (memory, observability, etc). Need a formal guide documenting hook interfaces, override patterns, and how third parties create plugins that interface with the platform. | Needs planning |
+| **Documentation restructure** | README should be an index/table of contents linking to detailed pages under `docs/`. Each major subsystem (architecture, API, plugins, deployment, configuration) gets its own focused page.                    | Needs planning |
+
+---
+
 ## References
 
 - `agent_architecture_detailed_adr.md`
