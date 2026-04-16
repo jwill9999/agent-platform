@@ -22,18 +22,19 @@ RUN pnpm -r run build
 RUN pnpm prune --prod
 
 FROM node:20-alpine AS runner
-RUN apk add --no-cache curl su-exec \
+RUN apk add --no-cache curl \
   && addgroup -g 10001 -S appuser \
   && adduser -S -u 10001 -G appuser appuser
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
 COPY --from=build /app ./
+# Pre-create /data with appuser ownership; Docker copies these permissions
+# into new named volumes, so the non-root user can write SQLite + WAL files.
+RUN mkdir -p /data && chown appuser:appuser /data
 EXPOSE 3000
+USER appuser
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null || exit 1
-ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "apps/api/dist/index.js"]
