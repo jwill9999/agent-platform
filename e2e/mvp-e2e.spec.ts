@@ -37,7 +37,7 @@ test.describe('MVP E2E (compose-backed)', () => {
 
   test('home page chat smoke', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Chat' })).toBeVisible();
+    await expect(page.locator('h2', { hasText: 'AI Studio' })).toBeVisible();
   });
 
   test('tool_result panel renders (fixture page)', async ({ page }) => {
