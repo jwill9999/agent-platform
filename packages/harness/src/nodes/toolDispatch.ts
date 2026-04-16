@@ -2,6 +2,7 @@ import type { Agent, Output } from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
+import type { RunnableConfig } from '@langchain/core/runnables';
 
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
@@ -100,9 +101,14 @@ async function dispatchSingleTool(
  * Reads `llmOutput` from state (expects `kind: 'tool_calls'`).
  * Dispatches each tool call, appends results to messages, clears llmOutput.
  * Emits `tool_dispatch` trace events per tool call.
+ * Supports AbortSignal via `config.configurable.signal` for cancellation.
  */
 export function createToolDispatchNode(ctx: ToolDispatchContext) {
-  return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
+  return async (
+    state: HarnessStateType,
+    config?: RunnableConfig,
+  ): Promise<Partial<HarnessStateType>> => {
+    const signal = config?.configurable?.signal as AbortSignal | undefined;
     const { llmOutput } = state;
 
     if (llmOutput?.kind !== 'tool_calls') {
@@ -114,6 +120,8 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     const traceEvents: TraceEvent[] = [];
 
     for (const call of llmOutput.calls) {
+      if (signal?.aborted) break;
+
       // Fire onToolCall plugin hook before execution
       if (ctx.dispatcher) {
         try {
@@ -130,9 +138,9 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       const { output, ok } = await dispatchSingleTool(call, ctx);
 
-      // Stream the output event to the client
+      // Stream the output event to the client (backpressure-aware)
       if (ctx.emitter) {
-        ctx.emitter.emit(output);
+        await ctx.emitter.emit(output);
       }
 
       let content: string;

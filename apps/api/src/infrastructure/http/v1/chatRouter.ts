@@ -90,19 +90,6 @@ function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
   return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
 }
 
-/** Invoke graph.invoke wrapped in a timeout race. */
-async function invokeWithTimeout<T>(graphPromise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('__TIMEOUT__')), timeoutMs);
-  });
-  try {
-    return await Promise.race([graphPromise, timeoutPromise]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-}
-
 /** Persist only the new assistant/tool messages the graph appended. */
 function persistNewMessages(
   db: DrizzleDb,
@@ -134,19 +121,23 @@ async function safePluginCall(fn: () => Promise<void>): Promise<void> {
 }
 
 /** Build and write an NDJSON error event when the stream is still writable. */
-function emitStreamError(res: Response, err: unknown, timeoutMs: number): void {
+function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): void {
   if (res.writableEnded) return;
-  const isTimeout = err instanceof Error && err.message === '__TIMEOUT__';
-  const errorEvent = isTimeout
-    ? {
-        type: 'error' as const,
-        code: 'TIMEOUT',
-        message: `Execution timeout exceeded (${timeoutMs}ms)`,
-      }
-    : {
-        type: 'error' as const,
-        message: err instanceof Error ? err.message : 'Graph execution failed',
-      };
+
+  if (signal?.aborted) {
+    const reason = signal.reason === 'timeout' ? 'timeout' : 'client_disconnect';
+    const errorEvent =
+      reason === 'timeout'
+        ? { type: 'error' as const, code: 'TIMEOUT', message: 'Execution timeout exceeded' }
+        : { type: 'stream_aborted' as const, reason };
+    res.write(JSON.stringify(errorEvent) + '\n');
+    return;
+  }
+
+  const errorEvent = {
+    type: 'error' as const,
+    message: err instanceof Error ? err.message : 'Graph execution failed',
+  };
   res.write(JSON.stringify(errorEvent) + '\n');
 }
 
@@ -169,6 +160,11 @@ export function createChatRouter(db: DrizzleDb): Router {
       const agentCtx = await loadAgentContext(db, session.agentId);
       const modelCfg = resolveModelOrThrow(agentCtx, req.header('x-openai-key'));
 
+      const controller = new AbortController();
+      const { signal } = controller;
+      const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
       try {
         await safePluginCall(() =>
           agentCtx.pluginDispatcher.onSessionStart({
@@ -181,6 +177,14 @@ export function createChatRouter(db: DrizzleDb): Router {
         prepareNdjsonResponse(res);
         const emitter: OutputEmitter = createNdjsonEmitter(res);
         const dispatcher = agentCtx.pluginDispatcher;
+
+        // Abort on client disconnect
+        req.on('close', () => {
+          if (!res.writableFinished) controller.abort('client_disconnect');
+        });
+
+        // Abort on timeout
+        timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
 
         const graph = buildHarnessGraph({
           executeTool: async () => ({ ok: true }),
@@ -197,10 +201,9 @@ export function createChatRouter(db: DrizzleDb): Router {
         const messages = buildConversationMessages(db, sessionId, message, agentCtx.systemPrompt);
         const initialState = buildInitialState(sessionId, messages, agentCtx, modelCfg);
 
-        const finalState: { messages?: ChatMessage[] } = await invokeWithTimeout(
-          graph.invoke(initialState, { configurable: { thread_id: sessionId } }),
-          agentCtx.agent.executionLimits.timeoutMs,
-        );
+        const finalState: { messages?: ChatMessage[] } = await graph.invoke(initialState, {
+          configurable: { thread_id: sessionId, signal },
+        });
 
         persistNewMessages(db, sessionId, finalState?.messages, messages.length);
       } catch (err) {
@@ -208,12 +211,13 @@ export function createChatRouter(db: DrizzleDb): Router {
           agentCtx.pluginDispatcher.onError({
             sessionId,
             runId: 'unknown',
-            phase: err instanceof Error && err.message === '__TIMEOUT__' ? 'session' : 'unknown',
+            phase: signal.aborted && signal.reason === 'timeout' ? 'session' : 'unknown',
             error: err,
           }),
         );
-        emitStreamError(res, err, agentCtx.agent.executionLimits.timeoutMs);
+        emitStreamError(res, err, signal);
       } finally {
+        if (timeoutId) clearTimeout(timeoutId);
         await destroyAgentContext(agentCtx);
         if (!res.writableEnded) res.end();
       }

@@ -1,6 +1,7 @@
 import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
 import { streamText, jsonSchema } from 'ai';
 import type { CoreMessage } from 'ai';
+import type { RunnableConfig } from '@langchain/core/runnables';
 
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
@@ -100,7 +101,7 @@ async function streamAndAccumulate(
   for await (const chunk of textStream) {
     fullText += chunk;
     if (emitter && chunk) {
-      emitter.emit({ type: 'text', content: chunk });
+      await emitter.emit({ type: 'text', content: chunk });
     }
   }
   return fullText;
@@ -129,18 +130,18 @@ function buildLlmOutput(
 }
 
 /** Check maxTokens limit; appends trace event and emits error if exceeded. */
-function checkTokenLimit(
+async function checkTokenLimit(
   limits: HarnessStateType['limits'],
   newTotalTokens: number,
   traceEvents: TraceEvent[],
   emitter: OutputEmitter | undefined,
-): boolean {
+): Promise<boolean> {
   const maxTokens = limits?.maxTokens;
   if (maxTokens == null || newTotalTokens < maxTokens) return false;
 
   traceEvents.push({ type: 'limit_hit', kind: 'max_tokens' });
   if (emitter) {
-    emitter.emit({
+    await emitter.emit({
       type: 'error',
       code: 'MAX_TOKENS',
       message: `Token limit exceeded (${newTotalTokens}/${maxTokens})`,
@@ -150,18 +151,18 @@ function checkTokenLimit(
 }
 
 /** Check maxCostUnits limit; appends trace event and emits error if exceeded. */
-function checkCostLimit(
+async function checkCostLimit(
   limits: HarnessStateType['limits'],
   newTotalCost: number,
   traceEvents: TraceEvent[],
   emitter: OutputEmitter | undefined,
-): boolean {
+): Promise<boolean> {
   const maxCost = limits?.maxCostUnits;
   if (maxCost == null || maxCost <= 0 || newTotalCost < maxCost) return false;
 
   traceEvents.push({ type: 'limit_hit', kind: 'max_cost' });
   if (emitter) {
-    emitter.emit({
+    await emitter.emit({
       type: 'error',
       code: 'MAX_COST',
       message: `Cost limit exceeded (${newTotalCost}/${maxCost})`,
@@ -173,12 +174,12 @@ function checkCostLimit(
 const BUDGET_WARN_THRESHOLD = 0.8;
 
 /** Emit warnings when approaching token or cost limits (80% threshold). */
-function emitBudgetWarnings(
+async function emitBudgetWarnings(
   limits: HarnessStateType['limits'],
   newTotalTokens: number,
   newTotalCost: number,
   emitter: OutputEmitter | undefined,
-): void {
+): Promise<void> {
   if (!emitter) return;
 
   const maxTokens = limits?.maxTokens;
@@ -187,7 +188,7 @@ function emitBudgetWarnings(
     newTotalTokens >= maxTokens * BUDGET_WARN_THRESHOLD &&
     newTotalTokens < maxTokens
   ) {
-    emitter.emit({
+    await emitter.emit({
       type: 'text',
       content: `[warning] Token usage at ${Math.round((newTotalTokens / maxTokens) * 100)}% of limit (${newTotalTokens}/${maxTokens})`,
     });
@@ -200,7 +201,7 @@ function emitBudgetWarnings(
     newTotalCost >= maxCost * BUDGET_WARN_THRESHOLD &&
     newTotalCost < maxCost
   ) {
-    emitter.emit({
+    await emitter.emit({
       type: 'text',
       content: `[warning] Cost usage at ${Math.round((newTotalCost / maxCost) * 100)}% of limit (${newTotalCost}/${maxCost})`,
     });
@@ -223,11 +224,24 @@ function normaliseOptions(options?: OutputEmitter | LlmReasonNodeOptions): LlmRe
  * Appends the assistant message to conversation history.
  * Emits an `llm_call` trace event with optional token usage.
  * Calls `onPromptBuild` plugin hook before each LLM call.
+ * Supports AbortSignal via `config.configurable.signal` for cancellation.
  */
 export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptions) {
   const { emitter, dispatcher } = normaliseOptions(options);
 
-  return async function llmReasonNode(state: HarnessStateType): Promise<Partial<HarnessStateType>> {
+  return async function llmReasonNode(
+    state: HarnessStateType,
+    config?: RunnableConfig,
+  ): Promise<Partial<HarnessStateType>> {
+    const signal = config?.configurable?.signal as AbortSignal | undefined;
+
+    if (signal?.aborted) {
+      return {
+        halted: true,
+        trace: [{ type: 'stream_aborted', reason: 'client_disconnect' }],
+      };
+    }
+
     const { messages, toolDefinitions, modelConfig } = state;
 
     if (!modelConfig) {
@@ -245,7 +259,13 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       await firePromptBuildHook(dispatcher, state);
     }
 
-    const result = streamText({ model, messages: toCoreMessages(messages), tools, maxSteps: 1 });
+    const result = streamText({
+      model,
+      messages: toCoreMessages(messages),
+      tools,
+      maxSteps: 1,
+      abortSignal: signal,
+    });
 
     const fullText = await streamAndAccumulate(result.textStream, emitter);
     const finalToolCalls = await result.toolCalls;
@@ -264,13 +284,13 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const step = state.taskIndex ?? 0;
     const traceEvents: TraceEvent[] = [{ type: 'llm_call', step, tokenUsage }];
 
-    const tokenHalted = checkTokenLimit(state.limits, newTotalTokens, traceEvents, emitter);
+    const tokenHalted = await checkTokenLimit(state.limits, newTotalTokens, traceEvents, emitter);
     const costHalted =
-      !tokenHalted && checkCostLimit(state.limits, newTotalCost, traceEvents, emitter);
+      !tokenHalted && (await checkCostLimit(state.limits, newTotalCost, traceEvents, emitter));
     const halted = tokenHalted || costHalted;
 
     if (!halted) {
-      emitBudgetWarnings(state.limits, newTotalTokens, newTotalCost, emitter);
+      await emitBudgetWarnings(state.limits, newTotalTokens, newTotalCost, emitter);
     }
 
     return {
