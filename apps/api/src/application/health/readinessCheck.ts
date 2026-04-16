@@ -1,9 +1,12 @@
 import type { DrizzleDb } from '@agent-platform/db';
 import type { SubsystemCheck, ReadinessResponse } from '@agent-platform/contracts';
-import { statSync, accessSync, constants as fsConstants } from 'node:fs';
+import { statSync, accessSync, existsSync, constants as fsConstants } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const CHECK_TIMEOUT_MS = 5_000;
+
+// Resolve df to an absolute path at module load to avoid PATH-search (S4036)
+const DF_BIN = ['/usr/bin/df', '/bin/df'].find((p) => existsSync(p)) ?? null;
 
 // ---------------------------------------------------------------------------
 // Individual subsystem checks
@@ -100,11 +103,11 @@ export async function runReadinessCheck(deps: {
 
   checks['disk'] = checkDisk(deps.sqlitePath);
 
-  const statuses = Object.values(checks).map((c) => c.status);
+  const statuses = new Set(Object.values(checks).map((c) => c.status));
   let overall: 'healthy' | 'degraded' | 'unhealthy';
-  if (statuses.includes('unhealthy')) {
+  if (statuses.has('unhealthy')) {
     overall = 'unhealthy';
-  } else if (statuses.includes('degraded')) {
+  } else if (statuses.has('degraded')) {
     overall = 'degraded';
   } else {
     overall = 'healthy';
@@ -143,15 +146,15 @@ async function withTimeout<T>(
 
 function getFreeDiskSpace(filePath: string): number | null {
   try {
-    if (process.platform === 'win32') return null;
-    // execFileSync avoids shell interpolation — no injection risk (S4721)
-    const output = execFileSync('df', ['-k', filePath], {
+    if (process.platform === 'win32' || !DF_BIN) return null;
+    // Absolute path avoids PATH search (S4036); execFileSync avoids shell (S4721)
+    const output = execFileSync(DF_BIN, ['-k', filePath], {
       encoding: 'utf-8',
       timeout: 2000,
     }).trim();
     const lastLine = output.split('\n').pop() ?? '';
     const columns = lastLine.split(/\s+/);
-    const kb = parseInt(columns[3] ?? '', 10);
+    const kb = Number.parseInt(columns[3] ?? '', 10);
     return isNaN(kb) ? null : kb * 1024;
   } catch {
     return null;
