@@ -582,6 +582,16 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Session is currently processing another request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: SESSION_BUSY
+                  message: Session is currently processing another request
 
   # ── Settings ─────────────────────────────────────────────────────────────
   /v1/settings:
