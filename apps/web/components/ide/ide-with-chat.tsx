@@ -26,6 +26,7 @@ import {
   Plus,
   Paperclip,
   Menu,
+  RefreshCw,
   Terminal as TerminalIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -48,18 +49,12 @@ import { cn } from '@/lib/cn';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
 import { Terminal } from '@/components/ide/terminal';
 import { useSidebar } from '@/components/layout/sidebar-context';
+import { useFileSystem } from '@/hooks/use-file-system';
+import type { FileNode } from '@/hooks/use-file-system';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface FileNode {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  children?: FileNode[];
-  content?: string;
-}
 
 interface OpenTab {
   path: string;
@@ -67,6 +62,7 @@ interface OpenTab {
   content: string;
   isDirty: boolean;
   language: string;
+  handle?: FileSystemFileHandle;
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +293,12 @@ function IDEToolbar({
   pathInput,
   setPathInput,
   onLoadFromPath,
+  onOpenFolder,
+  isLoadingFolder,
+  rootName,
+  fsSupported,
+  onRefreshFolder,
+  onCloseFolder,
 }: Readonly<{
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
@@ -314,6 +316,12 @@ function IDEToolbar({
   pathInput: string;
   setPathInput: (v: string) => void;
   onLoadFromPath: () => void;
+  onOpenFolder: () => void;
+  isLoadingFolder: boolean;
+  rootName: string | null;
+  fsSupported: boolean;
+  onRefreshFolder: () => void;
+  onCloseFolder: () => void;
 }>) {
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
@@ -373,6 +381,29 @@ function IDEToolbar({
             </div>
           </DialogContent>
         </Dialog>
+        {fsSupported && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={rootName ? onCloseFolder : onOpenFolder}
+            disabled={isLoadingFolder}
+          >
+            <FolderOpen className="h-4 w-4" />
+            {isLoadingFolder ? 'Loading...' : rootName ? `Close ${rootName}` : 'Open Folder'}
+          </Button>
+        )}
+        {rootName && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRefreshFolder}
+            disabled={isLoadingFolder}
+            title="Refresh file tree"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -779,8 +810,12 @@ const defaultModel = process.env.NEXT_PUBLIC_DEFAULT_MODEL || 'gpt-4o-mini';
 export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatProps>) {
   const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebar();
 
-  // File state
-  const [fileTree] = useState<FileNode[]>(initialFileTree ?? sampleFileTree);
+  // File System Access API
+  const fs = useFileSystem();
+
+  // Use FS API tree when a directory is open, otherwise fall back to props or sample data
+  const fileTree = fs.isDirectoryOpen ? fs.fileTree : (initialFileTree ?? sampleFileTree);
+
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -834,22 +869,32 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   );
 
   const handleFileSelect = useCallback(
-    (node: FileNode) => {
+    async (node: FileNode) => {
       if (node.type !== 'file') return;
       const exists = openTabs.some((tab) => tab.path === node.path);
       if (!exists) {
+        let content = node.content ?? '';
+        // Read from filesystem if handle is available
+        if (node.handle) {
+          try {
+            content = await fs.readFile(node);
+          } catch {
+            content = `// Failed to read ${node.path}\n`;
+          }
+        }
         const newTab: OpenTab = {
           path: node.path,
           name: node.name,
-          content: node.content ?? '',
+          content,
           isDirty: false,
           language: getLanguage(node.name),
+          handle: node.handle as FileSystemFileHandle | undefined,
         };
         setOpenTabs((prev) => [...prev, newTab]);
       }
       setActiveTab(node.path);
     },
-    [openTabs],
+    [openTabs, fs],
   );
 
   const handleCloseTab = useCallback(
@@ -875,12 +920,22 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [activeTab],
   );
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!activeTab || !activeFile) return;
+    // Write to filesystem if handle is available
+    if (activeFile.handle) {
+      const node: FileNode = {
+        name: activeFile.name,
+        path: activeFile.path,
+        type: 'file',
+        handle: activeFile.handle,
+      };
+      await fs.writeFile(node, activeFile.content);
+    }
     setOpenTabs((prev) =>
       prev.map((tab) => (tab.path === activeTab ? { ...tab, isDirty: false } : tab)),
     );
-  }, [activeTab, activeFile]);
+  }, [activeTab, activeFile, fs]);
 
   // --- Context management ---
 
@@ -1025,6 +1080,12 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         pathInput={pathInput}
         setPathInput={setPathInput}
         onLoadFromPath={handleLoadFromPath}
+        onOpenFolder={fs.openDirectory}
+        isLoadingFolder={fs.isLoading}
+        rootName={fs.rootName}
+        fsSupported={fs.isSupported}
+        onRefreshFolder={fs.refresh}
+        onCloseFolder={fs.closeDirectory}
       />
 
       <ResizablePanelGroup orientation="horizontal" className="flex-1">
@@ -1046,9 +1107,13 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     />
                   </div>
                 </div>
-                <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Explorer
+                <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                  <span>{fs.rootName ?? 'Explorer'}</span>
+                  {fs.isLoading && <span className="text-xs animate-pulse">Loading…</span>}
                 </div>
+                {fs.error && (
+                  <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>
+                )}
                 <ScrollArea className="flex-1">
                   <div className="pb-4">
                     {filteredFileTree.map((node) => (
