@@ -45,7 +45,7 @@ export interface UseFileSystemReturn {
 // ---------------------------------------------------------------------------
 
 function isFileSystemAccessSupported(): boolean {
-  return typeof globalThis.window !== 'undefined' && 'showDirectoryPicker' in globalThis.window;
+  return globalThis.window !== undefined && 'showDirectoryPicker' in globalThis.window;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ export function useFileSystem(): UseFileSystemReturn {
 
   const readFile = useCallback(async (node: FileNode): Promise<string> => {
     const handle = node.handle;
-    if (!handle || handle.kind !== 'file') {
+    if (handle?.kind !== 'file') {
       throw new Error('No file handle available');
     }
 
@@ -186,7 +186,7 @@ export function useFileSystem(): UseFileSystemReturn {
 
   const writeFile = useCallback(async (node: FileNode, content: string): Promise<boolean> => {
     const handle = node.handle;
-    if (!handle || handle.kind !== 'file') return false;
+    if (handle?.kind !== 'file') return false;
 
     try {
       const writable = await handle.createWritable();

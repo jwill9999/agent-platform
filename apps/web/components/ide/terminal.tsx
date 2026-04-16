@@ -136,6 +136,12 @@ export function Terminal({ onCommand, className }: Readonly<TerminalProps>) {
     inputRef.current?.focus();
   }, []);
 
+  const handleTerminalKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      inputRef.current?.focus();
+    }
+  }, []);
+
   const appendLine = useCallback((tabId: string, line: TerminalLine) => {
     setTabs((prev) =>
       prev.map((tab) =>
@@ -345,8 +351,11 @@ export function Terminal({ onCommand, className }: Readonly<TerminalProps>) {
         ref={scrollRef}
         className="flex-1 overflow-auto p-3 font-mono text-sm cursor-text"
         onClick={handleTerminalClick}
-        role="log"
+        onKeyDown={handleTerminalKeyDown}
+        role="textbox"
+        aria-readonly="true"
         aria-label="Terminal output"
+        tabIndex={0}
       >
         {activeTab?.history.map((line) => (
           <div key={line.id} className={cn('whitespace-pre-wrap break-all', getLineColor(line.type))}>

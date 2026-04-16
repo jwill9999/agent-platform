@@ -329,9 +329,9 @@ function IDEToolbar({
   onRefreshFolder: () => void;
   onCloseFolder: () => void;
 }>) {
-  const menuVariant = sidebarCollapsed ? 'ghost' : 'secondary';
-  const menuTitle = sidebarCollapsed ? 'Show main menu' : 'Hide main menu';
-  const menuLabel = sidebarCollapsed ? 'Menu' : 'Hide';
+  const menuProps = sidebarCollapsed
+    ? { variant: 'ghost' as const, title: 'Show main menu', label: 'Menu' }
+    : { variant: 'secondary' as const, title: 'Hide main menu', label: 'Hide' };
 
   const explorerVariant = showExplorer ? 'secondary' : 'ghost';
   const explorerTitle = showExplorer ? 'Hide file explorer' : 'Show file explorer';
@@ -354,14 +354,14 @@ function IDEToolbar({
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
       <div className="flex items-center gap-2">
         <Button
-          variant={menuVariant}
+          variant={menuProps.variant}
           size="sm"
           onClick={toggleSidebar}
           className="gap-2"
-          title={menuTitle}
+          title={menuProps.title}
         >
           <Menu className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{menuLabel}</span>
+          <span className="hidden sm:inline text-xs">{menuProps.label}</span>
         </Button>
         <div className="w-px h-5 bg-border" />
         <Button
