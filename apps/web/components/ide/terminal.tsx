@@ -59,8 +59,11 @@ function createWelcomeLine(): TerminalLine {
   };
 }
 
+let lineIdCounter = 0;
+
 function createLine(type: TerminalLine['type'], content: string): TerminalLine {
-  return { id: `${Date.now()}-${Math.random()}`, type, content };
+  lineIdCounter += 1;
+  return { id: `line-${Date.now()}-${lineIdCounter}`, type, content };
 }
 
 const HELP_TEXT = `Available commands:
@@ -260,8 +263,8 @@ export function Terminal({ onCommand, className }: Readonly<TerminalProps>) {
 
       setTabs((prev) => prev.filter((t) => t.id !== tabId));
       if (activeTabId === tabId) {
-        const remaining = tabs.filter((t) => t.id !== tabId);
-        setActiveTabId(remaining[0]?.id ?? '');
+        const nextTab = tabs.find((t) => t.id !== tabId);
+        setActiveTabId(nextTab?.id ?? '');
       }
     },
     [tabs, activeTabId],
@@ -342,7 +345,8 @@ export function Terminal({ onCommand, className }: Readonly<TerminalProps>) {
         ref={scrollRef}
         className="flex-1 overflow-auto p-3 font-mono text-sm cursor-text"
         onClick={handleTerminalClick}
-        role="presentation"
+        role="log"
+        aria-label="Terminal output"
       >
         {activeTab?.history.map((line) => (
           <div key={line.id} className={cn('whitespace-pre-wrap break-all', getLineColor(line.type))}>

@@ -45,7 +45,7 @@ export interface UseFileSystemReturn {
 // ---------------------------------------------------------------------------
 
 function isFileSystemAccessSupported(): boolean {
-  return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+  return typeof globalThis.window !== 'undefined' && 'showDirectoryPicker' in globalThis.window;
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ export function useFileSystem(): UseFileSystemReturn {
     }
 
     try {
-      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
       await loadTree(handle);
     } catch (err) {
       // User cancelled the picker — not an error
@@ -175,21 +175,21 @@ export function useFileSystem(): UseFileSystemReturn {
   }, [isSupported, loadTree]);
 
   const readFile = useCallback(async (node: FileNode): Promise<string> => {
-    if (!node.handle || node.handle.kind !== 'file') {
+    const handle = node.handle;
+    if (!handle || handle.kind !== 'file') {
       throw new Error('No file handle available');
     }
 
-    const fileHandle = node.handle as FileSystemFileHandle;
-    const file = await fileHandle.getFile();
+    const file = await handle.getFile();
     return file.text();
   }, []);
 
   const writeFile = useCallback(async (node: FileNode, content: string): Promise<boolean> => {
-    if (!node.handle || node.handle.kind !== 'file') return false;
+    const handle = node.handle;
+    if (!handle || handle.kind !== 'file') return false;
 
     try {
-      const fileHandle = node.handle as FileSystemFileHandle;
-      const writable = await fileHandle.createWritable();
+      const writable = await handle.createWritable();
       await writable.write(content);
       await writable.close();
       return true;

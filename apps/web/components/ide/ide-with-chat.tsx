@@ -276,6 +276,12 @@ function FileTreeNode({
 // Toolbar
 // ---------------------------------------------------------------------------
 
+function getFolderButtonLabel(isLoading: boolean, rootName: string | null): string {
+  if (isLoading) return 'Loading...';
+  if (rootName) return `Close ${rootName}`;
+  return 'Open Folder';
+}
+
 function IDEToolbar({
   sidebarCollapsed,
   toggleSidebar,
@@ -323,35 +329,52 @@ function IDEToolbar({
   onRefreshFolder: () => void;
   onCloseFolder: () => void;
 }>) {
+  const menuVariant = sidebarCollapsed ? 'ghost' : 'secondary';
+  const menuTitle = sidebarCollapsed ? 'Show main menu' : 'Hide main menu';
+  const menuLabel = sidebarCollapsed ? 'Menu' : 'Hide';
+
+  const explorerVariant = showExplorer ? 'secondary' : 'ghost';
+  const explorerTitle = showExplorer ? 'Hide file explorer' : 'Show file explorer';
+  const explorerLabel = showExplorer ? 'Hide' : 'Files';
+  const ExplorerIcon = showExplorer ? PanelLeftClose : Folder;
+
+  const terminalVariant = showTerminal ? 'secondary' : 'ghost';
+  const terminalTitle = showTerminal ? 'Hide terminal' : 'Show terminal';
+  const terminalLabel = showTerminal ? 'Hide' : 'Terminal';
+  const TermIcon = showTerminal ? PanelBottomClose : TerminalIcon;
+
+  const chatVariant = showChat ? 'secondary' : 'ghost';
+  const chatTitle = showChat ? 'Hide AI assistant' : 'Show AI assistant';
+  const chatLabel = showChat ? 'Hide' : 'AI';
+  const ChatIcon = showChat ? PanelRightClose : MessageSquare;
+
+  const folderLabel = getFolderButtonLabel(isLoadingFolder, rootName);
+
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
       <div className="flex items-center gap-2">
         <Button
-          variant={sidebarCollapsed ? 'ghost' : 'secondary'}
+          variant={menuVariant}
           size="sm"
           onClick={toggleSidebar}
           className="gap-2"
-          title={sidebarCollapsed ? 'Show main menu' : 'Hide main menu'}
+          title={menuTitle}
         >
           <Menu className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{sidebarCollapsed ? 'Menu' : 'Hide'}</span>
+          <span className="hidden sm:inline text-xs">{menuLabel}</span>
         </Button>
         <div className="w-px h-5 bg-border" />
         <Button
-          variant={showExplorer ? 'secondary' : 'ghost'}
+          variant={explorerVariant}
           size="sm"
           onClick={() => {
             setShowExplorer(!showExplorer);
           }}
           className="gap-2"
-          title={showExplorer ? 'Hide file explorer' : 'Show file explorer'}
+          title={explorerTitle}
         >
-          {showExplorer ? (
-            <PanelLeftClose className="h-4 w-4" />
-          ) : (
-            <Folder className="h-4 w-4" />
-          )}
-          <span className="hidden sm:inline text-xs">{showExplorer ? 'Hide' : 'Files'}</span>
+          <ExplorerIcon className="h-4 w-4" />
+          <span className="hidden sm:inline text-xs">{explorerLabel}</span>
         </Button>
         <Dialog open={isPathDialogOpen} onOpenChange={setIsPathDialogOpen}>
           <DialogTrigger asChild>
@@ -390,7 +413,7 @@ function IDEToolbar({
             disabled={isLoadingFolder}
           >
             <FolderOpen className="h-4 w-4" />
-            {isLoadingFolder ? 'Loading...' : rootName ? `Close ${rootName}` : 'Open Folder'}
+            {folderLabel}
           </Button>
         )}
         {rootName && (
@@ -420,36 +443,28 @@ function IDEToolbar({
           {activeFilePath ?? 'No file open'}
         </span>
         <Button
-          variant={showTerminal ? 'secondary' : 'ghost'}
+          variant={terminalVariant}
           size="sm"
           onClick={() => {
             setShowTerminal(!showTerminal);
           }}
           className="gap-2"
-          title={showTerminal ? 'Hide terminal' : 'Show terminal'}
+          title={terminalTitle}
         >
-          {showTerminal ? (
-            <PanelBottomClose className="h-4 w-4" />
-          ) : (
-            <TerminalIcon className="h-4 w-4" />
-          )}
-          <span className="hidden sm:inline text-xs">{showTerminal ? 'Hide' : 'Terminal'}</span>
+          <TermIcon className="h-4 w-4" />
+          <span className="hidden sm:inline text-xs">{terminalLabel}</span>
         </Button>
         <Button
-          variant={showChat ? 'secondary' : 'ghost'}
+          variant={chatVariant}
           size="sm"
           onClick={() => {
             setShowChat(!showChat);
           }}
           className="gap-2"
-          title={showChat ? 'Hide AI assistant' : 'Show AI assistant'}
+          title={chatTitle}
         >
-          {showChat ? (
-            <PanelRightClose className="h-4 w-4" />
-          ) : (
-            <MessageSquare className="h-4 w-4" />
-          )}
-          <span className="hidden sm:inline text-xs">{showChat ? 'Hide' : 'AI'}</span>
+          <ChatIcon className="h-4 w-4" />
+          <span className="hidden sm:inline text-xs">{chatLabel}</span>
         </Button>
       </div>
     </div>
@@ -981,12 +996,17 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [openTabs],
   );
 
-  const handleCreateFile = useCallback((code: string, suggestedName?: string) => {
-    const name = suggestedName ?? 'new-file.ts';
-    const path = `/src/${name}`;
+  const handleCreateFile = useCallback((code: string, suggestedName = 'new-file.ts') => {
+    const path = `/src/${suggestedName}`;
     setOpenTabs((prev) => [
       ...prev,
-      { path, name, content: code, isDirty: true, language: getLanguage(name) },
+      {
+        path,
+        name: suggestedName,
+        content: code,
+        isDirty: true,
+        language: getLanguage(suggestedName),
+      },
     ]);
     setActiveTab(path);
   }, []);
@@ -996,7 +1016,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const handleLoadFromPath = useCallback(() => {
     if (!pathInput.trim()) return;
     const file = findFileByPath(pathInput);
-    if (file && file.type === 'file') {
+    if (file?.type === 'file') {
       handleFileSelect(file);
     } else {
       const name = pathInput.split('/').pop() ?? 'untitled';
@@ -1033,9 +1053,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         handleSave();
       }
     };
-    window.addEventListener('keydown', onKeyDown);
+    globalThis.addEventListener('keydown', onKeyDown);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
+      globalThis.removeEventListener('keydown', onKeyDown);
     };
   }, [handleSave]);
 

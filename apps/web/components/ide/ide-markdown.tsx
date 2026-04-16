@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check, Play, FileCode, FilePlus, Diff } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, createContext, useContext, useMemo } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,13 +43,13 @@ function extractFilename(language: string | undefined): { lang: string; filename
 
 function detectFilenameFromCode(code: string): string | undefined {
   const patterns = [
-    /^\/\/\s*(.+\.[a-z]+)\s*$/im,
-    /^\/\*\s*(.+\.[a-z]+)\s*\*\/\s*$/im,
-    /^#\s*(.+\.[a-z]+)\s*$/im,
-    /^<!--\s*(.+\.[a-z]+)\s*-->\s*$/im,
+    /^\/\/\s*(\S+\.[a-z]+)\s*$/im,
+    /^\/\*\s*(\S+\.[a-z]+)\s*\*\/\s*$/im,
+    /^#\s*(\S+\.[a-z]+)\s*$/im,
+    /^<!--\s*(\S+\.[a-z]+)\s*-->\s*$/im,
   ];
   for (const pattern of patterns) {
-    const match = code.match(pattern);
+    const match = pattern.exec(code);
     if (match) return match[1];
   }
   return undefined;
@@ -399,8 +399,63 @@ function MarkdownPre({ children }: Readonly<{ children?: React.ReactNode }>) {
 }
 
 // ---------------------------------------------------------------------------
-// IDEMarkdown
+// IDEMarkdown — context for code block callbacks
 // ---------------------------------------------------------------------------
+
+interface IDEMarkdownContextValue {
+  contextFiles?: ReadonlyArray<{ path: string; name: string }>;
+  onApplyCode?: (code: string, targetFile?: string, mode?: 'replace' | 'insert') => void;
+  onCreateFile?: (code: string, suggestedName?: string) => void;
+  onShowDiff?: (code: string, targetFile?: string) => void;
+}
+
+const IDEMarkdownContext = createContext<IDEMarkdownContextValue>({});
+
+function MarkdownCodeRenderer({
+  className: codeClassName,
+  children,
+}: Readonly<{ className?: string; children?: React.ReactNode }>) {
+  const { contextFiles, onApplyCode, onCreateFile, onShowDiff } = useContext(IDEMarkdownContext);
+  const match = /language-(\w+)/.exec(codeClassName ?? '');
+  const isInline = !match && !codeClassName;
+
+  if (isInline) {
+    return <InlineCode>{children}</InlineCode>;
+  }
+
+  return (
+    <CodeBlockWithApply
+      language={match?.[1]}
+      value={String(children).replace(/\n$/, '')}
+      contextFiles={contextFiles}
+      onApplyCode={onApplyCode}
+      onCreateFile={onCreateFile}
+      onShowDiff={onShowDiff}
+    />
+  );
+}
+
+const MARKDOWN_COMPONENTS = {
+  code: MarkdownCodeRenderer,
+  pre: MarkdownPre,
+  p: MarkdownParagraph,
+  ul: MarkdownUnorderedList,
+  ol: MarkdownOrderedList,
+  li: MarkdownListItem,
+  h1: MarkdownH1,
+  h2: MarkdownH2,
+  h3: MarkdownH3,
+  h4: MarkdownH4,
+  blockquote: MarkdownBlockquote,
+  a: MarkdownAnchor,
+  table: MarkdownTable,
+  thead: MarkdownThead,
+  th: MarkdownTh,
+  td: MarkdownTd,
+  hr: MarkdownHr,
+  strong: MarkdownStrong,
+  em: MarkdownEm,
+} as const;
 
 export function IDEMarkdown({
   content,
@@ -410,52 +465,18 @@ export function IDEMarkdown({
   onCreateFile,
   onShowDiff,
 }: Readonly<IDEMarkdownProps>) {
+  const ctxValue = useMemo(
+    () => ({ contextFiles, onApplyCode, onCreateFile, onShowDiff }),
+    [contextFiles, onApplyCode, onCreateFile, onShowDiff],
+  );
+
   return (
-    <div className={cn('prose prose-sm max-w-none', className)}>
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        code({ className: codeClassName, children }) {
-          const match = /language-(\w+)/.exec(codeClassName ?? '');
-          const isInline = !match && !codeClassName;
-
-          if (isInline) {
-            return <InlineCode>{children}</InlineCode>;
-          }
-
-          return (
-            <CodeBlockWithApply
-              language={match?.[1]}
-              value={String(children).replace(/\n$/, '')}
-              contextFiles={contextFiles}
-              onApplyCode={onApplyCode}
-              onCreateFile={onCreateFile}
-              onShowDiff={onShowDiff}
-            />
-          );
-        },
-        pre: MarkdownPre,
-        p: MarkdownParagraph,
-        ul: MarkdownUnorderedList,
-        ol: MarkdownOrderedList,
-        li: MarkdownListItem,
-        h1: MarkdownH1,
-        h2: MarkdownH2,
-        h3: MarkdownH3,
-        h4: MarkdownH4,
-        blockquote: MarkdownBlockquote,
-        a: MarkdownAnchor,
-        table: MarkdownTable,
-        thead: MarkdownThead,
-        th: MarkdownTh,
-        td: MarkdownTd,
-        hr: MarkdownHr,
-        strong: MarkdownStrong,
-        em: MarkdownEm,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-    </div>
+    <IDEMarkdownContext.Provider value={ctxValue}>
+      <div className={cn('prose prose-sm max-w-none', className)}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+          {content}
+        </ReactMarkdown>
+      </div>
+    </IDEMarkdownContext.Provider>
   );
 }
