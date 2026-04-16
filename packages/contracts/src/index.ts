@@ -23,7 +23,15 @@ export {
 } from './session.js';
 export { SkillSchema, SkillCreateBodySchema, type Skill, type SkillCreateBody } from './skill.js';
 export { SecretRefSchema, type SecretRef } from './secrets.js';
-export { AgentSchema, AgentCreateBodySchema, type Agent, type AgentCreateBody } from './agent.js';
+export {
+  AgentSchema,
+  AgentCreateBodySchema,
+  ContextWindowSchema,
+  DEFAULT_CONTEXT_WINDOW,
+  type Agent,
+  type AgentCreateBody,
+  type ContextWindow,
+} from './agent.js';
 export { PlanSchema, TaskSchema, type Plan, type Task } from './plan.js';
 export { ToolSchema, ToolCreateBodySchema, type Tool, type ToolCreateBody } from './tool.js';
 export { openApiToToolDefinitions, type OpenApiToolDefinition } from './openapi.js';

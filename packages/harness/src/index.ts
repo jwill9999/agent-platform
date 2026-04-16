@@ -43,3 +43,5 @@ export {
 } from './retry.js';
 export { createPlanGenerateNode, type PlanGenerateNodeOptions } from './nodes/planGenerate.js';
 export { createNdjsonEmitter, createNoopEmitter } from './emitters/ndjson.js';
+export { createApproximateCounter, type TokenCounter } from './tokenCount.js';
+export { buildWindowedContext, type ContextWindowResult } from './contextBuilder.js';
