@@ -259,6 +259,7 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
               agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
             pluginDenylistJson:
               agent.pluginDenylist === undefined ? null : JSON.stringify(agent.pluginDenylist),
+            contextWindowJson: agent.contextWindow ? JSON.stringify(agent.contextWindow) : null,
             createdAtMs,
             updatedAtMs: now,
           })
@@ -275,6 +276,7 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
                 agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
               pluginDenylistJson:
                 agent.pluginDenylist === undefined ? null : JSON.stringify(agent.pluginDenylist),
+              contextWindowJson: agent.contextWindow ? JSON.stringify(agent.contextWindow) : null,
               updatedAtMs: now,
             },
           })

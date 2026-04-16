@@ -63,6 +63,7 @@ export const agents = sqliteTable(
     modelOverrideJson: text('model_override_json'),
     pluginAllowlistJson: text('plugin_allowlist_json'),
     pluginDenylistJson: text('plugin_denylist_json'),
+    contextWindowJson: text('context_window_json'),
     createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
     updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
   },

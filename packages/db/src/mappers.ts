@@ -1,6 +1,15 @@
-import type { Agent, ExecutionLimits, McpServer, Skill, Tool } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ContextWindow,
+  ExecutionLimits,
+  McpServer,
+  Skill,
+  Tool,
+} from '@agent-platform/contracts';
 import {
   AgentSchema,
+  ContextWindowSchema,
+  DEFAULT_CONTEXT_WINDOW,
   ExecutionLimitsSchema,
   McpServerSchema,
   SessionRecordSchema,
@@ -70,6 +79,9 @@ export function loadAgentById(db: DrizzleDb, id: string): Agent | undefined {
   const pluginDenylist = row.pluginDenylistJson
     ? (JSON.parse(row.pluginDenylistJson) as string[] | null)
     : null;
+  const contextWindow = row.contextWindowJson
+    ? ContextWindowSchema.parse(JSON.parse(row.contextWindowJson) as ContextWindow)
+    : DEFAULT_CONTEXT_WINDOW;
 
   return AgentSchema.parse({
     id: row.id,
@@ -84,6 +96,7 @@ export function loadAgentById(db: DrizzleDb, id: string): Agent | undefined {
     modelOverride,
     pluginAllowlist: pluginAllowlist ?? undefined,
     pluginDenylist: pluginDenylist ?? undefined,
+    contextWindow,
   });
 }
 

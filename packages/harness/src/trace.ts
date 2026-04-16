@@ -24,4 +24,11 @@ export type TraceEvent =
   | { type: 'limit_hit'; kind: 'max_steps' | 'timeout' | 'max_tokens' | 'max_cost' }
   | { type: 'plan_failed'; reason: string }
   | { type: 'stream_aborted'; reason: 'client_disconnect' | 'timeout' }
+  | {
+      type: 'context_window';
+      contextTokens: number;
+      messagesTotal: number;
+      messagesIncluded: number;
+      strategy: string;
+    }
   | { type: 'graph_end' };
