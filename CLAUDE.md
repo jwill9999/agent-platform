@@ -23,6 +23,7 @@ make web                       # start Next.js dev server (port 3001)
 
 # Seed database
 SQLITE_PATH=<path> pnpm seed   # idempotent
+# `make seed` runs `pnpm rebuild:native` first so better-sqlite3 matches the active Node (see .nvmrc).
 
 # Quality gates
 pnpm typecheck                 # TypeScript across all packages

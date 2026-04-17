@@ -42,8 +42,10 @@ build:
 doctor:
 	@bash -c '$(WITH_NVM) node -v && command -v node && pnpm -v'
 
+# Rebuild better-sqlite3 in the same shell as `nvm use` immediately before seed so the .node ABI
+# matches the Node that runs `pnpm seed` (avoids ERR_DLOPEN when another Node previously built deps).
 seed: build
-	@bash -c '$(WITH_NVM) SQLITE_PATH="$(SQLITE_PATH)" pnpm seed'
+	@bash -c '$(WITH_NVM) pnpm rebuild:native && SQLITE_PATH="$(SQLITE_PATH)" pnpm seed'
 
 # API + PTY terminal: Node must match pnpm install (see .nvmrc).
 api: build
