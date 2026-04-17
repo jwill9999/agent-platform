@@ -266,15 +266,26 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
 
     const { fullText, finalToolCalls, usage } = await withRetry(
       async () => {
+        let streamError: Error | null = null;
         const res = streamText({
           model,
           messages: toCoreMessages(messages),
           tools,
           maxSteps: 1,
           abortSignal: signal,
+          onError: ({ error }) => {
+            streamError = error instanceof Error ? error : new Error(String(error));
+          },
         });
 
         const text = await streamAndAccumulate(res.textStream, emitter);
+
+        // The AI SDK's onError callback fires during streaming but doesn't throw.
+        // We must check and re-throw to surface errors properly.
+        if (streamError) {
+          throw streamError;
+        }
+
         const toolCalls = await res.toolCalls;
         const usageInfo = await res.usage;
         return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo };

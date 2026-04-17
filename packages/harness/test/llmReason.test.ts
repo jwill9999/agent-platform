@@ -218,6 +218,36 @@ describe('createLlmReasonNode with emitter', () => {
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toEqual({ type: 'text', content: 'text' });
   });
+
+  it('re-throws errors from onError callback', async () => {
+    const apiError = new Error('Invalid API key provided');
+
+    // Mock streamText to call onError synchronously before returning
+    // This simulates how the AI SDK fires onError when the request fails immediately
+    mockStreamText.mockImplementationOnce(
+      (options: { onError?: (opts: { error: Error }) => void }) => {
+        // Fire onError synchronously before returning the result
+        if (options.onError) {
+          options.onError({ error: apiError });
+        }
+        return {
+          textStream: (async function* () {
+            // Yield nothing - simulates empty response on error
+          })(),
+          toolCalls: Promise.resolve([]),
+          usage: Promise.resolve(undefined),
+        };
+      },
+    );
+
+    const emitter = {
+      emit: vi.fn(),
+      end: vi.fn(),
+    };
+
+    const node = createLlmReasonNode(emitter);
+    await expect(node(makeState())).rejects.toThrow('Invalid API key provided');
+  });
 });
 
 // ---------------------------------------------------------------------------
