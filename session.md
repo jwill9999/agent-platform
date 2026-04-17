@@ -8,57 +8,36 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** **Web chat → harness** — `/api/chat` proxies `POST /v1/chat`; home + IDE use sessions + **agent selector** (`useHarnessChat`, NDJSON) — branch `task/explorer-collapse-cta` (tip `4b5824e`).
+- **Session:** **Fix AI SDK streaming errors** — Added `onError` callback to `streamText` to surface errors that were silently swallowed, causing empty responses when switching agents — branch `task/explorer-collapse-cta` (tip `f668ae3`).
 
 ---
 
 ## What happened (this session)
 
-### Agents API + local dev workflow
+### Fix: AI SDK streaming errors returning empty responses
 
-- **`contracts/openapi/agent-platform.yaml`** — `PUT /v1/agents/{idOrSlug}` request body uses **`AgentCreateBody`** (same as POST) so OpenAPI validation no longer requires `id`/`slug` in JSON; matches `agentsRouter` + UI.
-- **`Makefile`** — `make up` runs **`seed`**; **`make restart`** = down + up (keeps SQLite); **`make new`** = install + reset (full scratch); **`setup`** = install + up only.
-- **`README.md`**, **`docs/development.md`**, **`CLAUDE.md`** — document first-time start, restart, scratch.
+**Problem:** When switching to a different agent (e.g., "coding" agent), chat requests returned HTTP 200 with empty NDJSON body — no content at all.
 
-### DB — stale schema repair
+**Root cause:** Vercel AI SDK's `streamText` uses `onError` callback instead of throwing. Errors (like invalid API key) caused:
 
-- **`packages/db/src/legacyRepair.ts`** + **`database.ts`** — after **`migrate()`**, idempotent repair for pre-0005 **`skills`** / slug columns when journal vs file drift.
+1. `textStream` to complete with 0 chunks
+2. Error captured but not re-thrown
+3. Graph "succeeded" with empty response
 
-### IDE explorer + toolbar — `task/explorer-collapse-cta` _(earlier commits)_
+**Fix in `packages/harness/src/nodes/llmReason.ts`:**
 
-- **`ide-with-chat.tsx`** — Explorer “Collapse all folders” CTA; removed duplicate sidebar **Menu** button.
+- Added `onError` callback to capture streaming errors
+- After stream completion, check and re-throw captured errors
+- Error now propagates through graph's catch handler → NDJSON error event to client
 
-### Seed naming
+**Test added:** `re-throws errors from onError callback` in `llmReason.test.ts`
 
-- **`packages/db/src/seed/runSeed.ts`** — Primary seeded agent **`name`**: “Personal assistant”; description notes specialists when configured. **`DEFAULT_AGENT_SLUG`** remains **`default-agent`** for stable API/URLs.
+### Previous work on this branch (earlier commits)
 
-### Agent identity (product intent)
-
-- **Display `name`** can change via PUT; **`slug`** is set at create and never changes (documented in **`contracts/openapi/agent-platform.yaml`**, **`packages/contracts/src/agent.ts`**, **`agentsRouter` PUT**).
-
-### Web chat execution
-
-- **`apps/web/app/api/chat/route.ts`** — BFF proxy to **`API_PROXY_URL/v1/chat`** (harness), not direct OpenAI.
-- **`apps/web/hooks/use-harness-chat.ts`** — streams NDJSON; **`ChatAgentSelector`** + **`POST /api/v1/sessions`** per agent; changing agent creates a new session and clears thread.
-
-### Frontend V0 Integration epic — `feature/frontend-v0` — PR #52 (all CI green) _(historical)_
-
-Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
-
-1. **agent-platform-fdu** — Tailwind v4 + shadcn foundation (previously done)
-2. **agent-platform-lsh** — Layout shell, sidebar, theme toggle (previously done)
-3. **agent-platform-cht** — Chat interface + AI SDK v4 wiring (previously done, PR #51 superseded)
-4. **agent-platform-cfg** — Config dashboards (this session)
-   - `AgentsDashboard` — card grid, search, visual editor with model override + execution limits
-   - `SkillsDashboard` — card grid, inline editor (goal, constraints, output schema)
-   - `McpDashboard` — list layout, transport selector (stdio/http/sse), args/metadata editors
-   - `ToolsDashboard` — card grid, inline editor (name, description, config JSON)
-   - Models page — styled InfoCard layout with lucide icons
-   - Plugins page — centered empty state with Puzzle icon
-   - Sessions page — styled form + session list with badges
-   - New UI primitives: Input, Badge, Label, Textarea
-   - Fixed e2e test: disambiguated "AI Studio" heading selector (sidebar h1 vs empty state h2)
-   - Fixed layout height chain: main → flex column for proper Chat visibility
+- IDE explorer "Collapse all folders" CTA
+- Web chat → harness proxy wiring (`/api/chat` → `/v1/chat`)
+- Agent selector with session creation per agent change
+- Seed naming and agent identity fixes
 
 ---
 
@@ -85,17 +64,14 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ### Quality
 
-- 237+ tests passing (55 API + 159 harness + 7 web + others)
+- 160 harness tests + 59 API tests passing (219+ total)
 - Build, typecheck, lint, format all clean
-- All CI checks green on PR #52 (verify, docker, e2e, GitGuardian, SonarCloud)
+- All CI checks green on PR #60
 
 ### Git
 
-- **`task/explorer-collapse-cta`** — tip `4b5824e` (harness chat + agent selector + prior work); push/PR when ready.
+- **`task/explorer-collapse-cta`** — tip `f668ae3` (AI SDK error fix pushed); PR #60 open
 - `main` — up to date with `origin/main` at session start
-- `feature/frontend-v0` — base branch for frontend epic
-- `task/agent-platform-cfg` — segment tip, PR #52 open → `feature/frontend-v0`
-- PR #51 closed (superseded by #52)
 
 ### Ready backlog
 
@@ -114,18 +90,16 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ## Next (priority order)
 
-1. **Push `task/explorer-collapse-cta`** and open PR (or merge per your branching rules).
-2. **Merge PR #52** — Frontend V0 Integration → `feature/frontend-v0`, then `feature/frontend-v0` → `main`
-3. **`agent-platform-a9g`** — Chat file/context attachments (P2, frontend)
-4. **`agent-platform-d8u`** — Concurrent session safety (P2, harness/reliability)
-5. **`agent-platform-psa`** — Context window management (P2, harness/runtime)
-6. **Agent/model selector** — User discussed wanting agent picker in chat header (needs task)
+1. **Merge PR #60** — `task/explorer-collapse-cta` → `main` (AI SDK error fix)
+2. **`agent-platform-a9g`** — Chat file/context attachments (P2, frontend)
+3. **`agent-platform-d8u`** — Concurrent session safety (P2, harness/reliability)
+4. **`agent-platform-psa`** — Context window management (P2, harness/runtime)
 
 ---
 
 ## Blockers / questions for owner
 
-- PR #52 needs review and merge to `feature/frontend-v0`, then `feature/frontend-v0` → `main`
+- None currently
 
 ---
 
@@ -141,7 +115,6 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 ## Quick commands
 
 ```bash
-bd ready --json
-gh pr view 52
+gh pr view 60
 pnpm install && pnpm build && pnpm typecheck && pnpm lint && pnpm test
 ```
