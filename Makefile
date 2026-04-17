@@ -17,6 +17,11 @@ define WITH_NVM
 export NVM_DIR="$${NVM_DIR:-$$HOME/.nvm}"; if [ -s "$$NVM_DIR/nvm.sh" ]; then . "$$NVM_DIR/nvm.sh" && cd "$(REPO_ROOT)" && nvm use; fi;
 endef
 
+# Harness chat prefers AGENT_OPENAI_API_KEY; if unset, reuse OPENAI_API_KEY for local make targets (avoids duplicate .env lines).
+define WITH_AGENT_OPENAI_FALLBACK
+export AGENT_OPENAI_API_KEY="$${AGENT_OPENAI_API_KEY:-$${OPENAI_API_KEY-}}";
+endef
+
 # Recompile better-sqlite3 for the current Node (must match `make doctor`). Run after switching Node or if seed/api fails with ERR_DLOPEN / NODE_MODULE_VERSION.
 install:
 	@bash -c '$(WITH_NVM) pnpm install && pnpm rebuild:native'
@@ -42,7 +47,7 @@ seed: build
 
 # API + PTY terminal: Node must match pnpm install (see .nvmrc).
 api: build
-	@bash -c '$(WITH_NVM) node -e "console.log(\"Using\", process.version, process.execPath, \"— must match Node used for pnpm install (make doctor)\")" && SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js'
+	@bash -c '$(WITH_NVM) $(WITH_AGENT_OPENAI_FALLBACK) node -e "console.log(\"Using\", process.version, process.execPath, \"— must match Node used for pnpm install (make doctor)\")" && SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js'
 
 # Next.js dev server on WEB_PORT.
 web:
@@ -60,12 +65,12 @@ reset-db:
 # API + web together: same nvm/Node for background node and foreground pnpm/next.
 # Runs seed after build/down so the DB has the seeded agents + demo rows before the API serves /v1 (idempotent).
 up: build down seed
-	@bash -c 'set -euo pipefail; $(WITH_NVM) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
+	@bash -c 'set -euo pipefail; $(WITH_NVM) $(WITH_AGENT_OPENAI_FALLBACK) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
 
 down: stop-sessions stop-ports
 
 reset: down reset-db build seed
-	@bash -c 'set -euo pipefail; $(WITH_NVM) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
+	@bash -c 'set -euo pipefail; $(WITH_NVM) $(WITH_AGENT_OPENAI_FALLBACK) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
 
 start: up
 

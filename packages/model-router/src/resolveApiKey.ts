@@ -70,7 +70,7 @@ export function resolveApiKeyForProvider(options: {
 
   return {
     outcome: 'legacy_blocked',
-    message: `${legacyVar} is set but blocked. Use ${envVar}, or set ALLOW_LEGACY_ENV=1 to allow legacy env fallback.`,
+    message: `${legacyVar} is set but blocked. Set ${envVar} (same key), or set OPENAI_ALLOW_LEGACY_ENV=1 or ALLOW_LEGACY_ENV=1 to allow ${legacyVar}.`,
   };
 }
 
