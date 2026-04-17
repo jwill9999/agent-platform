@@ -10,9 +10,11 @@ export interface ChatProps {
   messages: UIMessage[];
   onSend: (text: string) => void;
   isLoading: boolean;
+  /** When false, input is disabled until a session id exists. */
+  canSend?: boolean;
 }
 
-export function Chat({ messages, onSend, isLoading }: Readonly<ChatProps>) {
+export function Chat({ messages, onSend, isLoading, canSend = true }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -42,7 +44,7 @@ export function Chat({ messages, onSend, isLoading }: Readonly<ChatProps>) {
       </div>
 
       {/* Input */}
-      <ChatInput onSend={onSend} isLoading={isLoading} />
+      <ChatInput onSend={onSend} isLoading={isLoading} canSend={canSend} />
     </div>
   );
 }

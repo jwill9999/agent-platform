@@ -357,7 +357,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
           },
         });
 
-        const text = await streamAndAccumulate(res.textStream, emitter);
+        const text = await streamAndAccumulate(res, emitter);
 
         // The AI SDK's onError callback fires during streaming but doesn't throw.
         // We must check and re-throw to surface errors properly.

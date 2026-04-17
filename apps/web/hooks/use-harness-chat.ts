@@ -54,11 +54,12 @@ export function useHarnessChat(sessionId: string | null) {
 
         if (!res.ok) {
           let msg = `Chat failed (${res.status})`;
+          const raw = await res.text();
           try {
-            const j = (await res.json()) as { error?: { message?: string } };
+            const j = JSON.parse(raw) as { error?: { message?: string } };
             if (j.error?.message) msg = j.error.message;
           } catch {
-            /* ignore */
+            if (raw.trim()) msg = raw.slice(0, 500);
           }
           throw new Error(msg);
         }

@@ -7,9 +7,11 @@ import { cn } from '@/lib/cn';
 interface ChatInputProps {
   onSend: (text: string) => void;
   isLoading: boolean;
+  /** When false, sending is blocked (e.g. session not ready yet). */
+  canSend?: boolean;
 }
 
-export function ChatInput({ onSend, isLoading }: Readonly<ChatInputProps>) {
+export function ChatInput({ onSend, isLoading, canSend = true }: Readonly<ChatInputProps>) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -25,14 +27,14 @@ export function ChatInput({ onSend, isLoading }: Readonly<ChatInputProps>) {
     (e: FormEvent) => {
       e.preventDefault();
       const trimmed = input.trim();
-      if (!trimmed || isLoading) return;
+      if (!trimmed || isLoading || !canSend) return;
       onSend(trimmed);
       setInput('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     },
-    [input, isLoading, onSend],
+    [input, isLoading, onSend, canSend],
   );
 
   const handleKeyDown = useCallback(
@@ -60,11 +62,11 @@ export function ChatInput({ onSend, isLoading }: Readonly<ChatInputProps>) {
             placeholder="Send a message..."
             className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-sm leading-relaxed max-h-[200px]"
             rows={1}
-            disabled={isLoading}
+            disabled={isLoading || !canSend}
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !canSend}
             className={cn(
               'flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all',
               input.trim() && !isLoading
@@ -80,7 +82,9 @@ export function ChatInput({ onSend, isLoading }: Readonly<ChatInputProps>) {
           </button>
         </div>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          Press Enter to send, Shift+Enter for new line
+          {!canSend
+            ? 'Waiting for chat session…'
+            : 'Press Enter to send, Shift+Enter for new line'}
         </p>
       </form>
     </div>

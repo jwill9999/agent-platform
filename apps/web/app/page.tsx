@@ -100,7 +100,12 @@ export default function HomePage() {
         </p>
       </div>
       <div className="flex-1 flex flex-col min-h-0">
-        <Chat messages={messages} onSend={handleSend} isLoading={isLoading} />
+        <Chat
+          messages={messages}
+          onSend={handleSend}
+          isLoading={isLoading}
+          canSend={Boolean(sessionId)}
+        />
       </div>
     </div>
   );
