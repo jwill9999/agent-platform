@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+The **Makefile** loads **nvm** when present and runs **`nvm install`** in the repo root so **`.nvmrc`** is applied (installs that Node version if missing). Use that for consistent Node across `make install`, `build`, `seed`, etc.
+
 ```bash
 # Install
 pnpm install

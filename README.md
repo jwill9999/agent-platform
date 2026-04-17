@@ -4,7 +4,7 @@ Composable agent harness for building, configuring, and running AI agents. Built
 
 ## Quick Start
 
-Prerequisites: **Node.js 20** (see `.nvmrc`), **pnpm** 9+. The Makefile loads **nvm** when present so `nvm use` matches the repo.
+Prerequisites: **Node.js 20** (see `.nvmrc`), **pnpm** 9+. The Makefile loads **nvm** when present and runs **`nvm install`** from the repo root so the **`.nvmrc`** version is installed (if needed) and selected before any `node`/`pnpm` step.
 
 ### First time (install, build, seed DB, run API + web)
 

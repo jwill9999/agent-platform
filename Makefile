@@ -11,10 +11,11 @@ SQLITE_PATH ?= $(CURDIR)/data/dev.sqlite
 # Directory containing this Makefile (repo root when building from Makefile).
 REPO_ROOT := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 
-# If nvm is installed, load it and apply .nvmrc in REPO_ROOT. No-op when nvm is missing (Docker/CI).
+# If nvm is installed, load it, cd to REPO_ROOT, and `nvm install` (reads `.nvmrc`, installs that
+# Node version if missing, then selects it). No-op when nvm is missing (Docker/CI).
 # Used by install, build, doctor, seed, api, web, up, reset (anything that runs node or pnpm).
 define WITH_NVM
-export NVM_DIR="$${NVM_DIR:-$$HOME/.nvm}"; if [ -s "$$NVM_DIR/nvm.sh" ]; then . "$$NVM_DIR/nvm.sh" && cd "$(REPO_ROOT)" && nvm use; fi;
+export NVM_DIR="$${NVM_DIR:-$$HOME/.nvm}"; if [ -s "$$NVM_DIR/nvm.sh" ]; then . "$$NVM_DIR/nvm.sh" && cd "$(REPO_ROOT)" && nvm install; fi;
 endef
 
 # Harness chat prefers AGENT_OPENAI_API_KEY; if unset, reuse OPENAI_API_KEY for local make targets (avoids duplicate .env lines).
@@ -42,7 +43,7 @@ build:
 doctor:
 	@bash -c '$(WITH_NVM) node -v && command -v node && pnpm -v'
 
-# Rebuild better-sqlite3 in the same shell as `nvm use`, delete stale .node so rebuild cannot no-op,
+# Rebuild better-sqlite3 in the same shell as `nvm install` (`.nvmrc`), delete stale .node so rebuild cannot no-op,
 # verify load, then run the seed entrypoint with the same `node` as rebuild (pnpm seed can pick a
 # different Node than nvm in some setups).
 seed: build
