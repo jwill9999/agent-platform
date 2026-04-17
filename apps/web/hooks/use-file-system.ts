@@ -240,28 +240,18 @@ export function useFileSystem(): UseFileSystemReturn {
 
       const h = handle as FSHandleWithPermission;
 
-      // Re-request read/write permission (user may need to grant again)
+      // queryPermission is passive — it won't prompt the user or show any UI.
+      // If permission was already granted in a previous session Chrome remembers it.
       const perm = await h.queryPermission({ mode: 'readwrite' });
       if (perm === 'granted') {
         await loadTree(handle);
         return;
       }
 
-      // 'prompt' means the browser will ask the user — only works with a user gesture,
-      // but some browsers auto-grant for same-origin after the first grant.
-      if (perm === 'prompt') {
-        try {
-          const result = await h.requestPermission({ mode: 'readwrite' });
-          if (result === 'granted') {
-            await loadTree(handle);
-            return;
-          }
-        } catch {
-          // requestPermission may throw without a user gesture — expected
-        }
-      }
-
-      // Permission denied — clear the stale handle
+      // Permission not already granted (user must re-open folder manually).
+      // DO NOT call requestPermission here — it requires a user gesture and
+      // will put Chrome into a pending-permission state that blocks
+      // showDirectoryPicker with AbortError.
       await clearPersistedHandle();
     })();
   }, [loadTree]);
