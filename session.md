@@ -8,15 +8,16 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** IDE file explorer — committed “Collapse all folders” CTA on branch `task/explorer-collapse-cta` (`d82349e`).
+- **Session:** IDE — explorer “Collapse” CTA + removed duplicate sidebar Menu from toolbar (`task/explorer-collapse-cta`, tip `0c84f71`).
 
 ---
 
 ## What happened (this session)
 
-### IDE explorer collapse CTA — `task/explorer-collapse-cta`
+### IDE explorer + toolbar — `task/explorer-collapse-cta`
 
-- **`apps/web/components/ide/ide-with-chat.tsx`** — Header next to open folder name: ghost button (icon + “Collapse” on `sm+`) that increments a signal so all directory nodes collapse; avoids clobbering newly mounted children.
+- **`apps/web/components/ide/ide-with-chat.tsx`** — “Collapse all folders” CTA in explorer header (signal-based collapse).
+- **`apps/web/components/ide/ide-with-chat.tsx`** — Removed redundant **Menu** toolbar button that duplicated sidebar collapse/expand (sidebar chevrons + edge trigger remain).
 
 ### Frontend V0 Integration epic — `feature/frontend-v0` — PR #52 (all CI green) _(historical)_
 
@@ -68,7 +69,7 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ### Git
 
-- **`task/explorer-collapse-cta`** — tip: explorer “Collapse all folders” (`d82349e`); open PR → `main` (or merge via your feature branch workflow).
+- **`task/explorer-collapse-cta`** — tip: explorer collapse CTA + toolbar cleanup (`0c84f71`); push/PR when ready.
 - **Working tree (not in that commit):** local edits may remain on `Makefile`, `packages/db` legacy repair + tests — commit separately if still needed.
 - `main` — up to date with `origin/main` at session start
 - `feature/frontend-v0` — base branch for frontend epic
