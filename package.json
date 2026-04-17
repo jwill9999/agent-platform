@@ -3,7 +3,11 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
+    "rebuild:native": "pnpm rebuild better-sqlite3",
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
     "typecheck": "pnpm --filter @agent-platform/contracts build && pnpm --filter @agent-platform/agent-validation build && pnpm --filter @agent-platform/logger build && pnpm --filter @agent-platform/db build && pnpm --filter @agent-platform/mcp-adapter build && pnpm --filter @agent-platform/model-router build && pnpm --filter @agent-platform/plugin-sdk build && pnpm --filter @agent-platform/plugin-session build && pnpm --filter @agent-platform/plugin-observability build && pnpm --filter @agent-platform/planner build && pnpm --filter @agent-platform/harness build && pnpm -r run typecheck",
@@ -13,7 +17,8 @@
     "seed": "pnpm --filter @agent-platform/db run seed",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:install": "playwright install --with-deps chromium",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "node scripts/fix-node-pty-helpers.mjs"
   },
   "lint-staged": {
     "*.{ts,json,md,js}": "prettier --write",

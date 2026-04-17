@@ -1,23 +1,39 @@
-.PHONY: install build seed api web stop-sessions stop-ports reset-db up down reset start restart dev dev-seed dev-reset
+.PHONY: install build seed api web stop-sessions stop-ports reset-db up down reset start restart dev dev-seed dev-reset doctor
 
 PORT ?= 3000
 WEB_PORT ?= 3001
-SQLITE_PATH ?= /workspace/data/dev.sqlite
+# Local dev: repo-root data/ (created on first API start). Override for Docker: SQLITE_PATH=/workspace/data/dev.sqlite make api
+SQLITE_PATH ?= $(CURDIR)/data/dev.sqlite
+
+# Directory containing this Makefile (repo root when building from Makefile).
+REPO_ROOT := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
+
+# If nvm is installed, load it and apply .nvmrc in REPO_ROOT. No-op when nvm is missing (Docker/CI).
+# Used by install, build, doctor, seed, api, web, up, reset (anything that runs node or pnpm).
+define WITH_NVM
+export NVM_DIR="$${NVM_DIR:-$$HOME/.nvm}"; if [ -s "$$NVM_DIR/nvm.sh" ]; then . "$$NVM_DIR/nvm.sh" && cd "$(REPO_ROOT)" && nvm use; fi;
+endef
 
 install:
-	pnpm install
+	@bash -c '$(WITH_NVM) pnpm install'
 
 build:
-	pnpm build
+	@bash -c '$(WITH_NVM) pnpm build'
+
+# Print Node path/version — native deps (better-sqlite3) must be built with the same Node you use for `make api`.
+doctor:
+	@bash -c '$(WITH_NVM) node -v && command -v node && pnpm -v'
 
 seed: build
-	SQLITE_PATH="$(SQLITE_PATH)" pnpm seed
+	@bash -c '$(WITH_NVM) SQLITE_PATH="$(SQLITE_PATH)" pnpm seed'
 
+# API + PTY terminal: Node must match pnpm install (see .nvmrc).
 api: build
-	SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js
+	@bash -c '$(WITH_NVM) node -e "console.log(\"Using\", process.version, process.execPath, \"— must match Node used for pnpm install (make doctor)\")" && SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js'
 
+# Next.js dev server on WEB_PORT.
 web:
-	pnpm --filter @agent-platform/web run dev
+	@bash -c '$(WITH_NVM) pnpm --filter @agent-platform/web run dev'
 
 stop-ports:
 	@bash -lc 'set -euo pipefail; for port in "$(PORT)" "$(WEB_PORT)"; do pids="$$(lsof -tiTCP:$$port || true)"; if [ -n "$$pids" ]; then echo "Stopping processes on port $$port: $$pids"; kill $$pids || true; sleep 0.5; remaining="$$(lsof -tiTCP:$$port || true)"; if [ -n "$$remaining" ]; then echo "Force killing processes on port $$port: $$remaining"; kill -9 $$remaining || true; fi; fi; done'
@@ -28,13 +44,14 @@ stop-sessions:
 reset-db:
 	@bash -lc 'set -euo pipefail; if [ -f "$(SQLITE_PATH)" ]; then echo "Removing $(SQLITE_PATH)"; rm -f "$(SQLITE_PATH)"; fi'
 
+# API + web together: same nvm/Node for background node and foreground pnpm/next.
 up: build down
-	@bash -lc 'set -euo pipefail; trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
+	@bash -c 'set -euo pipefail; $(WITH_NVM) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
 
 down: stop-sessions stop-ports
 
 reset: down reset-db build seed
-	@bash -lc 'set -euo pipefail; trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
+	@bash -c 'set -euo pipefail; $(WITH_NVM) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
 
 start: up
 

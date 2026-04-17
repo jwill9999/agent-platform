@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 
+import { fsDebugLog } from '@/lib/fs-debug';
+
 // TypeScript doesn't include queryPermission / requestPermission yet.
 interface PermissionDescriptor {
   mode?: 'read' | 'readwrite';
@@ -47,6 +49,12 @@ export interface UseFileSystemReturn {
   refresh: () => Promise<void>;
   /** Close the current directory */
   closeDirectory: () => void;
+  /** True when a folder handle exists in IndexedDB but access must be re-granted (e.g. after refresh). */
+  needsFolderReconnect: boolean;
+  /** Display name for the reconnect banner (persisted folder). */
+  pendingReconnectFolderName: string | null;
+  /** Call from a button click to re-request permission and load the persisted folder. */
+  reconnectFolder: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,62 +215,211 @@ export function useFileSystem(): UseFileSystemReturn {
   const [isSupported, setIsSupported] = useState(false);
 
   const rootHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
+  /** Bumps on each loadTree start; only the latest completion may commit state (avoids races with restore vs picker). */
+  const loadGenerationRef = useRef(0);
+  /**
+   * Set when the user completes showDirectoryPicker (this session). Mount-time IndexedDB restore
+   * must not call loadTree after this, or it can overwrite the user's new folder with the old handle.
+   */
+  const userPickedFolderThisSessionRef = useRef(false);
+  /** Persisted handle waiting for user gesture (requestPermission) after refresh */
+  const pendingRestoreHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
+  const [needsFolderReconnect, setNeedsFolderReconnect] = useState(false);
+  const [pendingReconnectFolderName, setPendingReconnectFolderName] = useState<string | null>(null);
 
-  const loadTree = useCallback(async (handle: FileSystemDirectoryHandle) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const counter = { count: 0 };
-      const tree = await buildTree(handle, '', 0, counter);
-      setFileTree(tree);
-      setRootName(handle.name);
-      setIsDirectoryOpen(true);
-      rootHandleRef.current = handle;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to read directory';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
+  const clearReconnectState = useCallback(() => {
+    pendingRestoreHandleRef.current = null;
+    setNeedsFolderReconnect(false);
+    setPendingReconnectFolderName(null);
   }, []);
 
-  // Detect FS Access API support and restore persisted handle on mount
+  const loadTree = useCallback(
+    async (handle: FileSystemDirectoryHandle, source: 'restore' | 'picker' | 'refresh') => {
+      const generation = ++loadGenerationRef.current;
+      fsDebugLog('loadTree:start', { source, generation, name: handle.name });
+      setIsLoading(true);
+      setError(null);
+      try {
+        const counter = { count: 0 };
+        const tree = await buildTree(handle, '', 0, counter);
+        if (generation !== loadGenerationRef.current) {
+          fsDebugLog('loadTree:drop_stale_after_build', {
+            source,
+            generation,
+            current: loadGenerationRef.current,
+          });
+          return;
+        }
+        fsDebugLog('loadTree:commit', { source, generation, nodes: tree.length });
+        setFileTree(tree);
+        setRootName(handle.name);
+        setIsDirectoryOpen(true);
+        rootHandleRef.current = handle;
+      } catch (err) {
+        if (generation !== loadGenerationRef.current) {
+          fsDebugLog('loadTree:error_stale_ignored', { source, generation });
+          return;
+        }
+        const message = err instanceof Error ? err.message : 'Failed to read directory';
+        fsDebugLog('loadTree:error', { source, generation, message });
+        setError(message);
+      } finally {
+        if (generation === loadGenerationRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [],
+  );
+
+  // Detect FS Access API support and restore persisted handle on mount.
+  // Defer restore by one macrotask so the first paint / user gestures are less likely to race with IDB.
   useEffect(() => {
+    let cancelled = false;
     const supported = isFileSystemAccessSupported();
     setIsSupported(supported);
     if (!supported) return;
 
-    (async () => {
-      const handle = await loadPersistedHandle();
-      if (!handle) return;
+    const timerId = globalThis.setTimeout(() => {
+      if (cancelled) return;
+      fsDebugLog('restore:timer_fired');
+      (async () => {
+        fsDebugLog('restore:begin');
+        const handle = await loadPersistedHandle();
+        if (cancelled || !handle) {
+          fsDebugLog('restore:no_handle', { cancelled, hasHandle: Boolean(handle) });
+          return;
+        }
+        if (userPickedFolderThisSessionRef.current) {
+          fsDebugLog('restore:skip_user_already_picked');
+          return;
+        }
 
-      const h = handle as FSHandleWithPermission;
+        fsDebugLog('restore:idb_hit', handle.name);
 
-      // Re-request read/write permission (user may need to grant again)
-      const perm = await h.queryPermission({ mode: 'readwrite' });
-      if (perm === 'granted') {
-        await loadTree(handle);
+        const h = handle as FSHandleWithPermission;
+
+        // Re-request read/write permission (user may need to grant again)
+        const perm = await h.queryPermission({ mode: 'readwrite' });
+        if (cancelled || userPickedFolderThisSessionRef.current) {
+          fsDebugLog('restore:abort_after_perm_query', {
+            cancelled,
+            userPicked: userPickedFolderThisSessionRef.current,
+          });
+          return;
+        }
+        if (perm === 'granted') {
+          if (userPickedFolderThisSessionRef.current) return;
+          await loadTree(handle, 'restore');
+          return;
+        }
+
+        // 'prompt' means the browser will ask the user — only works with a user gesture,
+        // but some browsers auto-grant for same-origin after the first grant.
+        if (perm === 'prompt') {
+          try {
+            const result = await h.requestPermission({ mode: 'readwrite' });
+            if (cancelled || userPickedFolderThisSessionRef.current) return;
+            if (result === 'granted') {
+              if (userPickedFolderThisSessionRef.current) return;
+              await loadTree(handle, 'restore');
+              return;
+            }
+          } catch {
+            fsDebugLog('restore:requestPermission_rw_threw');
+            // requestPermission may throw without a user gesture — expected
+          }
+        }
+
+        if (cancelled || userPickedFolderThisSessionRef.current) return;
+
+        // Read-only permission often survives refresh when read/write does not — enough to list the tree.
+        const readPerm = await h.queryPermission({ mode: 'read' });
+        if (cancelled || userPickedFolderThisSessionRef.current) return;
+        if (readPerm === 'granted') {
+          if (userPickedFolderThisSessionRef.current) return;
+          fsDebugLog('restore:read_only_auto');
+          await loadTree(handle, 'restore');
+          return;
+        }
+        if (readPerm === 'prompt') {
+          try {
+            const readResult = await h.requestPermission({ mode: 'read' });
+            if (cancelled || userPickedFolderThisSessionRef.current) return;
+            if (readResult === 'granted') {
+              if (userPickedFolderThisSessionRef.current) return;
+              fsDebugLog('restore:read_only_after_prompt');
+              await loadTree(handle, 'restore');
+              return;
+            }
+          } catch {
+            fsDebugLog('restore:requestPermission_read_threw');
+          }
+        }
+
+        if (cancelled || userPickedFolderThisSessionRef.current) return;
+
+        // Keep IndexedDB handle — do not clear. User must click "Restore folder" (user gesture).
+        pendingRestoreHandleRef.current = handle;
+        setNeedsFolderReconnect(true);
+        setPendingReconnectFolderName(handle.name);
+        fsDebugLog('restore:needs_reconnect_banner', handle.name);
+      })();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      globalThis.clearTimeout(timerId);
+    };
+  }, [loadTree]);
+
+  const reconnectFolder = useCallback(async () => {
+    const handle = pendingRestoreHandleRef.current ?? (await loadPersistedHandle());
+    if (!handle) {
+      clearReconnectState();
+      return;
+    }
+    if (!isFileSystemAccessSupported()) {
+      setError('File System Access API is not supported in this browser. Use Chrome or Edge.');
+      return;
+    }
+
+    setError(null);
+    const h = handle as FSHandleWithPermission;
+    try {
+      let rw = await h.queryPermission({ mode: 'readwrite' });
+      if (rw !== 'granted') {
+        rw = await h.requestPermission({ mode: 'readwrite' });
+      }
+      if (rw === 'granted') {
+        userPickedFolderThisSessionRef.current = false;
+        await loadTree(handle, 'restore');
+        await persistHandle(handle);
+        clearReconnectState();
+        fsDebugLog('reconnect:ok_readwrite');
         return;
       }
 
-      // 'prompt' means the browser will ask the user — only works with a user gesture,
-      // but some browsers auto-grant for same-origin after the first grant.
-      if (perm === 'prompt') {
-        try {
-          const result = await h.requestPermission({ mode: 'readwrite' });
-          if (result === 'granted') {
-            await loadTree(handle);
-            return;
-          }
-        } catch {
-          // requestPermission may throw without a user gesture — expected
-        }
+      let r = await h.queryPermission({ mode: 'read' });
+      if (r !== 'granted') {
+        r = await h.requestPermission({ mode: 'read' });
+      }
+      if (r === 'granted') {
+        userPickedFolderThisSessionRef.current = false;
+        await loadTree(handle, 'restore');
+        await persistHandle(handle);
+        clearReconnectState();
+        fsDebugLog('reconnect:ok_read');
+        return;
       }
 
-      // Permission denied — clear the stale handle
-      await clearPersistedHandle();
-    })();
-  }, [loadTree]);
+      setError('Permission was not granted. Try Open Folder again.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to restore folder';
+      fsDebugLog('reconnect:error', message);
+      setError(message);
+    }
+  }, [loadTree, clearReconnectState]);
 
   const openDirectory = useCallback(async () => {
     if (!isFileSystemAccessSupported()) {
@@ -272,15 +429,24 @@ export function useFileSystem(): UseFileSystemReturn {
 
     try {
       const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
-      await loadTree(handle);
+      fsDebugLog('picker:resolved', handle.name);
+      // Before loadTree: block mount-time restore from applying a stale persisted handle after this.
+      userPickedFolderThisSessionRef.current = true;
+      await loadTree(handle, 'picker');
       await persistHandle(handle);
+      clearReconnectState();
+      fsDebugLog('picker:persisted');
     } catch (err) {
       // User cancelled the picker — not an error
-      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        fsDebugLog('picker:cancelled');
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to open directory';
+      fsDebugLog('picker:error', message);
       setError(message);
     }
-  }, [loadTree]);
+  }, [loadTree, clearReconnectState]);
 
   const readFile = useCallback(async (node: FileNode): Promise<string> => {
     const handle = node.handle;
@@ -309,7 +475,7 @@ export function useFileSystem(): UseFileSystemReturn {
 
   const refresh = useCallback(async () => {
     if (!rootHandleRef.current) return;
-    await loadTree(rootHandleRef.current);
+    await loadTree(rootHandleRef.current, 'refresh');
   }, [loadTree]);
 
   const closeDirectory = useCallback(() => {
@@ -318,8 +484,10 @@ export function useFileSystem(): UseFileSystemReturn {
     setIsDirectoryOpen(false);
     rootHandleRef.current = null;
     setError(null);
+    userPickedFolderThisSessionRef.current = false;
+    clearReconnectState();
     void clearPersistedHandle();
-  }, []);
+  }, [clearReconnectState]);
 
   return {
     isSupported,
@@ -333,5 +501,8 @@ export function useFileSystem(): UseFileSystemReturn {
     writeFile,
     refresh,
     closeDirectory,
+    needsFolderReconnect,
+    pendingReconnectFolderName,
+    reconnectFolder,
   };
 }
