@@ -4,13 +4,45 @@ Composable agent harness for building, configuring, and running AI agents. Built
 
 ## Quick Start
 
+Prerequisites: **Node.js 20** (see `.nvmrc`), **pnpm** 9+. The Makefile loads **nvm** when present so `nvm use` matches the repo.
+
+### First time (install, build, seed DB, run API + web)
+
+From the repo root:
+
 ```bash
-pnpm install          # Install dependencies
-pnpm build            # Build all packages
-make up               # Start API (:3000) + Web (:3001)
+make
 ```
 
-See [Development Guide](docs/development.md) for prerequisites and detailed setup.
+This is the same as **`make setup`**: runs **`make install`** then **`make up`**. The **`up`** target builds the monorepo, frees ports **3000** / **3001**, runs **`pnpm seed`** (default agent + demo data — idempotent), then starts the **API** on port **3000** and the **Next.js** app on **3001**.
+
+Alternatively, step by step: `make install` then `make up`.
+
+### Restart without wiping the database
+
+Stops whatever is listening on the dev ports, then starts the stack again (rebuild, seed, run). Your **`SQLITE_PATH`** file (default `data/dev.sqlite`) is **not** deleted.
+
+```bash
+make restart
+```
+
+### Full rebuild from scratch (destructive database)
+
+Reinstalls dependencies, deletes the local dev SQLite file, rebuilds, seeds, and starts the stack. Use when you want a clean DB or after major schema changes.
+
+```bash
+make new
+```
+
+### Other useful targets
+
+| Command      | Purpose                                                                      |
+| ------------ | ---------------------------------------------------------------------------- |
+| `make up`    | Build, free ports, seed, start API + web (no `pnpm install`)                 |
+| `make down`  | Stop processes on **PORT** / **WEB_PORT** (default 3000 / 3001)              |
+| `make reset` | Same as `up` but after **`reset-db`** (wipe SQLite only — no `pnpm install`) |
+
+See [Development Guide](docs/development.md) for prerequisites, env vars (**`SQLITE_PATH`**, **`SECRETS_MASTER_KEY`**), tests, and Docker.
 
 ## Documentation
 

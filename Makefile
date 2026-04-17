@@ -1,4 +1,7 @@
-.PHONY: install build seed api web stop-sessions stop-ports reset-db up down reset start restart dev dev-seed dev-reset doctor
+.PHONY: setup all install rebuild-native build seed api web stop-sessions stop-ports reset-db up down reset start new restart dev dev-seed dev-reset doctor
+
+# One-shot: install deps, build, seed DB, start API + web (nvm applied in each step).
+.DEFAULT_GOAL := setup
 
 PORT ?= 3000
 WEB_PORT ?= 3001
@@ -14,8 +17,18 @@ define WITH_NVM
 export NVM_DIR="$${NVM_DIR:-$$HOME/.nvm}"; if [ -s "$$NVM_DIR/nvm.sh" ]; then . "$$NVM_DIR/nvm.sh" && cd "$(REPO_ROOT)" && nvm use; fi;
 endef
 
+# Recompile better-sqlite3 for the current Node (must match `make doctor`). Run after switching Node or if seed/api fails with ERR_DLOPEN / NODE_MODULE_VERSION.
 install:
-	@bash -c '$(WITH_NVM) pnpm install'
+	@bash -c '$(WITH_NVM) pnpm install && pnpm rebuild:native'
+
+rebuild-native:
+	@bash -c '$(WITH_NVM) pnpm rebuild:native'
+
+# Chains install → up (build, free ports, seed DB, start API + web). Same as `make` with no args.
+setup: install
+	@$(MAKE) up
+
+all: setup
 
 build:
 	@bash -c '$(WITH_NVM) pnpm build'
@@ -45,7 +58,8 @@ reset-db:
 	@bash -lc 'set -euo pipefail; if [ -f "$(SQLITE_PATH)" ]; then echo "Removing $(SQLITE_PATH)"; rm -f "$(SQLITE_PATH)"; fi'
 
 # API + web together: same nvm/Node for background node and foreground pnpm/next.
-up: build down
+# Runs seed after build/down so the DB has the default agent + demo rows before the API serves /v1 (idempotent).
+up: build down seed
 	@bash -c 'set -euo pipefail; $(WITH_NVM) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
 
 down: stop-sessions stop-ports
@@ -55,7 +69,14 @@ reset: down reset-db build seed
 
 start: up
 
-restart: reset
+# Stop API + web, then bring them back up. Keeps the SQLite file (no `reset-db`).
+restart:
+	@$(MAKE) down
+	@$(MAKE) up
+
+# Reinstall deps, then full reset: wipe DB, rebuild, seed, start (destructive local DB).
+new: install
+	@$(MAKE) reset
 
 dev: build
 	@$(MAKE) up

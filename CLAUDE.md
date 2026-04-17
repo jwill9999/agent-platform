@@ -12,8 +12,10 @@ pnpm install
 pnpm build
 
 # Run API + Web together (builds first)
-make up                        # PORT=3000, WEB_PORT=3001
-make reset                     # down + wipe DB + build + seed + up
+make up                        # PORT=3000, WEB_PORT=3001 (build, seed, API + web)
+make restart                   # down + up — keeps SQLite
+make new                       # install + reset — full scratch (wipes DB)
+make reset                     # down + wipe DB + build + seed + up (no install)
 
 # Run individual services
 make api                       # build + start API (port 3000)
@@ -34,6 +36,7 @@ pnpm --filter <package-name> run test -- <path/to/test.ts>
 ```
 
 **Environment variables:**
+
 - `SQLITE_PATH` — required for API to serve `/v1` routes
 - `SECRETS_MASTER_KEY` — base64-encoded 32-byte key for AES-256-GCM secret encryption
 
@@ -43,12 +46,13 @@ This is a **pnpm monorepo** with two apps and ten shared packages.
 
 ### Apps
 
-| App | Tech | Port | Purpose |
-|-----|------|------|---------|
-| `apps/api` | Express + TypeScript | 3000 | REST JSON API, agent execution host |
+| App        | Tech                  | Port | Purpose                                           |
+| ---------- | --------------------- | ---- | ------------------------------------------------- |
+| `apps/api` | Express + TypeScript  | 3000 | REST JSON API, agent execution host               |
 | `apps/web` | Next.js 15 + React 19 | 3001 | Chat UI; proxies to API via `/api/chat` BFF route |
 
 **API layout** follows clean architecture:
+
 - `src/application/` — use cases
 - `src/infrastructure/` — DB, MCP clients, external calls
 - `src/interfaces/http/` — thin Express routes/controllers
@@ -56,18 +60,18 @@ This is a **pnpm monorepo** with two apps and ten shared packages.
 
 ### Shared Packages
 
-| Package | Role |
-|---------|------|
-| `packages/contracts` | Zod schemas shared between all layers (agents, skills, tools, sessions, plans) |
-| `packages/db` | Drizzle ORM + better-sqlite3; migrations in `drizzle/`; AES-256-GCM secret storage |
-| `packages/harness` | LangGraph-based agent execution graph (`buildGraph.ts`) and state (`graphState.ts`) |
-| `packages/model-router` | OpenAI provider routing via Vercel AI SDK; provider+model+key are user-configurable |
-| `packages/mcp-adapter` | MCP client lifecycle (`session.ts`); transforms MCP tools to contract tools |
-| `packages/plugin-sdk` | Plugin interface + hook dispatcher; hooks: `onSessionStart`, `onTaskStart`, `onPromptBuild`, `onToolCall`, `onTaskEnd`, `onError` |
-| `packages/planner` | LLM-driven planning layer producing structured JSON output |
-| `packages/agent-validation` | Agent schema validation |
-| `packages/plugin-session` | Session plugin implementation |
-| `packages/plugin-observability` | Logging/tracing plugin |
+| Package                         | Role                                                                                                                              |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/contracts`            | Zod schemas shared between all layers (agents, skills, tools, sessions, plans)                                                    |
+| `packages/db`                   | Drizzle ORM + better-sqlite3; migrations in `drizzle/`; AES-256-GCM secret storage                                                |
+| `packages/harness`              | LangGraph-based agent execution graph (`buildGraph.ts`) and state (`graphState.ts`)                                               |
+| `packages/model-router`         | OpenAI provider routing via Vercel AI SDK; provider+model+key are user-configurable                                               |
+| `packages/mcp-adapter`          | MCP client lifecycle (`session.ts`); transforms MCP tools to contract tools                                                       |
+| `packages/plugin-sdk`           | Plugin interface + hook dispatcher; hooks: `onSessionStart`, `onTaskStart`, `onPromptBuild`, `onToolCall`, `onTaskEnd`, `onError` |
+| `packages/planner`              | LLM-driven planning layer producing structured JSON output                                                                        |
+| `packages/agent-validation`     | Agent schema validation                                                                                                           |
+| `packages/plugin-session`       | Session plugin implementation                                                                                                     |
+| `packages/plugin-observability` | Logging/tracing plugin                                                                                                            |
 
 ### Data Flow
 
@@ -93,6 +97,7 @@ bd close <id>            # complete work
 ```
 
 **Branching rules (locked):**
+
 - `feature/<feature-name>` — integration branch
 - `task/<task-name>` — individual work units, chained linearly (each branches from the previous task branch)
 - Never commit directly to `main`

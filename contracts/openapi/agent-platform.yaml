@@ -146,13 +146,16 @@ paths:
     put:
       operationId: updateAgent
       summary: Update agent
+      description: |
+        Replace agent fields. `id` and `slug` are taken from the path (`idOrSlug` resolves
+        to the existing row); the body matches `AgentCreateBody` (same shape as POST /v1/agents).
       tags: [agents]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Agent'
+              $ref: '#/components/schemas/AgentCreateBody'
       responses:
         '200':
           description: Agent updated
@@ -846,7 +849,9 @@ components:
           nullable: true
 
     AgentCreateBody:
-      description: POST body for creating an agent — id and slug are system-generated.
+      description: |
+        Body for POST /v1/agents (create) and PUT /v1/agents/{idOrSlug} (replace). `id` and
+        `slug` are system-assigned on create and are not sent in the request body.
       type: object
       required: [name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
       properties:

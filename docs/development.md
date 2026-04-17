@@ -9,20 +9,24 @@
 ## Quick Start
 
 ```bash
-# Install dependencies
-pnpm install
+# First time from repo root (install + build + seed + API + web)
+make                       # same as `make setup`
 
-# Build all packages (required before running)
-pnpm build
+# Restart stack; keeps the SQLite file
+make restart
 
-# Start API + Web together
-make up                    # API on :3000, Web on :3001
+# Full scratch: reinstall deps + wipe DB + rebuild + seed + start
+make new
 
-# Or start individually
+# Or step by step
+pnpm install && pnpm build
+make up                    # API :3000, Web :3001 (includes seed)
+
+# Individual services
 make api                   # API only (builds first)
 make web                   # Next.js dev server
 
-# Full reset (stop + wipe DB + build + seed + start)
+# Wipe DB only (no pnpm install), then rebuild + seed + up
 make reset
 ```
 
@@ -43,13 +47,16 @@ make reset
 
 ### Make Targets
 
-| Target       | Description                        |
-| ------------ | ---------------------------------- |
-| `make up`    | Build + start API and Web          |
-| `make down`  | Stop the stack cleanly             |
-| `make reset` | Down + wipe DB + build + seed + up |
-| `make api`   | Build + start API only             |
-| `make web`   | Start Next.js dev server           |
+| Target                | Description                                             |
+| --------------------- | ------------------------------------------------------- |
+| `make` / `make setup` | `install` then `up` (first-time / full install path)    |
+| `make up`             | Build + down + seed + start API and Web                 |
+| `make down`           | Stop listeners on dev ports                             |
+| `make restart`        | `down` then `up` — **keeps** SQLite                     |
+| `make new`            | `install` + `reset` — reinstall deps + **wipe** DB + up |
+| `make reset`          | Down + wipe DB + build + seed + up (no `pnpm install`)  |
+| `make api`            | Build + start API only                                  |
+| `make web`            | Start Next.js dev server                                |
 
 Override ports: `make reset PORT=3000 WEB_PORT=3001 SQLITE_PATH=/path/to/dev.sqlite`
 
