@@ -5,26 +5,11 @@ import {
   type ChatMessage,
 } from '@agent-platform/model-router';
 import { convertToCoreMessages, type UIMessage } from 'ai';
-import { z } from 'zod';
 
+import { parseChatPostBody } from '@/lib/chat-post-body';
 import { sanitiseFileContext, formatFileContext, type FileContextEntry } from '@/lib/file-context';
 
 export const runtime = 'nodejs';
-
-const FileContextSchema = z.object({
-  files: z.array(
-    z.object({
-      file: z.string(),
-      code: z.string(),
-    }),
-  ),
-});
-
-const ChatPostBodySchema = z.object({
-  messages: z.array(z.any()),
-  model: z.string().optional(),
-  context: FileContextSchema.optional(),
-});
 
 function jsonError(status: number, code: string, message: string, details?: unknown): Response {
   return new Response(
@@ -88,20 +73,20 @@ export async function POST(req: Request) {
     return jsonError(400, 'INVALID_JSON', 'Invalid JSON');
   }
 
-  const parsed = ChatPostBodySchema.safeParse(body);
-  if (!parsed.success) {
-    return jsonError(400, 'INVALID_BODY', 'Invalid body: expected { messages, model? }');
+  const parsed = parseChatPostBody(body);
+  if (!parsed.ok) {
+    return jsonError(400, 'INVALID_BODY', parsed.message);
   }
 
-  const model = parsed.data.model ?? 'gpt-4o-mini';
+  const model = parsed.value.model ?? 'gpt-4o-mini';
 
   try {
-    const core = convertToCoreMessages(parsed.data.messages as UIMessage[]);
+    const core = convertToCoreMessages(parsed.value.messages as UIMessage[]);
     const messages = coreMessagesToChatMessages(core);
 
     // Inject file context into the last user message if present
-    if (parsed.data.context?.files?.length) {
-      const { files } = sanitiseFileContext(parsed.data.context.files as FileContextEntry[]);
+    if (parsed.value.context?.files?.length) {
+      const { files } = sanitiseFileContext(parsed.value.context.files as FileContextEntry[]);
       if (files.length > 0) {
         const contextBlock = formatFileContext(files);
         let lastUserIdx = -1;
