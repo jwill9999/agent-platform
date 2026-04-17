@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 import * as schema from './schema.js';
+import { repairLegacySlugMigrationIfNeeded } from './legacyRepair.js';
 
 const packageRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -20,6 +21,7 @@ export function openDatabase(sqlitePath: string): { db: DrizzleDb; sqlite: Datab
   sqlite.pragma('foreign_keys = ON');
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: path.join(packageRoot, 'drizzle') });
+  repairLegacySlugMigrationIfNeeded(sqlite);
   return { db, sqlite };
 }
 
