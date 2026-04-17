@@ -98,18 +98,13 @@ export async function POST(req: Request) {
 
   const parsed = parseChatPostBody(body);
   if (!parsed.ok) {
-    chatRouteLog({
-      event: 'invalid_body',
-      requestId,
-      bodyShape: parsed.bodyShape,
-    });
+    chatRouteLog({ event: 'invalid_body', requestId });
     return jsonError(400, 'INVALID_BODY', parsed.message);
   }
 
   chatRouteLog({
     event: 'body_parsed',
     requestId,
-    bodyShape: parsed.bodyShape,
     messageCount: parsed.value.messages.length,
     hasContextFiles: Boolean(parsed.value.context?.files?.length),
   });

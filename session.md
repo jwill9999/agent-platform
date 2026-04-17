@@ -8,13 +8,13 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** `/api/chat` legacy body support; optional `CHAT_ROUTE_DEBUG=1` server logs (no secrets / no message text) for tracing key gate, parse, stream start.
+- **Session:** `/api/chat` keeps a single body contract (`{ messages, ... }`); optional `CHAT_ROUTE_DEBUG=1` logs for tracing key gate, parse, stream start (no secrets / no message text).
 
 ---
 
 ## What happened (this session)
 
-- **Chat BFF:** `POST /api/chat` is built for `@ai-sdk/react` `useChat`, which sends `{ messages, model? }`. Manual tests sending `{ sessionId, message }` no longer fail body validation; `sessionId` is ignored for streaming.
+- **Chat BFF:** `POST /api/chat` matches `@ai-sdk/react` `useChat` only (`{ messages, model?, context? }`). Session-scoped chat remains on the API (`POST /v1/chat` with `{ sessionId, message }`), not this Next route.
 - **Tests:** `apps/web/test/chat-post-body.test.ts` covers parser only (not HTTP / keys / streaming).
 - **Debug:** `CHAT_ROUTE_DEBUG=1` in `apps/web/.env.example` — structured `[api/chat]` lines on the Next server terminal.
 
@@ -53,7 +53,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - `feature/frontend-v0` — base branch for frontend epic
 - `task/agent-platform-cfg` — segment tip, PR #52 open → `feature/frontend-v0`
 - PR #51 closed (superseded by #52)
-- **`cursor/fix-api-chat-legacy-body-f896`** — `/api/chat` legacy body support (PR open to `main`)
+- **`cursor/fix-api-chat-legacy-body-f896`** — `/api/chat` debug logging + single body contract (PR open to `main`)
 
 ### Ready backlog
 
@@ -73,7 +73,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Next (priority order)
 
 1. **Merge PR #52** — Frontend V0 Integration → `feature/frontend-v0`, then `feature/frontend-v0` → `main`
-2. **Review/merge** `cursor/fix-api-chat-legacy-body-f896` PR — legacy `/api/chat` body + docs for correct `useChat` payload
+2. **Review/merge** `cursor/fix-api-chat-legacy-body-f896` PR — `/api/chat` opt-in debug logs; document `useChat` vs `/v1/chat` payloads
 3. **`agent-platform-a9g`** — Chat file/context attachments (P2, frontend)
 4. **`agent-platform-d8u`** — Concurrent session safety (P2, harness/reliability)
 5. **`agent-platform-psa`** — Context window management (P2, harness/runtime)
