@@ -7,11 +7,23 @@ import {
 import { convertToCoreMessages, type UIMessage } from 'ai';
 import { z } from 'zod';
 
+import { sanitiseFileContext, formatFileContext, type FileContextEntry } from '@/lib/file-context';
+
 export const runtime = 'nodejs';
+
+const FileContextSchema = z.object({
+  files: z.array(
+    z.object({
+      file: z.string(),
+      code: z.string(),
+    }),
+  ),
+});
 
 const ChatPostBodySchema = z.object({
   messages: z.array(z.any()),
   model: z.string().optional(),
+  context: FileContextSchema.optional(),
 });
 
 function jsonError(status: number, code: string, message: string, details?: unknown): Response {
@@ -86,6 +98,29 @@ export async function POST(req: Request) {
   try {
     const core = convertToCoreMessages(parsed.data.messages as UIMessage[]);
     const messages = coreMessagesToChatMessages(core);
+
+    // Inject file context into the last user message if present
+    if (parsed.data.context?.files?.length) {
+      const { files } = sanitiseFileContext(parsed.data.context.files as FileContextEntry[]);
+      if (files.length > 0) {
+        const contextBlock = formatFileContext(files);
+        let lastUserIdx = -1;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i]!.role === 'user') {
+            lastUserIdx = i;
+            break;
+          }
+        }
+        if (lastUserIdx >= 0) {
+          const target = messages[lastUserIdx]!;
+          messages[lastUserIdx] = {
+            role: target.role,
+            content: contextBlock + target.content,
+          };
+        }
+      }
+    }
+
     const result = streamChat({ provider: 'openai', apiKey, model, messages });
     return result.toDataStreamResponse({
       getErrorMessage: (error) => `CHAT_STREAM_ERROR: ${getErrorMessage(error)}`,
