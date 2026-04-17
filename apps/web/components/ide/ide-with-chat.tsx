@@ -1088,12 +1088,37 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   <span>{fs.rootName ?? 'Explorer'}</span>
                   {fs.isLoading && <span className="text-xs animate-pulse">Loading…</span>}
                 </div>
+                {fs.needsFolderReconnect && (
+                  <div className="mx-2 mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+                    <p className="mb-2 leading-snug">
+                      Restore access to{' '}
+                      <span className="font-medium">
+                        {fs.pendingReconnectFolderName ?? 'your folder'}
+                      </span>{' '}
+                      after refresh (browser permission).
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => {
+                        void fs.reconnectFolder();
+                      }}
+                    >
+                      Restore folder…
+                    </Button>
+                  </div>
+                )}
                 {fs.error && (
                   <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>
                 )}
                 <ScrollArea className="flex-1">
                   <div className="pb-4">
-                    {filteredFileTree.length === 0 && !fs.isLoading && (
+                    {filteredFileTree.length === 0 &&
+                      !fs.isLoading &&
+                      !fs.isDirectoryOpen &&
+                      !fs.needsFolderReconnect && (
                       <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
                         <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
                         <p className="text-sm text-muted-foreground">
@@ -1110,6 +1135,16 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         </Button>
                       </div>
                     )}
+                    {filteredFileTree.length === 0 &&
+                      !fs.isLoading &&
+                      fs.isDirectoryOpen &&
+                      !fs.error && (
+                        <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                          {searchQuery.trim()
+                            ? 'No files match your search.'
+                            : 'This folder is empty, or everything here is hidden (ignored folders like node_modules).'}
+                        </div>
+                      )}
                     {filteredFileTree.map((node) => (
                       <FileTreeNode
                         key={node.path}
