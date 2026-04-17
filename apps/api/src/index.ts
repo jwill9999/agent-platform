@@ -1,6 +1,9 @@
+import { createServer } from 'node:http';
+
 import { closeDatabase, openDatabase } from '@agent-platform/db';
 
 import { createApp } from './infrastructure/http/createApp.js';
+import { attachTerminalWs } from './infrastructure/terminal/attachTerminalWs.js';
 import { createLogger } from '@agent-platform/logger';
 
 const log = createLogger('api');
@@ -14,10 +17,13 @@ if (sqlitePath) {
 }
 
 const app = createApp({ db: dbHandle?.db ?? null });
+const server = createServer(app);
+attachTerminalWs(server);
+
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? '0.0.0.0';
 
-const server = app.listen(port, host, () => {
+server.listen(port, host, () => {
   log.info('api.listen', { host, port });
 });
 
