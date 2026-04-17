@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** Agent CRUD usability (OpenAPI PUT fix), Makefile `new`/`restart`/seed-in-`up`, DB legacy repair — branch `task/explorer-collapse-cta` (tip `52284e2`).
+- **Session:** Seeded **Coding** specialist in `runSeed` (stable id/slug); prior OpenAPI/Makefile/legacy-repair work — branch `task/explorer-collapse-cta` (tip `76b8274`).
 
 ---
 
