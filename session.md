@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** Seed primary agent display name **Personal assistant** (slug unchanged `default-agent`); docs/Makefile/test label updates — branch `task/explorer-collapse-cta` (tip `6291d37`).
+- **Session:** Documented **agent `name` editable, `slug` immutable** (OpenAPI + contracts JSDoc + PUT comment) — branch `task/explorer-collapse-cta` (tip `d2b5917`).
 
 ---
 
@@ -31,6 +31,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ### Seed naming
 
 - **`packages/db/src/seed/runSeed.ts`** — Primary seeded agent **`name`**: “Personal assistant”; description notes specialists when configured. **`DEFAULT_AGENT_SLUG`** remains **`default-agent`** for stable API/URLs.
+
+### Agent identity (product intent)
+
+- **Display `name`** can change via PUT; **`slug`** is set at create and never changes (documented in **`contracts/openapi/agent-platform.yaml`**, **`packages/contracts/src/agent.ts`**, **`agentsRouter` PUT**).
 
 ### Frontend V0 Integration epic — `feature/frontend-v0` — PR #52 (all CI green) _(historical)_
 
@@ -82,7 +86,7 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ### Git
 
-- **`task/explorer-collapse-cta`** — tip `6291d37` (Personal assistant seed name + prior OpenAPI/Makefile/legacy repair/Coding seed); push/PR when ready.
+- **`task/explorer-collapse-cta`** — tip `d2b5917` (slug-immutability docs + prior work); push/PR when ready.
 - `main` — up to date with `origin/main` at session start
 - `feature/frontend-v0` — base branch for frontend epic
 - `task/agent-platform-cfg` — segment tip, PR #52 open → `feature/frontend-v0`
