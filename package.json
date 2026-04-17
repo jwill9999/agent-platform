@@ -14,7 +14,7 @@
     "lint": "pnpm -r run lint",
     "format": "prettier --write \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"e2e/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
     "format:check": "prettier --check \"apps/**/*.{ts,json,md}\" \"packages/**/*.{ts,json,md}\" \"e2e/**/*.{ts,json,md}\" \"*.{js,json}\" \"README.md\" \"CONTRIBUTING.md\"",
-    "seed": "pnpm --filter @agent-platform/db run seed",
+    "seed": "node ./packages/db/dist/seed/run.js",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:install": "playwright install --with-deps chromium",
     "prepare": "husky",
