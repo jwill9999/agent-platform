@@ -124,56 +124,6 @@ function getMessageText(message: UIMessage): string {
 }
 
 // Sample file tree (replaced by File System Access API in later task)
-const sampleFileTree: FileNode[] = [
-  {
-    name: 'src',
-    path: '/src',
-    type: 'directory',
-    children: [
-      {
-        name: 'index.ts',
-        path: '/src/index.ts',
-        type: 'file',
-        content:
-          "import { createApp } from './app';\n\nconst app = createApp();\n\napp.listen(3000, () => {\n  console.log('Server running on port 3000');\n});",
-      },
-      {
-        name: 'app.ts',
-        path: '/src/app.ts',
-        type: 'file',
-        content:
-          "import express from 'express';\n\nexport function createApp() {\n  const app = express();\n\n  app.get('/', (req, res) => {\n    res.json({ message: 'Hello World' });\n  });\n\n  return app;\n}",
-      },
-      {
-        name: 'utils',
-        path: '/src/utils',
-        type: 'directory',
-        children: [
-          {
-            name: 'helpers.ts',
-            path: '/src/utils/helpers.ts',
-            type: 'file',
-            content:
-              'export function formatDate(date: Date): string {\n  return date.toISOString().split("T")[0];\n}\n\nexport function capitalize(str: string): string {\n  return str.charAt(0).toUpperCase() + str.slice(1);\n}',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    name: 'package.json',
-    path: '/package.json',
-    type: 'file',
-    content: '{\n  "name": "my-project",\n  "version": "1.0.0",\n  "main": "src/index.ts"\n}',
-  },
-  {
-    name: 'README.md',
-    path: '/README.md',
-    type: 'file',
-    content: '# My Project\n\nA sample project for the IDE.\n',
-  },
-];
-
 // ---------------------------------------------------------------------------
 // FileTreeNode
 // ---------------------------------------------------------------------------
@@ -838,8 +788,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     }
   }, [fs]);
 
-  // Use FS API tree when a directory is open, otherwise fall back to props or sample data
-  const fileTree = fs.isDirectoryOpen ? fs.fileTree : (initialFileTree ?? sampleFileTree);
+  // Use FS API tree when a directory is open, otherwise fall back to props or empty
+  const fileTree = fs.isDirectoryOpen ? fs.fileTree : (initialFileTree ?? []);
 
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -1156,6 +1106,23 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 )}
                 <ScrollArea className="flex-1">
                   <div className="pb-4">
+                    {filteredFileTree.length === 0 && !fs.isLoading && (
+                      <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
+                        <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
+                        <p className="text-sm text-muted-foreground">
+                          No folder open
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={handleOpenFolder}
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          Open Folder
+                        </Button>
+                      </div>
+                    )}
                     {filteredFileTree.map((node) => (
                       <FileTreeNode
                         key={node.path}

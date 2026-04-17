@@ -2,6 +2,15 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 
+// TypeScript doesn't include queryPermission / requestPermission yet.
+interface PermissionDescriptor {
+  mode?: 'read' | 'readwrite';
+}
+interface FSHandleWithPermission extends FileSystemDirectoryHandle {
+  queryPermission(desc: PermissionDescriptor): Promise<PermissionState>;
+  requestPermission(desc: PermissionDescriptor): Promise<PermissionState>;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -46,6 +55,71 @@ export interface UseFileSystemReturn {
 
 function isFileSystemAccessSupported(): boolean {
   return globalThis.window !== undefined && 'showDirectoryPicker' in globalThis.window;
+}
+
+// ---------------------------------------------------------------------------
+// IndexedDB persistence for FileSystemDirectoryHandle
+// ---------------------------------------------------------------------------
+
+const IDB_NAME = 'agent-platform-fs';
+const IDB_STORE = 'handles';
+const IDB_KEY = 'rootDir';
+
+function openIDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function persistHandle(handle: FileSystemDirectoryHandle): Promise<void> {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {
+    // IndexedDB may be unavailable (e.g. private browsing) — non-fatal
+  }
+}
+
+async function loadPersistedHandle(): Promise<FileSystemDirectoryHandle | null> {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+    const handle = await new Promise<FileSystemDirectoryHandle | undefined>((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result as FileSystemDirectoryHandle | undefined);
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+    return handle ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function clearPersistedHandle(): Promise<void> {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(IDB_KEY);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {
+    // non-fatal
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -134,11 +208,6 @@ export function useFileSystem(): UseFileSystemReturn {
 
   const rootHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
 
-  // Detect FS Access API support only on the client (avoids SSR hydration mismatch)
-  useEffect(() => {
-    setIsSupported(isFileSystemAccessSupported());
-  }, []);
-
   const loadTree = useCallback(async (handle: FileSystemDirectoryHandle) => {
     setIsLoading(true);
     setError(null);
@@ -157,6 +226,44 @@ export function useFileSystem(): UseFileSystemReturn {
     }
   }, []);
 
+  // Detect FS Access API support and restore persisted handle on mount
+  useEffect(() => {
+    const supported = isFileSystemAccessSupported();
+    setIsSupported(supported);
+    if (!supported) return;
+
+    (async () => {
+      const handle = await loadPersistedHandle();
+      if (!handle) return;
+
+      const h = handle as FSHandleWithPermission;
+
+      // Re-request read/write permission (user may need to grant again)
+      const perm = await h.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        await loadTree(handle);
+        return;
+      }
+
+      // 'prompt' means the browser will ask the user — only works with a user gesture,
+      // but some browsers auto-grant for same-origin after the first grant.
+      if (perm === 'prompt') {
+        try {
+          const result = await h.requestPermission({ mode: 'readwrite' });
+          if (result === 'granted') {
+            await loadTree(handle);
+            return;
+          }
+        } catch {
+          // requestPermission may throw without a user gesture — expected
+        }
+      }
+
+      // Permission denied — clear the stale handle
+      await clearPersistedHandle();
+    })();
+  }, [loadTree]);
+
   const openDirectory = useCallback(async () => {
     if (!isFileSystemAccessSupported()) {
       setError('File System Access API is not supported in this browser. Use Chrome or Edge.');
@@ -166,6 +273,7 @@ export function useFileSystem(): UseFileSystemReturn {
     try {
       const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
       await loadTree(handle);
+      await persistHandle(handle);
     } catch (err) {
       // User cancelled the picker — not an error
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -210,6 +318,7 @@ export function useFileSystem(): UseFileSystemReturn {
     setIsDirectoryOpen(false);
     rootHandleRef.current = null;
     setError(null);
+    void clearPersistedHandle();
   }, []);
 
   return {
