@@ -14,7 +14,7 @@ From the repo root:
 make
 ```
 
-This is the same as **`make setup`**: runs **`make install`** then **`make up`**. The **`up`** target builds the monorepo, frees ports **3000** / **3001**, runs **`pnpm seed`** (default agent + demo data — idempotent), then starts the **API** on port **3000** and the **Next.js** app on **3001**.
+This is the same as **`make setup`**: runs **`make install`** then **`make up`**. The **`up`** target builds the monorepo, frees ports **3000** / **3001**, runs **`pnpm seed`** (seeded **Personal assistant** + **Coding** specialist + demo data — idempotent), then starts the **API** on port **3000** and the **Next.js** app on **3001**.
 
 Alternatively, step by step: `make install` then `make up`.
 

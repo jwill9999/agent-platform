@@ -52,7 +52,7 @@ Test-Driven Development (Strict)
 `;
 
 /**
- * Idempotent seed: demo skill + default agent + coding specialist + default↔demo skill link.
+ * Idempotent seed: demo skill + personal assistant + coding specialist + assistant↔demo skill link.
  * Safe to run after migrations; safe to run multiple times.
  */
 export function runSeed(db: DrizzleDb): void {
@@ -75,10 +75,11 @@ export function runSeed(db: DrizzleDb): void {
       .values({
         id: DEFAULT_AGENT_ID,
         slug: DEFAULT_AGENT_SLUG,
-        name: 'Default agent',
+        name: 'Personal assistant',
         systemPrompt:
           'You are a helpful assistant. Use available tools to help the user accomplish their tasks. Be concise and accurate.',
-        description: 'Default general-purpose agent with standard tools and limits.',
+        description:
+          'General-purpose personal assistant. Specialist agents can be used for focused work when configured.',
         executionLimitsJson: JSON.stringify({
           maxSteps: 32,
           maxParallelTasks: 4,

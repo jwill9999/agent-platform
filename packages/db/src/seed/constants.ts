@@ -1,10 +1,10 @@
-/** Stable slug for the seeded default agent (queryable after `pnpm seed`). */
+/** Stable slug for the primary seeded agent (“Personal assistant”; queryable after `pnpm seed`). */
 export const DEFAULT_AGENT_SLUG = 'default-agent';
 
-/** Stable UUID for the seeded default agent. */
+/** Stable UUID for the primary seeded agent (display name: Personal assistant). */
 export const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
 
-/** Optional demo skill linked to the default agent for empty-registry UX. */
+/** Optional demo skill linked to the primary agent for empty-registry UX. */
 export const DEMO_SKILL_SLUG = 'demo-skill';
 
 /** Stable UUID for the demo skill. */

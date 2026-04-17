@@ -105,7 +105,7 @@ pnpm build
 SQLITE_PATH=./data/dev.sqlite pnpm seed
 ```
 
-The seed creates a default agent with demo skills and tools. It is idempotent — safe to run multiple times.
+The seed creates a **Personal assistant** (primary agent), a **Coding** specialist, and demo registry rows. It is idempotent — safe to run multiple times.
 
 ## Typed Error Handling
 

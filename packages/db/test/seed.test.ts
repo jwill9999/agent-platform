@@ -55,7 +55,7 @@ describe('seed', () => {
     closeDatabase(sqlite);
   });
 
-  it('makes the default agent loadable and valid per AgentSchema', () => {
+  it('makes the seeded personal assistant loadable and valid per AgentSchema', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-seed-'));
     dirs.push(dir);
     const { db, sqlite } = openDatabase(path.join(dir, 'a.sqlite'));

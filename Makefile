@@ -58,7 +58,7 @@ reset-db:
 	@bash -lc 'set -euo pipefail; if [ -f "$(SQLITE_PATH)" ]; then echo "Removing $(SQLITE_PATH)"; rm -f "$(SQLITE_PATH)"; fi'
 
 # API + web together: same nvm/Node for background node and foreground pnpm/next.
-# Runs seed after build/down so the DB has the default agent + demo rows before the API serves /v1 (idempotent).
+# Runs seed after build/down so the DB has the seeded agents + demo rows before the API serves /v1 (idempotent).
 up: build down seed
 	@bash -c 'set -euo pipefail; $(WITH_NVM) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
 
