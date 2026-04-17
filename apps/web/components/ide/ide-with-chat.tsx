@@ -775,19 +775,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   // File System Access API
   const fs = useFileSystem();
 
-  const handleOpenFolder = useCallback(async () => {
-    if (!fs.isSupported) {
-      toast.error('Unsupported browser', {
-        description: 'File System Access API requires Chrome or Edge.',
-      });
-      return;
-    }
-    await fs.openDirectory();
-    if (fs.error) {
-      toast.error('Failed to open folder', { description: fs.error });
-    }
-  }, [fs]);
-
   // Use FS API tree when a directory is open, otherwise fall back to props or empty
   const fileTree = fs.isDirectoryOpen ? fs.fileTree : (initialFileTree ?? []);
 
@@ -1071,7 +1058,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         pathInput={pathInput}
         setPathInput={setPathInput}
         onLoadFromPath={handleLoadFromPath}
-        onOpenFolder={handleOpenFolder}
+        onOpenFolder={fs.openDirectory}
         isLoadingFolder={fs.isLoading}
         rootName={fs.rootName}
         onRefreshFolder={fs.refresh}
@@ -1116,7 +1103,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           variant="outline"
                           size="sm"
                           className="gap-2"
-                          onClick={handleOpenFolder}
+                          onClick={fs.openDirectory}
                         >
                           <FolderOpen className="h-4 w-4" />
                           Open Folder

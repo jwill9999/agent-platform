@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 
 // TypeScript doesn't include queryPermission / requestPermission yet.
 interface PermissionDescriptor {
@@ -221,6 +222,7 @@ export function useFileSystem(): UseFileSystemReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to read directory';
       setError(message);
+      toast.error('Failed to load folder', { description: message });
     } finally {
       setIsLoading(false);
     }
@@ -266,19 +268,30 @@ export function useFileSystem(): UseFileSystemReturn {
 
   const openDirectory = useCallback(async () => {
     if (!isFileSystemAccessSupported()) {
-      setError('File System Access API is not supported in this browser. Use Chrome or Edge.');
+      toast.error('Unsupported browser', {
+        description: 'File System Access API requires Chrome or Edge.',
+      });
       return;
     }
 
     try {
-      const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
+      // id helps Chrome persist permission grants across reloads.
+      // mode: 'readwrite' enables saving edits back to disk.
+      const handle = await window.showDirectoryPicker({
+        id: 'project-folder',
+        mode: 'readwrite',
+      });
       await loadTree(handle);
       await persistHandle(handle);
     } catch (err) {
-      // User cancelled the picker — not an error
-      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // Chrome uses AbortError for both user-cancel and permission denial.
+        // Don't toast on genuine cancels — but log so devs can diagnose.
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to open directory';
       setError(message);
+      toast.error('Failed to open folder', { description: message });
     }
   }, [loadTree]);
 
