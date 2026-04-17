@@ -8,16 +8,25 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** IDE — explorer “Collapse” CTA + removed duplicate sidebar Menu from toolbar (`task/explorer-collapse-cta`, tip `0c84f71`).
+- **Session:** Agent CRUD usability (OpenAPI PUT fix), Makefile `new`/`restart`/seed-in-`up`, DB legacy repair — branch `task/explorer-collapse-cta` (tip `52284e2`).
 
 ---
 
 ## What happened (this session)
 
-### IDE explorer + toolbar — `task/explorer-collapse-cta`
+### Agents API + local dev workflow
 
-- **`apps/web/components/ide/ide-with-chat.tsx`** — “Collapse all folders” CTA in explorer header (signal-based collapse).
-- **`apps/web/components/ide/ide-with-chat.tsx`** — Removed redundant **Menu** toolbar button that duplicated sidebar collapse/expand (sidebar chevrons + edge trigger remain).
+- **`contracts/openapi/agent-platform.yaml`** — `PUT /v1/agents/{idOrSlug}` request body uses **`AgentCreateBody`** (same as POST) so OpenAPI validation no longer requires `id`/`slug` in JSON; matches `agentsRouter` + UI.
+- **`Makefile`** — `make up` runs **`seed`**; **`make restart`** = down + up (keeps SQLite); **`make new`** = install + reset (full scratch); **`setup`** = install + up only.
+- **`README.md`**, **`docs/development.md`**, **`CLAUDE.md`** — document first-time start, restart, scratch.
+
+### DB — stale schema repair
+
+- **`packages/db/src/legacyRepair.ts`** + **`database.ts`** — after **`migrate()`**, idempotent repair for pre-0005 **`skills`** / slug columns when journal vs file drift.
+
+### IDE explorer + toolbar — `task/explorer-collapse-cta` _(earlier commits)_
+
+- **`ide-with-chat.tsx`** — Explorer “Collapse all folders” CTA; removed duplicate sidebar **Menu** button.
 
 ### Frontend V0 Integration epic — `feature/frontend-v0` — PR #52 (all CI green) _(historical)_
 
@@ -69,7 +78,7 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ### Git
 
-- **`task/explorer-collapse-cta`** — tip: explorer collapse CTA + toolbar cleanup (`0c84f71`); push/PR when ready.
+- **`task/explorer-collapse-cta`** — tip includes OpenAPI agent fix + Makefile + legacy DB repair (`52284e2`); push/PR when ready.
 - **Working tree (not in that commit):** local edits may remain on `Makefile`, `packages/db` legacy repair + tests — commit separately if still needed.
 - `main` — up to date with `origin/main` at session start
 - `feature/frontend-v0` — base branch for frontend epic
