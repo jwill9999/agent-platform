@@ -23,10 +23,17 @@ export const DEFAULT_CONTEXT_WINDOW: ContextWindow = {
   strategy: 'truncate',
 };
 
-/** Full agent record returned by the API (includes system-generated id + slug). */
+/**
+ * Full agent record returned by the API.
+ * `id` and `slug` are assigned at create time. The display `name` (and other fields in
+ * {@link AgentCreateBodySchema}) may be updated via PUT; `slug` is immutable for the
+ * lifetime of the agent.
+ */
 export const AgentSchema = z.object({
   id: z.string().min(1),
+  /** Stable URL-safe identifier; never changes after create. */
   slug: z.string().min(1),
+  /** Display label; may be changed without affecting `slug`. */
   name: z.string().min(1),
   systemPrompt: z.string().min(1),
   description: z.string().optional(),
@@ -42,7 +49,11 @@ export const AgentSchema = z.object({
 
 export type Agent = z.infer<typeof AgentSchema>;
 
-/** POST /v1/agents body — id and slug are system-generated. */
+/**
+ * POST /v1/agents body — `id` and `slug` are system-generated at create (`slug` is derived
+ * from `name`). PUT /v1/agents/{idOrSlug} uses the same shape; the server preserves the
+ * existing `slug` (immutable).
+ */
 export const AgentCreateBodySchema = AgentSchema.omit({ id: true, slug: true });
 
 export type AgentCreateBody = z.infer<typeof AgentCreateBodySchema>;

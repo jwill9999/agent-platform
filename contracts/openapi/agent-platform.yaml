@@ -21,7 +21,9 @@ tags:
   - name: health
     description: Liveness / readiness probe
   - name: agents
-    description: Agent CRUD
+    description: |
+      Agent CRUD. Display name and settings are editable; each agent’s `slug` is set at
+      create time and never changes (stable URLs and lookups).
   - name: skills
     description: Skill CRUD
   - name: tools
@@ -149,6 +151,8 @@ paths:
       description: |
         Replace agent fields. `id` and `slug` are taken from the path (`idOrSlug` resolves
         to the existing row); the body matches `AgentCreateBody` (same shape as POST /v1/agents).
+        You may change the display name and other profile fields; **`slug` is immutable** for
+        the lifetime of the agent (the server always keeps the stored slug).
       tags: [agents]
       requestBody:
         required: true
@@ -805,6 +809,9 @@ components:
     # -- Agent --
     Agent:
       type: object
+      description: |
+        Persisted agent. `slug` is assigned at create and never changes; `name` is the
+        editable display label.
       required: [id, slug, name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
       properties:
         id:
@@ -813,9 +820,11 @@ components:
         slug:
           type: string
           minLength: 1
+          description: Stable identifier for URLs and API lookups; immutable after create.
         name:
           type: string
           minLength: 1
+          description: Human-readable label; may be updated without changing `slug`.
         systemPrompt:
           type: string
           minLength: 1
@@ -851,7 +860,9 @@ components:
     AgentCreateBody:
       description: |
         Body for POST /v1/agents (create) and PUT /v1/agents/{idOrSlug} (replace). `id` and
-        `slug` are system-assigned on create and are not sent in the request body.
+        `slug` are system-assigned on create (`slug` is derived from `name`) and are not sent
+        in the request body. On replace, `name` and other fields here may change; the stored
+        `slug` is never updated from the body.
       type: object
       required: [name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
       properties:

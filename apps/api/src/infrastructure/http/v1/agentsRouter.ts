@@ -35,6 +35,7 @@ export function createAgentsRouter(db: DrizzleDb): Router {
     }),
   );
 
+  // Slug is immutable after create (stable URLs and lookups); name and other fields come from the body.
   router.put(
     '/:idOrSlug',
     asyncHandler(async (req, res) => {
