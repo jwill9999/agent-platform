@@ -1108,7 +1108,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         onCloseFolder={fs.closeDirectory}
       />
 
-      <ResizablePanelGroup orientation="horizontal" className="flex-1">
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* File Explorer */}
         {showExplorer && (
           <>
@@ -1166,7 +1166,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
         {/* Editor + Terminal */}
         <ResizablePanel defaultSize={showChat ? 50 : 85}>
-          <ResizablePanelGroup orientation="vertical">
+          <ResizablePanelGroup direction="vertical">
             <ResizablePanel defaultSize={showTerminal ? 70 : 100} minSize={30}>
               <div className="flex flex-col h-full overflow-hidden">
                 <EditorTabs
