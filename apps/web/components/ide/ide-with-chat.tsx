@@ -46,6 +46,7 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { cn } from '@/lib/cn';
+import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
 import { Terminal } from '@/components/ide/terminal';
 import { useSidebar } from '@/components/layout/sidebar-context';
@@ -302,7 +303,6 @@ function IDEToolbar({
   onOpenFolder,
   isLoadingFolder,
   rootName,
-  fsSupported,
   onRefreshFolder,
   onCloseFolder,
 }: Readonly<{
@@ -325,7 +325,6 @@ function IDEToolbar({
   onOpenFolder: () => void;
   isLoadingFolder: boolean;
   rootName: string | null;
-  fsSupported: boolean;
   onRefreshFolder: () => void;
   onCloseFolder: () => void;
 }>) {
@@ -404,18 +403,16 @@ function IDEToolbar({
             </div>
           </DialogContent>
         </Dialog>
-        {fsSupported && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={rootName ? onCloseFolder : onOpenFolder}
-            disabled={isLoadingFolder}
-          >
-            <FolderOpen className="h-4 w-4" />
-            {folderLabel}
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          onClick={rootName ? onCloseFolder : onOpenFolder}
+          disabled={isLoadingFolder}
+        >
+          <FolderOpen className="h-4 w-4" />
+          {folderLabel}
+        </Button>
         {rootName && (
           <Button
             variant="ghost"
@@ -828,6 +825,19 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   // File System Access API
   const fs = useFileSystem();
 
+  const handleOpenFolder = useCallback(async () => {
+    if (!fs.isSupported) {
+      toast.error('Unsupported browser', {
+        description: 'File System Access API requires Chrome or Edge.',
+      });
+      return;
+    }
+    await fs.openDirectory();
+    if (fs.error) {
+      toast.error('Failed to open folder', { description: fs.error });
+    }
+  }, [fs]);
+
   // Use FS API tree when a directory is open, otherwise fall back to props or sample data
   const fileTree = fs.isDirectoryOpen ? fs.fileTree : (initialFileTree ?? sampleFileTree);
 
@@ -945,7 +955,18 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         type: 'file',
         handle: activeFile.handle,
       };
-      await fs.writeFile(node, activeFile.content);
+      const ok = await fs.writeFile(node, activeFile.content);
+      if (!ok) {
+        toast.error(`Failed to save ${activeFile.name}`, {
+          description: 'The browser may have lost write permission. Try re-opening the folder.',
+        });
+        return;
+      }
+      toast.success(`Saved ${activeFile.name}`);
+    } else {
+      toast.info(`${activeFile.name} updated in editor`, {
+        description: 'Open a folder first to save changes to disk.',
+      });
     }
     setOpenTabs((prev) =>
       prev.map((tab) => (tab.path === activeTab ? { ...tab, isDirty: false } : tab)),
@@ -1100,10 +1121,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         pathInput={pathInput}
         setPathInput={setPathInput}
         onLoadFromPath={handleLoadFromPath}
-        onOpenFolder={fs.openDirectory}
+        onOpenFolder={handleOpenFolder}
         isLoadingFolder={fs.isLoading}
         rootName={fs.rootName}
-        fsSupported={fs.isSupported}
         onRefreshFolder={fs.refresh}
         onCloseFolder={fs.closeDirectory}
       />

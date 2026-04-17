@@ -158,7 +158,7 @@ export function useFileSystem(): UseFileSystemReturn {
   }, []);
 
   const openDirectory = useCallback(async () => {
-    if (!isSupported) {
+    if (!isFileSystemAccessSupported()) {
       setError('File System Access API is not supported in this browser. Use Chrome or Edge.');
       return;
     }
@@ -172,7 +172,7 @@ export function useFileSystem(): UseFileSystemReturn {
       const message = err instanceof Error ? err.message : 'Failed to open directory';
       setError(message);
     }
-  }, [isSupported, loadTree]);
+  }, [loadTree]);
 
   const readFile = useCallback(async (node: FileNode): Promise<string> => {
     const handle = node.handle;
@@ -193,7 +193,8 @@ export function useFileSystem(): UseFileSystemReturn {
       await writable.write(content);
       await writable.close();
       return true;
-    } catch {
+    } catch (err) {
+      console.error('[useFileSystem] writeFile failed:', err);
       return false;
     }
   }, []);
