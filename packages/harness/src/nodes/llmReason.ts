@@ -1,5 +1,5 @@
 import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
-import { streamText, jsonSchema } from 'ai';
+import { streamText, jsonSchema, type StreamTextResult, type ToolSet } from 'ai';
 import type { CoreMessage } from 'ai';
 import type { RunnableConfig } from '@langchain/core/runnables';
 
@@ -67,6 +67,28 @@ function toSdkTools(
   return tools;
 }
 
+/**
+ * Labels for the streamed "Calling tools…" placeholder: resolve each model
+ * `toolName` against `toolDefinitions` (from the agent `tools` array). Uses
+ * each definition's description (first line), falling back to id/`toolName`
+ * when unknown.
+ */
+function placeholderLabelsForToolCalls(
+  toolCalls: Array<{ toolName: string }>,
+  definitions: ToolDefinition[],
+): string {
+  const byName = new Map(definitions.map((d) => [d.name, d]));
+  return toolCalls
+    .map((tc) => {
+      const def = byName.get(tc.toolName);
+      if (!def) return tc.toolName;
+      const raw = (def.description ?? def.name).trim();
+      const line = raw.split(/\r?\n/)[0]?.trim() ?? def.name;
+      return line.length > 96 ? `${line.slice(0, 93)}…` : line;
+    })
+    .join(', ');
+}
+
 // ---------------------------------------------------------------------------
 // LLM reasoning node factory
 // ---------------------------------------------------------------------------
@@ -93,19 +115,76 @@ async function firePromptBuildHook(
   }
 }
 
-/** Stream text from result, emitting chunks, and return the accumulated text. */
+/**
+ * Stream text from `streamText`, emit NDJSON `text` chunks, and return the
+ * assistant-visible string.
+ *
+ * **Use `fullStream`, not `textStream` alone.** In AI SDK 4.x, `textStream`
+ * tees the underlying stream; consuming only that branch can leave the other
+ * branch unread so the pipeline never finishes and `result.text` never
+ * resolves — the UI sees an empty reply. Iterating `fullStream` drains the
+ * merged stream once. We still `await result.text` as a fallback when deltas
+ * are missing.
+ */
 async function streamAndAccumulate(
-  textStream: AsyncIterable<string>,
+  result: StreamTextResult<ToolSet, unknown>,
   emitter: OutputEmitter | undefined,
 ): Promise<string> {
   let fullText = '';
-  for await (const chunk of textStream) {
-    fullText += chunk;
-    if (emitter && chunk) {
-      await emitter.emit({ type: 'text', content: chunk });
+  // Prefer fullStream (drains the SDK pipeline once). Some tests / stubs only mock textStream.
+  if (result.fullStream) {
+    for await (const part of result.fullStream) {
+      if (part.type === 'text-delta') {
+        const chunk = part.textDelta;
+        fullText += chunk;
+        if (emitter && chunk) {
+          await emitter.emit({ type: 'text', content: chunk });
+        }
+      } else if (part.type === 'reasoning') {
+        const chunk = part.textDelta;
+        if (emitter && chunk) {
+          await emitter.emit({ type: 'thinking', content: chunk });
+        }
+      }
+    }
+  } else {
+    for await (const chunk of result.textStream) {
+      fullText += chunk;
+      if (emitter && chunk) {
+        await emitter.emit({ type: 'text', content: chunk });
+      }
+    }
+    await result.consumeStream?.();
+  }
+
+  const resolvedText = (await result.text) ?? '';
+  if (resolvedText.trim() && !fullText.trim()) {
+    if (emitter) {
+      await emitter.emit({ type: 'text', content: resolvedText });
+    }
+    return resolvedText;
+  }
+
+  // Prefer SDK `text` over streamed concatenation (canonical); emit any missing suffix to the client.
+  if (resolvedText.length > fullText.length && resolvedText.startsWith(fullText)) {
+    const suffix = resolvedText.slice(fullText.length);
+    if (emitter && suffix) {
+      await emitter.emit({ type: 'text', content: suffix });
     }
   }
-  return fullText;
+
+  const merged = resolvedText || fullText;
+  if (!merged.trim()) {
+    const reasoning = await result.reasoning;
+    if (reasoning?.trim()) {
+      if (emitter) {
+        await emitter.emit({ type: 'thinking', content: reasoning });
+      }
+      return reasoning;
+    }
+  }
+
+  return merged;
 }
 
 /** Build LlmOutput + assistant ChatMessage from the completed LLM response. */
@@ -274,9 +353,21 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
           abortSignal: signal,
         });
 
-        const text = await streamAndAccumulate(res.textStream, emitter);
+        const text = await streamAndAccumulate(res, emitter);
         const toolCalls = await res.toolCalls;
         const usageInfo = await res.usage;
+
+        // Models often request tools with no streamed text; the UI only shows streamed `text`
+        // events — emit a short line so the chat is not blank until tool results arrive.
+        if (toolCalls && toolCalls.length > 0 && !text.trim() && emitter) {
+          const names = placeholderLabelsForToolCalls(toolCalls, toolDefinitions);
+          const label = toolCalls.length === 1 ? 'tool' : 'tools';
+          await emitter.emit({
+            type: 'text',
+            content: `Calling ${label}: ${names}…`,
+          });
+        }
+
         return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo };
       },
       LLM_RETRY_CONFIG,

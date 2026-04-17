@@ -70,6 +70,27 @@ export function useHarnessChat(sessionId: string | null) {
         let buffer = '';
         let accumulated = '';
 
+        const appendAssistantText = (chunk: string) => {
+          if (!chunk) return;
+          accumulated += chunk;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? uiMessage(assistantId, 'assistant', accumulated) : m,
+            ),
+          );
+        };
+
+        const formatToolResultPreview = (data: unknown, maxLen = 6000): string => {
+          if (typeof data === 'string')
+            return data.length > maxLen ? `${data.slice(0, maxLen)}…` : data;
+          try {
+            const s = JSON.stringify(data, null, 2);
+            return s.length > maxLen ? `${s.slice(0, maxLen)}\n… (truncated)` : s;
+          } catch {
+            return String(data);
+          }
+        };
+
         const applyLine = (line: string) => {
           if (!line.trim()) return;
           let ev: unknown;
@@ -79,16 +100,41 @@ export function useHarnessChat(sessionId: string | null) {
             return;
           }
           if (typeof ev !== 'object' || ev === null || !('type' in ev)) return;
-          const o = ev as { type: string; content?: string; message?: string; reason?: string };
-          if (o.type === 'text' && typeof o.content === 'string') {
-            accumulated += o.content;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? uiMessage(assistantId, 'assistant', accumulated) : m,
-              ),
-            );
+          const o = ev as {
+            type: string;
+            /** NDJSON text delta (harness contract). */
+            content?: string;
+            /** Alternate key some streams use for the same payload. */
+            text?: string;
+            message?: string;
+            reason?: string;
+            toolId?: string;
+            data?: unknown;
+            language?: string;
+            code?: string;
+          };
+          if (o.type === 'text') {
+            const delta =
+              typeof o.content === 'string' ? o.content : typeof o.text === 'string' ? o.text : '';
+            appendAssistantText(delta);
+          } else if (o.type === 'thinking' && typeof o.content === 'string') {
+            appendAssistantText(o.content);
+          } else if (o.type === 'code' && typeof o.content === 'string') {
+            const lang = typeof o.language === 'string' && o.language ? o.language : '';
+            appendAssistantText(`\n\`\`\`${lang}\n${o.content}\n\`\`\`\n`);
+          } else if (o.type === 'tool_result' && typeof o.toolId === 'string') {
+            const body = formatToolResultPreview(o.data);
+            appendAssistantText(`\n\n**${o.toolId}**\n\`\`\`json\n${body}\n\`\`\`\n`);
           } else if (o.type === 'error' && typeof o.message === 'string') {
-            setError(o.message);
+            const code = o.code;
+            const inlineToolish =
+              typeof code === 'string' &&
+              (code.startsWith('TOOL_') || code.startsWith('MCP_') || code.startsWith('NATIVE_'));
+            if (inlineToolish) {
+              appendAssistantText(`\n\n[${code}] ${o.message}\n`);
+            } else {
+              setError(o.message);
+            }
           }
         };
 

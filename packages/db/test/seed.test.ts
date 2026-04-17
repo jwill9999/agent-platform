@@ -79,6 +79,8 @@ describe('seed', () => {
     expect(() => AgentSchema.parse(agent)).not.toThrow();
     expect(agent!.slug).toBe('coding');
     expect(agent!.allowedSkillIds).toEqual([]);
+    expect(agent!.allowedToolIds).toEqual([]);
+    expect(agent!.allowedMcpServerIds).toEqual([]);
     closeDatabase(sqlite);
   });
 });

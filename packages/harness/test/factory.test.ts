@@ -273,6 +273,45 @@ describe('buildAgentContext', () => {
     expect(ctx.skills).toEqual([skill1]);
     expect(ctx.tools).toEqual([tool1]);
   });
+
+  it('when no executable tools, tells the model not to use tools and omits skill tool lines', async () => {
+    const skillWithToolRefs: Skill = {
+      ...skill1,
+      tools: ['t1', 'ghost-id'],
+    };
+    mockLoadAgent.mockReturnValue({
+      ...baseAgent,
+      allowedSkillIds: ['s1'],
+      allowedToolIds: [],
+      allowedMcpServerIds: [],
+    });
+    mockGetSkill.mockReturnValue(skillWithToolRefs);
+    mockGetTool.mockReturnValue(undefined);
+
+    const ctx = await buildAgentContext(fakeDb, 'agent-1');
+
+    expect(ctx.tools).toEqual([]);
+    expect(ctx.systemPrompt).toContain('## Capabilities');
+    expect(ctx.systemPrompt).toContain('do not have access to tools');
+    expect(ctx.systemPrompt).not.toContain('Tools:');
+  });
+
+  it('lists only skill tool ids that intersect the executable tool set', async () => {
+    mockLoadAgent.mockReturnValue(baseAgent);
+    mockGetSkill.mockReturnValue({
+      ...skill1,
+      tools: ['t1', 'ghost-id'],
+    });
+    mockGetTool.mockReturnValue(tool1);
+    mockGetMcpServer.mockReturnValue(undefined);
+    mockGetSession.mockReturnValue(undefined);
+
+    const ctx = await buildAgentContext(fakeDb, 'agent-1');
+
+    expect(ctx.tools).toEqual([tool1]);
+    expect(ctx.systemPrompt).toContain('Tools: t1');
+    expect(ctx.systemPrompt).not.toContain('ghost-id');
+  });
 });
 
 describe('destroyAgentContext', () => {

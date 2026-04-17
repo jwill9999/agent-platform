@@ -218,6 +218,58 @@ describe('createLlmReasonNode with emitter', () => {
     expect(emitted).toHaveLength(1);
     expect(emitted[0]).toEqual({ type: 'text', content: 'text' });
   });
+
+  it('emits resolved `text` when `textStream` yields nothing (provider quirk)', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: [],
+        textOverride: 'Answer without streaming deltas',
+        usage: { promptTokens: 3, completionTokens: 10 },
+      }),
+    );
+
+    const emitted: { type: string; content?: string }[] = [];
+    const emitter = {
+      emit: (event: { type: string; content?: string }) => emitted.push(event),
+      end: vi.fn(),
+    };
+
+    const node = createLlmReasonNode(emitter);
+    const result = await node(makeState());
+
+    expect(emitted).toEqual([{ type: 'text', content: 'Answer without streaming deltas' }]);
+    expect(result.llmOutput).toEqual({ kind: 'text', content: 'Answer without streaming deltas' });
+  });
+
+  it('emits placeholder text when the model requests tools with no streamed text', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: [],
+        toolCalls: [
+          { toolCallId: 'tc1', toolName: 'search', args: { query: 'hello' } },
+          { toolCallId: 'tc2', toolName: 'read_file', args: { path: '/foo' } },
+        ],
+        usage: { promptTokens: 5, completionTokens: 3 },
+      }),
+    );
+
+    const emitted: { type: string; content?: string }[] = [];
+    const emitter = {
+      emit: (event: { type: string; content?: string }) => emitted.push(event),
+      end: vi.fn(),
+    };
+
+    const node = createLlmReasonNode(emitter);
+    const state = makeState({
+      toolDefinitions: [
+        { name: 'search', description: 'Search', parameters: { type: 'object', properties: {} } },
+        { name: 'read_file', description: 'Read', parameters: { type: 'object', properties: {} } },
+      ],
+    });
+    await node(state);
+
+    expect(emitted).toEqual([{ type: 'text', content: 'Calling tools: Search, Read…' }]);
+  });
 });
 
 // ---------------------------------------------------------------------------

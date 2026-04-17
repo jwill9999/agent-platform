@@ -53,7 +53,12 @@ export class AgentNotFoundError extends Error {
 // System prompt construction
 // ---------------------------------------------------------------------------
 
-function formatSkillSection(skills: Skill[]): string {
+/**
+ * Only list tool IDs that the agent can actually invoke (same set as passed to the LLM).
+ * Skill records may list aspirational tool ids; omitting mismatches avoids telling the model
+ * it can call tools it does not have.
+ */
+function formatSkillSection(skills: Skill[], executableToolIds: Set<string>): string {
   if (skills.length === 0) return '';
   const sorted = [...skills].sort((a, b) => a.id.localeCompare(b.id));
   const lines = sorted.map((s) => {
@@ -61,8 +66,9 @@ function formatSkillSection(skills: Skill[]): string {
     if (s.constraints.length > 0) {
       entry += `\n  Constraints: ${s.constraints.join('; ')}`;
     }
-    if (s.tools.length > 0) {
-      entry += `\n  Tools: ${s.tools.join(', ')}`;
+    const allowed = s.tools.filter((id) => executableToolIds.has(id));
+    if (allowed.length > 0) {
+      entry += `\n  Tools: ${allowed.join(', ')}`;
     }
     return entry;
   });
@@ -79,8 +85,18 @@ function formatToolSection(tools: ContractTool[]): string {
   return `\n\n## Available Tools\n${lines.join('\n')}`;
 }
 
+/** Explicit guidance when the harness will not pass any tools to the model. */
+function formatNoToolsCapabilitySection(): string {
+  return `\n\n## Capabilities\nYou do not have access to tools or function calls in this session. Do not claim to invoke tools, run shell commands, or call external APIs; respond using natural language only.`;
+}
+
 function buildAugmentedPrompt(base: string, skills: Skill[], tools: ContractTool[]): string {
-  return `${base}${formatSkillSection(skills)}${formatToolSection(tools)}`;
+  const executableIds = new Set(tools.map((t) => t.id));
+  const body = `${base}${formatSkillSection(skills, executableIds)}${formatToolSection(tools)}`;
+  if (tools.length === 0) {
+    return `${body}${formatNoToolsCapabilitySection()}`;
+  }
+  return body;
 }
 
 // ---------------------------------------------------------------------------

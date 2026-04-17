@@ -77,7 +77,7 @@ export function runSeed(db: DrizzleDb): void {
         slug: DEFAULT_AGENT_SLUG,
         name: 'Personal assistant',
         systemPrompt:
-          'You are a helpful assistant. Use available tools to help the user accomplish their tasks. Be concise and accurate.',
+          'You are a helpful assistant. Be concise and accurate. When tools are available for this agent, they are listed in your instructions below.',
         description:
           'General-purpose personal assistant. Specialist agents can be used for focused work when configured.',
         executionLimitsJson: JSON.stringify({

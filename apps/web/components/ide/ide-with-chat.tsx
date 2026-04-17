@@ -119,12 +119,18 @@ function getLanguage(filename: string): string {
   }
 }
 
+/** Match {@link Message} / chat — prefer `parts`, fall back to legacy `content`. */
 function getMessageText(message: UIMessage): string {
-  if (!message.parts) return '';
-  return message.parts
+  const textParts = (message.parts ?? [])
     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-    .map((p) => p.text)
-    .join('');
+    .map((p) => p.text);
+  if (textParts.length > 0) {
+    return textParts.join('');
+  }
+  if (typeof message.content === 'string' && message.content.trim()) {
+    return message.content;
+  }
+  return '';
 }
 
 // Sample file tree (replaced by File System Access API in later task)
