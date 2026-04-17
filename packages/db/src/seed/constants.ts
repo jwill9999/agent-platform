@@ -9,3 +9,9 @@ export const DEMO_SKILL_SLUG = 'demo-skill';
 
 /** Stable UUID for the demo skill. */
 export const DEMO_SKILL_ID = '00000000-0000-4000-8000-000000000002';
+
+/** Specialist coding agent (seeded for local/dev; same slug as UI-created `coding`). */
+export const CODING_AGENT_SLUG = 'coding';
+
+/** Stable UUID for the seeded coding agent. */
+export const CODING_AGENT_ID = '00000000-0000-4000-8000-000000000003';
