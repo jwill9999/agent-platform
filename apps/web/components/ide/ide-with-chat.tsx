@@ -25,7 +25,6 @@ import {
   MessageSquare,
   Plus,
   Paperclip,
-  Menu,
   RefreshCw,
   ListCollapse,
   Terminal as TerminalIcon,
@@ -50,7 +49,6 @@ import { cn } from '@/lib/cn';
 import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
 import { Terminal } from '@/components/ide/terminal';
-import { useSidebar } from '@/components/layout/sidebar-context';
 import { useFileSystem } from '@/hooks/use-file-system';
 import type { FileNode } from '@/hooks/use-file-system';
 
@@ -250,8 +248,6 @@ function getFolderButtonLabel(isLoading: boolean, rootName: string | null): stri
 }
 
 function IDEToolbar({
-  sidebarCollapsed,
-  toggleSidebar,
   showExplorer,
   setShowExplorer,
   showTerminal,
@@ -272,8 +268,6 @@ function IDEToolbar({
   onRefreshFolder,
   onCloseFolder,
 }: Readonly<{
-  sidebarCollapsed: boolean;
-  toggleSidebar: () => void;
   showExplorer: boolean;
   setShowExplorer: (v: boolean) => void;
   showTerminal: boolean;
@@ -294,10 +288,6 @@ function IDEToolbar({
   onRefreshFolder: () => void;
   onCloseFolder: () => void;
 }>) {
-  const menuProps = sidebarCollapsed
-    ? { variant: 'ghost' as const, title: 'Show main menu', label: 'Menu' }
-    : { variant: 'secondary' as const, title: 'Hide main menu', label: 'Hide' };
-
   const explorerVariant = showExplorer ? 'secondary' : 'ghost';
   const explorerTitle = showExplorer ? 'Hide file explorer' : 'Show file explorer';
   const explorerLabel = showExplorer ? 'Hide' : 'Files';
@@ -318,17 +308,6 @@ function IDEToolbar({
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
       <div className="flex items-center gap-2">
-        <Button
-          variant={menuProps.variant}
-          size="sm"
-          onClick={toggleSidebar}
-          className="gap-2"
-          title={menuProps.title}
-        >
-          <Menu className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{menuProps.label}</span>
-        </Button>
-        <div className="w-px h-5 bg-border" />
         <Button
           variant={explorerVariant}
           size="sm"
@@ -786,8 +765,6 @@ export interface IDEWithChatProps {
 const defaultModel = process.env.NEXT_PUBLIC_DEFAULT_MODEL || 'gpt-4o-mini';
 
 export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatProps>) {
-  const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebar();
-
   // File System Access API
   const fs = useFileSystem();
 
@@ -1059,8 +1036,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   return (
     <div className="flex flex-col h-full bg-background">
       <IDEToolbar
-        sidebarCollapsed={sidebarCollapsed}
-        toggleSidebar={toggleSidebar}
         showExplorer={showExplorer}
         setShowExplorer={setShowExplorer}
         showTerminal={showTerminal}
