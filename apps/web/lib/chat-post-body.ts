@@ -28,12 +28,17 @@ const LegacySingleMessageBodySchema = z.object({
 
 export type ChatPostBody = z.infer<typeof StandardChatPostBodySchema>;
 
-export function parseChatPostBody(
-  body: unknown,
-): { ok: true; value: ChatPostBody } | { ok: false; message: string } {
+/** How the request body was interpreted (for metrics / opt-in debug logs only). */
+export type ChatPostBodyShape = 'messages' | 'legacy_message' | 'invalid';
+
+export type ParseChatPostBodyResult =
+  | { ok: true; value: ChatPostBody; bodyShape: Exclude<ChatPostBodyShape, 'invalid'> }
+  | { ok: false; message: string; bodyShape: 'invalid' };
+
+export function parseChatPostBody(body: unknown): ParseChatPostBodyResult {
   const standard = StandardChatPostBodySchema.safeParse(body);
   if (standard.success) {
-    return { ok: true, value: standard.data };
+    return { ok: true, value: standard.data, bodyShape: 'messages' };
   }
 
   const legacy = LegacySingleMessageBodySchema.safeParse(body);
@@ -45,11 +50,13 @@ export function parseChatPostBody(
         model: legacy.data.model,
         context: legacy.data.context,
       },
+      bodyShape: 'legacy_message',
     };
   }
 
   return {
     ok: false,
+    bodyShape: 'invalid',
     message:
       'Invalid body: expected { messages, model?, context? } or { message, sessionId?, model?, context? }',
   };

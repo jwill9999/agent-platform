@@ -8,6 +8,7 @@ describe('parseChatPostBody', () => {
     const r = parseChatPostBody(body);
     expect(r).toEqual({
       ok: true,
+      bodyShape: 'messages',
       value: { messages: body.messages, model: undefined, context: undefined },
     });
   });
@@ -19,6 +20,7 @@ describe('parseChatPostBody', () => {
     });
     expect(r).toEqual({
       ok: true,
+      bodyShape: 'legacy_message',
       value: {
         messages: [{ role: 'user', content: 'test' }],
         model: undefined,
@@ -38,5 +40,8 @@ describe('parseChatPostBody', () => {
   it('rejects unknown shapes', () => {
     const r = parseChatPostBody({ foo: 1 });
     expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.bodyShape).toBe('invalid');
+    }
   });
 });

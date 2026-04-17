@@ -8,14 +8,15 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** `/api/chat` accepts legacy `{ sessionId, message }` POST bodies (maps to one user message); added `parseChatPostBody` + Vitest coverage.
+- **Session:** `/api/chat` legacy body support; optional `CHAT_ROUTE_DEBUG=1` server logs (no secrets / no message text) for tracing key gate, parse, stream start.
 
 ---
 
 ## What happened (this session)
 
 - **Chat BFF:** `POST /api/chat` is built for `@ai-sdk/react` `useChat`, which sends `{ messages, model? }`. Manual tests sending `{ sessionId, message }` no longer fail body validation; `sessionId` is ignored for streaming.
-- **Tests:** `apps/web/test/chat-post-body.test.ts` covers standard and legacy shapes.
+- **Tests:** `apps/web/test/chat-post-body.test.ts` covers parser only (not HTTP / keys / streaming).
+- **Debug:** `CHAT_ROUTE_DEBUG=1` in `apps/web/.env.example` — structured `[api/chat]` lines on the Next server terminal.
 
 ---
 
