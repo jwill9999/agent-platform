@@ -16,6 +16,7 @@ import {
   Puzzle,
   History,
   Hammer,
+  Code2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './sidebar-context';
@@ -26,6 +27,12 @@ const navigation = [
     href: '/',
     icon: MessageSquare,
     description: 'Start conversations',
+  },
+  {
+    name: 'IDE',
+    href: '/ide',
+    icon: Code2,
+    description: 'Code with AI assistant',
   },
   {
     name: 'Agents',

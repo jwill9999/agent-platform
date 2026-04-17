@@ -14,3 +14,4 @@ dist/
 *.sqlite
 playwright-report/
 test-results/
+.playwright-mcp/
