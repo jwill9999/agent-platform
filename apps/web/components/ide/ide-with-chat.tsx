@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useChat } from '@ai-sdk/react';
+import type { Agent, SessionRecord } from '@agent-platform/contracts';
 import type { UIMessage } from 'ai';
 import {
   FolderOpen,
@@ -50,7 +50,12 @@ import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
 import { Terminal } from '@/components/ide/terminal';
 import { useFileSystem } from '@/hooks/use-file-system';
+import { useHarnessChat } from '@/hooks/use-harness-chat';
 import type { FileNode } from '@/hooks/use-file-system';
+import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
+import { pickDefaultAgent } from '@/lib/default-agent';
+import { formatFileContext, sanitiseFileContext } from '@/lib/file-context';
+import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -525,6 +530,10 @@ function ChatPanel({
   onClearContext,
   onApplyCode,
   onCreateFile,
+  agents,
+  selectedAgentId,
+  onAgentChange,
+  sessionReady,
 }: Readonly<{
   messages: UIMessage[];
   isLoading: boolean;
@@ -538,6 +547,10 @@ function ChatPanel({
   onClearContext: () => void;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  agents: Agent[];
+  selectedAgentId: string | null;
+  onAgentChange: (id: string) => void;
+  sessionReady: boolean;
 }>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -548,13 +561,21 @@ function ChatPanel({
   return (
     <div className="flex flex-col h-full border-l border-border">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="font-medium text-sm">AI Assistant</span>
-          <span className="text-xs text-muted-foreground">
-            {isLoading ? 'Thinking...' : 'Ready'}
+      <div className="flex flex-col gap-2 px-4 py-2 border-b border-border bg-card/50">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <ChatAgentSelector
+            agents={agents}
+            selectedId={selectedAgentId}
+            onSelect={onAgentChange}
+            disabled={isLoading}
+          />
+          <span className="text-xs text-muted-foreground shrink-0">
+            {isLoading ? 'Thinking...' : sessionReady ? 'Ready' : 'Connecting…'}
           </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary shrink-0" />
+          <span className="font-medium text-sm truncate">AI Assistant</span>
         </div>
       </div>
 
@@ -645,7 +666,7 @@ function ChatPanel({
           <Button
             size="icon"
             onClick={onSendMessage}
-            disabled={!chatInput.trim() || isLoading}
+            disabled={!chatInput.trim() || isLoading || !sessionReady}
             className="flex-shrink-0"
           >
             <Send className="h-4 w-4" />
@@ -762,8 +783,6 @@ export interface IDEWithChatProps {
   fileTree?: FileNode[];
 }
 
-const defaultModel = process.env.NEXT_PUBLIC_DEFAULT_MODEL || 'gpt-4o-mini';
-
 export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatProps>) {
   // File System Access API
   const fs = useFileSystem();
@@ -783,14 +802,16 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [showChat, setShowChat] = useState(true);
   const [showTerminal, setShowTerminal] = useState(false);
 
-  // Chat state
+  // Chat state — harness + agent session
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [contextFiles, setContextFiles] = useState<OpenTab[]>([]);
 
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
 
-  // Build context body for API
-  const contextBody = useMemo(() => {
+  const contextFilesForMessage = useMemo(() => {
     const files: { file: string; code: string }[] = [];
     for (const f of contextFiles) {
       files.push({ file: f.path, code: f.content });
@@ -798,15 +819,56 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     if (activeFile && !contextFiles.some((f) => f.path === activeFile.path)) {
       files.push({ file: activeFile.path, code: activeFile.content });
     }
-    return files.length > 0 ? { files } : undefined;
+    return files;
   }, [contextFiles, activeFile]);
 
-  const { messages, append, status } = useChat({
-    api: '/api/chat',
-    body: { model: defaultModel, context: contextBody },
-  });
+  const { messages, sendMessage, status, error: harnessError, setError: setHarnessError } =
+    useHarnessChat(sessionId);
 
-  const isLoading = status === 'streaming' || status === 'submitted';
+  useEffect(() => {
+    void (async () => {
+      try {
+        const list = await apiGet<Agent[]>(apiPath('agents'));
+        const next = list ?? [];
+        setAgents(next);
+        const def = pickDefaultAgent(next);
+        if (def) {
+          setSelectedAgentId((prev) => prev ?? def.id);
+        }
+      } catch (e) {
+        toast.error(e instanceof ApiRequestError ? e.message : 'Failed to load agents');
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedAgentId) return;
+    void (async () => {
+      try {
+        const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+          agentId: selectedAgentId,
+        });
+        if (session?.id) {
+          setSessionId(session.id);
+        } else {
+          setSessionId(null);
+          toast.error('Failed to create chat session');
+        }
+      } catch (e) {
+        setSessionId(null);
+        toast.error(e instanceof ApiRequestError ? e.message : 'Failed to create session');
+      }
+    })();
+  }, [selectedAgentId]);
+
+  useEffect(() => {
+    if (harnessError) {
+      toast.error(harnessError);
+      setHarnessError(null);
+    }
+  }, [harnessError, setHarnessError]);
+
+  const isLoading = status === 'streaming';
 
   // --- File operations ---
 
@@ -991,10 +1053,14 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   // --- Chat send ---
 
   const handleSendMessage = useCallback(() => {
-    if (!chatInput.trim()) return;
-    append({ role: 'user', content: chatInput });
+    const userLine = chatInput.trim();
+    if (!userLine || !sessionId) return;
+    const { files } = sanitiseFileContext(contextFilesForMessage);
+    const prefix = formatFileContext(files);
+    const messageForApi = prefix ? `${prefix}\n${userLine}` : userLine;
+    void sendMessage(messageForApi, userLine);
     setChatInput('');
-  }, [chatInput, append]);
+  }, [chatInput, sessionId, contextFilesForMessage, sendMessage]);
 
   // --- Keyboard shortcuts ---
 
@@ -1234,6 +1300,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 onClearContext={handleClearContext}
                 onApplyCode={handleApplyCode}
                 onCreateFile={handleCreateFile}
+                agents={agents}
+                selectedAgentId={selectedAgentId}
+                onAgentChange={setSelectedAgentId}
+                sessionReady={Boolean(sessionId)}
               />
             </ResizablePanel>
           </>
