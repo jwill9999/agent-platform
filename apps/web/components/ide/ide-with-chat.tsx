@@ -27,6 +27,7 @@ import {
   Paperclip,
   Menu,
   RefreshCw,
+  ListCollapse,
   Terminal as TerminalIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -135,6 +136,7 @@ function FileTreeNode({
   onAddToContext,
   selectedPath,
   contextPaths,
+  collapseTreeSignal,
 }: Readonly<{
   node: FileNode;
   depth?: number;
@@ -142,8 +144,21 @@ function FileTreeNode({
   onAddToContext?: (node: FileNode) => void;
   selectedPath: string | null;
   contextPaths?: string[];
+  collapseTreeSignal: number;
 }>) {
   const [isExpanded, setIsExpanded] = useState(depth < 2);
+  const lastCollapseSignal = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (lastCollapseSignal.current === null) {
+      lastCollapseSignal.current = collapseTreeSignal;
+      return;
+    }
+    if (collapseTreeSignal > lastCollapseSignal.current) {
+      setIsExpanded(false);
+    }
+    lastCollapseSignal.current = collapseTreeSignal;
+  }, [collapseTreeSignal]);
 
   if (node.type === 'directory') {
     return (
@@ -179,6 +194,7 @@ function FileTreeNode({
                 onAddToContext={onAddToContext}
                 selectedPath={selectedPath}
                 contextPaths={contextPaths}
+                collapseTreeSignal={collapseTreeSignal}
               />
             ))}
           </div>
@@ -786,6 +802,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
+  const [explorerCollapseSignal, setExplorerCollapseSignal] = useState(0);
   const [showChat, setShowChat] = useState(true);
   const [showTerminal, setShowTerminal] = useState(false);
 
@@ -1084,9 +1101,27 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     />
                   </div>
                 </div>
-                <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between">
-                  <span>{fs.rootName ?? 'Explorer'}</span>
-                  {fs.isLoading && <span className="text-xs animate-pulse">Loading…</span>}
+                <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between gap-2 min-w-0">
+                  <span className="truncate">{fs.rootName ?? 'Explorer'}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {fs.isDirectoryOpen && filteredFileTree.length > 0 && !fs.isLoading && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs font-normal normal-case tracking-normal text-muted-foreground hover:text-foreground"
+                        title="Collapse all folders in the tree"
+                        aria-label="Collapse all folders"
+                        onClick={() => {
+                          setExplorerCollapseSignal((n) => n + 1);
+                        }}
+                      >
+                        <ListCollapse className="h-3.5 w-3.5" aria-hidden />
+                        <span className="hidden sm:inline">Collapse</span>
+                      </Button>
+                    )}
+                    {fs.isLoading && <span className="text-xs animate-pulse normal-case tracking-normal">Loading…</span>}
+                  </div>
                 </div>
                 {fs.needsFolderReconnect && (
                   <div className="mx-2 mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
@@ -1163,6 +1198,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         }}
                         selectedPath={activeTab}
                         contextPaths={contextFiles.map((f) => f.path)}
+                        collapseTreeSignal={explorerCollapseSignal}
                       />
                     ))}
                   </div>
