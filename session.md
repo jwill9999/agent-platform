@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** Seeded **Coding** specialist in `runSeed` (stable id/slug); prior OpenAPI/Makefile/legacy-repair work — branch `task/explorer-collapse-cta` (tip `76b8274`).
+- **Session:** Seed primary agent display name **Personal assistant** (slug unchanged `default-agent`); docs/Makefile/test label updates — branch `task/explorer-collapse-cta` (tip `6291d37`).
 
 ---
 
@@ -27,6 +27,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ### IDE explorer + toolbar — `task/explorer-collapse-cta` _(earlier commits)_
 
 - **`ide-with-chat.tsx`** — Explorer “Collapse all folders” CTA; removed duplicate sidebar **Menu** button.
+
+### Seed naming
+
+- **`packages/db/src/seed/runSeed.ts`** — Primary seeded agent **`name`**: “Personal assistant”; description notes specialists when configured. **`DEFAULT_AGENT_SLUG`** remains **`default-agent`** for stable API/URLs.
 
 ### Frontend V0 Integration epic — `feature/frontend-v0` — PR #52 (all CI green) _(historical)_
 
@@ -78,8 +82,7 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ### Git
 
-- **`task/explorer-collapse-cta`** — tip includes OpenAPI agent fix + Makefile + legacy DB repair (`52284e2`); push/PR when ready.
-- **Working tree (not in that commit):** local edits may remain on `Makefile`, `packages/db` legacy repair + tests — commit separately if still needed.
+- **`task/explorer-collapse-cta`** — tip `6291d37` (Personal assistant seed name + prior OpenAPI/Makefile/legacy repair/Coding seed); push/PR when ready.
 - `main` — up to date with `origin/main` at session start
 - `feature/frontend-v0` — base branch for frontend epic
 - `task/agent-platform-cfg` — segment tip, PR #52 open → `feature/frontend-v0`
