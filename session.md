@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-17
-- **Session:** Documented **agent `name` editable, `slug` immutable** (OpenAPI + contracts JSDoc + PUT comment) — branch `task/explorer-collapse-cta` (tip `d2b5917`).
+- **Session:** **Web chat → harness** — `/api/chat` proxies `POST /v1/chat`; home + IDE use sessions + **agent selector** (`useHarnessChat`, NDJSON) — branch `task/explorer-collapse-cta` (tip `4b5824e`).
 
 ---
 
@@ -35,6 +35,11 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ### Agent identity (product intent)
 
 - **Display `name`** can change via PUT; **`slug`** is set at create and never changes (documented in **`contracts/openapi/agent-platform.yaml`**, **`packages/contracts/src/agent.ts`**, **`agentsRouter` PUT**).
+
+### Web chat execution
+
+- **`apps/web/app/api/chat/route.ts`** — BFF proxy to **`API_PROXY_URL/v1/chat`** (harness), not direct OpenAI.
+- **`apps/web/hooks/use-harness-chat.ts`** — streams NDJSON; **`ChatAgentSelector`** + **`POST /api/v1/sessions`** per agent; changing agent creates a new session and clears thread.
 
 ### Frontend V0 Integration epic — `feature/frontend-v0` — PR #52 (all CI green) _(historical)_
 
@@ -86,7 +91,7 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ### Git
 
-- **`task/explorer-collapse-cta`** — tip `d2b5917` (slug-immutability docs + prior work); push/PR when ready.
+- **`task/explorer-collapse-cta`** — tip `4b5824e` (harness chat + agent selector + prior work); push/PR when ready.
 - `main` — up to date with `origin/main` at session start
 - `feature/frontend-v0` — base branch for frontend epic
 - `task/agent-platform-cfg` — segment tip, PR #52 open → `feature/frontend-v0`
