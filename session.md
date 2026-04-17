@@ -7,14 +7,18 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-16
-- **Session:** Frontend V0 Integration epic complete — PR #52 open (all CI green). Config dashboards, chat interface, layout shell all ported.
+- **Date:** 2026-04-17
+- **Session:** IDE file explorer — committed “Collapse all folders” CTA on branch `task/explorer-collapse-cta` (`d82349e`).
 
 ---
 
 ## What happened (this session)
 
-### Frontend V0 Integration epic — `feature/frontend-v0` — PR #52 (all CI green)
+### IDE explorer collapse CTA — `task/explorer-collapse-cta`
+
+- **`apps/web/components/ide/ide-with-chat.tsx`** — Header next to open folder name: ghost button (icon + “Collapse” on `sm+`) that increments a signal so all directory nodes collapse; avoids clobbering newly mounted children.
+
+### Frontend V0 Integration epic — `feature/frontend-v0` — PR #52 (all CI green) _(historical)_
 
 Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
@@ -64,7 +68,9 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ### Git
 
-- `main` — up to date through PR #41
+- **`task/explorer-collapse-cta`** — tip: explorer “Collapse all folders” (`d82349e`); open PR → `main` (or merge via your feature branch workflow).
+- **Working tree (not in that commit):** local edits may remain on `Makefile`, `packages/db` legacy repair + tests — commit separately if still needed.
+- `main` — up to date with `origin/main` at session start
 - `feature/frontend-v0` — base branch for frontend epic
 - `task/agent-platform-cfg` — segment tip, PR #52 open → `feature/frontend-v0`
 - PR #51 closed (superseded by #52)
@@ -86,11 +92,12 @@ Completed the `agent-platform-cfg` task (config dashboards). Full epic chain:
 
 ## Next (priority order)
 
-1. **Merge PR #52** — Frontend V0 Integration → `feature/frontend-v0`, then `feature/frontend-v0` → `main`
-2. **`agent-platform-a9g`** — Chat file/context attachments (P2, frontend)
-3. **`agent-platform-d8u`** — Concurrent session safety (P2, harness/reliability)
-4. **`agent-platform-psa`** — Context window management (P2, harness/runtime)
-5. **Agent/model selector** — User discussed wanting agent picker in chat header (needs task)
+1. **Push `task/explorer-collapse-cta`** and open PR (or merge per your branching rules).
+2. **Merge PR #52** — Frontend V0 Integration → `feature/frontend-v0`, then `feature/frontend-v0` → `main`
+3. **`agent-platform-a9g`** — Chat file/context attachments (P2, frontend)
+4. **`agent-platform-d8u`** — Concurrent session safety (P2, harness/reliability)
+5. **`agent-platform-psa`** — Context window management (P2, harness/runtime)
+6. **Agent/model selector** — User discussed wanting agent picker in chat header (needs task)
 
 ---
 
