@@ -446,8 +446,10 @@ paths:
         required: true
         content:
           application/json:
+            description: |
+              Same shape as POST create; `id` and `slug` come from the existing server (URL), not the body.
             schema:
-              $ref: '#/components/schemas/McpServer'
+              $ref: '#/components/schemas/McpServerCreateBody'
       responses:
         '200':
           description: MCP server updated
