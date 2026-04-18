@@ -4,12 +4,15 @@ import { cn } from '@/lib/cn';
 import { User, Sparkles } from 'lucide-react';
 import type { UIMessage } from 'ai';
 import { Markdown } from './markdown';
+import { StreamingAssistantPlaceholder } from './streaming-placeholder';
 
 interface MessageProps {
   message: UIMessage;
+  /** True while this assistant bubble is waiting for the first streamed token. */
+  isAwaitingStreamContent?: boolean;
 }
 
-function getMessageText(message: UIMessage): string {
+export function getMessageText(message: UIMessage): string {
   const textParts = message.parts
     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
     .map((p) => p.text);
@@ -25,7 +28,7 @@ function getMessageText(message: UIMessage): string {
   return '';
 }
 
-export function Message({ message }: Readonly<MessageProps>) {
+export function Message({ message, isAwaitingStreamContent = false }: Readonly<MessageProps>) {
   const isUser = message.role === 'user';
   const text = getMessageText(message);
 
@@ -45,7 +48,13 @@ export function Message({ message }: Readonly<MessageProps>) {
             : 'bg-card border border-border rounded-bl-md',
         )}
       >
-        {!text && <p className="text-sm text-muted-foreground italic">Empty message</p>}
+        {!text && isUser && (
+          <p className="text-sm text-muted-foreground italic">Empty message</p>
+        )}
+        {!text && !isUser && isAwaitingStreamContent && <StreamingAssistantPlaceholder />}
+        {!text && !isUser && !isAwaitingStreamContent && (
+          <p className="text-sm text-muted-foreground italic">No content</p>
+        )}
         {text && isUser && (
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
         )}

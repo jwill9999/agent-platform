@@ -127,6 +127,21 @@ describe('execution limits: maxTokens', () => {
     );
   });
 
+  it('does not halt when usage omits token fields (no NaN vs maxTokens)', async () => {
+    mockTokenUsage = {} as { promptTokens: number; completionTokens: number };
+    const emitter = { emit: vi.fn() };
+    const node = createLlmReasonNode({ emitter });
+    const state = makeState({ totalTokensUsed: 0, limits: HIGH_TOKEN_LIMITS });
+
+    const result = await node(state);
+
+    expect(result.halted).toBeUndefined();
+    expect(result.totalTokensUsed).toBe(0);
+    expect(
+      emitter.emit.mock.calls.some((c) => c[0]?.type === 'error' && c[0]?.code === 'MAX_TOKENS'),
+    ).toBe(false);
+  });
+
   it('does not halt when maxTokens is not set', async () => {
     mockTokenUsage = { promptTokens: 1000, completionTokens: 1000 };
     const node = createLlmReasonNode();

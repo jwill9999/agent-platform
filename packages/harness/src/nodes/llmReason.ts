@@ -209,6 +209,17 @@ function buildLlmOutput(
   };
 }
 
+/** Sum prompt + completion tokens; missing or invalid usage from the SDK → 0 (avoid NaN budgets). */
+function sumUsageTokens(
+  usage: { promptTokens?: number; completionTokens?: number } | undefined,
+): number {
+  if (!usage) return 0;
+  const p = Number(usage.promptTokens);
+  const c = Number(usage.completionTokens);
+  const sum = (Number.isFinite(p) ? p : 0) + (Number.isFinite(c) ? c : 0);
+  return Number.isFinite(sum) ? sum : 0;
+}
+
 /** Check maxTokens limit; appends trace event and emits error if exceeded. */
 async function checkTokenLimit(
   limits: HarnessStateType['limits'],
@@ -217,7 +228,8 @@ async function checkTokenLimit(
   emitter: OutputEmitter | undefined,
 ): Promise<boolean> {
   const maxTokens = limits?.maxTokens;
-  if (maxTokens == null || newTotalTokens < maxTokens) return false;
+  if (maxTokens == null || !Number.isFinite(newTotalTokens) || newTotalTokens < maxTokens)
+    return false;
 
   traceEvents.push({ type: 'limit_hit', kind: 'max_tokens' });
   if (emitter) {
@@ -238,7 +250,8 @@ async function checkCostLimit(
   emitter: OutputEmitter | undefined,
 ): Promise<boolean> {
   const maxCost = limits?.maxCostUnits;
-  if (maxCost == null || maxCost <= 0 || newTotalCost < maxCost) return false;
+  if (maxCost == null || maxCost <= 0 || !Number.isFinite(newTotalCost) || newTotalCost < maxCost)
+    return false;
 
   traceEvents.push({ type: 'limit_hit', kind: 'max_cost' });
   if (emitter) {
@@ -265,6 +278,7 @@ async function emitBudgetWarnings(
   const maxTokens = limits?.maxTokens;
   if (
     maxTokens != null &&
+    Number.isFinite(newTotalTokens) &&
     newTotalTokens >= maxTokens * BUDGET_WARN_THRESHOLD &&
     newTotalTokens < maxTokens
   ) {
@@ -278,6 +292,7 @@ async function emitBudgetWarnings(
   if (
     maxCost != null &&
     maxCost > 0 &&
+    Number.isFinite(newTotalCost) &&
     newTotalCost >= maxCost * BUDGET_WARN_THRESHOLD &&
     newTotalCost < maxCost
   ) {
@@ -406,12 +421,17 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     );
 
     const tokenUsage = usage
-      ? { promptTokens: usage.promptTokens, completionTokens: usage.completionTokens }
+      ? {
+          promptTokens: Number.isFinite(Number(usage.promptTokens)) ? usage.promptTokens : 0,
+          completionTokens: Number.isFinite(Number(usage.completionTokens))
+            ? usage.completionTokens
+            : 0,
+        }
       : undefined;
 
     const { output, assistantMessage } = buildLlmOutput(fullText, finalToolCalls);
 
-    const tokenDelta = tokenUsage ? tokenUsage.promptTokens + tokenUsage.completionTokens : 0;
+    const tokenDelta = sumUsageTokens(usage);
     const newTotalTokens = state.totalTokensUsed + tokenDelta;
     const costDelta = tokenDelta / 1000;
     const newTotalCost = (state.totalCostUnits ?? 0) + costDelta;

@@ -48,6 +48,7 @@ import {
 import { cn } from '@/lib/cn';
 import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
+import { StreamingAssistantPlaceholder } from '@/components/chat/streaming-placeholder';
 import { Terminal } from '@/components/ide/terminal';
 import { useFileSystem } from '@/hooks/use-file-system';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
@@ -597,45 +598,54 @@ function ChatPanel({
               </p>
             </div>
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  'flex gap-3',
-                  message.role === 'user' ? 'justify-end' : 'justify-start',
-                )}
-              >
-                {message.role === 'assistant' && (
-                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
-                  </div>
-                )}
+            messages.map((message, index) => {
+              const awaitingAssistant =
+                isLoading &&
+                message.role === 'assistant' &&
+                index === messages.length - 1 &&
+                !getMessageText(message).trim();
+              return (
                 <div
+                  key={message.id}
                   className={cn(
-                    'rounded-xl px-3 py-2 max-w-[85%] text-sm',
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary/50 border border-border/50',
+                    'flex gap-3',
+                    message.role === 'user' ? 'justify-end' : 'justify-start',
                   )}
                 >
-                  {message.role === 'user' ? (
-                    <span className="whitespace-pre-wrap">{getMessageText(message)}</span>
-                  ) : (
-                    <IDEMarkdown
-                      content={getMessageText(message)}
-                      contextFiles={[
-                        ...contextFiles.map((f) => ({ path: f.path, name: f.name })),
-                        ...(activeFile && !contextFiles.some((f) => f.path === activeFile.path)
-                          ? [{ path: activeFile.path, name: activeFile.name }]
-                          : []),
-                      ]}
-                      onApplyCode={onApplyCode}
-                      onCreateFile={onCreateFile}
-                    />
+                  {message.role === 'assistant' && (
+                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    </div>
                   )}
+                  <div
+                    className={cn(
+                      'rounded-xl px-3 py-2 max-w-[85%] text-sm',
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-secondary/50 border border-border/50',
+                    )}
+                  >
+                    {message.role === 'user' ? (
+                      <span className="whitespace-pre-wrap">{getMessageText(message)}</span>
+                    ) : awaitingAssistant ? (
+                      <StreamingAssistantPlaceholder />
+                    ) : (
+                      <IDEMarkdown
+                        content={getMessageText(message)}
+                        contextFiles={[
+                          ...contextFiles.map((f) => ({ path: f.path, name: f.name })),
+                          ...(activeFile && !contextFiles.some((f) => f.path === activeFile.path)
+                            ? [{ path: activeFile.path, name: activeFile.name }]
+                            : []),
+                        ]}
+                        onApplyCode={onApplyCode}
+                        onCreateFile={onCreateFile}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           <div ref={messagesEndRef} />
         </div>

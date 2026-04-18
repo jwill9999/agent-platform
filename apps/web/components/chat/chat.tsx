@@ -3,7 +3,7 @@
 import { useRef, useEffect, useCallback } from 'react';
 import type { UIMessage } from 'ai';
 import { Sparkles } from 'lucide-react';
-import { Message } from './message';
+import { Message, getMessageText } from './message';
 import { ChatInput } from './chat-input';
 
 export interface ChatProps {
@@ -34,8 +34,17 @@ export function Chat({ messages, onSend, isLoading, canSend = true }: Readonly<C
             <EmptyState />
           ) : (
             <>
-              {messages.map((message) => (
-                <Message key={message.id} message={message} />
+              {messages.map((message, index) => (
+                <Message
+                  key={message.id}
+                  message={message}
+                  isAwaitingStreamContent={
+                    isLoading &&
+                    message.role === 'assistant' &&
+                    index === messages.length - 1 &&
+                    !getMessageText(message).trim()
+                  }
+                />
               ))}
               <div ref={messagesEndRef} className="h-4" />
             </>

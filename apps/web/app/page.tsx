@@ -88,16 +88,13 @@ export default function HomePage() {
           </button>
         </div>
       )}
-      <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-border bg-card/50">
+      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50">
         <ChatAgentSelector
           agents={agents}
           selectedId={selectedAgentId}
           onSelect={handleAgentChange}
           disabled={isLoading}
         />
-        <p className="text-xs text-muted-foreground hidden sm:block">
-          Chat runs on the platform harness (agent prompt, skills, MCP allowlists).
-        </p>
       </div>
       <div className="flex-1 flex flex-col min-h-0">
         <Chat

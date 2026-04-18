@@ -9,6 +9,14 @@ export const runtime = 'nodejs';
 
 const TARGET = process.env.API_PROXY_URL ?? 'http://127.0.0.1:3000';
 
+/** Max wait for the API to return *response headers* (TLS + MCP + lock + DB). Body may stream much longer. */
+function upstreamHeaderTimeoutMs(): number {
+  const raw = process.env.CHAT_PROXY_HEADER_TIMEOUT_MS?.trim();
+  if (!raw) return 90_000;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 90_000;
+}
+
 const HarnessChatBodySchema = z.object({
   sessionId: z.string().min(1),
   message: z.string().min(1),
@@ -54,6 +62,9 @@ export async function POST(req: Request) {
   };
 
   let res: Response;
+  const headerDeadlineMs = upstreamHeaderTimeoutMs();
+  const headerAbort = new AbortController();
+  const headerTimer = setTimeout(() => headerAbort.abort(), headerDeadlineMs);
   try {
     res = await fetch(`${TARGET}/v1/chat`, {
       method: 'POST',
@@ -62,14 +73,25 @@ export async function POST(req: Request) {
         sessionId: parsed.data.sessionId,
         message: parsed.data.message,
       }),
+      signal: headerAbort.signal,
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
+    const aborted = err instanceof Error && err.name === 'AbortError';
+    if (aborted) {
+      return jsonError(
+        504,
+        'UPSTREAM_HEADER_TIMEOUT',
+        `API at ${TARGET} did not respond within ${headerDeadlineMs}ms (still starting MCP, waiting on a lock, or stuck). Check API logs. Increase CHAT_PROXY_HEADER_TIMEOUT_MS if needed.`,
+      );
+    }
     return jsonError(
       502,
       'UPSTREAM_UNREACHABLE',
       `Could not reach API at ${TARGET} (${detail}). Is the API running on port 3000?`,
     );
+  } finally {
+    clearTimeout(headerTimer);
   }
 
   const outHeaders = new Headers();
