@@ -195,7 +195,7 @@ describe('openApiToToolDefinitions', () => {
     const doc = parse(readFileSync(specPath, 'utf-8'));
     const tools = openApiToToolDefinitions(doc);
 
-    expect(tools.length).toBe(31);
+    expect(tools.length).toBe(32);
 
     const names = tools.map((t) => t.name);
     expect(names).toContain('listAgents');

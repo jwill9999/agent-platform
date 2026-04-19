@@ -3,6 +3,7 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat && corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY scripts scripts
 COPY packages/contracts packages/contracts
 COPY packages/model-router packages/model-router
 COPY apps/web apps/web

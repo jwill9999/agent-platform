@@ -18,6 +18,7 @@ import {
   contractToolsToDefinitions,
   createApproximateCounter,
   buildWindowedContext,
+  createSystemToolExecutor,
 } from '@agent-platform/harness';
 import type { AgentContext, ChatMessage, OutputEmitter } from '@agent-platform/harness';
 import {
@@ -171,6 +172,7 @@ export function createChatRouter(db: DrizzleDb): Router {
       const controller = new AbortController();
       const { signal } = controller;
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let heartbeatId: ReturnType<typeof setInterval> | undefined;
 
       try {
         await safePluginCall(() =>
@@ -193,12 +195,19 @@ export function createChatRouter(db: DrizzleDb): Router {
         // Abort on timeout
         timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
 
+        // Heartbeat: emit empty NDJSON lines to keep the body stream alive
+        // during long MCP tool executions (prevents undici body timeout).
+        heartbeatId = setInterval(() => {
+          if (!res.writableEnded) res.write('\n');
+        }, 15_000);
+
         const graph = buildHarnessGraph({
           executeTool: async () => ({ ok: true }),
           llmReasonNode: createLlmReasonNode({ emitter, dispatcher }),
           toolDispatchNode: createToolDispatchNode({
             agent: agentCtx.agent,
             mcpManager: agentCtx.mcpManager,
+            nativeToolExecutor: createSystemToolExecutor(),
             emitter,
             dispatcher,
           }),
@@ -234,6 +243,7 @@ export function createChatRouter(db: DrizzleDb): Router {
         emitStreamError(res, err, signal);
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
+        if (heartbeatId) clearInterval(heartbeatId);
         release();
         await destroyAgentContext(agentCtx);
         if (!res.writableEnded) res.end();

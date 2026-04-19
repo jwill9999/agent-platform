@@ -3,6 +3,7 @@ FROM node:20-alpine AS build
 RUN apk add --no-cache curl python3 make g++ && corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY scripts scripts
 COPY packages/contracts packages/contracts
 COPY packages/db packages/db
 COPY packages/logger packages/logger
@@ -23,17 +24,18 @@ RUN pnpm -r run build
 RUN pnpm prune --prod
 
 FROM node:20-alpine AS runner
-RUN apk add --no-cache curl \
+RUN apk add --no-cache curl chromium \
   && addgroup -g 10001 -S appuser \
   && adduser -S -u 10001 -G appuser appuser
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
+ENV CHROME_BIN=/usr/bin/chromium-browser
 COPY --from=build /app ./
 # Pre-create /data with appuser ownership; Docker copies these permissions
 # into new named volumes, so the non-root user can write SQLite + WAL files.
-RUN mkdir -p /data && chown appuser:appuser /data
+RUN mkdir -p /data /tmp/playwright-mcp && chown appuser:appuser /data /tmp/playwright-mcp
 EXPOSE 3000
 USER appuser
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \

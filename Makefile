@@ -1,95 +1,145 @@
-.PHONY: setup all install rebuild-native build seed api web stop-sessions stop-ports reset-db up down reset start new restart dev dev-seed dev-reset doctor
+.PHONY: build rebuild up down restart reset new seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format help
 
-# One-shot: install deps, build, seed DB, start API + web (nvm applied in each step).
-.DEFAULT_GOAL := setup
+# ---------------------------------------------------------------------------
+# Docker-only Makefile — all runtime commands run inside containers.
+# Local targets (test, lint, typecheck) are for host-side quality gates only.
+# ---------------------------------------------------------------------------
 
-PORT ?= 3000
-WEB_PORT ?= 3001
-# Local dev: repo-root data/ (created on first API start). Override for Docker: SQLITE_PATH=/workspace/data/dev.sqlite make api
-SQLITE_PATH ?= $(CURDIR)/data/dev.sqlite
+COMPOSE := docker compose --profile services
 
-# Directory containing this Makefile (repo root when building from Makefile).
-REPO_ROOT := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
+.DEFAULT_GOAL := up
 
-# If nvm is installed, load it, cd to REPO_ROOT, and `nvm install` (reads `.nvmrc`, installs that
-# Node version if missing, then selects it). No-op when nvm is missing (Docker/CI).
-# Used by install, build, doctor, seed, api, web, up, reset (anything that runs node or pnpm).
-define WITH_NVM
-export NVM_DIR="$${NVM_DIR:-$$HOME/.nvm}"; if [ -s "$$NVM_DIR/nvm.sh" ]; then . "$$NVM_DIR/nvm.sh" && cd "$(REPO_ROOT)" && nvm install; fi;
-endef
+# ---------------------------------------------------------------------------
+# Docker lifecycle
+# ---------------------------------------------------------------------------
 
-# Harness chat prefers AGENT_OPENAI_API_KEY; if unset, reuse OPENAI_API_KEY for local make targets (avoids duplicate .env lines).
-define WITH_AGENT_OPENAI_FALLBACK
-export AGENT_OPENAI_API_KEY="$${AGENT_OPENAI_API_KEY:-$${OPENAI_API_KEY-}}";
-endef
-
-# Recompile better-sqlite3 for the current Node (must match `make doctor`). Run after switching Node or if seed/api fails with ERR_DLOPEN / NODE_MODULE_VERSION.
-install:
-	@bash -c '$(WITH_NVM) pnpm install && pnpm rebuild:native'
-
-rebuild-native:
-	@bash -c '$(WITH_NVM) pnpm rebuild:native'
-
-# Chains install → up (build, free ports, seed DB, start API + web). Same as `make` with no args.
-setup: install
-	@$(MAKE) up
-
-all: setup
-
+## Build Docker images (api + web)
 build:
-	@bash -c '$(WITH_NVM) pnpm build'
+	$(COMPOSE) build
 
-# Print Node path/version — native deps (better-sqlite3) must be built with the same Node you use for `make api`.
-doctor:
-	@bash -c '$(WITH_NVM) node -v && command -v node && pnpm -v'
+## Build from scratch — no layer cache
+rebuild:
+	$(COMPOSE) build --no-cache
 
-# Rebuild better-sqlite3 (`.nvmrc` / same shell as `nvm install`), verify by opening :memory: DB (loads native
-# addon — plain require() can succeed without bindings), then seed with cwd packages/db so resolution matches pnpm.
-seed: build
-	@bash -c '$(WITH_NVM) cd "$(REPO_ROOT)" && pnpm rebuild:native && cd "$(REPO_ROOT)/packages/db" && node -e "const Database=require(\"better-sqlite3\"); new Database(\":memory:\").close(); console.log(\"better-sqlite3 native ok\", process.version)" && SQLITE_PATH="$(SQLITE_PATH)" node ./dist/seed/run.js'
+## Build, start, wait for healthy, then seed DB (the "just works" command)
+up:
+	$(COMPOSE) up -d --build --wait
+	$(COMPOSE) exec api node packages/db/dist/seed/run.js
+	@echo ""
+	@echo "✅ Services running:"
+	@echo "   API: http://localhost:$${HOST_PORT:-3000}"
+	@echo "   Web: http://localhost:$${WEB_HOST_PORT:-3001}"
+	@echo ""
+	@echo "   make logs      — follow output"
+	@echo "   make status    — check health"
+	@echo "   make restart   — rebuild & restart"
 
-# API + PTY terminal: Node must match pnpm install (see .nvmrc).
-api: build
-	@bash -c '$(WITH_NVM) $(WITH_AGENT_OPENAI_FALLBACK) node -e "console.log(\"Using\", process.version, process.execPath, \"— must match Node used for pnpm install (make doctor)\")" && SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js'
+## Stop all services (keeps volumes / DB)
+down:
+	$(COMPOSE) down
 
-# Next.js dev server on WEB_PORT.
-web:
-	@bash -c '$(WITH_NVM) pnpm --filter @agent-platform/web run dev'
-
-stop-ports:
-	@bash -lc 'set -euo pipefail; for port in "$(PORT)" "$(WEB_PORT)"; do pids="$$(lsof -tiTCP:$$port || true)"; if [ -n "$$pids" ]; then echo "Stopping processes on port $$port: $$pids"; kill $$pids || true; sleep 0.5; remaining="$$(lsof -tiTCP:$$port || true)"; if [ -n "$$remaining" ]; then echo "Force killing processes on port $$port: $$remaining"; kill -9 $$remaining || true; fi; fi; done'
-
-stop-sessions:
-	@bash -lc 'set -euo pipefail; tmux -f /exec-daemon/tmux.portal.conf has-session -t "=web-dev-server" 2>/dev/null && tmux -f /exec-daemon/tmux.portal.conf send-keys -t "web-dev-server:0.0" C-c || true; tmux -f /exec-daemon/tmux.portal.conf has-session -t "=api-server-run" 2>/dev/null && tmux -f /exec-daemon/tmux.portal.conf send-keys -t "api-server-run:0.0" C-c || true; tmux -f /exec-daemon/tmux.portal.conf has-session -t "=api-dev-server" 2>/dev/null && tmux -f /exec-daemon/tmux.portal.conf send-keys -t "api-dev-server:0.0" C-c || true'
-
-reset-db:
-	@bash -lc 'set -euo pipefail; if [ -f "$(SQLITE_PATH)" ]; then echo "Removing $(SQLITE_PATH)"; rm -f "$(SQLITE_PATH)"; fi'
-
-# API + web together: same nvm/Node for background node and foreground pnpm/next.
-# Runs seed after build/down so the DB has the seeded agents + demo rows before the API serves /v1 (idempotent).
-up: build down seed
-	@bash -c 'set -euo pipefail; $(WITH_NVM) $(WITH_AGENT_OPENAI_FALLBACK) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
-
-down: stop-sessions stop-ports
-
-reset: down reset-db build seed
-	@bash -c 'set -euo pipefail; $(WITH_NVM) $(WITH_AGENT_OPENAI_FALLBACK) trap "kill 0" EXIT INT TERM; SQLITE_PATH="$(SQLITE_PATH)" PORT="$(PORT)" node apps/api/dist/index.js & pnpm --filter @agent-platform/web exec next dev --hostname 0.0.0.0 --port "$(WEB_PORT)"'
-
-start: up
-
-# Stop API + web, then bring them back up. Keeps the SQLite file (no `reset-db`).
+## Restart: stop → rebuild → start + seed (keeps DB)
 restart:
-	@$(MAKE) down
-	@$(MAKE) up
+	$(COMPOSE) down
+	$(COMPOSE) up -d --build --wait
+	$(COMPOSE) exec api node packages/db/dist/seed/run.js
 
-# Reinstall deps, then full reset: wipe DB, rebuild, seed, start (destructive local DB).
-new: install
-	@$(MAKE) reset
+## Wipe DB & volumes, rebuild, start fresh
+reset:
+	$(COMPOSE) down -v --remove-orphans
+	$(COMPOSE) up -d --build --wait
+	$(COMPOSE) exec api node packages/db/dist/seed/run.js
 
-dev: build
-	@$(MAKE) up
+## Nuclear: remove everything (volumes + images), rebuild from scratch
+new:
+	$(COMPOSE) down -v --remove-orphans --rmi local
+	$(COMPOSE) build --no-cache
+	$(COMPOSE) up -d --wait
+	$(COMPOSE) exec api node packages/db/dist/seed/run.js
 
-dev-seed: stop-sessions stop-ports reset-db seed
-	@$(MAKE) reset
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
 
-dev-reset: dev-seed
+## Seed DB inside the running API container (idempotent)
+seed:
+	$(COMPOSE) exec api node packages/db/dist/seed/run.js
+
+# ---------------------------------------------------------------------------
+# Logs & status
+# ---------------------------------------------------------------------------
+
+## Follow logs for all services
+logs:
+	$(COMPOSE) logs -f
+
+## Follow API logs only
+logs-api:
+	$(COMPOSE) logs -f api
+
+## Follow web logs only
+logs-web:
+	$(COMPOSE) logs -f web
+
+## Show container status and health
+status:
+	$(COMPOSE) ps
+
+# ---------------------------------------------------------------------------
+# Shell access
+# ---------------------------------------------------------------------------
+
+## Open a shell in the API container
+shell-api:
+	$(COMPOSE) exec api sh
+
+## Open a shell in the web container
+shell-web:
+	$(COMPOSE) exec web sh
+
+# ---------------------------------------------------------------------------
+# Cleanup
+# ---------------------------------------------------------------------------
+
+## Remove containers, volumes, and locally-built images
+clean:
+	$(COMPOSE) down -v --remove-orphans --rmi local
+
+# ---------------------------------------------------------------------------
+# Local quality gates (runs on host for fast feedback, not in Docker)
+# ---------------------------------------------------------------------------
+
+test:
+	pnpm test
+
+lint:
+	pnpm lint
+
+typecheck:
+	pnpm typecheck
+
+format:
+	pnpm format:check
+
+# ---------------------------------------------------------------------------
+# Help
+# ---------------------------------------------------------------------------
+
+help:
+	@echo "Docker targets:"
+	@echo "  make up        Build, start, seed (default)"
+	@echo "  make down      Stop services"
+	@echo "  make restart   Rebuild & restart (keeps DB)"
+	@echo "  make reset     Wipe DB, rebuild, start fresh"
+	@echo "  make new       Nuclear: wipe everything, rebuild from scratch"
+	@echo "  make seed      Seed DB in running API container"
+	@echo "  make logs      Follow all service logs"
+	@echo "  make status    Show container health"
+	@echo "  make shell-api Open shell in API container"
+	@echo "  make shell-web Open shell in web container"
+	@echo "  make clean     Remove containers, volumes, images"
+	@echo ""
+	@echo "Local quality gates:"
+	@echo "  make test      Run unit tests"
+	@echo "  make lint      Run linter"
+	@echo "  make typecheck Run TypeScript checks"

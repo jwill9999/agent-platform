@@ -1,19 +1,74 @@
 import type { Output } from '@agent-platform/contracts';
 
+type ImageBlock = { type: 'image'; data: string; mimeType: string };
+type ContentBlock = { type?: string; text?: string; data?: string; mimeType?: string };
+
+/** Process a single content block, returning extracted text or null. */
+function processBlock(block: ContentBlock): { text: string | null; isImage: boolean } {
+  if (block.type === 'text' && typeof block.text === 'string') {
+    return { text: block.text, isImage: false };
+  }
+  if (block.type === 'image' && typeof block.data === 'string') {
+    const mime = typeof block.mimeType === 'string' ? block.mimeType : 'image/png';
+    const sizeKb = Math.round((block.data.length * 3) / 4 / 1024);
+    const placeholder = `[Screenshot captured and displayed inline to the user: ${mime}, ~${sizeKb}KB. Do not reference any file paths for this image.]`;
+    return { text: placeholder, isImage: true };
+  }
+  return { text: null, isImage: false };
+}
+
+/** Check if a block is a valid content object with a type field. */
+function isContentBlock(block: unknown): block is ContentBlock {
+  return typeof block === 'object' && block !== null && 'type' in block;
+}
+
 /** Normalize MCP `tools/call` content blocks to a single payload for `tool_result.data`. */
 export function summarizeToolContent(content: unknown): unknown {
   if (!Array.isArray(content)) return content;
   const texts: string[] = [];
+  let hasImages = false;
   for (const block of content) {
-    if (typeof block === 'object' && block !== null && 'type' in block) {
-      const b = block as { type?: string; text?: string };
-      if (b.type === 'text' && typeof b.text === 'string') {
-        texts.push(b.text);
-      }
-    }
+    if (!isContentBlock(block)) continue;
+    const { text, isImage } = processBlock(block);
+    if (text !== null) texts.push(text);
+    if (isImage) hasImages = true;
+  }
+  if (texts.length > 0) {
+    const filtered = texts.filter((t) => !isMcpLocalPath(t));
+    if (filtered.length > 0) return filtered.join('\n');
+    if (hasImages) return texts.filter((t) => t.startsWith('[')).join('\n') || texts.join('\n');
   }
   if (texts.length > 0) return texts.join('\n');
   return content;
+}
+
+/** Detect MCP tool local file paths that the user can't access (e.g. .playwright-mcp/). */
+function isMcpLocalPath(text: string): boolean {
+  const trimmed = text.trim();
+  // Match paths like /.playwright-mcp/page-xxx.yml, /tmp/playwright-mcp/file.yml,
+  // or markdown links containing them: [Snapshot](../tmp/playwright-mcp/page-xxx.yml)
+  if (/[./]playwright-mcp\//.test(trimmed)) return true;
+  // Generic: a standalone line that's just a file path (no spaces, starts with / or .)
+  return /^\/?\.[\w.-]+\/[\w./-]+\.\w+$/.test(trimmed);
+}
+
+/** Extract image content blocks as Output events for the stream. */
+export function extractImageOutputs(toolId: string, content: unknown): Output[] {
+  if (!Array.isArray(content)) return [];
+  const images: Output[] = [];
+  for (const block of content) {
+    if (!isContentBlock(block)) continue;
+    const b = block as Partial<ImageBlock & { type: string }>;
+    if (b.type === 'image' && typeof b.data === 'string') {
+      images.push({
+        type: 'image',
+        toolId,
+        mimeType: typeof b.mimeType === 'string' ? b.mimeType : 'image/png',
+        data: b.data,
+      });
+    }
+  }
+  return images;
 }
 
 type CallToolResultLike = {
@@ -40,4 +95,23 @@ export function callToolResultToOutput(
   }
   const data = r.structuredContent ?? summarizeToolContent(r.content);
   return { type: 'tool_result', toolId, data };
+}
+
+/**
+ * Like {@link callToolResultToOutput} but also extracts image outputs for streaming.
+ * Returns the primary output (tool_result/error) plus any image outputs found in content.
+ */
+export function callToolResultToOutputs(
+  mcpServerId: string,
+  mcpToolName: string,
+  result: unknown,
+): { output: Output; images: Output[] } {
+  const r = result as CallToolResultLike;
+  const toolId = `${mcpServerId}:${mcpToolName}`;
+  if (r.isError) {
+    return { output: callToolResultToOutput(mcpServerId, mcpToolName, result), images: [] };
+  }
+  const images = extractImageOutputs(toolId, r.content);
+  const data = r.structuredContent ?? summarizeToolContent(r.content);
+  return { output: { type: 'tool_result', toolId, data }, images };
 }

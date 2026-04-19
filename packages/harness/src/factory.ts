@@ -1,4 +1,5 @@
 import type { Agent, McpServer, Skill, Tool as ContractTool } from '@agent-platform/contracts';
+import { SYSTEM_TOOLS } from './systemTools.js';
 import type { DrizzleDb } from '@agent-platform/db';
 import { loadAgentById, getMcpServer, getSkill, getTool } from '@agent-platform/db';
 import { createLogger } from '@agent-platform/logger';
@@ -178,7 +179,7 @@ export async function buildAgentContext(
   await mcpManager.openSessions(mcpConfigs);
 
   const mcpTools = await discoverMcpTools(mcpManager, mcpConfigs);
-  const allTools = [...registryTools, ...mcpTools];
+  const allTools = [...SYSTEM_TOOLS, ...registryTools, ...mcpTools];
 
   const systemPrompt = buildAugmentedPrompt(agent.systemPrompt, skills, allTools);
 

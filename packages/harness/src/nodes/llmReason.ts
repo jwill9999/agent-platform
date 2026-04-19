@@ -29,7 +29,7 @@ function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
           {
             type: 'tool-result',
             toolCallId: m.toolCallId,
-            toolName: m.toolName,
+            toolName: sanitiseToolName(m.toolName),
             result: m.content,
           },
         ],
@@ -43,7 +43,7 @@ function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
           ...m.toolCalls.map((tc) => ({
             type: 'tool-call' as const,
             toolCallId: tc.id,
-            toolName: tc.name,
+            toolName: sanitiseToolName(tc.name),
             args: tc.args,
           })),
         ],
@@ -53,18 +53,37 @@ function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
   });
 }
 
-/** Convert harness ToolDefinition[] to Vercel AI SDK tools record. */
-function toSdkTools(
-  defs: ToolDefinition[],
-): Record<string, { description: string; parameters: unknown }> {
+/**
+ * Sanitise a tool name for LLM providers that restrict characters (e.g. OpenAI
+ * requires `^[a-zA-Z0-9_-]+$`).  MCP tool IDs contain `:` which is invalid.
+ * We replace `:` with `__` — the reverse mapping is stored alongside.
+ */
+function sanitiseToolName(name: string): string {
+  return name.replaceAll(':', '__');
+}
+
+/**
+ * Build a bidirectional map between sanitised (LLM-safe) names and original
+ * harness tool IDs so we can translate tool-call responses back.
+ */
+function buildToolNameMap(defs: ToolDefinition[]): {
+  tools: Record<string, { description: string; parameters: unknown }>;
+  /** sanitised → original */
+  toOriginal: Map<string, string>;
+} {
   const tools: Record<string, { description: string; parameters: unknown }> = {};
+  const toOriginal = new Map<string, string>();
+
   for (const def of defs) {
-    tools[def.name] = {
+    const safe = sanitiseToolName(def.name);
+    tools[safe] = {
       description: def.description,
       parameters: jsonSchema(def.parameters),
     };
+    toOriginal.set(safe, def.name);
   }
-  return tools;
+
+  return { tools, toOriginal };
 }
 
 /**
@@ -76,11 +95,13 @@ function toSdkTools(
 function placeholderLabelsForToolCalls(
   toolCalls: Array<{ toolName: string }>,
   definitions: ToolDefinition[],
+  nameMap: Map<string, string>,
 ): string {
   const byName = new Map(definitions.map((d) => [d.name, d]));
   return toolCalls
     .map((tc) => {
-      const def = byName.get(tc.toolName);
+      const originalName = nameMap.get(tc.toolName) ?? tc.toolName;
+      const def = byName.get(originalName);
       if (!def) return tc.toolName;
       const raw = (def.description ?? def.name).trim();
       const line = raw.split(/\r?\n/)[0]?.trim() ?? def.name;
@@ -187,15 +208,17 @@ async function streamAndAccumulate(
   return merged;
 }
 
-/** Build LlmOutput + assistant ChatMessage from the completed LLM response. */
+/** Build LlmOutput + assistant ChatMessage from the completed LLM response.
+ *  Reverses sanitised tool names back to original IDs via `nameMap`. */
 function buildLlmOutput(
   fullText: string,
   finalToolCalls: Array<{ toolCallId: string; toolName: string; args: unknown }>,
+  nameMap: Map<string, string>,
 ): { output: LlmOutput; assistantMessage: ChatMessage } {
   if (finalToolCalls.length > 0) {
     const calls: ToolCallIntent[] = finalToolCalls.map((tc) => ({
       id: tc.toolCallId,
-      name: tc.toolName,
+      name: nameMap.get(tc.toolName) ?? tc.toolName,
       args: (tc.args as Record<string, unknown>) ?? {},
     }));
     return {
@@ -348,7 +371,16 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       model: modelConfig.model,
       apiKey: modelConfig.apiKey,
     });
-    const tools = toolDefinitions.length > 0 ? toSdkTools(toolDefinitions) : undefined;
+    const { tools: sdkTools, toOriginal: toolNameMap } =
+      toolDefinitions.length > 0
+        ? buildToolNameMap(toolDefinitions)
+        : {
+            tools: undefined as
+              | Record<string, { description: string; parameters: unknown }>
+              | undefined,
+            toOriginal: new Map<string, string>(),
+          };
+    const tools = sdkTools && Object.keys(sdkTools).length > 0 ? sdkTools : undefined;
 
     if (dispatcher) {
       await firePromptBuildHook(dispatcher, state);
@@ -361,9 +393,10 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const { fullText, finalToolCalls, usage } = await withRetry(
       async () => {
         let streamError: Error | null = null;
+        const coreMessages = toCoreMessages(messages);
         const res = streamText({
           model,
-          messages: toCoreMessages(messages),
+          messages: coreMessages,
           tools,
           maxSteps: 1,
           abortSignal: signal,
@@ -386,7 +419,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
         // Models often request tools with no streamed text; the UI only shows streamed `text`
         // events — emit a short line so the chat is not blank until tool results arrive.
         if (toolCalls && toolCalls.length > 0 && !text.trim() && emitter) {
-          const names = placeholderLabelsForToolCalls(toolCalls, toolDefinitions);
+          const names = placeholderLabelsForToolCalls(toolCalls, toolDefinitions, toolNameMap);
           const label = toolCalls.length === 1 ? 'tool' : 'tools';
           await emitter.emit({
             type: 'text',
@@ -429,7 +462,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
         }
       : undefined;
 
-    const { output, assistantMessage } = buildLlmOutput(fullText, finalToolCalls);
+    const { output, assistantMessage } = buildLlmOutput(fullText, finalToolCalls, toolNameMap);
 
     const tokenDelta = sumUsageTokens(usage);
     const newTotalTokens = state.totalTokensUsed + tokenDelta;
