@@ -9,6 +9,8 @@ import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, NativeToolExecutor, OutputEmitter, ToolCallIntent } from '../types.js';
 import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTimeout.js';
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
+import { PathJail, PathJailError } from '../security/pathJail.js';
+import { isSystemTool } from '../systemTools.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -20,11 +22,53 @@ export type ToolDispatchContext = {
   nativeToolExecutor?: NativeToolExecutor;
   emitter?: OutputEmitter;
   dispatcher?: PluginDispatcher;
+  pathJail?: PathJail;
+};
+
+/** Map system tool IDs to their path operation type for PathJail enforcement. */
+const TOOL_PATH_OPERATIONS: Record<string, 'read' | 'write'> = {
+  sys_read_file: 'read',
+  sys_write_file: 'write',
+  sys_list_files: 'read',
+  sys_append_file: 'write',
+  sys_copy_file: 'write',
+  sys_file_exists: 'read',
+  sys_file_info: 'read',
+  sys_find_files: 'read',
+  sys_create_directory: 'write',
+  sys_download_file: 'write',
 };
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+async function enforcePathJail(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+): Promise<Output | null> {
+  if (!ctx.pathJail) return null;
+
+  const operation = TOOL_PATH_OPERATIONS[call.name];
+  if (!operation) return null;
+
+  const paths = PathJail.extractPaths(call.args);
+  for (const p of paths) {
+    try {
+      await ctx.pathJail.enforce(p, operation);
+    } catch (err) {
+      if (err instanceof PathJailError) {
+        return {
+          type: 'error',
+          code: 'PATH_ACCESS_DENIED',
+          message: err.message,
+        };
+      }
+      throw err;
+    }
+  }
+  return null;
+}
 
 async function dispatchSingleTool(
   call: ToolCallIntent,
@@ -40,6 +84,12 @@ async function dispatchSingleTool(
       },
       ok: false,
     };
+  }
+
+  // PathJail: enforce file-path constraints for system tools
+  if (isSystemTool(call.name)) {
+    const pathError = await enforcePathJail(call, ctx);
+    if (pathError) return { output: pathError, ok: false };
   }
 
   const parsed = parseToolId(call.name);

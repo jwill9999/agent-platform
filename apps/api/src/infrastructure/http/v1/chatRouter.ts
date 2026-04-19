@@ -19,6 +19,8 @@ import {
   createApproximateCounter,
   buildWindowedContext,
   createSystemToolExecutor,
+  PathJail,
+  DEFAULT_MOUNTS,
 } from '@agent-platform/harness';
 import type { AgentContext, ChatMessage, OutputEmitter } from '@agent-platform/harness';
 import {
@@ -210,6 +212,7 @@ export function createChatRouter(db: DrizzleDb): Router {
             nativeToolExecutor: createSystemToolExecutor(),
             emitter,
             dispatcher,
+            pathJail: new PathJail(DEFAULT_MOUNTS),
           }),
           dispatcher,
         });

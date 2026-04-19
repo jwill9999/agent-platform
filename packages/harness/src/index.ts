@@ -50,4 +50,12 @@ export {
   SYSTEM_TOOL_IDS,
   isSystemTool,
   createSystemToolExecutor,
+  SYSTEM_TOOL_RISK,
 } from './systemTools.js';
+export { PathJail, PathJailError, DEFAULT_MOUNTS, WORKSPACE_ROOT } from './security/index.js';
+export type {
+  Mount,
+  MountPermission,
+  PathOperation,
+  PathValidationResult,
+} from './security/index.js';
