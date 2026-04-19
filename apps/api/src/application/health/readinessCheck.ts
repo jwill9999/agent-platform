@@ -155,7 +155,7 @@ function getFreeDiskSpace(filePath: string): number | null {
     const lastLine = output.split('\n').pop() ?? '';
     const columns = lastLine.split(/\s+/);
     const kb = Number.parseInt(columns[3] ?? '', 10);
-    return isNaN(kb) ? null : kb * 1024;
+    return Number.isNaN(kb) ? null : kb * 1024;
   } catch {
     return null;
   }

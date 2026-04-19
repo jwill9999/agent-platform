@@ -36,7 +36,7 @@ export function mockStreamResult(opts: {
   usage?: { promptTokens: number; completionTokens: number };
   /** When set, `text` resolves to this instead of joined chunks (simulates empty `textStream`). */
   textOverride?: string;
-  reasoning?: string | undefined;
+  reasoning?: string;
 }) {
   const chunks = opts.textChunks ?? [];
   const joined = opts.textOverride !== undefined ? opts.textOverride : chunks.join('');

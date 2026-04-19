@@ -22,61 +22,53 @@ function columnSet(sqlite: Database.Database, table: string): Set<string> | null
  */
 export function repairLegacySlugMigrationIfNeeded(sqlite: Database.Database): void {
   sqlite.transaction(() => {
-    const agentsCols = columnSet(sqlite, 'agents');
-    if (agentsCols && !agentsCols.has('slug')) {
-      sqlite.exec(`ALTER TABLE agents ADD COLUMN slug text DEFAULT '' NOT NULL`);
-      sqlite.exec(
-        `UPDATE agents SET slug = LOWER(REPLACE(REPLACE(TRIM(name), ' ', '-'), '--', '-'))`,
-      );
-    }
+    ensureSlugColumn(sqlite, 'agents');
+    ensureSlugColumn(sqlite, 'mcp_servers');
+    ensureSlugColumn(sqlite, 'tools');
+    repairSkillsColumns(sqlite);
 
-    const mcpCols = columnSet(sqlite, 'mcp_servers');
-    if (mcpCols && !mcpCols.has('slug')) {
-      sqlite.exec(`ALTER TABLE mcp_servers ADD COLUMN slug text DEFAULT '' NOT NULL`);
-      sqlite.exec(
-        `UPDATE mcp_servers SET slug = LOWER(REPLACE(REPLACE(TRIM(name), ' ', '-'), '--', '-'))`,
-      );
-    }
-
-    const toolsCols = columnSet(sqlite, 'tools');
-    if (toolsCols && !toolsCols.has('slug')) {
-      sqlite.exec(`ALTER TABLE tools ADD COLUMN slug text DEFAULT '' NOT NULL`);
-      sqlite.exec(
-        `UPDATE tools SET slug = LOWER(REPLACE(REPLACE(TRIM(name), ' ', '-'), '--', '-'))`,
-      );
-    }
-
-    const skillsCols = columnSet(sqlite, 'skills');
-    if (skillsCols) {
-      let skillsNeedsBackfill = false;
-      if (!skillsCols.has('name')) {
-        sqlite.exec(`ALTER TABLE skills ADD COLUMN name text DEFAULT '' NOT NULL`);
-        skillsNeedsBackfill = true;
-      }
-      if (!skillsCols.has('slug')) {
-        sqlite.exec(`ALTER TABLE skills ADD COLUMN slug text DEFAULT '' NOT NULL`);
-        skillsNeedsBackfill = true;
-      }
-      if (skillsNeedsBackfill) {
-        sqlite.exec(`
-          UPDATE skills SET
-            name = SUBSTR(goal, 1, 60),
-            slug = LOWER(REPLACE(REPLACE(TRIM(SUBSTR(goal, 1, 60)), ' ', '-'), '--', '-'))
-        `);
-      }
-    }
-
-    if (tableExists(sqlite, 'agents')) {
-      sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS agents_slug_idx ON agents (slug)`);
-    }
-    if (tableExists(sqlite, 'mcp_servers')) {
-      sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS mcp_servers_slug_idx ON mcp_servers (slug)`);
-    }
-    if (tableExists(sqlite, 'skills')) {
-      sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS skills_slug_idx ON skills (slug)`);
-    }
-    if (tableExists(sqlite, 'tools')) {
-      sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS tools_slug_idx ON tools (slug)`);
-    }
+    createSlugIndexIfNeeded(sqlite, 'agents');
+    createSlugIndexIfNeeded(sqlite, 'mcp_servers');
+    createSlugIndexIfNeeded(sqlite, 'skills');
+    createSlugIndexIfNeeded(sqlite, 'tools');
   })();
+}
+
+/** Add a `slug` column to a table and backfill from `name` if missing. */
+function ensureSlugColumn(sqlite: Database.Database, table: string): void {
+  const cols = columnSet(sqlite, table);
+  if (!cols || cols.has('slug')) return;
+  sqlite.exec(`ALTER TABLE ${table} ADD COLUMN slug text DEFAULT '' NOT NULL`);
+  sqlite.exec(
+    `UPDATE ${table} SET slug = LOWER(REPLACE(REPLACE(TRIM(name), ' ', '-'), '--', '-'))`,
+  );
+}
+
+/** Skills need both `name` and `slug`, backfilled from `goal`. */
+function repairSkillsColumns(sqlite: Database.Database): void {
+  const cols = columnSet(sqlite, 'skills');
+  if (!cols) return;
+
+  let needsBackfill = false;
+  if (!cols.has('name')) {
+    sqlite.exec(`ALTER TABLE skills ADD COLUMN name text DEFAULT '' NOT NULL`);
+    needsBackfill = true;
+  }
+  if (!cols.has('slug')) {
+    sqlite.exec(`ALTER TABLE skills ADD COLUMN slug text DEFAULT '' NOT NULL`);
+    needsBackfill = true;
+  }
+  if (needsBackfill) {
+    sqlite.exec(`
+      UPDATE skills SET
+        name = SUBSTR(goal, 1, 60),
+        slug = LOWER(REPLACE(REPLACE(TRIM(SUBSTR(goal, 1, 60)), ' ', '-'), '--', '-'))
+    `);
+  }
+}
+
+/** Create a unique index on slug if the table exists. */
+function createSlugIndexIfNeeded(sqlite: Database.Database, table: string): void {
+  if (!tableExists(sqlite, table)) return;
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ${table}_slug_idx ON ${table} (slug)`);
 }

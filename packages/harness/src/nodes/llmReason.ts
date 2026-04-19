@@ -137,6 +137,95 @@ async function firePromptBuildHook(
 }
 
 /**
+ * Consume the merged `fullStream` — drains the SDK pipeline once.
+ * Returns the accumulated text-delta content.
+ */
+async function consumeFullStream(
+  result: StreamTextResult<ToolSet, unknown>,
+  emitter: OutputEmitter | undefined,
+): Promise<string> {
+  let fullText = '';
+  for await (const part of result.fullStream) {
+    if (part.type === 'text-delta') {
+      const chunk = part.textDelta;
+      fullText += chunk;
+      if (emitter && chunk) {
+        await emitter.emit({ type: 'text', content: chunk });
+      }
+    } else if (part.type === 'reasoning') {
+      const chunk = part.textDelta;
+      if (emitter && chunk) {
+        await emitter.emit({ type: 'thinking', content: chunk });
+      }
+    }
+  }
+  return fullText;
+}
+
+/** Fallback: consume `textStream` when `fullStream` is unavailable (e.g. test stubs). */
+async function consumeTextStream(
+  result: StreamTextResult<ToolSet, unknown>,
+  emitter: OutputEmitter | undefined,
+): Promise<string> {
+  let fullText = '';
+  for await (const chunk of result.textStream) {
+    fullText += chunk;
+    if (emitter && chunk) {
+      await emitter.emit({ type: 'text', content: chunk });
+    }
+  }
+  await result.consumeStream?.();
+  return fullText;
+}
+
+/**
+ * Reconcile the streamed text with the SDK-resolved `result.text`.
+ * Emits any missing suffix or falls back to reasoning content.
+ */
+async function reconcileText(
+  streamedText: string,
+  result: StreamTextResult<ToolSet, unknown>,
+  emitter: OutputEmitter | undefined,
+): Promise<string> {
+  const resolvedText = (await result.text) ?? '';
+
+  if (resolvedText.trim() && !streamedText.trim()) {
+    if (emitter) {
+      await emitter.emit({ type: 'text', content: resolvedText });
+    }
+    return resolvedText;
+  }
+
+  // Prefer SDK `text` over streamed concatenation (canonical); emit any missing suffix.
+  if (resolvedText.length > streamedText.length && resolvedText.startsWith(streamedText)) {
+    const suffix = resolvedText.slice(streamedText.length);
+    if (emitter && suffix) {
+      await emitter.emit({ type: 'text', content: suffix });
+    }
+  }
+
+  const merged = resolvedText || streamedText;
+  if (!merged.trim()) {
+    return (await tryReasoningFallback(result, emitter)) ?? merged;
+  }
+
+  return merged;
+}
+
+/** Return reasoning text if available, emitting it as a thinking chunk. */
+async function tryReasoningFallback(
+  result: StreamTextResult<ToolSet, unknown>,
+  emitter: OutputEmitter | undefined,
+): Promise<string | null> {
+  const reasoning = await result.reasoning;
+  if (!reasoning?.trim()) return null;
+  if (emitter) {
+    await emitter.emit({ type: 'thinking', content: reasoning });
+  }
+  return reasoning;
+}
+
+/**
  * Stream text from `streamText`, emit NDJSON `text` chunks, and return the
  * assistant-visible string.
  *
@@ -151,61 +240,11 @@ async function streamAndAccumulate(
   result: StreamTextResult<ToolSet, unknown>,
   emitter: OutputEmitter | undefined,
 ): Promise<string> {
-  let fullText = '';
-  // Prefer fullStream (drains the SDK pipeline once). Some tests / stubs only mock textStream.
-  if (result.fullStream) {
-    for await (const part of result.fullStream) {
-      if (part.type === 'text-delta') {
-        const chunk = part.textDelta;
-        fullText += chunk;
-        if (emitter && chunk) {
-          await emitter.emit({ type: 'text', content: chunk });
-        }
-      } else if (part.type === 'reasoning') {
-        const chunk = part.textDelta;
-        if (emitter && chunk) {
-          await emitter.emit({ type: 'thinking', content: chunk });
-        }
-      }
-    }
-  } else {
-    for await (const chunk of result.textStream) {
-      fullText += chunk;
-      if (emitter && chunk) {
-        await emitter.emit({ type: 'text', content: chunk });
-      }
-    }
-    await result.consumeStream?.();
-  }
+  const streamedText = result.fullStream
+    ? await consumeFullStream(result, emitter)
+    : await consumeTextStream(result, emitter);
 
-  const resolvedText = (await result.text) ?? '';
-  if (resolvedText.trim() && !fullText.trim()) {
-    if (emitter) {
-      await emitter.emit({ type: 'text', content: resolvedText });
-    }
-    return resolvedText;
-  }
-
-  // Prefer SDK `text` over streamed concatenation (canonical); emit any missing suffix to the client.
-  if (resolvedText.length > fullText.length && resolvedText.startsWith(fullText)) {
-    const suffix = resolvedText.slice(fullText.length);
-    if (emitter && suffix) {
-      await emitter.emit({ type: 'text', content: suffix });
-    }
-  }
-
-  const merged = resolvedText || fullText;
-  if (!merged.trim()) {
-    const reasoning = await result.reasoning;
-    if (reasoning?.trim()) {
-      if (emitter) {
-        await emitter.emit({ type: 'thinking', content: reasoning });
-      }
-      return reasoning;
-    }
-  }
-
-  return merged;
+  return reconcileText(streamedText, result, emitter);
 }
 
 /** Build LlmOutput + assistant ChatMessage from the completed LLM response.
@@ -333,6 +372,82 @@ function normaliseOptions(options?: OutputEmitter | LlmReasonNodeOptions): LlmRe
   return options;
 }
 
+/** Normalise raw SDK usage into safe prompt/completion token counts. */
+function normaliseTokenUsage(
+  usage: { promptTokens?: number; completionTokens?: number } | undefined,
+): { promptTokens: number; completionTokens: number } | undefined {
+  if (!usage) return undefined;
+  const p = Number(usage.promptTokens);
+  const c = Number(usage.completionTokens);
+  return {
+    promptTokens: Number.isFinite(p) ? p : 0,
+    completionTokens: Number.isFinite(c) ? c : 0,
+  };
+}
+
+/** Emit a placeholder line when the model requests tools with no streamed text. */
+async function emitToolCallPlaceholder(
+  text: string,
+  toolCalls: Array<{ toolName: string }>,
+  toolDefinitions: ToolDefinition[],
+  toolNameMap: Map<string, string>,
+  emitter: OutputEmitter | undefined,
+): Promise<void> {
+  if (!emitter || !toolCalls.length || text.trim()) return;
+  const names = placeholderLabelsForToolCalls(toolCalls, toolDefinitions, toolNameMap);
+  const label = toolCalls.length === 1 ? 'tool' : 'tools';
+  await emitter.emit({ type: 'text', content: `Calling ${label}: ${names}…` });
+}
+
+/** Build retry-notification callback for the withRetry helper. */
+function buildRetryCallback(
+  step: number,
+  retryTraceEvents: TraceEvent[],
+  retryCounter: { count: number },
+  dispatcher: PluginDispatcher | undefined,
+  state: HarnessStateType,
+): (attempt: number, error: unknown, delayMs: number) => void {
+  return (attempt, error, delayMs) => {
+    retryCounter.count++;
+    const errMsg = error instanceof Error ? error.message : String(error);
+    retryTraceEvents.push({ type: 'llm_retry', step, attempt, error: errMsg, delayMs });
+
+    if (dispatcher) {
+      dispatcher
+        .onError({
+          sessionId: state.sessionId ?? '',
+          runId: state.runId ?? '',
+          phase: 'prompt',
+          error,
+          retryAttempt: attempt,
+          willRetry: attempt < LLM_RETRY_CONFIG.maxAttempts - 1,
+          maxRetries: LLM_RETRY_CONFIG.maxAttempts - 1,
+        })
+        .catch(() => {
+          /* plugin errors must not crash the graph */
+        });
+    }
+  };
+}
+
+/** Check budget limits and return whether execution should halt. */
+async function checkBudgetLimits(
+  state: HarnessStateType,
+  newTotalTokens: number,
+  newTotalCost: number,
+  traceEvents: TraceEvent[],
+  emitter: OutputEmitter | undefined,
+): Promise<boolean> {
+  const tokenHalted = await checkTokenLimit(state.limits, newTotalTokens, traceEvents, emitter);
+  if (tokenHalted) return true;
+
+  const costHalted = await checkCostLimit(state.limits, newTotalCost, traceEvents, emitter);
+  if (costHalted) return true;
+
+  await emitBudgetWarnings(state.limits, newTotalTokens, newTotalCost, emitter);
+  return false;
+}
+
 /**
  * Creates a graph node that invokes the LLM via the Vercel AI SDK using streamText.
  *
@@ -388,7 +503,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
 
     const step = state.taskIndex ?? 0;
     const retryTraceEvents: TraceEvent[] = [];
-    let retryCount = 0;
+    const retryCounter = { count: 0 };
 
     const { fullText, finalToolCalls, usage } = await withRetry(
       async () => {
@@ -407,8 +522,6 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
 
         const text = await streamAndAccumulate(res, emitter);
 
-        // The AI SDK's onError callback fires during streaming but doesn't throw.
-        // We must check and re-throw to surface errors properly.
         if (streamError) {
           throw streamError;
         }
@@ -416,52 +529,15 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
         const toolCalls = await res.toolCalls;
         const usageInfo = await res.usage;
 
-        // Models often request tools with no streamed text; the UI only shows streamed `text`
-        // events — emit a short line so the chat is not blank until tool results arrive.
-        if (toolCalls && toolCalls.length > 0 && !text.trim() && emitter) {
-          const names = placeholderLabelsForToolCalls(toolCalls, toolDefinitions, toolNameMap);
-          const label = toolCalls.length === 1 ? 'tool' : 'tools';
-          await emitter.emit({
-            type: 'text',
-            content: `Calling ${label}: ${names}…`,
-          });
-        }
+        await emitToolCallPlaceholder(text, toolCalls, toolDefinitions, toolNameMap, emitter);
 
         return { fullText: text, finalToolCalls: toolCalls, usage: usageInfo };
       },
       LLM_RETRY_CONFIG,
-      (attempt, error, delayMs) => {
-        retryCount++;
-        const errMsg = error instanceof Error ? error.message : String(error);
-        retryTraceEvents.push({ type: 'llm_retry', step, attempt, error: errMsg, delayMs });
-
-        if (dispatcher) {
-          dispatcher
-            .onError({
-              sessionId: state.sessionId ?? '',
-              runId: state.runId ?? '',
-              phase: 'prompt',
-              error,
-              retryAttempt: attempt,
-              willRetry: attempt < LLM_RETRY_CONFIG.maxAttempts - 1,
-              maxRetries: LLM_RETRY_CONFIG.maxAttempts - 1,
-            })
-            .catch(() => {
-              /* plugin errors must not crash the graph */
-            });
-        }
-      },
+      buildRetryCallback(step, retryTraceEvents, retryCounter, dispatcher, state),
     );
 
-    const tokenUsage = usage
-      ? {
-          promptTokens: Number.isFinite(Number(usage.promptTokens)) ? usage.promptTokens : 0,
-          completionTokens: Number.isFinite(Number(usage.completionTokens))
-            ? usage.completionTokens
-            : 0,
-        }
-      : undefined;
-
+    const tokenUsage = normaliseTokenUsage(usage);
     const { output, assistantMessage } = buildLlmOutput(fullText, finalToolCalls, toolNameMap);
 
     const tokenDelta = sumUsageTokens(usage);
@@ -470,14 +546,13 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
     const newTotalCost = (state.totalCostUnits ?? 0) + costDelta;
     const traceEvents: TraceEvent[] = [...retryTraceEvents, { type: 'llm_call', step, tokenUsage }];
 
-    const tokenHalted = await checkTokenLimit(state.limits, newTotalTokens, traceEvents, emitter);
-    const costHalted =
-      !tokenHalted && (await checkCostLimit(state.limits, newTotalCost, traceEvents, emitter));
-    const halted = tokenHalted || costHalted;
-
-    if (!halted) {
-      await emitBudgetWarnings(state.limits, newTotalTokens, newTotalCost, emitter);
-    }
+    const halted = await checkBudgetLimits(
+      state,
+      newTotalTokens,
+      newTotalCost,
+      traceEvents,
+      emitter,
+    );
 
     return {
       llmOutput: output,
@@ -485,7 +560,7 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       trace: traceEvents,
       totalTokensUsed: newTotalTokens,
       totalCostUnits: newTotalCost,
-      totalRetries: (state.totalRetries ?? 0) + retryCount,
+      totalRetries: (state.totalRetries ?? 0) + retryCounter.count,
       ...(halted ? { halted: true } : {}),
     };
   };
