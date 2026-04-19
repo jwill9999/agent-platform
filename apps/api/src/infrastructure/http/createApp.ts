@@ -11,6 +11,10 @@ import { createV1Router } from './v1/v1Router.js';
 export function createApp(options: { db: DrizzleDb | null }): Application {
   const app = express();
 
+  // Trust first proxy hop (Next.js BFF / Docker network) so express-rate-limit
+  // can read X-Forwarded-For without ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+  app.set('trust proxy', 1);
+
   app.use(correlationMiddleware);
   app.use(express.json({ limit: '1mb' }));
 

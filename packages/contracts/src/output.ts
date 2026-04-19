@@ -17,6 +17,12 @@ export const OutputSchema = z.discriminatedUnion('type', [
     data: z.unknown(),
   }),
   z.object({
+    type: z.literal('image'),
+    toolId: z.string(),
+    mimeType: z.string(),
+    data: z.string(),
+  }),
+  z.object({
     type: z.literal('error'),
     message: z.string(),
     code: z.string().optional(),

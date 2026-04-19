@@ -8,6 +8,8 @@ import {
   DEFAULT_AGENT_SLUG,
   DEMO_SKILL_ID,
   DEMO_SKILL_SLUG,
+  PLAYWRIGHT_MCP_ID,
+  PLAYWRIGHT_MCP_SLUG,
 } from './constants.js';
 
 /** Seeded specialist prompt (same content as a typical “Coding” agent). */
@@ -119,6 +121,43 @@ export function runSeed(db: DrizzleDb): void {
 
     tx.insert(schema.agentSkills)
       .values({ agentId: DEFAULT_AGENT_ID, skillId: DEMO_SKILL_ID })
+      .onConflictDoNothing()
+      .run();
+
+    // Playwright MCP server (headless chromium for web browsing/screenshots)
+    tx.insert(schema.mcpServers)
+      .values({
+        id: PLAYWRIGHT_MCP_ID,
+        slug: PLAYWRIGHT_MCP_SLUG,
+        name: 'playwright',
+        transport: 'stdio',
+        command: 'npx',
+        argsJson: JSON.stringify([
+          '-y',
+          '@playwright/mcp@latest',
+          '--browser',
+          'chromium',
+          '--headless',
+          '--no-sandbox',
+          '--isolated',
+          '--executable-path',
+          '/usr/bin/chromium-browser',
+          '--output-dir',
+          '/tmp/playwright-mcp',
+        ]),
+      })
+      .onConflictDoNothing()
+      .run();
+
+    // Link Playwright MCP to the Coding agent
+    tx.insert(schema.agentMcpServers)
+      .values({ agentId: CODING_AGENT_ID, mcpServerId: PLAYWRIGHT_MCP_ID })
+      .onConflictDoNothing()
+      .run();
+
+    // Link Playwright MCP to the Personal assistant too
+    tx.insert(schema.agentMcpServers)
+      .values({ agentId: DEFAULT_AGENT_ID, mcpServerId: PLAYWRIGHT_MCP_ID })
       .onConflictDoNothing()
       .run();
   });

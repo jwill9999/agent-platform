@@ -1,0 +1,243 @@
+import { execFile } from 'node:child_process';
+import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
+import type { NativeToolExecutor } from './types.js';
+
+// ---------------------------------------------------------------------------
+// Tool definitions (contract-shaped, always injected into every agent)
+// ---------------------------------------------------------------------------
+
+const SYSTEM_TOOL_PREFIX = 'sys_';
+
+/** Well-known IDs — no colons, no UUIDs; always allowed. */
+const ids = {
+  bash: `${SYSTEM_TOOL_PREFIX}bash`,
+  readFile: `${SYSTEM_TOOL_PREFIX}read_file`,
+  writeFile: `${SYSTEM_TOOL_PREFIX}write_file`,
+  listFiles: `${SYSTEM_TOOL_PREFIX}list_files`,
+} as const;
+
+export const SYSTEM_TOOLS: readonly ContractTool[] = [
+  {
+    id: ids.bash,
+    slug: 'sys-bash',
+    name: 'bash',
+    description: 'Execute a shell command and return its stdout/stderr.',
+    config: {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            description: 'The shell command to execute.',
+          },
+          timeout_ms: {
+            type: 'number',
+            description: 'Timeout in milliseconds (default 30000).',
+          },
+        },
+        required: ['command'],
+      },
+    },
+  },
+  {
+    id: ids.readFile,
+    slug: 'sys-read-file',
+    name: 'read_file',
+    description: 'Read the contents of a file at the given path.',
+    config: {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Absolute or relative file path to read.',
+          },
+        },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    id: ids.writeFile,
+    slug: 'sys-write-file',
+    name: 'write_file',
+    description: 'Write content to a file, creating it if it does not exist.',
+    config: {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Absolute or relative file path to write.',
+          },
+          content: {
+            type: 'string',
+            description: 'The text content to write to the file.',
+          },
+        },
+        required: ['path', 'content'],
+      },
+    },
+  },
+  {
+    id: ids.listFiles,
+    slug: 'sys-list-files',
+    name: 'list_files',
+    description: 'List files and directories at the given path.',
+    config: {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Directory path to list (default ".").',
+          },
+        },
+      },
+    },
+  },
+];
+
+/** Set of system tool IDs for fast lookup. */
+export const SYSTEM_TOOL_IDS = new Set(SYSTEM_TOOLS.map((t) => t.id));
+
+/** Returns true if the given toolId is a built-in system tool. */
+export function isSystemTool(toolId: string): boolean {
+  return SYSTEM_TOOL_IDS.has(toolId);
+}
+
+// ---------------------------------------------------------------------------
+// Executor
+// ---------------------------------------------------------------------------
+
+const DEFAULT_BASH_TIMEOUT_MS = 30_000;
+const MAX_BASH_TIMEOUT_MS = 120_000;
+const MAX_OUTPUT_BYTES = 100_000;
+
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}\n… (truncated, ${text.length} total chars)`;
+}
+
+async function execBash(
+  command: string,
+  timeoutMs: number,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return new Promise((res) => {
+    const proc = execFile(
+      '/bin/sh',
+      ['-c', command],
+      { timeout: timeoutMs, maxBuffer: MAX_OUTPUT_BYTES * 2 },
+      (error, stdout, stderr) => {
+        const exitCode =
+          error && 'code' in error && typeof error.code === 'number' ? error.code : error ? 1 : 0;
+        res({
+          stdout: truncate(stdout, MAX_OUTPUT_BYTES),
+          stderr: truncate(stderr, MAX_OUTPUT_BYTES),
+          exitCode,
+        });
+      },
+    );
+    // Ensure cleanup on timeout
+    proc.on('error', () => {});
+  });
+}
+
+/**
+ * Creates the native executor that handles all system tools.
+ * Returns `undefined` for unknown tool IDs (callers should fall through).
+ */
+export function createSystemToolExecutor(): NativeToolExecutor {
+  return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
+    switch (toolId) {
+      case ids.bash: {
+        const command = String(args.command ?? '');
+        if (!command.trim()) {
+          return { type: 'error', code: 'INVALID_ARGS', message: 'command is required' };
+        }
+        const rawTimeout =
+          typeof args.timeout_ms === 'number' ? args.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
+        const timeoutMs = Math.min(Math.max(rawTimeout, 1000), MAX_BASH_TIMEOUT_MS);
+        const { stdout, stderr, exitCode } = await execBash(command, timeoutMs);
+        return { type: 'tool_result', toolId, data: { stdout, stderr, exitCode } };
+      }
+
+      case ids.readFile: {
+        const filePath = String(args.path ?? '');
+        if (!filePath.trim()) {
+          return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+        }
+        try {
+          const content = await readFile(resolve(filePath), 'utf-8');
+          return {
+            type: 'tool_result',
+            toolId,
+            data: { content: truncate(content, MAX_OUTPUT_BYTES) },
+          };
+        } catch (err) {
+          return {
+            type: 'error',
+            code: 'READ_FAILED',
+            message: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
+
+      case ids.writeFile: {
+        const filePath = String(args.path ?? '');
+        const content = String(args.content ?? '');
+        if (!filePath.trim()) {
+          return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+        }
+        try {
+          await writeFile(resolve(filePath), content, 'utf-8');
+          return { type: 'tool_result', toolId, data: { written: true, path: resolve(filePath) } };
+        } catch (err) {
+          return {
+            type: 'error',
+            code: 'WRITE_FAILED',
+            message: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
+
+      case ids.listFiles: {
+        const dirPath = String(args.path ?? '.');
+        try {
+          const entries = await readdir(resolve(dirPath));
+          const detailed = await Promise.all(
+            entries.map(async (name) => {
+              try {
+                const s = await stat(resolve(dirPath, name));
+                return { name, type: s.isDirectory() ? 'directory' : 'file', size: s.size };
+              } catch {
+                return { name, type: 'unknown', size: 0 };
+              }
+            }),
+          );
+          return {
+            type: 'tool_result',
+            toolId,
+            data: { path: resolve(dirPath), entries: detailed },
+          };
+        } catch (err) {
+          return {
+            type: 'error',
+            code: 'LIST_FAILED',
+            message: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
+
+      default:
+        return {
+          type: 'error',
+          code: 'TOOL_NOT_FOUND',
+          message: `Unknown system tool: ${toolId}`,
+        };
+    }
+  };
+}

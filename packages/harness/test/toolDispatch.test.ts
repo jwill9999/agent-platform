@@ -73,7 +73,7 @@ describe('toolDispatchNode', () => {
 
   it('dispatches MCP tool call successfully', async () => {
     const mcpResult: Output = { type: 'tool_result', toolId: 'mcp-fs:readFile', data: 'contents' };
-    const callFn = vi.fn().mockResolvedValue(mcpResult);
+    const callFn = vi.fn().mockResolvedValue({ output: mcpResult, images: [] });
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
       mcpManager: makeMcpManager({ 'mcp-fs': { callToolAsOutput: callFn } }),
@@ -219,7 +219,7 @@ describe('toolDispatchNode', () => {
 
   it('handles multiple tool calls in single dispatch', async () => {
     const mcpResult: Output = { type: 'tool_result', toolId: 'mcp-fs:ls', data: ['a', 'b'] };
-    const callFn = vi.fn().mockResolvedValue(mcpResult);
+    const callFn = vi.fn().mockResolvedValue({ output: mcpResult, images: [] });
     const nativeResult: Output = { type: 'tool_result', toolId: 'echo', data: 'ok' };
     const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
     const ctx: ToolDispatchContext = {
