@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 
 import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
 import type { NativeToolExecutor } from './types.js';
+import { validateBashCommand } from './security/bashGuard.js';
 
 // ---------------------------------------------------------------------------
 // Tool definitions (contract-shaped, always injected into every agent)
@@ -171,6 +172,15 @@ async function handleBash(toolId: string, args: Record<string, unknown>): Promis
   const command = stringArg(args, 'command');
   if (!command.trim()) {
     return { type: 'error', code: 'INVALID_ARGS', message: 'command is required' };
+  }
+  // Validate command against bash guardrails
+  const validation = validateBashCommand(command);
+  if (!validation.allowed) {
+    return {
+      type: 'error',
+      code: 'BASH_COMMAND_BLOCKED',
+      message: validation.reason ?? 'Command is not allowed',
+    };
   }
   const rawTimeout =
     typeof args.timeout_ms === 'number' ? args.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;

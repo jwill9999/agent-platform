@@ -53,9 +53,11 @@ export {
   SYSTEM_TOOL_RISK,
 } from './systemTools.js';
 export { PathJail, PathJailError, DEFAULT_MOUNTS, WORKSPACE_ROOT } from './security/index.js';
+export { validateBashCommand, buildAllowlist } from './security/index.js';
 export type {
   Mount,
   MountPermission,
   PathOperation,
   PathValidationResult,
+  BashValidationResult,
 } from './security/index.js';
