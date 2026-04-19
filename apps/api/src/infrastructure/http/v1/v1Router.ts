@@ -9,6 +9,7 @@ import { createSessionsRouter } from './sessionsRouter.js';
 import { createSettingsRouter } from './settingsRouter.js';
 import { createSkillsRouter } from './skillsRouter.js';
 import { createToolsRouter } from './toolsRouter.js';
+import { createToolExecutionsRouter } from './toolExecutionsRouter.js';
 import { createDynamicRateLimiter } from '../dynamicRateLimiter.js';
 
 export function createV1Router(db: DrizzleDb): Router {
@@ -37,6 +38,7 @@ export function createV1Router(db: DrizzleDb): Router {
     '/settings',
     createSettingsRouter(db, (config) => rateLimiter.reconfigure(config)),
   );
+  router.use('/tool-executions', createToolExecutionsRouter(db));
 
   return router;
 }
