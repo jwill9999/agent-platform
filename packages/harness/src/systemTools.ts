@@ -12,6 +12,9 @@ import {
   LOW_RISK_TOOLS,
   LOW_RISK_MAP,
   executeLowRiskTool,
+  MEDIUM_RISK_TOOLS,
+  MEDIUM_RISK_MAP,
+  executeMediumRiskTool,
 } from './tools/index.js';
 
 // ---------------------------------------------------------------------------
@@ -36,6 +39,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   [ids.listFiles]: 'low',
   ...ZERO_RISK_MAP,
   ...LOW_RISK_MAP,
+  ...MEDIUM_RISK_MAP,
 } as const;
 
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
@@ -127,6 +131,8 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...ZERO_RISK_TOOLS,
   // New low-risk tools (read-only I/O, PathJail enforced)
   ...LOW_RISK_TOOLS,
+  // New medium-risk tools (write I/O + network, PathJail + URL guard enforced)
+  ...MEDIUM_RISK_TOOLS,
 ];
 
 /** Set of system tool IDs for fast lookup. */
@@ -295,6 +301,10 @@ export function createSystemToolExecutor(): NativeToolExecutor {
     // Low-risk tools (async, read-only I/O)
     const lowResult = await executeLowRiskTool(toolId, args);
     if (lowResult) return lowResult;
+
+    // Medium-risk tools (async, write I/O + network)
+    const mediumResult = await executeMediumRiskTool(toolId, args);
+    if (mediumResult) return mediumResult;
 
     return {
       type: 'error',

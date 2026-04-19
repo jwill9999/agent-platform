@@ -59,15 +59,20 @@ export {
   LOW_RISK_TOOLS,
   LOW_RISK_IDS,
   executeLowRiskTool,
+  MEDIUM_RISK_TOOLS,
+  MEDIUM_RISK_IDS,
+  executeMediumRiskTool,
 } from './tools/index.js';
 export { PathJail, PathJailError, DEFAULT_MOUNTS, WORKSPACE_ROOT } from './security/index.js';
 export { validateBashCommand, buildAllowlist } from './security/index.js';
+export { validateUrl } from './security/index.js';
 export type {
   Mount,
   MountPermission,
   PathOperation,
   PathValidationResult,
   BashValidationResult,
+  UrlValidationResult,
 } from './security/index.js';
 export { createToolAuditLogger, createNoopAuditLogger, redactArgs } from './audit/index.js';
 export type {

@@ -3,3 +3,5 @@ export type { Mount, MountPermission, PathOperation, PathValidationResult } from
 export { DEFAULT_MOUNTS, WORKSPACE_ROOT } from './mounts.js';
 export { validateBashCommand, buildAllowlist } from './bashGuard.js';
 export type { BashValidationResult } from './bashGuard.js';
+export { validateUrl } from './urlGuard.js';
+export type { UrlValidationResult } from './urlGuard.js';
