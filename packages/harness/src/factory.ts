@@ -154,6 +154,20 @@ async function discoverMcpTools(
 // Factory
 // ---------------------------------------------------------------------------
 
+function getAllowedSystemTools(agent: Agent): ContractTool[] {
+  const allowedToolIds = new Set(agent.allowedToolIds ?? []);
+
+  return SYSTEM_TOOLS.filter((tool) => {
+    const toolId = typeof tool.id === 'string' ? tool.id : undefined;
+    const toolName = typeof tool.name === 'string' ? tool.name : undefined;
+
+    return (
+      (toolId !== undefined && allowedToolIds.has(toolId)) ||
+      (toolName !== undefined && allowedToolIds.has(toolName))
+    );
+  });
+}
+
 /**
  * Assembles a fully resolved runtime context for an agent.
  *
@@ -172,6 +186,7 @@ export async function buildAgentContext(
   if (!agent) throw new AgentNotFoundError(agentId);
 
   const skills = loadAllowedSkills(db, agent.allowedSkillIds);
+  const allowedSystemTools = getAllowedSystemTools(agent);
   const registryTools = loadAllowedTools(db, agent.allowedToolIds);
   const mcpConfigs = loadAllowedMcpConfigs(db, agent.allowedMcpServerIds);
 
@@ -179,7 +194,7 @@ export async function buildAgentContext(
   await mcpManager.openSessions(mcpConfigs);
 
   const mcpTools = await discoverMcpTools(mcpManager, mcpConfigs);
-  const allTools = [...SYSTEM_TOOLS, ...registryTools, ...mcpTools];
+  const allTools = [...allowedSystemTools, ...registryTools, ...mcpTools];
 
   const systemPrompt = buildAugmentedPrompt(agent.systemPrompt, skills, allTools);
 
