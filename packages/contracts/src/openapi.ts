@@ -43,19 +43,13 @@ function resolveRef(doc: OpenApiDoc, ref: string): Record<string, unknown> | und
     : undefined;
 }
 
-/** Build a JSON Schema `parameters` object from path params + request body. */
-function buildParameters(
-  doc: OpenApiDoc,
-  operation: Record<string, unknown>,
-  pathParams: unknown[],
-): Record<string, unknown> {
+/** Extract parameter schemas from OpenAPI parameter objects into properties/required. */
+function extractParamSchemas(allParams: Record<string, unknown>[]): {
+  properties: Record<string, unknown>;
+  required: string[];
+} {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
-
-  const allParams = [
-    ...(pathParams as Record<string, unknown>[]),
-    ...((operation.parameters as Record<string, unknown>[]) ?? []),
-  ];
 
   for (const param of allParams) {
     const name = param.name as string;
@@ -66,18 +60,46 @@ function buildParameters(
     }
   }
 
+  return { properties, required };
+}
+
+/** Extract the request body schema, resolving `$ref` if present. */
+function extractRequestBodySchema(
+  doc: OpenApiDoc,
+  operation: Record<string, unknown>,
+): { schema: Record<string, unknown>; isRequired: boolean } | null {
   const requestBody = operation.requestBody as Record<string, unknown> | undefined;
-  if (requestBody) {
-    const content = requestBody.content as Record<string, Record<string, unknown>> | undefined;
-    const jsonContent = content?.['application/json'];
-    if (jsonContent?.schema) {
-      let bodySchema = jsonContent.schema as Record<string, unknown>;
-      if (bodySchema.$ref) {
-        bodySchema = resolveRef(doc, bodySchema.$ref as string) ?? bodySchema;
-      }
-      properties['body'] = bodySchema;
-      if (requestBody.required) required.push('body');
-    }
+  if (!requestBody) return null;
+
+  const content = requestBody.content as Record<string, Record<string, unknown>> | undefined;
+  const jsonContent = content?.['application/json'];
+  if (!jsonContent?.schema) return null;
+
+  let bodySchema = jsonContent.schema as Record<string, unknown>;
+  if (bodySchema.$ref) {
+    bodySchema = resolveRef(doc, bodySchema.$ref as string) ?? bodySchema;
+  }
+
+  return { schema: bodySchema, isRequired: !!requestBody.required };
+}
+
+/** Build a JSON Schema `parameters` object from path params + request body. */
+function buildParameters(
+  doc: OpenApiDoc,
+  operation: Record<string, unknown>,
+  pathParams: unknown[],
+): Record<string, unknown> {
+  const allParams = [
+    ...(pathParams as Record<string, unknown>[]),
+    ...((operation.parameters as Record<string, unknown>[]) ?? []),
+  ];
+
+  const { properties, required } = extractParamSchemas(allParams);
+
+  const body = extractRequestBodySchema(doc, operation);
+  if (body) {
+    properties['body'] = body.schema;
+    if (body.isRequired) required.push('body');
   }
 
   return {
