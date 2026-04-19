@@ -132,8 +132,10 @@ async function execBash(
       ['-c', command],
       { timeout: timeoutMs, maxBuffer: MAX_OUTPUT_BYTES * 2 },
       (error, stdout, stderr) => {
-        const exitCode =
-          error && 'code' in error && typeof error.code === 'number' ? error.code : error ? 1 : 0;
+        let exitCode = 0;
+        if (error) {
+          exitCode = 'code' in error && typeof error.code === 'number' ? error.code : 1;
+        }
         res({
           stdout: truncate(stdout, MAX_OUTPUT_BYTES),
           stderr: truncate(stderr, MAX_OUTPUT_BYTES),
@@ -146,6 +148,91 @@ async function execBash(
   });
 }
 
+/** Safely extract a string arg with a fallback. */
+function stringArg(args: Record<string, unknown>, key: string, fallback = ''): string {
+  const val = args[key];
+  return typeof val === 'string' ? val : fallback;
+}
+
+async function handleBash(toolId: string, args: Record<string, unknown>): Promise<Output> {
+  const command = stringArg(args, 'command');
+  if (!command.trim()) {
+    return { type: 'error', code: 'INVALID_ARGS', message: 'command is required' };
+  }
+  const rawTimeout =
+    typeof args.timeout_ms === 'number' ? args.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
+  const timeoutMs = Math.min(Math.max(rawTimeout, 1000), MAX_BASH_TIMEOUT_MS);
+  const { stdout, stderr, exitCode } = await execBash(command, timeoutMs);
+  return { type: 'tool_result', toolId, data: { stdout, stderr, exitCode } };
+}
+
+async function handleReadFile(toolId: string, args: Record<string, unknown>): Promise<Output> {
+  const filePath = stringArg(args, 'path');
+  if (!filePath.trim()) {
+    return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+  }
+  try {
+    const content = await readFile(resolve(filePath), 'utf-8');
+    return {
+      type: 'tool_result',
+      toolId,
+      data: { content: truncate(content, MAX_OUTPUT_BYTES) },
+    };
+  } catch (err) {
+    return {
+      type: 'error',
+      code: 'READ_FAILED',
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function handleWriteFile(toolId: string, args: Record<string, unknown>): Promise<Output> {
+  const filePath = stringArg(args, 'path');
+  const content = stringArg(args, 'content');
+  if (!filePath.trim()) {
+    return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+  }
+  try {
+    await writeFile(resolve(filePath), content, 'utf-8');
+    return { type: 'tool_result', toolId, data: { written: true, path: resolve(filePath) } };
+  } catch (err) {
+    return {
+      type: 'error',
+      code: 'WRITE_FAILED',
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+async function handleListFiles(toolId: string, args: Record<string, unknown>): Promise<Output> {
+  const dirPath = stringArg(args, 'path', '.');
+  try {
+    const entries = await readdir(resolve(dirPath));
+    const detailed = await Promise.all(
+      entries.map(async (name) => {
+        try {
+          const s = await stat(resolve(dirPath, name));
+          return { name, type: s.isDirectory() ? 'directory' : 'file', size: s.size };
+        } catch {
+          return { name, type: 'unknown', size: 0 };
+        }
+      }),
+    );
+    return {
+      type: 'tool_result',
+      toolId,
+      data: { path: resolve(dirPath), entries: detailed },
+    };
+  } catch (err) {
+    return {
+      type: 'error',
+      code: 'LIST_FAILED',
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 /**
  * Creates the native executor that handles all system tools.
  * Returns `undefined` for unknown tool IDs (callers should fall through).
@@ -153,85 +240,14 @@ async function execBash(
 export function createSystemToolExecutor(): NativeToolExecutor {
   return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
     switch (toolId) {
-      case ids.bash: {
-        const command = String(args.command ?? '');
-        if (!command.trim()) {
-          return { type: 'error', code: 'INVALID_ARGS', message: 'command is required' };
-        }
-        const rawTimeout =
-          typeof args.timeout_ms === 'number' ? args.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
-        const timeoutMs = Math.min(Math.max(rawTimeout, 1000), MAX_BASH_TIMEOUT_MS);
-        const { stdout, stderr, exitCode } = await execBash(command, timeoutMs);
-        return { type: 'tool_result', toolId, data: { stdout, stderr, exitCode } };
-      }
-
-      case ids.readFile: {
-        const filePath = String(args.path ?? '');
-        if (!filePath.trim()) {
-          return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
-        }
-        try {
-          const content = await readFile(resolve(filePath), 'utf-8');
-          return {
-            type: 'tool_result',
-            toolId,
-            data: { content: truncate(content, MAX_OUTPUT_BYTES) },
-          };
-        } catch (err) {
-          return {
-            type: 'error',
-            code: 'READ_FAILED',
-            message: err instanceof Error ? err.message : String(err),
-          };
-        }
-      }
-
-      case ids.writeFile: {
-        const filePath = String(args.path ?? '');
-        const content = String(args.content ?? '');
-        if (!filePath.trim()) {
-          return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
-        }
-        try {
-          await writeFile(resolve(filePath), content, 'utf-8');
-          return { type: 'tool_result', toolId, data: { written: true, path: resolve(filePath) } };
-        } catch (err) {
-          return {
-            type: 'error',
-            code: 'WRITE_FAILED',
-            message: err instanceof Error ? err.message : String(err),
-          };
-        }
-      }
-
-      case ids.listFiles: {
-        const dirPath = String(args.path ?? '.');
-        try {
-          const entries = await readdir(resolve(dirPath));
-          const detailed = await Promise.all(
-            entries.map(async (name) => {
-              try {
-                const s = await stat(resolve(dirPath, name));
-                return { name, type: s.isDirectory() ? 'directory' : 'file', size: s.size };
-              } catch {
-                return { name, type: 'unknown', size: 0 };
-              }
-            }),
-          );
-          return {
-            type: 'tool_result',
-            toolId,
-            data: { path: resolve(dirPath), entries: detailed },
-          };
-        } catch (err) {
-          return {
-            type: 'error',
-            code: 'LIST_FAILED',
-            message: err instanceof Error ? err.message : String(err),
-          };
-        }
-      }
-
+      case ids.bash:
+        return handleBash(toolId, args);
+      case ids.readFile:
+        return handleReadFile(toolId, args);
+      case ids.writeFile:
+        return handleWriteFile(toolId, args);
+      case ids.listFiles:
+        return handleListFiles(toolId, args);
       default:
         return {
           type: 'error',

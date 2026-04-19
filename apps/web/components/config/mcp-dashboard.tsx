@@ -319,12 +319,12 @@ export function McpDashboard() {
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-foreground truncate">{server.name}</h3>
                       <Badge variant="secondary" className="text-xs shrink-0">{server.transport}</Badge>
-                      {result && result.status === 'ok' && (
+                      {result?.status === 'ok' && (
                         <Badge variant="outline" className="text-xs shrink-0 text-emerald-600 border-emerald-300">
                           {result.toolCount} {result.toolCount === 1 ? 'tool' : 'tools'} &middot; {result.latencyMs}ms
                         </Badge>
                       )}
-                      {result && result.status === 'error' && (
+                      {result?.status === 'error' && (
                         <Badge variant="outline" className="text-xs shrink-0 text-destructive border-destructive/30">
                           Failed
                         </Badge>
@@ -449,35 +449,7 @@ function McpImport({ onCancel, onSaved }: Readonly<McpImportProps>) {
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-2xl space-y-6">
-          {!preview ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="mcp-json">Paste server JSON</Label>
-                <p className="text-sm text-muted-foreground">
-                  Paste the config from your MCP server&apos;s documentation.
-                  Supports Claude Desktop, Cursor, and standard MCP formats.
-                </p>
-                <Textarea
-                  id="mcp-json"
-                  rows={12}
-                  placeholder={`{
-  "my-server": {
-    "command": "npx",
-    "args": ["-y", "@modelcontextprotocol/server-example"]
-  }
-}`}
-                  value={jsonText}
-                  onChange={(e) => { setJsonText(e.target.value); setParseError(null); }}
-                  className="font-mono text-sm"
-                  autoFocus
-                />
-              </div>
-              <Button onClick={handleParse} disabled={!jsonText.trim()}>
-                <ClipboardPaste className="h-4 w-4 mr-2" />
-                Parse
-              </Button>
-            </>
-          ) : (
+          {preview ? (
             <>
               <div className="space-y-2">
                 <Label>Review before importing</Label>
@@ -489,8 +461,8 @@ function McpImport({ onCancel, onSaved }: Readonly<McpImportProps>) {
               </div>
 
               <div className="space-y-3">
-                {preview.map((s, i) => (
-                  <div key={i} className="border border-border rounded-lg p-4 bg-card space-y-2">
+                {preview.map((s) => (
+                  <div key={s.name} className="border border-border rounded-lg p-4 bg-card space-y-2">
                     <div className="flex items-center gap-2">
                       <Server className="h-4 w-4 text-primary" />
                       <span className="font-semibold text-foreground">{s.name}</span>
@@ -525,6 +497,34 @@ function McpImport({ onCancel, onSaved }: Readonly<McpImportProps>) {
                   Back
                 </Button>
               </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="mcp-json">Paste server JSON</Label>
+                <p className="text-sm text-muted-foreground">
+                  Paste the config from your MCP server&apos;s documentation.
+                  Supports Claude Desktop, Cursor, and standard MCP formats.
+                </p>
+                <Textarea
+                  id="mcp-json"
+                  rows={12}
+                  placeholder={`{
+  "my-server": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-example"]
+  }
+}`}
+                  value={jsonText}
+                  onChange={(e) => { setJsonText(e.target.value); setParseError(null); }}
+                  className="font-mono text-sm"
+                  autoFocus
+                />
+              </div>
+              <Button onClick={handleParse} disabled={!jsonText.trim()}>
+                <ClipboardPaste className="h-4 w-4 mr-2" />
+                Parse
+              </Button>
             </>
           )}
         </div>

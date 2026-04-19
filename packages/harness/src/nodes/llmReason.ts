@@ -59,7 +59,7 @@ function toCoreMessages(messages: ChatMessage[]): CoreMessage[] {
  * We replace `:` with `__` — the reverse mapping is stored alongside.
  */
 function sanitiseToolName(name: string): string {
-  return name.replace(/:/g, '__');
+  return name.replaceAll(':', '__');
 }
 
 /**
