@@ -26,6 +26,10 @@ export const tools = sqliteTable(
     description: text('description'),
     /** Non-secret tool configuration (JSON). */
     configJson: text('config_json'),
+    /** Risk tier: zero, low, medium, high, critical (default medium). */
+    riskTier: text('risk_tier').notNull().default('medium'),
+    /** Whether this tool requires human approval before execution. */
+    requiresApproval: integer('requires_approval', { mode: 'boolean' }).notNull().default(false),
   },
   (t) => ({
     slugIdx: uniqueIndex('tools_slug_idx').on(t.slug),

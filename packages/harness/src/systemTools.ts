@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
+import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
 import type { NativeToolExecutor } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -19,12 +19,22 @@ const ids = {
   listFiles: `${SYSTEM_TOOL_PREFIX}list_files`,
 } as const;
 
+/** Risk tier assignments for system tools. */
+export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
+  [ids.bash]: 'high',
+  [ids.readFile]: 'low',
+  [ids.writeFile]: 'medium',
+  [ids.listFiles]: 'low',
+} as const;
+
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
   {
     id: ids.bash,
     slug: 'sys-bash',
     name: 'bash',
     description: 'Execute a shell command and return its stdout/stderr.',
+    riskTier: SYSTEM_TOOL_RISK[ids.bash],
+    requiresApproval: true,
     config: {
       inputSchema: {
         type: 'object',
@@ -47,6 +57,7 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
     slug: 'sys-read-file',
     name: 'read_file',
     description: 'Read the contents of a file at the given path.',
+    riskTier: SYSTEM_TOOL_RISK[ids.readFile],
     config: {
       inputSchema: {
         type: 'object',
@@ -65,6 +76,7 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
     slug: 'sys-write-file',
     name: 'write_file',
     description: 'Write content to a file, creating it if it does not exist.',
+    riskTier: SYSTEM_TOOL_RISK[ids.writeFile],
     config: {
       inputSchema: {
         type: 'object',
@@ -87,6 +99,7 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
     slug: 'sys-list-files',
     name: 'list_files',
     description: 'List files and directories at the given path.',
+    riskTier: SYSTEM_TOOL_RISK[ids.listFiles],
     config: {
       inputSchema: {
         type: 'object',

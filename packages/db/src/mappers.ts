@@ -107,6 +107,8 @@ export function toolRowToContract(row: typeof schema.tools.$inferSelect): Tool {
     name: row.name,
     description: row.description ?? undefined,
     config: row.configJson ? (JSON.parse(row.configJson) as Record<string, unknown>) : undefined,
+    riskTier: row.riskTier ?? undefined,
+    requiresApproval: row.requiresApproval ?? undefined,
   });
 }
 
@@ -117,6 +119,8 @@ export function toolToRow(tool: Tool): typeof schema.tools.$inferInsert {
     name: tool.name,
     description: tool.description ?? null,
     configJson: tool.config ? JSON.stringify(tool.config) : null,
+    riskTier: tool.riskTier ?? 'medium',
+    requiresApproval: tool.requiresApproval ?? false,
   };
 }
 

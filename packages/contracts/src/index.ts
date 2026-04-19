@@ -40,7 +40,14 @@ export {
   type ContextWindow,
 } from './agent.js';
 export { PlanSchema, TaskSchema, type Plan, type Task } from './plan.js';
-export { ToolSchema, ToolCreateBodySchema, type Tool, type ToolCreateBody } from './tool.js';
+export {
+  ToolSchema,
+  ToolCreateBodySchema,
+  RiskTierSchema,
+  type Tool,
+  type ToolCreateBody,
+  type RiskTier,
+} from './tool.js';
 export { openApiToToolDefinitions, type OpenApiToolDefinition } from './openapi.js';
 export {
   RateLimitSettingsSchema,
