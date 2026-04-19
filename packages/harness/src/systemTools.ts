@@ -2,14 +2,33 @@ import { execFile } from 'node:child_process';
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
+import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
 import type { NativeToolExecutor } from './types.js';
+import { validateBashCommand } from './security/bashGuard.js';
+import {
+  ZERO_RISK_TOOLS,
+  ZERO_RISK_MAP,
+  executeZeroRiskTool,
+  LOW_RISK_TOOLS,
+  LOW_RISK_MAP,
+  executeLowRiskTool,
+  MEDIUM_RISK_TOOLS,
+  MEDIUM_RISK_MAP,
+  executeMediumRiskTool,
+} from './tools/index.js';
+import {
+  SYSTEM_TOOL_PREFIX,
+  MAX_OUTPUT_BYTES,
+  stringArg,
+  truncate,
+  errorMessage,
+  toolResult,
+  toolError,
+} from './tools/toolHelpers.js';
 
 // ---------------------------------------------------------------------------
 // Tool definitions (contract-shaped, always injected into every agent)
 // ---------------------------------------------------------------------------
-
-const SYSTEM_TOOL_PREFIX = 'sys_';
 
 /** Well-known IDs — no colons, no UUIDs; always allowed. */
 const ids = {
@@ -19,12 +38,25 @@ const ids = {
   listFiles: `${SYSTEM_TOOL_PREFIX}list_files`,
 } as const;
 
+/** Risk tier assignments for system tools. */
+export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
+  [ids.bash]: 'high',
+  [ids.readFile]: 'low',
+  [ids.writeFile]: 'medium',
+  [ids.listFiles]: 'low',
+  ...ZERO_RISK_MAP,
+  ...LOW_RISK_MAP,
+  ...MEDIUM_RISK_MAP,
+} as const;
+
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
   {
     id: ids.bash,
     slug: 'sys-bash',
     name: 'bash',
     description: 'Execute a shell command and return its stdout/stderr.',
+    riskTier: SYSTEM_TOOL_RISK[ids.bash],
+    requiresApproval: true,
     config: {
       inputSchema: {
         type: 'object',
@@ -47,6 +79,7 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
     slug: 'sys-read-file',
     name: 'read_file',
     description: 'Read the contents of a file at the given path.',
+    riskTier: SYSTEM_TOOL_RISK[ids.readFile],
     config: {
       inputSchema: {
         type: 'object',
@@ -65,6 +98,7 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
     slug: 'sys-write-file',
     name: 'write_file',
     description: 'Write content to a file, creating it if it does not exist.',
+    riskTier: SYSTEM_TOOL_RISK[ids.writeFile],
     config: {
       inputSchema: {
         type: 'object',
@@ -87,6 +121,7 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
     slug: 'sys-list-files',
     name: 'list_files',
     description: 'List files and directories at the given path.',
+    riskTier: SYSTEM_TOOL_RISK[ids.listFiles],
     config: {
       inputSchema: {
         type: 'object',
@@ -99,6 +134,12 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
       },
     },
   },
+  // New zero-risk tools (pure compute, no I/O)
+  ...ZERO_RISK_TOOLS,
+  // New low-risk tools (read-only I/O, PathJail enforced)
+  ...LOW_RISK_TOOLS,
+  // New medium-risk tools (write I/O + network, PathJail + URL guard enforced)
+  ...MEDIUM_RISK_TOOLS,
 ];
 
 /** Set of system tool IDs for fast lookup. */
@@ -115,12 +156,6 @@ export function isSystemTool(toolId: string): boolean {
 
 const DEFAULT_BASH_TIMEOUT_MS = 30_000;
 const MAX_BASH_TIMEOUT_MS = 120_000;
-const MAX_OUTPUT_BYTES = 100_000;
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}\n… (truncated, ${text.length} total chars)`;
-}
 
 async function execBash(
   command: string,
@@ -148,42 +183,33 @@ async function execBash(
   });
 }
 
-/** Safely extract a string arg with a fallback. */
-function stringArg(args: Record<string, unknown>, key: string, fallback = ''): string {
-  const val = args[key];
-  return typeof val === 'string' ? val : fallback;
-}
-
 async function handleBash(toolId: string, args: Record<string, unknown>): Promise<Output> {
   const command = stringArg(args, 'command');
   if (!command.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'command is required' };
+    return toolError('INVALID_ARGS', 'command is required');
+  }
+  // Validate command against bash guardrails
+  const validation = validateBashCommand(command);
+  if (!validation.allowed) {
+    return toolError('BASH_COMMAND_BLOCKED', validation.reason ?? 'Command is not allowed');
   }
   const rawTimeout =
     typeof args.timeout_ms === 'number' ? args.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
   const timeoutMs = Math.min(Math.max(rawTimeout, 1000), MAX_BASH_TIMEOUT_MS);
   const { stdout, stderr, exitCode } = await execBash(command, timeoutMs);
-  return { type: 'tool_result', toolId, data: { stdout, stderr, exitCode } };
+  return toolResult(toolId, { stdout, stderr, exitCode });
 }
 
 async function handleReadFile(toolId: string, args: Record<string, unknown>): Promise<Output> {
   const filePath = stringArg(args, 'path');
   if (!filePath.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+    return toolError('INVALID_ARGS', 'path is required');
   }
   try {
     const content = await readFile(resolve(filePath), 'utf-8');
-    return {
-      type: 'tool_result',
-      toolId,
-      data: { content: truncate(content, MAX_OUTPUT_BYTES) },
-    };
+    return toolResult(toolId, { content: truncate(content, MAX_OUTPUT_BYTES) });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'READ_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('READ_FAILED', errorMessage(err));
   }
 }
 
@@ -191,17 +217,13 @@ async function handleWriteFile(toolId: string, args: Record<string, unknown>): P
   const filePath = stringArg(args, 'path');
   const content = stringArg(args, 'content');
   if (!filePath.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+    return toolError('INVALID_ARGS', 'path is required');
   }
   try {
     await writeFile(resolve(filePath), content, 'utf-8');
-    return { type: 'tool_result', toolId, data: { written: true, path: resolve(filePath) } };
+    return toolResult(toolId, { written: true, path: resolve(filePath) });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'WRITE_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('WRITE_FAILED', errorMessage(err));
   }
 }
 
@@ -219,17 +241,9 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
         }
       }),
     );
-    return {
-      type: 'tool_result',
-      toolId,
-      data: { path: resolve(dirPath), entries: detailed },
-    };
+    return toolResult(toolId, { path: resolve(dirPath), entries: detailed });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'LIST_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('LIST_FAILED', errorMessage(err));
   }
 }
 
@@ -239,6 +253,7 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
  */
 export function createSystemToolExecutor(): NativeToolExecutor {
   return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
+    // Core tools
     switch (toolId) {
       case ids.bash:
         return handleBash(toolId, args);
@@ -248,12 +263,24 @@ export function createSystemToolExecutor(): NativeToolExecutor {
         return handleWriteFile(toolId, args);
       case ids.listFiles:
         return handleListFiles(toolId, args);
-      default:
-        return {
-          type: 'error',
-          code: 'TOOL_NOT_FOUND',
-          message: `Unknown system tool: ${toolId}`,
-        };
     }
+
+    // Zero-risk tools (synchronous, pure compute)
+    const zeroResult = executeZeroRiskTool(toolId, args);
+    if (zeroResult) return zeroResult;
+
+    // Low-risk tools (async, read-only I/O)
+    const lowResult = await executeLowRiskTool(toolId, args);
+    if (lowResult) return lowResult;
+
+    // Medium-risk tools (async, write I/O + network)
+    const mediumResult = await executeMediumRiskTool(toolId, args);
+    if (mediumResult) return mediumResult;
+
+    return {
+      type: 'error',
+      code: 'TOOL_NOT_FOUND',
+      message: `Unknown system tool: ${toolId}`,
+    };
   };
 }

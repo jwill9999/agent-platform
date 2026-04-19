@@ -9,6 +9,9 @@ import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, NativeToolExecutor, OutputEmitter, ToolCallIntent } from '../types.js';
 import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTimeout.js';
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
+import { PathJail, PathJailError } from '../security/pathJail.js';
+import { isSystemTool } from '../systemTools.js';
+import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -20,11 +23,54 @@ export type ToolDispatchContext = {
   nativeToolExecutor?: NativeToolExecutor;
   emitter?: OutputEmitter;
   dispatcher?: PluginDispatcher;
+  pathJail?: PathJail;
+  auditLog?: ToolAuditLogger;
+};
+
+/** Map system tool IDs to their path operation type for PathJail enforcement. */
+const TOOL_PATH_OPERATIONS: Record<string, 'read' | 'write'> = {
+  sys_read_file: 'read',
+  sys_write_file: 'write',
+  sys_list_files: 'read',
+  sys_append_file: 'write',
+  sys_copy_file: 'write',
+  sys_file_exists: 'read',
+  sys_file_info: 'read',
+  sys_find_files: 'read',
+  sys_create_directory: 'write',
+  sys_download_file: 'write',
 };
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+async function enforcePathJail(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+): Promise<Output | null> {
+  if (!ctx.pathJail) return null;
+
+  const operation = TOOL_PATH_OPERATIONS[call.name];
+  if (!operation) return null;
+
+  const paths = PathJail.extractPaths(call.args);
+  for (const p of paths) {
+    try {
+      await ctx.pathJail.enforce(p, operation);
+    } catch (err) {
+      if (err instanceof PathJailError) {
+        return {
+          type: 'error',
+          code: 'PATH_ACCESS_DENIED',
+          message: err.message,
+        };
+      }
+      throw err;
+    }
+  }
+  return null;
+}
 
 async function dispatchSingleTool(
   call: ToolCallIntent,
@@ -32,14 +78,30 @@ async function dispatchSingleTool(
   options?: { timeoutMs?: number },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
   if (!isToolExecutionAllowed(ctx.agent, call.name)) {
-    return {
-      output: {
-        type: 'error',
-        code: 'TOOL_NOT_ALLOWED',
-        message: `Tool "${call.name}" is not in the agent's allowlist`,
-      },
-      ok: false,
+    const output: Output = {
+      type: 'error',
+      code: 'TOOL_NOT_ALLOWED',
+      message: `Tool "${call.name}" is not in the agent's allowlist`,
     };
+    ctx.auditLog?.logDenied(call.name, call.args, ctx.agent.id, '', 'Tool not in agent allowlist');
+    return { output, ok: false };
+  }
+
+  // PathJail: enforce file-path constraints for system tools
+  if (isSystemTool(call.name)) {
+    const pathError = await enforcePathJail(call, ctx);
+    if (pathError) {
+      ctx.auditLog?.logDenied(
+        call.name,
+        call.args,
+        ctx.agent.id,
+        '',
+        pathError.type === 'error'
+          ? (pathError.message ?? 'Path access denied')
+          : 'Path access denied',
+      );
+      return { output: pathError, ok: false };
+    }
   }
 
   const parsed = parseToolId(call.name);
@@ -216,6 +278,10 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       await fireToolCallHook(ctx, state, call);
 
+      // Audit: log start (skipped for zero-risk tools)
+      const auditId =
+        ctx.auditLog?.logStart(call.name, call.args, ctx.agent.id, state.sessionId ?? '') ?? null;
+
       const { output, ok, retryCount, images } = await executeToolWithRetry(
         call,
         ctx,
@@ -224,6 +290,11 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         traceEvents,
         signal,
       );
+
+      // Audit: log completion
+      if (auditId && ctx.auditLog) {
+        ctx.auditLog.logComplete(auditId, output);
+      }
 
       if (ctx.emitter) {
         // Emit extracted images first so they appear above the tool result

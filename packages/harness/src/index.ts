@@ -50,4 +50,34 @@ export {
   SYSTEM_TOOL_IDS,
   isSystemTool,
   createSystemToolExecutor,
+  SYSTEM_TOOL_RISK,
 } from './systemTools.js';
+export {
+  ZERO_RISK_TOOLS,
+  ZERO_RISK_IDS,
+  executeZeroRiskTool,
+  LOW_RISK_TOOLS,
+  LOW_RISK_IDS,
+  executeLowRiskTool,
+  MEDIUM_RISK_TOOLS,
+  MEDIUM_RISK_IDS,
+  executeMediumRiskTool,
+} from './tools/index.js';
+export { PathJail, PathJailError, DEFAULT_MOUNTS, WORKSPACE_ROOT } from './security/index.js';
+export { validateBashCommand, buildAllowlist } from './security/index.js';
+export { validateUrl } from './security/index.js';
+export type {
+  Mount,
+  MountPermission,
+  PathOperation,
+  PathValidationResult,
+  BashValidationResult,
+  UrlValidationResult,
+} from './security/index.js';
+export { createToolAuditLogger, createNoopAuditLogger, redactArgs } from './audit/index.js';
+export type {
+  ToolAuditLogger,
+  ToolAuditStore,
+  ToolAuditEntry,
+  ToolAuditCompletion,
+} from './audit/index.js';

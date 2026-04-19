@@ -26,6 +26,10 @@ export const tools = sqliteTable(
     description: text('description'),
     /** Non-secret tool configuration (JSON). */
     configJson: text('config_json'),
+    /** Risk tier: zero, low, medium, high, critical (default medium). */
+    riskTier: text('risk_tier').notNull().default('medium'),
+    /** Whether this tool requires human approval before execution. */
+    requiresApproval: integer('requires_approval', { mode: 'boolean' }).notNull().default(false),
   },
   (t) => ({
     slugIdx: uniqueIndex('tools_slug_idx').on(t.slug),
@@ -184,4 +188,19 @@ export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
   updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+});
+
+/** Audit log for tool executions (low+ risk tools). */
+export const toolExecutions = sqliteTable('tool_executions', {
+  id: text('id').primaryKey(),
+  toolName: text('tool_name').notNull(),
+  agentId: text('agent_id').notNull(),
+  sessionId: text('session_id').notNull(),
+  argsJson: text('args_json').notNull(),
+  resultJson: text('result_json'),
+  riskTier: text('risk_tier'),
+  status: text('status').notNull().default('pending'),
+  startedAtMs: integer('started_at_ms', { mode: 'number' }).notNull(),
+  completedAtMs: integer('completed_at_ms', { mode: 'number' }),
+  durationMs: integer('duration_ms', { mode: 'number' }),
 });
