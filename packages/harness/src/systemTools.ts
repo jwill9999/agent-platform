@@ -5,6 +5,14 @@ import { resolve } from 'node:path';
 import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
 import type { NativeToolExecutor } from './types.js';
 import { validateBashCommand } from './security/bashGuard.js';
+import {
+  ZERO_RISK_TOOLS,
+  ZERO_RISK_MAP,
+  executeZeroRiskTool,
+  LOW_RISK_TOOLS,
+  LOW_RISK_MAP,
+  executeLowRiskTool,
+} from './tools/index.js';
 
 // ---------------------------------------------------------------------------
 // Tool definitions (contract-shaped, always injected into every agent)
@@ -26,6 +34,8 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   [ids.readFile]: 'low',
   [ids.writeFile]: 'medium',
   [ids.listFiles]: 'low',
+  ...ZERO_RISK_MAP,
+  ...LOW_RISK_MAP,
 } as const;
 
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
@@ -113,6 +123,10 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
       },
     },
   },
+  // New zero-risk tools (pure compute, no I/O)
+  ...ZERO_RISK_TOOLS,
+  // New low-risk tools (read-only I/O, PathJail enforced)
+  ...LOW_RISK_TOOLS,
 ];
 
 /** Set of system tool IDs for fast lookup. */
@@ -262,6 +276,7 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
  */
 export function createSystemToolExecutor(): NativeToolExecutor {
   return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
+    // Core tools
     switch (toolId) {
       case ids.bash:
         return handleBash(toolId, args);
@@ -271,12 +286,20 @@ export function createSystemToolExecutor(): NativeToolExecutor {
         return handleWriteFile(toolId, args);
       case ids.listFiles:
         return handleListFiles(toolId, args);
-      default:
-        return {
-          type: 'error',
-          code: 'TOOL_NOT_FOUND',
-          message: `Unknown system tool: ${toolId}`,
-        };
     }
+
+    // Zero-risk tools (synchronous, pure compute)
+    const zeroResult = executeZeroRiskTool(toolId, args);
+    if (zeroResult) return zeroResult;
+
+    // Low-risk tools (async, read-only I/O)
+    const lowResult = await executeLowRiskTool(toolId, args);
+    if (lowResult) return lowResult;
+
+    return {
+      type: 'error',
+      code: 'TOOL_NOT_FOUND',
+      message: `Unknown system tool: ${toolId}`,
+    };
   };
 }

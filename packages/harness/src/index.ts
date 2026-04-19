@@ -52,6 +52,14 @@ export {
   createSystemToolExecutor,
   SYSTEM_TOOL_RISK,
 } from './systemTools.js';
+export {
+  ZERO_RISK_TOOLS,
+  ZERO_RISK_IDS,
+  executeZeroRiskTool,
+  LOW_RISK_TOOLS,
+  LOW_RISK_IDS,
+  executeLowRiskTool,
+} from './tools/index.js';
 export { PathJail, PathJailError, DEFAULT_MOUNTS, WORKSPACE_ROOT } from './security/index.js';
 export { validateBashCommand, buildAllowlist } from './security/index.js';
 export type {
