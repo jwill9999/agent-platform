@@ -7,9 +7,15 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 
-import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
-
-const SYSTEM_TOOL_PREFIX = 'sys_';
+import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
+import {
+  SYSTEM_TOOL_PREFIX,
+  stringArg,
+  errorMessage,
+  toolResult,
+  toolError,
+  buildRiskMap,
+} from './toolHelpers.js';
 
 // ---------------------------------------------------------------------------
 // IDs
@@ -33,9 +39,7 @@ export const ZERO_RISK_IDS = {
 // Risk assignments
 // ---------------------------------------------------------------------------
 
-export const ZERO_RISK_MAP: Record<string, RiskTier> = Object.fromEntries(
-  Object.values(ZERO_RISK_IDS).map((id) => [id, 'zero' as RiskTier]),
-);
+export const ZERO_RISK_MAP = buildRiskMap(ZERO_RISK_IDS, 'zero');
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -241,17 +245,12 @@ export const ZERO_RISK_TOOLS: readonly ContractTool[] = [
 // Handlers
 // ---------------------------------------------------------------------------
 
-function str(args: Record<string, unknown>, key: string, fallback = ''): string {
-  const v = args[key];
-  return typeof v === 'string' ? v : fallback;
-}
-
 function handleGenerateUuid(toolId: string): Output {
-  return { type: 'tool_result', toolId, data: { uuid: randomUUID() } };
+  return toolResult(toolId, { uuid: randomUUID() });
 }
 
 function handleGetCurrentTime(toolId: string, args: Record<string, unknown>): Output {
-  const tz = str(args, 'timezone', 'UTC');
+  const tz = stringArg(args, 'timezone', 'UTC');
   const now = new Date();
   let formatted: string;
   try {
@@ -263,29 +262,21 @@ function handleGetCurrentTime(toolId: string, args: Record<string, unknown>): Ou
   } catch {
     formatted = now.toISOString();
   }
-  return {
-    type: 'tool_result',
-    toolId,
-    data: {
-      iso: now.toISOString(),
-      unix: Math.floor(now.getTime() / 1000),
-      formatted,
-      timezone: tz,
-    },
-  };
+  return toolResult(toolId, {
+    iso: now.toISOString(),
+    unix: Math.floor(now.getTime() / 1000),
+    formatted,
+    timezone: tz,
+  });
 }
 
 function handleJsonParse(toolId: string, args: Record<string, unknown>): Output {
-  const text = str(args, 'text');
+  const text = stringArg(args, 'text');
   try {
     const parsed: unknown = JSON.parse(text);
-    return { type: 'tool_result', toolId, data: { result: parsed } };
+    return toolResult(toolId, { result: parsed });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'JSON_PARSE_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('JSON_PARSE_FAILED', errorMessage(err));
   }
 }
 
@@ -294,127 +285,91 @@ function handleJsonStringify(toolId: string, args: Record<string, unknown>): Out
   const pretty = args.pretty === true;
   try {
     const result = JSON.stringify(data, null, pretty ? 2 : undefined);
-    return { type: 'tool_result', toolId, data: { result } };
+    return toolResult(toolId, { result });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'JSON_STRINGIFY_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('JSON_STRINGIFY_FAILED', errorMessage(err));
   }
 }
 
 const MAX_REGEX_INPUT_LEN = 100_000;
 
 function handleRegexMatch(toolId: string, args: Record<string, unknown>): Output {
-  const text = str(args, 'text');
-  const pattern = str(args, 'pattern');
-  const flags = str(args, 'flags');
+  const text = stringArg(args, 'text');
+  const pattern = stringArg(args, 'pattern');
+  const flags = stringArg(args, 'flags');
   if (text.length > MAX_REGEX_INPUT_LEN) {
-    return {
-      type: 'error',
-      code: 'INPUT_TOO_LARGE',
-      message: 'Text exceeds 100k character limit for regex',
-    };
+    return toolError('INPUT_TOO_LARGE', 'Text exceeds 100k character limit for regex');
   }
   try {
     const regex = new RegExp(pattern, flags);
     const globalFlags = regex.flags.includes('g') ? regex.flags : regex.flags + 'g';
     const matches = [...text.matchAll(new RegExp(regex.source, globalFlags))];
-    return {
-      type: 'tool_result',
-      toolId,
-      data: {
-        matched: matches.length > 0,
-        count: matches.length,
-        matches: matches.slice(0, 100).map((m) => ({
-          match: m[0],
-          index: m.index,
-          groups: m.groups ?? null,
-        })),
-      },
-    };
+    return toolResult(toolId, {
+      matched: matches.length > 0,
+      count: matches.length,
+      matches: matches.slice(0, 100).map((m) => ({
+        match: m[0],
+        index: m.index,
+        groups: m.groups ?? null,
+      })),
+    });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'REGEX_ERROR',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('REGEX_ERROR', errorMessage(err));
   }
 }
 
 function handleRegexReplace(toolId: string, args: Record<string, unknown>): Output {
-  const text = str(args, 'text');
-  const pattern = str(args, 'pattern');
-  const replacement = str(args, 'replacement');
-  const flags = str(args, 'flags', 'g');
+  const text = stringArg(args, 'text');
+  const pattern = stringArg(args, 'pattern');
+  const replacement = stringArg(args, 'replacement');
+  const flags = stringArg(args, 'flags', 'g');
   try {
     const regex = new RegExp(pattern, flags);
     const result = text.replace(regex, replacement);
-    return { type: 'tool_result', toolId, data: { result } };
+    return toolResult(toolId, { result });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'REGEX_ERROR',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('REGEX_ERROR', errorMessage(err));
   }
 }
 
 function handleCountTokens(toolId: string, args: Record<string, unknown>): Output {
-  const text = str(args, 'text');
+  const text = stringArg(args, 'text');
   const chars = text.length;
   const words = text.split(/\s+/).filter(Boolean).length;
   const lines = text.split('\n').length;
   // Rough token estimate: ~4 chars per token (GPT-like)
   const estimatedTokens = Math.ceil(chars / 4);
-  return {
-    type: 'tool_result',
-    toolId,
-    data: { chars, words, lines, estimatedTokens },
-  };
+  return toolResult(toolId, { chars, words, lines, estimatedTokens });
 }
 
 function handleBase64Encode(toolId: string, args: Record<string, unknown>): Output {
-  const text = str(args, 'text');
-  return {
-    type: 'tool_result',
-    toolId,
-    data: { encoded: Buffer.from(text, 'utf-8').toString('base64') },
-  };
+  const text = stringArg(args, 'text');
+  return toolResult(toolId, { encoded: Buffer.from(text, 'utf-8').toString('base64') });
 }
 
 function handleBase64Decode(toolId: string, args: Record<string, unknown>): Output {
-  const encoded = str(args, 'encoded');
+  const encoded = stringArg(args, 'encoded');
   try {
     const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
-    return { type: 'tool_result', toolId, data: { decoded } };
+    return toolResult(toolId, { decoded });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'BASE64_DECODE_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('BASE64_DECODE_FAILED', errorMessage(err));
   }
 }
 
 function handleHashString(toolId: string, args: Record<string, unknown>): Output {
-  const text = str(args, 'text');
-  const algorithm = str(args, 'algorithm', 'sha256');
+  const text = stringArg(args, 'text');
+  const algorithm = stringArg(args, 'algorithm', 'sha256');
   const allowed = ['sha256', 'sha512'];
   if (!allowed.includes(algorithm)) {
-    return {
-      type: 'error',
-      code: 'INVALID_ARGS',
-      message: `Algorithm must be one of: ${allowed.join(', ')}`,
-    };
+    return toolError('INVALID_ARGS', `Algorithm must be one of: ${allowed.join(', ')}`);
   }
   const hash = createHash(algorithm).update(text, 'utf-8').digest('hex');
-  return { type: 'tool_result', toolId, data: { hash, algorithm } };
+  return toolResult(toolId, { hash, algorithm });
 }
 
 function handleTemplateRender(toolId: string, args: Record<string, unknown>): Output {
-  const template = str(args, 'template');
+  const template = stringArg(args, 'template');
   const variables = (
     args.variables && typeof args.variables === 'object' ? args.variables : {}
   ) as Record<string, unknown>;
@@ -422,7 +377,7 @@ function handleTemplateRender(toolId: string, args: Record<string, unknown>): Ou
     const val = variables[key];
     return val !== undefined ? String(val) : `{{${key}}}`;
   });
-  return { type: 'tool_result', toolId, data: { result } };
+  return toolResult(toolId, { result });
 }
 
 // ---------------------------------------------------------------------------

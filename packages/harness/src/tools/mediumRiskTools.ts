@@ -11,11 +11,19 @@ import { resolve, dirname } from 'node:path';
 import { createWriteStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 
-import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
+import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
 import { validateUrl } from '../security/urlGuard.js';
+import {
+  SYSTEM_TOOL_PREFIX,
+  MAX_OUTPUT_BYTES,
+  stringArg,
+  truncate,
+  errorMessage,
+  toolResult,
+  toolError,
+  buildRiskMap,
+} from './toolHelpers.js';
 
-const SYSTEM_TOOL_PREFIX = 'sys_';
-const MAX_OUTPUT_BYTES = 100_000;
 const HTTP_TIMEOUT_MS = 30_000;
 const MAX_DOWNLOAD_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -35,9 +43,7 @@ export const MEDIUM_RISK_IDS = {
 // Risk assignments
 // ---------------------------------------------------------------------------
 
-export const MEDIUM_RISK_MAP: Record<string, RiskTier> = Object.fromEntries(
-  Object.values(MEDIUM_RISK_IDS).map((id) => [id, 'medium' as RiskTier]),
-);
+export const MEDIUM_RISK_MAP = buildRiskMap(MEDIUM_RISK_IDS, 'medium');
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -175,39 +181,17 @@ export const MEDIUM_RISK_TOOLS: readonly ContractTool[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function stringArg(args: Record<string, unknown>, key: string, fallback = ''): string {
-  const val = args[key];
-  return typeof val === 'string' ? val : fallback;
-}
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}\n… (truncated, ${text.length} total chars)`;
-}
-
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
-
 async function handleAppendFile(toolId: string, args: Record<string, unknown>): Promise<Output> {
   const filePath = stringArg(args, 'path');
   const content = stringArg(args, 'content');
   if (!filePath.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+    return toolError('INVALID_ARGS', 'path is required');
   }
   try {
     await appendFile(resolve(filePath), content, 'utf-8');
-    return { type: 'tool_result', toolId, data: { appended: true, path: resolve(filePath) } };
+    return toolResult(toolId, { appended: true, path: resolve(filePath) });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'APPEND_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('APPEND_FAILED', errorMessage(err));
   }
 }
 
@@ -215,21 +199,17 @@ async function handleCopyFile(toolId: string, args: Record<string, unknown>): Pr
   const source = stringArg(args, 'source');
   const destination = stringArg(args, 'destination');
   if (!source.trim() || !destination.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'source and destination are required' };
+    return toolError('INVALID_ARGS', 'source and destination are required');
   }
   try {
     await copyFile(resolve(source), resolve(destination));
-    return {
-      type: 'tool_result',
-      toolId,
-      data: { copied: true, source: resolve(source), destination: resolve(destination) },
-    };
+    return toolResult(toolId, {
+      copied: true,
+      source: resolve(source),
+      destination: resolve(destination),
+    });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'COPY_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('COPY_FAILED', errorMessage(err));
   }
 }
 
@@ -239,29 +219,25 @@ async function handleCreateDirectory(
 ): Promise<Output> {
   const dirPath = stringArg(args, 'path');
   if (!dirPath.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+    return toolError('INVALID_ARGS', 'path is required');
   }
   try {
     await mkdir(resolve(dirPath), { recursive: true });
-    return { type: 'tool_result', toolId, data: { created: true, path: resolve(dirPath) } };
+    return toolResult(toolId, { created: true, path: resolve(dirPath) });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'MKDIR_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('MKDIR_FAILED', errorMessage(err));
   }
 }
 
 async function handleHttpRequest(toolId: string, args: Record<string, unknown>): Promise<Output> {
   const url = stringArg(args, 'url');
   if (!url.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'url is required' };
+    return toolError('INVALID_ARGS', 'url is required');
   }
 
   const urlCheck = validateUrl(url);
   if (!urlCheck.allowed) {
-    return { type: 'error', code: 'URL_BLOCKED', message: urlCheck.reason ?? 'URL is blocked' };
+    return toolError('URL_BLOCKED', urlCheck.reason ?? 'URL is blocked');
   }
 
   const method = stringArg(args, 'method', 'GET').toUpperCase();
@@ -287,22 +263,14 @@ async function handleHttpRequest(toolId: string, args: Record<string, unknown>):
 
     const responseBody = truncate(await response.text(), MAX_OUTPUT_BYTES);
 
-    return {
-      type: 'tool_result',
-      toolId,
-      data: {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        body: responseBody,
-      },
-    };
+    return toolResult(toolId, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseBody,
+    });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'HTTP_REQUEST_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('HTTP_REQUEST_FAILED', errorMessage(err));
   }
 }
 
@@ -310,12 +278,12 @@ async function handleDownloadFile(toolId: string, args: Record<string, unknown>)
   const url = stringArg(args, 'url');
   const filePath = stringArg(args, 'path');
   if (!url.trim() || !filePath.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'url and path are required' };
+    return toolError('INVALID_ARGS', 'url and path are required');
   }
 
   const urlCheck = validateUrl(url);
   if (!urlCheck.allowed) {
-    return { type: 'error', code: 'URL_BLOCKED', message: urlCheck.reason ?? 'URL is blocked' };
+    return toolError('URL_BLOCKED', urlCheck.reason ?? 'URL is blocked');
   }
 
   const timeoutMs = typeof args.timeout_ms === 'number' ? args.timeout_ms : HTTP_TIMEOUT_MS;
@@ -328,29 +296,17 @@ async function handleDownloadFile(toolId: string, args: Record<string, unknown>)
     clearTimeout(timer);
 
     if (!response.ok) {
-      return {
-        type: 'error',
-        code: 'DOWNLOAD_FAILED',
-        message: `HTTP ${response.status}: ${response.statusText}`,
-      };
+      return toolError('DOWNLOAD_FAILED', `HTTP ${response.status}: ${response.statusText}`);
     }
 
     if (!response.body) {
-      return {
-        type: 'error',
-        code: 'DOWNLOAD_FAILED',
-        message: 'No response body',
-      };
+      return toolError('DOWNLOAD_FAILED', 'No response body');
     }
 
     // Check content-length before downloading
     const contentLength = response.headers.get('content-length');
     if (contentLength && parseInt(contentLength, 10) > MAX_DOWNLOAD_SIZE) {
-      return {
-        type: 'error',
-        code: 'DOWNLOAD_TOO_LARGE',
-        message: `File exceeds ${MAX_DOWNLOAD_SIZE} byte limit`,
-      };
+      return toolError('DOWNLOAD_TOO_LARGE', `File exceeds ${MAX_DOWNLOAD_SIZE} byte limit`);
     }
 
     // Ensure parent directory exists
@@ -364,17 +320,9 @@ async function handleDownloadFile(toolId: string, args: Record<string, unknown>)
     );
     await pipeline(readable, dest);
 
-    return {
-      type: 'tool_result',
-      toolId,
-      data: { downloaded: true, path: resolve(filePath), url },
-    };
+    return toolResult(toolId, { downloaded: true, path: resolve(filePath), url });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'DOWNLOAD_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('DOWNLOAD_FAILED', errorMessage(err));
   }
 }
 

@@ -16,12 +16,19 @@ import {
   MEDIUM_RISK_MAP,
   executeMediumRiskTool,
 } from './tools/index.js';
+import {
+  SYSTEM_TOOL_PREFIX,
+  MAX_OUTPUT_BYTES,
+  stringArg,
+  truncate,
+  errorMessage,
+  toolResult,
+  toolError,
+} from './tools/toolHelpers.js';
 
 // ---------------------------------------------------------------------------
 // Tool definitions (contract-shaped, always injected into every agent)
 // ---------------------------------------------------------------------------
-
-const SYSTEM_TOOL_PREFIX = 'sys_';
 
 /** Well-known IDs — no colons, no UUIDs; always allowed. */
 const ids = {
@@ -149,12 +156,6 @@ export function isSystemTool(toolId: string): boolean {
 
 const DEFAULT_BASH_TIMEOUT_MS = 30_000;
 const MAX_BASH_TIMEOUT_MS = 120_000;
-const MAX_OUTPUT_BYTES = 100_000;
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}\n… (truncated, ${text.length} total chars)`;
-}
 
 async function execBash(
   command: string,
@@ -182,51 +183,33 @@ async function execBash(
   });
 }
 
-/** Safely extract a string arg with a fallback. */
-function stringArg(args: Record<string, unknown>, key: string, fallback = ''): string {
-  const val = args[key];
-  return typeof val === 'string' ? val : fallback;
-}
-
 async function handleBash(toolId: string, args: Record<string, unknown>): Promise<Output> {
   const command = stringArg(args, 'command');
   if (!command.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'command is required' };
+    return toolError('INVALID_ARGS', 'command is required');
   }
   // Validate command against bash guardrails
   const validation = validateBashCommand(command);
   if (!validation.allowed) {
-    return {
-      type: 'error',
-      code: 'BASH_COMMAND_BLOCKED',
-      message: validation.reason ?? 'Command is not allowed',
-    };
+    return toolError('BASH_COMMAND_BLOCKED', validation.reason ?? 'Command is not allowed');
   }
   const rawTimeout =
     typeof args.timeout_ms === 'number' ? args.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
   const timeoutMs = Math.min(Math.max(rawTimeout, 1000), MAX_BASH_TIMEOUT_MS);
   const { stdout, stderr, exitCode } = await execBash(command, timeoutMs);
-  return { type: 'tool_result', toolId, data: { stdout, stderr, exitCode } };
+  return toolResult(toolId, { stdout, stderr, exitCode });
 }
 
 async function handleReadFile(toolId: string, args: Record<string, unknown>): Promise<Output> {
   const filePath = stringArg(args, 'path');
   if (!filePath.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+    return toolError('INVALID_ARGS', 'path is required');
   }
   try {
     const content = await readFile(resolve(filePath), 'utf-8');
-    return {
-      type: 'tool_result',
-      toolId,
-      data: { content: truncate(content, MAX_OUTPUT_BYTES) },
-    };
+    return toolResult(toolId, { content: truncate(content, MAX_OUTPUT_BYTES) });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'READ_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('READ_FAILED', errorMessage(err));
   }
 }
 
@@ -234,17 +217,13 @@ async function handleWriteFile(toolId: string, args: Record<string, unknown>): P
   const filePath = stringArg(args, 'path');
   const content = stringArg(args, 'content');
   if (!filePath.trim()) {
-    return { type: 'error', code: 'INVALID_ARGS', message: 'path is required' };
+    return toolError('INVALID_ARGS', 'path is required');
   }
   try {
     await writeFile(resolve(filePath), content, 'utf-8');
-    return { type: 'tool_result', toolId, data: { written: true, path: resolve(filePath) } };
+    return toolResult(toolId, { written: true, path: resolve(filePath) });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'WRITE_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('WRITE_FAILED', errorMessage(err));
   }
 }
 
@@ -262,17 +241,9 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
         }
       }),
     );
-    return {
-      type: 'tool_result',
-      toolId,
-      data: { path: resolve(dirPath), entries: detailed },
-    };
+    return toolResult(toolId, { path: resolve(dirPath), entries: detailed });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'LIST_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('LIST_FAILED', errorMessage(err));
   }
 }
 

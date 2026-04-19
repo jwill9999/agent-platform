@@ -9,9 +9,15 @@ import { stat, access, readdir } from 'node:fs/promises';
 import { resolve, join, relative } from 'node:path';
 import { constants } from 'node:fs';
 
-import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
-
-const SYSTEM_TOOL_PREFIX = 'sys_';
+import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
+import {
+  SYSTEM_TOOL_PREFIX,
+  stringArg,
+  errorMessage,
+  toolResult,
+  toolError,
+  buildRiskMap,
+} from './toolHelpers.js';
 
 // ---------------------------------------------------------------------------
 // IDs
@@ -27,9 +33,7 @@ export const LOW_RISK_IDS = {
 // Risk assignments
 // ---------------------------------------------------------------------------
 
-export const LOW_RISK_MAP: Record<string, RiskTier> = Object.fromEntries(
-  Object.values(LOW_RISK_IDS).map((id) => [id, 'low' as RiskTier]),
-);
+export const LOW_RISK_MAP = buildRiskMap(LOW_RISK_IDS, 'low');
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -111,72 +115,43 @@ export const LOW_RISK_TOOLS: readonly ContractTool[] = [
 // Handlers
 // ---------------------------------------------------------------------------
 
-function str(args: Record<string, unknown>, key: string, fallback = ''): string {
-  const v = args[key];
-  return typeof v === 'string' ? v : fallback;
-}
-
 async function handleFileExists(toolId: string, args: Record<string, unknown>): Promise<Output> {
-  const filePath = str(args, 'path');
+  const filePath = stringArg(args, 'path');
   if (!filePath.trim()) {
-    return {
-      type: 'error',
-      code: 'INVALID_ARGS',
-      message: 'path is required',
-    };
+    return toolError('INVALID_ARGS', 'path is required');
   }
   try {
     await access(resolve(filePath), constants.F_OK);
-    return {
-      type: 'tool_result',
-      toolId,
-      data: { exists: true, path: resolve(filePath) },
-    };
+    return toolResult(toolId, { exists: true, path: resolve(filePath) });
   } catch {
-    return {
-      type: 'tool_result',
-      toolId,
-      data: { exists: false, path: resolve(filePath) },
-    };
+    return toolResult(toolId, { exists: false, path: resolve(filePath) });
   }
 }
 
 async function handleFileInfo(toolId: string, args: Record<string, unknown>): Promise<Output> {
-  const filePath = str(args, 'path');
+  const filePath = stringArg(args, 'path');
   if (!filePath.trim()) {
-    return {
-      type: 'error',
-      code: 'INVALID_ARGS',
-      message: 'path is required',
-    };
+    return toolError('INVALID_ARGS', 'path is required');
   }
   try {
     const s = await stat(resolve(filePath));
-    return {
-      type: 'tool_result',
-      toolId,
-      data: {
-        path: resolve(filePath),
-        type: s.isDirectory()
-          ? 'directory'
-          : s.isFile()
-            ? 'file'
-            : s.isSymbolicLink()
-              ? 'symlink'
-              : 'other',
-        size: s.size,
-        mode: `0${(s.mode & 0o777).toString(8)}`,
-        createdAt: s.birthtime.toISOString(),
-        modifiedAt: s.mtime.toISOString(),
-        accessedAt: s.atime.toISOString(),
-      },
-    };
+    return toolResult(toolId, {
+      path: resolve(filePath),
+      type: s.isDirectory()
+        ? 'directory'
+        : s.isFile()
+          ? 'file'
+          : s.isSymbolicLink()
+            ? 'symlink'
+            : 'other',
+      size: s.size,
+      mode: `0${(s.mode & 0o777).toString(8)}`,
+      createdAt: s.birthtime.toISOString(),
+      modifiedAt: s.mtime.toISOString(),
+      accessedAt: s.atime.toISOString(),
+    });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'STAT_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('STAT_FAILED', errorMessage(err));
   }
 }
 
@@ -185,14 +160,10 @@ const DEFAULT_MAX_RESULTS = 200;
 const HARD_MAX_RESULTS = 1000;
 
 async function handleFindFiles(toolId: string, args: Record<string, unknown>): Promise<Output> {
-  const directory = str(args, 'directory', '.');
-  const pattern = str(args, 'pattern');
+  const directory = stringArg(args, 'directory', '.');
+  const pattern = stringArg(args, 'pattern');
   if (!pattern.trim()) {
-    return {
-      type: 'error',
-      code: 'INVALID_ARGS',
-      message: 'pattern is required',
-    };
+    return toolError('INVALID_ARGS', 'pattern is required');
   }
   const maxDepth =
     typeof args.maxDepth === 'number' ? Math.max(1, args.maxDepth) : DEFAULT_MAX_DEPTH;
@@ -234,23 +205,15 @@ async function handleFindFiles(toolId: string, args: Record<string, unknown>): P
 
   try {
     await walk(rootDir, 0);
-    return {
-      type: 'tool_result',
-      toolId,
-      data: {
-        directory: rootDir,
-        pattern,
-        count: results.length,
-        truncated: results.length >= maxResults,
-        files: results,
-      },
-    };
+    return toolResult(toolId, {
+      directory: rootDir,
+      pattern,
+      count: results.length,
+      truncated: results.length >= maxResults,
+      files: results,
+    });
   } catch (err) {
-    return {
-      type: 'error',
-      code: 'FIND_FAILED',
-      message: err instanceof Error ? err.message : String(err),
-    };
+    return toolError('FIND_FAILED', errorMessage(err));
   }
 }
 
