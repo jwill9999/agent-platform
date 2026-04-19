@@ -110,7 +110,6 @@ export function OutputRenderer({ output, showThinking }: Props) {
     case 'image':
       return (
         <div style={{ margin: '0.5rem 0' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`data:${output.mimeType};base64,${output.data}`}
             alt={`Screenshot from ${output.toolId}`}
