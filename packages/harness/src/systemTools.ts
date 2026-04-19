@@ -235,7 +235,7 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
 
 /**
  * Creates the native executor that handles all system tools.
- * Returns `undefined` for unknown tool IDs (callers should fall through).
+ * Returns an error `Output` for unknown tool IDs.
  */
 export function createSystemToolExecutor(): NativeToolExecutor {
   return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
