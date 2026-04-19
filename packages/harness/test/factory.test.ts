@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Agent, McpServer, Skill, Tool as ContractTool } from '@agent-platform/contracts';
 import type { McpSession } from '@agent-platform/mcp-adapter';
 import { buildAgentContext, destroyAgentContext, AgentNotFoundError } from '../src/factory.js';
+import { SYSTEM_TOOLS } from '../src/systemTools.js';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -126,7 +127,7 @@ describe('buildAgentContext', () => {
 
     expect(ctx.agent).toBe(baseAgent);
     expect(ctx.skills).toEqual([skill1]);
-    expect(ctx.tools).toEqual([tool1, mcpTool]);
+    expect(ctx.tools).toEqual([...SYSTEM_TOOLS, tool1, mcpTool]);
     expect(ctx.mcpManager).toBeDefined();
     expect(mockOpenSessions).toHaveBeenCalledWith([mcpServer1]);
     expect(ctx.pluginDispatcher).toBeDefined();
@@ -203,8 +204,8 @@ describe('buildAgentContext', () => {
 
     const ctx = await buildAgentContext(fakeDb, 'agent-1');
 
-    // Should still succeed, with only registry tools
-    expect(ctx.tools).toEqual([tool1]);
+    // Should still succeed, with system + registry tools
+    expect(ctx.tools).toEqual([...SYSTEM_TOOLS, tool1]);
   });
 
   it('uses agent modelOverride when present', async () => {
@@ -271,10 +272,10 @@ describe('buildAgentContext', () => {
     const ctx = await buildAgentContext(fakeDb, 'agent-1');
 
     expect(ctx.skills).toEqual([skill1]);
-    expect(ctx.tools).toEqual([tool1]);
+    expect(ctx.tools).toEqual([...SYSTEM_TOOLS, tool1]);
   });
 
-  it('when no executable tools, tells the model not to use tools and omits skill tool lines', async () => {
+  it('when no registry/MCP tools, system tools are still present and skill tool refs are filtered', async () => {
     const skillWithToolRefs: Skill = {
       ...skill1,
       tools: ['t1', 'ghost-id'],
@@ -290,10 +291,12 @@ describe('buildAgentContext', () => {
 
     const ctx = await buildAgentContext(fakeDb, 'agent-1');
 
-    expect(ctx.tools).toEqual([]);
-    expect(ctx.systemPrompt).toContain('## Capabilities');
-    expect(ctx.systemPrompt).toContain('do not have access to tools');
-    expect(ctx.systemPrompt).not.toContain('Tools:');
+    // System tools are always injected even with no registry/MCP tools
+    expect(ctx.tools).toEqual([...SYSTEM_TOOLS]);
+    expect(ctx.systemPrompt).toContain('## Available Tools');
+    // Skill tool refs that don't match executable tools are omitted
+    expect(ctx.systemPrompt).not.toContain('Tools: t1');
+    expect(ctx.systemPrompt).not.toContain('ghost-id');
   });
 
   it('lists only skill tool ids that intersect the executable tool set', async () => {
@@ -308,7 +311,7 @@ describe('buildAgentContext', () => {
 
     const ctx = await buildAgentContext(fakeDb, 'agent-1');
 
-    expect(ctx.tools).toEqual([tool1]);
+    expect(ctx.tools).toEqual([...SYSTEM_TOOLS, tool1]);
     expect(ctx.systemPrompt).toContain('Tools: t1');
     expect(ctx.systemPrompt).not.toContain('ghost-id');
   });

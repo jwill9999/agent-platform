@@ -113,6 +113,7 @@ export function useHarnessChat(sessionId: string | null) {
             data?: unknown;
             language?: string;
             code?: string;
+            mimeType?: string;
           };
           if (o.type === 'text') {
             const delta =
@@ -123,6 +124,12 @@ export function useHarnessChat(sessionId: string | null) {
           } else if (o.type === 'code' && typeof o.content === 'string') {
             const lang = typeof o.language === 'string' && o.language ? o.language : '';
             appendAssistantText(`\n\`\`\`${lang}\n${o.content}\n\`\`\`\n`);
+          } else if (
+            o.type === 'image' &&
+            typeof o.data === 'string' &&
+            typeof o.mimeType === 'string'
+          ) {
+            appendAssistantText(`\n\n![screenshot](data:${o.mimeType};base64,${o.data})\n\n`);
           } else if (o.type === 'tool_result' && typeof o.toolId === 'string') {
             const body = formatToolResultPreview(o.data);
             appendAssistantText(`\n\n**${o.toolId}**\n\`\`\`json\n${body}\n\`\`\`\n`);

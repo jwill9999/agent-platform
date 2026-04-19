@@ -107,6 +107,16 @@ export function OutputRenderer({ output, showThinking }: Props) {
           </div>
         </details>
       );
+    case 'image':
+      return (
+        <div style={{ margin: '0.5rem 0' }}>
+          <img
+            src={`data:${output.mimeType};base64,${output.data}`}
+            alt={`Screenshot from ${output.toolId}`}
+            style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid #e2e8f0' }}
+          />
+        </div>
+      );
     default: {
       const _exhaustive: never = output;
       return _exhaustive;

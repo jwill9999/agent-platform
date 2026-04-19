@@ -45,3 +45,9 @@ export { createPlanGenerateNode, type PlanGenerateNodeOptions } from './nodes/pl
 export { createNdjsonEmitter, createNoopEmitter } from './emitters/ndjson.js';
 export { createApproximateCounter, type TokenCounter } from './tokenCount.js';
 export { buildWindowedContext, type ContextWindowResult } from './contextBuilder.js';
+export {
+  SYSTEM_TOOLS,
+  SYSTEM_TOOL_IDS,
+  isSystemTool,
+  createSystemToolExecutor,
+} from './systemTools.js';

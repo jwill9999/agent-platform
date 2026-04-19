@@ -30,7 +30,7 @@ async function dispatchSingleTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
   options?: { timeoutMs?: number },
-): Promise<{ output: Output; ok: boolean }> {
+): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
   if (!isToolExecutionAllowed(ctx.agent, call.name)) {
     return {
       output: {
@@ -57,11 +57,11 @@ async function dispatchSingleTool(
       };
     }
     try {
-      const result = await session.callToolAsOutput(parsed.mcpToolName, call.args, {
+      const { output, images } = await session.callToolAsOutput(parsed.mcpToolName, call.args, {
         timeoutMs: options?.timeoutMs,
       });
-      const ok = result.type !== 'error';
-      return { output: result, ok };
+      const ok = output.type !== 'error';
+      return { output, ok, images };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return {
@@ -128,7 +128,7 @@ async function executeToolWithRetry(
   agentToolTimeoutMs: number | undefined,
   traceEvents: TraceEvent[],
   signal?: AbortSignal,
-): Promise<{ output: Output; ok: boolean; retryCount: number }> {
+): Promise<{ output: Output; ok: boolean; retryCount: number; images?: Output[] }> {
   const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs);
   let retryCount = 0;
 
@@ -155,7 +155,7 @@ async function executeToolWithRetry(
         });
       },
     );
-    return { output: result.output, ok: result.ok, retryCount };
+    return { output: result.output, ok: result.ok, retryCount, images: result.images };
   } catch (err) {
     if (!(err instanceof ToolTimeoutError)) throw err;
     traceEvents.push({
@@ -216,7 +216,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       await fireToolCallHook(ctx, state, call);
 
-      const { output, ok, retryCount } = await executeToolWithRetry(
+      const { output, ok, retryCount, images } = await executeToolWithRetry(
         call,
         ctx,
         step,
@@ -226,6 +226,12 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       );
 
       if (ctx.emitter) {
+        // Emit extracted images first so they appear above the tool result
+        if (images) {
+          for (const img of images) {
+            await ctx.emitter.emit(img);
+          }
+        }
         await ctx.emitter.emit(output);
       }
 

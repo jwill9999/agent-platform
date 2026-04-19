@@ -44,6 +44,9 @@ importers:
       '@agent-platform/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@agent-platform/mcp-adapter':
+        specifier: workspace:*
+        version: link:../../packages/mcp-adapter
       '@agent-platform/model-router':
         specifier: workspace:*
         version: link:../../packages/model-router

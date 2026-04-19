@@ -15,3 +15,9 @@ export const CODING_AGENT_SLUG = 'coding';
 
 /** Stable UUID for the seeded coding agent. */
 export const CODING_AGENT_ID = '00000000-0000-4000-8000-000000000003';
+
+/** Seeded Playwright MCP server (headless chromium for web browsing). */
+export const PLAYWRIGHT_MCP_SLUG = 'playwright';
+
+/** Stable UUID for the seeded Playwright MCP server. */
+export const PLAYWRIGHT_MCP_ID = '00000000-0000-4000-8000-000000000010';

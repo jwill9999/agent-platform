@@ -5,13 +5,17 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${HOST_PORT:-3000}:3000"
+    # Chromium (used by Playwright MCP) needs >64MB shared memory for rendering.
+    shm_size: '256mb'
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
       # SQLite file path inside the container; persisted on named volume below.
       SQLITE_PATH: "/data/agent.sqlite"
+      # LLM API key — resolved from root .env file (see .env.example).
+      AGENT_OPENAI_API_KEY: "${AGENT_OPENAI_API_KEY:-}"
       # Base64-encoded 32-byte key for AES-256-GCM secret storage (required when writing secrets).
-      # SECRETS_MASTER_KEY: ""
+      # SECRETS_MASTER_KEY: "${SECRETS_MASTER_KEY:-}"
     volumes:
       - sqlite_data:/data
       # E2E filesystem MCP seed expects a mount at /workspace (see packages/db e2e seed).
@@ -34,6 +38,8 @@ services:
       PORT: "3001"
       HOSTNAME: "0.0.0.0"
       API_PROXY_URL: "http://api:3000"
+      # LLM API key — web BFF forwards this as x-openai-key header to the API.
+      AGENT_OPENAI_API_KEY: "${AGENT_OPENAI_API_KEY:-}"
     depends_on:
       api:
         condition: service_healthy

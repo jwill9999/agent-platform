@@ -444,10 +444,10 @@ paths:
       tags: [mcp-servers]
       requestBody:
         required: true
+        description: |
+          Same shape as POST create; `id` and `slug` come from the existing server (URL), not the body.
         content:
           application/json:
-            description: |
-              Same shape as POST create; `id` and `slug` come from the existing server (URL), not the body.
             schema:
               $ref: '#/components/schemas/McpServerCreateBody'
       responses:
@@ -470,6 +470,30 @@ paths:
       responses:
         '204':
           description: MCP server deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/mcp-servers/{idOrSlug}/test:
+    parameters:
+      - $ref: '#/components/parameters/IdOrSlug'
+    post:
+      operationId: testMcpServer
+      summary: Test MCP server connectivity
+      description: |
+        Opens a real MCP session, lists available tools, then closes.
+        Returns connection status, discovered tools, and latency.
+      tags: [mcp-servers]
+      responses:
+        '200':
+          description: Test result (status may be "ok" or "error")
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/McpServerTestResult'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -853,6 +877,8 @@ components:
           items:
             type: string
           nullable: true
+        contextWindow:
+          $ref: '#/components/schemas/ContextWindow'
         pluginDenylist:
           type: array
           items:
@@ -897,6 +923,8 @@ components:
           items:
             type: string
           nullable: true
+        contextWindow:
+          $ref: '#/components/schemas/ContextWindow'
         pluginDenylist:
           type: array
           items:
@@ -916,12 +944,27 @@ components:
         timeoutMs:
           type: integer
           minimum: 1
+        toolTimeoutMs:
+          type: integer
+          minimum: 1
         maxTokens:
           type: integer
           minimum: 1
         maxCostUnits:
           type: number
           minimum: 0
+
+    ContextWindow:
+      type: object
+      properties:
+        maxInputTokens:
+          type: integer
+          minimum: 1
+          default: 8000
+        strategy:
+          type: string
+          enum: [truncate, summarize]
+          default: truncate
 
     ModelOverride:
       type: object
@@ -1071,6 +1114,29 @@ components:
         metadata:
           type: object
           description: Arbitrary metadata
+
+    McpServerTestResult:
+      type: object
+      required: [status, latencyMs]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        toolCount:
+          type: integer
+        tools:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+        error:
+          type: string
+        latencyMs:
+          type: integer
 
     # -- Session --
     SessionRecord:

@@ -3,7 +3,7 @@
  * which makes posix_spawnp fail for every shell. On macOS, Gatekeeper quarantine can
  * also block exec until cleared. Restore execute permission and strip quarantine.
  */
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,9 +21,10 @@ if (!existsSync(nm)) {
 }
 
 try {
-  const out = execSync(
-    `find "${nm}" -name spawn-helper -path '*node-pty*' -type f 2>/dev/null`,
-    { encoding: 'utf8' },
+  const out = execFileSync(
+    'find',
+    [nm, '-name', 'spawn-helper', '-path', '*node-pty*', '-type', 'f'],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] },
   );
   for (const line of out.trim().split('\n')) {
     const p = line.trim();
