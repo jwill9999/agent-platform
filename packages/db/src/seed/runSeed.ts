@@ -12,6 +12,8 @@ import {
   PLAYWRIGHT_MCP_SLUG,
 } from './constants.js';
 
+const PLAYWRIGHT_MCP_PACKAGE = '@playwright/mcp@^0';
+
 /** Seeded specialist prompt (same content as a typical “Coding” agent). */
 const CODING_AGENT_SYSTEM_PROMPT = `[ROLE]
 Senior Software Engineer (Execution Agent)
@@ -134,7 +136,7 @@ export function runSeed(db: DrizzleDb): void {
         command: 'npx',
         argsJson: JSON.stringify([
           '-y',
-          '@playwright/mcp@latest',
+          PLAYWRIGHT_MCP_PACKAGE,
           '--browser',
           'chromium',
           '--headless',
