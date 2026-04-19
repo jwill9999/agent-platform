@@ -4,6 +4,8 @@ import {
   appendMessage,
   listMessagesBySession,
   withTransaction,
+  insertToolExecution,
+  completeToolExecution,
 } from '@agent-platform/db';
 import type { ContextWindow, MessageRecord } from '@agent-platform/contracts';
 import { DEFAULT_CONTEXT_WINDOW } from '@agent-platform/contracts';
@@ -21,8 +23,14 @@ import {
   createSystemToolExecutor,
   PathJail,
   DEFAULT_MOUNTS,
+  createToolAuditLogger,
 } from '@agent-platform/harness';
-import type { AgentContext, ChatMessage, OutputEmitter } from '@agent-platform/harness';
+import type {
+  AgentContext,
+  ChatMessage,
+  OutputEmitter,
+  ToolAuditStore,
+} from '@agent-platform/harness';
 import {
   resolveModelConfig,
   openAiKeyGateToApiOutcome,
@@ -203,6 +211,13 @@ export function createChatRouter(db: DrizzleDb): Router {
           if (!res.writableEnded) res.write('\n');
         }, 15_000);
 
+        // Create DB-backed audit store for tool execution logging
+        const auditStore: ToolAuditStore = {
+          insert: (entry) => insertToolExecution(db, entry),
+          complete: (id, data) => completeToolExecution(db, id, data),
+        };
+        const auditLog = createToolAuditLogger(auditStore);
+
         const graph = buildHarnessGraph({
           executeTool: async () => ({ ok: true }),
           llmReasonNode: createLlmReasonNode({ emitter, dispatcher }),
@@ -213,6 +228,7 @@ export function createChatRouter(db: DrizzleDb): Router {
             emitter,
             dispatcher,
             pathJail: new PathJail(DEFAULT_MOUNTS),
+            auditLog,
           }),
           dispatcher,
         });

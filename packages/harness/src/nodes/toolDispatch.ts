@@ -11,6 +11,7 @@ import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTi
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
 import { isSystemTool } from '../systemTools.js';
+import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -23,6 +24,7 @@ export type ToolDispatchContext = {
   emitter?: OutputEmitter;
   dispatcher?: PluginDispatcher;
   pathJail?: PathJail;
+  auditLog?: ToolAuditLogger;
 };
 
 /** Map system tool IDs to their path operation type for PathJail enforcement. */
@@ -76,20 +78,30 @@ async function dispatchSingleTool(
   options?: { timeoutMs?: number },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
   if (!isToolExecutionAllowed(ctx.agent, call.name)) {
-    return {
-      output: {
-        type: 'error',
-        code: 'TOOL_NOT_ALLOWED',
-        message: `Tool "${call.name}" is not in the agent's allowlist`,
-      },
-      ok: false,
+    const output: Output = {
+      type: 'error',
+      code: 'TOOL_NOT_ALLOWED',
+      message: `Tool "${call.name}" is not in the agent's allowlist`,
     };
+    ctx.auditLog?.logDenied(call.name, call.args, ctx.agent.id, '', 'Tool not in agent allowlist');
+    return { output, ok: false };
   }
 
   // PathJail: enforce file-path constraints for system tools
   if (isSystemTool(call.name)) {
     const pathError = await enforcePathJail(call, ctx);
-    if (pathError) return { output: pathError, ok: false };
+    if (pathError) {
+      ctx.auditLog?.logDenied(
+        call.name,
+        call.args,
+        ctx.agent.id,
+        '',
+        pathError.type === 'error'
+          ? (pathError.message ?? 'Path access denied')
+          : 'Path access denied',
+      );
+      return { output: pathError, ok: false };
+    }
   }
 
   const parsed = parseToolId(call.name);
@@ -266,6 +278,10 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       await fireToolCallHook(ctx, state, call);
 
+      // Audit: log start (skipped for zero-risk tools)
+      const auditId =
+        ctx.auditLog?.logStart(call.name, call.args, ctx.agent.id, state.sessionId ?? '') ?? null;
+
       const { output, ok, retryCount, images } = await executeToolWithRetry(
         call,
         ctx,
@@ -274,6 +290,11 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         traceEvents,
         signal,
       );
+
+      // Audit: log completion
+      if (auditId && ctx.auditLog) {
+        ctx.auditLog.logComplete(auditId, output);
+      }
 
       if (ctx.emitter) {
         // Emit extracted images first so they appear above the tool result

@@ -11,4 +11,5 @@ export * from './transaction.js';
 export * from './repositories/messages.js';
 export * from './repositories/registry.js';
 export * from './repositories/settings.js';
+export * from './repositories/toolExecutions.js';
 export * from './slug.js';

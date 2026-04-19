@@ -69,3 +69,10 @@ export type {
   PathValidationResult,
   BashValidationResult,
 } from './security/index.js';
+export { createToolAuditLogger, createNoopAuditLogger, redactArgs } from './audit/index.js';
+export type {
+  ToolAuditLogger,
+  ToolAuditStore,
+  ToolAuditEntry,
+  ToolAuditCompletion,
+} from './audit/index.js';

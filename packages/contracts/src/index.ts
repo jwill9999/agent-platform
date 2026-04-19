@@ -59,3 +59,11 @@ export {
   type PlatformSettings,
   type PlatformSettingsUpdate,
 } from './settings.js';
+export {
+  ToolExecutionSchema,
+  ToolExecutionStatusSchema,
+  ToolExecutionQuerySchema,
+  type ToolExecution,
+  type ToolExecutionStatus,
+  type ToolExecutionQuery,
+} from './toolExecution.js';

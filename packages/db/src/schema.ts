@@ -189,3 +189,18 @@ export const settings = sqliteTable('settings', {
   value: text('value').notNull(),
   updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
 });
+
+/** Audit log for tool executions (low+ risk tools). */
+export const toolExecutions = sqliteTable('tool_executions', {
+  id: text('id').primaryKey(),
+  toolName: text('tool_name').notNull(),
+  agentId: text('agent_id').notNull(),
+  sessionId: text('session_id').notNull(),
+  argsJson: text('args_json').notNull(),
+  resultJson: text('result_json'),
+  riskTier: text('risk_tier'),
+  status: text('status').notNull().default('pending'),
+  startedAtMs: integer('started_at_ms', { mode: 'number' }).notNull(),
+  completedAtMs: integer('completed_at_ms', { mode: 'number' }),
+  durationMs: integer('duration_ms', { mode: 'number' }),
+});
