@@ -43,10 +43,15 @@ function parseMcpJson(raw: string): { ok: true; servers: ParsedServer[] } | { ok
 
   // Bare URL
   if (/^https?:\/\//i.test(trimmed) && !trimmed.startsWith('{')) {
-    return {
-      ok: true,
-      servers: [{ name: new URL(trimmed).hostname, transport: 'http', url: trimmed }],
-    };
+    try {
+      const parsedUrl = new URL(trimmed);
+      return {
+        ok: true,
+        servers: [{ name: parsedUrl.hostname, transport: 'http', url: trimmed }],
+      };
+    } catch {
+      return { ok: false, error: 'Invalid URL — enter a complete http(s) endpoint' };
+    }
   }
 
   let parsed: unknown;
