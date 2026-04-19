@@ -9,12 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { closeDatabase, openDatabase } from '../src/database.js';
 import { loadAgentById } from '../src/mappers.js';
 import * as schema from '../src/schema.js';
-import {
-  CODING_AGENT_ID,
-  DEFAULT_AGENT_ID,
-  DEMO_SKILL_ID,
-  PLAYWRIGHT_MCP_ID,
-} from '../src/seed/constants.js';
+import { CODING_AGENT_ID, DEFAULT_AGENT_ID, DEMO_SKILL_ID } from '../src/seed/constants.js';
 import { runSeed } from '../src/seed/runSeed.js';
 
 describe('seed', () => {
@@ -70,7 +65,7 @@ describe('seed', () => {
     expect(() => AgentSchema.parse(agent)).not.toThrow();
     expect(agent!.allowedSkillIds).toContain(DEMO_SKILL_ID);
     expect(agent!.allowedToolIds).toEqual([]);
-    expect(agent!.allowedMcpServerIds).toEqual([PLAYWRIGHT_MCP_ID]);
+    expect(agent!.allowedMcpServerIds).toEqual([]);
     closeDatabase(sqlite);
   });
 
@@ -85,7 +80,7 @@ describe('seed', () => {
     expect(agent!.slug).toBe('coding');
     expect(agent!.allowedSkillIds).toEqual([]);
     expect(agent!.allowedToolIds).toEqual([]);
-    expect(agent!.allowedMcpServerIds).toEqual([PLAYWRIGHT_MCP_ID]);
+    expect(agent!.allowedMcpServerIds).toEqual([]);
     closeDatabase(sqlite);
   });
 });

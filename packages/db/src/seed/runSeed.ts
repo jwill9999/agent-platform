@@ -149,16 +149,9 @@ export function runSeed(db: DrizzleDb): void {
       .onConflictDoNothing()
       .run();
 
-    // Link Playwright MCP to the Coding agent
-    tx.insert(schema.agentMcpServers)
-      .values({ agentId: CODING_AGENT_ID, mcpServerId: PLAYWRIGHT_MCP_ID })
-      .onConflictDoNothing()
-      .run();
-
-    // Link Playwright MCP to the Personal assistant too
-    tx.insert(schema.agentMcpServers)
-      .values({ agentId: DEFAULT_AGENT_ID, mcpServerId: PLAYWRIGHT_MCP_ID })
-      .onConflictDoNothing()
-      .run();
+    // Note: Playwright MCP is registered but NOT auto-linked to agents.
+    // Users can manually assign it via the UI/API. Auto-linking causes
+    // buildAgentContext() to spawn the MCP process on every agent load,
+    // which fails in environments without Playwright (CI, fresh installs).
   });
 }
