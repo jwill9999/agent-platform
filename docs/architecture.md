@@ -164,6 +164,8 @@ Skills are **not** injected in full into the system prompt. Instead, the harness
 
 Schema fields: `description` (one-liner for stub) and `hint` (when-to-use) are optional on the Skill contract. When absent, `goal` is truncated to ~100 chars for the stub.
 
+For the full implementation guide (architecture decisions, data flow, governor logic, error cases), see **[Lazy Skill Loading](architecture/lazy-skill-loading.md)**.
+
 ## Streaming Protocol
 
 The chat response uses **NDJSON** (`application/x-ndjson`). Each line is a JSON event:

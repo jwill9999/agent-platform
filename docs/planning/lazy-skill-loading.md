@@ -1,12 +1,14 @@
-# Lazy Skill Loading — Agent Harness Implementation Guide
+# Lazy Skill Loading — Original Design Reference
 
-> **Status: IMPLEMENTED** — This pattern is live in the harness. See implementation in `packages/harness/src/factory.ts` (stub injection), `packages/harness/src/nodes/toolDispatch.ts` (sys_get_skill_detail handler + governor), and `packages/harness/src/systemTools.ts` (tool definition).
+> **Status: IMPLEMENTED** — This was the original design document that guided our implementation. The actual implementation differs in key ways (DB-driven instead of file-based, no frontmatter parsing, callback injection instead of direct DB access). For the implementation doc, see **[architecture/lazy-skill-loading.md](../architecture/lazy-skill-loading.md)**.
+
+> **What changed:** Our platform stores skills in SQLite (not markdown files), so we skipped all file-parsing code (Steps 1–2, 8), adapted the schema extension (Step 7) to add `description` and `hint` as optional columns, and used a `skillResolver` callback pattern to keep the harness independent of the DB layer. The core concept — stubs in the system prompt, full body on demand, governor for loop detection — is preserved exactly.
 
 ---
 
 ## Overview
 
-This document describes how to implement **lazy skill loading** in the agent harness. The pattern keeps the model context window lean by injecting only skill stubs (name, description, hint) into the system prompt upfront. The model requests full skill instructions on demand via a dedicated `get_skill_detail` tool when it decides to use a skill.
+This document describes the **reference pattern** for lazy skill loading in an agent harness. The pattern keeps the model context window lean by injecting only skill stubs (name, description, hint) into the system prompt upfront. The model requests full skill instructions on demand via a dedicated `get_skill_detail` tool when it decides to use a skill.
 
 ### Why This Matters
 

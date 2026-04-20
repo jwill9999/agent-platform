@@ -145,7 +145,11 @@ flowchart TD
         TOOL_WRAP --> TOOL_LOOP["For each tool call in llmOutput.calls"]
         TOOL_LOOP --> CUMUL_CHECK{"totalToolCalls >=<br/>maxToolCallsTotal?"}
         CUMUL_CHECK -->|yes| LIMIT_MSG["Return TOOL_LIMIT_REACHED<br/>to LLM as tool message"]
-        CUMUL_CHECK -->|no| HOOK["🔌 onToolCall hook"]
+        CUMUL_CHECK -->|no| RATE_CHECK{"Per-tool<br/>rate limit?"}
+        RATE_CHECK -->|exceeded| RATE_MSG["Return RATE_LIMITED<br/>to LLM as tool message"]
+        RATE_CHECK -->|ok| SKILL_CHECK{"sys_get_skill_detail?"}
+        SKILL_CHECK -->|yes| SKILL_GOV["🔍 Lazy skill loading:<br/>governor check (warn@3, error@5)<br/>→ skillResolver callback<br/>→ return full skill detail"]
+        SKILL_CHECK -->|no| HOOK["🔌 onToolCall hook"]
         HOOK --> ALLOWLIST{"isToolExecutionAllowed?<br/>agent allowlist check"}
         ALLOWLIST -->|denied| TOOL_DENIED["Return TOOL_NOT_ALLOWED<br/>+ audit log denied"]
         ALLOWLIST -->|allowed| SYS_CHECK{System tool?}
@@ -167,6 +171,8 @@ flowchart TD
     end
 
     LIMIT_MSG --> LOOP_DETECT
+    RATE_MSG --> LOOP_DETECT
+    SKILL_GOV --> LOOP_DETECT
     TOOL_DENIED --> LOOP_DETECT
     PATH_ERR --> LOOP_DETECT
     TRACE_EVENT --> LOOP_DETECT
