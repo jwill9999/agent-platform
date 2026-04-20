@@ -8,3 +8,5 @@ export type { UrlValidationResult, UrlValidationOptions } from './urlGuard.js';
 export { scanForInjection, wrapToolResult, getSecurityReinforcement } from './injectionGuard.js';
 export { scanOutput, scanOutboundBody, redactCredentials } from './outputGuard.js';
 export { validateMcpTools } from './mcpTrustGuard.js';
+export { ToolRateLimiter } from './rateLimiter.js';
+export type { RateLimitResult } from './rateLimiter.js';

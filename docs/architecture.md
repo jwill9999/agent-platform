@@ -140,13 +140,13 @@ The API app (`apps/api`) follows a layered architecture:
 
 The harness treats the LLM and external tool outputs as **untrusted**. Security guards execute at multiple phases:
 
-| Phase         | Guards                                                                  |
-| ------------- | ----------------------------------------------------------------------- |
-| Agent boot    | MCP Trust Guard (shadowing, injection, schemas), security prompt suffix |
-| Per-turn      | Wall-time deadline check, token/cost budget limits, abort signal        |
-| Pre-dispatch  | Agent allowlist, PathJail (mount enforcement), cumulative tool limit    |
-| Post-dispatch | Injection scan, credential leak scan, untrusted content wrapping        |
-| Graph level   | Loop detection (3 identical calls), max steps, deadline routing guard   |
+| Phase         | Guards                                                                                    |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| Agent boot    | MCP Trust Guard (shadowing, injection, schemas), security prompt suffix                   |
+| Per-turn      | Wall-time deadline check, token/cost budget limits, abort signal                          |
+| Pre-dispatch  | Agent allowlist, PathJail (mount enforcement), cumulative tool limit, per-tool rate limit |
+| Post-dispatch | Injection scan, credential leak scan, untrusted content wrapping                          |
+| Graph level   | Loop detection (3 identical calls), max steps, deadline routing guard                     |
 
 See the full guard map in **[Message Flow § Security Checkpoints](architecture/message-flow.md#3-security-checkpoints)**.
 

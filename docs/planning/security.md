@@ -527,6 +527,11 @@ class MemoryGuard {
 
 ### Threat 8: Resource Exhaustion
 
+> **Status — Mitigated.** File size limits enforced in `toolDispatch.ts`,
+> per-tool sliding-window rate limiting via `ToolRateLimiter` (default 30 calls/min),
+> cumulative tool call cap via `maxToolCallsTotal`, and wall-time deadline
+> propagation prevent resource exhaustion within a single run.
+
 ```typescript
 // src/security/resource-guard.ts
 
@@ -699,7 +704,7 @@ Memory
 Resources
 ├── ✅ File size limits on writes
 ├── ✅ Disk quota per agent
-├── ✅ Per-tool rate limiting
+├── ✅ Per-tool rate limiting (ToolRateLimiter, sliding window)
 └── ✅ HTTP response size limits
 ```
 
