@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** Implemented per-tool rate limiting + wall-time deadline propagation (PRs #68 merged; rate limiting on task branch).
+- **Session:** PR #69 merged — per-tool rate limiting now on `main`. Both security hardening features (deadline + rate limit) shipped.
 
 ---
 
@@ -28,29 +28,27 @@ Added `ToolRateLimiter` — sliding-window rate limiter (default 30 calls/min pe
 
 ### Git
 
-- **`main`** — includes PR #68 (wall-time deadline)
-- **`feature/per-tool-rate-limit`** — branched from `main`
-- **`task/per-tool-rate-limit`** — pushed to origin, segment tip
-- Next: open PR `task/per-tool-rate-limit` → `feature/per-tool-rate-limit`
+- **`main`** — up to date, includes PR #69 (`c57b33f`) — per-tool rate limiting
+- Feature/task branches cleaned up
+- No open PRs
 
 ### Quality
 
-- **398 harness tests**, all passing (480 total across all packages)
+- **398 harness tests**, 480 total across all packages, all passing
 - Build, typecheck, lint, format all pass
 
 ### Key commits
 
 | Commit    | Description                                            |
 | --------- | ------------------------------------------------------ |
-| `31c3855` | feat(harness): per-tool sliding-window rate limiting   |
+| `c57b33f` | Merge PR #69 — per-tool rate limiting → `main`         |
 | `5855611` | Merge PR #68 — wall-time deadline propagation → `main` |
 
 ---
 
 ## Next (priority order)
 
-1. **Merge rate limiting** — Open PR for per-tool rate limit branch
-2. **Document security architecture** — Add contributor guide for security guard patterns
+1. **Document security architecture** — Add contributor guide for security guard patterns
 
 ---
 
