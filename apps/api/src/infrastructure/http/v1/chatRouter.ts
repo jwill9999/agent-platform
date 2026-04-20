@@ -4,6 +4,7 @@ import {
   getSkill,
   appendMessage,
   listMessagesBySession,
+  updateSessionTitle,
   withTransaction,
   insertToolExecution,
   completeToolExecution,
@@ -70,6 +71,17 @@ const LegacyChatStreamBodySchema = z.object({
 // ---------------------------------------------------------------------------
 // Extracted helpers — keep the route handlers flat
 // ---------------------------------------------------------------------------
+
+const MAX_TITLE_LENGTH = 80;
+
+/** Derive a human-readable session title from the first user message. */
+function deriveSessionTitle(message: string): string {
+  const trimmed = message.trim().replace(/\s+/g, ' ');
+  if (trimmed.length <= MAX_TITLE_LENGTH) return trimmed;
+  const cut = trimmed.slice(0, MAX_TITLE_LENGTH);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > MAX_TITLE_LENGTH / 2 ? cut.slice(0, lastSpace) : cut) + '…';
+}
 
 /** Build agent context; translates AgentNotFoundError to HttpError. */
 async function loadAgentContext(db: DrizzleDb, agentId: string): Promise<AgentContext> {
@@ -242,6 +254,11 @@ export function createChatRouter(db: DrizzleDb): Router {
           agentCtx.systemPrompt,
           agentCtx.agent.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
         );
+
+        // Auto-generate a human-readable title on first user message
+        if (!session.title) {
+          updateSessionTitle(db, sessionId, deriveSessionTitle(message));
+        }
         const initialState = buildInitialState(sessionId, messages, agentCtx, modelCfg, {
           dropped,
           contextTokens,
