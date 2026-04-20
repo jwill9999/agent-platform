@@ -8,6 +8,8 @@ import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import { resolveEffectivePluginHooks } from '@agent-platform/plugin-session';
+import { getSecurityReinforcement } from './security/injectionGuard.js';
+import { validateMcpTools } from './security/mcpTrustGuard.js';
 
 const log = createLogger('harness');
 
@@ -94,10 +96,9 @@ function formatNoToolsCapabilitySection(): string {
 function buildAugmentedPrompt(base: string, skills: Skill[], tools: ContractTool[]): string {
   const executableIds = new Set(tools.map((t) => t.id));
   const body = `${base}${formatSkillSection(skills, executableIds)}${formatToolSection(tools)}`;
-  if (tools.length === 0) {
-    return `${body}${formatNoToolsCapabilitySection()}`;
-  }
-  return body;
+  const withCaps = tools.length === 0 ? `${body}${formatNoToolsCapabilitySection()}` : body;
+  // Append security reinforcement (non-negotiable rules about untrusted data)
+  return `${withCaps}\n\n${getSecurityReinforcement()}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +142,18 @@ async function discoverMcpTools(
     if (!session) continue;
     try {
       const discovered = await session.listContractTools();
-      tools.push(...discovered);
+      // Filter through MCP trust guard (blocks shadowing, injection, suspicious schemas)
+      const validation = validateMcpTools(config.id, discovered);
+      if (validation.rejected.length > 0) {
+        for (const r of validation.rejected) {
+          log.warn('MCP tool rejected by trust guard', {
+            serverId: config.id,
+            toolId: r.tool.id,
+            reasons: r.reasons,
+          });
+        }
+      }
+      tools.push(...validation.safe);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.warn('Tool discovery failed', { serverId: config.id, error: message });

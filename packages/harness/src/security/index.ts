@@ -4,4 +4,7 @@ export { DEFAULT_MOUNTS, WORKSPACE_ROOT } from './mounts.js';
 export { validateBashCommand, buildAllowlist } from './bashGuard.js';
 export type { BashValidationResult } from './bashGuard.js';
 export { validateUrl } from './urlGuard.js';
-export type { UrlValidationResult } from './urlGuard.js';
+export type { UrlValidationResult, UrlValidationOptions } from './urlGuard.js';
+export { scanForInjection, wrapToolResult, getSecurityReinforcement } from './injectionGuard.js';
+export { scanOutput, scanOutboundBody, redactCredentials } from './outputGuard.js';
+export { validateMcpTools } from './mcpTrustGuard.js';

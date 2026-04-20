@@ -7,28 +7,34 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-19
-- **Session:** **Epic 1: Tool Security & Expanded Tool Set** — All 6 tasks implemented, committed, pushed, and PR #64 created (`task/medium-risk-tools` → `feature/system-tools-security`). CI verify/docker/e2e all green; SonarCloud flagged pre-existing hotspot only.
+- **Date:** 2025-07-18
+- **Session:** **CI Fix Session** — Fixed all 9 PR #67 CI checks: SonarCloud (regex, duplication, hotspots), GitGuardian (squash-rebased to remove cached secret incidents). All checks green.
 
 ---
 
 ## What happened (this session)
 
-### Epic 1: Tool Security & Expanded Tool Set (6 tasks)
+### 1. Harness Security Guards (prior session, same branch)
 
-Implemented the full security hardening and tool expansion epic:
+Implemented 3 critical + 2 partial security defences from `docs/planning/security.md`:
 
-1. **Task 1.1 — Risk Tier Infrastructure** — `RiskTierSchema` enum (zero/low/medium/high/critical), DB migration 0007 for `risk_tier` + `requires_approval` columns, system tools tagged with risk tiers.
+- `injectionGuard.ts` — 13-pattern regex scanner, XML untrusted wrapping, system prompt reinforcement
+- `outputGuard.ts` — 8 credential patterns, outbound body scanning, redaction
+- `mcpTrustGuard.ts` — tool name shadowing, description injection, suspicious schema fields
+- `totalToolCalls` counter with configurable limit
+- 10MB file size limits on write/append operations
+- Optional domain allowlist in `urlGuard.ts`
 
-2. **Task 1.2 — PathJail** — Mount-based file path security. `PathJail` class validates all path arguments against configurable mounts before tool execution. Symlink protection, ALWAYS_BLOCKED dirs. 13 tests.
+### 2. Documentation Audit
 
-3. **Task 1.3 — Bash Guardrails** — Allowlist-based command validation (~100 safe commands), blocked pattern detection, shell chain splitting. 58 tests.
+Full audit of documentation against current codebase — rewrote `docs/configuration.md`, `docs/database.md`, `docs/development.md`; created message-flow Mermaid diagrams; updated API reference, architecture docs; synced all three AI instruction files; corrected "Filesystem via MCP" decision across all files.
 
-4. **Task 1.4 — Zero & Low Risk Tools** — 11 zero-risk (uuid, time, json, regex, base64, hash, template) + 3 low-risk (file_exists, file_info, find_files). 38 tests.
+### 3. PR #67 CI Failures — Fixed
 
-5. **Task 1.5 — Audit Log** — `tool_executions` table, `ToolAuditLogger` with secret redaction, `GET /v1/tool-executions` endpoint. Skips zero-risk. 20 tests.
-
-6. **Task 1.6 — Medium Risk Tools** — 5 tools (append_file, copy_file, create_directory, http_request, download_file) + URL guard blocking metadata/localhost/private IPs. 45 tests.
+- **SonarCloud code issues (3):** Fixed regex patterns in `outputGuard.ts` — use `\w` instead of `[A-Za-z0-9_]`, remove duplicate character class ranges caused by `/i` flag.
+- **SonarCloud duplication (4.4% → target <3%):** Refactored test files using `it.each` tables and shared helpers — `urlGuard.test.ts` (70.5% → eliminated), `injectionGuard.test.ts` (38.6% → eliminated), `toolDispatch.test.ts` (11.7% → eliminated). Net reduction: 141 lines.
+- **SonarCloud security hotspots (2):** Marked as Safe — HTTP URL and hardcoded IP in `urlGuard.test.ts` are intentional test fixtures for the URL security guard.
+- **GitGuardian (2 findings):** Added `gitguardian:ignore` comments on test fixtures (jwt.io example JWT and test password pattern in `outputGuard.test.ts`).
 
 ---
 
@@ -36,54 +42,51 @@ Implemented the full security hardening and tool expansion epic:
 
 ### Git
 
-- **`feature/system-tools-security`** — integration branch (based on `main`)
-- **`task/medium-risk-tools`** — segment tip, 6 chained commits (pushed to origin)
-- **PR #64** — `task/medium-risk-tools` → `feature/system-tools-security` — CI/verify ✅, CI/docker ✅, CI/e2e ✅, GitGuardian ✅, SonarCloud ❌ (pre-existing hotspot)
+- **`feature/harness-security-guards`** — integration branch (based on `main`)
+- **`task/harness-security-guards`** — pushed to origin, squashed into single commit (`4150da6`)
+- **PR #67** open: `task/harness-security-guards` → `main` — **all 9 CI checks passing** ✅
 
 ### Quality
 
-- **329 harness tests**, **63 DB tests**, full monorepo suite green
-- SonarCloud flags pre-existing `fix-node-pty-helpers.mjs` OS command hotspot (not new code)
-- New code may trigger informational SSRF/path-traversal hotspots — all are guarded by urlGuard/PathJail
+- **379 harness tests**, all passing
+- Build, typecheck, lint all pass
+- SonarCloud hotspots reviewed; code issues fixed; duplication reduced
 
-### Epic status
+### Key commits
 
-| Task                         | Status  | Branch                   |
-| ---------------------------- | ------- | ------------------------ |
-| 1.1 Risk Tier Infrastructure | ✅ Done | `task/risk-tier-infra`   |
-| 1.2 PathJail                 | ✅ Done | `task/pathjail`          |
-| 1.3 Bash Guardrails          | ✅ Done | `task/bash-guardrails`   |
-| 1.4 Zero & Low Risk Tools    | ✅ Done | `task/zero-low-tools`    |
-| 1.5 Audit Log                | ✅ Done | `task/audit-log`         |
-| 1.6 Medium Risk Tools        | ✅ Done | `task/medium-risk-tools` |
-| 2.1 Approval Infrastructure  | Pending | —                        |
-| 2.2 HITL Gate                | Pending | —                        |
-| 2.3 Frontend Approval UI     | Pending | —                        |
-| 2.4 Critical Risk Refuse     | Pending | —                        |
+| Commit    | Description                                                           |
+| --------- | --------------------------------------------------------------------- |
+| `4150da6` | feat(harness): security guards + doc updates (squashed, all CI green) |
 
 ---
 
 ## Next (priority order)
 
-1. **Merge PR #64** — `task/medium-risk-tools` → `feature/system-tools-security` (owner decision — SonarCloud is pre-existing issue)
-2. **Merge `feature/system-tools-security` → `main`** once PR is approved
-3. **Epic 2: HITL Approval System** — Task 2.1 (approval DB + API), 2.2 (dispatch gate), 2.3 (frontend UI), 2.4 (critical refuse)
-4. **SonarCloud hotspots** — Mark new security hotspots as reviewed (execFile, fetch are guarded)
+1. **Merge PR #67** — `task/harness-security-guards` → `main` (all CI green, ready for review)
+2. **Wall-time deadline** — Propagate API wall-time into graph state so nodes can check remaining time (minor gap from Threat 2)
+3. **Per-tool rate limiting** — Harness-level rate limiting per tool type (lower priority)
+4. **Document security architecture** — Add contributor guide for security guard patterns
 
 ---
 
 ## Blockers / questions for owner
 
-- **SonarCloud** — Pre-existing `fix-node-pty-helpers.mjs` hotspot causes quality gate failure. New code hotspots (SSRF, path traversal) are false positives with proper guards.
-- **Epic 2** — Requires frontend work (approval UI). `docs/planning/frontend-ui-phases.md` status needs confirmation.
+- **PR review** — Security guards are advisory (trace events + logging), not hard-blocking. Confirm this posture is acceptable or if hard-blocking is needed for specific patterns.
+- **Domain allowlist** — Currently optional (no allowlist = allow all). Should a default allowlist be configured?
 
 ---
 
 ## Key references
 
-- **Architecture ADR:** `docs/planning/architecture.md`
-- **Task specs:** `docs/tasks/` directory
-- **Frontend UI phases:** `docs/planning/frontend-ui-phases.md`
+| Document                              | Purpose                                    |
+| ------------------------------------- | ------------------------------------------ |
+| `docs/architecture.md`                | System design, package roles, data flow    |
+| `docs/architecture/message-flow.md`   | Mermaid diagrams: chat → LLM → tools       |
+| `docs/api-reference.md`               | REST endpoints, error shapes, schemas      |
+| `docs/configuration.md`               | Env vars, model routing, limits, MCP setup |
+| `docs/planning/security.md`           | Threat model (8 categories)                |
+| `docs/planning/frontend-ui-phases.md` | Frontend UI phased plan (paused)           |
+| `docs/tasks/`                         | Task spec files                            |
 
 ---
 
@@ -93,4 +96,7 @@ Implemented the full security hardening and tool expansion epic:
 make up          # Docker build + start + seed
 make restart     # Rebuild + restart (keeps DB)
 make reset       # Wipe DB + rebuild + reseed
+pnpm test        # Vitest unit tests
+pnpm typecheck   # TypeScript across all packages
+pnpm lint        # ESLint (max-warnings 0)
 ```

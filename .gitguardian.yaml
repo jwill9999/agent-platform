@@ -1,0 +1,5 @@
+secret:
+  # Test fixture files that contain intentional fake credentials
+  # for security guard pattern-detection testing
+  ignored-paths:
+    - "**/test/outputGuard.test.ts"

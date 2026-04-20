@@ -50,7 +50,13 @@ export interface UrlValidationResult {
   reason?: string;
 }
 
-export function validateUrl(rawUrl: string): UrlValidationResult {
+/** Options for URL validation, extending base safety checks. */
+export interface UrlValidationOptions {
+  /** When non-empty, only these domains (and their subdomains) are allowed. */
+  allowedDomains?: string[];
+}
+
+export function validateUrl(rawUrl: string, options?: UrlValidationOptions): UrlValidationResult {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -89,6 +95,15 @@ export function validateUrl(rawUrl: string): UrlValidationResult {
   for (const prefix of BLOCKED_IP_PREFIXES) {
     if (hostname.startsWith(prefix)) {
       return { allowed: false, reason: `Blocked private IP range: ${hostname}` };
+    }
+  }
+
+  // Domain allowlist (when configured, only listed domains pass)
+  const allowed = options?.allowedDomains;
+  if (allowed && allowed.length > 0) {
+    const match = allowed.some((d) => hostname === d || hostname.endsWith(`.${d}`));
+    if (!match) {
+      return { allowed: false, reason: `Domain "${hostname}" is not in the allowlist` };
     }
   }
 

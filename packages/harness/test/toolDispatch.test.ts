@@ -46,6 +46,25 @@ const makeMcpManager = (
     getSession: (id: string) => sessionMap[id],
   }) as unknown as McpSessionManager;
 
+/** Dispatch a single tool call and assert it produces an error result. */
+const dispatchExpectingError = async (
+  ctx: ToolDispatchContext,
+  call: { id: string; name: string; args: Record<string, unknown> },
+  expectedError: string,
+  expectedMessage?: string,
+) => {
+  const node = createToolDispatchNode(ctx);
+  const state = makeState({
+    llmOutput: { kind: 'tool_calls', calls: [call] },
+  });
+  const result = await node(state);
+  const content = JSON.parse(result.messages![0]!.content);
+  expect(content.error).toBe(expectedError);
+  if (expectedMessage) expect(content.message).toBe(expectedMessage);
+  expect(result.trace![0]).toMatchObject({ ok: false });
+  return result;
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -128,9 +147,11 @@ describe('toolDispatchNode', () => {
       role: 'tool',
       toolCallId: 'tc-2',
       toolName: 'echo',
-      content: '"echoed"',
     });
-    expect(result.trace![0]).toMatchObject({ ok: true });
+    // Successful results are wrapped as untrusted XML content
+    expect(result.messages![0]!.content).toContain('trusted="false"');
+    expect(result.messages![0]!.content).toContain('"echoed"');
+    expect(result.trace!.some((t: { type: string }) => t.type === 'tool_dispatch')).toBe(true);
   });
 
   it('rejects tool not in agent allowlist', async () => {
@@ -138,20 +159,11 @@ describe('toolDispatchNode', () => {
       agent: makeAgent({ allowedToolIds: [], allowedMcpServerIds: [] }),
       mcpManager: makeMcpManager(),
     };
-    const node = createToolDispatchNode(ctx);
-    const state = makeState({
-      llmOutput: {
-        kind: 'tool_calls',
-        calls: [{ id: 'tc-3', name: 'forbidden', args: {} }],
-      },
-    });
-
-    const result = await node(state);
-
-    expect(result.messages).toHaveLength(1);
-    const content = JSON.parse(result.messages![0]!.content);
-    expect(content.error).toBe('TOOL_NOT_ALLOWED');
-    expect(result.trace![0]).toMatchObject({ ok: false });
+    await dispatchExpectingError(
+      ctx,
+      { id: 'tc-3', name: 'forbidden', args: {} },
+      'TOOL_NOT_ALLOWED',
+    );
   });
 
   it('returns error when MCP session is not found', async () => {
@@ -159,19 +171,11 @@ describe('toolDispatchNode', () => {
       agent: makeAgent({ allowedMcpServerIds: ['missing-server'] }),
       mcpManager: makeMcpManager({}),
     };
-    const node = createToolDispatchNode(ctx);
-    const state = makeState({
-      llmOutput: {
-        kind: 'tool_calls',
-        calls: [{ id: 'tc-4', name: 'missing-server:tool', args: {} }],
-      },
-    });
-
-    const result = await node(state);
-
-    const content = JSON.parse(result.messages![0]!.content);
-    expect(content.error).toBe('MCP_SESSION_NOT_FOUND');
-    expect(result.trace![0]).toMatchObject({ ok: false });
+    await dispatchExpectingError(
+      ctx,
+      { id: 'tc-4', name: 'missing-server:tool', args: {} },
+      'MCP_SESSION_NOT_FOUND',
+    );
   });
 
   it('returns error when native executor throws', async () => {
@@ -181,40 +185,20 @@ describe('toolDispatchNode', () => {
       mcpManager: makeMcpManager(),
       nativeToolExecutor: nativeExecutor,
     };
-    const node = createToolDispatchNode(ctx);
-    const state = makeState({
-      llmOutput: {
-        kind: 'tool_calls',
-        calls: [{ id: 'tc-5', name: 'echo', args: {} }],
-      },
-    });
-
-    const result = await node(state);
-
-    const content = JSON.parse(result.messages![0]!.content);
-    expect(content.error).toBe('NATIVE_TOOL_FAILED');
-    expect(content.message).toBe('boom');
-    expect(result.trace![0]).toMatchObject({ ok: false });
+    await dispatchExpectingError(
+      ctx,
+      { id: 'tc-5', name: 'echo', args: {} },
+      'NATIVE_TOOL_FAILED',
+      'boom',
+    );
   });
 
   it('returns error when no native executor and tool is plain', async () => {
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
       mcpManager: makeMcpManager(),
-      // no nativeToolExecutor
     };
-    const node = createToolDispatchNode(ctx);
-    const state = makeState({
-      llmOutput: {
-        kind: 'tool_calls',
-        calls: [{ id: 'tc-6', name: 'echo', args: {} }],
-      },
-    });
-
-    const result = await node(state);
-
-    const content = JSON.parse(result.messages![0]!.content);
-    expect(content.error).toBe('TOOL_NOT_FOUND');
+    await dispatchExpectingError(ctx, { id: 'tc-6', name: 'echo', args: {} }, 'TOOL_NOT_FOUND');
   });
 
   it('handles multiple tool calls in single dispatch', async () => {
@@ -252,19 +236,11 @@ describe('toolDispatchNode', () => {
       agent: makeAgent(),
       mcpManager: makeMcpManager({ 'mcp-fs': { callToolAsOutput: callFn } }),
     };
-    const node = createToolDispatchNode(ctx);
-    const state = makeState({
-      llmOutput: {
-        kind: 'tool_calls',
-        calls: [{ id: 'tc-7', name: 'mcp-fs:read', args: {} }],
-      },
-    });
-
-    const result = await node(state);
-
-    const content = JSON.parse(result.messages![0]!.content);
-    expect(content.error).toBe('MCP_CALL_FAILED');
-    expect(content.message).toBe('timeout');
-    expect(result.trace![0]).toMatchObject({ ok: false });
+    await dispatchExpectingError(
+      ctx,
+      { id: 'tc-7', name: 'mcp-fs:read', args: {} },
+      'MCP_CALL_FAILED',
+      'timeout',
+    );
   });
 });

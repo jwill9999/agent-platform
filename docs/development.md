@@ -2,106 +2,170 @@
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 20+
-- [pnpm](https://pnpm.io/) 9+ — enable with `corepack enable && corepack prepare pnpm@9.15.4 --activate`
-- [Docker](https://www.docker.com/) (optional, for containerized development)
+- [Docker](https://www.docker.com/) — **required** for all development (dev/prod parity)
+- [Node.js](https://nodejs.org/) 20+ — host-side quality gates only (tests, lint, typecheck)
+- [pnpm](https://pnpm.io/) 9+ — `corepack enable && corepack prepare pnpm@9.15.4 --activate`
+
+> **All runtime commands use Docker.** Never run the API or web app locally. The Makefile targets build images, start containers, and seed the database inside the running API container. Host-side Node/pnpm is only used for quality gates (tests, lint, typecheck).
 
 ## Quick Start
 
+### 1. Configure environment
+
 ```bash
-# First time from repo root (install + build + seed + API + web)
-make                       # same as `make setup`
-
-# Restart stack; keeps the SQLite file
-make restart
-
-# Full scratch: reinstall deps + wipe DB + rebuild + seed + start
-make new
-
-# Or step by step
-pnpm install && pnpm build
-make up                    # API :3000, Web :3001 (includes seed)
-
-# Individual services
-make api                   # API only (builds first)
-make web                   # Next.js dev server
-
-# Wipe DB only (no pnpm install), then rebuild + seed + up
-make reset
+cp -f .env.example .env
+# Edit .env — set AGENT_OPENAI_API_KEY (required for chat)
 ```
 
-## Commands Reference
+### 2. Start the stack
 
-| Command                 | Description                                                    |
-| ----------------------- | -------------------------------------------------------------- |
-| `pnpm install`          | Install workspace dependencies                                 |
-| `pnpm build`            | Build all packages                                             |
-| `pnpm typecheck`        | TypeScript check across all packages                           |
-| `pnpm lint`             | ESLint (max-warnings 0)                                        |
-| `pnpm format`           | Prettier write                                                 |
-| `pnpm format:check`     | Prettier check (CI mode)                                       |
-| `pnpm test`             | Vitest unit tests                                              |
-| `pnpm test:e2e`         | Playwright end-to-end tests                                    |
-| `pnpm test:e2e:install` | Install Playwright browsers (one-time)                         |
-| `pnpm seed`             | Seed database (requires `SQLITE_PATH`, run after `pnpm build`) |
+```bash
+make up       # Build images → start containers → wait for healthy → seed DB
+```
 
-### Make Targets
+This builds both Docker images (`Dockerfile` for API, `Dockerfile.web` for Next.js), starts them via Docker Compose, waits for healthchecks, then seeds the database inside the API container. When complete:
 
-| Target                | Description                                             |
-| --------------------- | ------------------------------------------------------- |
-| `make` / `make setup` | `install` then `up` (first-time / full install path)    |
-| `make up`             | Build + down + seed + start API and Web                 |
-| `make down`           | Stop listeners on dev ports                             |
-| `make restart`        | `down` then `up` — **keeps** SQLite                     |
-| `make new`            | `install` + `reset` — reinstall deps + **wipe** DB + up |
-| `make reset`          | Down + wipe DB + build + seed + up (no `pnpm install`)  |
-| `make api`            | Build + start API only                                  |
-| `make web`            | Start Next.js dev server                                |
+- **API:** `http://localhost:3000` (Swagger UI at `/api-docs`)
+- **Web:** `http://localhost:3001`
 
-Override ports: `make reset PORT=3000 WEB_PORT=3001 SQLITE_PATH=/path/to/dev.sqlite`
+### 3. Verify
+
+```bash
+make status   # Check container health
+make logs     # Follow all service logs
+```
+
+## Order of Operations
+
+The `make up` target handles the correct sequence automatically:
+
+1. **Build images** — `docker compose build` (installs deps + compiles TypeScript inside the container)
+2. **Start containers** — `docker compose up -d --wait` (blocks until healthchecks pass)
+3. **Seed database** — `exec api node packages/db/dist/seed/run.js` (idempotent, runs inside the API container)
+
+> **Seeding requires a running, healthy API container.** The seed script runs inside the container where `SQLITE_PATH` points to the Docker volume (`/data/agent.sqlite`). You never need to set `SQLITE_PATH` on the host.
+
+## Make Targets
+
+All Docker targets handle build → start → seed in the correct order.
+
+| Target           | Description                                                    |
+| ---------------- | -------------------------------------------------------------- |
+| `make up`        | Build, start, wait for healthy, seed DB **(default)**          |
+| `make down`      | Stop all services (keeps volumes / DB)                         |
+| `make restart`   | Stop → rebuild → start + seed (keeps DB data)                  |
+| `make reset`     | Wipe DB & volumes → rebuild → start + seed (fresh DB)          |
+| `make new`       | Nuclear: remove volumes + images → rebuild from scratch → seed |
+| `make seed`      | Re-run seed in running API container (idempotent)              |
+| `make build`     | Build Docker images only (no start)                            |
+| `make rebuild`   | Build from scratch — no Docker layer cache                     |
+| `make logs`      | Follow logs for all services                                   |
+| `make logs-api`  | Follow API logs only                                           |
+| `make logs-web`  | Follow web logs only                                           |
+| `make status`    | Show container status and health                               |
+| `make shell-api` | Open a shell in the API container                              |
+| `make shell-web` | Open a shell in the web container                              |
+| `make clean`     | Remove containers, volumes, and locally-built images           |
+
+Override host ports: `HOST_PORT=4000 WEB_HOST_PORT=4001 make up`
+
+### Host-Side Quality Gates
+
+These run on the host (not in Docker) for fast feedback:
+
+| Target           | Description          |
+| ---------------- | -------------------- |
+| `make test`      | `pnpm test` (Vitest) |
+| `make lint`      | `pnpm lint` (ESLint) |
+| `make typecheck` | `pnpm typecheck`     |
+| `make format`    | `pnpm format:check`  |
+
+> Host-side quality gates require `pnpm install` on the host. The pre-push git hook runs `build + typecheck + test` on affected packages automatically.
 
 ## Project Structure
 
 ```
 agent-platform/
 ├── apps/
-│   ├── api/              # Express REST API
-│   └── web/              # Next.js chat UI
+│   ├── api/              # Express REST API (Dockerfile → port 3000)
+│   └── web/              # Next.js chat UI (Dockerfile.web → port 3001)
 ├── packages/
 │   ├── contracts/        # Shared Zod schemas
-│   ├── db/               # Drizzle ORM + SQLite
-│   ├── harness/          # LangGraph agent graph
-│   ├── model-router/     # LLM provider routing
+│   ├── db/               # Drizzle ORM + SQLite + seed scripts
+│   ├── harness/          # LangGraph agent graph + security guards
+│   ├── model-router/     # LLM provider routing + API key resolution
 │   ├── mcp-adapter/      # MCP tool bridge
 │   ├── plugin-sdk/       # Plugin hooks interface
 │   ├── planner/          # LLM planning layer
-│   ├── logger/           # Structured logging
+│   ├── logger/           # Structured JSON logging
 │   ├── agent-validation/ # Schema validation
 │   ├── plugin-session/   # Session plugin
 │   └── plugin-observability/ # Observability plugin
 ├── e2e/                  # Playwright E2E tests
 ├── docs/                 # Documentation
-│   ├── tasks/            # Task specifications
-│   └── planning/         # Architecture planning
-├── docker-compose.yml
-├── Makefile
+├── docker-compose.yml    # Service definitions (api, web, volumes)
+├── Dockerfile            # API image (multi-stage: build → runner)
+├── Dockerfile.web        # Web image (multi-stage: deps → build → runner)
+├── Makefile              # Docker-only workflow targets
 └── pnpm-workspace.yaml
 ```
 
+## Environment Variables
+
+Docker Compose reads from `.env` in the repo root (gitignored). Copy `.env.example` to get started.
+
+### Docker Compose variables
+
+| Variable               | Default | Description                                            |
+| ---------------------- | ------- | ------------------------------------------------------ |
+| `HOST_PORT`            | `3000`  | Host port mapped to API container                      |
+| `WEB_HOST_PORT`        | `3001`  | Host port mapped to web container                      |
+| `AGENT_OPENAI_API_KEY` | —       | OpenAI API key (passed to both API and web containers) |
+
+### API container (set in docker-compose.yml)
+
+| Variable             | Default              | Description                                        |
+| -------------------- | -------------------- | -------------------------------------------------- |
+| `SQLITE_PATH`        | `/data/agent.sqlite` | SQLite path inside container (Docker volume)       |
+| `PORT`               | `3000`               | API listen port                                    |
+| `HOST`               | `0.0.0.0`            | API bind address                                   |
+| `SECRETS_MASTER_KEY` | —                    | Base64-encoded 32-byte key for AES-256-GCM secrets |
+
+### Web container (set in docker-compose.yml)
+
+| Variable               | Default           | Description                                  |
+| ---------------------- | ----------------- | -------------------------------------------- |
+| `API_PROXY_URL`        | `http://api:3000` | Internal URL to API service (Docker network) |
+| `AGENT_OPENAI_API_KEY` | —                 | Forwarded as `x-openai-key` header to API    |
+
+### API Key Resolution Chain
+
+When the API receives a chat request, it resolves the LLM API key in this order:
+
+1. **Request header** — `x-openai-key` (sent by web BFF or curl)
+2. **Provider env var** — `AGENT_OPENAI_API_KEY` (or `AGENT_ANTHROPIC_API_KEY` for Anthropic)
+3. **Legacy fallback** — `OPENAI_API_KEY` only if `OPENAI_ALLOW_LEGACY_ENV=1` or `ALLOW_LEGACY_ENV=1`
+
+Ollama (local models) does not require an API key.
+
+### Secret Storage
+
+MCP server credentials and other sensitive values are stored in the `secret_refs` table with **AES-256-GCM** encryption. This requires `SECRETS_MASTER_KEY` to be set. See [Database — Secret Storage](database.md#secret-storage) for details.
+
+> **Note:** LLM API keys are resolved from environment variables / request headers, not from the secrets table. The secrets system is for MCP server credentials and other stored secrets.
+
 ## Quality Gates
 
-Run all quality checks before pushing:
+Run before pushing (or let the pre-push hook handle it):
 
 ```bash
-pnpm typecheck        # TypeScript
-pnpm lint             # ESLint
+pnpm typecheck        # TypeScript across all packages
+pnpm lint             # ESLint (max-warnings 0)
 pnpm format:check     # Prettier
-pnpm test             # Unit tests
+pnpm test             # Vitest unit tests
 ```
 
-The pre-push git hook runs `build + typecheck + test` on affected packages automatically.
-
-## Running a Single Test File
+### Running a Single Test File
 
 ```bash
 pnpm --filter <package-name> run test -- <path/to/test.ts>
@@ -110,37 +174,17 @@ pnpm --filter <package-name> run test -- <path/to/test.ts>
 pnpm --filter @agent-platform/db run test -- test/referential-integrity.test.ts
 ```
 
-## Database Setup
+## Debugging
 
-The API requires `SQLITE_PATH` to serve `/v1` routes:
-
-```bash
-# Local development
-export SQLITE_PATH=./data/dev.sqlite
-pnpm build && pnpm seed    # Create and seed DB
-make api                    # Start API
-```
-
-## Environment Variables
-
-| Variable                  | Required  | Description                                      |
-| ------------------------- | --------- | ------------------------------------------------ |
-| `SQLITE_PATH`             | Yes (API) | Path to SQLite database file                     |
-| `PORT`                    | No        | API listen port (default: 3000)                  |
-| `HOST`                    | No        | API bind address (default: 0.0.0.0)              |
-| `SECRETS_MASTER_KEY`      | No\*      | Base64-encoded 32-byte key for secret encryption |
-| `AGENT_OPENAI_API_KEY`    | No        | OpenAI API key for chat streaming                |
-| `OPENAI_ALLOW_LEGACY_ENV` | No        | Set to `1` to allow `OPENAI_API_KEY` fallback    |
-| `NEXT_OPENAI_API_KEY`     | No        | OpenAI key for Next.js BFF route                 |
-
-\* Required when writing encrypted secrets.
-
-## Debugging Tips
-
-- **API won't start?** Check `SQLITE_PATH` is set and the directory exists
-- **No `/v1` routes?** The API only mounts v1 routes when a DB connection is established
-- **Test failures?** Run `pnpm build` first — tests may depend on compiled output
-- **Swagger UI:** Visit `http://localhost:3000/api-docs` when the API is running
+| Symptom                   | Check                                                              |
+| ------------------------- | ------------------------------------------------------------------ |
+| Containers won't start    | `make status` — check health; `make logs` — check errors           |
+| No `/v1` routes           | API mounts v1 routes only when DB connects — check `make logs-api` |
+| Chat returns 401/500      | Verify `AGENT_OPENAI_API_KEY` in `.env`; rebuild: `make restart`   |
+| Stale code after changes  | `make restart` rebuilds images; `make rebuild` for no-cache build  |
+| DB corruption / bad state | `make reset` wipes volumes and reseeds                             |
+| Need a clean shell inside | `make shell-api` or `make shell-web`                               |
+| Swagger UI                | `http://localhost:3000/api-docs` when API is running               |
 
 ## Task Tracking
 

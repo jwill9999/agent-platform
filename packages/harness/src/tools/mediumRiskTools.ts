@@ -13,6 +13,7 @@ import { pipeline } from 'node:stream/promises';
 
 import type { Output, Tool as ContractTool } from '@agent-platform/contracts';
 import { validateUrl } from '../security/urlGuard.js';
+import { scanOutboundBody } from '../security/outputGuard.js';
 import {
   SYSTEM_TOOL_PREFIX,
   MAX_OUTPUT_BYTES,
@@ -26,6 +27,7 @@ import {
 
 const HTTP_TIMEOUT_MS = 30_000;
 const MAX_DOWNLOAD_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_WRITE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 // ---------------------------------------------------------------------------
 // IDs
@@ -187,6 +189,9 @@ async function handleAppendFile(toolId: string, args: Record<string, unknown>): 
   if (!filePath.trim()) {
     return toolError('INVALID_ARGS', 'path is required');
   }
+  if (Buffer.byteLength(content, 'utf-8') > MAX_WRITE_SIZE) {
+    return toolError('CONTENT_TOO_LARGE', `Content exceeds ${MAX_WRITE_SIZE} byte limit`);
+  }
   try {
     await appendFile(resolve(filePath), content, 'utf-8');
     return toolResult(toolId, { appended: true, path: resolve(filePath) });
@@ -248,6 +253,17 @@ async function handleHttpRequest(toolId: string, args: Record<string, unknown>):
   const body = typeof args.body === 'string' ? args.body : undefined;
   const timeoutMs = typeof args.timeout_ms === 'number' ? args.timeout_ms : HTTP_TIMEOUT_MS;
 
+  // Scan outbound body for sensitive data leakage
+  if (body) {
+    const bodyCheck = scanOutboundBody(url, body);
+    if (!bodyCheck.safe) {
+      return toolError(
+        'OUTBOUND_DATA_BLOCKED',
+        `Request body contains sensitive data: ${bodyCheck.issues.join(', ')}`,
+      );
+    }
+  }
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -305,7 +321,7 @@ async function handleDownloadFile(toolId: string, args: Record<string, unknown>)
 
     // Check content-length before downloading
     const contentLength = response.headers.get('content-length');
-    if (contentLength && parseInt(contentLength, 10) > MAX_DOWNLOAD_SIZE) {
+    if (contentLength && Number.parseInt(contentLength, 10) > MAX_DOWNLOAD_SIZE) {
       return toolError('DOWNLOAD_TOO_LARGE', `File exceeds ${MAX_DOWNLOAD_SIZE} byte limit`);
     }
 
