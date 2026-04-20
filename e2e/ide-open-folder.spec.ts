@@ -24,8 +24,7 @@ test.describe('IDE open folder', () => {
 
     // Snapshot: FS API available in this browser context
     const fsProbe = await page.evaluate(() => ({
-      hasPicker:
-        typeof globalThis.window !== 'undefined' && 'showDirectoryPicker' in globalThis.window,
+      hasPicker: globalThis.window !== undefined && 'showDirectoryPicker' in globalThis.window,
       href: globalThis.location.href,
     }));
     expect(fsProbe.hasPicker).toBeTruthy();

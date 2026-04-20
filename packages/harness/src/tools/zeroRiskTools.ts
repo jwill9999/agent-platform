@@ -373,9 +373,10 @@ function handleTemplateRender(toolId: string, args: Record<string, unknown>): Ou
   const variables = (
     args.variables && typeof args.variables === 'object' ? args.variables : {}
   ) as Record<string, unknown>;
-  const result = template.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => {
+  const result = template.replaceAll(/\{\{(\w+)\}\}/g, (_match, key: string) => {
     const val = variables[key];
-    return val !== undefined ? String(val) : `{{${key}}}`;
+    if (val === undefined) return `{{${key}}}`;
+    return typeof val === 'object' ? JSON.stringify(val) : String(val);
   });
   return toolResult(toolId, { result });
 }

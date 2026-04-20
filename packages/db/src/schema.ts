@@ -130,6 +130,7 @@ export const sessions = sqliteTable('sessions', {
   agentId: text('agent_id')
     .notNull()
     .references(() => agents.id, { onDelete: 'cascade' }),
+  title: text('title'),
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
   updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
 });

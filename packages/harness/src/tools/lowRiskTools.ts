@@ -135,15 +135,15 @@ async function handleFileInfo(toolId: string, args: Record<string, unknown>): Pr
   }
   try {
     const s = await stat(resolve(filePath));
+    let fileType: string;
+    if (s.isDirectory()) fileType = 'directory';
+    else if (s.isFile()) fileType = 'file';
+    else if (s.isSymbolicLink()) fileType = 'symlink';
+    else fileType = 'other';
+
     return toolResult(toolId, {
       path: resolve(filePath),
-      type: s.isDirectory()
-        ? 'directory'
-        : s.isFile()
-          ? 'file'
-          : s.isSymbolicLink()
-            ? 'symlink'
-            : 'other',
+      type: fileType,
       size: s.size,
       mode: `0${(s.mode & 0o777).toString(8)}`,
       createdAt: s.birthtime.toISOString(),

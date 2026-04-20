@@ -353,6 +353,7 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
           .values({
             id: record.id,
             agentId: record.agentId,
+            title: record.title ?? null,
             createdAtMs: existing?.createdAtMs ?? record.createdAtMs,
             updatedAtMs: record.updatedAtMs,
           })
@@ -360,6 +361,7 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
             target: schema.sessions.id,
             set: {
               agentId: record.agentId,
+              title: record.title ?? null,
               updatedAtMs: record.updatedAtMs,
             },
           })
@@ -371,5 +373,15 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
 
 export function deleteSession(db: DrizzleDb, id: string): boolean {
   const r = db.delete(schema.sessions).where(eq(schema.sessions.id, id)).run();
+  return r.changes > 0;
+}
+
+/** Update a session's title. Returns true if the row was found and updated. */
+export function updateSessionTitle(db: DrizzleDb, id: string, title: string): boolean {
+  const r = db
+    .update(schema.sessions)
+    .set({ title, updatedAtMs: Date.now() })
+    .where(eq(schema.sessions.id, id))
+    .run();
   return r.changes > 0;
 }

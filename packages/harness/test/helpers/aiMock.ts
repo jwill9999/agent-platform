@@ -39,7 +39,7 @@ export function mockStreamResult(opts: {
   reasoning?: string;
 }) {
   const chunks = opts.textChunks ?? [];
-  const joined = opts.textOverride !== undefined ? opts.textOverride : chunks.join('');
+  const joined = opts.textOverride ?? chunks.join('');
   return {
     textStream: (async function* () {
       for (const chunk of chunks) yield chunk;

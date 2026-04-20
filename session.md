@@ -8,21 +8,24 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** Lazy skill loading merged to `main` (PR #70 → #71). Branches cleaned.
+- **Session:** SonarQube fixes + lint cleanup across monorepo (post session-history feature).
 
 ---
 
 ## What happened (this session)
 
-### Lazy skill loading — merged ✅
+### SonarQube + lint fixes — complete ✅
 
-- Implemented lazy skill loading: stubs-only system prompt + `sys_get_skill_detail` on-demand tool
-- Extended Skill schema with `description` and `hint` (contracts + DB migration 0009)
-- Governor: warn@3, error@5 per-skill loads (reasoning loop detection)
-- Addressed PR review: trace accuracy, ghost-tool filtering, SonarQube fix
-- 14 new tests, 412 total harness tests passing
-- Full architecture docs: `docs/architecture/lazy-skill-loading.md`
-- PR #70 (`task → feature`), PR #71 (`feature → main`) — both merged
+- Resolved 44 SonarQube issues across 18 files (6 CRITICAL, 7 MAJOR, 31 MINOR)
+- Fixed lint blocker: removed invalid `eslint-disable react-hooks/exhaustive-deps` comment in `page.tsx`
+- Major refactor of `use-harness-chat.ts`: extracted 8 module-level helpers (StreamEvent, extractTextDelta, renderErrorEvent, renderStreamEvent, formatToolResultPreview, parseErrorResponse, readNdjsonStream, updateAssistantMessage)
+- Refactored `use-file-system.ts`: extracted `restorePersistedFolder` and `tryPermission` helpers, fixed IDB Promise rejections
+- Extracted `StatusLabel` and `AssistantContent` components from `ide-with-chat.tsx`
+- Replaced all `void asyncFn()` with `.catch(() => {})` pattern
+- Replaced `replace()` with `replaceAll()`, `typeof` with direct comparison, `[length-1]` with `.at(-1)`
+- Fixed FormEvent deprecation in `chat-input.tsx` — extracted `doSend` helper
+- All quality gates passing: lint ✅ typecheck ✅ 475 tests ✅
+- Committed and pushed to `task/session-history-ui` (updates PR #72)
 
 ---
 
@@ -31,30 +34,34 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ### Git
 
 - **`main`** — includes lazy skill loading (PR #71), per-tool rate limiting (PR #69), all prior features
-- No open feature or task branches
+- **`feature/session-history`** — integration branch (currently at `main`)
+- **`task/extend-session-schema`** — backend: title, messages endpoint, auto-title (pushed)
+- **`task/session-history-ui`** — frontend: panel, resume, settings link (pushed, segment tip)
 
 ### Quality
 
-- **412 harness tests**, all passing
+- **475 tests** (412 harness + 63 API), all passing
 - Build, typecheck, lint all clean
-- SonarQube Quality Gate passed on PR #70
+- SonarQube: 44 issues addressed (some may remain as false positives in local analyzer)
 
-### Key commits on `main`
+### Key commits on task branches
 
-| Commit    | Description                                      |
-| --------- | ------------------------------------------------ |
-| `bd0deea` | Merge PR #71 — lazy skill loading → `main`       |
-| `2506999` | fix: PR #70 review (trace ok, ghost-tool filter) |
-| `3a95ede` | feat(harness): implement lazy skill loading      |
-| `c57b33f` | Merge PR #69 — per-tool rate limiting → `main`   |
+| Commit    | Branch                       | Description                                        |
+| --------- | ---------------------------- | -------------------------------------------------- |
+| `5a98ba6` | `task/extend-session-schema` | feat: session title, messages endpoint, auto-title |
+| `ed1abcf` | `task/session-history-ui`    | feat: session history panel and resume flow        |
+| `65454b3` | `task/session-history-ui`    | fix: resolve SonarQube issues and lint failures    |
 
 ---
 
 ## Next (priority order)
 
-1. **Frontend UI** — `agent-platform-ntf` is unblocked (P2). See `docs/planning/frontend-ui-phases.md` for phased approach.
-2. **Document security architecture** — Add contributor guide for security guard patterns
-3. **Domain allowlist** — Currently optional (no allowlist = allow all). Consider default config.
+1. **Merge PR #72** — `task/session-history-ui` → `feature/session-history`, then `feature/session-history` → `main`
+2. **Close beads issue** — `agent-platform-uto` after merge
+3. **SonarQube server review** — Verify remaining issues in CI analysis (local analyzer had caching/parsing issues)
+4. **Frontend UI next phase** — `agent-platform-ntf` (unblocked). See `docs/planning/frontend-ui-phases.md`.
+5. **Document security architecture** — Add contributor guide for security guard patterns
+6. **Domain allowlist** — Currently optional (no allowlist = allow all). Consider default config.
 
 ---
 
