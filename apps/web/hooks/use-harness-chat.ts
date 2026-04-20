@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
+import type { MessageRecord } from '@agent-platform/contracts';
+import { apiGet, apiPath } from '@/lib/apiClient';
 
 function makeTextParts(text: string): NonNullable<UIMessage['parts']> {
   return [{ type: 'text', text }];
@@ -16,18 +18,57 @@ function uiMessage(id: string, role: 'user' | 'assistant', text: string): UIMess
   };
 }
 
+function messageRecordToUi(m: MessageRecord): UIMessage | null {
+  if (m.role !== 'user' && m.role !== 'assistant') return null;
+  return uiMessage(m.id, m.role, m.content);
+}
+
 /**
  * Chat against the platform harness via `POST /api/chat` → `POST /v1/chat`
- * (NDJSON stream). Resets messages when `sessionId` changes.
+ * (NDJSON stream). When `sessionId` changes:
+ * - If `resume` is true, fetches existing messages from the backend.
+ * - Otherwise, starts with an empty message list (new session).
  */
-export function useHarnessChat(sessionId: string | null) {
+export function useHarnessChat(sessionId: string | null, resume = false) {
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [status, setStatus] = useState<'ready' | 'streaming'>('ready');
   const [error, setError] = useState<string | null>(null);
+  const resumeRef = useRef(resume);
+  resumeRef.current = resume;
 
   useEffect(() => {
-    setMessages([]);
     setError(null);
+    if (!sessionId) {
+      setMessages([]);
+      return;
+    }
+
+    if (!resumeRef.current) {
+      setMessages([]);
+      return;
+    }
+
+    // Fetch existing messages for a resumed session
+    let cancelled = false;
+    (async () => {
+      try {
+        const records = await apiGet<MessageRecord[]>(apiPath('sessions', sessionId, 'messages'));
+        if (cancelled) return;
+        const uiMsgs = (records ?? [])
+          .map(messageRecordToUi)
+          .filter((m): m is UIMessage => m !== null);
+        setMessages(uiMsgs);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : String(e));
+          setMessages([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
   const sendMessage = useCallback(
