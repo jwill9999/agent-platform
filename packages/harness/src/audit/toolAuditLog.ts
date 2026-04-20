@@ -108,7 +108,7 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       if (isZeroRisk(toolName)) return null;
 
       const id = randomUUID();
-      const riskTier = SYSTEM_TOOL_RISK[toolName] as RiskTier | undefined;
+      const riskTier = SYSTEM_TOOL_RISK[toolName];
       const redacted = redactArgs(args);
       const now = Date.now();
 
@@ -148,7 +148,7 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       if (isZeroRisk(toolName)) return;
 
       const id = randomUUID();
-      const riskTier = SYSTEM_TOOL_RISK[toolName] as RiskTier | undefined;
+      const riskTier = SYSTEM_TOOL_RISK[toolName];
       const redacted = redactArgs(args);
       const now = Date.now();
 

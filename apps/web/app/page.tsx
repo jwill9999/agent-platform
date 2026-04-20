@@ -37,7 +37,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    void bootstrapAgents();
+    bootstrapAgents().catch(() => {});
   }, [bootstrapAgents]);
 
   const createSessionForAgent = useCallback(async (agentId: string) => {
@@ -64,10 +64,9 @@ export default function HomePage() {
     // Only create a new session when agent selection changes organically
     // (not via resume, which sets sessionId directly)
     if (!isResuming) {
-      void createSessionForAgent(selectedAgentId);
+      createSessionForAgent(selectedAgentId).catch(() => {});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAgentId, createSessionForAgent]);
+  }, [selectedAgentId, createSessionForAgent, isResuming]);
 
   const handleAgentChange = useCallback((agentId: string) => {
     setIsResuming(false);
@@ -84,7 +83,7 @@ export default function HomePage() {
     (agentId: string) => {
       setIsResuming(false);
       setSelectedAgentId(agentId);
-      void createSessionForAgent(agentId);
+      createSessionForAgent(agentId).catch(() => {});
     },
     [createSessionForAgent],
   );
@@ -93,10 +92,9 @@ export default function HomePage() {
 
   const handleSend = useCallback(
     (text: string) => {
-      void sendMessage(text).then(() => {
-        // Refresh session list so newly generated title appears
-        void refreshSessions();
-      });
+      sendMessage(text)
+        .then(() => refreshSessions())
+        .catch(() => {});
     },
     [sendMessage, refreshSessions],
   );

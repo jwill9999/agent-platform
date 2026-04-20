@@ -151,7 +151,7 @@ export interface SanitiseResult {
 /** Strip null bytes and C0 control characters (except \n, \r, \t). */
 function stripControlChars(text: string): string {
   // eslint-disable-next-line no-control-regex
-  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  return text.replaceAll(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }
 
 /** Extract the extension from a file path (lowercase, no dot). */
@@ -164,7 +164,7 @@ function getExtension(filePath: string): string {
 
 /** Basic path normalisation – collapse `..` / `.` / double-slashes. */
 function normalisePath(raw: string): { normalised: string; escaped: boolean } {
-  const parts = raw.replace(/\\/g, '/').split('/');
+  const parts = raw.replaceAll('\\', '/').split('/');
   const isAbsolute = raw.startsWith('/');
   const result: string[] = [];
   let escapeCount = 0;

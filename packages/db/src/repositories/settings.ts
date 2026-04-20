@@ -17,7 +17,7 @@ function rowsToSettings(rows: SettingRow[]): PlatformSettings {
       cursor[k] = (cursor[k] as Record<string, unknown>) ?? {};
       cursor = cursor[k] as Record<string, unknown>;
     }
-    const leaf = keys[keys.length - 1]!;
+    const leaf = keys.at(-1)!;
     cursor[leaf] = JSON.parse(row.value);
   }
   return PlatformSettingsSchema.parse(raw);

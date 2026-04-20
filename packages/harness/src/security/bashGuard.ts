@@ -240,7 +240,7 @@ function extractLeadingCommands(command: string): string[] {
     // Skip env-like prefixes and variable assignments
     while (idx < tokens.length) {
       const tok = tokens[idx]!;
-      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) {
+      if (/^[A-Za-z_]\w*=/.test(tok)) {
         idx++;
         continue;
       }

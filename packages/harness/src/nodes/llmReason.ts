@@ -1,6 +1,5 @@
 import { createLanguageModel, type SupportedProvider } from '@agent-platform/model-router';
-import { streamText, jsonSchema, type StreamTextResult, type ToolSet } from 'ai';
-import type { CoreMessage } from 'ai';
+import { streamText, jsonSchema, type StreamTextResult, type ToolSet, type CoreMessage } from 'ai';
 import type { RunnableConfig } from '@langchain/core/runnables';
 
 import type { HarnessStateType } from '../graphState.js';
