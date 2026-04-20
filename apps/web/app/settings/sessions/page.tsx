@@ -140,7 +140,10 @@ export default function SessionsPage() {
                   <div key={s.id} className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">
                     <MessageSquare className="h-5 w-5 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <code className="text-sm font-mono text-foreground truncate block">{s.id}</code>
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {s.title ?? 'Untitled'}
+                      </p>
+                      <code className="text-xs font-mono text-muted-foreground truncate block mt-0.5">{s.id}</code>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Created {new Date(s.createdAtMs).toLocaleString()}
                       </p>
@@ -148,6 +151,13 @@ export default function SessionsPage() {
                     <Badge variant="secondary" className="text-xs shrink-0">
                       {agents.find((a) => a.id === s.agentId)?.name ?? s.agentId}
                     </Badge>
+                    <a
+                      href="/"
+                      className="text-xs text-primary hover:underline shrink-0"
+                      title="Open this session in chat"
+                    >
+                      Open in Chat
+                    </a>
                   </div>
                 ))}
               </div>

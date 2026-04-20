@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, type KeyboardEvent, type FormEvent } from 'react';
+import { useState, useRef, useCallback, type KeyboardEvent } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -23,28 +23,32 @@ export function ChatInput({ onSend, isLoading, canSend = true }: Readonly<ChatIn
     }
   }, []);
 
+  const doSend = useCallback(() => {
+    const trimmed = input.trim();
+    if (!trimmed || isLoading || !canSend) return;
+    onSend(trimmed);
+    setInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  }, [input, isLoading, onSend, canSend]);
+
   const handleSubmit = useCallback(
-    (e: FormEvent) => {
+    (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      const trimmed = input.trim();
-      if (!trimmed || isLoading || !canSend) return;
-      onSend(trimmed);
-      setInput('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      doSend();
     },
-    [input, isLoading, onSend, canSend],
+    [doSend],
   );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        handleSubmit(e as unknown as FormEvent);
+        doSend();
       }
     },
-    [handleSubmit],
+    [doSend],
   );
 
   return (
@@ -82,9 +86,9 @@ export function ChatInput({ onSend, isLoading, canSend = true }: Readonly<ChatIn
           </button>
         </div>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          {!canSend
-            ? 'Waiting for chat session…'
-            : 'Press Enter to send, Shift+Enter for new line'}
+          {canSend
+            ? 'Press Enter to send, Shift+Enter for new line'
+            : 'Waiting for chat session…'}
         </p>
       </form>
     </div>

@@ -15,7 +15,7 @@ export function expandFencedCodeToOutputs(text: string): Output[] {
     }
     const language = m[1]?.trim() || 'plaintext';
     const raw = m[2] ?? '';
-    const content = raw.replaceAll(/\r\n/g, '\n').replace(/\n$/, '');
+    const content = raw.replaceAll('\r\n', '\n').replace(/\n$/, '');
     out.push({ type: 'code', language, content });
     lastIndex = m.index + m[0].length;
   }

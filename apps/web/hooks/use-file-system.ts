@@ -80,7 +80,7 @@ function openIDB(): Promise<IDBDatabase> {
       req.result.createObjectStore(IDB_STORE);
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(new Error('Failed to open IndexedDB'));
   });
 }
 
@@ -91,7 +91,7 @@ async function persistHandle(handle: FileSystemDirectoryHandle): Promise<void> {
     tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => reject(new Error('Failed to persist handle'));
     });
     db.close();
   } catch {
@@ -106,7 +106,7 @@ async function loadPersistedHandle(): Promise<FileSystemDirectoryHandle | null> 
     const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
     const handle = await new Promise<FileSystemDirectoryHandle | undefined>((resolve, reject) => {
       req.onsuccess = () => resolve(req.result as FileSystemDirectoryHandle | undefined);
-      req.onerror = () => reject(req.error);
+      req.onerror = () => reject(new Error('Failed to load persisted handle'));
     });
     db.close();
     return handle ?? null;
@@ -122,7 +122,7 @@ async function clearPersistedHandle(): Promise<void> {
     tx.objectStore(IDB_STORE).delete(IDB_KEY);
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = () => reject(new Error('Failed to clear persisted handle'));
     });
     db.close();
   } catch {
@@ -203,6 +203,66 @@ async function buildTree(
 }
 
 // ---------------------------------------------------------------------------
+// Restore logic — extracted to reduce cognitive complexity of the hook
+// ---------------------------------------------------------------------------
+
+type RestoreResult = { needsReconnect: true; handle: FileSystemDirectoryHandle } | null;
+
+/** Try to obtain permission for a mode, returning true if granted. */
+async function tryPermission(
+  h: FSHandleWithPermission,
+  mode: 'readwrite' | 'read',
+  isCancelled: () => boolean,
+): Promise<boolean> {
+  const perm = await h.queryPermission({ mode });
+  if (isCancelled()) return false;
+  if (perm === 'granted') return true;
+  if (perm !== 'prompt') return false;
+  try {
+    const result = await h.requestPermission({ mode });
+    if (isCancelled()) return false;
+    return result === 'granted';
+  } catch {
+    fsDebugLog(`restore:requestPermission_${mode}_threw`);
+    return false;
+  }
+}
+
+async function restorePersistedFolder(
+  isCancelled: () => boolean,
+  loadTree: (handle: FileSystemDirectoryHandle, source: 'restore') => Promise<void>,
+): Promise<RestoreResult> {
+  fsDebugLog('restore:begin');
+  const handle = await loadPersistedHandle();
+  if (isCancelled() || !handle) {
+    fsDebugLog('restore:no_handle', { hasHandle: Boolean(handle) });
+    return null;
+  }
+
+  fsDebugLog('restore:idb_hit', handle.name);
+  const h = handle as FSHandleWithPermission;
+
+  // Try read/write first, then fall back to read-only
+  if (await tryPermission(h, 'readwrite', isCancelled)) {
+    if (!isCancelled()) await loadTree(handle, 'restore');
+    return null;
+  }
+  if (isCancelled()) return null;
+
+  if (await tryPermission(h, 'read', isCancelled)) {
+    if (!isCancelled()) {
+      fsDebugLog('restore:read_only');
+      await loadTree(handle, 'restore');
+    }
+    return null;
+  }
+  if (isCancelled()) return null;
+
+  // No permission — user must click "Restore folder" (requires user gesture)
+  return { needsReconnect: true, handle };
+}
+
+// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -280,91 +340,23 @@ export function useFileSystem(): UseFileSystemReturn {
     setIsSupported(supported);
     if (!supported) return;
 
+    const isCancelled = () => cancelled || userPickedFolderThisSessionRef.current;
+
     const timerId = globalThis.setTimeout(() => {
       if (cancelled) return;
       fsDebugLog('restore:timer_fired');
-      (async () => {
-        fsDebugLog('restore:begin');
-        const handle = await loadPersistedHandle();
-        if (cancelled || !handle) {
-          fsDebugLog('restore:no_handle', { cancelled, hasHandle: Boolean(handle) });
-          return;
-        }
-        if (userPickedFolderThisSessionRef.current) {
-          fsDebugLog('restore:skip_user_already_picked');
-          return;
-        }
-
-        fsDebugLog('restore:idb_hit', handle.name);
-
-        const h = handle as FSHandleWithPermission;
-
-        // Re-request read/write permission (user may need to grant again)
-        const perm = await h.queryPermission({ mode: 'readwrite' });
-        if (cancelled || userPickedFolderThisSessionRef.current) {
-          fsDebugLog('restore:abort_after_perm_query', {
-            cancelled,
-            userPicked: userPickedFolderThisSessionRef.current,
-          });
-          return;
-        }
-        if (perm === 'granted') {
-          if (userPickedFolderThisSessionRef.current) return;
-          await loadTree(handle, 'restore');
-          return;
-        }
-
-        // 'prompt' means the browser will ask the user — only works with a user gesture,
-        // but some browsers auto-grant for same-origin after the first grant.
-        if (perm === 'prompt') {
-          try {
-            const result = await h.requestPermission({ mode: 'readwrite' });
-            if (cancelled || userPickedFolderThisSessionRef.current) return;
-            if (result === 'granted') {
-              if (userPickedFolderThisSessionRef.current) return;
-              await loadTree(handle, 'restore');
-              return;
-            }
-          } catch {
-            fsDebugLog('restore:requestPermission_rw_threw');
-            // requestPermission may throw without a user gesture — expected
+      restorePersistedFolder(isCancelled, loadTree)
+        .then((result) => {
+          if (result?.needsReconnect) {
+            pendingRestoreHandleRef.current = result.handle;
+            setNeedsFolderReconnect(true);
+            setPendingReconnectFolderName(result.handle.name);
+            fsDebugLog('restore:needs_reconnect_banner', result.handle.name);
           }
-        }
-
-        if (cancelled || userPickedFolderThisSessionRef.current) return;
-
-        // Read-only permission often survives refresh when read/write does not — enough to list the tree.
-        const readPerm = await h.queryPermission({ mode: 'read' });
-        if (cancelled || userPickedFolderThisSessionRef.current) return;
-        if (readPerm === 'granted') {
-          if (userPickedFolderThisSessionRef.current) return;
-          fsDebugLog('restore:read_only_auto');
-          await loadTree(handle, 'restore');
-          return;
-        }
-        if (readPerm === 'prompt') {
-          try {
-            const readResult = await h.requestPermission({ mode: 'read' });
-            if (cancelled || userPickedFolderThisSessionRef.current) return;
-            if (readResult === 'granted') {
-              if (userPickedFolderThisSessionRef.current) return;
-              fsDebugLog('restore:read_only_after_prompt');
-              await loadTree(handle, 'restore');
-              return;
-            }
-          } catch {
-            fsDebugLog('restore:requestPermission_read_threw');
-          }
-        }
-
-        if (cancelled || userPickedFolderThisSessionRef.current) return;
-
-        // Keep IndexedDB handle — do not clear. User must click "Restore folder" (user gesture).
-        pendingRestoreHandleRef.current = handle;
-        setNeedsFolderReconnect(true);
-        setPendingReconnectFolderName(handle.name);
-        fsDebugLog('restore:needs_reconnect_banner', handle.name);
-      })();
+        })
+        .catch(() => {
+          /* restore is best-effort */
+        });
     }, 0);
 
     return () => {

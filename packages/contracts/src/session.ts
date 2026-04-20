@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const SessionRecordSchema = z.object({
   id: z.string().min(1),
   agentId: z.string().min(1),
+  title: z.string().nullish(),
   createdAtMs: z.number().int().nonnegative(),
   updatedAtMs: z.number().int().nonnegative(),
 });

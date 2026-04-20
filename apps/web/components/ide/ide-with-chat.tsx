@@ -59,6 +59,47 @@ import { formatFileContext, sanitiseFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 
 // ---------------------------------------------------------------------------
+// Small presentational components
+// ---------------------------------------------------------------------------
+
+function StatusLabel({ isLoading, sessionReady }: Readonly<{ isLoading: boolean; sessionReady: boolean }>) {
+  let label: string;
+  if (isLoading) label = 'Thinking...';
+  else if (sessionReady) label = 'Ready';
+  else label = 'Connecting…';
+  return <span className="text-xs text-muted-foreground shrink-0">{label}</span>;
+}
+
+function AssistantContent({
+  message,
+  awaiting,
+  contextFiles,
+  activeFile,
+  onApplyCode,
+  onCreateFile,
+}: Readonly<{
+  message: UIMessage;
+  awaiting: boolean;
+  contextFiles: { path: string; name: string }[];
+  activeFile: { path: string; name: string } | null;
+  onApplyCode: (code: string, targetFile?: string) => void;
+  onCreateFile: (code: string, suggestedName?: string) => void;
+}>) {
+  if (awaiting) return <StreamingAssistantPlaceholder />;
+  const allFiles = activeFile && !contextFiles.some((f) => f.path === activeFile.path)
+    ? [...contextFiles, { path: activeFile.path, name: activeFile.name }]
+    : [...contextFiles];
+  return (
+    <IDEMarkdown
+      content={getMessageText(message)}
+      contextFiles={allFiles}
+      onApplyCode={onApplyCode}
+      onCreateFile={onCreateFile}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -576,9 +617,7 @@ function ChatPanel({
             onSelect={onAgentChange}
             disabled={isLoading}
           />
-          <span className="text-xs text-muted-foreground shrink-0">
-            {isLoading ? 'Thinking...' : sessionReady ? 'Ready' : 'Connecting…'}
-          </span>
+          <StatusLabel isLoading={isLoading} sessionReady={sessionReady} />
         </div>
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary shrink-0" />
@@ -627,17 +666,12 @@ function ChatPanel({
                   >
                     {message.role === 'user' ? (
                       <span className="whitespace-pre-wrap">{getMessageText(message)}</span>
-                    ) : awaitingAssistant ? (
-                      <StreamingAssistantPlaceholder />
                     ) : (
-                      <IDEMarkdown
-                        content={getMessageText(message)}
-                        contextFiles={[
-                          ...contextFiles.map((f) => ({ path: f.path, name: f.name })),
-                          ...(activeFile && !contextFiles.some((f) => f.path === activeFile.path)
-                            ? [{ path: activeFile.path, name: activeFile.name }]
-                            : []),
-                        ]}
+                      <AssistantContent
+                        message={message}
+                        awaiting={awaitingAssistant}
+                        contextFiles={contextFiles}
+                        activeFile={activeFile ?? null}
                         onApplyCode={onApplyCode}
                         onCreateFile={onCreateFile}
                       />
@@ -937,7 +971,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       setOpenTabs((prev) => prev.filter((tab) => tab.path !== path));
       if (activeTab === path) {
         const remaining = openTabs.filter((tab) => tab.path !== path);
-        const last = remaining.length > 0 ? remaining[remaining.length - 1] : undefined;
+        const last = remaining.at(-1);
         setActiveTab(last?.path ?? null);
       }
     },
@@ -1074,7 +1108,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     const { files } = sanitiseFileContext(contextFilesForMessage);
     const prefix = formatFileContext(files);
     const messageForApi = prefix ? `${prefix}\n${userLine}` : userLine;
-    void sendMessage(messageForApi, userLine);
+    sendMessage(messageForApi, userLine).catch(() => {});
     setChatInput('');
   }, [chatInput, sessionId, contextFilesForMessage, sendMessage]);
 
@@ -1195,7 +1229,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                       variant="secondary"
                       className="w-full"
                       onClick={() => {
-                        void fs.reconnectFolder();
+                        fs.reconnectFolder().catch(() => {});
                       }}
                     >
                       Restore folder…

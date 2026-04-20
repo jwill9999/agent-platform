@@ -21,7 +21,7 @@ export interface TerminalProps {
 const CTRL_PREFIX = 0x01;
 
 function readStoredTerminalCwd(): string | null {
-  if (typeof window === 'undefined') return null;
+  if (globalThis.window === undefined) return null;
   try {
     const v = sessionStorage.getItem(TERMINAL_CWD_KEY);
     return v?.trim() ? v.trim() : null;
@@ -37,8 +37,8 @@ function readStoredTerminalCwd(): string | null {
 function getApiHostForTerminal(): string {
   const fromEnv = process.env.NEXT_PUBLIC_API_HOST?.trim();
   if (fromEnv) return fromEnv;
-  if (typeof window === 'undefined') return '127.0.0.1';
-  const { hostname } = window.location;
+  if (globalThis.window === undefined) return '127.0.0.1';
+  const { hostname } = globalThis.location;
   if (hostname === 'localhost' || hostname === '[::1]') return '127.0.0.1';
   return hostname;
 }
@@ -54,8 +54,8 @@ function getTerminalWsBaseUrl(): string {
       return explicit.split('?')[0] ?? explicit;
     }
   }
-  if (typeof window === 'undefined') return '';
-  const { protocol } = window.location;
+  if (globalThis.window === undefined) return '';
+  const { protocol } = globalThis.location;
   const apiPort = process.env.NEXT_PUBLIC_API_PORT ?? '3000';
   const wsProto = protocol === 'https:' ? 'wss:' : 'ws:';
   const host = getApiHostForTerminal();
@@ -101,10 +101,11 @@ function formatTerminalFailure(wsUrl: string, closeCode: number, closeReason: st
     );
   }
 
-  return (
-    `Terminal WebSocket closed (${closeCode}${closeReason ? `: ${closeReason}` : ''}). URL: ${wsUrl}. ` +
-    `Confirm ${healthUrl} loads in this browser. Start the API (make api / make up) or set NEXT_PUBLIC_TERMINAL_WS_URL if the API uses another host/port.`
-  );
+  const reasonSuffix = closeReason ? `: ${closeReason}` : '';
+  const healthInfo = `Confirm ${healthUrl} loads in this browser.`;
+  const startInfo = 'Start the API (make api / make up) or set NEXT_PUBLIC_TERMINAL_WS_URL if the API uses another host/port.';
+
+  return `Terminal WebSocket closed (${closeCode}${reasonSuffix}). URL: ${wsUrl}. ${healthInfo} ${startInfo}`;
 }
 
 function sendResize(ws: WebSocket, cols: number, rows: number): void {
@@ -242,9 +243,9 @@ export function Terminal({ className, explorerFolderOpen }: Readonly<TerminalPro
       }
       if (didOpen && ev.code !== 1000) {
         setStatus('error');
+        const reason = ev.reason ? `: ${ev.reason}` : '';
         setErrorText(
-          `Shell session closed (${ev.code}${ev.reason ? `: ${ev.reason}` : ''}). ` +
-            `The PTY on the API host may have exited. Check API logs (pty.exit). Try Reconnect.`,
+          `Shell session closed (${ev.code}${reason}). The PTY on the API host may have exited. Check API logs (pty.exit). Try Reconnect.`,
         );
         return;
       }
