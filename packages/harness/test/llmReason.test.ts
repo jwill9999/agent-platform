@@ -303,3 +303,65 @@ describe('contractToolsToDefinitions', () => {
     expect(defs[0]!.description).toBe('tool-a');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tests: wall-time deadline propagation in llmReasonNode
+// ---------------------------------------------------------------------------
+
+describe('llmReasonNode — deadline propagation', () => {
+  it('halts immediately when deadline is already exceeded', async () => {
+    const node = _createNode();
+    const state = makeState({
+      startedAtMs: 1000,
+      deadlineMs: 5000,
+    });
+
+    // Simulate "now" well past the deadline (1000 + 5000 = 6000 deadline, now=99999)
+    // The real implementation calls Date.now() internally, so we use fake timers
+    vi.useFakeTimers();
+    vi.setSystemTime(99999);
+
+    const result = await node(state);
+
+    vi.useRealTimers();
+
+    expect(result.halted).toBe(true);
+    expect(result.trace).toContainEqual(expect.objectContaining({ type: 'deadline_exceeded' }));
+  });
+
+  it('does not halt when deadline has time remaining', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['ok'],
+        usage: { promptTokens: 5, completionTokens: 5 },
+      }),
+    );
+    const now = Date.now();
+    const node = _createNode();
+    const state = makeState({
+      startedAtMs: now,
+      deadlineMs: 60_000, // 60s budget — plenty of room
+    });
+
+    const result = await node(state);
+
+    expect(result.halted).toBeUndefined();
+    expect(result.llmOutput).toBeDefined();
+  });
+
+  it('is backwards-compatible when deadline fields are missing', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['ok'],
+        usage: { promptTokens: 5, completionTokens: 5 },
+      }),
+    );
+    const node = _createNode();
+    const state = makeState(); // no startedAtMs / deadlineMs
+
+    const result = await node(state);
+
+    expect(result.halted).toBeUndefined();
+    expect(result.llmOutput).toBeDefined();
+  });
+});

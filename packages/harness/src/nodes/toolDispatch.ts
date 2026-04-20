@@ -9,6 +9,7 @@ import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, NativeToolExecutor, OutputEmitter, ToolCallIntent } from '../types.js';
 import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTimeout.js';
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
+import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
 import { isSystemTool } from '../systemTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
@@ -196,8 +197,9 @@ async function executeToolWithRetry(
   agentToolTimeoutMs: number | undefined,
   traceEvents: TraceEvent[],
   signal?: AbortSignal,
+  remainingDeadlineMs?: number,
 ): Promise<{ output: Output; ok: boolean; retryCount: number; images?: Output[] }> {
-  const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs);
+  const effectiveTimeout = resolveToolTimeout(agentToolTimeoutMs, undefined, remainingDeadlineMs);
   let retryCount = 0;
 
   try {
@@ -324,6 +326,21 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
     if (llmOutput?.kind !== 'tool_calls') return {};
 
+    // Wall-time deadline check — abort before dispatching tools
+    const deadline = checkDeadline(state);
+    if (deadline.expired) {
+      return {
+        halted: true,
+        trace: [
+          {
+            type: 'deadline_exceeded',
+            elapsedMs: deadline.elapsedMs,
+            deadlineMs: state.deadlineMs,
+          },
+        ],
+      };
+    }
+
     const step = state.taskIndex ?? 0;
     const agentToolTimeoutMs = ctx.agent.executionLimits.toolTimeoutMs;
     const toolMessages: ChatMessage[] = [];
@@ -355,6 +372,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         agentToolTimeoutMs,
         traceEvents,
         signal,
+        deadline.remainingMs,
       );
 
       if (auditId && ctx.auditLog) ctx.auditLog.logComplete(auditId, output);

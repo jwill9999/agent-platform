@@ -374,5 +374,7 @@ function buildInitialState(
     recentToolCalls: [],
     totalTokensUsed: 0,
     totalCostUnits: 0,
+    startedAtMs: Date.now(),
+    deadlineMs: agentCtx.agent.executionLimits.timeoutMs,
   };
 }

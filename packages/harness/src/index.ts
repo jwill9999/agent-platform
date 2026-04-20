@@ -75,6 +75,7 @@ export type {
   UrlValidationResult,
 } from './security/index.js';
 export { createToolAuditLogger, createNoopAuditLogger, redactArgs } from './audit/index.js';
+export { checkDeadline, type DeadlineStatus } from './deadline.js';
 export type {
   ToolAuditLogger,
   ToolAuditStore,

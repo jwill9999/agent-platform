@@ -243,4 +243,61 @@ describe('toolDispatchNode', () => {
       'timeout',
     );
   });
+
+  // -------------------------------------------------------------------------
+  // Wall-time deadline propagation
+  // -------------------------------------------------------------------------
+
+  it('halts immediately when deadline is already exceeded', async () => {
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: vi.fn(),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(99999);
+
+    const state = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [{ id: 'tc-d', name: 'echo', args: {} }],
+      },
+      startedAtMs: 1000,
+      deadlineMs: 5000, // deadline at 6000, now=99999
+    });
+    const result = await node(state);
+
+    vi.useRealTimers();
+
+    expect(result.halted).toBe(true);
+    expect(result.trace).toContainEqual(expect.objectContaining({ type: 'deadline_exceeded' }));
+    // Tool executor should never have been called
+    expect(ctx.nativeToolExecutor).not.toHaveBeenCalled();
+  });
+
+  it('does not halt when deadline has time remaining', async () => {
+    const toolOutput: Output = { type: 'tool_result', data: 'ok' };
+    const executor: NativeToolExecutor = vi.fn().mockResolvedValue(toolOutput);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: executor,
+    };
+    const node = createToolDispatchNode(ctx);
+    const now = Date.now();
+    const state = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [{ id: 'tc-d2', name: 'echo', args: {} }],
+      },
+      startedAtMs: now,
+      deadlineMs: 60_000,
+    });
+    const result = await node(state);
+
+    expect(result.halted).toBeUndefined();
+    expect(executor).toHaveBeenCalledTimes(1);
+  });
 });
