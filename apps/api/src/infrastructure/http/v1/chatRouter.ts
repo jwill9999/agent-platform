@@ -1,6 +1,7 @@
 import type { DrizzleDb } from '@agent-platform/db';
 import {
   getSession,
+  getSkill,
   appendMessage,
   listMessagesBySession,
   withTransaction,
@@ -229,6 +230,7 @@ export function createChatRouter(db: DrizzleDb): Router {
             dispatcher,
             pathJail: new PathJail(DEFAULT_MOUNTS),
             auditLog,
+            skillResolver: (id: string) => getSkill(db, id),
           }),
           dispatcher,
         });

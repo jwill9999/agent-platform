@@ -215,6 +215,8 @@ curl -X POST http://localhost:3000/v1/skills \
   -d '{
     "name": "Web Research",
     "goal": "Search and summarize web content",
+    "description": "Searches the web and summarizes findings",
+    "hint": "Use when user asks about current events or external information",
     "constraints": ["Only use approved sources", "Limit to 500 words"],
     "tools": ["<tool-id>"]
   }'
@@ -223,10 +225,14 @@ curl -X POST http://localhost:3000/v1/skills \
 | Field          | Required | Description                                       |
 | -------------- | -------- | ------------------------------------------------- |
 | `name`         | **Yes**  | Display name for the skill                        |
-| `goal`         | **Yes**  | What the skill achieves                           |
+| `goal`         | **Yes**  | What the skill achieves (full instructions body)  |
+| `description`  | No       | One-line summary (used as stub in system prompt)  |
+| `hint`         | No       | When-to-use guidance (helps model decide)         |
 | `constraints`  | **Yes**  | Rules the agent must follow when using this skill |
 | `tools`        | **Yes**  | Tool IDs available to this skill                  |
 | `outputSchema` | No       | JSON schema for structured skill output           |
+
+> **Lazy loading:** Only `name`, `description`, and `hint` are injected into the system prompt. The model calls `sys_get_skill_detail` to fetch the full `goal` and `constraints` before using a skill. If `description` is not set, the first ~100 characters of `goal` are used as the stub.
 
 ---
 

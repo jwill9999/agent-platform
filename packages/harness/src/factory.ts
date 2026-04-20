@@ -57,25 +57,26 @@ export class AgentNotFoundError extends Error {
 // ---------------------------------------------------------------------------
 
 /**
- * Only list tool IDs that the agent can actually invoke (same set as passed to the LLM).
- * Skill records may list aspirational tool ids; omitting mismatches avoids telling the model
- * it can call tools it does not have.
+ * Emit lightweight skill stubs (name + description + hint) for lazy loading.
+ * The model must call `sys_get_skill_detail` to fetch full instructions before using a skill.
+ * When `description` is absent, truncates `goal` to ~100 chars.
  */
-function formatSkillSection(skills: Skill[], executableToolIds: Set<string>): string {
+function formatSkillSection(skills: Skill[]): string {
   if (skills.length === 0) return '';
   const sorted = [...skills].sort((a, b) => a.id.localeCompare(b.id));
   const lines = sorted.map((s) => {
-    let entry = `- **${s.id}**: ${s.goal}`;
-    if (s.constraints.length > 0) {
-      entry += `\n  Constraints: ${s.constraints.join('; ')}`;
-    }
-    const allowed = s.tools.filter((id) => executableToolIds.has(id));
-    if (allowed.length > 0) {
-      entry += `\n  Tools: ${allowed.join(', ')}`;
-    }
+    const desc = s.description ?? truncateGoal(s.goal);
+    let entry = `- **${s.id}** (${s.name}): ${desc}`;
+    if (s.hint) entry += `\n  Hint: ${s.hint}`;
     return entry;
   });
-  return `\n\n## Available Skills\n${lines.join('\n')}`;
+  return `\n\n## Available Skills\nCall \`sys_get_skill_detail\` with the skill ID before using any skill.\n${lines.join('\n')}`;
+}
+
+/** Truncate a goal string for use as a stub description. */
+function truncateGoal(goal: string, maxLen = 100): string {
+  if (goal.length <= maxLen) return goal;
+  return goal.slice(0, maxLen - 1) + '…';
 }
 
 function formatToolSection(tools: ContractTool[]): string {
@@ -94,8 +95,7 @@ function formatNoToolsCapabilitySection(): string {
 }
 
 function buildAugmentedPrompt(base: string, skills: Skill[], tools: ContractTool[]): string {
-  const executableIds = new Set(tools.map((t) => t.id));
-  const body = `${base}${formatSkillSection(skills, executableIds)}${formatToolSection(tools)}`;
+  const body = `${base}${formatSkillSection(skills)}${formatToolSection(tools)}`;
   const withCaps = tools.length === 0 ? `${body}${formatNoToolsCapabilitySection()}` : body;
   // Append security reinforcement (non-negotiable rules about untrusted data)
   return `${withCaps}\n\n${getSecurityReinforcement()}`;
