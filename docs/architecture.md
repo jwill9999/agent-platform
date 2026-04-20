@@ -150,6 +150,20 @@ The harness treats the LLM and external tool outputs as **untrusted**. Security 
 
 See the full guard map in **[Message Flow § Security Checkpoints](architecture/message-flow.md#3-security-checkpoints)**.
 
+## Lazy Skill Loading
+
+Skills are **not** injected in full into the system prompt. Instead, the harness emits lightweight **stubs** (name, description, hint) and provides a `sys_get_skill_detail` system tool. The model calls this tool on demand to fetch full instructions before using a skill.
+
+| Aspect         | Detail                                                            |
+| -------------- | ----------------------------------------------------------------- |
+| Stub format    | `- **id** (name): description` + optional hint                    |
+| Full fetch     | `sys_get_skill_detail({ skill_id })` → goal + constraints + tools |
+| State tracking | `loadedSkillIds` (append-only) in graph state                     |
+| Governor       | Warn at 3 loads of same skill; hard error at 5 (loop detection)   |
+| Token savings  | ~70% reduction for multi-skill agents                             |
+
+Schema fields: `description` (one-liner for stub) and `hint` (when-to-use) are optional on the Skill contract. When absent, `goal` is truncated to ~100 chars for the stub.
+
 ## Streaming Protocol
 
 The chat response uses **NDJSON** (`application/x-ndjson`). Each line is a JSON event:

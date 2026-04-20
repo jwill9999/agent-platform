@@ -5,6 +5,10 @@ export const SkillSchema = z.object({
   id: z.string().min(1),
   slug: z.string().min(1),
   name: z.string().min(1),
+  /** Short one-liner for system-prompt stubs (lazy loading). */
+  description: z.string().optional(),
+  /** When-to-use hint shown in stubs so the model knows when to load this skill. */
+  hint: z.string().optional(),
   goal: z.string(),
   constraints: z.array(z.string()),
   tools: z.array(z.string()),

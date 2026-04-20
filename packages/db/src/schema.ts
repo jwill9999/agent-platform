@@ -7,6 +7,10 @@ export const skills = sqliteTable(
     id: text('id').primaryKey(),
     name: text('name').notNull().default(''),
     slug: text('slug').notNull().default(''),
+    /** Short one-liner for system-prompt stubs (lazy loading). */
+    description: text('description'),
+    /** When-to-use hint for lazy loading stubs. */
+    hint: text('hint'),
     goal: text('goal').notNull(),
     constraintsJson: text('constraints_json').notNull(),
     toolIdsJson: text('tool_ids_json').notNull(),

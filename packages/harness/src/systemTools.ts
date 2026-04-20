@@ -36,6 +36,7 @@ const ids = {
   readFile: `${SYSTEM_TOOL_PREFIX}read_file`,
   writeFile: `${SYSTEM_TOOL_PREFIX}write_file`,
   listFiles: `${SYSTEM_TOOL_PREFIX}list_files`,
+  getSkillDetail: `${SYSTEM_TOOL_PREFIX}get_skill_detail`,
 } as const;
 
 /** Risk tier assignments for system tools. */
@@ -44,6 +45,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   [ids.readFile]: 'low',
   [ids.writeFile]: 'medium',
   [ids.listFiles]: 'low',
+  [ids.getSkillDetail]: 'zero',
   ...ZERO_RISK_MAP,
   ...LOW_RISK_MAP,
   ...MEDIUM_RISK_MAP,
@@ -140,10 +142,34 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...LOW_RISK_TOOLS,
   // New medium-risk tools (write I/O + network, PathJail + URL guard enforced)
   ...MEDIUM_RISK_TOOLS,
+  // Lazy skill loading — fetch full skill instructions on demand
+  {
+    id: ids.getSkillDetail,
+    slug: 'sys-get-skill-detail',
+    name: 'get_skill_detail',
+    description:
+      'Retrieve the full instructions for a skill before using it. Call this once per skill.',
+    riskTier: SYSTEM_TOOL_RISK[ids.getSkillDetail],
+    config: {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          skill_id: {
+            type: 'string',
+            description: 'The ID of the skill to load (from the Available Skills list).',
+          },
+        },
+        required: ['skill_id'],
+      },
+    },
+  },
 ];
 
 /** Set of system tool IDs for fast lookup. */
 export const SYSTEM_TOOL_IDS = new Set(SYSTEM_TOOLS.map((t) => t.id));
+
+/** ID for the lazy skill loading tool (used by toolDispatch interceptor). */
+export const GET_SKILL_DETAIL_ID = ids.getSkillDetail;
 
 /** Returns true if the given toolId is a built-in system tool. */
 export function isSystemTool(toolId: string): boolean {

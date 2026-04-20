@@ -40,4 +40,6 @@ export type TraceEvent =
       messagesIncluded: number;
       strategy: string;
     }
+  | { type: 'skill_loaded'; skillId: string; loadCount: number }
+  | { type: 'skill_load_loop'; skillId: string; loadCount: number }
   | { type: 'graph_end' };

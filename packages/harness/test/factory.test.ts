@@ -182,14 +182,17 @@ describe('buildAgentContext', () => {
     expect(t1Pos).toBeLessThan(t2Pos);
   });
 
-  it('system prompt includes skill constraints and tool descriptions', async () => {
+  it('system prompt includes skill stubs and tool descriptions (lazy loading)', async () => {
     mockLoadAgent.mockReturnValue({ ...baseAgent, allowedMcpServerIds: [] });
     mockGetSkill.mockReturnValue(skill1);
     mockGetTool.mockReturnValue(tool1);
 
     const ctx = await buildAgentContext(fakeDb, 'agent-1');
 
-    expect(ctx.systemPrompt).toContain('max 100 words');
+    // Stubs show skill name, not full constraints
+    expect(ctx.systemPrompt).toContain('Summarize text');
+    expect(ctx.systemPrompt).toContain('sys_get_skill_detail');
+    // Tool descriptions still appear in the tools section
     expect(ctx.systemPrompt).toContain('Summarizes input text');
   });
 
@@ -299,7 +302,7 @@ describe('buildAgentContext', () => {
     expect(ctx.systemPrompt).not.toContain('ghost-id');
   });
 
-  it('lists only skill tool ids that intersect the executable tool set', async () => {
+  it('skill stubs do not include tool IDs (lazy loading defers detail)', async () => {
     mockLoadAgent.mockReturnValue(baseAgent);
     mockGetSkill.mockReturnValue({
       ...skill1,
@@ -312,8 +315,10 @@ describe('buildAgentContext', () => {
     const ctx = await buildAgentContext(fakeDb, 'agent-1');
 
     expect(ctx.tools).toEqual([...SYSTEM_TOOLS, tool1]);
-    expect(ctx.systemPrompt).toContain('Tools: t1');
+    // Stubs never list individual tool IDs — those come from sys_get_skill_detail
+    expect(ctx.systemPrompt).not.toContain('Tools: t1');
     expect(ctx.systemPrompt).not.toContain('ghost-id');
+    expect(ctx.systemPrompt).toContain('sys_get_skill_detail');
   });
 });
 

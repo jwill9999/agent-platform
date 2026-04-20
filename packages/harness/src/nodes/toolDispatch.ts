@@ -1,4 +1,4 @@
-import type { Agent, Output } from '@agent-platform/contracts';
+import type { Agent, Output, Skill } from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
@@ -12,7 +12,7 @@ import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
 import { ToolRateLimiter } from '../security/rateLimiter.js';
-import { isSystemTool } from '../systemTools.js';
+import { isSystemTool, GET_SKILL_DETAIL_ID } from '../systemTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
 import { scanOutput } from '../security/outputGuard.js';
@@ -29,6 +29,8 @@ export type ToolDispatchContext = {
   dispatcher?: PluginDispatcher;
   pathJail?: PathJail;
   auditLog?: ToolAuditLogger;
+  /** Resolves a skill by ID for lazy loading (sys_get_skill_detail). */
+  skillResolver?: (skillId: string) => Skill | undefined;
 };
 
 /** Map system tool IDs to their path operation type for PathJail enforcement. */
@@ -293,6 +295,136 @@ function buildLimitReachedMessage(call: ToolCallIntent, maxTotal: number): ChatM
   };
 }
 
+// -- Lazy skill loading governor thresholds --
+const SKILL_LOAD_WARN_THRESHOLD = 3;
+const SKILL_LOAD_ERROR_THRESHOLD = 5;
+
+/**
+ * Handle sys_get_skill_detail inline (with governor tracking).
+ * Returns a tool message + trace events, or null if this call is not get_skill_detail.
+ */
+function handleGetSkillDetail(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+  loadedSkillIds: string[],
+): { message: ChatMessage; trace: TraceEvent[]; newLoadedIds: string[] } | null {
+  if (call.name !== GET_SKILL_DETAIL_ID) return null;
+
+  const skillId = (call.args as Record<string, unknown>)?.skill_id;
+  if (typeof skillId !== 'string' || !skillId) {
+    return {
+      message: {
+        role: 'tool',
+        toolCallId: call.id,
+        toolName: call.name,
+        content: JSON.stringify({ error: 'INVALID_INPUT', message: 'skill_id is required.' }),
+      },
+      trace: [],
+      newLoadedIds: [],
+    };
+  }
+
+  // Check the skill is assigned to this agent
+  const agentSkillIds = ctx.agent.allowedSkillIds ?? [];
+  if (!agentSkillIds.includes(skillId)) {
+    return {
+      message: {
+        role: 'tool',
+        toolCallId: call.id,
+        toolName: call.name,
+        content: JSON.stringify({
+          error: 'SKILL_NOT_ASSIGNED',
+          message: `Skill "${skillId}" is not assigned to this agent.`,
+        }),
+      },
+      trace: [],
+      newLoadedIds: [],
+    };
+  }
+
+  // Governor: count loads of this skill
+  const loadCount = loadedSkillIds.filter((id) => id === skillId).length + 1;
+  const trace: TraceEvent[] = [];
+
+  if (loadCount >= SKILL_LOAD_ERROR_THRESHOLD) {
+    trace.push({ type: 'skill_load_loop', skillId, loadCount });
+    return {
+      message: {
+        role: 'tool',
+        toolCallId: call.id,
+        toolName: call.name,
+        content: JSON.stringify({
+          error: 'SKILL_LOAD_LOOP',
+          message: `Skill "${skillId}" loaded ${loadCount} times — possible reasoning loop. Use the skill instructions you already have.`,
+        }),
+      },
+      trace,
+      newLoadedIds: [],
+    };
+  }
+
+  if (loadCount >= SKILL_LOAD_WARN_THRESHOLD) {
+    trace.push({ type: 'skill_load_loop', skillId, loadCount });
+  }
+
+  // Resolve skill via callback
+  if (!ctx.skillResolver) {
+    return {
+      message: {
+        role: 'tool',
+        toolCallId: call.id,
+        toolName: call.name,
+        content: JSON.stringify({
+          error: 'SKILL_RESOLVER_MISSING',
+          message: 'Skill resolver not configured.',
+        }),
+      },
+      trace: [],
+      newLoadedIds: [],
+    };
+  }
+
+  const skill = ctx.skillResolver(skillId);
+  if (!skill) {
+    return {
+      message: {
+        role: 'tool',
+        toolCallId: call.id,
+        toolName: call.name,
+        content: JSON.stringify({
+          error: 'SKILL_NOT_FOUND',
+          message: `Skill "${skillId}" not found.`,
+        }),
+      },
+      trace: [],
+      newLoadedIds: [],
+    };
+  }
+
+  // Return full skill body
+  const detail = {
+    id: skill.id,
+    name: skill.name,
+    goal: skill.goal,
+    constraints: skill.constraints,
+    tools: skill.tools,
+    outputSchema: skill.outputSchema,
+  };
+
+  trace.push({ type: 'skill_loaded', skillId, loadCount });
+
+  return {
+    message: {
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: JSON.stringify(detail),
+    },
+    trace,
+    newLoadedIds: [skillId],
+  };
+}
+
 /** Emit tool output (with any extracted images) through the emitter. */
 async function emitToolOutput(
   ctx: ToolDispatchContext,
@@ -356,6 +488,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     let totalToolRetries = 0;
     let toolCallCount = state.totalToolCalls ?? 0;
     const maxToolCallsTotal = ctx.agent.executionLimits.maxToolCallsTotal;
+    const newLoadedSkillIds: string[] = [];
 
     for (const call of llmOutput.calls) {
       if (signal?.aborted) break;
@@ -390,6 +523,17 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         continue;
       }
       rateLimiter.record(call.name);
+
+      // Intercept sys_get_skill_detail — handled inline with governor
+      const allLoadedIds = [...(state.loadedSkillIds ?? []), ...newLoadedSkillIds];
+      const skillResult = handleGetSkillDetail(call, ctx, allLoadedIds);
+      if (skillResult) {
+        toolMessages.push(skillResult.message);
+        traceEvents.push(...skillResult.trace);
+        newLoadedSkillIds.push(...skillResult.newLoadedIds);
+        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: true });
+        continue;
+      }
 
       await fireToolCallHook(ctx, state, call);
 
@@ -430,6 +574,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       trace: traceEvents,
       totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
       totalToolCalls: toolCallCount,
+      loadedSkillIds: newLoadedSkillIds,
     };
   };
 }
