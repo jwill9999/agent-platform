@@ -81,10 +81,10 @@ const mcpServer1: McpServer = {
 };
 
 const mcpTool: ContractTool = {
-  id: 'mcp-1:read_file',
-  slug: 'mcp-1--read-file',
-  name: 'read_file',
-  description: 'Read a file from disk',
+  id: 'mcp-1:search_index',
+  slug: 'mcp-1--search-index',
+  name: 'search_index',
+  description: 'Search an index',
 };
 
 function createMockSession(tools: ContractTool[] = []): McpSession {

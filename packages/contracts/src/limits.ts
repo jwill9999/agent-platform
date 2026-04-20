@@ -8,6 +8,7 @@ export const ExecutionLimitsSchema = z.object({
   toolTimeoutMs: z.number().int().positive().optional(),
   maxTokens: z.number().int().positive().optional(),
   maxCostUnits: z.number().nonnegative().optional(),
+  maxToolCallsTotal: z.number().int().positive().optional(),
 });
 
 export type ExecutionLimits = z.infer<typeof ExecutionLimitsSchema>;

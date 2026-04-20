@@ -46,23 +46,25 @@ See [Development Guide](docs/development.md) for prerequisites, env vars (**`SQL
 
 ## Documentation
 
-| Guide                                  | Description                               |
-| -------------------------------------- | ----------------------------------------- |
-| [Architecture](docs/architecture.md)   | System design, package roles, data flow   |
-| [API Reference](docs/api-reference.md) | REST endpoints, error shapes, schemas     |
-| [Database](docs/database.md)           | Schema, migrations, secret storage        |
-| [Development](docs/development.md)     | Local setup, build, test, lint commands   |
-| [Deployment](docs/deployment.md)       | Docker, environment variables, production |
-| [Configuration](docs/configuration.md) | Model routing, MCP servers, agent setup   |
-| [Plugin Guide](docs/plugin-guide.md)   | Plugin hooks and authoring                |
+| Guide                                             | Description                                     |
+| ------------------------------------------------- | ----------------------------------------------- |
+| [Architecture](docs/architecture.md)              | System design, package roles, data flow         |
+| [Message Flow](docs/architecture/message-flow.md) | Mermaid diagrams: chat → security → LLM → tools |
+| [API Reference](docs/api-reference.md)            | REST endpoints, error shapes, schemas           |
+| [Database](docs/database.md)                      | Schema, migrations, secret storage              |
+| [Development](docs/development.md)                | Local setup, build, test, lint commands         |
+| [Deployment](docs/deployment.md)                  | Docker, environment variables, production       |
+| [Configuration](docs/configuration.md)            | Env vars, model routing, limits, MCP, security  |
+| [Plugin Guide](docs/plugin-guide.md)              | Plugin hooks and authoring                      |
 
 ## Project Layout
 
 ```
 apps/api          Express REST API (port 3000)
 apps/web          Next.js chat UI (port 3001)
-packages/         Shared libraries (contracts, db, harness, model-router, etc.)
-docs/             Documentation
+packages/         Shared libraries (contracts, db, harness, model-router, mcp-adapter, etc.)
+  harness/src/security/  Security guards: PathJail, bash guard, injection/output/MCP trust guards
+docs/             Documentation (architecture, API, config, message flow diagrams)
 e2e/              Playwright E2E tests
 ```
 

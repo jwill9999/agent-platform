@@ -53,6 +53,10 @@ export const HarnessState = Annotation.Root({
   totalTokensUsed: Annotation<number>(),
   totalCostUnits: Annotation<number>(),
 
+  // -- Cumulative tool call counter (security) --
+  /** Total tool calls dispatched across all steps in this run. */
+  totalToolCalls: Annotation<number>(),
+
   // -- Retry budget (task 426) --
   /** Total retries consumed across all operations in this run. */
   totalRetries: Annotation<number>(),

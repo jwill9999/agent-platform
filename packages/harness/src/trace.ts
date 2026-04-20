@@ -23,6 +23,7 @@ export type TraceEvent =
   | { type: 'loop_detected'; toolSignature: string; repeats: number }
   | { type: 'limit_hit'; kind: 'max_steps' | 'timeout' | 'max_tokens' | 'max_cost' }
   | { type: 'plan_failed'; reason: string }
+  | { type: 'security_warning'; detail: string }
   | { type: 'stream_aborted'; reason: 'client_disconnect' | 'timeout' }
   | {
       type: 'context_window';

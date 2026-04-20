@@ -12,6 +12,8 @@ import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
 import { isSystemTool } from '../systemTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
+import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
+import { scanOutput } from '../security/outputGuard.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -72,6 +74,59 @@ async function enforcePathJail(
   return null;
 }
 
+/** Dispatch a tool call to an MCP session. */
+async function dispatchMcpTool(
+  parsed: { mcpServerId: string; mcpToolName: string },
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+  options?: { timeoutMs?: number },
+): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
+  const session = ctx.mcpManager.getSession(parsed.mcpServerId);
+  if (!session) {
+    return {
+      output: {
+        type: 'error',
+        code: 'MCP_SESSION_NOT_FOUND',
+        message: `No MCP session for server "${parsed.mcpServerId}"`,
+      },
+      ok: false,
+    };
+  }
+  try {
+    const { output, images } = await session.callToolAsOutput(parsed.mcpToolName, call.args, {
+      timeoutMs: options?.timeoutMs,
+    });
+    return { output, ok: output.type !== 'error', images };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { output: { type: 'error', code: 'MCP_CALL_FAILED', message }, ok: false };
+  }
+}
+
+/** Dispatch a tool call to a native executor. */
+async function dispatchNativeTool(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+): Promise<{ output: Output; ok: boolean }> {
+  if (!ctx.nativeToolExecutor) {
+    return {
+      output: {
+        type: 'error',
+        code: 'TOOL_NOT_FOUND',
+        message: `No executor found for tool "${call.name}"`,
+      },
+      ok: false,
+    };
+  }
+  try {
+    const result = await ctx.nativeToolExecutor(call.name, call.args);
+    return { output: result, ok: result.type !== 'error' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { output: { type: 'error', code: 'NATIVE_TOOL_FAILED', message }, ok: false };
+  }
+}
+
 async function dispatchSingleTool(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
@@ -105,57 +160,8 @@ async function dispatchSingleTool(
   }
 
   const parsed = parseToolId(call.name);
-
-  if (parsed.kind === 'mcp') {
-    const session = ctx.mcpManager.getSession(parsed.mcpServerId);
-    if (!session) {
-      return {
-        output: {
-          type: 'error',
-          code: 'MCP_SESSION_NOT_FOUND',
-          message: `No MCP session for server "${parsed.mcpServerId}"`,
-        },
-        ok: false,
-      };
-    }
-    try {
-      const { output, images } = await session.callToolAsOutput(parsed.mcpToolName, call.args, {
-        timeoutMs: options?.timeoutMs,
-      });
-      const ok = output.type !== 'error';
-      return { output, ok, images };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return {
-        output: { type: 'error', code: 'MCP_CALL_FAILED', message },
-        ok: false,
-      };
-    }
-  }
-
-  // Plain (registry/native) tool
-  if (ctx.nativeToolExecutor) {
-    try {
-      const result = await ctx.nativeToolExecutor(call.name, call.args);
-      const ok = result.type !== 'error';
-      return { output: result, ok };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return {
-        output: { type: 'error', code: 'NATIVE_TOOL_FAILED', message },
-        ok: false,
-      };
-    }
-  }
-
-  return {
-    output: {
-      type: 'error',
-      code: 'TOOL_NOT_FOUND',
-      message: `No executor found for tool "${call.name}"`,
-    },
-    ok: false,
-  };
+  if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, call, ctx, options);
+  return dispatchNativeTool(call, ctx);
 }
 
 /**
@@ -235,16 +241,69 @@ async function executeToolWithRetry(
 }
 
 /** Serialise a tool output to a string suitable for a tool message. */
-function outputToContent(output: Output): string {
-  if (output.type === 'tool_result') return JSON.stringify(output.data);
+function outputToContent(toolName: string, output: Output): string {
   if (output.type === 'error')
     return JSON.stringify({ error: output.code, message: output.message });
+  // Wrap successful tool results as untrusted content
+  if (output.type === 'tool_result') return wrapToolResult(toolName, JSON.stringify(output.data));
   return JSON.stringify(output);
+}
+
+/** Scan tool output for security issues and emit trace events. */
+function scanToolOutput(toolName: string, output: Output, traceEvents: TraceEvent[]): void {
+  if (output.type !== 'tool_result') return;
+  const content = typeof output.data === 'string' ? output.data : JSON.stringify(output.data);
+
+  // Check for prompt injection attempts
+  const injection = scanForInjection(content);
+  if (injection.suspicious) {
+    traceEvents.push({
+      type: 'security_warning',
+      detail: `Possible injection in ${toolName}: ${injection.patterns.join(', ')}`,
+    });
+  }
+
+  // Check for credential leakage
+  const credentials = scanOutput(content);
+  if (!credentials.safe) {
+    traceEvents.push({
+      type: 'security_warning',
+      detail: `Credential patterns in ${toolName}: ${credentials.issues.join(', ')}`,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Tool dispatch node factory
 // ---------------------------------------------------------------------------
+
+/** Build a tool message indicating the cumulative limit has been reached. */
+function buildLimitReachedMessage(call: ToolCallIntent, maxTotal: number): ChatMessage {
+  return {
+    role: 'tool',
+    toolCallId: call.id,
+    toolName: call.name,
+    content: JSON.stringify({
+      error: 'TOOL_LIMIT_REACHED',
+      message: `Cumulative tool call limit (${maxTotal}) exceeded. Please finish with available information.`,
+    }),
+  };
+}
+
+/** Emit tool output (with any extracted images) through the emitter. */
+async function emitToolOutput(
+  ctx: ToolDispatchContext,
+  output: Output,
+  images?: Output[],
+): Promise<void> {
+  if (!ctx.emitter) return;
+  if (images) {
+    for (const img of images) {
+      await ctx.emitter.emit(img);
+    }
+  }
+  await ctx.emitter.emit(output);
+}
 
 /**
  * Creates a tool_dispatch graph node bound to the given dispatch context.
@@ -263,22 +322,29 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
     const signal = config?.configurable?.signal as AbortSignal | undefined;
     const { llmOutput } = state;
 
-    if (llmOutput?.kind !== 'tool_calls') {
-      return {};
-    }
+    if (llmOutput?.kind !== 'tool_calls') return {};
 
     const step = state.taskIndex ?? 0;
     const agentToolTimeoutMs = ctx.agent.executionLimits.toolTimeoutMs;
     const toolMessages: ChatMessage[] = [];
     const traceEvents: TraceEvent[] = [];
     let totalToolRetries = 0;
+    let toolCallCount = state.totalToolCalls ?? 0;
+    const maxToolCallsTotal = ctx.agent.executionLimits.maxToolCallsTotal;
 
     for (const call of llmOutput.calls) {
       if (signal?.aborted) break;
 
+      // Cumulative tool call limit
+      if (maxToolCallsTotal && toolCallCount >= maxToolCallsTotal) {
+        toolMessages.push(buildLimitReachedMessage(call, maxToolCallsTotal));
+        traceEvents.push({ type: 'limit_hit', kind: 'max_steps' });
+        continue;
+      }
+      toolCallCount++;
+
       await fireToolCallHook(ctx, state, call);
 
-      // Audit: log start (skipped for zero-risk tools)
       const auditId =
         ctx.auditLog?.logStart(call.name, call.args, ctx.agent.id, state.sessionId ?? '') ?? null;
 
@@ -291,26 +357,18 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         signal,
       );
 
-      // Audit: log completion
-      if (auditId && ctx.auditLog) {
-        ctx.auditLog.logComplete(auditId, output);
-      }
+      if (auditId && ctx.auditLog) ctx.auditLog.logComplete(auditId, output);
 
-      if (ctx.emitter) {
-        // Emit extracted images first so they appear above the tool result
-        if (images) {
-          for (const img of images) {
-            await ctx.emitter.emit(img);
-          }
-        }
-        await ctx.emitter.emit(output);
-      }
+      await emitToolOutput(ctx, output, images);
+
+      // Security scanning (injection detection + credential leak detection)
+      scanToolOutput(call.name, output, traceEvents);
 
       toolMessages.push({
         role: 'tool',
         toolCallId: call.id,
         toolName: call.name,
-        content: outputToContent(output),
+        content: outputToContent(call.name, output),
       });
 
       traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok });
@@ -322,6 +380,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       messages: toolMessages,
       trace: traceEvents,
       totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+      totalToolCalls: toolCallCount,
     };
   };
 }

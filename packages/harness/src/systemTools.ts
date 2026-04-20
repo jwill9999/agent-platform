@@ -213,11 +213,16 @@ async function handleReadFile(toolId: string, args: Record<string, unknown>): Pr
   }
 }
 
+const MAX_WRITE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 async function handleWriteFile(toolId: string, args: Record<string, unknown>): Promise<Output> {
   const filePath = stringArg(args, 'path');
   const content = stringArg(args, 'content');
   if (!filePath.trim()) {
     return toolError('INVALID_ARGS', 'path is required');
+  }
+  if (Buffer.byteLength(content, 'utf-8') > MAX_WRITE_SIZE) {
+    return toolError('CONTENT_TOO_LARGE', `Content exceeds ${MAX_WRITE_SIZE} byte limit`);
   }
   try {
     await writeFile(resolve(filePath), content, 'utf-8');
