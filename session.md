@@ -7,8 +7,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2025-07-18
-- **Session:** **CI Fix Session** — Fixed all 9 PR #67 CI checks: SonarCloud (regex, duplication, hotspots), GitGuardian (squash-rebased to remove cached secret incidents). All checks green.
+- **Date:** 2026-04-20
+- **Session:** **Post-merge** — PR #67 merged to `main`. Security guards + comprehensive doc updates now on `main`.
 
 ---
 
@@ -42,9 +42,9 @@ Full audit of documentation against current codebase — rewrote `docs/configura
 
 ### Git
 
-- **`feature/harness-security-guards`** — integration branch (based on `main`)
-- **`task/harness-security-guards`** — pushed to origin, squashed into single commit (`4150da6`)
-- **PR #67** open: `task/harness-security-guards` → `main` — **all 9 CI checks passing** ✅
+- **`main`** — up to date, includes merged PR #67 (`d5b4d2e`)
+- Feature/task branches cleaned up
+- No open PRs
 
 ### Quality
 
@@ -54,18 +54,17 @@ Full audit of documentation against current codebase — rewrote `docs/configura
 
 ### Key commits
 
-| Commit    | Description                                                           |
-| --------- | --------------------------------------------------------------------- |
-| `4150da6` | feat(harness): security guards + doc updates (squashed, all CI green) |
+| Commit    | Description                                       |
+| --------- | ------------------------------------------------- |
+| `d5b4d2e` | Merge PR #67 — security guards + docs into `main` |
 
 ---
 
 ## Next (priority order)
 
-1. **Merge PR #67** — `task/harness-security-guards` → `main` (all CI green, ready for review)
-2. **Wall-time deadline** — Propagate API wall-time into graph state so nodes can check remaining time (minor gap from Threat 2)
-3. **Per-tool rate limiting** — Harness-level rate limiting per tool type (lower priority)
-4. **Document security architecture** — Add contributor guide for security guard patterns
+1. **Wall-time deadline** — Propagate API wall-time into graph state so nodes can check remaining time (minor gap from Threat 2)
+2. **Per-tool rate limiting** — Harness-level rate limiting per tool type (lower priority)
+3. **Document security architecture** — Add contributor guide for security guard patterns
 
 ---
 
