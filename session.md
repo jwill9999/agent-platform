@@ -8,33 +8,33 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** **Post-merge** — PR #67 merged to `main`. Security guards + comprehensive doc updates now on `main`.
+- **Session:** Implemented wall-time deadline propagation into harness graph nodes (closes Threat 2 gap).
 
 ---
 
 ## What happened (this session)
 
-### 1. Harness Security Guards (prior session, same branch)
+### Wall-time deadline propagation
 
-Implemented 3 critical + 2 partial security defences from `docs/planning/security.md`:
+Implemented cooperative deadline checking so every graph node (LLM calls, tool dispatch) checks remaining time before starting work. The API-level `timeoutMs` is now propagated into graph state as `startedAtMs` / `deadlineMs`, and a pure `checkDeadline()` helper returns `{expired, remainingMs, elapsedMs}`.
 
-- `injectionGuard.ts` — 13-pattern regex scanner, XML untrusted wrapping, system prompt reinforcement
-- `outputGuard.ts` — 8 credential patterns, outbound body scanning, redaction
-- `mcpTrustGuard.ts` — tool name shadowing, description injection, suspicious schema fields
-- `totalToolCalls` counter with configurable limit
-- 10MB file size limits on write/append operations
-- Optional domain allowlist in `urlGuard.ts`
+**Files created:**
 
-### 2. Documentation Audit
+- `packages/harness/src/deadline.ts` — core helper function
+- `packages/harness/test/deadline.test.ts` — 6 unit tests
 
-Full audit of documentation against current codebase — rewrote `docs/configuration.md`, `docs/database.md`, `docs/development.md`; created message-flow Mermaid diagrams; updated API reference, architecture docs; synced all three AI instruction files; corrected "Filesystem via MCP" decision across all files.
+**Files modified:**
 
-### 3. PR #67 CI Failures — Fixed
+- `graphState.ts` — added `startedAtMs` + `deadlineMs` annotations
+- `trace.ts` — added `deadline_exceeded` event type
+- `buildGraph.ts` — deadline checks in routing functions
+- `llmReason.ts` — deadline check before LLM call
+- `toolDispatch.ts` — deadline check + tool timeout capping
+- `chatRouter.ts` — wire initial state with `Date.now()` + `timeoutMs`
+- `index.ts` — export new symbols
+- Docs: `architecture.md`, `configuration.md`, `security.md`
 
-- **SonarCloud code issues (3):** Fixed regex patterns in `outputGuard.ts` — use `\w` instead of `[A-Za-z0-9_]`, remove duplicate character class ranges caused by `/i` flag.
-- **SonarCloud duplication (4.4% → target <3%):** Refactored test files using `it.each` tables and shared helpers — `urlGuard.test.ts` (70.5% → eliminated), `injectionGuard.test.ts` (38.6% → eliminated), `toolDispatch.test.ts` (11.7% → eliminated). Net reduction: 141 lines.
-- **SonarCloud security hotspots (2):** Marked as Safe — HTTP URL and hardcoded IP in `urlGuard.test.ts` are intentional test fixtures for the URL security guard.
-- **GitGuardian (2 findings):** Added `gitguardian:ignore` comments on test fixtures (jwt.io example JWT and test password pattern in `outputGuard.test.ts`).
+**Tests:** 390 total (11 new deadline tests), all passing.
 
 ---
 
@@ -42,27 +42,29 @@ Full audit of documentation against current codebase — rewrote `docs/configura
 
 ### Git
 
-- **`main`** — up to date, includes merged PR #67 (`d5b4d2e`)
-- Feature/task branches cleaned up
-- No open PRs
+- **`main`** — includes merged PR #67 (`d5b4d2e`)
+- **`feature/wall-time-deadline`** — branched from `main`
+- **`task/wall-time-deadline`** — pushed to origin (`c555718`), segment tip
+- Next step: open PR `task/wall-time-deadline` → `feature/wall-time-deadline`
 
 ### Quality
 
-- **379 harness tests**, all passing
-- Build, typecheck, lint all pass
-- SonarCloud hotspots reviewed; code issues fixed; duplication reduced
+- **390 tests** (harness 390), all passing
+- Build, typecheck, lint, format all pass
+- SonarCloud: pending CI run on new branch
 
 ### Key commits
 
 | Commit    | Description                                       |
 | --------- | ------------------------------------------------- |
+| `c555718` | feat(harness): wall-time deadline propagation     |
 | `d5b4d2e` | Merge PR #67 — security guards + docs into `main` |
 
 ---
 
 ## Next (priority order)
 
-1. **Wall-time deadline** — Propagate API wall-time into graph state so nodes can check remaining time (minor gap from Threat 2)
+1. **Open PR** — `task/wall-time-deadline` → `feature/wall-time-deadline` (then merge feature → `main`)
 2. **Per-tool rate limiting** — Harness-level rate limiting per tool type (lower priority)
 3. **Document security architecture** — Add contributor guide for security guard patterns
 
