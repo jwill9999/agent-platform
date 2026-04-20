@@ -57,6 +57,16 @@ export const HarnessState = Annotation.Root({
   /** Total tool calls dispatched across all steps in this run. */
   totalToolCalls: Annotation<number>(),
 
+  // -- Lazy skill loading --
+  /** Skill IDs loaded via sys_get_skill_detail in this run (for governor). */
+  loadedSkillIds: Annotation<string[]>({
+    reducer: (left: string[], right: string | string[]) => {
+      const next = Array.isArray(right) ? right : [right];
+      return [...left, ...next];
+    },
+    default: () => [],
+  }),
+
   // -- Retry budget (task 426) --
   /** Total retries consumed across all operations in this run. */
   totalRetries: Annotation<number>(),

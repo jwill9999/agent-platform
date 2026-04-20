@@ -68,6 +68,8 @@ export function runSeed(db: DrizzleDb): void {
         id: DEMO_SKILL_ID,
         slug: DEMO_SKILL_SLUG,
         name: 'Demo skill',
+        description: 'Placeholder skill for demonstration purposes.',
+        hint: 'Use when testing the skill system or as a template for new skills.',
         goal: 'Demo skill placeholder (replace with real skills in production).',
         constraintsJson: '[]',
         toolIdsJson: '[]',

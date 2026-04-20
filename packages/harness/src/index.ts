@@ -48,6 +48,7 @@ export { buildWindowedContext, type ContextWindowResult } from './contextBuilder
 export {
   SYSTEM_TOOLS,
   SYSTEM_TOOL_IDS,
+  GET_SKILL_DETAIL_ID,
   isSystemTool,
   createSystemToolExecutor,
   SYSTEM_TOOL_RISK,

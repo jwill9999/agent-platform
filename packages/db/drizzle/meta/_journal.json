@@ -64,6 +64,13 @@
       "when": 1776700000000,
       "tag": "0008_add_tool_executions",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1776800000000,
+      "tag": "0009_add_skill_lazy_fields",
+      "breakpoints": true
     }
   ]
 }
