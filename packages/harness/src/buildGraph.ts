@@ -4,6 +4,7 @@ import type { Plan } from '@agent-platform/contracts';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { HarnessState, type HarnessStateType } from './graphState.js';
 import type { TraceEvent } from './trace.js';
+import { checkDeadline } from './deadline.js';
 
 export type ToolExecutor = (toolId: string) => Promise<{ ok: boolean; detail?: string }>;
 
@@ -144,6 +145,7 @@ function createExecuteNode(options: BuildHarnessGraphOptions) {
 function routeAfterExecute(state: HarnessStateType): typeof END | 'execute' {
   if (state.halted) return END;
   if (!state.plan) return END;
+  if (checkDeadline(state).expired) return END;
   if (state.taskIndex >= state.plan.tasks.length) return END;
   return 'execute';
 }
@@ -249,6 +251,7 @@ function routeAfterLlm(state: HarnessStateType): 'react_tool_dispatch' | typeof 
 
 function routeAfterReactDispatch(state: HarnessStateType): 'react_llm_reason' | typeof END {
   if (state.halted) return END;
+  if (checkDeadline(state).expired) return END;
   const maxSteps = state.limits?.maxSteps ?? Infinity;
   if ((state.stepCount ?? 0) >= maxSteps) {
     return END;

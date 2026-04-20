@@ -60,6 +60,12 @@ export const HarnessState = Annotation.Root({
   // -- Retry budget (task 426) --
   /** Total retries consumed across all operations in this run. */
   totalRetries: Annotation<number>(),
+
+  // -- Wall-time deadline propagation --
+  /** Epoch millis when this run started (set once in initial state). */
+  startedAtMs: Annotation<number>(),
+  /** Maximum wall-time budget in ms for the entire run (from executionLimits.timeoutMs). */
+  deadlineMs: Annotation<number>(),
 });
 
 export type HarnessStateType = typeof HarnessState.State;

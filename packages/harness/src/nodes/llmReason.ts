@@ -14,6 +14,7 @@ import type {
 } from '../types.js';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { withRetry, LLM_RETRY_CONFIG } from '../retry.js';
+import { checkDeadline } from '../deadline.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -472,6 +473,21 @@ export function createLlmReasonNode(options?: OutputEmitter | LlmReasonNodeOptio
       return {
         halted: true,
         trace: [{ type: 'stream_aborted', reason: 'client_disconnect' }],
+      };
+    }
+
+    // Wall-time deadline check — abort before starting an LLM call
+    const deadline = checkDeadline(state);
+    if (deadline.expired) {
+      return {
+        halted: true,
+        trace: [
+          {
+            type: 'deadline_exceeded',
+            elapsedMs: deadline.elapsedMs,
+            deadlineMs: state.deadlineMs,
+          },
+        ],
       };
     }
 

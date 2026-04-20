@@ -123,15 +123,15 @@ curl -X POST http://localhost:3000/v1/agents \
 
 All limits are enforced by the harness per request.
 
-| Field               | Required | Description                                            |
-| ------------------- | -------- | ------------------------------------------------------ |
-| `maxSteps`          | **Yes**  | Maximum agent reasoning steps (LLM turns) per request  |
-| `maxParallelTasks`  | **Yes**  | Maximum concurrent parallel tasks                      |
-| `timeoutMs`         | **Yes**  | Overall wall-time timeout for the entire request (ms)  |
-| `toolTimeoutMs`     | No       | Per-tool-call timeout (ms); defaults to harness global |
-| `maxTokens`         | No       | Cumulative token budget across the request             |
-| `maxCostUnits`      | No       | Cumulative cost cap (provider-defined units)           |
-| `maxToolCallsTotal` | No       | Maximum total tool calls across the entire request     |
+| Field               | Required | Description                                                                                                                                                                                                                                                                 |
+| ------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `maxSteps`          | **Yes**  | Maximum agent reasoning steps (LLM turns) per request                                                                                                                                                                                                                       |
+| `maxParallelTasks`  | **Yes**  | Maximum concurrent parallel tasks                                                                                                                                                                                                                                           |
+| `timeoutMs`         | **Yes**  | Wall-time deadline for the entire run (ms). The harness propagates this into graph state so every node (LLM calls, tool dispatch) checks remaining time before starting work. Individual tool calls are capped at the lesser of `toolTimeoutMs` and the remaining deadline. |
+| `toolTimeoutMs`     | No       | Per-tool-call timeout (ms); defaults to harness global                                                                                                                                                                                                                      |
+| `maxTokens`         | No       | Cumulative token budget across the request                                                                                                                                                                                                                                  |
+| `maxCostUnits`      | No       | Cumulative cost cap (provider-defined units)                                                                                                                                                                                                                                |
+| `maxToolCallsTotal` | No       | Maximum total tool calls across the entire request                                                                                                                                                                                                                          |
 
 Budget warnings are emitted at 80% utilisation for `maxTokens`, `maxCostUnits`, and `maxToolCallsTotal`.
 
