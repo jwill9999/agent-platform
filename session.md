@@ -8,21 +8,25 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** Lazy skill loading merged to `main` (PR #70 → #71). Branches cleaned.
+- **Session:** Session history + resume feature (backend + frontend). Beads `agent-platform-uto`.
 
 ---
 
 ## What happened (this session)
 
-### Lazy skill loading — merged ✅
+### Session history + resume — in progress 🚧
 
-- Implemented lazy skill loading: stubs-only system prompt + `sys_get_skill_detail` on-demand tool
-- Extended Skill schema with `description` and `hint` (contracts + DB migration 0009)
-- Governor: warn@3, error@5 per-skill loads (reasoning loop detection)
-- Addressed PR review: trace accuracy, ghost-tool filtering, SonarQube fix
-- 14 new tests, 412 total harness tests passing
-- Full architecture docs: `docs/architecture/lazy-skill-loading.md`
-- PR #70 (`task → feature`), PR #71 (`feature → main`) — both merged
+- Added `title` column to sessions (migration 0010, contract, mapper, DB function)
+- Exposed `GET /v1/sessions/:id/messages` endpoint (user+assistant roles only)
+- Auto-title generation: derives from first user message (~80 chars, word boundary)
+- Created `SessionHistoryPanel` — collapsible side panel showing titled sessions
+- Created `useSessions` hook for session list fetching
+- Updated `useHarnessChat` with resume support (fetch history vs clear)
+- Updated `page.tsx` — panel integration, resume handler, new chat button
+- Updated settings/sessions page with title display + "Open in Chat" link
+- 4 new integration tests (63 total API tests passing)
+- Committed research docs (gap analysis, harness optimisation, etc.)
+- Branches pushed: `task/extend-session-schema`, `task/session-history-ui`
 
 ---
 
@@ -31,30 +35,32 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ### Git
 
 - **`main`** — includes lazy skill loading (PR #71), per-tool rate limiting (PR #69), all prior features
-- No open feature or task branches
+- **`feature/session-history`** — integration branch (currently at `main`)
+- **`task/extend-session-schema`** — backend: title, messages endpoint, auto-title (pushed)
+- **`task/session-history-ui`** — frontend: panel, resume, settings link (pushed, segment tip)
 
 ### Quality
 
-- **412 harness tests**, all passing
+- **63 API tests**, all passing (15 test files)
 - Build, typecheck, lint all clean
-- SonarQube Quality Gate passed on PR #70
 
-### Key commits on `main`
+### Key commits on task branches
 
-| Commit    | Description                                      |
-| --------- | ------------------------------------------------ |
-| `bd0deea` | Merge PR #71 — lazy skill loading → `main`       |
-| `2506999` | fix: PR #70 review (trace ok, ghost-tool filter) |
-| `3a95ede` | feat(harness): implement lazy skill loading      |
-| `c57b33f` | Merge PR #69 — per-tool rate limiting → `main`   |
+| Commit    | Branch                       | Description                                        |
+| --------- | ---------------------------- | -------------------------------------------------- |
+| `5a98ba6` | `task/extend-session-schema` | feat: session title, messages endpoint, auto-title |
+| `ed1abcf` | `task/session-history-ui`    | feat: session history panel and resume flow        |
+| `f04fcce` | `task/session-history-ui`    | docs: gap analysis + research documents            |
 
 ---
 
 ## Next (priority order)
 
-1. **Frontend UI** — `agent-platform-ntf` is unblocked (P2). See `docs/planning/frontend-ui-phases.md` for phased approach.
-2. **Document security architecture** — Add contributor guide for security guard patterns
-3. **Domain allowlist** — Currently optional (no allowlist = allow all). Consider default config.
+1. **Open segment PR** — `task/session-history-ui` → `feature/session-history`, then `feature/session-history` → `main`
+2. **Update docs** — session.md update commit, close beads issue `agent-platform-uto`
+3. **Frontend UI next phase** — `agent-platform-ntf` (unblocked). See `docs/planning/frontend-ui-phases.md`.
+4. **Document security architecture** — Add contributor guide for security guard patterns
+5. **Domain allowlist** — Currently optional (no allowlist = allow all). Consider default config.
 
 ---
 
