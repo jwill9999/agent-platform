@@ -191,6 +191,63 @@ describe('sys_get_skill_detail', () => {
     expect(loadEvent).toEqual({ type: 'skill_loaded', skillId: 'skill-1', loadCount: 1 });
   });
 
+  it('emits tool_dispatch trace with ok:true on success', async () => {
+    const ctx = makeCtx();
+    const node = createToolDispatchNode(ctx);
+    const state = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [{ id: 'tc-1', name: GET_SKILL_DETAIL_ID, args: { skill_id: 'skill-1' } }],
+      },
+    });
+
+    const result = await node(state);
+    const dispatchEvent = result.trace?.find((e) => e.type === 'tool_dispatch');
+    expect(dispatchEvent).toMatchObject({ type: 'tool_dispatch', ok: true });
+  });
+
+  it('emits tool_dispatch trace with ok:false on error', async () => {
+    const ctx = makeCtx();
+    const node = createToolDispatchNode(ctx);
+    const state = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [{ id: 'tc-1', name: GET_SKILL_DETAIL_ID, args: { skill_id: 'unknown-skill' } }],
+      },
+    });
+
+    const result = await node(state);
+    const dispatchEvent = result.trace?.find((e) => e.type === 'tool_dispatch');
+    expect(dispatchEvent).toMatchObject({ type: 'tool_dispatch', ok: false });
+  });
+
+  it('filters returned tools to only those executable for the agent', async () => {
+    const skillWithGhost: Skill = {
+      ...fullSkill,
+      tools: ['sys_read_file', 'ghost_tool', 'another_missing'],
+    };
+    const ctx = makeCtx({
+      agent: {
+        ...baseAgent,
+        allowedToolIds: ['sys_read_file'],
+      },
+      skillResolver: (id: string) => (id === 'skill-1' ? skillWithGhost : undefined),
+    });
+    const node = createToolDispatchNode(ctx);
+    const state = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [{ id: 'tc-1', name: GET_SKILL_DETAIL_ID, args: { skill_id: 'skill-1' } }],
+      },
+    });
+
+    const result = await node(state);
+    const msg = result.messages?.[0];
+    const content = JSON.parse(msg!.content);
+    // ghost_tool and another_missing should be filtered out
+    expect(content.tools).toEqual(['sys_read_file']);
+  });
+
   describe('governor', () => {
     it('emits warning trace at 3 loads of same skill', async () => {
       const ctx = makeCtx();

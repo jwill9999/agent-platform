@@ -310,7 +310,7 @@ function handleGetSkillDetail(
 ): { message: ChatMessage; trace: TraceEvent[]; newLoadedIds: string[] } | null {
   if (call.name !== GET_SKILL_DETAIL_ID) return null;
 
-  const skillId = (call.args as Record<string, unknown>)?.skill_id;
+  const skillId = call.args?.skill_id;
   if (typeof skillId !== 'string' || !skillId) {
     return {
       message: {
@@ -401,13 +401,15 @@ function handleGetSkillDetail(
     };
   }
 
-  // Return full skill body
+  // Filter tools to only those executable for this agent (avoids ghost-tool hallucination)
+  const executableTools = skill.tools.filter((toolId) => isToolExecutionAllowed(ctx.agent, toolId));
+
   const detail = {
     id: skill.id,
     name: skill.name,
     goal: skill.goal,
     constraints: skill.constraints,
-    tools: skill.tools,
+    tools: executableTools,
     outputSchema: skill.outputSchema,
   };
 
@@ -531,7 +533,8 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         toolMessages.push(skillResult.message);
         traceEvents.push(...skillResult.trace);
         newLoadedSkillIds.push(...skillResult.newLoadedIds);
-        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: true });
+        const ok = skillResult.newLoadedIds.length > 0;
+        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok });
         continue;
       }
 

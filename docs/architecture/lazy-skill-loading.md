@@ -102,7 +102,7 @@ This keeps the harness pure and testable — tests inject a mock resolver, the A
    │   a. Validate skill_id is a string                   │
    │   b. Check skill is in agent.allowedSkillIds         │
    │   c. Governor: count loads from loadedSkillIds state │
-   │      - >= 5: SKILL_LOAD_LOOP error (halt)            │
+   │      - >= 5: Return SKILL_LOAD_LOOP tool error       │
    │      - >= 3: Trace warning (continue)                │
    │   d. Call ctx.skillResolver(skillId) → Skill         │
    │   e. Return { goal, constraints, tools, outputSchema }│
