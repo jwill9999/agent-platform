@@ -8,25 +8,24 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** Session history + resume feature (backend + frontend). Beads `agent-platform-uto`.
+- **Session:** SonarQube fixes + lint cleanup across monorepo (post session-history feature).
 
 ---
 
 ## What happened (this session)
 
-### Session history + resume — in progress 🚧
+### SonarQube + lint fixes — complete ✅
 
-- Added `title` column to sessions (migration 0010, contract, mapper, DB function)
-- Exposed `GET /v1/sessions/:id/messages` endpoint (user+assistant roles only)
-- Auto-title generation: derives from first user message (~80 chars, word boundary)
-- Created `SessionHistoryPanel` — collapsible side panel showing titled sessions
-- Created `useSessions` hook for session list fetching
-- Updated `useHarnessChat` with resume support (fetch history vs clear)
-- Updated `page.tsx` — panel integration, resume handler, new chat button
-- Updated settings/sessions page with title display + "Open in Chat" link
-- 4 new integration tests (63 total API tests passing)
-- Committed research docs (gap analysis, harness optimisation, etc.)
-- Branches pushed: `task/extend-session-schema`, `task/session-history-ui`
+- Resolved 44 SonarQube issues across 18 files (6 CRITICAL, 7 MAJOR, 31 MINOR)
+- Fixed lint blocker: removed invalid `eslint-disable react-hooks/exhaustive-deps` comment in `page.tsx`
+- Major refactor of `use-harness-chat.ts`: extracted 8 module-level helpers (StreamEvent, extractTextDelta, renderErrorEvent, renderStreamEvent, formatToolResultPreview, parseErrorResponse, readNdjsonStream, updateAssistantMessage)
+- Refactored `use-file-system.ts`: extracted `restorePersistedFolder` and `tryPermission` helpers, fixed IDB Promise rejections
+- Extracted `StatusLabel` and `AssistantContent` components from `ide-with-chat.tsx`
+- Replaced all `void asyncFn()` with `.catch(() => {})` pattern
+- Replaced `replace()` with `replaceAll()`, `typeof` with direct comparison, `[length-1]` with `.at(-1)`
+- Fixed FormEvent deprecation in `chat-input.tsx` — extracted `doSend` helper
+- All quality gates passing: lint ✅ typecheck ✅ 475 tests ✅
+- Committed and pushed to `task/session-history-ui` (updates PR #72)
 
 ---
 
@@ -41,8 +40,9 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ### Quality
 
-- **63 API tests**, all passing (15 test files)
+- **475 tests** (412 harness + 63 API), all passing
 - Build, typecheck, lint all clean
+- SonarQube: 44 issues addressed (some may remain as false positives in local analyzer)
 
 ### Key commits on task branches
 
@@ -50,17 +50,18 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 | --------- | ---------------------------- | -------------------------------------------------- |
 | `5a98ba6` | `task/extend-session-schema` | feat: session title, messages endpoint, auto-title |
 | `ed1abcf` | `task/session-history-ui`    | feat: session history panel and resume flow        |
-| `f04fcce` | `task/session-history-ui`    | docs: gap analysis + research documents            |
+| `65454b3` | `task/session-history-ui`    | fix: resolve SonarQube issues and lint failures    |
 
 ---
 
 ## Next (priority order)
 
-1. **Open segment PR** — `task/session-history-ui` → `feature/session-history`, then `feature/session-history` → `main`
-2. **Update docs** — session.md update commit, close beads issue `agent-platform-uto`
-3. **Frontend UI next phase** — `agent-platform-ntf` (unblocked). See `docs/planning/frontend-ui-phases.md`.
-4. **Document security architecture** — Add contributor guide for security guard patterns
-5. **Domain allowlist** — Currently optional (no allowlist = allow all). Consider default config.
+1. **Merge PR #72** — `task/session-history-ui` → `feature/session-history`, then `feature/session-history` → `main`
+2. **Close beads issue** — `agent-platform-uto` after merge
+3. **SonarQube server review** — Verify remaining issues in CI analysis (local analyzer had caching/parsing issues)
+4. **Frontend UI next phase** — `agent-platform-ntf` (unblocked). See `docs/planning/frontend-ui-phases.md`.
+5. **Document security architecture** — Add contributor guide for security guard patterns
+6. **Domain allowlist** — Currently optional (no allowlist = allow all). Consider default config.
 
 ---
 
