@@ -8,15 +8,15 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** Lazy skill loading implemented on `task/lazy-skill-loading` branch. Stubs-only system prompt + `sys_get_skill_detail` on-demand tool with governor logic.
+- **Session:** Lazy skill loading complete — PR #70 open (`task/lazy-skill-loading → feature/lazy-skill-loading`). Implementation + architecture docs all pushed.
 
 ---
 
 ## What happened (this session)
 
-### Lazy skill loading (task/lazy-skill-loading — pushed, pending PR)
+### Lazy skill loading (task/lazy-skill-loading — PR #70 open)
 
-Implemented lazy skill loading pattern from `docs/lazy-skill-loading.md`:
+Implemented lazy skill loading pattern from `docs/planning/lazy-skill-loading.md`:
 
 - Extended Skill schema with `description` and `hint` optional fields (contracts + DB migration 0009)
 - Rewrote `formatSkillSection()` to emit lightweight stubs (~30 tokens each)
@@ -24,7 +24,9 @@ Implemented lazy skill loading pattern from `docs/lazy-skill-loading.md`:
 - Added `loadedSkillIds` state tracking + governor (warn@3, error@5)
 - Threaded `skillResolver` callback through ToolDispatchContext (clean arch, no direct DB dependency in harness)
 - 11 new tests, 409 total harness tests passing
-- Updated docs: architecture.md, configuration.md, lazy-skill-loading.md
+- Created `docs/architecture/lazy-skill-loading.md` — full implementation guide
+- Updated message-flow diagram with rate limit + skill detail intercept
+- Updated `docs/configuration.md`, `docs/architecture.md`, `decisions.md`
 
 ---
 
@@ -34,8 +36,8 @@ Implemented lazy skill loading pattern from `docs/lazy-skill-loading.md`:
 
 - **`main`** — up to date with PR #69 (per-tool rate limiting)
 - **`feature/lazy-skill-loading`** — integration branch (pushed, from main)
-- **`task/lazy-skill-loading`** — implementation (pushed, from feature branch)
-- This is a single-task segment; PR should go `task/lazy-skill-loading → feature/lazy-skill-loading`, then `feature → main`
+- **`task/lazy-skill-loading`** — implementation (pushed, 3 commits ahead of feature)
+- **PR #70** — `task/lazy-skill-loading → feature/lazy-skill-loading` (open, segment tip)
 
 ### Quality
 
@@ -47,6 +49,8 @@ Implemented lazy skill loading pattern from `docs/lazy-skill-loading.md`:
 
 | Commit    | Description                                    |
 | --------- | ---------------------------------------------- |
+| `315e7a6` | docs: lazy skill loading architecture doc      |
+| `5e688ae` | docs: update session.md and decisions.md       |
 | `3a95ede` | feat(harness): implement lazy skill loading    |
 | `c57b33f` | Merge PR #69 — per-tool rate limiting → `main` |
 
@@ -54,7 +58,7 @@ Implemented lazy skill loading pattern from `docs/lazy-skill-loading.md`:
 
 ## Next (priority order)
 
-1. **Open PR** — `task/lazy-skill-loading → feature/lazy-skill-loading` then `feature → main`
+1. **Merge PR #70** — `task/lazy-skill-loading → feature/lazy-skill-loading`, then `feature → main`
 2. **Frontend UI** — `agent-platform-ntf` is unblocked (P2). See `docs/planning/frontend-ui-phases.md` for phased approach.
 3. **Document security architecture** — Add contributor guide for security guard patterns
 
@@ -69,16 +73,17 @@ Implemented lazy skill loading pattern from `docs/lazy-skill-loading.md`:
 
 ## Key references
 
-| Document                              | Purpose                                    |
-| ------------------------------------- | ------------------------------------------ |
-| `docs/architecture.md`                | System design, package roles, data flow    |
-| `docs/architecture/message-flow.md`   | Mermaid diagrams: chat → LLM → tools       |
-| `docs/api-reference.md`               | REST endpoints, error shapes, schemas      |
-| `docs/configuration.md`               | Env vars, model routing, limits, MCP setup |
-| `docs/lazy-skill-loading.md`          | Lazy skill pattern (IMPLEMENTED)           |
-| `docs/planning/security.md`           | Threat model (8 categories)                |
-| `docs/planning/frontend-ui-phases.md` | Frontend UI phased plan (unblocked)        |
-| `docs/tasks/`                         | Task spec files                            |
+| Document                                  | Purpose                                    |
+| ----------------------------------------- | ------------------------------------------ |
+| `docs/architecture.md`                    | System design, package roles, data flow    |
+| `docs/architecture/message-flow.md`       | Mermaid diagrams: chat → LLM → tools       |
+| `docs/api-reference.md`                   | REST endpoints, error shapes, schemas      |
+| `docs/configuration.md`                   | Env vars, model routing, limits, MCP setup |
+| `docs/planning/lazy-skill-loading.md`     | Lazy skill pattern (planning reference)    |
+| `docs/architecture/lazy-skill-loading.md` | Lazy skill loading implementation guide    |
+| `docs/planning/security.md`               | Threat model (8 categories)                |
+| `docs/planning/frontend-ui-phases.md`     | Frontend UI phased plan (unblocked)        |
+| `docs/tasks/`                             | Task spec files                            |
 
 ---
 
