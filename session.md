@@ -8,25 +8,21 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** Lazy skill loading complete — PR #70 open (`task/lazy-skill-loading → feature/lazy-skill-loading`). Implementation + architecture docs all pushed.
+- **Session:** Lazy skill loading merged to `main` (PR #70 → #71). Branches cleaned.
 
 ---
 
 ## What happened (this session)
 
-### Lazy skill loading (task/lazy-skill-loading — PR #70 open)
+### Lazy skill loading — merged ✅
 
-Implemented lazy skill loading pattern from `docs/planning/lazy-skill-loading.md`:
-
-- Extended Skill schema with `description` and `hint` optional fields (contracts + DB migration 0009)
-- Rewrote `formatSkillSection()` to emit lightweight stubs (~30 tokens each)
-- Added `sys_get_skill_detail` system tool for on-demand full skill fetch
-- Added `loadedSkillIds` state tracking + governor (warn@3, error@5)
-- Threaded `skillResolver` callback through ToolDispatchContext (clean arch, no direct DB dependency in harness)
-- 11 new tests, 409 total harness tests passing
-- Created `docs/architecture/lazy-skill-loading.md` — full implementation guide
-- Updated message-flow diagram with rate limit + skill detail intercept
-- Updated `docs/configuration.md`, `docs/architecture.md`, `decisions.md`
+- Implemented lazy skill loading: stubs-only system prompt + `sys_get_skill_detail` on-demand tool
+- Extended Skill schema with `description` and `hint` (contracts + DB migration 0009)
+- Governor: warn@3, error@5 per-skill loads (reasoning loop detection)
+- Addressed PR review: trace accuracy, ghost-tool filtering, SonarQube fix
+- 14 new tests, 412 total harness tests passing
+- Full architecture docs: `docs/architecture/lazy-skill-loading.md`
+- PR #70 (`task → feature`), PR #71 (`feature → main`) — both merged
 
 ---
 
@@ -34,39 +30,36 @@ Implemented lazy skill loading pattern from `docs/planning/lazy-skill-loading.md
 
 ### Git
 
-- **`main`** — up to date with PR #69 (per-tool rate limiting)
-- **`feature/lazy-skill-loading`** — integration branch (pushed, from main)
-- **`task/lazy-skill-loading`** — implementation (pushed, 3 commits ahead of feature)
-- **PR #70** — `task/lazy-skill-loading → feature/lazy-skill-loading` (open, segment tip)
+- **`main`** — includes lazy skill loading (PR #71), per-tool rate limiting (PR #69), all prior features
+- No open feature or task branches
 
 ### Quality
 
-- **409 harness tests**, all passing
-- Build, typecheck, lint all pass
-- Migration 0009 adds `description` + `hint` columns to skills table
+- **412 harness tests**, all passing
+- Build, typecheck, lint all clean
+- SonarQube Quality Gate passed on PR #70
 
-### Key commits
+### Key commits on `main`
 
-| Commit    | Description                                    |
-| --------- | ---------------------------------------------- |
-| `315e7a6` | docs: lazy skill loading architecture doc      |
-| `5e688ae` | docs: update session.md and decisions.md       |
-| `3a95ede` | feat(harness): implement lazy skill loading    |
-| `c57b33f` | Merge PR #69 — per-tool rate limiting → `main` |
+| Commit    | Description                                      |
+| --------- | ------------------------------------------------ |
+| `bd0deea` | Merge PR #71 — lazy skill loading → `main`       |
+| `2506999` | fix: PR #70 review (trace ok, ghost-tool filter) |
+| `3a95ede` | feat(harness): implement lazy skill loading      |
+| `c57b33f` | Merge PR #69 — per-tool rate limiting → `main`   |
 
 ---
 
 ## Next (priority order)
 
-1. **Merge PR #70** — `task/lazy-skill-loading → feature/lazy-skill-loading`, then `feature → main`
-2. **Frontend UI** — `agent-platform-ntf` is unblocked (P2). See `docs/planning/frontend-ui-phases.md` for phased approach.
-3. **Document security architecture** — Add contributor guide for security guard patterns
+1. **Frontend UI** — `agent-platform-ntf` is unblocked (P2). See `docs/planning/frontend-ui-phases.md` for phased approach.
+2. **Document security architecture** — Add contributor guide for security guard patterns
+3. **Domain allowlist** — Currently optional (no allowlist = allow all). Consider default config.
 
 ---
 
 ## Blockers / questions for owner
 
-- **PR review** — Lazy skill loading is backwards-compatible (NULL description/hint falls back to truncated goal). No breaking API changes.
 - **Domain allowlist** — Currently optional (no allowlist = allow all). Should a default allowlist be configured?
 
 ---
