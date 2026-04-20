@@ -1,7 +1,7 @@
 'use client';
 
 import type { Agent, SessionRecord } from '@agent-platform/contracts';
-import { useCallback, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { MessageSquare, Plus, PanelLeftClose, PanelLeft } from 'lucide-react';
 
@@ -10,7 +10,7 @@ export interface SessionHistoryPanelProps {
   agents: Agent[];
   activeSessionId: string | null;
   onSelectSession: (session: SessionRecord) => void;
-  onNewChat: () => void;
+  onNewChatForAgent: (agentId: string) => void;
   loading?: boolean;
 }
 
@@ -27,20 +27,35 @@ function relativeTime(ms: number): string {
   return new Date(ms).toLocaleDateString();
 }
 
+interface AgentGroup {
+  agentId: string;
+  agentName: string;
+  sessions: SessionRecord[];
+}
+
 export function SessionHistoryPanel({
   sessions,
   agents,
   activeSessionId,
   onSelectSession,
-  onNewChat,
+  onNewChatForAgent,
   loading,
 }: Readonly<SessionHistoryPanelProps>) {
   const [collapsed, setCollapsed] = useState(false);
 
-  const agentName = useCallback(
-    (agentId: string) => agents.find((a) => a.id === agentId)?.name ?? 'Unknown',
-    [agents],
-  );
+  const groups = useMemo((): AgentGroup[] => {
+    const map = new Map<string, SessionRecord[]>();
+    for (const s of sessions) {
+      const list = map.get(s.agentId) ?? [];
+      list.push(s);
+      map.set(s.agentId, list);
+    }
+    return Array.from(map.entries()).map(([agentId, items]) => ({
+      agentId,
+      agentName: agents.find((a) => a.id === agentId)?.name ?? 'Unknown',
+      sessions: items,
+    }));
+  }, [sessions, agents]);
 
   if (collapsed) {
     return (
@@ -62,25 +77,14 @@ export function SessionHistoryPanel({
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-3 border-b border-border">
         <h2 className="text-sm font-medium text-foreground">Sessions</h2>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onNewChat}
-            className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-            aria-label="New chat"
-            title="New chat"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setCollapsed(true)}
-            className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground"
-            aria-label="Collapse panel"
-          >
-            <PanelLeftClose className="h-4 w-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setCollapsed(true)}
+          className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground"
+          aria-label="Collapse panel"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Session list */}
@@ -98,15 +102,31 @@ export function SessionHistoryPanel({
           </div>
         )}
 
-        {sessions.length > 0 && (
-          <div className="py-1">
-            {sessions.map((session) => (
+        {groups.map((group) => (
+          <div key={group.agentId} className="border-b border-border/50 last:border-b-0">
+            {/* Agent group header */}
+            <div className="flex items-center justify-between px-3 py-2 bg-muted/20">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                {group.agentName}
+              </span>
+              <button
+                type="button"
+                onClick={() => onNewChatForAgent(group.agentId)}
+                className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                aria-label={`New chat with ${group.agentName}`}
+                title={`New chat with ${group.agentName}`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {/* Sessions in this group */}
+            {group.sessions.map((session) => (
               <button
                 key={session.id}
                 type="button"
                 onClick={() => onSelectSession(session)}
                 className={cn(
-                  'w-full text-left px-3 py-2.5 hover:bg-muted/50 transition-colors',
+                  'w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors',
                   'focus:outline-none focus:bg-muted/50',
                   session.id === activeSessionId && 'bg-muted/70',
                 )}
@@ -114,23 +134,18 @@ export function SessionHistoryPanel({
                 <div className="flex items-start gap-2 min-w-0">
                   <MessageSquare className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate leading-tight">
+                    <p className="text-sm text-foreground truncate leading-tight">
                       {session.title ?? 'Untitled'}
                     </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-muted-foreground truncate">
-                        {agentName(session.agentId)}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground/60 shrink-0">
-                        {relativeTime(session.updatedAtMs)}
-                      </span>
-                    </div>
+                    <span className="text-[11px] text-muted-foreground/60">
+                      {relativeTime(session.updatedAtMs)}
+                    </span>
                   </div>
                 </div>
               </button>
             ))}
           </div>
-        )}
+        ))}
       </div>
     </div>
   );

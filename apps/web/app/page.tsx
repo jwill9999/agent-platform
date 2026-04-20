@@ -80,11 +80,14 @@ export default function HomePage() {
     setSessionId(session.id);
   }, []);
 
-  const handleNewChat = useCallback(() => {
-    if (!selectedAgentId) return;
-    setIsResuming(false);
-    void createSessionForAgent(selectedAgentId);
-  }, [selectedAgentId, createSessionForAgent]);
+  const handleNewChatForAgent = useCallback(
+    (agentId: string) => {
+      setIsResuming(false);
+      setSelectedAgentId(agentId);
+      void createSessionForAgent(agentId);
+    },
+    [createSessionForAgent],
+  );
 
   const isLoading = status === 'streaming';
 
@@ -106,7 +109,7 @@ export default function HomePage() {
         agents={agents}
         activeSessionId={sessionId}
         onSelectSession={handleSelectSession}
-        onNewChat={handleNewChat}
+        onNewChatForAgent={handleNewChatForAgent}
         loading={sessionsLoading}
       />
 
