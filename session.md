@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2025-07-18
-- **Session:** **CI Fix + Documentation Audit** — Fixed SonarCloud quality gate failures (duplication, code issues, security hotspots) and GitGuardian false positives. Completed comprehensive docs audit following harness security guards implementation.
+- **Session:** **CI Fix Session** — Fixed all 9 PR #67 CI checks: SonarCloud (regex, duplication, hotspots), GitGuardian (squash-rebased to remove cached secret incidents). All checks green.
 
 ---
 
@@ -43,8 +43,8 @@ Full audit of documentation against current codebase — rewrote `docs/configura
 ### Git
 
 - **`feature/harness-security-guards`** — integration branch (based on `main`)
-- **`task/harness-security-guards`** — pushed to origin, all security + docs + CI fix commits
-- **PR #67** open: `task/harness-security-guards` → `main` — awaiting re-run of CI checks after push `e9afbd6`
+- **`task/harness-security-guards`** — pushed to origin, squashed into single commit (`4150da6`)
+- **PR #67** open: `task/harness-security-guards` → `main` — **all 9 CI checks passing** ✅
 
 ### Quality
 
@@ -52,24 +52,20 @@ Full audit of documentation against current codebase — rewrote `docs/configura
 - Build, typecheck, lint all pass
 - SonarCloud hotspots reviewed; code issues fixed; duplication reduced
 
-### Key commits (recent)
+### Key commits
 
-| Commit    | Description                                                       |
-| --------- | ----------------------------------------------------------------- |
-| `e9afbd6` | Fix SonarCloud (regex, duplication) + GitGuardian (test fixtures) |
-| `81b2643` | Rewrite docs/development.md for Docker-only workflow              |
-| `0f30215` | Rewrite docs/database.md with full schema detail                  |
-| `65914e2` | Filesystem decision correction + session/README updates           |
+| Commit    | Description                                                           |
+| --------- | --------------------------------------------------------------------- |
+| `4150da6` | feat(harness): security guards + doc updates (squashed, all CI green) |
 
 ---
 
 ## Next (priority order)
 
-1. **Verify PR #67 CI** — Confirm SonarCloud quality gate passes after duplication reduction and hotspot reviews; confirm GitGuardian passes with inline ignores
-2. **Merge PR #67** — `task/harness-security-guards` → `main`
-3. **Wall-time deadline** — Propagate API wall-time into graph state so nodes can check remaining time (minor gap from Threat 2)
-4. **Per-tool rate limiting** — Harness-level rate limiting per tool type (lower priority)
-5. **Document security architecture** — Add contributor guide for security guard patterns
+1. **Merge PR #67** — `task/harness-security-guards` → `main` (all CI green, ready for review)
+2. **Wall-time deadline** — Propagate API wall-time into graph state so nodes can check remaining time (minor gap from Threat 2)
+3. **Per-tool rate limiting** — Harness-level rate limiting per tool type (lower priority)
+4. **Document security architecture** — Add contributor guide for security guard patterns
 
 ---
 
