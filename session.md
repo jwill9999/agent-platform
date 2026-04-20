@@ -8,33 +8,19 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** PR #68 merged — wall-time deadline propagation now on `main`. Branches cleaned up.
+- **Session:** Implemented per-tool rate limiting + wall-time deadline propagation (PRs #68 merged; rate limiting on task branch).
 
 ---
 
 ## What happened (this session)
 
-### Wall-time deadline propagation
+### Wall-time deadline propagation (PR #68 — merged)
 
-Implemented cooperative deadline checking so every graph node (LLM calls, tool dispatch) checks remaining time before starting work. The API-level `timeoutMs` is now propagated into graph state as `startedAtMs` / `deadlineMs`, and a pure `checkDeadline()` helper returns `{expired, remainingMs, elapsedMs}`.
+Cooperative deadline checking across all harness graph nodes. `startedAtMs`/`deadlineMs` propagated into graph state. 11 new tests.
 
-**Files created:**
+### Per-tool rate limiting (task branch)
 
-- `packages/harness/src/deadline.ts` — core helper function
-- `packages/harness/test/deadline.test.ts` — 6 unit tests
-
-**Files modified:**
-
-- `graphState.ts` — added `startedAtMs` + `deadlineMs` annotations
-- `trace.ts` — added `deadline_exceeded` event type
-- `buildGraph.ts` — deadline checks in routing functions
-- `llmReason.ts` — deadline check before LLM call
-- `toolDispatch.ts` — deadline check + tool timeout capping
-- `chatRouter.ts` — wire initial state with `Date.now()` + `timeoutMs`
-- `index.ts` — export new symbols
-- Docs: `architecture.md`, `configuration.md`, `security.md`
-
-**Tests:** 390 total (11 new deadline tests), all passing.
+Added `ToolRateLimiter` — sliding-window rate limiter (default 30 calls/min per tool) integrated into the tool dispatch loop. New `toolRateLimitPerMinute` field in `ExecutionLimits`. 8 new tests.
 
 ---
 
@@ -42,27 +28,28 @@ Implemented cooperative deadline checking so every graph node (LLM calls, tool d
 
 ### Git
 
-- **`main`** — up to date, includes PR #68 (`5855611`) — wall-time deadline propagation
-- Feature/task branches cleaned up
-- No open PRs
+- **`main`** — includes PR #68 (wall-time deadline)
+- **`feature/per-tool-rate-limit`** — branched from `main`
+- **`task/per-tool-rate-limit`** — pushed to origin, segment tip
+- Next: open PR `task/per-tool-rate-limit` → `feature/per-tool-rate-limit`
 
 ### Quality
 
-- **390 tests** (harness 390), all passing
+- **398 harness tests**, all passing (480 total across all packages)
 - Build, typecheck, lint, format all pass
 
 ### Key commits
 
 | Commit    | Description                                            |
 | --------- | ------------------------------------------------------ |
+| `31c3855` | feat(harness): per-tool sliding-window rate limiting   |
 | `5855611` | Merge PR #68 — wall-time deadline propagation → `main` |
-| `d5b4d2e` | Merge PR #67 — security guards + docs → `main`         |
 
 ---
 
 ## Next (priority order)
 
-1. **Per-tool rate limiting** — Harness-level rate limiting per tool type
+1. **Merge rate limiting** — Open PR for per-tool rate limit branch
 2. **Document security architecture** — Add contributor guide for security guard patterns
 
 ---
