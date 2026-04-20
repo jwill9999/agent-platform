@@ -66,6 +66,7 @@ export {
 export { PathJail, PathJailError, DEFAULT_MOUNTS, WORKSPACE_ROOT } from './security/index.js';
 export { validateBashCommand, buildAllowlist } from './security/index.js';
 export { validateUrl } from './security/index.js';
+export { ToolRateLimiter } from './security/index.js';
 export type {
   Mount,
   MountPermission,
@@ -73,6 +74,7 @@ export type {
   PathValidationResult,
   BashValidationResult,
   UrlValidationResult,
+  RateLimitResult,
 } from './security/index.js';
 export { createToolAuditLogger, createNoopAuditLogger, redactArgs } from './audit/index.js';
 export { checkDeadline, type DeadlineStatus } from './deadline.js';

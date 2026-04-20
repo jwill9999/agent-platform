@@ -300,4 +300,88 @@ describe('toolDispatchNode', () => {
     expect(result.halted).toBeUndefined();
     expect(executor).toHaveBeenCalledTimes(1);
   });
+
+  it('rate-limits a tool that exceeds the per-minute window', async () => {
+    const toolOutput: Output = { type: 'tool_result', data: 'ok' };
+    const executor: NativeToolExecutor = vi.fn().mockResolvedValue(toolOutput);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({
+        executionLimits: { maxSteps: 10, toolRateLimitPerMinute: 2 },
+      }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: executor,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    // First 2 calls succeed
+    const state1 = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [
+          { id: 'tc-r1', name: 'echo', args: {} },
+          { id: 'tc-r2', name: 'echo', args: {} },
+        ],
+      },
+    });
+    const result1 = await node(state1);
+    expect(executor).toHaveBeenCalledTimes(2);
+
+    // 3rd call should be rate-limited
+    const state2 = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [{ id: 'tc-r3', name: 'echo', args: {} }],
+      },
+      totalToolCalls: result1.totalToolCalls,
+    });
+    const result2 = await node(state2);
+
+    expect(executor).toHaveBeenCalledTimes(2); // still 2, no new dispatch
+    expect(result2.trace).toContainEqual(
+      expect.objectContaining({ type: 'rate_limit_hit', toolId: 'echo' }),
+    );
+    const toolMsg = result2.messages?.[0];
+    expect(toolMsg?.content).toContain('RATE_LIMITED');
+  });
+
+  it('rate-limits independently per tool name', async () => {
+    const toolOutput: Output = { type: 'tool_result', data: 'ok' };
+    const executor: NativeToolExecutor = vi.fn().mockResolvedValue(toolOutput);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({
+        allowedToolIds: ['echo', 'other'],
+        executionLimits: { maxSteps: 10, toolRateLimitPerMinute: 1 },
+      }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: executor,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    // First call to 'echo' succeeds, then 'echo' is limited but 'other' should work
+    const state1 = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [{ id: 'tc-a', name: 'echo', args: {} }],
+      },
+    });
+    await node(state1);
+    expect(executor).toHaveBeenCalledTimes(1);
+
+    const state2 = makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [
+          { id: 'tc-b', name: 'echo', args: {} },
+          { id: 'tc-c', name: 'other', args: {} },
+        ],
+      },
+    });
+    const result2 = await node(state2);
+
+    // echo should be rate-limited, other should succeed
+    expect(executor).toHaveBeenCalledTimes(2); // only 'other' dispatched
+    expect(result2.trace).toContainEqual(
+      expect.objectContaining({ type: 'rate_limit_hit', toolId: 'echo' }),
+    );
+  });
 });

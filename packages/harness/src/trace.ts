@@ -22,6 +22,13 @@ export type TraceEvent =
     }
   | { type: 'loop_detected'; toolSignature: string; repeats: number }
   | { type: 'limit_hit'; kind: 'max_steps' | 'timeout' | 'max_tokens' | 'max_cost' }
+  | {
+      type: 'rate_limit_hit';
+      toolId: string;
+      count: number;
+      limit: number;
+      windowMs: number;
+    }
   | { type: 'deadline_exceeded'; elapsedMs: number; deadlineMs: number }
   | { type: 'plan_failed'; reason: string }
   | { type: 'security_warning'; detail: string }

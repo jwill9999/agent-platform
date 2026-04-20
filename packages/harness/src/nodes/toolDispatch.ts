@@ -11,6 +11,7 @@ import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTi
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
+import { ToolRateLimiter } from '../security/rateLimiter.js';
 import { isSystemTool } from '../systemTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
@@ -307,6 +308,8 @@ async function emitToolOutput(
   await ctx.emitter.emit(output);
 }
 
+const DEFAULT_RATE_LIMIT_PER_MINUTE = 30;
+
 /**
  * Creates a tool_dispatch graph node bound to the given dispatch context.
  *
@@ -315,8 +318,13 @@ async function emitToolOutput(
  * Emits `tool_dispatch` trace events per tool call.
  * Supports AbortSignal via `config.configurable.signal` for cancellation.
  * Enforces per-tool execution timeouts (agent-level / system default / per-tool override).
+ * Enforces per-tool sliding-window rate limits.
  */
 export function createToolDispatchNode(ctx: ToolDispatchContext) {
+  const rateLimitPerMin =
+    ctx.agent.executionLimits.toolRateLimitPerMinute ?? DEFAULT_RATE_LIMIT_PER_MINUTE;
+  const rateLimiter = new ToolRateLimiter(rateLimitPerMin);
+
   return async (
     state: HarnessStateType,
     config?: RunnableConfig,
@@ -359,6 +367,29 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         continue;
       }
       toolCallCount++;
+
+      // Per-tool sliding-window rate limit
+      const rlResult = rateLimiter.check(call.name);
+      if (!rlResult.allowed) {
+        traceEvents.push({
+          type: 'rate_limit_hit',
+          toolId: call.name,
+          count: rlResult.count,
+          limit: rlResult.limit,
+          windowMs: rlResult.windowMs,
+        });
+        toolMessages.push({
+          role: 'tool',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: JSON.stringify({
+            error: 'RATE_LIMITED',
+            message: `Tool "${call.name}" rate-limited: ${rlResult.count}/${rlResult.limit} calls in the last ${rlResult.windowMs / 1000}s. Wait before retrying.`,
+          }),
+        });
+        continue;
+      }
+      rateLimiter.record(call.name);
 
       await fireToolCallHook(ctx, state, call);
 

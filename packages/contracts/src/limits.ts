@@ -9,6 +9,8 @@ export const ExecutionLimitsSchema = z.object({
   maxTokens: z.number().int().positive().optional(),
   maxCostUnits: z.number().nonnegative().optional(),
   maxToolCallsTotal: z.number().int().positive().optional(),
+  /** Max calls per tool per sliding window (default 30/min). */
+  toolRateLimitPerMinute: z.number().int().positive().optional(),
 });
 
 export type ExecutionLimits = z.infer<typeof ExecutionLimitsSchema>;
