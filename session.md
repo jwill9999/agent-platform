@@ -8,26 +8,23 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** Frontend UI unblocked. Per-tool rate limiting (PR #69) and wall-time deadline (PR #68) shipped. All security hardening features complete.
+- **Session:** Lazy skill loading implemented on `task/lazy-skill-loading` branch. Stubs-only system prompt + `sys_get_skill_detail` on-demand tool with governor logic.
 
 ---
 
 ## What happened (this session)
 
-### Wall-time deadline propagation (PR #68 — merged)
+### Lazy skill loading (task/lazy-skill-loading — pushed, pending PR)
 
-Cooperative deadline checking across all harness graph nodes. `startedAtMs`/`deadlineMs` propagated into graph state. 11 new tests.
+Implemented lazy skill loading pattern from `docs/lazy-skill-loading.md`:
 
-### Per-tool rate limiting (PR #69 — merged)
-
-Added `ToolRateLimiter` — sliding-window rate limiter (default 30 calls/min per tool) integrated into the tool dispatch loop. New `toolRateLimitPerMinute` field in `ExecutionLimits`. 8 new tests.
-
-### Frontend UI unblocked
-
-- `agent-platform-ntf` promoted from P3 → P2 in beads
-- `decisions.md` updated: "Frontend UI: Unblocked (2026-04-20)"
-- `docs/planning/frontend-ui-phases.md` status changed from Paused → Unblocked
-- CLAUDE.md, AGENTS.md, copilot-instructions.md updated to reflect unblock
+- Extended Skill schema with `description` and `hint` optional fields (contracts + DB migration 0009)
+- Rewrote `formatSkillSection()` to emit lightweight stubs (~30 tokens each)
+- Added `sys_get_skill_detail` system tool for on-demand full skill fetch
+- Added `loadedSkillIds` state tracking + governor (warn@3, error@5)
+- Threaded `skillResolver` callback through ToolDispatchContext (clean arch, no direct DB dependency in harness)
+- 11 new tests, 409 total harness tests passing
+- Updated docs: architecture.md, configuration.md, lazy-skill-loading.md
 
 ---
 
@@ -35,34 +32,37 @@ Added `ToolRateLimiter` — sliding-window rate limiter (default 30 calls/min pe
 
 ### Git
 
-- **`main`** — up to date, includes PR #69 (`c57b33f`) — per-tool rate limiting
-- Feature/task branches cleaned up
-- No open PRs
+- **`main`** — up to date with PR #69 (per-tool rate limiting)
+- **`feature/lazy-skill-loading`** — integration branch (pushed, from main)
+- **`task/lazy-skill-loading`** — implementation (pushed, from feature branch)
+- This is a single-task segment; PR should go `task/lazy-skill-loading → feature/lazy-skill-loading`, then `feature → main`
 
 ### Quality
 
-- **398 harness tests**, 480 total across all packages, all passing
-- Build, typecheck, lint, format all pass
+- **409 harness tests**, all passing
+- Build, typecheck, lint all pass
+- Migration 0009 adds `description` + `hint` columns to skills table
 
 ### Key commits
 
-| Commit    | Description                                            |
-| --------- | ------------------------------------------------------ |
-| `c57b33f` | Merge PR #69 — per-tool rate limiting → `main`         |
-| `5855611` | Merge PR #68 — wall-time deadline propagation → `main` |
+| Commit    | Description                                    |
+| --------- | ---------------------------------------------- |
+| `3a95ede` | feat(harness): implement lazy skill loading    |
+| `c57b33f` | Merge PR #69 — per-tool rate limiting → `main` |
 
 ---
 
 ## Next (priority order)
 
-1. **Frontend UI** — `agent-platform-ntf` is unblocked (P2). See `docs/planning/frontend-ui-phases.md` for phased approach.
-2. **Document security architecture** — Add contributor guide for security guard patterns
+1. **Open PR** — `task/lazy-skill-loading → feature/lazy-skill-loading` then `feature → main`
+2. **Frontend UI** — `agent-platform-ntf` is unblocked (P2). See `docs/planning/frontend-ui-phases.md` for phased approach.
+3. **Document security architecture** — Add contributor guide for security guard patterns
 
 ---
 
 ## Blockers / questions for owner
 
-- **PR review** — Security guards are advisory (trace events + logging), not hard-blocking. Confirm this posture is acceptable or if hard-blocking is needed for specific patterns.
+- **PR review** — Lazy skill loading is backwards-compatible (NULL description/hint falls back to truncated goal). No breaking API changes.
 - **Domain allowlist** — Currently optional (no allowlist = allow all). Should a default allowlist be configured?
 
 ---
@@ -75,6 +75,7 @@ Added `ToolRateLimiter` — sliding-window rate limiter (default 30 calls/min pe
 | `docs/architecture/message-flow.md`   | Mermaid diagrams: chat → LLM → tools       |
 | `docs/api-reference.md`               | REST endpoints, error shapes, schemas      |
 | `docs/configuration.md`               | Env vars, model routing, limits, MCP setup |
+| `docs/lazy-skill-loading.md`          | Lazy skill pattern (IMPLEMENTED)           |
 | `docs/planning/security.md`           | Threat model (8 categories)                |
 | `docs/planning/frontend-ui-phases.md` | Frontend UI phased plan (unblocked)        |
 | `docs/tasks/`                         | Task spec files                            |
