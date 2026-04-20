@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-20
-- **Session:** Implemented wall-time deadline propagation into harness graph nodes (closes Threat 2 gap).
+- **Session:** PR #68 merged — wall-time deadline propagation now on `main`. Branches cleaned up.
 
 ---
 
@@ -42,31 +42,28 @@ Implemented cooperative deadline checking so every graph node (LLM calls, tool d
 
 ### Git
 
-- **`main`** — includes merged PR #67 (`d5b4d2e`)
-- **`feature/wall-time-deadline`** — branched from `main`
-- **`task/wall-time-deadline`** — pushed to origin (`c555718`), segment tip
-- Next step: open PR `task/wall-time-deadline` → `feature/wall-time-deadline`
+- **`main`** — up to date, includes PR #68 (`5855611`) — wall-time deadline propagation
+- Feature/task branches cleaned up
+- No open PRs
 
 ### Quality
 
 - **390 tests** (harness 390), all passing
 - Build, typecheck, lint, format all pass
-- SonarCloud: pending CI run on new branch
 
 ### Key commits
 
-| Commit    | Description                                       |
-| --------- | ------------------------------------------------- |
-| `c555718` | feat(harness): wall-time deadline propagation     |
-| `d5b4d2e` | Merge PR #67 — security guards + docs into `main` |
+| Commit    | Description                                            |
+| --------- | ------------------------------------------------------ |
+| `5855611` | Merge PR #68 — wall-time deadline propagation → `main` |
+| `d5b4d2e` | Merge PR #67 — security guards + docs → `main`         |
 
 ---
 
 ## Next (priority order)
 
-1. **Open PR** — `task/wall-time-deadline` → `feature/wall-time-deadline` (then merge feature → `main`)
-2. **Per-tool rate limiting** — Harness-level rate limiting per tool type (lower priority)
-3. **Document security architecture** — Add contributor guide for security guard patterns
+1. **Per-tool rate limiting** — Harness-level rate limiting per tool type
+2. **Document security architecture** — Add contributor guide for security guard patterns
 
 ---
 
