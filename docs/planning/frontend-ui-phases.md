@@ -1,6 +1,6 @@
-# Frontend UI — paused roadmap (planning before `agent-platform-ntf`)
+# Frontend UI — phased roadmap
 
-**Status:** Paused for reflection and **planning** before implementing Beads **`agent-platform-ntf`** (_Frontend: design polish (visual/UI follow-up)_).
+**Status:** Unblocked (2026-04-20). Ready for implementation. The phased approach below still applies as guidance.
 
 **Purpose:** Durable note for humans and agents when returning to this work. **Execution** still lives in **bd**; split or refine **`ntf`** after planning if scope grows.
 

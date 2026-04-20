@@ -271,7 +271,7 @@ For more details, see `docs/tasks/README.md` and `decisions.md`.
 - Docker for all runtime — never run API/web locally
 - No hardcoded model IDs — provider + model + API key are user-configurable
 - Built-in system tools — bash, read/write/list files with risk tiers, PathJail, bash guard, and HITL approval
-- Frontend UI paused until `docs/planning/frontend-ui-phases.md` planning completes
+- Frontend UI unblocked — see `docs/planning/frontend-ui-phases.md` for phased approach
 - Plugin hooks: backend lifecycle only for MVP
 
 See `decisions.md` for the full locked decision table.

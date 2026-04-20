@@ -153,7 +153,7 @@ cp -f   mv -f   rm -f   rm -rf   cp -rf
 - **No hardcoded model IDs** — provider + model + API key are user-configurable
 - **Built-in system tools** — bash, read/write/list files with risk tiers, PathJail, bash guard, and HITL approval
 - **Docker for all runtime** — never run API/web locally
-- **Frontend UI paused** — do not implement `agent-platform-ntf` until `docs/planning/frontend-ui-phases.md` planning completes
+- **Frontend UI unblocked** — `agent-platform-ntf` is ready for implementation; see `docs/planning/frontend-ui-phases.md` for phased approach
 - **Plugin hooks:** backend lifecycle only for MVP
 
 See `decisions.md` for the full locked decision table and `session.md` for current session context.
