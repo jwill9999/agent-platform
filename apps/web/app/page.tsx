@@ -6,6 +6,7 @@ import { Chat } from '../components/chat/chat';
 import { ChatAgentSelector } from '../components/chat/chat-agent-selector';
 import { SessionHistoryPanel } from '../components/chat/session-history-panel';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
+import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgent } from '@/lib/default-agent';
@@ -20,6 +21,14 @@ export default function HomePage() {
 
   const { messages, sendMessage, status, error, setError } = useHarnessChat(sessionId, isResuming);
   const { sessions, loading: sessionsLoading, refresh: refreshSessions } = useSessions();
+  const {
+    attachments,
+    warnings: attachmentWarnings,
+    formattedContext,
+    addFiles,
+    removeAttachment,
+    clearAll: clearAttachments,
+  } = useContextAttachments();
 
   const bootstrapAgents = useCallback(async () => {
     setLoadError(null);
@@ -92,11 +101,14 @@ export default function HomePage() {
 
   const handleSend = useCallback(
     (text: string) => {
-      sendMessage(text)
+      const messageForApi = formattedContext ? `${formattedContext}\n${text}` : text;
+      const displayText = formattedContext ? text : undefined;
+      sendMessage(messageForApi, displayText)
         .then(() => refreshSessions())
         .catch(() => {});
+      clearAttachments();
     },
-    [sendMessage, refreshSessions],
+    [sendMessage, refreshSessions, formattedContext, clearAttachments],
   );
 
   return (
@@ -141,6 +153,11 @@ export default function HomePage() {
             onSend={handleSend}
             isLoading={isLoading}
             canSend={Boolean(sessionId)}
+            attachments={attachments}
+            onAddFiles={addFiles}
+            onRemoveAttachment={removeAttachment}
+            onClearAttachments={clearAttachments}
+            attachmentWarnings={attachmentWarnings}
           />
         </div>
       </div>

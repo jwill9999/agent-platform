@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/cn';
-import { User, Sparkles } from 'lucide-react';
+import { User, Sparkles, Paperclip } from 'lucide-react';
 import type { UIMessage } from 'ai';
 import { Markdown } from './markdown';
 import { StreamingAssistantPlaceholder } from './streaming-placeholder';
@@ -28,9 +28,18 @@ export function getMessageText(message: UIMessage): string {
   return '';
 }
 
+/** Count the number of files referenced in a `<file_context>` block. */
+function countContextFiles(content: string): number {
+  if (!content.includes('<file_context>')) return 0;
+  // Each file starts with "--- path ---"
+  const matches = content.match(/^--- .+ ---$/gm);
+  return matches?.length ?? 0;
+}
+
 export function Message({ message, isAwaitingStreamContent = false }: Readonly<MessageProps>) {
   const isUser = message.role === 'user';
   const text = getMessageText(message);
+  const contextFileCount = isUser ? countContextFiles(message.content) : 0;
 
   return (
     <div className={cn('flex gap-3 py-6', isUser ? 'justify-end' : 'justify-start')}>
@@ -40,25 +49,33 @@ export function Message({ message, isAwaitingStreamContent = false }: Readonly<M
         </div>
       )}
 
-      <div
-        className={cn(
-          'max-w-[85%] rounded-2xl px-4 py-3',
-          isUser
-            ? 'bg-primary text-primary-foreground rounded-br-md'
-            : 'bg-card border border-border rounded-bl-md',
+      <div className="flex flex-col items-end max-w-[85%]">
+        <div
+          className={cn(
+            'w-full rounded-2xl px-4 py-3',
+            isUser
+              ? 'bg-primary text-primary-foreground rounded-br-md'
+              : 'bg-card border border-border rounded-bl-md',
+          )}
+        >
+          {!text && isUser && (
+            <p className="text-sm text-muted-foreground italic">Empty message</p>
+          )}
+          {!text && !isUser && isAwaitingStreamContent && <StreamingAssistantPlaceholder />}
+          {!text && !isUser && !isAwaitingStreamContent && (
+            <p className="text-sm text-muted-foreground italic">No content</p>
+          )}
+          {text && isUser && (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
+          )}
+          {text && !isUser && <Markdown content={text} />}
+        </div>
+        {contextFileCount > 0 && (
+          <span className="inline-flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+            <Paperclip className="h-3 w-3" />
+            {contextFileCount} {contextFileCount === 1 ? 'file' : 'files'} attached
+          </span>
         )}
-      >
-        {!text && isUser && (
-          <p className="text-sm text-muted-foreground italic">Empty message</p>
-        )}
-        {!text && !isUser && isAwaitingStreamContent && <StreamingAssistantPlaceholder />}
-        {!text && !isUser && !isAwaitingStreamContent && (
-          <p className="text-sm text-muted-foreground italic">No content</p>
-        )}
-        {text && isUser && (
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
-        )}
-        {text && !isUser && <Markdown content={text} />}
       </div>
 
       {isUser && (

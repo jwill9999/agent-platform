@@ -5,6 +5,7 @@ import type { UIMessage } from 'ai';
 import { Sparkles } from 'lucide-react';
 import { Message, getMessageText } from './message';
 import { ChatInput } from './chat-input';
+import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 
 export interface ChatProps {
   messages: UIMessage[];
@@ -12,9 +13,29 @@ export interface ChatProps {
   isLoading: boolean;
   /** When false, input is disabled until a session id exists. */
   canSend?: boolean;
+  /** Context attachments (optional — pass to enable attachment UI). */
+  attachments?: AttachmentEntry[];
+  /** Callback when user picks or drops files. */
+  onAddFiles?: (files: File[]) => Promise<void>;
+  /** Remove an attachment by index. */
+  onRemoveAttachment?: (index: number) => void;
+  /** Clear all attachments. */
+  onClearAttachments?: () => void;
+  /** Sanitisation warnings from file validation. */
+  attachmentWarnings?: string[];
 }
 
-export function Chat({ messages, onSend, isLoading, canSend = true }: Readonly<ChatProps>) {
+export function Chat({
+  messages,
+  onSend,
+  isLoading,
+  canSend = true,
+  attachments,
+  onAddFiles,
+  onRemoveAttachment,
+  onClearAttachments,
+  attachmentWarnings,
+}: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -53,7 +74,16 @@ export function Chat({ messages, onSend, isLoading, canSend = true }: Readonly<C
       </div>
 
       {/* Input */}
-      <ChatInput onSend={onSend} isLoading={isLoading} canSend={canSend} />
+      <ChatInput
+        onSend={onSend}
+        isLoading={isLoading}
+        canSend={canSend}
+        attachments={attachments}
+        onAddFiles={onAddFiles}
+        onRemoveAttachment={onRemoveAttachment}
+        onClearAttachments={onClearAttachments}
+        attachmentWarnings={attachmentWarnings}
+      />
     </div>
   );
 }
