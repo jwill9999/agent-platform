@@ -196,7 +196,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   }, [sessionId]);
 
   const sendMessage = useCallback(
-    async (messageForApi: string, displayText?: string) => {
+    async (messageForApi: string, displayText?: string, modelConfigId?: string | null) => {
       const trimmed = messageForApi.trim();
       if (!sessionId || !trimmed) return;
 
@@ -215,7 +215,11 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, message: trimmed }),
+          body: JSON.stringify({
+            sessionId,
+            message: trimmed,
+            ...(modelConfigId ? { modelConfigId } : {}),
+          }),
         });
 
         if (!res.ok) throw new Error(await parseErrorResponse(res));

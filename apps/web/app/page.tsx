@@ -1,9 +1,10 @@
 'use client';
 
-import type { Agent, SessionRecord } from '@agent-platform/contracts';
+import type { Agent, ModelConfig, SessionRecord } from '@agent-platform/contracts';
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '../components/chat/chat';
 import { ChatAgentSelector } from '../components/chat/chat-agent-selector';
+import { ChatModelSelector } from '../components/chat/chat-model-selector';
 import { SessionHistoryPanel } from '../components/chat/session-history-panel';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
@@ -13,7 +14,9 @@ import { pickDefaultAgent } from '@/lib/default-agent';
 
 export default function HomePage() {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedModelConfigId, setSelectedModelConfigId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isResuming, setIsResuming] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -33,13 +36,20 @@ export default function HomePage() {
   const bootstrapAgents = useCallback(async () => {
     setLoadError(null);
     try {
-      const list = await apiGet<Agent[]>(apiPath('agents'));
-      const next = list ?? [];
-      setAgents(next);
-      const def = pickDefaultAgent(next);
+      const [agentList, configList] = await Promise.all([
+        apiGet<Agent[]>(apiPath('agents')),
+        apiGet<ModelConfig[]>(apiPath('model-configs')),
+      ]);
+      const nextAgents = agentList ?? [];
+      setAgents(nextAgents);
+      const def = pickDefaultAgent(nextAgents);
       if (def) {
         setSelectedAgentId((prev) => prev ?? def.id);
       }
+      // Only show configs that have an API key stored; pre-select the first one
+      const withKey = (configList ?? []).filter((c) => c.hasApiKey);
+      setModelConfigs(withKey);
+      setSelectedModelConfigId((prev) => prev ?? withKey[0]?.id ?? null);
     } catch (e) {
       setLoadError(e instanceof ApiRequestError ? e.message : String(e));
     }
@@ -103,12 +113,12 @@ export default function HomePage() {
     (text: string) => {
       const messageForApi = formattedContext ? `${formattedContext}\n${text}` : text;
       const displayText = formattedContext ? text : undefined;
-      sendMessage(messageForApi, displayText)
+      sendMessage(messageForApi, displayText, selectedModelConfigId)
         .then(() => refreshSessions())
         .catch(() => {});
       clearAttachments();
     },
-    [sendMessage, refreshSessions, formattedContext, clearAttachments],
+    [sendMessage, refreshSessions, formattedContext, clearAttachments, selectedModelConfigId],
   );
 
   return (
@@ -144,6 +154,12 @@ export default function HomePage() {
             agents={agents}
             selectedId={selectedAgentId}
             onSelect={handleAgentChange}
+            disabled={isLoading}
+          />
+          <ChatModelSelector
+            modelConfigs={modelConfigs}
+            selectedId={selectedModelConfigId}
+            onSelect={setSelectedModelConfigId}
             disabled={isLoading}
           />
         </div>
