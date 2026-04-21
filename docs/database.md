@@ -26,20 +26,16 @@ Source of truth: `packages/db/src/schema.ts`
 | `plugin_allowlist_json` | text    | JSON array of plugin IDs (optional)                 |
 | `plugin_denylist_json`  | text    | JSON array of plugin IDs (optional)                 |
 | `context_window_json`   | text    | JSON — `{ maxInputTokens, strategy }` (optional)    |
+| `model_config_id`       | text FK | → `model_configs.id`, SET NULL on delete (optional) |
 | `created_at_ms`         | integer | Unix epoch ms                                       |
 | `updated_at_ms`         | integer | Unix epoch ms                                       |
 
 #### `skills` — Skill definitions
 
-| Column               | Type    | Notes                           |
-| -------------------- | ------- | ------------------------------- |
-| `id`                 | text PK | UUID                            |
-| `slug`               | text    | Unique index                    |
-| `name`               | text    | Default: `''`                   |
-| `goal`               | text    | Required                        |
-| `constraints_json`   | text    | JSON array (required)           |
-| `tool_ids_json`      | text    | JSON array of tool IDs          |
-| `output_schema_json` | text    | Optional JSON Schema for output |
+| `goal` | text | Required |
+| `constraints_json` | text | JSON array (required) |
+| `tool_ids_json` | text | JSON array of tool IDs |
+| `output_schema_json` | text | Optional JSON Schema for output |
 
 #### `tools` — Tool definitions
 
@@ -121,6 +117,20 @@ Source of truth: `packages/db/src/schema.ts`
 | `title`         | text    | Chat title (optional)                   |
 | `metadata_json` | text    | Additional UI metadata (optional)       |
 
+#### `model_configs` — Saved LLM provider configurations
+
+| Column          | Type    | Notes                                                      |
+| --------------- | ------- | ---------------------------------------------------------- |
+| `id`            | text PK | UUID, auto-generated                                       |
+| `name`          | text    | Display name (required)                                    |
+| `provider`      | text    | LLM provider (e.g. `openai`, `anthropic`)                  |
+| `model`         | text    | Model identifier (e.g. `gpt-4o`)                           |
+| `secret_ref_id` | text FK | → `secret_refs.id`, holds the encrypted API key (optional) |
+| `created_at_ms` | integer | Unix epoch ms                                              |
+| `updated_at_ms` | integer | Unix epoch ms                                              |
+
+> **API key** is never stored in plaintext. When `apiKey` is provided on create/update, it is encrypted with AES-256-GCM and stored in `secret_refs`. The `hasApiKey` flag in API responses indicates whether a key is stored.
+
 #### `secret_refs` — Encrypted secret references
 
 | Column           | Type    | Notes                          |
@@ -168,6 +178,7 @@ agents ──< agent_mcp_servers >── mcp_servers
 agents ──< sessions ──< messages
 sessions ──< plans
 sessions ── chat_metadata (1:1)
+agents >── model_configs ──< secret_refs (model_config_id FK; SET NULL on delete)
 tool_executions (references agent_id, session_id — no FK constraints)
 ```
 
@@ -184,17 +195,20 @@ All foreign keys use **cascade delete** — deleting an agent removes its sessio
 
 Migrations live in `packages/db/drizzle/` and are numbered sequentially:
 
-| File                           | Description                                                       |
-| ------------------------------ | ----------------------------------------------------------------- |
-| `0000_initial.sql`             | Core schema (agents, skills, tools, mcp_servers, sessions, plans) |
-| `0001_secret_crypto.sql`       | AES-256-GCM columns on secret_refs                                |
-| `0002_keen_owl.sql`            | Agent system_prompt and description                               |
-| `0003_add_messages.sql`        | Messages table                                                    |
-| `0004_add_settings.sql`        | Settings table                                                    |
-| `0005_add_slugs.sql`           | Slug columns + unique indexes on all entities                     |
-| `0006_add_context_window.sql`  | context_window_json on agents                                     |
-| `0007_add_risk_tier.sql`       | risk_tier and requires_approval on tools                          |
-| `0008_add_tool_executions.sql` | tool_executions audit log table                                   |
+| File                             | Description                                                       |
+| -------------------------------- | ----------------------------------------------------------------- |
+| `0000_initial.sql`               | Core schema (agents, skills, tools, mcp_servers, sessions, plans) |
+| `0001_secret_crypto.sql`         | AES-256-GCM columns on secret_refs                                |
+| `0002_keen_owl.sql`              | Agent system_prompt and description                               |
+| `0003_add_messages.sql`          | Messages table                                                    |
+| `0004_add_settings.sql`          | Settings table                                                    |
+| `0005_add_slugs.sql`             | Slug columns + unique indexes on all entities                     |
+| `0006_add_context_window.sql`    | context_window_json on agents                                     |
+| `0007_add_risk_tier.sql`         | risk_tier and requires_approval on tools                          |
+| `0008_add_tool_executions.sql`   | tool_executions audit log table                                   |
+| `0009_add_chat_metadata.sql`     | chat_metadata table for session titles                            |
+| `0010_extend_session_schema.sql` | messages table, updated sessions columns                          |
+| `0011_add_model_configs.sql`     | model_configs table + model_config_id FK on agents                |
 
 ### Adding a New Migration
 
