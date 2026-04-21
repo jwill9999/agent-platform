@@ -42,6 +42,11 @@ export const AgentSchema = z.object({
   allowedMcpServerIds: z.array(z.string()),
   executionLimits: ExecutionLimitsSchema,
   modelOverride: modelOverrideShape,
+  /**
+   * ID of a saved model config (provider + model + encrypted API key).
+   * When set, takes precedence over `modelOverride` and env-var key resolution.
+   */
+  modelConfigId: z.string().optional(),
   contextWindow: ContextWindowSchema.optional(),
   pluginAllowlist: z.array(z.string()).nullable().optional(),
   pluginDenylist: z.array(z.string()).nullable().optional(),

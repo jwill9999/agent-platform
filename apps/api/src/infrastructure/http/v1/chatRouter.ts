@@ -8,6 +8,9 @@ import {
   withTransaction,
   insertToolExecution,
   completeToolExecution,
+  getModelConfig,
+  resolveModelConfigKey,
+  parseMasterKeyFromBase64,
 } from '@agent-platform/db';
 import type { ContextWindow, MessageRecord } from '@agent-platform/contracts';
 import { DEFAULT_CONTEXT_WINDOW } from '@agent-platform/contracts';
@@ -95,11 +98,35 @@ async function loadAgentContext(db: DrizzleDb, agentId: string): Promise<AgentCo
   }
 }
 
-/** Resolve model config or throw an HttpError on failure (cleans up agent ctx). */
+/** Resolve model config or throw an HttpError on failure. */
 function resolveModelOrThrow(
+  db: DrizzleDb,
   agentCtx: AgentContext,
   headerKey: string | undefined,
 ): { provider: string; model: string; apiKey?: string } {
+  // If the agent has a stored model config, use its encrypted key (highest precedence).
+  if (agentCtx.agent.modelConfigId) {
+    const cfg = getModelConfig(db, agentCtx.agent.modelConfigId);
+    if (!cfg) {
+      throw new HttpError(
+        404,
+        'NOT_FOUND',
+        `Model config '${agentCtx.agent.modelConfigId}' not found`,
+      );
+    }
+    let apiKey: string | undefined;
+    if (cfg.hasApiKey) {
+      const masterKeyB64 = process.env['SECRETS_MASTER_KEY'];
+      if (!masterKeyB64) {
+        throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
+      }
+      const masterKey = parseMasterKeyFromBase64(masterKeyB64);
+      apiKey = resolveModelConfigKey(db, agentCtx.agent.modelConfigId, masterKey);
+    }
+    return { provider: cfg.provider, model: cfg.model, apiKey };
+  }
+
+  // Fall back to free-form modelOverride + env-var chain.
   const resolution = resolveModelConfig({
     agentOverride: agentCtx.agent.modelOverride ?? null,
     headerKey,
@@ -187,7 +214,7 @@ export function createChatRouter(db: DrizzleDb): Router {
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
       const agentCtx = await loadAgentContext(db, session.agentId);
-      const modelCfg = resolveModelOrThrow(agentCtx, req.header('x-openai-key'));
+      const modelCfg = resolveModelOrThrow(db, agentCtx, req.header('x-openai-key'));
 
       const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
       const release = await sessionLock.acquire(sessionId, timeoutMs);
