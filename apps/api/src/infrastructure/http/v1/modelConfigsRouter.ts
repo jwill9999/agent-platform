@@ -24,7 +24,12 @@ const KEY_VERSION = 1;
 
 function getMasterKey(): Buffer {
   const b64 = process.env['SECRETS_MASTER_KEY'];
-  if (!b64) throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
+  if (!b64)
+    throw new HttpError(
+      503,
+      'CONFIGURATION_ERROR',
+      'SECRETS_MASTER_KEY is not configured — set it in your environment to store API keys',
+    );
   return parseMasterKeyFromBase64(b64);
 }
 
@@ -51,7 +56,7 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
     '/',
     asyncHandler(async (req, res) => {
       const body = parseBody(ModelConfigCreateBodySchema, req.body);
-      const masterKey = getMasterKey();
+      const masterKey = body.apiKey ? getMasterKey() : undefined;
       const cfg = createModelConfig(db, body, masterKey, KEY_VERSION);
       res.status(201).json({ data: cfg });
     }),
@@ -63,7 +68,7 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
       const id = requireParam(req.params, 'id');
       if (!getModelConfig(db, id)) throw new HttpError(404, 'NOT_FOUND', 'Model config not found');
       const body = parseBody(ModelConfigUpdateBodySchema, req.body);
-      const masterKey = getMasterKey();
+      const masterKey = body.apiKey !== undefined ? getMasterKey() : undefined;
       const updated = updateModelConfig(db, id, body, masterKey, KEY_VERSION);
       if (!updated) throw new HttpError(404, 'NOT_FOUND', 'Model config not found');
       res.json({ data: updated });

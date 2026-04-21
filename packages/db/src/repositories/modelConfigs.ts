@@ -70,7 +70,7 @@ export function getModelConfig(db: DrizzleDb, id: string): ModelConfig | undefin
 export function createModelConfig(
   db: DrizzleDb,
   body: ModelConfigCreateBody,
-  masterKey: Buffer,
+  masterKey: Buffer | undefined,
   keyVersion: number,
 ): ModelConfig {
   const id = randomUUID();
@@ -78,6 +78,7 @@ export function createModelConfig(
   let secretRefId: string | null = null;
 
   if (body.apiKey) {
+    if (!masterKey) throw new Error('SECRETS_MASTER_KEY is required to store an API key');
     const secretId = randomUUID();
     const payload = encryptUtf8(body.apiKey, masterKey, keyVersion);
     db.insert(schema.secretRefs)
@@ -121,7 +122,7 @@ export function updateModelConfig(
   db: DrizzleDb,
   id: string,
   body: ModelConfigUpdateBody,
-  masterKey: Buffer,
+  masterKey: Buffer | undefined,
   keyVersion: number,
 ): ModelConfig | undefined {
   const existing = db
@@ -142,6 +143,7 @@ export function updateModelConfig(
         secretRefId = null;
       }
     } else {
+      if (!masterKey) throw new Error('SECRETS_MASTER_KEY is required to store an API key');
       const payload = encryptUtf8(body.apiKey, masterKey, keyVersion);
       if (secretRefId) {
         // Re-encrypt in place
