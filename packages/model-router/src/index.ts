@@ -26,6 +26,13 @@ export {
   type ResolveModelConfigOptions,
 } from './resolveModelConfig.js';
 
+// Connection test utility
+export {
+  testModelConnection,
+  type TestConnectionOptions,
+  type TestConnectionResult,
+} from './testConnection.js';
+
 // Legacy OpenAI-specific exports (backward compatible)
 export { streamOpenAiChat } from './openai.js';
 export {

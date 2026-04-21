@@ -1,5 +1,12 @@
 import { AgentCreateBodySchema, AgentSchema } from '@agent-platform/contracts';
-import { createAgent, deleteAgent, getAgent, listAgents, replaceAgent } from '@agent-platform/db';
+import {
+  createAgent,
+  deleteAgent,
+  getAgent,
+  listAgents,
+  replaceAgent,
+  getModelConfig,
+} from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
 
@@ -30,6 +37,11 @@ export function createAgentsRouter(db: DrizzleDb): Router {
     '/',
     asyncHandler(async (req, res) => {
       const body = parseBody(AgentCreateBodySchema, req.body);
+      if (body.modelConfigId) {
+        const cfg = getModelConfig(db, body.modelConfigId);
+        if (!cfg)
+          throw new HttpError(404, 'NOT_FOUND', `Model config '${body.modelConfigId}' not found`);
+      }
       const agent = createAgent(db, body);
       res.status(201).json({ data: agent });
     }),
@@ -42,6 +54,11 @@ export function createAgentsRouter(db: DrizzleDb): Router {
       const existing = getAgent(db, requireParam(req.params, 'idOrSlug'));
       if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Agent not found');
       const agent = parseBody(AgentSchema, { ...req.body, id: existing.id, slug: existing.slug });
+      if (agent.modelConfigId) {
+        const cfg = getModelConfig(db, agent.modelConfigId);
+        if (!cfg)
+          throw new HttpError(404, 'NOT_FOUND', `Model config '${agent.modelConfigId}' not found`);
+      }
       replaceAgent(db, agent);
       res.json({ data: getAgent(db, existing.id) });
     }),

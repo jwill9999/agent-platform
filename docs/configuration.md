@@ -6,18 +6,18 @@ All configuration ultimately flows through environment variables and the Setting
 
 ### API Server (`apps/api`)
 
-| Variable                 | Required | Default                     | Description                                                                                         |
-| ------------------------ | -------- | --------------------------- | --------------------------------------------------------------------------------------------------- |
-| `SQLITE_PATH`            | **Yes**  | —                           | Absolute path to the SQLite database file                                                           |
-| `SECRETS_MASTER_KEY`     | No       | —                           | Base64-encoded 32-byte key for AES-256-GCM secret encryption. Required to use encrypted secret refs |
-| `PORT`                   | No       | `3000`                      | API listen port                                                                                     |
-| `HOST`                   | No       | `0.0.0.0`                   | API bind address                                                                                    |
-| `RATE_LIMIT_WINDOW_MS`   | No       | `60000`                     | Rate-limiter sliding window (ms)                                                                    |
-| `RATE_LIMIT_MAX`         | No       | `100`                       | Maximum requests per window                                                                         |
-| `DEFAULT_MODEL_PROVIDER` | No       | `openai`                    | Default LLM provider when no agent override is set                                                  |
-| `DEFAULT_MODEL`          | No       | Provider default            | Default model name when no agent override is set                                                    |
-| `OLLAMA_BASE_URL`        | No       | `http://localhost:11434/v1` | Base URL for the Ollama provider                                                                    |
-| `NODE_ENV`               | No       | —                           | Set to `production` to disable OpenAPI response validation                                          |
+| Variable                 | Required | Default                     | Description                                                                                                          |
+| ------------------------ | -------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `SQLITE_PATH`            | **Yes**  | —                           | Absolute path to the SQLite database file                                                                            |
+| `SECRETS_MASTER_KEY`     | No \*    | —                           | Base64-encoded 32-byte key for AES-256-GCM secret encryption. **Required** to store or use API keys in model configs |
+| `PORT`                   | No       | `3000`                      | API listen port                                                                                                      |
+| `HOST`                   | No       | `0.0.0.0`                   | API bind address                                                                                                     |
+| `RATE_LIMIT_WINDOW_MS`   | No       | `60000`                     | Rate-limiter sliding window (ms)                                                                                     |
+| `RATE_LIMIT_MAX`         | No       | `100`                       | Maximum requests per window                                                                                          |
+| `DEFAULT_MODEL_PROVIDER` | No       | `openai`                    | Default LLM provider when no agent override is set                                                                   |
+| `DEFAULT_MODEL`          | No       | Provider default            | Default model name when no agent override is set                                                                     |
+| `OLLAMA_BASE_URL`        | No       | `http://localhost:11434/v1` | Base URL for the Ollama provider                                                                                     |
+| `NODE_ENV`               | No       | —                           | Set to `production` to disable OpenAPI response validation                                                           |
 
 ### LLM API Keys (API Server)
 
@@ -48,9 +48,45 @@ Keys are resolved in order of precedence:
 
 Model configuration is fully user-controlled — no hardcoded model IDs. The `model-router` package routes requests to the configured LLM provider using the Vercel AI SDK.
 
+### Resolution Order
+
+For each chat request the API resolves the model + API key in this precedence order:
+
+1. **Saved model config** — agent has a `modelConfigId` referencing a `model_configs` row; provider, model, and encrypted API key are loaded from the DB. Requires `SECRETS_MASTER_KEY`.
+2. **Agent `modelOverride`** — free-form `{ provider, model }` stored on the agent; key resolved via env-var chain below.
+3. **Env-var defaults** — `DEFAULT_MODEL_PROVIDER` / `DEFAULT_MODEL`; key resolved via env-var chain below.
+4. **System fallback** — `openai` / `gpt-4o`.
+
+### Saved Model Configs (recommended)
+
+Model configs store a provider, model, and encrypted API key that can be reused across agents:
+
+```bash
+# Create a saved config
+curl -X POST http://localhost:3000/v1/model-configs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "GPT-4o (production)",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "apiKey": "sk-..."
+  }'
+
+# Assign to an agent
+curl -X PUT http://localhost:3000/v1/agents/<id> \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "My Agent",
+    "modelConfigId": "<model-config-id>",
+    "executionLimits": { "maxSteps": 10, "maxParallelTasks": 1, "timeoutMs": 120000 }
+  }'
+```
+
+See the [API Reference — Model Configs](./api-reference.md#model-configs) for the full endpoint spec.
+
 ### Agent-Level Model Override
 
-Each agent can specify a model override in its configuration:
+Each agent can also specify a free-form model override (no stored key):
 
 ```json
 {
@@ -68,7 +104,7 @@ Each agent can specify a model override in its configuration:
 }
 ```
 
-> **Note:** `modelOverride` contains `provider` and `model` only. API keys are resolved separately via the precedence chain above — they are never stored in the agent record.
+> **Note:** `modelOverride` contains `provider` and `model` only. API keys are resolved from the env-var chain. `modelConfigId` takes precedence when both are set.
 
 ### Settings-Based Configuration
 

@@ -14,8 +14,10 @@ services:
       SQLITE_PATH: "/data/agent.sqlite"
       # LLM API key — resolved from root .env file (see .env.example).
       AGENT_OPENAI_API_KEY: "${AGENT_OPENAI_API_KEY:-}"
-      # Base64-encoded 32-byte key for AES-256-GCM secret storage (required when writing secrets).
-      # SECRETS_MASTER_KEY: "${SECRETS_MASTER_KEY:-}"
+      # Base64-encoded 32-byte key for AES-256-GCM secret storage.
+      # Required to store/use API keys in model configs.
+      # Generate with: openssl rand -base64 32
+      SECRETS_MASTER_KEY: "${SECRETS_MASTER_KEY:-}"
     volumes:
       - sqlite_data:/data
       # E2E filesystem MCP seed expects a mount at /workspace (see packages/db e2e seed).
