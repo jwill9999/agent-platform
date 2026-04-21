@@ -42,41 +42,47 @@ The Next.js BFF exposes two proxy layers to the browser:
 - **`/api/chat`** — dedicated BFF route with its own Zod validation, timeout, and error handling; proxies to `POST /v1/chat`.
 - **`/api/v1/[...path]`** — catch-all proxy that forwards any `/v1` request to the API verbatim.
 
-| Endpoint                        | Frontend | curl / API-only | Notes                                        |
-| ------------------------------- | :------: | :-------------: | -------------------------------------------- |
-| `POST /v1/chat`                 |    ✅    |       ✅        | Primary chat — via dedicated `/api/chat` BFF |
-| `GET /v1/agents`                |    ✅    |       ✅        | Agent dashboard, agent editor, home page     |
-| `POST /v1/agents`               |    ✅    |       ✅        | Agent editor, duplicate                      |
-| `PUT /v1/agents/:id`            |    ✅    |       ✅        | Agent editor                                 |
-| `DELETE /v1/agents/:id`         |    ✅    |       ✅        | Agent dashboard                              |
-| `GET /v1/sessions`              |    ✅    |       ✅        | Sessions page                                |
-| `POST /v1/sessions`             |    ✅    |       ✅        | Home page, IDE chat                          |
-| `GET /v1/skills`                |    ✅    |       ✅        | Skills dashboard, agent editor               |
-| `POST /v1/skills`               |    ✅    |       ✅        | Skills dashboard                             |
-| `PUT /v1/skills/:id`            |    ✅    |       ✅        | Skills dashboard                             |
-| `DELETE /v1/skills/:id`         |    ✅    |       ✅        | Skills dashboard                             |
-| `GET /v1/tools`                 |    ✅    |       ✅        | Tools dashboard                              |
-| `POST /v1/tools`                |    ✅    |       ✅        | Tools dashboard                              |
-| `PUT /v1/tools/:id`             |    ✅    |       ✅        | Tools dashboard                              |
-| `DELETE /v1/tools/:id`          |    ✅    |       ✅        | Tools dashboard                              |
-| `GET /v1/mcp-servers`           |    ✅    |       ✅        | MCP dashboard, agent editor                  |
-| `POST /v1/mcp-servers`          |    ✅    |       ✅        | MCP dashboard                                |
-| `PUT /v1/mcp-servers/:id`       |    ✅    |       ✅        | MCP dashboard                                |
-| `DELETE /v1/mcp-servers/:id`    |    ✅    |       ✅        | MCP dashboard                                |
-| `POST /v1/mcp-servers/:id/test` |    ✅    |       ✅        | MCP dashboard — connection test              |
-| `GET /v1/agents/:id`            |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/skills/:id`            |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/tools/:id`             |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/mcp-servers/:id`       |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/sessions/:id`          |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `PUT /v1/sessions/:id`          |    —     |       ✅        | Update session (no UI)                       |
-| `DELETE /v1/sessions/:id`       |    —     |       ✅        | Delete session (no UI)                       |
-| `GET /v1/settings`              |    —     |       ✅        | Platform settings — API / automation only    |
-| `PUT /v1/settings/:key`         |    —     |       ✅        | Set a setting — API / automation only        |
-| `DELETE /v1/settings/:key`      |    —     |       ✅        | Delete a setting — API / automation only     |
-| `GET /v1/tool-executions`       |    —     |       ✅        | Audit log query — API / automation only      |
-| `POST /v1/chat/stream`          |    —     |       ✅        | ⚠️ Deprecated legacy pass-through            |
-| `GET /health`                   |    —     |       ✅        | Health check (outside `/v1`)                 |
+| Endpoint                          | Frontend | curl / API-only | Notes                                        |
+| --------------------------------- | :------: | :-------------: | -------------------------------------------- |
+| `POST /v1/chat`                   |    ✅    |       ✅        | Primary chat — via dedicated `/api/chat` BFF |
+| `GET /v1/agents`                  |    ✅    |       ✅        | Agent dashboard, agent editor, home page     |
+| `POST /v1/agents`                 |    ✅    |       ✅        | Agent editor, duplicate                      |
+| `PUT /v1/agents/:id`              |    ✅    |       ✅        | Agent editor                                 |
+| `DELETE /v1/agents/:id`           |    ✅    |       ✅        | Agent dashboard                              |
+| `GET /v1/sessions`                |    ✅    |       ✅        | Sessions page                                |
+| `POST /v1/sessions`               |    ✅    |       ✅        | Home page, IDE chat                          |
+| `GET /v1/skills`                  |    ✅    |       ✅        | Skills dashboard, agent editor               |
+| `POST /v1/skills`                 |    ✅    |       ✅        | Skills dashboard                             |
+| `PUT /v1/skills/:id`              |    ✅    |       ✅        | Skills dashboard                             |
+| `DELETE /v1/skills/:id`           |    ✅    |       ✅        | Skills dashboard                             |
+| `GET /v1/tools`                   |    ✅    |       ✅        | Tools dashboard                              |
+| `POST /v1/tools`                  |    ✅    |       ✅        | Tools dashboard                              |
+| `PUT /v1/tools/:id`               |    ✅    |       ✅        | Tools dashboard                              |
+| `DELETE /v1/tools/:id`            |    ✅    |       ✅        | Tools dashboard                              |
+| `GET /v1/mcp-servers`             |    ✅    |       ✅        | MCP dashboard, agent editor                  |
+| `POST /v1/mcp-servers`            |    ✅    |       ✅        | MCP dashboard                                |
+| `PUT /v1/mcp-servers/:id`         |    ✅    |       ✅        | MCP dashboard                                |
+| `DELETE /v1/mcp-servers/:id`      |    ✅    |       ✅        | MCP dashboard                                |
+| `POST /v1/mcp-servers/:id/test`   |    ✅    |       ✅        | MCP dashboard — connection test              |
+| `GET /v1/agents/:id`              |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/skills/:id`              |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/tools/:id`               |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/mcp-servers/:id`         |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/sessions/:id`            |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `PUT /v1/sessions/:id`            |    —     |       ✅        | Update session (no UI)                       |
+| `DELETE /v1/sessions/:id`         |    —     |       ✅        | Delete session (no UI)                       |
+| `GET /v1/model-configs`           |    ✅    |       ✅        | Model configs dashboard                      |
+| `POST /v1/model-configs`          |    ✅    |       ✅        | Model configs dashboard — create             |
+| `PUT /v1/model-configs/:id`       |    ✅    |       ✅        | Model configs dashboard — edit               |
+| `DELETE /v1/model-configs/:id`    |    ✅    |       ✅        | Model configs dashboard — delete             |
+| `POST /v1/model-configs/:id/test` |    ✅    |       ✅        | Model configs dashboard — test connection    |
+| `GET /v1/model-configs/:id`       |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/settings`                |    —     |       ✅        | Platform settings — API / automation only    |
+| `PUT /v1/settings/:key`           |    —     |       ✅        | Set a setting — API / automation only        |
+| `DELETE /v1/settings/:key`        |    —     |       ✅        | Delete a setting — API / automation only     |
+| `GET /v1/tool-executions`         |    —     |       ✅        | Audit log query — API / automation only      |
+| `POST /v1/chat/stream`            |    —     |       ✅        | ⚠️ Deprecated legacy pass-through            |
+| `GET /health`                     |    —     |       ✅        | Health check (outside `/v1`)                 |
 
 > **Note:** The catch-all BFF proxy makes all `/v1` endpoints technically reachable from the browser. The "—" entries above simply have no UI that calls them today.
 
@@ -126,7 +132,68 @@ Body schema: `McpServerSchema` — requires `name`, `transport`. Optional: `comm
 | `PUT`    | `/v1/agents/:id` | Replace an agent (includes skill/tool/MCP allowlists) |
 | `DELETE` | `/v1/agents/:id` | Delete an agent (cascades to sessions)                |
 
-Body schema: `AgentSchema` — requires `name`, `executionLimits`. Optional: `systemPrompt`, `description`, `modelOverride`, `skills`, `tools`, `mcpServers`.
+Body schema: `AgentSchema` — requires `name`, `executionLimits`. Optional: `systemPrompt`, `description`, `modelOverride`, `modelConfigId`, `skills`, `tools`, `mcpServers`.
+
+> **`modelConfigId`** — reference a saved model configuration (see [Model Configs](#model-configs) below). When set, it takes precedence over `modelOverride` and env-var key resolution. The API validates the referenced config exists on create/update.
+
+### Model Configs
+
+Saved LLM provider configurations with securely stored API keys. Assigned to agents to pin them to a specific model + key.
+
+| Method   | Path                         | Description                                         |
+| -------- | ---------------------------- | --------------------------------------------------- |
+| `GET`    | `/v1/model-configs`          | List all model configs                              |
+| `GET`    | `/v1/model-configs/:id`      | Get model config by ID                              |
+| `POST`   | `/v1/model-configs`          | Create a model config                               |
+| `PUT`    | `/v1/model-configs/:id`      | Update a model config                               |
+| `DELETE` | `/v1/model-configs/:id`      | Delete a model config (unlinks agents via SET NULL) |
+| `POST`   | `/v1/model-configs/:id/test` | Test connection — fires a minimal LLM ping          |
+
+**Create / Update body:**
+
+```json
+{
+  "name": "GPT-4o (production)",
+  "provider": "openai",
+  "model": "gpt-4o",
+  "apiKey": "sk-..."
+}
+```
+
+| Field      | Required on create | Notes                                                                                     |
+| ---------- | :----------------: | ----------------------------------------------------------------------------------------- |
+| `name`     |      **Yes**       | Display name                                                                              |
+| `provider` |      **Yes**       | `openai` / `anthropic` / `ollama` / any string                                            |
+| `model`    |      **Yes**       | Model identifier (e.g. `gpt-4o`, `claude-3-5-sonnet`)                                     |
+| `apiKey`   |         No         | API key — encrypted at rest (AES-256-GCM). Omit to keep existing key. Pass `""` to clear. |
+
+**Response shape** — API key is **never** returned:
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "name": "GPT-4o (production)",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "hasApiKey": true,
+    "createdAtMs": 1714000000000,
+    "updatedAtMs": 1714000000000
+  }
+}
+```
+
+**Test connection response:**
+
+```json
+{
+  "data": { "ok": true, "latencyMs": 312 }
+}
+```
+
+On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
+
+> **Security:** `SECRETS_MASTER_KEY` must be set to store or use API keys in model configs. Keys are encrypted with AES-256-GCM and never appear in API responses or logs.
 
 ### Sessions
 

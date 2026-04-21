@@ -1,5 +1,19 @@
 import { integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
+/**
+ * Secret registry: label + optional **ciphertext-only** material (AES-256-GCM envelope).
+ * Plaintext must never be persisted.
+ */
+export const secretRefs = sqliteTable('secret_refs', {
+  id: text('id').primaryKey(),
+  label: text('label'),
+  ciphertextB64: text('ciphertext_b64'),
+  ivB64: text('iv_b64'),
+  authTagB64: text('auth_tag_b64'),
+  keyVersion: integer('key_version', { mode: 'number' }),
+  algorithm: text('algorithm'),
+});
+
 /** Normalized skill row; arrays stored as JSON (matches @agent-platform/contracts Skill). */
 export const skills = sqliteTable(
   'skills',
@@ -58,6 +72,21 @@ export const mcpServers = sqliteTable(
   }),
 );
 
+/**
+ * Saved model configurations with securely stored API keys.
+ * The API key itself lives in `secret_refs` — only the FK is here.
+ */
+export const modelConfigs = sqliteTable('model_configs', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  /** FK to secret_refs; null when no key is stored (e.g. Ollama). */
+  secretRefId: text('secret_ref_id').references(() => secretRefs.id, { onDelete: 'set null' }),
+  createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+  updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+});
+
 /** Persisted agent profile (matches Agent contract shape via JSON + join tables). */
 export const agents = sqliteTable(
   'agents',
@@ -69,6 +98,10 @@ export const agents = sqliteTable(
     description: text('description'),
     executionLimitsJson: text('execution_limits_json').notNull(),
     modelOverrideJson: text('model_override_json'),
+    /** FK to model_configs; when set, its stored key takes precedence over env-var resolution. */
+    modelConfigId: text('model_config_id').references(() => modelConfigs.id, {
+      onDelete: 'set null',
+    }),
     pluginAllowlistJson: text('plugin_allowlist_json'),
     pluginDenylistJson: text('plugin_denylist_json'),
     contextWindowJson: text('context_window_json'),
@@ -172,20 +205,6 @@ export const messages = sqliteTable('messages', {
   content: text('content').notNull(),
   toolCallId: text('tool_call_id'),
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
-});
-
-/**
- * Secret registry: label + optional **ciphertext-only** material (AES-256-GCM envelope).
- * Plaintext must never be persisted.
- */
-export const secretRefs = sqliteTable('secret_refs', {
-  id: text('id').primaryKey(),
-  label: text('label'),
-  ciphertextB64: text('ciphertext_b64'),
-  ivB64: text('iv_b64'),
-  authTagB64: text('auth_tag_b64'),
-  keyVersion: integer('key_version', { mode: 'number' }),
-  algorithm: text('algorithm'),
 });
 
 /** Key-value platform settings (rate limits, cost budgets, etc.). */

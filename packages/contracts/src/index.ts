@@ -6,6 +6,14 @@ export {
   type ReadinessResponse,
   type SubsystemCheck,
 } from './health.js';
+export {
+  ModelConfigSchema,
+  ModelConfigCreateBodySchema,
+  ModelConfigUpdateBodySchema,
+  type ModelConfig,
+  type ModelConfigCreateBody,
+  type ModelConfigUpdateBody,
+} from './modelConfig.js';
 export { ExecutionLimitsSchema, type ExecutionLimits } from './limits.js';
 export {
   McpServerSchema,

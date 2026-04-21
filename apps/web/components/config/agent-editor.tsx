@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Agent, AgentCreateBody, Skill, McpServer } from '@agent-platform/contracts';
+import type { Agent, AgentCreateBody, ModelConfig, Skill, McpServer } from '@agent-platform/contracts';
 import { apiGet, apiPost, apiPut, apiPath, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ interface FormState {
   name: string;
   description: string;
   systemPrompt: string;
+  modelConfigId: string;
   provider: string;
   model: string;
   maxSteps: number;
@@ -36,6 +37,7 @@ function buildInitialState(agent?: Agent): FormState {
     name: agent?.name ?? '',
     description: agent?.description ?? '',
     systemPrompt: agent?.systemPrompt ?? 'You are a helpful assistant.',
+    modelConfigId: agent?.modelConfigId ?? '',
     provider: agent?.modelOverride?.provider ?? '',
     model: agent?.modelOverride?.model ?? '',
     maxSteps: agent?.executionLimits.maxSteps ?? 10,
@@ -51,6 +53,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
   const [form, setForm] = useState<FormState>(() => buildInitialState(agent));
   const [skills, setSkills] = useState<Skill[]>([]);
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
+  const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +61,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
     void Promise.all([
       apiGet<Skill[]>(apiPath('skills')).then((d) => setSkills(d ?? [])),
       apiGet<McpServer[]>(apiPath('mcp-servers')).then((d) => setMcpServers(d ?? [])),
+      apiGet<ModelConfig[]>(apiPath('model-configs')).then((d) => setModelConfigs(d ?? [])),
     ]).catch(() => {
       /* ignore — lists may be empty */
     });
@@ -105,6 +109,7 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
           timeoutMs: form.timeoutMs,
         },
         modelOverride,
+        modelConfigId: form.modelConfigId || undefined,
       };
 
       if (agent) {
@@ -119,6 +124,8 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
       setSaving(false);
     }
   }, [form, agent, onSaved]);
+
+  const selectedConfig = modelConfigs.find((c) => c.id === form.modelConfigId);
 
   return (
     <div className="flex flex-col h-full">
@@ -192,40 +199,68 @@ export function AgentEditor({ agent, onCancel, onSaved }: Readonly<AgentEditorPr
             </div>
           </section>
 
-          {/* Model Override */}
+          {/* Model Configuration */}
           <section className="space-y-4">
-            <h2 className="text-lg font-medium text-foreground">Model Override</h2>
-            <p className="text-sm text-muted-foreground">
-              Leave blank to use the platform default model.
-            </p>
+            <h2 className="text-lg font-medium text-foreground">Model Configuration</h2>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="agent-provider">Provider</Label>
-                <select
-                  id="agent-provider"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring"
-                  value={form.provider}
-                  onChange={(e) => setField('provider', e.target.value)}
-                >
-                  <option value="">None (use default)</option>
-                  {PROVIDERS.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Saved model config (highest precedence) */}
+            <div className="space-y-2">
+              <Label htmlFor="agent-model-config">Saved Model Config</Label>
+              <select
+                id="agent-model-config"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring"
+                value={form.modelConfigId}
+                onChange={(e) => setField('modelConfigId', e.target.value)}
+              >
+                <option value="">None — use free-form override or env vars</option>
+                {modelConfigs.map((cfg) => (
+                  <option key={cfg.id} value={cfg.id}>
+                    {cfg.name} ({cfg.provider} / {cfg.model})
+                  </option>
+                ))}
+              </select>
+              {selectedConfig && (
+                <p className="text-xs text-muted-foreground">
+                  Using saved config — provider/model free-form fields below are ignored.
+                  {selectedConfig.hasApiKey ? ' API key is stored securely.' : ' No API key stored; uses env vars.'}
+                </p>
+              )}
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="agent-model">Model</Label>
-                <Input
-                  id="agent-model"
-                  placeholder="e.g. gpt-4o"
-                  value={form.model}
-                  onChange={(e) => setField('model', e.target.value)}
-                  disabled={!form.provider}
-                />
+            {/* Free-form override (used only when no saved config selected) */}
+            <div className={selectedConfig ? 'opacity-40 pointer-events-none' : ''}>
+              <p className="text-sm text-muted-foreground mb-3">
+                Free-form override — leave blank to use the platform default model.
+                {selectedConfig && ' (ignored when a saved config is selected)'}
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="agent-provider">Provider</Label>
+                  <select
+                    id="agent-provider"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring"
+                    value={form.provider}
+                    onChange={(e) => setField('provider', e.target.value)}
+                  >
+                    <option value="">None (use default)</option>
+                    {PROVIDERS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="agent-model">Model</Label>
+                  <Input
+                    id="agent-model"
+                    placeholder="e.g. gpt-4o"
+                    value={form.model}
+                    onChange={(e) => setField('model', e.target.value)}
+                    disabled={!form.provider}
+                  />
+                </div>
               </div>
             </div>
           </section>

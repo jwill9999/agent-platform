@@ -7,25 +7,41 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-20
-- **Session:** SonarQube fixes + lint cleanup across monorepo (post session-history feature).
+- **Date:** 2026-04-21
+- **Session:** Model configuration management — secure multi-provider LLM config storage + agent assignment.
 
 ---
 
 ## What happened (this session)
 
-### SonarQube + lint fixes — complete ✅
+### Model configuration management — complete ✅ (PR #77 open, all CI green)
 
-- Resolved 44 SonarQube issues across 18 files (6 CRITICAL, 7 MAJOR, 31 MINOR)
-- Fixed lint blocker: removed invalid `eslint-disable react-hooks/exhaustive-deps` comment in `page.tsx`
-- Major refactor of `use-harness-chat.ts`: extracted 8 module-level helpers (StreamEvent, extractTextDelta, renderErrorEvent, renderStreamEvent, formatToolResultPreview, parseErrorResponse, readNdjsonStream, updateAssistantMessage)
-- Refactored `use-file-system.ts`: extracted `restorePersistedFolder` and `tryPermission` helpers, fixed IDB Promise rejections
-- Extracted `StatusLabel` and `AssistantContent` components from `ide-with-chat.tsx`
-- Replaced all `void asyncFn()` with `.catch(() => {})` pattern
-- Replaced `replace()` with `replaceAll()`, `typeof` with direct comparison, `[length-1]` with `.at(-1)`
-- Fixed FormEvent deprecation in `chat-input.tsx` — extracted `doSend` helper
-- All quality gates passing: lint ✅ typecheck ✅ 475 tests ✅
-- Committed and pushed to `task/session-history-ui` (updates PR #72)
+Full-stack feature: store multiple LLM provider configs (provider + model + encrypted API key), expose via REST, assign to agents in the UI.
+
+**DB layer (`task/model-config-db`):**
+
+- New `model_configs` table + nullable `model_config_id` FK on `agents`
+- Migration `0011_add_model_configs.sql` (with `--> statement-breakpoint`)
+- Full CRUD repository with AES-256-GCM key encryption via `secret_refs`
+- `resolveModelConfigKey` for runtime decryption
+
+**Contracts + API (`task/model-config-api`):**
+
+- `ModelConfigSchema`, `ModelConfigCreateBodySchema`, `ModelConfigUpdateBodySchema` in `@agent-platform/contracts`
+- 6 endpoints under `/v1/model-configs` (list, get, create, update, delete, test)
+- Chat router updated: `modelConfigId` → `modelOverride` → env-var fallback chain
+- `testModelConnection` helper in `@agent-platform/model-router`
+- `SECRETS_MASTER_KEY` enabled in `docker-compose.yml` + `.env.example`
+- API keys never returned in GET responses
+
+**Frontend (`task/model-config-frontend`):**
+
+- Static models settings page replaced with live `ModelConfigsDashboard` (CRUD + test inline)
+- Agent editor updated with model config dropdown
+
+**Docs:** `docs/api-reference.md`, `docs/configuration.md`, `docs/database.md` updated.
+
+All three task branches squash-merged into `feature/model-config-management` (PR #75). Stale PR #76 closed. PR #77 (`feature → main`) open with all CI checks green.
 
 ---
 
@@ -33,35 +49,29 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ### Git
 
-- **`main`** — includes lazy skill loading (PR #71), per-tool rate limiting (PR #69), all prior features
-- **`feature/session-history`** — integration branch (currently at `main`)
-- **`task/extend-session-schema`** — backend: title, messages endpoint, auto-title (pushed)
-- **`task/session-history-ui`** — frontend: panel, resume, settings link (pushed, segment tip)
+- **`main`** — includes chat-context-attachments (PR #74) and all prior features
+- **`feature/model-config-management`** — squash of all 3 task branches, **1 commit ahead of main**
+- **PR #77** — `feature/model-config-management → main`, all CI ✅ — ready to merge
 
 ### Quality
 
-- **475 tests** (412 harness + 63 API), all passing
-- Build, typecheck, lint all clean
-- SonarQube: 44 issues addressed (some may remain as false positives in local analyzer)
+- **All tests passing** (unit + integration + e2e)
+- verify ✅ docker ✅ e2e ✅ CodeQL ✅ SonarCloud ✅ GitGuardian ✅
 
-### Key commits on task branches
+### Key commits
 
-| Commit    | Branch                       | Description                                        |
-| --------- | ---------------------------- | -------------------------------------------------- |
-| `5a98ba6` | `task/extend-session-schema` | feat: session title, messages endpoint, auto-title |
-| `ed1abcf` | `task/session-history-ui`    | feat: session history panel and resume flow        |
-| `65454b3` | `task/session-history-ui`    | fix: resolve SonarQube issues and lint failures    |
+| Commit    | Branch                            | Description                                                          |
+| --------- | --------------------------------- | -------------------------------------------------------------------- |
+| `ff88318` | `feature/model-config-management` | feat: model configuration management (squash of all 3 task branches) |
 
 ---
 
 ## Next (priority order)
 
-1. **Merge PR #72** — `task/session-history-ui` → `feature/session-history`, then `feature/session-history` → `main`
-2. **Close beads issue** — `agent-platform-uto` after merge
-3. **SonarQube server review** — Verify remaining issues in CI analysis (local analyzer had caching/parsing issues)
-4. **Frontend UI next phase** — `agent-platform-ntf` (unblocked). See `docs/planning/frontend-ui-phases.md`.
-5. **Document security architecture** — Add contributor guide for security guard patterns
-6. **Domain allowlist** — Currently optional (no allowlist = allow all). Consider default config.
+1. **Merge PR #77** — `feature/model-config-management → main` (all CI green, ready)
+2. **Frontend UI next phase** — `agent-platform-ntf` (design polish). See `docs/planning/frontend-ui-phases.md`.
+3. **Document security architecture** — `agent-platform-e4n` contributor guide.
+4. **Domain allowlist** — `agent-platform-o1g`. Currently optional (no allowlist = allow all).
 
 ---
 

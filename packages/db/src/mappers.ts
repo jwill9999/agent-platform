@@ -98,6 +98,7 @@ export function loadAgentById(db: DrizzleDb, id: string): Agent | undefined {
     allowedMcpServerIds: mcpRows.map((r) => r.mcpServerId),
     executionLimits,
     modelOverride,
+    modelConfigId: row.modelConfigId ?? undefined,
     pluginAllowlist: pluginAllowlist ?? undefined,
     pluginDenylist: pluginDenylist ?? undefined,
     contextWindow,

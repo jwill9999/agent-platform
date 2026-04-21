@@ -255,6 +255,7 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
             description: agent.description ?? null,
             executionLimitsJson: JSON.stringify(agent.executionLimits),
             modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
+            modelConfigId: agent.modelConfigId ?? null,
             pluginAllowlistJson:
               agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
             pluginDenylistJson:
@@ -272,6 +273,7 @@ export function replaceAgent(db: DrizzleDb, agent: Agent): void {
               description: agent.description ?? null,
               executionLimitsJson: JSON.stringify(agent.executionLimits),
               modelOverrideJson: agent.modelOverride ? JSON.stringify(agent.modelOverride) : null,
+              modelConfigId: agent.modelConfigId ?? null,
               pluginAllowlistJson:
                 agent.pluginAllowlist === undefined ? null : JSON.stringify(agent.pluginAllowlist),
               pluginDenylistJson:

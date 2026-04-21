@@ -5,6 +5,7 @@ import { Router } from 'express';
 import { createAgentsRouter } from './agentsRouter.js';
 import { createChatRouter } from './chatRouter.js';
 import { createMcpServersRouter } from './mcpServersRouter.js';
+import { createModelConfigsRouter } from './modelConfigsRouter.js';
 import { createSessionsRouter } from './sessionsRouter.js';
 import { createSettingsRouter } from './settingsRouter.js';
 import { createSkillsRouter } from './skillsRouter.js';
@@ -39,6 +40,7 @@ export function createV1Router(db: DrizzleDb): Router {
     createSettingsRouter(db, (config) => rateLimiter.reconfigure(config)),
   );
   router.use('/tool-executions', createToolExecutionsRouter(db));
+  router.use('/model-configs', createModelConfigsRouter(db));
 
   return router;
 }
