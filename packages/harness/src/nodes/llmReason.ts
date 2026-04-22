@@ -63,6 +63,35 @@ function sanitiseToolName(name: string): string {
 }
 
 /**
+ * Recursively add `additionalProperties: false` to every JSON Schema object node.
+ *
+ * Newer OpenAI models (e.g. gpt-5.4-nano) require this on all object schemas in
+ * tool definitions and will return HTTP 400 without it. Adding it universally is
+ * safe — other providers ignore or accept the constraint, and it doesn't break
+ * schemas that already declare it.
+ */
+function makeStrictSchema(schema: unknown): unknown {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
+  const s = schema as Record<string, unknown>;
+  const result: Record<string, unknown> = { ...s };
+  if (s['type'] === 'object') {
+    result['additionalProperties'] = false;
+    if (s['properties'] && typeof s['properties'] === 'object') {
+      const props: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(s['properties'] as Record<string, unknown>)) {
+        props[k] = makeStrictSchema(v);
+      }
+      result['properties'] = props;
+    }
+  }
+  if (s['items']) result['items'] = makeStrictSchema(s['items']);
+  if (Array.isArray(s['anyOf'])) result['anyOf'] = (s['anyOf'] as unknown[]).map(makeStrictSchema);
+  if (Array.isArray(s['oneOf'])) result['oneOf'] = (s['oneOf'] as unknown[]).map(makeStrictSchema);
+  if (Array.isArray(s['allOf'])) result['allOf'] = (s['allOf'] as unknown[]).map(makeStrictSchema);
+  return result;
+}
+
+/**
  * Build a bidirectional map between sanitised (LLM-safe) names and original
  * harness tool IDs so we can translate tool-call responses back.
  */
@@ -78,7 +107,7 @@ function buildToolNameMap(defs: ToolDefinition[]): {
     const safe = sanitiseToolName(def.name);
     tools[safe] = {
       description: def.description,
-      parameters: jsonSchema(def.parameters),
+      parameters: jsonSchema(makeStrictSchema(def.parameters) as Record<string, unknown>),
     };
     toOriginal.set(safe, def.name);
   }
@@ -157,6 +186,10 @@ async function consumeFullStream(
       if (emitter && chunk) {
         await emitter.emit({ type: 'thinking', content: chunk });
       }
+    } else if (part.type === 'error') {
+      // Throw immediately so callers never reach `await result.text`, which
+      // hangs indefinitely when the stream errors while `onError` is set.
+      throw part.error instanceof Error ? part.error : new Error(String(part.error));
     }
   }
   return fullText;
