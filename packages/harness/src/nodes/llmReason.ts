@@ -63,12 +63,13 @@ function sanitiseToolName(name: string): string {
 }
 
 /**
- * Recursively add `additionalProperties: false` to every JSON Schema object node.
+ * Recursively enforce OpenAI strict-mode requirements on every JSON Schema object node:
+ *   1. `additionalProperties: false` — newer models (gpt-5.4-nano+) reject schemas without it.
+ *   2. Every key in `properties` must appear in `required` — OpenAI strict mode mandates this.
+ *      Tool handlers that treat a param as optional must handle undefined themselves; the model
+ *      will always supply the key (possibly null/empty string).
  *
- * Newer OpenAI models (e.g. gpt-5.4-nano) require this on all object schemas in
- * tool definitions and will return HTTP 400 without it. Adding it universally is
- * safe — other providers ignore or accept the constraint, and it doesn't break
- * schemas that already declare it.
+ * Both constraints are ignored by lenient providers, so patching universally is safe.
  */
 function makeStrictSchema(schema: unknown): unknown {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
@@ -78,10 +79,15 @@ function makeStrictSchema(schema: unknown): unknown {
     result['additionalProperties'] = false;
     if (s['properties'] && typeof s['properties'] === 'object') {
       const props: Record<string, unknown> = {};
+      const propKeys: string[] = [];
       for (const [k, v] of Object.entries(s['properties'] as Record<string, unknown>)) {
         props[k] = makeStrictSchema(v);
+        propKeys.push(k);
       }
       result['properties'] = props;
+      // Merge existing required entries with all property keys (dedup).
+      const existingRequired = Array.isArray(s['required']) ? (s['required'] as string[]) : [];
+      result['required'] = [...new Set([...existingRequired, ...propKeys])];
     }
   }
   if (s['items']) result['items'] = makeStrictSchema(s['items']);
