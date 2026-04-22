@@ -63,34 +63,93 @@ function sanitiseToolName(name: string): string {
 }
 
 /**
- * Recursively enforce OpenAI strict-mode requirements on every JSON Schema object node:
- *   1. `additionalProperties: false` — newer models (gpt-5.4-nano+) reject schemas without it.
- *   2. Every key in `properties` must appear in `required` — OpenAI strict mode mandates this.
- *      Tool handlers that treat a param as optional must handle undefined themselves; the model
- *      will always supply the key (possibly null/empty string).
+ * Primitive type branches used when a schema has no declared type.
+ * These cover every JSON scalar; complex values must be pre-serialised by the model.
+ */
+const STRICT_ANY_PRIMITIVE: unknown[] = [
+  { type: 'string' },
+  { type: 'number' },
+  { type: 'integer' },
+  { type: 'boolean' },
+  { type: 'null' },
+];
+
+/**
+ * Wrap a schema in `anyOf: [schema, {type:'null'}]` unless it is already nullable.
+ * Used for optional properties that strict mode forces into `required`.
+ */
+function makeNullable(schema: unknown): unknown {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) {
+    return { anyOf: [schema, { type: 'null' }] };
+  }
+  const s = schema as Record<string, unknown>;
+  if (s['type'] === 'null') return schema;
+  if (
+    Array.isArray(s['anyOf']) &&
+    (s['anyOf'] as unknown[]).some(
+      (v) =>
+        typeof v === 'object' &&
+        v !== null &&
+        !Array.isArray(v) &&
+        (v as Record<string, unknown>)['type'] === 'null',
+    )
+  )
+    return schema;
+  return { anyOf: [schema, { type: 'null' }] };
+}
+
+/**
+ * Recursively enforce OpenAI strict-mode requirements on every JSON Schema node:
+ *   1. Schemas with no `type` (and no anyOf/oneOf/allOf/$ref) → `anyOf` with all JSON primitives.
+ *   2. `type: 'object'` → `additionalProperties: false`; empty `properties/required` when absent.
+ *   3. Every key in `properties` must appear in `required` — strict mode mandates this.
+ *      Properties that were originally optional become nullable (anyOf + null) so the model can
+ *      omit them by passing null; handlers already guard with `typeof x === 'string'` etc.
+ *   4. `type: 'array'` → inject `items` (anyOf primitives) when missing.
  *
- * Both constraints are ignored by lenient providers, so patching universally is safe.
+ * All four constraints are either ignored or already satisfied by lenient providers,
+ * so patching universally is safe.
  */
 function makeStrictSchema(schema: unknown): unknown {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
   const s = schema as Record<string, unknown>;
   const result: Record<string, unknown> = { ...s };
-  if (s['type'] === 'object') {
-    result['additionalProperties'] = false;
-    if (s['properties'] && typeof s['properties'] === 'object') {
-      const props: Record<string, unknown> = {};
-      const propKeys: string[] = [];
-      for (const [k, v] of Object.entries(s['properties'] as Record<string, unknown>)) {
-        props[k] = makeStrictSchema(v);
-        propKeys.push(k);
-      }
-      result['properties'] = props;
-      // Merge existing required entries with all property keys (dedup).
-      const existingRequired = Array.isArray(s['required']) ? (s['required'] as string[]) : [];
-      result['required'] = [...new Set([...existingRequired, ...propKeys])];
-    }
+
+  // Rule 1 — typeless, bare schema → anyOf with primitives (covers e.g. `data` in json_stringify).
+  if (!s['type'] && !s['anyOf'] && !s['oneOf'] && !s['allOf'] && !s['$ref']) {
+    const base: Record<string, unknown> = { anyOf: STRICT_ANY_PRIMITIVE };
+    if (s['description']) base['description'] = s['description'];
+    return base;
   }
-  if (s['items']) result['items'] = makeStrictSchema(s['items']);
+
+  if (s['type'] === 'object') {
+    // Rule 2 — additionalProperties must be false.
+    result['additionalProperties'] = false;
+    const rawProps = (
+      typeof s['properties'] === 'object' && s['properties'] !== null ? s['properties'] : {}
+    ) as Record<string, unknown>;
+    const originalRequired = new Set(
+      Array.isArray(s['required']) ? (s['required'] as string[]) : [],
+    );
+    const props: Record<string, unknown> = {};
+    const propKeys: string[] = [];
+    for (const [k, v] of Object.entries(rawProps)) {
+      const processed = makeStrictSchema(v);
+      // Rule 3 — optional properties become nullable so the model can pass null to "skip" them.
+      props[k] = originalRequired.has(k) ? processed : makeNullable(processed);
+      propKeys.push(k);
+    }
+    result['properties'] = props;
+    result['required'] = [...new Set([...originalRequired, ...propKeys])];
+  }
+
+  // Rule 4 — arrays must declare their item schema.
+  if (s['type'] === 'array') {
+    result['items'] = s['items'] ? makeStrictSchema(s['items']) : { anyOf: STRICT_ANY_PRIMITIVE };
+  } else if (s['items']) {
+    result['items'] = makeStrictSchema(s['items']);
+  }
+
   if (Array.isArray(s['anyOf'])) result['anyOf'] = (s['anyOf'] as unknown[]).map(makeStrictSchema);
   if (Array.isArray(s['oneOf'])) result['oneOf'] = (s['oneOf'] as unknown[]).map(makeStrictSchema);
   if (Array.isArray(s['allOf'])) result['allOf'] = (s['allOf'] as unknown[]).map(makeStrictSchema);

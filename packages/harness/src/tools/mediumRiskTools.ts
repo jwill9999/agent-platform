@@ -137,8 +137,9 @@ export const MEDIUM_RISK_TOOLS: readonly ContractTool[] = [
             description: 'HTTP method (GET, POST, PUT, DELETE, PATCH). Default: GET.',
           },
           headers: {
-            type: 'object',
-            description: 'Optional HTTP headers as key-value pairs.',
+            type: 'string',
+            description:
+              'Optional HTTP headers as a JSON object string e.g. {"Content-Type":"application/json"}.',
           },
           body: {
             type: 'string',
@@ -246,10 +247,19 @@ async function handleHttpRequest(toolId: string, args: Record<string, unknown>):
   }
 
   const method = stringArg(args, 'method', 'GET').toUpperCase();
-  const headers =
-    typeof args.headers === 'object' && args.headers !== null
-      ? (args.headers as Record<string, string>)
-      : {};
+  let headers: Record<string, string> = {};
+  if (typeof args.headers === 'string' && args.headers.trim()) {
+    try {
+      const parsed: unknown = JSON.parse(args.headers);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        headers = parsed as Record<string, string>;
+      }
+    } catch {
+      /* ignore malformed header JSON — proceed with empty headers */
+    }
+  } else if (typeof args.headers === 'object' && args.headers !== null) {
+    headers = args.headers as Record<string, string>;
+  }
   const body = typeof args.body === 'string' ? args.body : undefined;
   const timeoutMs = typeof args.timeout_ms === 'number' ? args.timeout_ms : HTTP_TIMEOUT_MS;
 

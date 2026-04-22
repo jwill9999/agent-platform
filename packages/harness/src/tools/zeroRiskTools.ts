@@ -231,8 +231,9 @@ export const ZERO_RISK_TOOLS: readonly ContractTool[] = [
             description: 'Template with {{key}} placeholders.',
           },
           variables: {
-            type: 'object',
-            description: 'Key-value map of variables to substitute.',
+            type: 'string',
+            description:
+              'Key-value map of variables to substitute, as a JSON object string e.g. {"name":"Alice","count":5}.',
           },
         },
         required: ['template', 'variables'],
@@ -370,9 +371,19 @@ function handleHashString(toolId: string, args: Record<string, unknown>): Output
 
 function handleTemplateRender(toolId: string, args: Record<string, unknown>): Output {
   const template = stringArg(args, 'template');
-  const variables = (
-    args.variables && typeof args.variables === 'object' ? args.variables : {}
-  ) as Record<string, unknown>;
+  let variables: Record<string, unknown> = {};
+  if (typeof args.variables === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(args.variables);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        variables = parsed as Record<string, unknown>;
+      }
+    } catch {
+      /* ignore parse errors — use empty variables */
+    }
+  } else if (typeof args.variables === 'object' && args.variables !== null) {
+    variables = args.variables as Record<string, unknown>;
+  }
   const result = template.replaceAll(/\{\{(\w+)\}\}/g, (_match, key: string) => {
     const val = variables[key];
     if (val === undefined) return `{{${key}}}`;
