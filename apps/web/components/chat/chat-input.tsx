@@ -120,7 +120,8 @@ export function ChatInput({
   return (
     <div className="border-t border-border/50 bg-background/80 backdrop-blur-sm p-4">
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
-        <div
+        <section
+          aria-label="Chat input and file drop zone"
           className={cn(
             'relative flex flex-col bg-card border rounded-2xl shadow-sm transition-all',
             isDragOver
@@ -241,7 +242,7 @@ export function ChatInput({
               )}
             </button>
           </div>
-        </div>
+        </section>
         <p className="text-xs text-muted-foreground text-center mt-2">
           {canSend
             ? 'Press Enter to send, Shift+Enter for new line'

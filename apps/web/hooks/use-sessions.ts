@@ -15,7 +15,7 @@ export function useSessions() {
       const data = await apiGet<SessionRecord[]>(apiPath('sessions'));
       // Only show sessions that have a title (i.e. at least one message was sent)
       const titled = (data ?? []).filter((s) => s.title);
-      const sorted = titled.sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+      const sorted = titled.toSorted((a, b) => b.updatedAtMs - a.updatedAtMs);
       setSessions(sorted);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -25,7 +25,7 @@ export function useSessions() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    refresh().catch(() => {});
   }, [refresh]);
 
   return { sessions, loading, error, refresh };

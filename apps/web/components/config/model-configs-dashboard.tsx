@@ -312,6 +312,12 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
     }
   }, [form, config, onSaved]);
 
+  const modelPlaceholder = {
+    openai: 'gpt-4o',
+    anthropic: 'claude-sonnet-4-20250514',
+    ollama: 'llama3.2',
+  }[form.provider] ?? 'llama3.2';
+
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center gap-3 px-6 py-4 border-b border-border bg-card/50">
@@ -369,7 +375,7 @@ function ModelConfigEditor({ config, onCancel, onSaved }: Readonly<ModelConfigEd
               <Label htmlFor="mc-model">Model</Label>
               <Input
                 id="mc-model"
-                placeholder={form.provider === 'openai' ? 'gpt-4o' : form.provider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'llama3.2'}
+                placeholder={modelPlaceholder}
                 value={form.model}
                 onChange={(e) => setField('model', e.target.value)}
               />

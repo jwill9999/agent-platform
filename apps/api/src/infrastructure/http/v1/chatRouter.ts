@@ -79,7 +79,7 @@ const MAX_TITLE_LENGTH = 80;
 
 /** Derive a human-readable session title from the first user message. */
 function deriveSessionTitle(message: string): string {
-  const trimmed = message.trim().replace(/\s+/g, ' ');
+  const trimmed = message.trim().replaceAll(/\s+/g, ' ');
   if (trimmed.length <= MAX_TITLE_LENGTH) return trimmed;
   const cut = trimmed.slice(0, MAX_TITLE_LENGTH);
   const lastSpace = cut.lastIndexOf(' ');

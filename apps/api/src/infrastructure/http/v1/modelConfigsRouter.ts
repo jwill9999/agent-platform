@@ -68,7 +68,7 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
       const id = requireParam(req.params, 'id');
       if (!getModelConfig(db, id)) throw new HttpError(404, 'NOT_FOUND', 'Model config not found');
       const body = parseBody(ModelConfigUpdateBodySchema, req.body);
-      const masterKey = body.apiKey !== undefined ? getMasterKey() : undefined;
+      const masterKey = body.apiKey ? getMasterKey() : undefined;
       const updated = updateModelConfig(db, id, body, masterKey, KEY_VERSION);
       if (!updated) throw new HttpError(404, 'NOT_FOUND', 'Model config not found');
       res.json({ data: updated });
