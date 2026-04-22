@@ -1,5 +1,5 @@
 import { generateText } from 'ai';
-import { createLanguageModel, isSupportedProvider, type SupportedProvider } from './providers.js';
+import { createLanguageModel, isSupportedProvider } from './providers.js';
 
 export type TestConnectionOptions = {
   provider: string;
@@ -25,7 +25,7 @@ export async function testModelConnection(
   const start = Date.now();
   try {
     const model = createLanguageModel({
-      provider: options.provider as SupportedProvider,
+      provider: options.provider,
       model: options.model,
       apiKey: options.apiKey,
     });

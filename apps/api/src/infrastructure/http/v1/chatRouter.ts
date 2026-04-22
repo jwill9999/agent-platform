@@ -79,7 +79,7 @@ const MAX_TITLE_LENGTH = 80;
 
 /** Derive a human-readable session title from the first user message. */
 function deriveSessionTitle(message: string): string {
-  const trimmed = message.trim().replace(/\s+/g, ' ');
+  const trimmed = message.trim().replaceAll(/\s+/g, ' ');
   if (trimmed.length <= MAX_TITLE_LENGTH) return trimmed;
   const cut = trimmed.slice(0, MAX_TITLE_LENGTH);
   const lastSpace = cut.lastIndexOf(' ');
@@ -98,20 +98,39 @@ async function loadAgentContext(db: DrizzleDb, agentId: string): Promise<AgentCo
   }
 }
 
-/** Resolve model config or throw an HttpError on failure. */
+/** Resolve model config or throw an HttpError on failure.
+ *
+ * Precedence (highest → lowest):
+ *  1. `requestModelConfigId` — per-request override from the chat UI picker
+ *  2. `agentCtx.agent.modelConfigId` — agent's saved config
+ *  3. `agentCtx.agent.modelOverride` + `headerKey` (x-openai-key) + env-var chain
+ *
+ * Single-user MVP note: model configs are not scoped per-user. If multi-tenancy is
+ * added in future, enforce that `effectiveModelConfigId` belongs to the requesting user
+ * before calling `getModelConfig`.
+ */
 function resolveModelOrThrow(
   db: DrizzleDb,
   agentCtx: AgentContext,
   headerKey: string | undefined,
+  requestModelConfigId?: string,
 ): { provider: string; model: string; apiKey?: string } {
+  // Effective model config ID: per-request override wins over agent's stored config.
+  const effectiveModelConfigId = requestModelConfigId ?? agentCtx.agent.modelConfigId;
+
   // If the agent has a stored model config, use its encrypted key (highest precedence).
-  if (agentCtx.agent.modelConfigId) {
-    const cfg = getModelConfig(db, agentCtx.agent.modelConfigId);
+  if (effectiveModelConfigId) {
+    const cfg = getModelConfig(db, effectiveModelConfigId);
     if (!cfg) {
+      throw new HttpError(404, 'NOT_FOUND', `Model config '${effectiveModelConfigId}' not found`);
+    }
+    // A per-request UI override must reference a config that has a stored API key.
+    // Configs without a key cannot be meaningfully used as an explicit override.
+    if (requestModelConfigId && !cfg.hasApiKey) {
       throw new HttpError(
-        404,
-        'NOT_FOUND',
-        `Model config '${agentCtx.agent.modelConfigId}' not found`,
+        400,
+        'VALIDATION_ERROR',
+        `Model config '${effectiveModelConfigId}' has no API key stored`,
       );
     }
     let apiKey: string | undefined;
@@ -121,7 +140,7 @@ function resolveModelOrThrow(
         throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
       }
       const masterKey = parseMasterKeyFromBase64(masterKeyB64);
-      apiKey = resolveModelConfigKey(db, agentCtx.agent.modelConfigId, masterKey);
+      apiKey = resolveModelConfigKey(db, effectiveModelConfigId, masterKey);
     }
     return { provider: cfg.provider, model: cfg.model, apiKey };
   }
@@ -214,7 +233,12 @@ export function createChatRouter(db: DrizzleDb): Router {
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
       const agentCtx = await loadAgentContext(db, session.agentId);
-      const modelCfg = resolveModelOrThrow(db, agentCtx, req.header('x-openai-key'));
+      const modelCfg = resolveModelOrThrow(
+        db,
+        agentCtx,
+        req.header('x-openai-key'),
+        req.header('x-model-config-id') || undefined,
+      );
 
       const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
       const release = await sessionLock.acquire(sessionId, timeoutMs);
