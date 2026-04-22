@@ -49,7 +49,21 @@ export default function HomePage() {
       // Only show configs that have an API key stored; pre-select the first one
       const withKey = (configList ?? []).filter((c) => c.hasApiKey);
       setModelConfigs(withKey);
-      setSelectedModelConfigId((prev) => prev ?? withKey[0]?.id ?? null);
+      setSelectedModelConfigId((prev) => {
+        if (prev == null) {
+          // No previous selection: default to the first available config (if any)
+          return withKey[0]?.id ?? null;
+        }
+
+        // Keep previous selection only if it still exists in the new list
+        const stillExists = withKey.some((c) => c.id === prev);
+        if (stillExists) {
+          return prev;
+        }
+
+        // Previous selection is gone: fall back to the first config (or null)
+        return withKey[0]?.id ?? null;
+      });
     } catch (e) {
       setLoadError(e instanceof ApiRequestError ? e.message : String(e));
     }
