@@ -8,11 +8,17 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-22
-- **Session:** Resolved 9 SonarQube issues in chat model picker feature branch (S2004, S3735, S4043, S3358, S6848, S7756, S4325, S7781, S6959).
+- **Session:** Fixed flaky pre-push test (ephemeral-port exhaustion); capped `apps/api` Vitest fork concurrency to 4 in `apps/api/vitest.config.ts`. Also resolved 9 SonarQube issues (S2004, S3735, S4043, S3358, S6848, S7756, S4325, S7781, S6959) and addressed Sourcery false-positive with explanatory comment in `modelConfigsRouter.ts`.
 
 ---
 
 ## What happened (this session)
+
+### Flaky test fix — complete ✅ (committed to `feature/chat-model-picker`)
+
+Root cause: `apps/api` Vitest default config spawns one fork per test file (up to CPU count = 11). With 15 test files × supertest ephemeral HTTP servers, combined with other package test suites running in parallel during pre-push, rapid port recycling in `TIME_WAIT` caused Node's llhttp parser to receive stale non-HTTP data → `"Parse Error: Expected HTTP/, RTSP/ or ICE/"`.
+
+Fix: added `pool: 'forks', poolOptions: { forks: { minForks: 1, maxForks: 4 } }` to `apps/api/vitest.config.ts`. All 63 tests still pass; pre-push hook passes reliably.
 
 ### SonarQube fixes — complete ✅ (commit pushed to `task/chat-model-picker-ui`)
 
@@ -87,10 +93,6 @@ Branches: `feature/chat-model-picker` + `task/chat-model-picker-api` pushed. Seg
 3. **Frontend UI next phase** — `agent-platform-ntf` (design polish). See `docs/planning/frontend-ui-phases.md`.
 4. **Document security architecture** — `agent-platform-e4n` contributor guide.
 5. **Domain allowlist** — `agent-platform-o1g`. Currently optional (no allowlist = allow all).
-
----
-
-## What happened (this session)
 
 ### Model configuration management — complete ✅ (PR #77 open, all CI green)
 
