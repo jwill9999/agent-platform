@@ -104,6 +104,10 @@ async function loadAgentContext(db: DrizzleDb, agentId: string): Promise<AgentCo
  *  1. `requestModelConfigId` — per-request override from the chat UI picker
  *  2. `agentCtx.agent.modelConfigId` — agent's saved config
  *  3. `agentCtx.agent.modelOverride` + `headerKey` (x-openai-key) + env-var chain
+ *
+ * Single-user MVP note: model configs are not scoped per-user. If multi-tenancy is
+ * added in future, enforce that `effectiveModelConfigId` belongs to the requesting user
+ * before calling `getModelConfig`.
  */
 function resolveModelOrThrow(
   db: DrizzleDb,
@@ -119,6 +123,15 @@ function resolveModelOrThrow(
     const cfg = getModelConfig(db, effectiveModelConfigId);
     if (!cfg) {
       throw new HttpError(404, 'NOT_FOUND', `Model config '${effectiveModelConfigId}' not found`);
+    }
+    // A per-request UI override must reference a config that has a stored API key.
+    // Configs without a key cannot be meaningfully used as an explicit override.
+    if (requestModelConfigId && !cfg.hasApiKey) {
+      throw new HttpError(
+        400,
+        'VALIDATION_ERROR',
+        `Model config '${effectiveModelConfigId}' has no API key stored`,
+      );
     }
     let apiKey: string | undefined;
     if (cfg.hasApiKey) {
