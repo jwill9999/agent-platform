@@ -8,11 +8,31 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-22
-- **Session:** Chat model picker — per-message model config override in chat UI.
+- **Session:** Resolved 9 SonarQube issues in chat model picker feature branch (S2004, S3735, S4043, S3358, S6848, S7756, S4325, S7781, S6959).
 
 ---
 
 ## What happened (this session)
+
+### SonarQube fixes — complete ✅ (commit pushed to `task/chat-model-picker-ui`)
+
+Fixed 9 issues flagged on the chat model picker feature branch:
+
+| Rule                      | File                          | Fix                                                           |
+| ------------------------- | ----------------------------- | ------------------------------------------------------------- |
+| S2004 (nesting depth)     | `use-harness-chat.ts`         | Extracted `updateAssistantMessage` as top-level `useCallback` |
+| S7781 (non-mutating sort) | `use-sessions.ts`             | `.sort()` → `.toSorted()`                                     |
+| S6959 (void operator)     | `use-sessions.ts`             | `void refresh()` → `refresh().catch(() => {})`                |
+| S7756 (FileReader)        | `use-context-attachments.ts`  | `FileReader.readAsText()` → `file.text()`                     |
+| S6848 (ARIA role)         | `chat-input.tsx`              | `<div role="region">` → `<section>`                           |
+| S3358 (nested ternary)    | `model-configs-dashboard.tsx` | Replaced with lookup object                                   |
+| S4043 (replaceAll)        | `chatRouter.ts`               | `.replace(regex)` → `.replaceAll(regex)`                      |
+| S3735 (negated condition) | `modelConfigsRouter.ts`       | `!== undefined` → truthy check                                |
+| S4325 (unnecessary cast)  | `testConnection.ts`           | Removed `as SupportedProvider` + unused import                |
+
+Also updated `apps/web/tsconfig.json` lib from `"ES2022"` to `"ES2023"` (required for `toSorted`).
+
+All quality gates: typecheck ✅ lint ✅ tests ✅ (63/63 pass). Branch pushed.
 
 ### Chat model picker — in progress 🔄 (PR #78 open, awaiting CI)
 
@@ -44,12 +64,12 @@ Branches: `feature/chat-model-picker` + `task/chat-model-picker-api` pushed. Seg
 - **`main`** — includes model-config-management (PR #77 merged)
 - **`feature/chat-model-picker`** — integration branch (no extra commits)
 - **`task/chat-model-picker-api`** — 1 commit (API + BFF layer)
-- **`task/chat-model-picker-ui`** — 1 commit (frontend + docs) — **segment tip**
+- **`task/chat-model-picker-ui`** — 2 commits (frontend + docs; Sonar fixes) — **segment tip**
 - **PR #78** — `task/chat-model-picker-ui → feature/chat-model-picker`, CI pending
 
 ### Quality
 
-- Typecheck ✅ Lint ✅ (all packages clean)
+- Typecheck ✅ Lint ✅ Tests ✅ (63/63) — all packages clean
 
 ### Key commits
 
