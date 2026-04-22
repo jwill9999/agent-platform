@@ -8,91 +8,60 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-22
-- **Session:** Fixed flaky pre-push test (ephemeral-port exhaustion); capped `apps/api` Vitest fork concurrency to 4 in `apps/api/vitest.config.ts`. Also resolved 9 SonarQube issues (S2004, S3735, S4043, S3358, S6848, S7756, S4325, S7781, S6959) and addressed Sourcery false-positive with explanatory comment in `modelConfigsRouter.ts`.
+- **Session:** Fixed chat hang on `feature/chat-model-picker`: (1) added `makeStrictSchema()` to inject `additionalProperties: false` recursively into tool parameter schemas (required by newer OpenAI models); (2) `consumeFullStream()` now throws immediately on `error` stream parts, preventing `await result.text` from hanging forever after an `onError`-suppressed error.
 
 ---
 
 ## What happened (this session)
 
-### Flaky test fix — complete ✅ (committed to `feature/chat-model-picker`)
+### Chat hang fix — complete ✅ (committed to `feature/chat-model-picker`)
 
-Root cause: `apps/api` Vitest default config spawns one fork per test file (up to CPU count = 11). With 15 test files × supertest ephemeral HTTP servers, combined with other package test suites running in parallel during pre-push, rapid port recycling in `TIME_WAIT` caused Node's llhttp parser to receive stale non-HTTP data → `"Parse Error: Expected HTTP/, RTSP/ or ICE/"`.
+Root cause: two bugs in `packages/harness/src/nodes/llmReason.ts` that combine to hang the chat stream indefinitely when using newer OpenAI models (e.g. `gpt-5.4-nano`).
 
-Fix: added `pool: 'forks', poolOptions: { forks: { minForks: 1, maxForks: 4 } }` to `apps/api/vitest.config.ts`. All 63 tests still pass; pre-push hook passes reliably.
+**Bug 1 — Missing `additionalProperties: false` in tool schemas:**
+Newer OpenAI models require every object node in a tool's parameter schema to declare `additionalProperties: false` or they return HTTP 400. Added `makeStrictSchema()` helper that recursively patches all object nodes before they are passed to `jsonSchema()`. Safe for all providers — lenient models ignore the field.
 
-### SonarQube fixes — complete ✅ (commit pushed to `task/chat-model-picker-ui`)
+**Bug 2 — `consumeFullStream()` didn't throw on `error` stream parts:**
+When the 400 above fires `onError` on the `streamText` call, the SDK emits an `{ type: 'error' }` part on `fullStream` then closes the stream. The `for await` loop ended normally, then `reconcileText()` called `await result.text` — which never resolves when `onError` is set (Vercel AI SDK 4.3.19 behaviour). Fix: throw immediately on the `error` part so the error propagates through `withRetry` and back to the client as an NDJSON error event instead of hanging.
 
-Fixed 9 issues flagged on the chat model picker feature branch:
+All quality gates: typecheck ✅ lint ✅ 412 tests ✅. Committed `dc5a7ad` and pushed to `feature/chat-model-picker`.
 
-| Rule                      | File                          | Fix                                                           |
-| ------------------------- | ----------------------------- | ------------------------------------------------------------- |
-| S2004 (nesting depth)     | `use-harness-chat.ts`         | Extracted `updateAssistantMessage` as top-level `useCallback` |
-| S7781 (non-mutating sort) | `use-sessions.ts`             | `.sort()` → `.toSorted()`                                     |
-| S6959 (void operator)     | `use-sessions.ts`             | `void refresh()` → `refresh().catch(() => {})`                |
-| S7756 (FileReader)        | `use-context-attachments.ts`  | `FileReader.readAsText()` → `file.text()`                     |
-| S6848 (ARIA role)         | `chat-input.tsx`              | `<div role="region">` → `<section>`                           |
-| S3358 (nested ternary)    | `model-configs-dashboard.tsx` | Replaced with lookup object                                   |
-| S4043 (replaceAll)        | `chatRouter.ts`               | `.replace(regex)` → `.replaceAll(regex)`                      |
-| S3735 (negated condition) | `modelConfigsRouter.ts`       | `!== undefined` → truthy check                                |
-| S4325 (unnecessary cast)  | `testConnection.ts`           | Removed `as SupportedProvider` + unused import                |
+### Chat model picker — complete ✅
 
-Also updated `apps/web/tsconfig.json` lib from `"ES2022"` to `"ES2023"` (required for `toSorted`).
-
-All quality gates: typecheck ✅ lint ✅ tests ✅ (63/63 pass). Branch pushed.
-
-### Chat model picker — in progress 🔄 (PR #78 open, awaiting CI)
-
-Per-message model config override: users can select any stored model config (with API key) from the chat header bar. Selection overrides the agent's default for every message sent in that session.
-
-**API / BFF (`task/chat-model-picker-api`):**
-
-- `chatRouter.ts`: `resolveModelOrThrow` accepts optional `requestModelConfigId` param; uses `effectiveModelConfigId = requestModelConfigId ?? agent.modelConfigId`
-- BFF `apps/web/app/api/chat/route.ts`: `HarnessChatBodySchema` extended with `modelConfigId?: string`; forwarded as `x-model-config-id` header upstream
-
-**Frontend (`task/chat-model-picker-ui`):**
-
-- New `components/ui/select.tsx` — shadcn/ui Select primitive (Radix UI, new-york style)
-- New `components/chat/chat-model-selector.tsx` — dropdown with "Default (agent config)" + all configs with `hasApiKey: true`
-- Refactored `chat-agent-selector.tsx` from native `<select>` → shadcn Select
-- `use-harness-chat.ts`: `sendMessage` accepts optional `modelConfigId` param
-- `page.tsx`: fetches model configs alongside agents on mount; manages `selectedModelConfigId` state; pre-selects first config with an API key
-
-**Docs:** `docs/api-reference.md` updated with `x-model-config-id` and `x-openai-key` header table.
-
-Branches: `feature/chat-model-picker` + `task/chat-model-picker-api` pushed. Segment tip `task/chat-model-picker-ui` pushed. **PR #78** (`task/chat-model-picker-ui → feature/chat-model-picker`) open.
-
----
+Per-message model config override is fully implemented and working. Stack up with `make restart`.
 
 ## Current state
 
 ### Git
 
 - **`main`** — includes model-config-management (PR #77 merged)
-- **`feature/chat-model-picker`** — integration branch (no extra commits)
-- **`task/chat-model-picker-api`** — 1 commit (API + BFF layer)
-- **`task/chat-model-picker-ui`** — 2 commits (frontend + docs; Sonar fixes) — **segment tip**
-- **PR #78** — `task/chat-model-picker-ui → feature/chat-model-picker`, CI pending
+- **`feature/chat-model-picker`** — integration branch, latest commit `dc5a7ad` (chat hang fix)
+- **`task/chat-model-picker-api`** — API + BFF layer
+- **`task/chat-model-picker-ui`** — frontend + docs + Sonar fixes — segment tip
+- **PR #78** — `task/chat-model-picker-ui → feature/chat-model-picker`
 
 ### Quality
 
-- Typecheck ✅ Lint ✅ Tests ✅ (63/63) — all packages clean
+- Typecheck ✅ Lint ✅ Tests ✅ (412 harness + 63 API — all pass)
 
 ### Key commits
 
-| Commit    | Branch                       | Description                                   |
-| --------- | ---------------------------- | --------------------------------------------- |
-| `e6bead1` | `task/chat-model-picker-api` | feat: accept x-model-config-id header         |
-| `74af56a` | `task/chat-model-picker-ui`  | feat: chat model picker UI with shadcn Select |
+| Commit    | Branch                       | Description                                      |
+| --------- | ---------------------------- | ------------------------------------------------ |
+| `e6bead1` | `task/chat-model-picker-api` | feat: accept x-model-config-id header            |
+| `74af56a` | `task/chat-model-picker-ui`  | feat: chat model picker UI with shadcn Select    |
+| `dc5a7ad` | `feature/chat-model-picker`  | fix: strict tool schemas + throw on stream error |
 
 ---
 
 ## Next (priority order)
 
-1. **Wait for CI on PR #78** — if green, merge into `feature/chat-model-picker`
-2. **Open PR `feature/chat-model-picker → main`** — once feature branch CI passes
-3. **Frontend UI next phase** — `agent-platform-ntf` (design polish). See `docs/planning/frontend-ui-phases.md`.
-4. **Document security architecture** — `agent-platform-e4n` contributor guide.
-5. **Domain allowlist** — `agent-platform-o1g`. Currently optional (no allowlist = allow all).
+1. **Test chat** with `gpt-5.4-nano` model config selected — should respond instead of hanging
+2. **Merge PR #78** (`task/chat-model-picker-ui → feature/chat-model-picker`) once CI passes
+3. **Open PR `feature/chat-model-picker → main`** once feature branch CI passes
+4. **Frontend UI next phase** — `agent-platform-ntf`. See `docs/planning/frontend-ui-phases.md`.
+5. **Document security architecture** — `agent-platform-e4n` contributor guide.
+6. **Domain allowlist** — `agent-platform-o1g`. Currently optional (no allowlist = allow all).
 
 ### Model configuration management — complete ✅ (PR #77 open, all CI green)
 
