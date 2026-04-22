@@ -159,4 +159,4 @@ SonarQube/Problems Completion Gate (Strict)
 
 - Prefer SonarQube MCP for issue discovery and remediation guidance.
 - If MCP cannot run, use Problems + terminal quality commands as authoritative fallback.
-- Never claim done if gate status is fail.
+- Never claim done if the gate status is failed.
