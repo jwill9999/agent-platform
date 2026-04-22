@@ -13,7 +13,8 @@ export type TestConnectionResult =
 
 /**
  * Fire a minimal chat completion to verify the provider/model/key combination is working.
- * Uses maxTokens: 1 to minimise cost.
+ * Uses maxTokens: 5 — low enough to minimise cost, high enough for models that require
+ * more than 1 token to produce any output (maxTokens: 1 causes a false-negative for those).
  */
 export async function testModelConnection(
   options: TestConnectionOptions,
@@ -29,13 +30,14 @@ export async function testModelConnection(
       model: options.model,
       apiKey: options.apiKey,
     });
-    await generateText({ model, messages: [{ role: 'user', content: 'Hi' }], maxTokens: 1 });
+    await generateText({ model, messages: [{ role: 'user', content: 'Hi' }], maxTokens: 5 });
     return { ok: true, latencyMs: Date.now() - start };
   } catch (err: unknown) {
-    return {
-      ok: false,
-      latencyMs: Date.now() - start,
-      error: err instanceof Error ? err.message : String(err),
-    };
+    const message = err instanceof Error ? err.message : String(err);
+    // A "max tokens reached" finish reason means the model responded — treat as success.
+    if (message.includes('max_tokens') || message.includes('output limit')) {
+      return { ok: true, latencyMs: Date.now() - start };
+    }
+    return { ok: false, latencyMs: Date.now() - start, error: message };
   }
 }

@@ -56,8 +56,9 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
     '/',
     asyncHandler(async (req, res) => {
       const body = parseBody(ModelConfigCreateBodySchema, req.body);
-      const masterKey = body.apiKey ? getMasterKey() : undefined;
-      const cfg = createModelConfig(db, body, masterKey, KEY_VERSION);
+      const normalized = { ...body, model: body.model.trim().toLowerCase() };
+      const masterKey = normalized.apiKey ? getMasterKey() : undefined;
+      const cfg = createModelConfig(db, normalized, masterKey, KEY_VERSION);
       res.status(201).json({ data: cfg });
     }),
   );
@@ -68,11 +69,15 @@ export function createModelConfigsRouter(db: DrizzleDb): Router {
       const id = requireParam(req.params, 'id');
       if (!getModelConfig(db, id)) throw new HttpError(404, 'NOT_FOUND', 'Model config not found');
       const body = parseBody(ModelConfigUpdateBodySchema, req.body);
+      const normalized = {
+        ...body,
+        ...(body.model !== undefined ? { model: body.model.trim().toLowerCase() } : {}),
+      };
       // masterKey is only needed for encryption (non-empty apiKey).
       // apiKey === '' triggers the clear-key path in updateModelConfig which deletes the
       // secret ref without using masterKey, so the truthy check is intentional and correct.
-      const masterKey = body.apiKey ? getMasterKey() : undefined;
-      const updated = updateModelConfig(db, id, body, masterKey, KEY_VERSION);
+      const masterKey = normalized.apiKey ? getMasterKey() : undefined;
+      const updated = updateModelConfig(db, id, normalized, masterKey, KEY_VERSION);
       if (!updated) throw new HttpError(404, 'NOT_FOUND', 'Model config not found');
       res.json({ data: updated });
     }),
