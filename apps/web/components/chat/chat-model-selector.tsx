@@ -30,9 +30,9 @@ export function ChatModelSelector({
     <div className="inline-flex items-center gap-1.5 min-w-0">
       <Cpu className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       <Select
-        value={selectedId ?? ''}
+        value={selectedId ?? '__default__'}
         onValueChange={(v) => {
-          onSelect(v === '' ? null : v);
+          onSelect(v === '__default__' ? null : v);
         }}
         disabled={disabled}
       >
@@ -40,7 +40,7 @@ export function ChatModelSelector({
           <SelectValue placeholder="Default (agent config)" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">Default (agent config)</SelectItem>
+          <SelectItem value="__default__">Default (agent config)</SelectItem>
           <SelectSeparator />
           {modelConfigs.map((cfg) => (
             <SelectItem key={cfg.id} value={cfg.id}>
