@@ -131,3 +131,32 @@ For detailed specs beyond this summary, consult:
 - Built-in system tools — bash, read/write/list files with risk tiers, PathJail, bash guard, and HITL approval
 - Frontend UI unblocked — see `docs/planning/frontend-ui-phases.md` for phased approach
 - Plugin hooks: backend lifecycle only for MVP
+
+SonarQube/Problems Completion Gate (Strict)
+
+- If any code file is changed, a quality gate is mandatory before completion.
+- First choice: SonarQube MCP.
+- Run SonarQube MCP analysis for all touched files and fix issues in priority order:
+- Blocker
+- Critical
+- Major
+- If SonarQube MCP is unavailable, immediately fall back to:
+- IDE Problems diagnostics
+- Typecheck
+- Lint
+- Relevant tests
+- Completion is blocked when either condition is true:
+  - Any unresolved Blocker/Critical issue exists in touched files
+  - Any Problems error exists in touched files
+- The agent must re-run checks after fixes and repeat until the gate passes or clearly report why it cannot pass.
+- Final response must include:
+  - Checks run
+  - Files fixed
+  - Remaining issues (if any) with reason
+  - Explicit pass/fail gate status
+
+## Tooling Behavior Rules
+
+- Prefer SonarQube MCP for issue discovery and remediation guidance.
+- If MCP cannot run, use Problems + terminal quality commands as authoritative fallback.
+- Never claim done if the gate status is failed.

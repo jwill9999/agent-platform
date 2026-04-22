@@ -7,12 +7,61 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-21
-- **Session:** Model configuration management — secure multi-provider LLM config storage + agent assignment.
+- **Date:** 2026-04-22
+- **Session:** Fixed chat hang on `feature/chat-model-picker`: (1) added `makeStrictSchema()` to inject `additionalProperties: false` recursively into tool parameter schemas (required by newer OpenAI models); (2) `consumeFullStream()` now throws immediately on `error` stream parts, preventing `await result.text` from hanging forever after an `onError`-suppressed error.
 
 ---
 
 ## What happened (this session)
+
+### Chat hang fix — complete ✅ (committed to `feature/chat-model-picker`)
+
+Root cause: two bugs in `packages/harness/src/nodes/llmReason.ts` that combine to hang the chat stream indefinitely when using newer OpenAI models (e.g. `gpt-5.4-nano`).
+
+**Bug 1 — Missing `additionalProperties: false` in tool schemas:**
+Newer OpenAI models require every object node in a tool's parameter schema to declare `additionalProperties: false` or they return HTTP 400. Added `makeStrictSchema()` helper that recursively patches all object nodes before they are passed to `jsonSchema()`. Safe for all providers — lenient models ignore the field.
+
+**Bug 2 — `consumeFullStream()` didn't throw on `error` stream parts:**
+When the 400 above fires `onError` on the `streamText` call, the SDK emits an `{ type: 'error' }` part on `fullStream` then closes the stream. The `for await` loop ended normally, then `reconcileText()` called `await result.text` — which never resolves when `onError` is set (Vercel AI SDK 4.3.19 behaviour). Fix: throw immediately on the `error` part so the error propagates through `withRetry` and back to the client as an NDJSON error event instead of hanging.
+
+All quality gates: typecheck ✅ lint ✅ 412 tests ✅. Committed `dc5a7ad` and pushed to `feature/chat-model-picker`.
+
+### Chat model picker — complete ✅
+
+Per-message model config override is fully implemented and working. Stack up with `make restart`.
+
+## Current state
+
+### Git
+
+- **`main`** — includes model-config-management (PR #77 merged)
+- **`feature/chat-model-picker`** — integration branch, latest commit `dc5a7ad` (chat hang fix)
+- **`task/chat-model-picker-api`** — API + BFF layer
+- **`task/chat-model-picker-ui`** — frontend + docs + Sonar fixes — segment tip
+- **PR #78** — `task/chat-model-picker-ui → feature/chat-model-picker`
+
+### Quality
+
+- Typecheck ✅ Lint ✅ Tests ✅ (412 harness + 63 API — all pass)
+
+### Key commits
+
+| Commit    | Branch                       | Description                                      |
+| --------- | ---------------------------- | ------------------------------------------------ |
+| `e6bead1` | `task/chat-model-picker-api` | feat: accept x-model-config-id header            |
+| `74af56a` | `task/chat-model-picker-ui`  | feat: chat model picker UI with shadcn Select    |
+| `dc5a7ad` | `feature/chat-model-picker`  | fix: strict tool schemas + throw on stream error |
+
+---
+
+## Next (priority order)
+
+1. **Test chat** with `gpt-5.4-nano` model config selected — should respond instead of hanging
+2. **Merge PR #78** (`task/chat-model-picker-ui → feature/chat-model-picker`) once CI passes
+3. **Open PR `feature/chat-model-picker → main`** once feature branch CI passes
+4. **Frontend UI next phase** — `agent-platform-ntf`. See `docs/planning/frontend-ui-phases.md`.
+5. **Document security architecture** — `agent-platform-e4n` contributor guide.
+6. **Domain allowlist** — `agent-platform-o1g`. Currently optional (no allowlist = allow all).
 
 ### Model configuration management — complete ✅ (PR #77 open, all CI green)
 

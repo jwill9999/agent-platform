@@ -195,8 +195,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     };
   }, [sessionId]);
 
+  // Extracted to keep sendMessage's nesting depth within 4 levels (sonar S2004).
+  const updateAssistantMessage = useCallback((id: string, text: string) => {
+    setMessages((prev) => prev.map((m) => (m.id === id ? uiMessage(id, 'assistant', text) : m)));
+  }, []);
+
   const sendMessage = useCallback(
-    async (messageForApi: string, displayText?: string) => {
+    async (messageForApi: string, displayText?: string, modelConfigId?: string | null) => {
       const trimmed = messageForApi.trim();
       if (!sessionId || !trimmed) return;
 
@@ -215,24 +220,23 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, message: trimmed }),
+          body: JSON.stringify({
+            sessionId,
+            message: trimmed,
+            ...(modelConfigId ? { modelConfigId } : {}),
+          }),
         });
 
         if (!res.ok) throw new Error(await parseErrorResponse(res));
         if (!res.body) throw new Error('No response body');
 
         let accumulated = '';
-        const updateAssistantMessage = (text: string) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? uiMessage(assistantId, 'assistant', text) : m)),
-          );
-        };
         await readNdjsonStream(
           res.body,
           (chunk) => {
             if (!chunk) return;
             accumulated += chunk;
-            updateAssistantMessage(accumulated);
+            updateAssistantMessage(assistantId, accumulated);
           },
           (msg) => setError(msg),
         );
@@ -243,7 +247,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         setStatus('ready');
       }
     },
-    [sessionId],
+    [sessionId, updateAssistantMessage],
   );
 
   return { messages, sendMessage, status, error, setError };

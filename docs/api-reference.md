@@ -224,7 +224,12 @@ The primary chat endpoint. Runs the full agent harness (ReAct loop, tool dispatc
 { "sessionId": "uuid", "message": "user message text" }
 ```
 
-**Headers:** `x-openai-key` (optional) — overrides the configured API key for this request.
+**Headers:**
+
+| Header              | Required | Description                                                                                                                                    |
+| ------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `x-openai-key`      | No       | API key override for this request (falls back to env-var chain)                                                                                |
+| `x-model-config-id` | No       | Override the agent's model config for this request — must be an ID from `/v1/model-configs`. Takes highest precedence in the resolution chain. |
 
 **Response:** NDJSON stream. Each line is a JSON object with a `type` field:
 

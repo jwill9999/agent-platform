@@ -17,7 +17,8 @@ services:
       # Base64-encoded 32-byte key for AES-256-GCM secret storage.
       # Required to store/use API keys in model configs.
       # Generate with: openssl rand -base64 32
-      SECRETS_MASTER_KEY: "${SECRETS_MASTER_KEY:-}"
+      # The fallback below is a dev-only default — override in .env for production.
+      SECRETS_MASTER_KEY: "${SECRETS_MASTER_KEY:-kDa9TbuIXhrZFMHkn3Y90FCTfvCwA7d1armHBgdNp/o=}"
     volumes:
       - sqlite_data:/data
       # E2E filesystem MCP seed expects a mount at /workspace (see packages/db e2e seed).

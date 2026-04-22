@@ -20,6 +20,8 @@ function upstreamHeaderTimeoutMs(): number {
 const HarnessChatBodySchema = z.object({
   sessionId: z.string().min(1),
   message: z.string().min(1),
+  /** Optional per-request model config override (ID from /v1/model-configs). */
+  modelConfigId: z.string().min(1).optional(),
 });
 
 function jsonError(status: number, code: string, message: string): Response {
@@ -59,6 +61,7 @@ export async function POST(req: Request) {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(openAiKey ? { 'x-openai-key': openAiKey } : {}),
+    ...(parsed.data.modelConfigId ? { 'x-model-config-id': parsed.data.modelConfigId } : {}),
   };
 
   let res: Response;
