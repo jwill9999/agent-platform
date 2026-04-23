@@ -87,4 +87,24 @@ describe('contracts round-trip', () => {
     });
     expect(limits.maxCriticIterations).toBe(4);
   });
+
+  it('ExecutionLimitsSchema rejects non-positive maxCriticIterations', () => {
+    expect(() =>
+      ExecutionLimitsSchema.parse({
+        maxSteps: 10,
+        maxParallelTasks: 2,
+        timeoutMs: 60_000,
+        maxCriticIterations: 0,
+      }),
+    ).toThrow();
+
+    expect(() =>
+      ExecutionLimitsSchema.parse({
+        maxSteps: 10,
+        maxParallelTasks: 2,
+        timeoutMs: 60_000,
+        maxCriticIterations: -1,
+      }),
+    ).toThrow();
+  });
 });
