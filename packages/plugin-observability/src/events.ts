@@ -36,6 +36,14 @@ export type ObservabilityEvent = Readonly<
       detail?: string;
     }
   | {
+      kind: 'dod_check';
+      sessionId: string;
+      runId: string;
+      passed: boolean;
+      criteriaCount: number;
+      failedCriteriaCount: number;
+    }
+  | {
       kind: 'error';
       sessionId: string;
       runId: string;

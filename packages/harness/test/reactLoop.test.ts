@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ExecutionLimits } from '@agent-platform/contracts';
-import { buildHarnessGraph, type GraphNodeFn } from '../src/buildGraph.js';
+import {
+  buildHarnessGraph,
+  createDodCheckNode,
+  createDodProposeNode,
+  type GraphNodeFn,
+} from '../src/index.js';
 import type { HarnessStateType } from '../src/graphState.js';
-import type { LlmOutput, ChatMessage } from '../src/types.js';
+import type { LlmOutput, ChatMessage, OutputEmitter } from '../src/types.js';
 
 const limits: ExecutionLimits = {
   maxSteps: 10,
@@ -28,6 +33,19 @@ function makeInitialState(overrides?: Partial<HarnessStateType>): Record<string,
     totalTokensUsed: 0,
     totalCostUnits: 0,
     ...overrides,
+  };
+}
+
+function captureEmitter(): { emitter: OutputEmitter; events: Array<Record<string, unknown>> } {
+  const events: Array<Record<string, unknown>> = [];
+  return {
+    events,
+    emitter: {
+      emit: async (event) => {
+        events.push(event as unknown as Record<string, unknown>);
+      },
+      end: () => {},
+    },
   };
 }
 
@@ -244,5 +262,93 @@ describe('ReAct loop', () => {
     expect(toolNode).not.toHaveBeenCalled();
     expect(exec).toHaveBeenCalledTimes(1);
     expect(out.trace.some((e: { type: string }) => e.type === 'plan_ready')).toBe(true);
+  });
+
+  it('does not end the react path until DoD passes', async () => {
+    let llmCalls = 0;
+    const llmNode: GraphNodeFn = vi.fn(async () => {
+      llmCalls++;
+      return {
+        llmOutput: { kind: 'text', content: `draft ${llmCalls}` } as LlmOutput,
+        messages: [{ role: 'assistant', content: `draft ${llmCalls}` }] as ChatMessage[],
+      };
+    });
+    const toolNode: GraphNodeFn = vi.fn(async () => ({}));
+    let dodChecks = 0;
+    const graph = buildHarnessGraph({
+      executeTool: vi.fn(),
+      llmReasonNode: llmNode,
+      toolDispatchNode: toolNode,
+      dodProposeNode: createDodProposeNode({ propose: async () => ['Be complete'] }),
+      dodCheckNode: createDodCheckNode({
+        evaluate: async (_state, contract) => {
+          dodChecks++;
+          if (dodChecks === 1) {
+            return {
+              ...contract,
+              evidence: ['First draft was incomplete'],
+              passed: false,
+              failedCriteria: ['Be complete'],
+            };
+          }
+          return {
+            ...contract,
+            evidence: ['Second draft satisfied the criterion'],
+            passed: true,
+            failedCriteria: [],
+          };
+        },
+      }),
+    });
+
+    const out = await graph.invoke(
+      makeInitialState({ messages: [{ role: 'user', content: 'hi' }] }),
+      {
+        configurable: { thread_id: 'react-dod-pass' },
+      },
+    );
+
+    expect(llmCalls).toBe(2);
+    expect(dodChecks).toBe(2);
+    expect(out.dodContract?.passed).toBe(true);
+  });
+
+  it('ends with DOD_FAILED when the DoD check still fails at the iteration cap', async () => {
+    const { emitter, events } = captureEmitter();
+    const llmNode: GraphNodeFn = vi.fn(async () => ({
+      llmOutput: { kind: 'text', content: 'draft' } as LlmOutput,
+      messages: [{ role: 'assistant', content: 'draft' }] as ChatMessage[],
+    }));
+    const toolNode: GraphNodeFn = vi.fn(async () => ({}));
+
+    const graph = buildHarnessGraph({
+      executeTool: vi.fn(),
+      llmReasonNode: llmNode,
+      toolDispatchNode: toolNode,
+      dodProposeNode: createDodProposeNode({ propose: async () => ['Be complete'] }),
+      dodCheckNode: createDodCheckNode({
+        emitter,
+        evaluate: async (_state, contract) => ({
+          ...contract,
+          evidence: ['Still incomplete'],
+          passed: false,
+          failedCriteria: ['Be complete'],
+        }),
+      }),
+    });
+
+    const out = await graph.invoke(
+      makeInitialState({
+        messages: [{ role: 'user', content: 'hi' }],
+        iterations: 1,
+        limits: { ...limits, maxCriticIterations: 1 },
+      }),
+      { configurable: { thread_id: 'react-dod-fail' } },
+    );
+
+    expect(out.dodContract?.passed).toBe(false);
+    expect(
+      events.some((event) => event['type'] === 'error' && event['code'] === 'DOD_FAILED'),
+    ).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import type { PluginHooks } from './hooks.js';
 import type {
+  DodCheckContext,
   ErrorContext,
   PromptBuildContext,
   SessionStartContext,
@@ -7,6 +8,7 @@ import type {
   TaskStartContext,
   ToolCallContext,
 } from './contexts.js';
+import type { DodContract } from '@agent-platform/contracts';
 
 export type PluginDispatcher = {
   readonly chain: readonly PluginHooks[];
@@ -15,6 +17,7 @@ export type PluginDispatcher = {
   onPromptBuild(ctx: PromptBuildContext): Promise<void>;
   onToolCall(ctx: ToolCallContext): Promise<void>;
   onTaskEnd(ctx: TaskEndContext): Promise<void>;
+  onDodCheck(ctx: DodCheckContext): Promise<DodContract | undefined>;
   onError(ctx: ErrorContext): Promise<void>;
 };
 
@@ -48,6 +51,16 @@ export function createPluginDispatcher(chain: readonly PluginHooks[]): PluginDis
       for (const p of chain) {
         await p.onTaskEnd?.(ctx);
       }
+    },
+    async onDodCheck(ctx) {
+      let override: DodContract | undefined;
+      for (const p of chain) {
+        const result = await p.onDodCheck?.(ctx);
+        if (result) {
+          override = result;
+        }
+      }
+      return override;
     },
     async onError(ctx) {
       for (const p of chain) {

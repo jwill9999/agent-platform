@@ -80,7 +80,7 @@ packages/mcp-adapter
 | `harness`              | LangGraph-based agent execution graph; security guards (injection, credential, MCP trust, path jail) |
 | `model-router`         | OpenAI provider routing via Vercel AI SDK; provider+model+key configurable                           |
 | `mcp-adapter`          | MCP client lifecycle; transforms MCP tools to contract tools                                         |
-| `plugin-sdk`           | Plugin interface + hook dispatcher (6 lifecycle hooks)                                               |
+| `plugin-sdk`           | Plugin interface + hook dispatcher (7 lifecycle hooks, including DoD override)                       |
 | `planner`              | LLM-driven planning layer producing structured JSON output                                           |
 | `logger`               | Structured logging with context propagation                                                          |
 | `agent-validation`     | Agent schema validation                                                                              |
@@ -105,6 +105,7 @@ User message
                 → 🔒 Injection scan → credential scan → wrap result
               → 🔒 Loop detection → step limit
               → 🔍 Critic / evaluator (accept | revise loop, capped by maxCriticIterations)
+              → ✅ Definition-of-Done propose + check (retry until pass or cap exhaustion)
             → streaming NDJSON text/tool_result events to UI
       → persist messages → release lock → close MCP sessions
 ```

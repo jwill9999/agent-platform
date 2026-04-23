@@ -113,9 +113,11 @@ This diagram zooms into the LangGraph ReAct cycle, showing every security checkp
 ```mermaid
 flowchart TD
     START((START)) --> MODE{state.mode?}
-    MODE -->|react| LLM_WRAP[react_llm_reason wrapper]
+    MODE -->|react| DOD_PROPOSE[react_dod_propose node]
     MODE -->|plan| PLAN[plan_generate → resolve_plan → execute]
     PLAN --> END_NODE((END))
+
+    DOD_PROPOSE --> LLM_WRAP
 
     subgraph LLM_REASON ["LLM Reasoning (llmReason.ts)"]
         LLM_WRAP --> ABORT_CHECK{signal.aborted?}
@@ -146,11 +148,22 @@ flowchart TD
         EVAL_RUN --> EVAL_PARSE["Parse JSON → CriticVerdictSchema<br/>malformed → accept (logged via onError)"]
         EVAL_PARSE --> EVAL_EMIT["Emit thinking event<br/>(verdict, iteration count)"]
         EVAL_EMIT --> EVAL_VERDICT{verdict?}
-        EVAL_VERDICT -->|accept| END_NODE
+        EVAL_VERDICT -->|accept| DOD_CHECK[react_dod_check node]
         EVAL_VERDICT -->|revise & iterations < cap| INJECT["Inject &lt;critique&gt; system message<br/>iterations++"]
         EVAL_VERDICT -->|revise & cap reached| CAP_HIT["Emit error CRITIC_CAP_REACHED"]
         INJECT --> LLM_WRAP
         CAP_HIT --> END_NODE
+    end
+
+    subgraph DOD ["Definition of Done (dodPropose.ts / dodCheck.ts)"]
+        DOD_CHECK --> DOD_EVAL["Evaluate criteria against answer + tool evidence<br/>plugin onDodCheck may override"]
+        DOD_EVAL --> DOD_ROUTE{passed?}
+        DOD_ROUTE -->|yes| DOD_SUMMARY["Emit text: DoD X/Y criteria met"]
+        DOD_ROUTE -->|no & iterations < cap| DOD_RETRY["Inject &lt;dod-failed&gt; system message"]
+        DOD_ROUTE -->|no & iterations >= cap| DOD_FAIL["Emit error DOD_FAILED<br/>+ DoD summary text"]
+        DOD_SUMMARY --> END_NODE
+        DOD_RETRY --> LLM_WRAP
+        DOD_FAIL --> END_NODE
     end
 
     subgraph TOOL_DISPATCH ["Tool Dispatch (toolDispatch.ts)"]
@@ -201,6 +214,7 @@ flowchart TD
 **Key source files:**
 
 - `packages/harness/src/nodes/llmReason.ts` — LLM streaming, budget checks, retry
+- `packages/harness/src/nodes/dodPropose.ts` / `dodCheck.ts` — DoD criteria + pass/fail gate
 - `packages/harness/src/nodes/toolDispatch.ts` — tool dispatch, security scans
 - `packages/harness/src/buildGraph.ts` — wrappers (step counting, loop detection)
 - `packages/harness/src/security/injectionGuard.ts` — injection scanning + content wrapping

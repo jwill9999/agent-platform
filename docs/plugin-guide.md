@@ -4,7 +4,7 @@
 
 ## Overview
 
-Agent Platform uses a plugin system with six lifecycle hooks. Plugins can observe and augment the agent execution pipeline without modifying core behavior.
+Agent Platform uses a plugin system with seven lifecycle hooks. Plugins can observe and augment the agent execution pipeline without modifying core behavior.
 
 ## Available Hooks
 
@@ -15,6 +15,7 @@ Agent Platform uses a plugin system with six lifecycle hooks. Plugins can observ
 | `onPromptBuild`  | Prompt assembled | Inject system context     |
 | `onToolCall`     | Tool invoked     | Log or audit tool usage   |
 | `onTaskEnd`      | Task completes   | Clean up, record metrics  |
+| `onDodCheck`     | DoD evaluated    | Override or veto success  |
 | `onError`        | Error occurs     | Error reporting, alerting |
 
 ## Existing Plugins
@@ -34,7 +35,13 @@ const myPlugin: PluginHooks = {
     console.log('Session started:', ctx.sessionId);
   },
   onToolCall: async (ctx) => {
-    console.log('Tool called:', ctx.toolName);
+    console.log('Tool called:', ctx.toolId);
+  },
+  onDodCheck: async (ctx) => {
+    return {
+      ...ctx.contract,
+      passed: ctx.contract.failedCriteria.length === 0,
+    };
   },
 };
 ```

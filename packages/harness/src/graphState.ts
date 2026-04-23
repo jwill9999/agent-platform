@@ -1,5 +1,5 @@
 import { Annotation } from '@langchain/langgraph';
-import type { ExecutionLimits, Plan } from '@agent-platform/contracts';
+import type { DodContract, ExecutionLimits, Plan } from '@agent-platform/contracts';
 import type { TraceEvent } from './trace.js';
 import type { ChatMessage, LlmModelConfig, LlmOutput, ToolDefinition } from './types.js';
 
@@ -93,6 +93,10 @@ export const HarnessState = Annotation.Root({
    * `accept` so a subsequent run does not see stale critique.
    */
   critique: Annotation<string | undefined>(),
+
+  // -- Definition-of-Done contract (task agent-platform-fc8) --
+  /** Current DoD contract for the run; last-write-wins across propose/check phases. */
+  dodContract: Annotation<DodContract | undefined>(),
 });
 
 export type HarnessStateType = typeof HarnessState.State;

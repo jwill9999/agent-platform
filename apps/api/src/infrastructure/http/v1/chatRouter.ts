@@ -22,6 +22,8 @@ import {
   createLlmReasonNode,
   createToolDispatchNode,
   createCriticNode,
+  createDodCheckNode,
+  createDodProposeNode,
   createNdjsonEmitter,
   contractToolsToDefinitions,
   createApproximateCounter,
@@ -241,7 +243,7 @@ export function createChatRouter(db: DrizzleDb): Router {
         req.header('x-model-config-id') || undefined,
       );
 
-      const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
+      const { timeoutMs } = agentCtx.agent.executionLimits;
       const release = await sessionLock.acquire(sessionId, timeoutMs);
 
       const controller = new AbortController();
@@ -297,6 +299,8 @@ export function createChatRouter(db: DrizzleDb): Router {
             skillResolver: (id: string) => getSkill(db, id),
           }),
           criticNode: createCriticNode({ emitter, dispatcher }),
+          dodProposeNode: createDodProposeNode(),
+          dodCheckNode: createDodCheckNode({ emitter, dispatcher }),
           dispatcher,
         });
 

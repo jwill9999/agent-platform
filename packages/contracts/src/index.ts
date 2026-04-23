@@ -68,6 +68,7 @@ export {
   type PlatformSettings,
   type PlatformSettingsUpdate,
 } from './settings.js';
+export { DodContractSchema, type DodContract } from './dod.js';
 export {
   ToolExecutionSchema,
   ToolExecutionStatusSchema,

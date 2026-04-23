@@ -73,6 +73,16 @@ export function createObservabilityPlugin(options: ObservabilityPluginOptions): 
         detail: ctx.detail,
       });
     },
+    onDodCheck(ctx) {
+      log({
+        kind: 'dod_check',
+        sessionId: ctx.sessionId,
+        runId: ctx.runId,
+        passed: ctx.contract.passed,
+        criteriaCount: ctx.contract.criteria.length,
+        failedCriteriaCount: ctx.contract.failedCriteria.length,
+      });
+    },
     onError(ctx) {
       log({
         kind: 'error',

@@ -1,4 +1,5 @@
 import type {
+  DodCheckContext,
   ErrorContext,
   PromptBuildContext,
   SessionStartContext,
@@ -6,6 +7,9 @@ import type {
   TaskStartContext,
   ToolCallContext,
 } from './contexts.js';
+import type { DodContract } from '@agent-platform/contracts';
+
+type MaybePromise<T> = T | Promise<T>;
 
 /**
  * Optional lifecycle hooks for plugins. Implementations are synchronous or async;
@@ -20,5 +24,6 @@ export type PluginHooks = {
   onPromptBuild?: (ctx: PromptBuildContext) => void | Promise<void>;
   onToolCall?: (ctx: ToolCallContext) => void | Promise<void>;
   onTaskEnd?: (ctx: TaskEndContext) => void | Promise<void>;
+  onDodCheck?: (ctx: DodCheckContext) => MaybePromise<DodContract | void>;
   onError?: (ctx: ErrorContext) => void | Promise<void>;
 };

@@ -1,4 +1,5 @@
 export type {
+  DodCheckContext,
   ErrorContext,
   PromptBuildContext,
   SessionStartContext,

@@ -39,6 +39,16 @@ export {
   type CriticNodeOptions,
   type CriticEvaluator,
 } from './nodes/critic.js';
+export {
+  createDodProposeNode,
+  type DodProposeNodeOptions,
+  type DodCriteriaProposer,
+} from './nodes/dodPropose.js';
+export {
+  createDodCheckNode,
+  type DodCheckNodeOptions,
+  type DodCheckEvaluator,
+} from './nodes/dodCheck.js';
 export { EVALUATOR_SYSTEM_PROMPT } from './personas/evaluator.js';
 export { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from './toolTimeout.js';
 export {
