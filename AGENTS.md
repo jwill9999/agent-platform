@@ -128,140 +128,53 @@ cp -rf source dest          # NOT: cp -r source dest
 - `apt-get` - use `-y` flag
 - `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
-<!-- BEGIN BEADS INTEGRATION -->
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 
-## Issue Tracking with bd (beads)
+## Beads Issue Tracker
 
-**IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
+This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
 
-### Why bd?
-
-- Dependency-aware: Track blockers and relationships between issues
-- Version-controlled: Built on Dolt with cell-level merge
-- Agent-optimized: JSON output, ready work detection, discovered-from links
-- Prevents duplicate tracking systems and confusion
-
-### Quick Start
-
-**Check for ready work:**
+### Quick Reference
 
 ```bash
-bd ready --json
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --claim  # Claim work
+bd close <id>         # Complete work
 ```
 
-**Create new issues:**
+### Rules
 
-```bash
-bd create "Issue title" --description="Detailed context" -t bug|feature|task -p 0-4 --json
-bd create "Issue title" --description="What this issue is about" -p 1 --deps discovered-from:bd-123 --json
-```
+- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
+- Run `bd prime` for detailed command reference and session close protocol
+- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
-**Claim and update:**
+## Session Completion
 
-```bash
-bd update <id> --claim --json
-bd update bd-42 --priority 1 --json
-```
-
-**Complete work:**
-
-```bash
-bd close bd-42 --reason "Completed" --json
-```
-
-### Issue Types
-
-- `bug` - Something broken
-- `feature` - New functionality
-- `task` - Work item (tests, docs, refactoring)
-- `epic` - Large feature with subtasks
-- `chore` - Maintenance (dependencies, tooling)
-
-### Priorities
-
-- `0` - Critical (security, data loss, broken builds)
-- `1` - High (major features, important bugs)
-- `2` - Medium (default, nice-to-have)
-- `3` - Low (polish, optimization)
-- `4` - Backlog (future ideas)
-
-### Workflow for AI Agents
-
-1. **Check ready work**: `bd ready` shows unblocked issues
-2. **Claim your task atomically**: `bd update <id> --claim`
-3. **Work on it**: Implement, test, document
-4. **Discover new work?** Create linked issue:
-   - `bd create "Found bug" --description="Details about what was found" -p 1 --deps discovered-from:<parent-id>`
-5. **Complete**: `bd close <id> --reason "Done"`
-
-### Auto-Sync
-
-bd automatically syncs with git:
-
-- Exports to `.beads/issues.jsonl` after changes (5s debounce)
-- Imports from JSONL when newer (e.g., after `git pull`)
-- No manual export/import needed!
-
-### Important Rules
-
-- ✅ Use bd for ALL task tracking
-- ✅ Always use `--json` flag for programmatic use
-- ✅ Link discovered work with `discovered-from` dependencies
-- ✅ Check `bd ready` before asking "what should I work on?"
-- ❌ Do NOT create markdown TODO lists
-- ❌ Do NOT use external issue trackers
-- ❌ Do NOT duplicate tracking systems
-
-### Exception: decision log and session handoff
-
-These files are **not** task trackers; they complement bd:
-
-- **`decisions.md`** — Architectural and product decisions (see also Definition of Done there).
-- **`session.md`** — Short narrative: what changed, current focus, next steps; update at session end.
-
-Do not replace bd issues with these; keep tasks, acceptance criteria, and closure in bd.
-
-### Task specification files (`docs/tasks/`)
-
-Each **task** issue includes `Spec: docs/tasks/<issue-id>.md` at the start of its **description**. Those Markdown files hold detailed implementation plans and sign-off checklists; **bd** still owns ordering via **`blocks`** dependencies. When planning discovers new cross-task dependencies, add **`bd dep add`** first, then update the spec tables.
-
-### Git branches (mandatory)
-
-- **Naming:** **`feature/<feature-name>`** (integration); **`task/<task-name>`** (each task).
-- **Chaining (default):** the **first** task in a segment branches from **`feature/<feature-name>`**. **Each next** task branches from the **previous `task/<task-name>`** branch (linear chain). **One PR per segment** from **`task/<segment-tip>` → `feature/<feature-name>`** when that segment’s tasks are done—not a PR per task. Next segment starts from **updated** `feature/<feature-name>`.
-- **Never commit directly to `main`.** When the feature is ready on **`feature/<feature-name>`**, open **one** PR **`feature/<feature-name>` → `main`**.
-- **Before sign-off:** unit tests pass (minimum); checklist complete; **`bd close`**; **PR to `feature`** only on **segment tip** (see `docs/tasks/<issue-id>.md`).
-
-For more details, see `docs/tasks/README.md` and `decisions.md`.
-
-## Landing the Plane (Session Completion)
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until the **current task branch** is pushed to `origin` (unless nothing was implemented).
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
 
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - **Unit tests** (minimum), linters, builds
-3. **Update issue status** - Close finished work only after **PR merged** and checklist in `docs/tasks/<issue-id>.md` is complete
-4. **PUSH THE TASK BRANCH** - This is MANDATORY when commits exist:
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
-   git fetch origin
-   # Rebase onto parent: previous task branch or feature (see task spec)
-   git push -u origin HEAD
-   git status
+   git pull --rebase
+   bd dolt push
+   git push
+   git status  # MUST show "up to date with origin"
    ```
-   Do **not** push to `main`. If this task is the **segment tip**, open **one** PR **`task/<tip> → feature/<feature-name>`**. If using `bd` with git export, run your usual **`bd` sync** workflow if the project documents it.
 5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed to the **task branch**; next task branches from here, **or** open segment PR if this is the tip
+6. **Verify** - All changes committed AND pushed
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 
-- Work is NOT complete until the **task branch** is pushed when there are commits
-- NEVER commit directly to **`main`**
-- NEVER merge a task PR to **`main`**; merge **segment tip** to **`feature/<feature-name>`**; merge **`feature` → `main`** only at release
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
-
 <!-- END BEADS INTEGRATION -->
 
 ## Key Decisions (Locked)

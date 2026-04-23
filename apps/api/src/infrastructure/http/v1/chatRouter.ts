@@ -21,6 +21,7 @@ import {
   buildHarnessGraph,
   createLlmReasonNode,
   createToolDispatchNode,
+  createCriticNode,
   createNdjsonEmitter,
   contractToolsToDefinitions,
   createApproximateCounter,
@@ -295,6 +296,7 @@ export function createChatRouter(db: DrizzleDb): Router {
             auditLog,
             skillResolver: (id: string) => getSkill(db, id),
           }),
+          criticNode: createCriticNode({ emitter, dispatcher }),
           dispatcher,
         });
 

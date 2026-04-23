@@ -104,6 +104,7 @@ User message
                 → 🔒 Allowlist → PathJail → MCP/native dispatch
                 → 🔒 Injection scan → credential scan → wrap result
               → 🔒 Loop detection → step limit
+              → 🔍 Critic / evaluator (accept | revise loop, capped by maxCriticIterations)
             → streaming NDJSON text/tool_result events to UI
       → persist messages → release lock → close MCP sessions
 ```

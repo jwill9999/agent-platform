@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AgentSchema,
+  CriticVerdictSchema,
   ExecutionLimitsSchema,
   HealthResponseSchema,
   OutputSchema,
@@ -64,5 +65,46 @@ describe('contracts round-trip', () => {
     });
     expect(SecretRefSchema.parse(structuredClone(ref))).toEqual(ref);
     expect(PlanSchema.parse(structuredClone(plan))).toEqual(plan);
+  });
+
+  it('CriticVerdictSchema', () => {
+    const accept = CriticVerdictSchema.parse({ verdict: 'accept' });
+    expect(accept).toEqual({ verdict: 'accept', reasons: [] });
+    const revise = CriticVerdictSchema.parse({
+      verdict: 'revise',
+      reasons: ['gap', 'fix'],
+    });
+    expect(CriticVerdictSchema.parse(structuredClone(revise))).toEqual(revise);
+    expect(() => CriticVerdictSchema.parse({ verdict: 'maybe' })).toThrow();
+  });
+
+  it('ExecutionLimitsSchema accepts maxCriticIterations', () => {
+    const limits = ExecutionLimitsSchema.parse({
+      maxSteps: 10,
+      maxParallelTasks: 2,
+      timeoutMs: 60_000,
+      maxCriticIterations: 4,
+    });
+    expect(limits.maxCriticIterations).toBe(4);
+  });
+
+  it('ExecutionLimitsSchema rejects non-positive maxCriticIterations', () => {
+    expect(() =>
+      ExecutionLimitsSchema.parse({
+        maxSteps: 10,
+        maxParallelTasks: 2,
+        timeoutMs: 60_000,
+        maxCriticIterations: 0,
+      }),
+    ).toThrow();
+
+    expect(() =>
+      ExecutionLimitsSchema.parse({
+        maxSteps: 10,
+        maxParallelTasks: 2,
+        timeoutMs: 60_000,
+        maxCriticIterations: -1,
+      }),
+    ).toThrow();
   });
 });

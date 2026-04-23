@@ -76,6 +76,23 @@ export const HarnessState = Annotation.Root({
   startedAtMs: Annotation<number>(),
   /** Maximum wall-time budget in ms for the entire run (from executionLimits.timeoutMs). */
   deadlineMs: Annotation<number>(),
+
+  // -- Critic / evaluator loop (task agent-platform-7ga) --
+  /**
+   * Number of critic→revise→llmReason iterations performed in the current run.
+   * Increments by the delta returned from `criticNode`; capped via
+   * `executionLimits.maxCriticIterations` (default 3) by the graph router.
+   */
+  iterations: Annotation<number>({
+    reducer: (left: number, right: number) => (left ?? 0) + (right ?? 0),
+    default: () => 0,
+  }),
+  /**
+   * Last critique text produced by the evaluator. Last-write-wins; the
+   * critic node sets this on `revise` and clears it (empty string) on
+   * `accept` so a subsequent run does not see stale critique.
+   */
+  critique: Annotation<string | undefined>(),
 });
 
 export type HarnessStateType = typeof HarnessState.State;

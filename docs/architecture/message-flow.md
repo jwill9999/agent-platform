@@ -138,8 +138,20 @@ flowchart TD
     HALT_COST --> END_NODE
 
     INC_STEP --> ROUTE_LLM{llmOutput.kind?}
-    ROUTE_LLM -->|text| END_NODE
+    ROUTE_LLM -->|text| CRITIC_NODE[react_critic node]
     ROUTE_LLM -->|tool_calls| TOOL_WRAP[react_tool_dispatch wrapper]
+
+    subgraph CRITIC ["Critic / Evaluator (critic.ts)"]
+        CRITIC_NODE --> EVAL_RUN["evaluate(state)<br/>default: model-router with EVALUATOR_SYSTEM_PROMPT"]
+        EVAL_RUN --> EVAL_PARSE["Parse JSON → CriticVerdictSchema<br/>malformed → accept (logged via onError)"]
+        EVAL_PARSE --> EVAL_EMIT["Emit thinking event<br/>(verdict, iteration count)"]
+        EVAL_EMIT --> EVAL_VERDICT{verdict?}
+        EVAL_VERDICT -->|accept| END_NODE
+        EVAL_VERDICT -->|revise & iterations < cap| INJECT["Inject &lt;critique&gt; system message<br/>iterations++"]
+        EVAL_VERDICT -->|revise & cap reached| CAP_HIT["Emit error CRITIC_CAP_REACHED"]
+        INJECT --> LLM_WRAP
+        CAP_HIT --> END_NODE
+    end
 
     subgraph TOOL_DISPATCH ["Tool Dispatch (toolDispatch.ts)"]
         TOOL_WRAP --> TOOL_LOOP["For each tool call in llmOutput.calls"]

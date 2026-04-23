@@ -32,6 +32,14 @@ export {
   type LlmReasonNodeOptions,
 } from './nodes/llmReason.js';
 export { createToolDispatchNode, type ToolDispatchContext } from './nodes/toolDispatch.js';
+export {
+  createCriticNode,
+  resolveCriticCap,
+  DEFAULT_MAX_CRITIC_ITERATIONS,
+  type CriticNodeOptions,
+  type CriticEvaluator,
+} from './nodes/critic.js';
+export { EVALUATOR_SYSTEM_PROMPT } from './personas/evaluator.js';
 export { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from './toolTimeout.js';
 export {
   withRetry,
