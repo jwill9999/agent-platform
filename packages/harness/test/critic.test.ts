@@ -11,6 +11,14 @@ import {
 import type { HarnessStateType } from '../src/graphState.js';
 import type { ChatMessage, LlmOutput, OutputEmitter } from '../src/types.js';
 
+// Spy on the Vercel AI SDK's generateText so tests can assert the default
+// evaluator does not reach the model when no modelConfig is present.
+const { generateTextSpy } = vi.hoisted(() => ({ generateTextSpy: vi.fn() }));
+vi.mock('ai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ai')>();
+  return { ...actual, generateText: generateTextSpy };
+});
+
 const baseLimits: ExecutionLimits = {
   maxSteps: 10,
   maxParallelTasks: 2,
@@ -87,6 +95,21 @@ describe('resolveCriticCap', () => {
 });
 
 describe('createCriticNode (unit)', () => {
+  it('default evaluator with no modelConfig accepts without any model call', async () => {
+    generateTextSpy.mockClear();
+    const { emitter, events } = captureEmitter();
+    const node = createCriticNode({ emitter });
+    const delta = await node(initialState({ modelConfig: null }) as unknown as HarnessStateType);
+
+    expect(delta.iterations).toBe(1);
+    expect(delta.critique).toBe('');
+    expect(delta.messages).toBeUndefined();
+    expect(generateTextSpy).not.toHaveBeenCalled();
+    const trace = (delta.trace as Array<Record<string, unknown>>) ?? [];
+    expect(trace[0]?.['verdict']).toBe('accept');
+    expect(events.some((e) => e['type'] === 'thinking')).toBe(true);
+  });
+
   it('accept path: clears critique and emits a thinking event', async () => {
     const { emitter, events } = captureEmitter();
     const node = createCriticNode({
