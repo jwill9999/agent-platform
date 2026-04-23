@@ -42,4 +42,11 @@ export type TraceEvent =
     }
   | { type: 'skill_loaded'; skillId: string; loadCount: number }
   | { type: 'skill_load_loop'; skillId: string; loadCount: number }
+  | {
+      type: 'critic_verdict';
+      iterations: number;
+      verdict: 'accept' | 'revise';
+      reasons: string[];
+      capReached?: boolean;
+    }
   | { type: 'graph_end' };

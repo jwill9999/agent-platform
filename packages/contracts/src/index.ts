@@ -15,6 +15,7 @@ export {
   type ModelConfigUpdateBody,
 } from './modelConfig.js';
 export { ExecutionLimitsSchema, type ExecutionLimits } from './limits.js';
+export { CriticVerdictSchema, type CriticVerdict } from './critic.js';
 export {
   McpServerSchema,
   McpServerCreateBodySchema,

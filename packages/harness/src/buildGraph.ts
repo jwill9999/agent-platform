@@ -26,6 +26,13 @@ export type BuildHarnessGraphOptions = {
   llmReasonNode?: GraphNodeFn;
   /** Tool dispatch node (ReAct path). Required for mode='react'. */
   toolDispatchNode?: GraphNodeFn;
+  /**
+   * Optional critic / evaluator node (ReAct path). When provided, the graph
+   * routes `llmReason → critic → (END | llmReason)` instead of going straight
+   * to END on a tool-free LLM response. Cap is sourced from
+   * `executionLimits.maxCriticIterations` (default 3).
+   */
+  criticNode?: GraphNodeFn;
   /** Plan generate node (plan path). Optional — if absent, falls back to stubPlan. */
   planGenerateNode?: GraphNodeFn;
   /** Plugin dispatcher for lifecycle hooks (plan-mode task start/end). */
@@ -249,6 +256,29 @@ function routeAfterLlm(state: HarnessStateType): 'react_tool_dispatch' | typeof 
   return END;
 }
 
+function routeAfterLlmWithCritic(
+  state: HarnessStateType,
+): 'react_tool_dispatch' | 'react_critic' | typeof END {
+  if (state.halted) return END;
+  if (state.llmOutput?.kind === 'tool_calls') return 'react_tool_dispatch';
+  return 'react_critic';
+}
+
+/** Default cap for critic iterations when not configured on executionLimits. */
+const DEFAULT_MAX_CRITIC_ITERATIONS = 3;
+
+function routeAfterCritic(state: HarnessStateType): 'react_llm_reason' | typeof END {
+  if (state.halted) return END;
+  if (checkDeadline(state).expired) return END;
+  const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
+  const iterations = state.iterations ?? 0;
+  // Critic clears `critique` on accept; otherwise it sets a non-empty value.
+  const accepted = !state.critique;
+  if (accepted) return END;
+  if (iterations >= cap) return END;
+  return 'react_llm_reason';
+}
+
 function routeAfterReactDispatch(state: HarnessStateType): 'react_llm_reason' | typeof END {
   if (state.halted) return END;
   if (checkDeadline(state).expired) return END;
@@ -297,6 +327,25 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
 
   if (options.llmReasonNode && options.toolDispatchNode) {
     // Full graph with mode router → (react | plan) paths
+    if (options.criticNode) {
+      const llmRouter = routeAfterLlmWithCritic;
+      const graph = new StateGraph(HarnessState)
+        .addNode('plan_generate', planGenNode)
+        .addNode('resolve_plan', createResolvePlanNode(options))
+        .addNode('execute', createExecuteNode(options))
+        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
+        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+        .addNode('react_critic', options.criticNode)
+        .addConditionalEdges(START, routeByMode)
+        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+        .addEdge('resolve_plan', 'execute')
+        .addConditionalEdges('execute', routeAfterExecute)
+        .addConditionalEdges('react_llm_reason', llmRouter)
+        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch)
+        .addConditionalEdges('react_critic', routeAfterCritic);
+      return graph.compile({ checkpointer });
+    }
+
     const graph = new StateGraph(HarnessState)
       .addNode('plan_generate', planGenNode)
       .addNode('resolve_plan', createResolvePlanNode(options))
