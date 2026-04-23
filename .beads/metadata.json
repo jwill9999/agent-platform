@@ -1,8 +1,7 @@
 {
   "database": "dolt",
   "backend": "dolt",
-  "dolt_mode": "server",
-  "dolt_server_port": 13931,
+  "dolt_mode": "embedded",
   "dolt_database": "agent_platform",
-  "project_id": "d638b052-1a15-4f71-9571-fa7e2ea2cac5"
+  "project_id": "8cedd151-416e-46ed-9cfd-96f8c3981561"
 }
