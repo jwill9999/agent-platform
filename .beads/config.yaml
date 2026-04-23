@@ -53,6 +53,6 @@
 # - github.org
 # - github.repo
 
-sync.remote: "git+ssh://git@github.com/jwill9999/agent-platform.git"
+sync.remote: 'git+ssh://git@github.com/jwill9999/agent-platform.git'
 
 export.auto: false
