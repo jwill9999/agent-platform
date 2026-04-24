@@ -189,6 +189,25 @@ async function fireToolCallHook(
   }
 }
 
+async function fireToolErrorHook(
+  ctx: ToolDispatchContext,
+  state: HarnessStateType,
+  call: ToolCallIntent,
+  output: Output,
+): Promise<void> {
+  if (!ctx.dispatcher || output.type !== 'error') return;
+  try {
+    await ctx.dispatcher.onError({
+      sessionId: state.sessionId ?? '',
+      runId: state.runId ?? '',
+      phase: 'tool',
+      error: new Error(`Tool "${call.name}" failed: ${output.code}: ${output.message}`),
+    });
+  } catch {
+    /* plugin errors must not crash the graph */
+  }
+}
+
 /**
  * Execute a single tool call with retry + timeout wrapping.
  * Returns tool output/ok plus how many retries occurred.
@@ -554,6 +573,8 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       );
 
       if (auditId && ctx.auditLog) ctx.auditLog.logComplete(auditId, output);
+
+      await fireToolErrorHook(ctx, state, call, output);
 
       await emitToolOutput(ctx, output, images);
 

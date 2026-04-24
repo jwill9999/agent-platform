@@ -50,6 +50,9 @@ importers:
       '@agent-platform/model-router':
         specifier: workspace:*
         version: link:../../packages/model-router
+      '@agent-platform/plugin-observability':
+        specifier: workspace:*
+        version: link:../../packages/plugin-observability
       express:
         specifier: ^4.21.2
         version: 4.22.1

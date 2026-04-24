@@ -9,7 +9,8 @@ import {
   type GraphNodeFn,
 } from '../src/index.js';
 import type { HarnessStateType } from '../src/graphState.js';
-import type { ChatMessage, LlmOutput, OutputEmitter } from '../src/types.js';
+import type { ChatMessage, LlmOutput } from '../src/types.js';
+import { captureEmitter, createIncrementingTextNode } from './testUtils.js';
 
 // Spy on the Vercel AI SDK's generateText so tests can assert the default
 // evaluator does not reach the model when no modelConfig is present.
@@ -51,19 +52,6 @@ function initialState(overrides: Partial<HarnessStateType> = {}): Record<string,
   };
 }
 
-function captureEmitter(): { emitter: OutputEmitter; events: Array<Record<string, unknown>> } {
-  const events: Array<Record<string, unknown>> = [];
-  return {
-    events,
-    emitter: {
-      emit: async (e) => {
-        events.push(e as unknown as Record<string, unknown>);
-      },
-      end: () => {},
-    },
-  };
-}
-
 describe('CriticVerdictSchema', () => {
   it('parses an accept verdict with default reasons', () => {
     const v = CriticVerdictSchema.parse({ verdict: 'accept' });
@@ -101,7 +89,7 @@ describe('createCriticNode (unit)', () => {
     const node = createCriticNode({ emitter });
     const delta = await node(initialState({ modelConfig: null }) as unknown as HarnessStateType);
 
-    expect(delta.iterations).toBe(1);
+    expect(delta.iterations).toBeUndefined();
     expect(delta.critique).toBe('');
     expect(delta.messages).toBeUndefined();
     expect(generateTextSpy).not.toHaveBeenCalled();
@@ -117,7 +105,7 @@ describe('createCriticNode (unit)', () => {
       evaluate: async () => ({ verdict: 'accept', reasons: ['looks good'] }),
     });
     const delta = await node(initialState() as unknown as HarnessStateType);
-    expect(delta.iterations).toBe(1);
+    expect(delta.iterations).toBeUndefined();
     expect(delta.critique).toBe('');
     expect(delta.messages).toBeUndefined();
     expect(events.some((e) => e['type'] === 'thinking')).toBe(true);
@@ -164,8 +152,7 @@ describe('createCriticNode (unit)', () => {
       },
     });
     const delta = await node(initialState() as unknown as HarnessStateType);
-    // Error path returns accept with reason; iterations still advanced
-    expect(delta.iterations).toBe(1);
+    expect(delta.iterations).toBeUndefined();
     expect(delta.critique).toBe('');
   });
 });
@@ -195,19 +182,12 @@ describe('createCriticNode (graph integration)', () => {
       configurable: { thread_id: 'critic-accept' },
     });
     expect(llmCalls).toBe(1);
-    expect(out.iterations).toBe(1);
+    expect(out.iterations).toBe(0);
     expect(out.trace.some((e: { type: string }) => e.type === 'critic_verdict')).toBe(true);
   });
 
   it('revise loop converges within the iteration cap', async () => {
-    let llmCalls = 0;
-    const llmNode: GraphNodeFn = vi.fn(async () => {
-      llmCalls++;
-      return {
-        llmOutput: { kind: 'text', content: `draft ${llmCalls}` } as LlmOutput,
-        messages: [{ role: 'assistant', content: `draft ${llmCalls}` }] as ChatMessage[],
-      };
-    });
+    const { llmNode, getCallCount } = createIncrementingTextNode();
     const toolNode: GraphNodeFn = vi.fn(async () => ({}));
     let criticCalls = 0;
     const criticNode = createCriticNode({
@@ -228,9 +208,9 @@ describe('createCriticNode (graph integration)', () => {
     const out = await graph.invoke(initialState({ messages: [{ role: 'user', content: 'hi' }] }), {
       configurable: { thread_id: 'critic-revise-converges' },
     });
-    expect(llmCalls).toBe(2);
+    expect(getCallCount()).toBe(2);
     expect(criticCalls).toBe(2);
-    expect(out.iterations).toBe(2);
+    expect(out.iterations).toBe(1);
   });
 
   it('cap reached: graph ends after maxCriticIterations', async () => {

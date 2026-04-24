@@ -3,6 +3,7 @@ import { createLanguageModel, type SupportedProvider } from '@agent-platform/mod
 import { DodContractSchema, type DodContract } from '@agent-platform/contracts';
 
 import type { HarnessStateType } from '../graphState.js';
+import { extractFirstJsonObject } from './jsonUtils.js';
 
 const DEFAULT_DOD_CRITERIA = "Answer the user's question.";
 
@@ -11,15 +12,6 @@ export type DodCriteriaProposer = (state: HarnessStateType) => Promise<string[]>
 export type DodProposeNodeOptions = {
   propose?: DodCriteriaProposer;
 };
-
-function extractFirstJsonObject(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) return null;
-  return trimmed.slice(start, end + 1);
-}
 
 function parseCriteria(json: string): string[] | null {
   try {

@@ -12,6 +12,13 @@ export {
   executeMediumRiskTool,
 } from './mediumRiskTools.js';
 export {
+  OBSERVABILITY_TOOLS,
+  OBSERVABILITY_IDS,
+  OBSERVABILITY_MAP,
+  executeObservabilityTool,
+  type ObservabilityToolContext,
+} from './observabilityTools.js';
+export {
   SYSTEM_TOOL_PREFIX,
   MAX_OUTPUT_BYTES,
   stringArg,

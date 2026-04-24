@@ -7,6 +7,7 @@ import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, OutputEmitter } from '../types.js';
+import { extractFirstJsonObject } from './jsonUtils.js';
 
 const log = createLogger('harness:dod-check');
 const DEFAULT_MAX_CRITIC_ITERATIONS = 3;
@@ -22,15 +23,6 @@ export type DodCheckNodeOptions = {
   dispatcher?: PluginDispatcher;
   evaluate?: DodCheckEvaluator;
 };
-
-function extractFirstJsonObject(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) return null;
-  return trimmed.slice(start, end + 1);
-}
 
 async function safeEmit(
   emitter: OutputEmitter | undefined,
@@ -78,6 +70,27 @@ function buildFailureContract(contract: DodContract, note: string): DodContract 
     passed: false,
     failedCriteria:
       contract.failedCriteria.length > 0 ? contract.failedCriteria : contract.criteria,
+  });
+}
+
+function normalizeDodContract(contract: DodContract): DodContract {
+  const criterionSet = new Set(contract.criteria);
+  const failedCriteria = Array.from(
+    new Set(contract.failedCriteria.filter((criterion) => criterionSet.has(criterion))),
+  );
+  let normalizedFailedCriteria: string[];
+
+  if (contract.passed) {
+    normalizedFailedCriteria = [];
+  } else if (failedCriteria.length > 0) {
+    normalizedFailedCriteria = failedCriteria;
+  } else {
+    normalizedFailedCriteria = contract.criteria;
+  }
+
+  return DodContractSchema.parse({
+    ...contract,
+    failedCriteria: normalizedFailedCriteria,
   });
 }
 
@@ -174,7 +187,8 @@ function buildFailureNote(contract: DodContract): string {
 }
 
 function buildSummary(contract: DodContract): string {
-  const met = contract.criteria.length - contract.failedCriteria.length;
+  const failedCount = Math.min(contract.failedCriteria.length, contract.criteria.length);
+  const met = Math.max(contract.criteria.length - failedCount, 0);
   return `DoD: ${met}/${contract.criteria.length} criteria met`;
 }
 
@@ -184,8 +198,12 @@ export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
 
   return async (state: HarnessStateType) => {
     const candidate = buildCandidateContract(state);
-    const evaluated = DodContractSchema.parse(await evaluate(state, candidate));
-    const contract = await applyDispatcherOverride(dispatcher, state, evaluated);
+    const evaluated = normalizeDodContract(
+      DodContractSchema.parse(await evaluate(state, candidate)),
+    );
+    const contract = normalizeDodContract(
+      await applyDispatcherOverride(dispatcher, state, evaluated),
+    );
     const trace = buildTrace(contract);
     const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
     const capReached = (state.iterations ?? 0) >= cap;
@@ -199,7 +217,7 @@ export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
       await safeEmit(emitter, {
         type: 'error',
         code: 'DOD_FAILED',
-        message: `Definition of Done failed after ${cap} critic iteration(s).`,
+        message: `Definition of Done failed after ${cap} revision attempt(s).`,
       });
       await safeEmit(emitter, { type: 'text', content: `${buildSummary(contract)}\n` });
       return { dodContract: contract, trace };

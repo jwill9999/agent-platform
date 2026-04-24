@@ -3,6 +3,7 @@ import type { Agent, DodContract } from '@agent-platform/contracts';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import { createObservabilityPlugin } from '../src/observability.js';
 import type { ObservabilityEvent } from '../src/events.js';
+import { createObservabilityStore } from '../src/store.js';
 
 const agent: Agent = {
   id: 'a1',
@@ -91,5 +92,25 @@ describe('createObservabilityPlugin', () => {
     if (tool?.kind === 'tool_call') {
       expect(tool.args).toEqual({ x: 1 });
     }
+  });
+
+  it('records events in the in-memory store when configured', async () => {
+    const store = createObservabilityStore();
+    const obs = createObservabilityPlugin({ store });
+    const d = createPluginDispatcher([obs]);
+
+    await d.onSessionStart({ sessionId: 's1', agentId: 'a1', agent });
+    await d.onError({
+      sessionId: 's1',
+      runId: 'r1',
+      phase: 'tool',
+      error: new Error('store boom'),
+    });
+
+    expect(store.getLogs({ sessionId: 's1', limit: 10 })).toHaveLength(2);
+    expect(store.getErrors({ sessionId: 's1', limit: 10 })[0]?.event).toMatchObject({
+      kind: 'error',
+      message: 'store boom',
+    });
   });
 });

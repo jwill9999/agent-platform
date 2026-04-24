@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ExecutionLimits } from '@agent-platform/contracts';
 import {
   buildHarnessGraph,
+  createCriticNode,
   createDodCheckNode,
   createDodProposeNode,
   type GraphNodeFn,
 } from '../src/index.js';
 import type { HarnessStateType } from '../src/graphState.js';
-import type { LlmOutput, ChatMessage, OutputEmitter } from '../src/types.js';
+import type { LlmOutput, ChatMessage } from '../src/types.js';
+import { captureEmitter, createIncrementingTextNode } from './testUtils.js';
 
 const limits: ExecutionLimits = {
   maxSteps: 10,
@@ -33,19 +35,6 @@ function makeInitialState(overrides?: Partial<HarnessStateType>): Record<string,
     totalTokensUsed: 0,
     totalCostUnits: 0,
     ...overrides,
-  };
-}
-
-function captureEmitter(): { emitter: OutputEmitter; events: Array<Record<string, unknown>> } {
-  const events: Array<Record<string, unknown>> = [];
-  return {
-    events,
-    emitter: {
-      emit: async (event) => {
-        events.push(event as unknown as Record<string, unknown>);
-      },
-      end: () => {},
-    },
   };
 }
 
@@ -265,14 +254,7 @@ describe('ReAct loop', () => {
   });
 
   it('does not end the react path until DoD passes', async () => {
-    let llmCalls = 0;
-    const llmNode: GraphNodeFn = vi.fn(async () => {
-      llmCalls++;
-      return {
-        llmOutput: { kind: 'text', content: `draft ${llmCalls}` } as LlmOutput,
-        messages: [{ role: 'assistant', content: `draft ${llmCalls}` }] as ChatMessage[],
-      };
-    });
+    const { llmNode, getCallCount } = createIncrementingTextNode();
     const toolNode: GraphNodeFn = vi.fn(async () => ({}));
     let dodChecks = 0;
     const graph = buildHarnessGraph({
@@ -308,7 +290,7 @@ describe('ReAct loop', () => {
       },
     );
 
-    expect(llmCalls).toBe(2);
+    expect(getCallCount()).toBe(2);
     expect(dodChecks).toBe(2);
     expect(out.dodContract?.passed).toBe(true);
   });
@@ -350,5 +332,66 @@ describe('ReAct loop', () => {
     expect(
       events.some((event) => event['type'] === 'error' && event['code'] === 'DOD_FAILED'),
     ).toBe(true);
+  });
+
+  it('allows a DoD retry after the critic accepts on the last available draft', async () => {
+    const { emitter, events } = captureEmitter();
+    const { llmNode, getCallCount } = createIncrementingTextNode();
+    const toolNode: GraphNodeFn = vi.fn(async () => ({}));
+    let criticCalls = 0;
+    let dodChecks = 0;
+
+    const graph = buildHarnessGraph({
+      executeTool: vi.fn(),
+      llmReasonNode: llmNode,
+      toolDispatchNode: toolNode,
+      criticNode: createCriticNode({
+        evaluate: async () => {
+          criticCalls++;
+          if (criticCalls <= 2) {
+            return { verdict: 'revise', reasons: ['needs more detail'] };
+          }
+          return { verdict: 'accept', reasons: [] };
+        },
+      }),
+      dodProposeNode: createDodProposeNode({ propose: async () => ['Be complete'] }),
+      dodCheckNode: createDodCheckNode({
+        emitter,
+        evaluate: async (_state, contract) => {
+          dodChecks++;
+          if (dodChecks === 1) {
+            return {
+              ...contract,
+              evidence: ['Still incomplete'],
+              passed: false,
+              failedCriteria: ['Be complete'],
+            };
+          }
+          return {
+            ...contract,
+            evidence: ['Revision satisfied the criterion'],
+            passed: true,
+            failedCriteria: [],
+          };
+        },
+      }),
+    });
+
+    const out = await graph.invoke(
+      makeInitialState({
+        messages: [{ role: 'user', content: 'hi' }],
+        limits: { ...limits, maxCriticIterations: 3 },
+      }),
+      { configurable: { thread_id: 'react-dod-retry-after-accept' } },
+    );
+
+    expect(getCallCount()).toBe(4);
+    expect(criticCalls).toBe(4);
+    expect(dodChecks).toBe(2);
+    expect(out.iterations).toBe(2);
+    expect(out.dodContract?.passed).toBe(true);
+    expect(
+      events.some((event) => event['type'] === 'error' && event['code'] === 'DOD_FAILED'),
+    ).toBe(false);
   });
 });

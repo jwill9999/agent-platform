@@ -49,9 +49,23 @@ describe('REST /v1 (integration)', () => {
       })
       .expect(201);
 
+    const toolsRes = await request(app).get('/v1/tools').expect(200);
+    expect(toolsRes.body.data.some((tool: { id: string }) => tool.id === 'sys_query_logs')).toBe(
+      true,
+    );
+    expect(
+      toolsRes.body.data.some((tool: { id: string }) => tool.id === 'sys_query_recent_errors'),
+    ).toBe(true);
+    expect(toolsRes.body.data.some((tool: { id: string }) => tool.id === 'sys_inspect_trace')).toBe(
+      true,
+    );
+
     const toolSlug = createToolRes.body.data.slug as string;
     const toolGet = await request(app).get(`/v1/tools/${toolSlug}`).expect(200);
     expect(toolGet.body.data.name).toBe('Extra tool');
+
+    const builtInToolRes = await request(app).get('/v1/tools/sys-query-recent-errors').expect(200);
+    expect(builtInToolRes.body.data.id).toBe('sys_query_recent_errors');
 
     const sessionRes = await request(app)
       .post('/v1/sessions')

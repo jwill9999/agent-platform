@@ -9,6 +9,10 @@ import {
   ZERO_RISK_TOOLS,
   ZERO_RISK_MAP,
   executeZeroRiskTool,
+  OBSERVABILITY_TOOLS,
+  OBSERVABILITY_MAP,
+  executeObservabilityTool,
+  type ObservabilityToolContext,
   LOW_RISK_TOOLS,
   LOW_RISK_MAP,
   executeLowRiskTool,
@@ -47,6 +51,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   [ids.listFiles]: 'low',
   [ids.getSkillDetail]: 'zero',
   ...ZERO_RISK_MAP,
+  ...OBSERVABILITY_MAP,
   ...LOW_RISK_MAP,
   ...MEDIUM_RISK_MAP,
 } as const;
@@ -138,6 +143,8 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   },
   // New zero-risk tools (pure compute, no I/O)
   ...ZERO_RISK_TOOLS,
+  // Session-bound observability tools
+  ...OBSERVABILITY_TOOLS,
   // New low-risk tools (read-only I/O, PathJail enforced)
   ...LOW_RISK_TOOLS,
   // New medium-risk tools (write I/O + network, PathJail + URL guard enforced)
@@ -282,7 +289,9 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
  * Creates the native executor that handles all system tools.
  * Returns an error `Output` for unknown tool IDs.
  */
-export function createSystemToolExecutor(): NativeToolExecutor {
+export function createSystemToolExecutor(options?: {
+  observability?: ObservabilityToolContext;
+}): NativeToolExecutor {
   return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
     // Core tools
     switch (toolId) {
@@ -299,6 +308,10 @@ export function createSystemToolExecutor(): NativeToolExecutor {
     // Zero-risk tools (synchronous, pure compute)
     const zeroResult = executeZeroRiskTool(toolId, args);
     if (zeroResult) return zeroResult;
+
+    if (toolId in OBSERVABILITY_MAP) {
+      return executeObservabilityTool(toolId, args, options?.observability);
+    }
 
     // Low-risk tools (async, read-only I/O)
     const lowResult = await executeLowRiskTool(toolId, args);
