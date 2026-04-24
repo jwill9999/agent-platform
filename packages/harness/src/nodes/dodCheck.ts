@@ -199,7 +199,7 @@ export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
       await safeEmit(emitter, {
         type: 'error',
         code: 'DOD_FAILED',
-        message: `Definition of Done failed after ${cap} critic iteration(s).`,
+        message: `Definition of Done failed after ${cap} iteration(s).`,
       });
       await safeEmit(emitter, { type: 'text', content: `${buildSummary(contract)}\n` });
       return { dodContract: contract, trace };
