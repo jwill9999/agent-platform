@@ -33,7 +33,8 @@ function initialState(overrides: Partial<HarnessStateType> = {}): Record<string,
     recentToolCalls: [],
     totalTokensUsed: 0,
     totalCostUnits: 0,
-    iterations: 1,
+    iterations: 0,
+    dodAttempts: 0,
     dodContract: {
       criteria: ['Answer the user'],
       evidence: [],
@@ -83,6 +84,7 @@ describe('createDodCheckNode', () => {
       passed: false,
       failedCriteria: ['Answer the user'],
     });
+    expect(delta.dodAttempts).toBe(1);
     expect(delta.messages?.[0]?.role).toBe('system');
     expect(delta.messages?.[0]?.content).toContain('<dod-failed>');
   });
@@ -172,11 +174,12 @@ describe('createDodCheckNode', () => {
 
     const delta = await node(
       initialState({
-        iterations: 1,
+        dodAttempts: 0,
         limits: { ...limits, maxCriticIterations: 1 },
       }) as HarnessStateType,
     );
 
+    expect(delta.dodAttempts).toBe(1);
     expect(delta.messages).toBeUndefined();
     expect(
       events.some((event) => event['type'] === 'error' && event['code'] === 'DOD_FAILED'),

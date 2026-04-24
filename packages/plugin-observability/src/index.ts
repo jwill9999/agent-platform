@@ -4,6 +4,7 @@ export { mergeOrderedPluginLayers } from './order.js';
 export {
   createObservabilityStore,
   type ObservabilityStore,
+  type ObservabilityStoreOptions,
   type ObservabilityRecord,
   type ObservabilityTrace,
   type ObservabilityLevel,

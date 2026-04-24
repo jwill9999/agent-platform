@@ -47,6 +47,12 @@ export type ObservabilityStore = Readonly<{
 }>;
 
 const DEFAULT_LIMIT = 20;
+const DEFAULT_MAX_RECORDS = 5_000;
+
+export type ObservabilityStoreOptions = Readonly<{
+  /** Maximum number of records retained in memory before oldest entries are evicted. */
+  maxRecords?: number;
+}>;
 
 function requireSessionId(sessionId: string): string {
   const trimmed = sessionId.trim();
@@ -78,6 +84,14 @@ function normalizeLimit(limit?: number): number {
   return Math.floor(limit);
 }
 
+function normalizeMaxRecords(maxRecords?: number): number {
+  if (maxRecords == null) return DEFAULT_MAX_RECORDS;
+  if (!Number.isFinite(maxRecords) || maxRecords < 1) {
+    throw new TypeError('maxRecords must be a positive number');
+  }
+  return Math.floor(maxRecords);
+}
+
 function toLevel(event: ObservabilityEvent): ObservabilityLevel {
   if (event.kind === 'error') return 'error';
   if (event.kind === 'dod_check' && !event.passed) return 'error';
@@ -93,7 +107,10 @@ function oldestFirst(a: ObservabilityRecord, b: ObservabilityRecord): number {
   return a.timestampMs - b.timestampMs;
 }
 
-export function createObservabilityStore(): ObservabilityStore {
+export function createObservabilityStore(
+  options: ObservabilityStoreOptions = {},
+): ObservabilityStore {
+  const maxRecords = normalizeMaxRecords(options.maxRecords);
   const records: ObservabilityRecord[] = [];
 
   return {
@@ -110,6 +127,9 @@ export function createObservabilityStore(): ObservabilityStore {
         event,
       };
       records.push(record);
+      if (records.length > maxRecords) {
+        records.splice(0, records.length - maxRecords);
+      }
       return record;
     },
 

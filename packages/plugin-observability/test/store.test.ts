@@ -1,8 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createObservabilityStore } from '../src/store.js';
 
 describe('createObservabilityStore', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('filters logs by session, level, and since', () => {
     const store = createObservabilityStore();
 
@@ -104,6 +112,35 @@ describe('createObservabilityStore', () => {
 
     const latestTrace = store.getTrace({ sessionId: 's1' });
     expect(latestTrace?.traceId).toBe('r2');
+  });
+
+  it('evicts the oldest records when maxRecords is exceeded', () => {
+    const store = createObservabilityStore({ maxRecords: 2 });
+
+    vi.setSystemTime(new Date('2026-04-23T12:00:00.000Z'));
+    store.record({ kind: 'session_start', sessionId: 's1', agentId: 'a1' });
+    vi.setSystemTime(new Date('2026-04-23T12:00:01.000Z'));
+    store.record({
+      kind: 'task_start',
+      sessionId: 's1',
+      runId: 'r1',
+      planId: 'p1',
+      taskId: 't1',
+      toolIds: [],
+    });
+    vi.setSystemTime(new Date('2026-04-23T12:00:02.000Z'));
+    store.record({
+      kind: 'error',
+      sessionId: 's1',
+      runId: 'r1',
+      phase: 'tool',
+      message: 'boom',
+    });
+
+    expect(store.getLogs({ sessionId: 's1', limit: 10 }).map((record) => record.kind)).toEqual([
+      'error',
+      'task_start',
+    ]);
   });
 
   it('rejects blank session ids', () => {

@@ -292,6 +292,7 @@ describe('ReAct loop', () => {
 
     expect(getCallCount()).toBe(2);
     expect(dodChecks).toBe(2);
+    expect(out.dodAttempts).toBe(1);
     expect(out.dodContract?.passed).toBe(true);
   });
 
@@ -322,12 +323,12 @@ describe('ReAct loop', () => {
     const out = await graph.invoke(
       makeInitialState({
         messages: [{ role: 'user', content: 'hi' }],
-        iterations: 1,
         limits: { ...limits, maxCriticIterations: 1 },
       }),
       { configurable: { thread_id: 'react-dod-fail' } },
     );
 
+    expect(out.dodAttempts).toBe(1);
     expect(out.dodContract?.passed).toBe(false);
     expect(
       events.some((event) => event['type'] === 'error' && event['code'] === 'DOD_FAILED'),
@@ -388,6 +389,7 @@ describe('ReAct loop', () => {
     expect(getCallCount()).toBe(4);
     expect(criticCalls).toBe(4);
     expect(dodChecks).toBe(2);
+    expect(out.dodAttempts).toBe(1);
     expect(out.iterations).toBe(2);
     expect(out.dodContract?.passed).toBe(true);
     expect(

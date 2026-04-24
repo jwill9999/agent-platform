@@ -226,6 +226,14 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
       window.length >= LOOP_DETECTION_THRESHOLD && window.every((sig) => sig === window[0]);
 
     if (isLoop) {
+      const toolSignature = window[0];
+      if (!toolSignature) {
+        return {
+          ...result,
+          recentToolCalls: window,
+        };
+      }
+
       let trace: TraceEvent[];
       if (!result.trace) {
         trace = [];
@@ -236,7 +244,7 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
       }
       trace.push({
         type: 'loop_detected',
-        toolSignature: window[0]!,
+        toolSignature,
         repeats: LOOP_DETECTION_THRESHOLD,
       });
 
@@ -307,7 +315,7 @@ function routeAfterDodCheck(state: HarnessStateType): 'react_llm_reason' | typeo
   if (checkDeadline(state).expired) return END;
   if (state.dodContract?.passed) return END;
   const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
-  if ((state.iterations ?? 0) >= cap) return END;
+  if ((state.dodAttempts ?? 0) >= cap) return END;
   return 'react_llm_reason';
 }
 

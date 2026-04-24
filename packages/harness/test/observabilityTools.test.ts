@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createObservabilityStore } from '../../plugin-observability/src/store.js';
+import { createObservabilityStore } from '@agent-platform/plugin-observability';
 
 import {
   OBSERVABILITY_IDS,

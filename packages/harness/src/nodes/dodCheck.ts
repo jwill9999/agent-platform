@@ -206,7 +206,8 @@ export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
     );
     const trace = buildTrace(contract);
     const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
-    const capReached = (state.iterations ?? 0) >= cap;
+    const nextDodAttempt = (state.dodAttempts ?? 0) + 1;
+    const capReached = nextDodAttempt >= cap;
 
     if (contract.passed) {
       await safeEmit(emitter, { type: 'text', content: `${buildSummary(contract)}\n` });
@@ -217,15 +218,16 @@ export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
       await safeEmit(emitter, {
         type: 'error',
         code: 'DOD_FAILED',
-        message: `Definition of Done failed after ${cap} revision attempt(s).`,
+        message: `Definition of Done failed after ${nextDodAttempt} revision attempt(s).`,
       });
       await safeEmit(emitter, { type: 'text', content: `${buildSummary(contract)}\n` });
-      return { dodContract: contract, trace };
+      return { dodAttempts: 1, dodContract: contract, trace };
     }
 
     const feedback: ChatMessage = { role: 'system', content: buildFailureNote(contract) };
 
     return {
+      dodAttempts: 1,
       dodContract: contract,
       messages: [feedback],
       trace,

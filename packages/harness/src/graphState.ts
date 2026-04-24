@@ -94,6 +94,16 @@ export const HarnessState = Annotation.Root({
    */
   critique: Annotation<string | undefined>(),
 
+  /**
+   * Number of failed DoD evaluations consumed in the current run.
+   * Increments by the delta returned from `dodCheckNode`; capped via
+   * `executionLimits.maxCriticIterations` or the shared harness default.
+   */
+  dodAttempts: Annotation<number>({
+    reducer: (left: number, right: number) => (left ?? 0) + (right ?? 0),
+    default: () => 0,
+  }),
+
   // -- Definition-of-Done contract (task agent-platform-fc8) --
   /** Current DoD contract for the run; last-write-wins across propose/check phases. */
   dodContract: Annotation<DodContract | undefined>(),

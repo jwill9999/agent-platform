@@ -85,7 +85,7 @@ vi.mock('@agent-platform/harness', async () => {
         };
       };
     },
-    createCriticNode: () => async () => ({ critique: '', iterations: 1, trace: [] }),
+    createCriticNode: () => async () => ({ critique: '', trace: [] }),
     createDodProposeNode: () => async () => ({
       dodContract: {
         criteria: ['Inspect recent errors after a tool failure.'],
