@@ -7,66 +7,69 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-23
-- **Session:** `agent-platform-7ga` merged to `main`; implemented `agent-platform-fc8` on `task/agent-platform-fc8` with the new DoD contract phase, hook, tests, and docs.
+- **Date:** 2026-04-25
+- **Session:** PR #82 merged to `main` — `agent-platform-2v6` (agent-queryable observability tools) shipped. Beads issue closed.
 
 ---
 
 ## What happened (this session)
 
-### `agent-platform-7ga` landed on `main` ✅
+### `agent-platform-2v6` merged to `main` ✅
 
-The critic / evaluator loop is merged and released. That unblocked the next Tier 1 remediation task in the chain.
+PR #82 (`task/agent-platform-2v6` → `main`) merged at commit `aa935b6`. Landed:
 
-### `agent-platform-fc8` implemented on `task/agent-platform-fc8` ✅
+- `query_logs`, `query_recent_errors`, `inspect_trace` native tools in `packages/harness/src/tools/observabilityTools.ts`
+- Risk-tier 0, session-jailed via closure-bound `sessionId`
+- Schemas added to `packages/contracts`
+- Wired into harness `toolDispatch` with audit logging
+- `plugin-observability` log/trace store backing the tools
+- Tests: harness, plugin-observability, and apps/api integration suites all green
 
-Added an explicit Definition-of-Done phase to the harness runtime:
+### Review-fix follow-up commit `919ab9b`
 
-- New `DodContractSchema` in `packages/contracts/src/dod.ts`
-- New `onDodCheck` plugin hook with ordered override semantics in `packages/plugin-sdk`
-- New `dodPropose` and `dodCheck` nodes in `packages/harness/src/nodes/`
-- Graph routing now enforces `dodCheck` before `END`
-- Failed DoD injects `<dod-failed>` feedback back into `llmReason`; cap exhaustion emits `DOD_FAILED`
-- `plugin-observability` now records `dod_check` events
-- Docs updated: architecture, message-flow, plugin guide
+Pre-merge cleanup addressed all 7 PR review threads:
 
-Validation run this session:
+- Replaced `window[0]!` non-null assertion in `buildGraph.ts` loop detection with explicit guard
+- Tightened OpenAPI / contracts shapes
+- Strengthened observability store and DoD checks
+- Sonar: 0 findings on touched files; typecheck/lint/tests all passed
 
-- `pnpm typecheck` ✅
-- `pnpm lint` ✅
-- `pnpm test` ✅ (run unsandboxed because `apps/api` binds a local port)
+### Beads
 
-Branch pushed: `task/agent-platform-fc8` @ `9500350`.
+- `agent-platform-2v6` closed locally (dolt remote push deferred — sandbox SSH blocked)
 
 ## Current state
 
 ### Git
 
-- **`main`** — includes `agent-platform-7ga` (critic / evaluator loop)
-- **`task/agent-platform-fc8`** — current branch, pushed to `origin/task/agent-platform-fc8`, latest commit `9500350`
-- **Next chained task after fc8:** `agent-platform-2v6` (agent-queryable observability tools)
+- **`main`** — `aa935b6` Merge pull request #82 (agent-platform-2v6)
+- Working tree clean; on `main`, in sync with `origin/main`
+- Stale branch `task/agent-platform-2v6` still exists locally at `919ab9b` (safe to prune after dolt sync)
 
 ### Quality
 
 - Typecheck ✅ Lint ✅ Tests ✅
-- Harness now at **433 passing tests** including DoD propose/check coverage
-- API tests pass unsandboxed; sandboxed runs still hit the expected `listen EPERM 0.0.0.0` restriction
+- Sonar (touched files) ✅
 
 ### Key commits
 
-| Commit    | Branch                    | Description                                  |
-| --------- | ------------------------- | -------------------------------------------- |
-| `9500350` | `task/agent-platform-fc8` | feat: add Definition-of-Done contract phase  |
-| `d4dfd1b` | `main`                    | latest main after `agent-platform-7ga` merge |
+| Commit    | Branch | Description                                            |
+| --------- | ------ | ------------------------------------------------------ |
+| `aa935b6` | `main` | Merge PR #82 — agent-queryable observability tools     |
+| `919ab9b` | (PR)   | fix: address PR review follow-up (Sonar + types + DoD) |
+| `b236b54` | (PR)   | Commit remaining local changes                         |
+| `2eaff1c` | (PR)   | Add observability tools and tighten DoD checks         |
 
 ---
 
 ## Next (priority order)
 
-1. **Close + sync `agent-platform-fc8`** if not already done after this handoff commit
-2. **Start `agent-platform-2v6`** from `task/agent-platform-fc8`
-3. Expose the new `dod_check` observability data through the runtime tools (`query_logs`, `query_recent_errors`, `inspect_trace`)
-4. After `2v6`, continue to `agent-platform-n6t` (docs CI + ADR + instruction de-dup)
+1. **Sync beads** — run `bd dolt push` once SSH/network is available so the remote reflects the closed `agent-platform-2v6`
+2. **Prune merged branches** — `git branch -d task/agent-platform-2v6` after dolt sync
+3. **Pick next bd-ready task** (currently unblocked):
+   - `agent-platform-d87` (P1) — Tier 1 epic: gap remediation
+   - `agent-platform-n6t` (P1) — Docs-as-record CI + ADR pattern + de-dup AGENTS/CLAUDE/copilot-instructions
+   - `agent-platform-btm` (P2) — Surface critic iterations visibly in chat UI
 
 ---
 
