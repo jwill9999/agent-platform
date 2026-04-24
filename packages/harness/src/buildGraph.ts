@@ -308,8 +308,11 @@ function routeAfterDodCheck(state: HarnessStateType): 'react_llm_reason' | typeo
   if (state.halted) return END;
   if (checkDeadline(state).expired) return END;
   if (state.dodContract?.passed) return END;
+  const maxSteps = state.limits?.maxSteps ?? Infinity;
+  if ((state.stepCount ?? 0) >= maxSteps) return END;
   const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
-  if ((state.iterations ?? 0) >= cap) return END;
+  const dodRetryCount = Math.max(state.iterations ?? 0, state.stepCount ?? 0);
+  if (dodRetryCount >= cap) return END;
   return 'react_llm_reason';
 }
 
