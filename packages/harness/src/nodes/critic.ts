@@ -4,15 +4,16 @@ import { createLanguageModel, type SupportedProvider } from '@agent-platform/mod
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { createLogger } from '@agent-platform/logger';
 
+import { DEFAULT_MAX_CRITIC_ITERATIONS } from '../constants.js';
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, OutputEmitter } from '../types.js';
 import { EVALUATOR_SYSTEM_PROMPT } from '../personas/evaluator.js';
+import { extractFirstJsonObject } from './jsonUtils.js';
 
 const log = createLogger('harness:critic');
 
-/** Default cap when `executionLimits.maxCriticIterations` is unset. */
-export const DEFAULT_MAX_CRITIC_ITERATIONS = 3;
+export { DEFAULT_MAX_CRITIC_ITERATIONS };
 
 /**
  * Pluggable evaluator. Receives the harness state at the moment the LLM
@@ -31,15 +32,6 @@ export type CriticNodeOptions = {
 // ---------------------------------------------------------------------------
 // Default evaluator (model-router-backed)
 // ---------------------------------------------------------------------------
-
-function extractFirstJsonObject(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) return null;
-  return trimmed.slice(start, end + 1);
-}
 
 /**
  * Build the message thread for the evaluator: the original user request and
@@ -74,7 +66,7 @@ function buildEvaluatorMessages(state: HarnessStateType): ChatMessage[] {
 }
 
 async function defaultEvaluate(state: HarnessStateType): Promise<CriticVerdict> {
-  const modelConfig = state.modelConfig;
+  const { modelConfig } = state;
   if (!modelConfig) {
     // No LLM configured (e.g. test harness without a model) — accept by default.
     return { verdict: 'accept', reasons: [] };
@@ -168,13 +160,13 @@ async function runEvaluator(
 
 function buildVerdictTrace(
   verdict: CriticVerdict,
-  nextIterations: number,
+  iterations: number,
   capReached: boolean,
 ): TraceEvent[] {
   return [
     {
       type: 'critic_verdict',
-      iterations: nextIterations,
+      iterations,
       verdict: verdict.verdict,
       reasons: verdict.reasons,
       capReached,
@@ -185,13 +177,21 @@ function buildVerdictTrace(
 async function emitVerdictThinking(
   emitter: OutputEmitter | undefined,
   verdict: CriticVerdict,
-  nextIterations: number,
+  iterations: number,
   cap: number,
 ): Promise<void> {
-  const label = verdict.verdict === 'accept' ? 'accept' : 'revise';
+  const reasons = summariseReasons(verdict.reasons);
+  let content = `Critic: revise (${iterations}/${cap}) - ${reasons}`;
+  if (verdict.verdict === 'accept') {
+    if (iterations > 0) {
+      content = `Critic: accept after ${iterations} revision(s) - ${reasons}`;
+    } else {
+      content = `Critic: accept on first pass - ${reasons}`;
+    }
+  }
   await safeEmit(emitter, {
     type: 'thinking',
-    content: `Critic: ${label} (${nextIterations}/${cap}) — ${summariseReasons(verdict.reasons)}`,
+    content,
   });
 }
 
@@ -205,14 +205,16 @@ export function createCriticNode(options: CriticNodeOptions = {}) {
 
   return async (state: HarnessStateType): Promise<Partial<HarnessStateType>> => {
     const cap = resolveCriticCap(state);
-    const nextIterations = (state.iterations ?? 0) + 1;
+    const currentIterations = state.iterations ?? 0;
     const verdict = await runEvaluator(evaluate, state, dispatcher);
-    const capReached = verdict.verdict === 'revise' && nextIterations >= cap;
+    const revisedIterations = currentIterations + 1;
+    const nextIterations = verdict.verdict === 'revise' ? revisedIterations : currentIterations;
+    const capReached = verdict.verdict === 'revise' && revisedIterations >= cap;
     await emitVerdictThinking(emitter, verdict, nextIterations, cap);
     const trace = buildVerdictTrace(verdict, nextIterations, capReached);
 
     if (verdict.verdict === 'accept') {
-      return { iterations: 1, critique: '', trace };
+      return { critique: '', trace };
     }
 
     const critique = buildCritiqueText(verdict.reasons);

@@ -49,4 +49,10 @@ export type TraceEvent =
       reasons: string[];
       capReached?: boolean;
     }
+  | {
+      type: 'dod_check';
+      passed: boolean;
+      criteriaCount: number;
+      failedCriteria: string[];
+    }
   | { type: 'graph_end' };

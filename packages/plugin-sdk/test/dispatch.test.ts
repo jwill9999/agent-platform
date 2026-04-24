@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Agent } from '@agent-platform/contracts';
+import type { Agent, DodContract } from '@agent-platform/contracts';
 import type { PluginHooks } from '../src/hooks.js';
 import { createPluginDispatcher } from '../src/dispatch.js';
 
@@ -98,5 +98,54 @@ describe('createPluginDispatcher', () => {
     ]);
     await d.onSessionStart({ sessionId: 's', agentId: 'a', agent });
     expect(seen).toEqual(['only']);
+  });
+
+  it('returns the last onDodCheck override in registration order', async () => {
+    const first: DodContract = {
+      criteria: ['one'],
+      evidence: ['first'],
+      passed: false,
+      failedCriteria: ['one'],
+    };
+    const second: DodContract = {
+      criteria: ['one'],
+      evidence: ['second'],
+      passed: true,
+      failedCriteria: [],
+    };
+    const d = createPluginDispatcher([
+      {
+        onDodCheck: async () => first,
+      },
+      {
+        onDodCheck: async () => second,
+      },
+    ]);
+
+    await expect(
+      d.onDodCheck({
+        sessionId: 's',
+        runId: 'r',
+        contract: first,
+      }),
+    ).resolves.toEqual(second);
+  });
+
+  it('returns undefined when no plugin overrides onDodCheck', async () => {
+    const contract: DodContract = {
+      criteria: ['one'],
+      evidence: [],
+      passed: false,
+      failedCriteria: ['one'],
+    };
+    const d = createPluginDispatcher([{}, {}]);
+
+    await expect(
+      d.onDodCheck({
+        sessionId: 's',
+        runId: 'r',
+        contract,
+      }),
+    ).resolves.toBeUndefined();
   });
 });

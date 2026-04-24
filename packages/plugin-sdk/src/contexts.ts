@@ -1,4 +1,4 @@
-import type { Agent, Plan } from '@agent-platform/contracts';
+import type { Agent, DodContract, Plan } from '@agent-platform/contracts';
 
 /**
  * Session lifecycle — `sessionId` is the persisted/API session identifier.
@@ -54,6 +54,12 @@ export type TaskEndContext = Readonly<{
   taskId: string;
   ok: boolean;
   detail?: string;
+}>;
+
+export type DodCheckContext = Readonly<{
+  sessionId: string;
+  runId: string;
+  contract: Readonly<DodContract>;
 }>;
 
 export type ErrorContext = Readonly<{

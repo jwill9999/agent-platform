@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ExecutionLimits } from '@agent-platform/contracts';
-import { buildHarnessGraph, type GraphNodeFn } from '../src/buildGraph.js';
+import {
+  buildHarnessGraph,
+  createCriticNode,
+  createDodCheckNode,
+  createDodProposeNode,
+  type GraphNodeFn,
+} from '../src/index.js';
 import type { HarnessStateType } from '../src/graphState.js';
 import type { LlmOutput, ChatMessage } from '../src/types.js';
+import { captureEmitter, createIncrementingTextNode } from './testUtils.js';
 
 const limits: ExecutionLimits = {
   maxSteps: 10,
@@ -244,5 +251,149 @@ describe('ReAct loop', () => {
     expect(toolNode).not.toHaveBeenCalled();
     expect(exec).toHaveBeenCalledTimes(1);
     expect(out.trace.some((e: { type: string }) => e.type === 'plan_ready')).toBe(true);
+  });
+
+  it('does not end the react path until DoD passes', async () => {
+    const { llmNode, getCallCount } = createIncrementingTextNode();
+    const toolNode: GraphNodeFn = vi.fn(async () => ({}));
+    let dodChecks = 0;
+    const graph = buildHarnessGraph({
+      executeTool: vi.fn(),
+      llmReasonNode: llmNode,
+      toolDispatchNode: toolNode,
+      dodProposeNode: createDodProposeNode({ propose: async () => ['Be complete'] }),
+      dodCheckNode: createDodCheckNode({
+        evaluate: async (_state, contract) => {
+          dodChecks++;
+          if (dodChecks === 1) {
+            return {
+              ...contract,
+              evidence: ['First draft was incomplete'],
+              passed: false,
+              failedCriteria: ['Be complete'],
+            };
+          }
+          return {
+            ...contract,
+            evidence: ['Second draft satisfied the criterion'],
+            passed: true,
+            failedCriteria: [],
+          };
+        },
+      }),
+    });
+
+    const out = await graph.invoke(
+      makeInitialState({ messages: [{ role: 'user', content: 'hi' }] }),
+      {
+        configurable: { thread_id: 'react-dod-pass' },
+      },
+    );
+
+    expect(getCallCount()).toBe(2);
+    expect(dodChecks).toBe(2);
+    expect(out.dodAttempts).toBe(1);
+    expect(out.dodContract?.passed).toBe(true);
+  });
+
+  it('ends with DOD_FAILED when the DoD check still fails at the iteration cap', async () => {
+    const { emitter, events } = captureEmitter();
+    const llmNode: GraphNodeFn = vi.fn(async () => ({
+      llmOutput: { kind: 'text', content: 'draft' } as LlmOutput,
+      messages: [{ role: 'assistant', content: 'draft' }] as ChatMessage[],
+    }));
+    const toolNode: GraphNodeFn = vi.fn(async () => ({}));
+
+    const graph = buildHarnessGraph({
+      executeTool: vi.fn(),
+      llmReasonNode: llmNode,
+      toolDispatchNode: toolNode,
+      dodProposeNode: createDodProposeNode({ propose: async () => ['Be complete'] }),
+      dodCheckNode: createDodCheckNode({
+        emitter,
+        evaluate: async (_state, contract) => ({
+          ...contract,
+          evidence: ['Still incomplete'],
+          passed: false,
+          failedCriteria: ['Be complete'],
+        }),
+      }),
+    });
+
+    const out = await graph.invoke(
+      makeInitialState({
+        messages: [{ role: 'user', content: 'hi' }],
+        limits: { ...limits, maxCriticIterations: 1 },
+      }),
+      { configurable: { thread_id: 'react-dod-fail' } },
+    );
+
+    expect(out.dodAttempts).toBe(1);
+    expect(out.dodContract?.passed).toBe(false);
+    expect(
+      events.some((event) => event['type'] === 'error' && event['code'] === 'DOD_FAILED'),
+    ).toBe(true);
+  });
+
+  it('allows a DoD retry after the critic accepts on the last available draft', async () => {
+    const { emitter, events } = captureEmitter();
+    const { llmNode, getCallCount } = createIncrementingTextNode();
+    const toolNode: GraphNodeFn = vi.fn(async () => ({}));
+    let criticCalls = 0;
+    let dodChecks = 0;
+
+    const graph = buildHarnessGraph({
+      executeTool: vi.fn(),
+      llmReasonNode: llmNode,
+      toolDispatchNode: toolNode,
+      criticNode: createCriticNode({
+        evaluate: async () => {
+          criticCalls++;
+          if (criticCalls <= 2) {
+            return { verdict: 'revise', reasons: ['needs more detail'] };
+          }
+          return { verdict: 'accept', reasons: [] };
+        },
+      }),
+      dodProposeNode: createDodProposeNode({ propose: async () => ['Be complete'] }),
+      dodCheckNode: createDodCheckNode({
+        emitter,
+        evaluate: async (_state, contract) => {
+          dodChecks++;
+          if (dodChecks === 1) {
+            return {
+              ...contract,
+              evidence: ['Still incomplete'],
+              passed: false,
+              failedCriteria: ['Be complete'],
+            };
+          }
+          return {
+            ...contract,
+            evidence: ['Revision satisfied the criterion'],
+            passed: true,
+            failedCriteria: [],
+          };
+        },
+      }),
+    });
+
+    const out = await graph.invoke(
+      makeInitialState({
+        messages: [{ role: 'user', content: 'hi' }],
+        limits: { ...limits, maxCriticIterations: 3 },
+      }),
+      { configurable: { thread_id: 'react-dod-retry-after-accept' } },
+    );
+
+    expect(getCallCount()).toBe(4);
+    expect(criticCalls).toBe(4);
+    expect(dodChecks).toBe(2);
+    expect(out.dodAttempts).toBe(1);
+    expect(out.iterations).toBe(2);
+    expect(out.dodContract?.passed).toBe(true);
+    expect(
+      events.some((event) => event['type'] === 'error' && event['code'] === 'DOD_FAILED'),
+    ).toBe(false);
   });
 });

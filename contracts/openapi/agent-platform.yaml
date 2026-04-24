@@ -321,6 +321,8 @@ paths:
                     $ref: '#/components/schemas/Tool'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /v1/tools/{idOrSlug}:
     parameters:
@@ -340,6 +342,8 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Tool'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '404':
           $ref: '#/components/responses/NotFound'
     put:
@@ -351,7 +355,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Tool'
+              $ref: '#/components/schemas/ToolCreateBody'
       responses:
         '200':
           description: Tool updated
@@ -365,6 +369,8 @@ paths:
                     $ref: '#/components/schemas/Tool'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
     delete:
       operationId: deleteTool
       summary: Delete tool
@@ -838,7 +844,17 @@ components:
       description: |
         Persisted agent. `slug` is assigned at create and never changes; `name` is the
         editable display label.
-      required: [id, slug, name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
+      required:
+        [
+          id,
+          slug,
+          name,
+          systemPrompt,
+          allowedSkillIds,
+          allowedToolIds,
+          allowedMcpServerIds,
+          executionLimits,
+        ]
       properties:
         id:
           type: string
@@ -892,7 +908,8 @@ components:
         in the request body. On replace, `name` and other fields here may change; the stored
         `slug` is never updated from the body.
       type: object
-      required: [name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
+      required:
+        [name, systemPrompt, allowedSkillIds, allowedToolIds, allowedMcpServerIds, executionLimits]
       properties:
         name:
           type: string

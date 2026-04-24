@@ -1,5 +1,12 @@
 import type { DrizzleDb } from '@agent-platform/db';
 import { loadSettings } from '@agent-platform/db';
+import { createLogger } from '@agent-platform/logger';
+import {
+  createObservabilityPlugin,
+  createObservabilityStore,
+  type ObservabilityEvent,
+} from '@agent-platform/plugin-observability';
+import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import { Router } from 'express';
 
 import { createAgentsRouter } from './agentsRouter.js';
@@ -13,8 +20,20 @@ import { createToolsRouter } from './toolsRouter.js';
 import { createToolExecutionsRouter } from './toolExecutionsRouter.js';
 import { createDynamicRateLimiter } from '../dynamicRateLimiter.js';
 
+const observabilityLog = createLogger('api:observability');
+
 export function createV1Router(db: DrizzleDb): Router {
   const router = Router();
+  const observabilityStore = createObservabilityStore();
+  const globalPlugins: readonly RegisteredPlugin[] = [
+    {
+      id: 'plugin-observability',
+      hooks: createObservabilityPlugin({
+        store: observabilityStore,
+        log: (event: ObservabilityEvent) => observabilityLog.info('observability.event', { event }),
+      }),
+    },
+  ];
 
   const rateLimiter = createDynamicRateLimiter();
 
@@ -34,7 +53,13 @@ export function createV1Router(db: DrizzleDb): Router {
   router.use('/mcp-servers', createMcpServersRouter(db));
   router.use('/agents', createAgentsRouter(db));
   router.use('/sessions', createSessionsRouter(db));
-  router.use('/chat', createChatRouter(db));
+  router.use(
+    '/chat',
+    createChatRouter(db, {
+      globalPlugins,
+      observabilityStore,
+    }),
+  );
   router.use(
     '/settings',
     createSettingsRouter(db, (config) => rateLimiter.reconfigure(config)),

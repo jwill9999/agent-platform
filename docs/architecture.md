@@ -80,12 +80,12 @@ packages/mcp-adapter
 | `harness`              | LangGraph-based agent execution graph; security guards (injection, credential, MCP trust, path jail) |
 | `model-router`         | OpenAI provider routing via Vercel AI SDK; provider+model+key configurable                           |
 | `mcp-adapter`          | MCP client lifecycle; transforms MCP tools to contract tools                                         |
-| `plugin-sdk`           | Plugin interface + hook dispatcher (6 lifecycle hooks)                                               |
+| `plugin-sdk`           | Plugin interface + hook dispatcher (7 lifecycle hooks, including DoD override)                       |
 | `planner`              | LLM-driven planning layer producing structured JSON output                                           |
 | `logger`               | Structured logging with context propagation                                                          |
 | `agent-validation`     | Agent schema validation                                                                              |
 | `plugin-session`       | Session plugin implementation                                                                        |
-| `plugin-observability` | Logging/tracing plugin                                                                               |
+| `plugin-observability` | Logging/tracing plugin plus an in-memory, session-scoped observability store                         |
 
 ## Data Flow
 
@@ -95,6 +95,7 @@ User message
     → API POST /v1/chat (NDJSON stream)
       → Zod validate → load session → session lock
         → buildAgentContext
+          → register global observability plugin + session-scoped in-memory store
           → 🔒 MCP Trust Guard filters tools
           → 🔒 Security reinforcement on system prompt
         → buildWindowedContext (system + history within budget)
@@ -102,14 +103,23 @@ User message
             → LLM streamText (model-router) + budget checks
               → tool calls
                 → 🔒 Allowlist → PathJail → MCP/native dispatch
+                → observability hooks record session/task/prompt/tool/error events
                 → 🔒 Injection scan → credential scan → wrap result
               → 🔒 Loop detection → step limit
               → 🔍 Critic / evaluator (accept | revise loop, capped by maxCriticIterations)
+              → ✅ Definition-of-Done propose + check (retry until pass or cap exhaustion)
+              → built-in `query_logs` / `query_recent_errors` / `inspect_trace` tools read the same session store
             → streaming NDJSON text/tool_result events to UI
       → persist messages → release lock → close MCP sessions
 ```
 
 > For the full lifecycle with all security checkpoints and error handling, see **[Message Flow](architecture/message-flow.md)**.
+
+## Observability
+
+The API owns a process-local observability store keyed by `sessionId` and `runId`. A global `plugin-observability` instance records lifecycle events into that store during each chat run, and the three zero-risk built-in observability tools read from the same store through a session-bound executor context.
+
+This keeps observability queryable by the agent at runtime without allowing cross-session reads. Tool access is jailed by closure-bound `sessionId`/`runId`, not by model-supplied parameters.
 
 ## API Clean Architecture
 

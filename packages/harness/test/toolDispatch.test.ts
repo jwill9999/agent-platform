@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createToolDispatchNode, type ToolDispatchContext } from '../src/nodes/toolDispatch.js';
 import type { HarnessStateType } from '../src/graphState.js';
 import type { Agent, Output } from '@agent-platform/contracts';
+import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { NativeToolExecutor } from '../src/types.js';
 
@@ -191,6 +192,44 @@ describe('toolDispatchNode', () => {
       'NATIVE_TOOL_FAILED',
       'boom',
     );
+  });
+
+  it('fires dispatcher onError when a native tool returns an error output', async () => {
+    const onError = vi.fn();
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'error',
+      code: 'READ_FAILED',
+      message: 'disk exploded',
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      dispatcher: createPluginDispatcher([{ onError }]),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    await node(
+      makeState({
+        sessionId: 'session-1',
+        runId: 'run-1',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-err', name: 'echo', args: {} }],
+        },
+      }),
+    );
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        runId: 'run-1',
+        phase: 'tool',
+      }),
+    );
+    const [{ error }] = onError.mock.calls[0] ?? [];
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('disk exploded');
   });
 
   it('returns error when no native executor and tool is plain', async () => {

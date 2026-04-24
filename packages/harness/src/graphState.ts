@@ -1,5 +1,5 @@
 import { Annotation } from '@langchain/langgraph';
-import type { ExecutionLimits, Plan } from '@agent-platform/contracts';
+import type { DodContract, ExecutionLimits, Plan } from '@agent-platform/contracts';
 import type { TraceEvent } from './trace.js';
 import type { ChatMessage, LlmModelConfig, LlmOutput, ToolDefinition } from './types.js';
 
@@ -81,7 +81,7 @@ export const HarnessState = Annotation.Root({
   /**
    * Number of critic→revise→llmReason iterations performed in the current run.
    * Increments by the delta returned from `criticNode`; capped via
-   * `executionLimits.maxCriticIterations` (default 3) by the graph router.
+   * `executionLimits.maxCriticIterations` or the shared harness default by the graph router.
    */
   iterations: Annotation<number>({
     reducer: (left: number, right: number) => (left ?? 0) + (right ?? 0),
@@ -93,6 +93,20 @@ export const HarnessState = Annotation.Root({
    * `accept` so a subsequent run does not see stale critique.
    */
   critique: Annotation<string | undefined>(),
+
+  /**
+   * Number of failed DoD evaluations consumed in the current run.
+   * Increments by the delta returned from `dodCheckNode`; capped via
+   * `executionLimits.maxCriticIterations` or the shared harness default.
+   */
+  dodAttempts: Annotation<number>({
+    reducer: (left: number, right: number) => (left ?? 0) + (right ?? 0),
+    default: () => 0,
+  }),
+
+  // -- Definition-of-Done contract (task agent-platform-fc8) --
+  /** Current DoD contract for the run; last-write-wins across propose/check phases. */
+  dodContract: Annotation<DodContract | undefined>(),
 });
 
 export type HarnessStateType = typeof HarnessState.State;

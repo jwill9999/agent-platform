@@ -100,15 +100,25 @@ Body schema: `SkillSchema` — requires `goal` (string), `constraints` (string[]
 
 ### Tools
 
-| Method   | Path            | Description    |
-| -------- | --------------- | -------------- |
-| `GET`    | `/v1/tools`     | List all tools |
-| `GET`    | `/v1/tools/:id` | Get tool by ID |
-| `POST`   | `/v1/tools`     | Create a tool  |
-| `PUT`    | `/v1/tools/:id` | Replace a tool |
-| `DELETE` | `/v1/tools/:id` | Delete a tool  |
+| Method   | Path            | Description                                             |
+| -------- | --------------- | ------------------------------------------------------- |
+| `GET`    | `/v1/tools`     | List all tools, including built-in system tools         |
+| `GET`    | `/v1/tools/:id` | Get tool by ID or slug, including built-in system tools |
+| `POST`   | `/v1/tools`     | Create a tool                                           |
+| `PUT`    | `/v1/tools/:id` | Replace a tool                                          |
+| `DELETE` | `/v1/tools/:id` | Delete a tool                                           |
 
 Body schema: `ToolSchema` — requires `name`, `handler` with `{ type: 'inline', code: string }`.
+
+Built-in observability tools exposed by `GET /v1/tools`:
+
+| Tool ID                   | Name                  | Parameters                   | Result envelope                         |
+| ------------------------- | --------------------- | ---------------------------- | --------------------------------------- |
+| `sys_query_logs`          | `query_logs`          | `level?`, `since?`, `limit?` | `{ total, truncated, records }`         |
+| `sys_query_recent_errors` | `query_recent_errors` | `limit?`                     | `{ total, truncated, records }`         |
+| `sys_inspect_trace`       | `inspect_trace`       | `traceId?`                   | `{ traceId, total, truncated, events }` |
+
+All three observability tools are read-only, zero-risk system tools. They are jailed to the current API session, and `inspect_trace` defaults to the current run when `traceId` is omitted.
 
 ### MCP Servers
 

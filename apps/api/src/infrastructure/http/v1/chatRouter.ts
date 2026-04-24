@@ -22,6 +22,8 @@ import {
   createLlmReasonNode,
   createToolDispatchNode,
   createCriticNode,
+  createDodCheckNode,
+  createDodProposeNode,
   createNdjsonEmitter,
   contractToolsToDefinitions,
   createApproximateCounter,
@@ -43,6 +45,8 @@ import {
   resolveGatedOpenAiKeyForRequest,
   streamChat,
 } from '@agent-platform/model-router';
+import type { ObservabilityStore } from '@agent-platform/plugin-observability';
+import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import type { Response, Router } from 'express';
 import { Router as createRouter } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -78,6 +82,11 @@ const LegacyChatStreamBodySchema = z.object({
 
 const MAX_TITLE_LENGTH = 80;
 
+type ChatRouterOptions = {
+  globalPlugins?: readonly RegisteredPlugin[];
+  observabilityStore?: ObservabilityStore;
+};
+
 /** Derive a human-readable session title from the first user message. */
 function deriveSessionTitle(message: string): string {
   const trimmed = message.trim().replaceAll(/\s+/g, ' ');
@@ -88,9 +97,15 @@ function deriveSessionTitle(message: string): string {
 }
 
 /** Build agent context; translates AgentNotFoundError to HttpError. */
-async function loadAgentContext(db: DrizzleDb, agentId: string): Promise<AgentContext> {
+async function loadAgentContext(
+  db: DrizzleDb,
+  agentId: string,
+  options: Pick<ChatRouterOptions, 'globalPlugins'> = {},
+): Promise<AgentContext> {
   try {
-    return await buildAgentContext(db, agentId);
+    return await buildAgentContext(db, agentId, {
+      globalPlugins: options.globalPlugins,
+    });
   } catch (err) {
     if (err instanceof AgentNotFoundError) {
       throw new HttpError(404, 'NOT_FOUND', `Agent '${agentId}' not found`);
@@ -220,7 +235,7 @@ function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): voi
 // Router factory
 // ---------------------------------------------------------------------------
 
-export function createChatRouter(db: DrizzleDb): Router {
+export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {}): Router {
   const router = createRouter();
   const sessionLock = createInProcessSessionLock();
 
@@ -233,7 +248,9 @@ export function createChatRouter(db: DrizzleDb): Router {
       const session = getSession(db, sessionId);
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
-      const agentCtx = await loadAgentContext(db, session.agentId);
+      const agentCtx = await loadAgentContext(db, session.agentId, {
+        globalPlugins: options.globalPlugins,
+      });
       const modelCfg = resolveModelOrThrow(
         db,
         agentCtx,
@@ -241,11 +258,12 @@ export function createChatRouter(db: DrizzleDb): Router {
         req.header('x-model-config-id') || undefined,
       );
 
-      const timeoutMs = agentCtx.agent.executionLimits.timeoutMs;
+      const { timeoutMs } = agentCtx.agent.executionLimits;
       const release = await sessionLock.acquire(sessionId, timeoutMs);
 
       const controller = new AbortController();
       const { signal } = controller;
+      const runId = randomUUID();
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
       let heartbeatId: ReturnType<typeof setInterval> | undefined;
 
@@ -261,6 +279,16 @@ export function createChatRouter(db: DrizzleDb): Router {
         prepareNdjsonResponse(res);
         const emitter: OutputEmitter = createNdjsonEmitter(res);
         const dispatcher = agentCtx.pluginDispatcher;
+
+        await safePluginCall(() =>
+          dispatcher.onTaskStart({
+            sessionId,
+            runId,
+            planId: runId,
+            taskId: runId,
+            toolIds: agentCtx.tools.map((tool) => tool.id),
+          }),
+        );
 
         // Abort on client disconnect
         req.on('close', () => {
@@ -289,7 +317,17 @@ export function createChatRouter(db: DrizzleDb): Router {
           toolDispatchNode: createToolDispatchNode({
             agent: agentCtx.agent,
             mcpManager: agentCtx.mcpManager,
-            nativeToolExecutor: createSystemToolExecutor(),
+            nativeToolExecutor: createSystemToolExecutor(
+              options.observabilityStore
+                ? {
+                    observability: {
+                      store: options.observabilityStore,
+                      sessionId,
+                      traceId: runId,
+                    },
+                  }
+                : undefined,
+            ),
             emitter,
             dispatcher,
             pathJail: new PathJail(DEFAULT_MOUNTS),
@@ -297,6 +335,8 @@ export function createChatRouter(db: DrizzleDb): Router {
             skillResolver: (id: string) => getSkill(db, id),
           }),
           criticNode: createCriticNode({ emitter, dispatcher }),
+          dodProposeNode: createDodProposeNode(),
+          dodCheckNode: createDodCheckNode({ emitter, dispatcher }),
           dispatcher,
         });
 
@@ -312,7 +352,7 @@ export function createChatRouter(db: DrizzleDb): Router {
         if (!session.title) {
           updateSessionTitle(db, sessionId, deriveSessionTitle(message));
         }
-        const initialState = buildInitialState(sessionId, messages, agentCtx, modelCfg, {
+        const initialState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
           dropped,
           contextTokens,
         });
@@ -322,11 +362,28 @@ export function createChatRouter(db: DrizzleDb): Router {
         });
 
         persistNewMessages(db, sessionId, finalState?.messages, messages.length);
+        await safePluginCall(() =>
+          dispatcher.onTaskEnd({
+            sessionId,
+            runId,
+            taskId: runId,
+            ok: true,
+          }),
+        );
       } catch (err) {
+        await safePluginCall(() =>
+          agentCtx.pluginDispatcher.onTaskEnd({
+            sessionId,
+            runId,
+            taskId: runId,
+            ok: false,
+            detail: err instanceof Error ? err.message : String(err),
+          }),
+        );
         await safePluginCall(() =>
           agentCtx.pluginDispatcher.onError({
             sessionId,
-            runId: 'unknown',
+            runId,
             phase: signal.aborted && signal.reason === 'timeout' ? 'session' : 'unknown',
             error: err,
           }),
@@ -413,6 +470,7 @@ function buildConversationMessages(
 }
 
 function buildInitialState(
+  runId: string,
   sessionId: string,
   messages: ChatMessage[],
   agentCtx: AgentContext,
@@ -434,7 +492,7 @@ function buildInitialState(
     plan: null,
     taskIndex: 0,
     limits: agentCtx.agent.executionLimits,
-    runId: randomUUID(),
+    runId,
     sessionId,
     halted: false,
     mode: 'react' as const,

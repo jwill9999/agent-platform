@@ -2,6 +2,7 @@ import { END, MemorySaver, START, StateGraph } from '@langchain/langgraph';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import type { Plan } from '@agent-platform/contracts';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
+import { DEFAULT_MAX_CRITIC_ITERATIONS } from './constants.js';
 import { HarnessState, type HarnessStateType } from './graphState.js';
 import type { TraceEvent } from './trace.js';
 import { checkDeadline } from './deadline.js';
@@ -22,6 +23,10 @@ export type BuildHarnessGraphOptions = {
   /** Stub planner: if `plan` in initial state is null, use this fixed plan. */
   stubPlan?: Plan;
   executeTool: ToolExecutor;
+  /** Optional DoD proposer node, run once before the first react llmReason. */
+  dodProposeNode?: GraphNodeFn;
+  /** Optional DoD check node, run after a tool-free draft answer before END. */
+  dodCheckNode?: GraphNodeFn;
   /** LLM reasoning node (ReAct path). Required for mode='react'. */
   llmReasonNode?: GraphNodeFn;
   /** Tool dispatch node (ReAct path). Required for mode='react'. */
@@ -30,7 +35,7 @@ export type BuildHarnessGraphOptions = {
    * Optional critic / evaluator node (ReAct path). When provided, the graph
    * routes `llmReason → critic → (END | llmReason)` instead of going straight
    * to END on a tool-free LLM response. Cap is sourced from
-   * `executionLimits.maxCriticIterations` (default 3).
+   * `executionLimits.maxCriticIterations` or the shared harness default.
    */
   criticNode?: GraphNodeFn;
   /** Plan generate node (plan path). Optional — if absent, falls back to stubPlan. */
@@ -80,7 +85,7 @@ function createExecuteNode(options: BuildHarnessGraphOptions) {
     if (state.halted) {
       return {};
     }
-    const plan = state.plan;
+    const { plan } = state;
     if (!plan) {
       return { trace: [{ type: 'graph_end' }] };
     }
@@ -221,6 +226,14 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
       window.length >= LOOP_DETECTION_THRESHOLD && window.every((sig) => sig === window[0]);
 
     if (isLoop) {
+      const toolSignature = window[0];
+      if (!toolSignature) {
+        return {
+          ...result,
+          recentToolCalls: window,
+        };
+      }
+
       let trace: TraceEvent[];
       if (!result.trace) {
         trace = [];
@@ -231,7 +244,7 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
       }
       trace.push({
         type: 'loop_detected',
-        toolSignature: window[0]!,
+        toolSignature,
         repeats: LOOP_DETECTION_THRESHOLD,
       });
 
@@ -264,8 +277,13 @@ function routeAfterLlmWithCritic(
   return 'react_critic';
 }
 
-/** Default cap for critic iterations when not configured on executionLimits. */
-const DEFAULT_MAX_CRITIC_ITERATIONS = 3;
+function routeAfterLlmWithDod(
+  state: HarnessStateType,
+): 'react_tool_dispatch' | 'react_dod_check' | typeof END {
+  if (state.halted) return END;
+  if (state.llmOutput?.kind === 'tool_calls') return 'react_tool_dispatch';
+  return 'react_dod_check';
+}
 
 function routeAfterCritic(state: HarnessStateType): 'react_llm_reason' | typeof END {
   if (state.halted) return END;
@@ -276,6 +294,28 @@ function routeAfterCritic(state: HarnessStateType): 'react_llm_reason' | typeof 
   const accepted = !state.critique;
   if (accepted) return END;
   if (iterations >= cap) return END;
+  return 'react_llm_reason';
+}
+
+function routeAfterCriticWithDod(
+  state: HarnessStateType,
+): 'react_llm_reason' | 'react_dod_check' | typeof END {
+  if (state.halted) return END;
+  if (checkDeadline(state).expired) return END;
+  const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
+  const iterations = state.iterations ?? 0;
+  const accepted = !state.critique;
+  if (!accepted && iterations >= cap) return END;
+  if (!accepted) return 'react_llm_reason';
+  return 'react_dod_check';
+}
+
+function routeAfterDodCheck(state: HarnessStateType): 'react_llm_reason' | typeof END {
+  if (state.halted) return END;
+  if (checkDeadline(state).expired) return END;
+  if (state.dodContract?.passed) return END;
+  const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
+  if ((state.dodAttempts ?? 0) >= cap) return END;
   return 'react_llm_reason';
 }
 
@@ -320,14 +360,63 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
   // Determine plan-mode routing based on whether planGenerateNode is provided
   const planGenNode: GraphNodeFn = options.planGenerateNode ?? (async () => ({}));
 
-  const routeByMode = (state: HarnessStateType): 'react_llm_reason' | 'plan_generate' => {
-    if (state.mode === 'plan') return 'plan_generate';
-    return 'react_llm_reason';
-  };
-
   if (options.llmReasonNode && options.toolDispatchNode) {
     // Full graph with mode router → (react | plan) paths
+    if (options.dodProposeNode && options.dodCheckNode && options.criticNode) {
+      const routeByMode = (state: HarnessStateType): 'react_dod_propose' | 'plan_generate' => {
+        if (state.mode === 'plan') return 'plan_generate';
+        return 'react_dod_propose';
+      };
+      const graph = new StateGraph(HarnessState)
+        .addNode('plan_generate', planGenNode)
+        .addNode('resolve_plan', createResolvePlanNode(options))
+        .addNode('execute', createExecuteNode(options))
+        .addNode('react_dod_propose', options.dodProposeNode)
+        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
+        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+        .addNode('react_critic', options.criticNode)
+        .addNode('react_dod_check', options.dodCheckNode)
+        .addConditionalEdges(START, routeByMode)
+        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+        .addEdge('resolve_plan', 'execute')
+        .addConditionalEdges('execute', routeAfterExecute)
+        .addEdge('react_dod_propose', 'react_llm_reason')
+        .addConditionalEdges('react_llm_reason', routeAfterLlmWithCritic)
+        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch)
+        .addConditionalEdges('react_critic', routeAfterCriticWithDod)
+        .addConditionalEdges('react_dod_check', routeAfterDodCheck);
+      return graph.compile({ checkpointer });
+    }
+
+    if (options.dodProposeNode && options.dodCheckNode) {
+      const routeByMode = (state: HarnessStateType): 'react_dod_propose' | 'plan_generate' => {
+        if (state.mode === 'plan') return 'plan_generate';
+        return 'react_dod_propose';
+      };
+      const graph = new StateGraph(HarnessState)
+        .addNode('plan_generate', planGenNode)
+        .addNode('resolve_plan', createResolvePlanNode(options))
+        .addNode('execute', createExecuteNode(options))
+        .addNode('react_dod_propose', options.dodProposeNode)
+        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
+        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+        .addNode('react_dod_check', options.dodCheckNode)
+        .addConditionalEdges(START, routeByMode)
+        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+        .addEdge('resolve_plan', 'execute')
+        .addConditionalEdges('execute', routeAfterExecute)
+        .addEdge('react_dod_propose', 'react_llm_reason')
+        .addConditionalEdges('react_llm_reason', routeAfterLlmWithDod)
+        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch)
+        .addConditionalEdges('react_dod_check', routeAfterDodCheck);
+      return graph.compile({ checkpointer });
+    }
+
     if (options.criticNode) {
+      const routeByMode = (state: HarnessStateType): 'react_llm_reason' | 'plan_generate' => {
+        if (state.mode === 'plan') return 'plan_generate';
+        return 'react_llm_reason';
+      };
       const llmRouter = routeAfterLlmWithCritic;
       const graph = new StateGraph(HarnessState)
         .addNode('plan_generate', planGenNode)
@@ -346,6 +435,10 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
       return graph.compile({ checkpointer });
     }
 
+    const routeByMode = (state: HarnessStateType): 'react_llm_reason' | 'plan_generate' => {
+      if (state.mode === 'plan') return 'plan_generate';
+      return 'react_llm_reason';
+    };
     const graph = new StateGraph(HarnessState)
       .addNode('plan_generate', planGenNode)
       .addNode('resolve_plan', createResolvePlanNode(options))
