@@ -209,6 +209,7 @@ export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
 
     return {
       dodContract: contract,
+      iterations: (state.iterations ?? 0) + 1,
       messages: [feedback],
       trace,
     };
