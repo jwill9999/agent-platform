@@ -1,3 +1,11 @@
 {
-  "hooks": {}
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "bash ./.github/hooks/check-session-update.sh",
+        "timeout": 120
+      }
+    ]
+  }
 }

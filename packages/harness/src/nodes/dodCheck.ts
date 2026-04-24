@@ -7,10 +7,10 @@ import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, OutputEmitter } from '../types.js';
+import { DEFAULT_MAX_CRITIC_ITERATIONS } from '../constants.js';
 import { extractFirstJsonObject } from './jsonUtils.js';
 
 const log = createLogger('harness:dod-check');
-const DEFAULT_MAX_CRITIC_ITERATIONS = 3;
 const DEFAULT_DOD_CRITERIA = "Answer the user's question.";
 
 export type DodCheckEvaluator = (

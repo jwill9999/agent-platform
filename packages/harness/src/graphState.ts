@@ -81,7 +81,7 @@ export const HarnessState = Annotation.Root({
   /**
    * Number of critic→revise→llmReason iterations performed in the current run.
    * Increments by the delta returned from `criticNode`; capped via
-   * `executionLimits.maxCriticIterations` (default 3) by the graph router.
+   * `executionLimits.maxCriticIterations` or the shared harness default by the graph router.
    */
   iterations: Annotation<number>({
     reducer: (left: number, right: number) => (left ?? 0) + (right ?? 0),

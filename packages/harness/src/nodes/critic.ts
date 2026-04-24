@@ -4,6 +4,7 @@ import { createLanguageModel, type SupportedProvider } from '@agent-platform/mod
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
 import { createLogger } from '@agent-platform/logger';
 
+import { DEFAULT_MAX_CRITIC_ITERATIONS } from '../constants.js';
 import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, OutputEmitter } from '../types.js';
@@ -12,8 +13,7 @@ import { extractFirstJsonObject } from './jsonUtils.js';
 
 const log = createLogger('harness:critic');
 
-/** Default cap when `executionLimits.maxCriticIterations` is unset. */
-export const DEFAULT_MAX_CRITIC_ITERATIONS = 3;
+export { DEFAULT_MAX_CRITIC_ITERATIONS };
 
 /**
  * Pluggable evaluator. Receives the harness state at the moment the LLM

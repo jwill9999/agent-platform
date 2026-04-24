@@ -92,7 +92,9 @@ describe('observability tools', () => {
     if (output.type === 'tool_result') {
       const records = output.data.records as Array<{ event: { kind: string } }>;
       expect(records).toHaveLength(2);
-      expect(records.map((record) => record.event.kind).sort()).toEqual(['dod_check', 'error']);
+      expect(
+        records.map((record) => record.event.kind).sort((left, right) => left.localeCompare(right)),
+      ).toEqual(['dod_check', 'error']);
     }
   });
 

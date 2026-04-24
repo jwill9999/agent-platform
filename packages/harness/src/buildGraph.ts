@@ -2,6 +2,7 @@ import { END, MemorySaver, START, StateGraph } from '@langchain/langgraph';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import type { Plan } from '@agent-platform/contracts';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
+import { DEFAULT_MAX_CRITIC_ITERATIONS } from './constants.js';
 import { HarnessState, type HarnessStateType } from './graphState.js';
 import type { TraceEvent } from './trace.js';
 import { checkDeadline } from './deadline.js';
@@ -34,7 +35,7 @@ export type BuildHarnessGraphOptions = {
    * Optional critic / evaluator node (ReAct path). When provided, the graph
    * routes `llmReason → critic → (END | llmReason)` instead of going straight
    * to END on a tool-free LLM response. Cap is sourced from
-   * `executionLimits.maxCriticIterations` (default 3).
+   * `executionLimits.maxCriticIterations` or the shared harness default.
    */
   criticNode?: GraphNodeFn;
   /** Plan generate node (plan path). Optional — if absent, falls back to stubPlan. */
@@ -275,9 +276,6 @@ function routeAfterLlmWithDod(
   if (state.llmOutput?.kind === 'tool_calls') return 'react_tool_dispatch';
   return 'react_dod_check';
 }
-
-/** Default cap for critic iterations when not configured on executionLimits. */
-const DEFAULT_MAX_CRITIC_ITERATIONS = 3;
 
 function routeAfterCritic(state: HarnessStateType): 'react_llm_reason' | typeof END {
   if (state.halted) return END;
