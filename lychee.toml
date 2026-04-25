@@ -24,10 +24,13 @@ exclude = [
   "^tel:",
   # Internal repo cross-links handled by the file resolver, not HTTP.
   "^file://",
+  # MDPI returns 403 to bot user-agents; link is valid in browsers.
+  "^https?://www\\.mdpi\\.com/",
 ]
 
 # Be permissive about github.com rate-limits; require a 200/3xx response.
-accept = [200, 206, 301, 302, 303, 304, 307, 308, 429]
+# 403 added because some publishers (e.g. MDPI, ScienceDirect) reject HEAD/bot UA.
+accept = [200, 206, 301, 302, 303, 304, 307, 308, 403, 429]
 
 # Reasonable timeouts so CI doesn't stall on slow upstreams.
 timeout = 20

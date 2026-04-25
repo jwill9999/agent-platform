@@ -58,6 +58,6 @@ jobs:
           args: >-
             --config lychee.toml
             --no-progress
-            --base ${{ github.workspace }}
+            --base-url ${{ github.workspace }}
             "**/*.md"
           fail: true
