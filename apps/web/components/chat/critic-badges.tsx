@@ -3,7 +3,7 @@
 import { Check, RefreshCw, AlertTriangle } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import type { CriticEvent } from '@/lib/critic-events';
+import { formatCriticBadgeLabel, type CriticEvent } from '@/lib/critic-events';
 
 interface CriticBadgeProps {
   readonly event: CriticEvent;
@@ -11,23 +11,6 @@ interface CriticBadgeProps {
 
 interface CriticBadgesProps {
   readonly events: readonly CriticEvent[];
-}
-
-function badgeLabel(event: CriticEvent): string {
-  switch (event.kind) {
-    case 'revise': {
-      const denom = event.total ? `/${event.total}` : '';
-      return `Revising (${event.iteration ?? '?'}${denom})`;
-    }
-    case 'accept': {
-      const n = event.iteration ?? 0;
-      if (n <= 0) return 'Accepted';
-      const suffix = n === 1 ? '' : 's';
-      return `Accepted after ${n} revision${suffix}`;
-    }
-    case 'cap_reached':
-      return 'Critic cap reached';
-  }
 }
 
 function badgeIcon(event: CriticEvent) {
@@ -64,7 +47,7 @@ export function CriticBadge({ event }: CriticBadgeProps) {
       )}
     >
       {badgeIcon(event)}
-      <span>{badgeLabel(event)}</span>
+      <span>{formatCriticBadgeLabel(event)}</span>
     </span>
   );
 }

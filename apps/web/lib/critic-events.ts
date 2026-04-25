@@ -85,18 +85,35 @@ export function parseCriticContent(content: string): CriticEvent | null {
 }
 
 /**
- * Build a status-bar label for the most recent critic event on the active
- * assistant turn. Returns `null` to fall back to the generic loader.
+ * Format the "in-progress" / status-bar text for the most recent critic event
+ * on the active assistant turn. Used by `StatusLabel` instead of the generic
+ * `Thinking…` loader.
  */
 export function formatCriticStatus(event: CriticEvent): string {
   switch (event.kind) {
-    case 'revise': {
-      const denom = event.total ? `/${event.total}` : '';
-      return `Revising (${event.iteration ?? '?'}${denom})`;
-    }
+    case 'revise':
+      return formatReviseLabel(event);
     case 'accept':
       return 'Finalising';
     case 'cap_reached':
       return 'Critic cap reached';
   }
+}
+
+/**
+ * Format the badge text for an individual critic event in the chat history.
+ * Differs from `formatCriticStatus` only for `accept`, which surfaces the
+ * final revision count once the loop has settled.
+ */
+export function formatCriticBadgeLabel(event: CriticEvent): string {
+  if (event.kind !== 'accept') return formatCriticStatus(event);
+  const n = event.iteration ?? 0;
+  if (n <= 0) return 'Accepted';
+  const suffix = n === 1 ? '' : 's';
+  return `Accepted after ${n} revision${suffix}`;
+}
+
+function formatReviseLabel(event: CriticEvent): string {
+  const denom = event.total ? `/${event.total}` : '';
+  return `Revising (${event.iteration ?? '?'}${denom})`;
 }

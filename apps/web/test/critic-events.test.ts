@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatCriticStatus, isCriticContent, parseCriticContent } from '../lib/critic-events';
+import {
+  formatCriticBadgeLabel,
+  formatCriticStatus,
+  isCriticContent,
+  parseCriticContent,
+} from '../lib/critic-events';
 
 describe('parseCriticContent', () => {
   it('returns null for plain thinking content', () => {
@@ -58,5 +63,30 @@ describe('formatCriticStatus', () => {
 
   it('renders cap reached', () => {
     expect(formatCriticStatus({ kind: 'cap_reached', reasons: 'cap' })).toBe('Critic cap reached');
+  });
+});
+
+describe('formatCriticBadgeLabel', () => {
+  it('reuses the status text for revise and cap_reached', () => {
+    expect(formatCriticBadgeLabel({ kind: 'revise', iteration: 1, total: 3, reasons: '' })).toBe(
+      'Revising (1/3)',
+    );
+    expect(formatCriticBadgeLabel({ kind: 'cap_reached', reasons: '' })).toBe('Critic cap reached');
+  });
+
+  it('renders accept on first pass without revision count', () => {
+    expect(formatCriticBadgeLabel({ kind: 'accept', iteration: 0, reasons: '' })).toBe('Accepted');
+  });
+
+  it('renders accept after one revision (singular)', () => {
+    expect(formatCriticBadgeLabel({ kind: 'accept', iteration: 1, reasons: '' })).toBe(
+      'Accepted after 1 revision',
+    );
+  });
+
+  it('renders accept after multiple revisions (plural)', () => {
+    expect(formatCriticBadgeLabel({ kind: 'accept', iteration: 3, reasons: '' })).toBe(
+      'Accepted after 3 revisions',
+    );
   });
 });
