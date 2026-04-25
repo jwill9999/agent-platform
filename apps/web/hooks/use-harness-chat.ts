@@ -257,6 +257,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         uiMessage(crypto.randomUUID(), 'user', userVisible),
         uiMessage(assistantId, 'assistant', ''),
       ]);
+      setThinkingByMessage((prev) => ({ ...prev, [assistantId]: 'The agent is thinking…' }));
       setStatus('streaming');
       setError(null);
 
@@ -275,12 +276,21 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         if (!res.body) throw new Error('No response body');
 
         let accumulated = '';
+        let firstTextArrived = false;
         await readNdjsonStream(
           res.body,
           (chunk) => {
             if (!chunk) return;
             accumulated += chunk;
             updateAssistantMessage(assistantId, accumulated);
+            if (!firstTextArrived) {
+              setThinkingByMessage((prev) => {
+                const next = { ...prev };
+                delete next[assistantId];
+                return next;
+              });
+              firstTextArrived = true;
+            }
           },
           (msg) => setError(msg),
           (event) => appendCriticEvent(assistantId, event),
