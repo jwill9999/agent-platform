@@ -8,13 +8,30 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-25
-- **Session:** PR #82 merged to `main` — `agent-platform-2v6` (agent-queryable observability tools) shipped. Beads issue closed.
+- **Session:** `agent-platform-n6t` shipped on `task/agent-platform-n6t` (commit `156df57`). Last child of Tier 1 epic `agent-platform-d87` — all four children now closed. PR pending.
 
 ---
 
 ## What happened (this session)
 
-### `agent-platform-2v6` merged to `main` ✅
+### `agent-platform-n6t` — Docs-as-record CI + ADR pattern + agent-instructions de-dup ✅
+
+Branch `task/agent-platform-n6t` (from `main`), commit `156df57` pushed to `origin`.
+
+- **Shared instructions:** `docs/agent-instructions-shared.md` is now the single source of truth (commands, architecture, conventions, env vars, beads/git workflow, completion gate, session protocol).
+- **De-duplication:** `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` reduced to thin wrappers — **582 → 115 lines (80% reduction)**. Beads-integration blocks preserved.
+- **ADR pattern:** `docs/adr/README.md`, `docs/adr/0000-template.md`, `docs/adr/0001-tier1-gap-remediation.md` (records the full Tier 1 epic).
+- **Docs CI:** `.github/workflows/docs-ci.yml` runs `markdownlint-cli2` + `lychee` on PRs touching markdown.
+- **Local gate:** `pnpm docs:lint` chains markdownlint-cli2 with `scripts/check-doc-links.mjs` (Node-based relative-link validator).
+- **Configs:** `.markdownlint-cli2.jsonc` (strict, ignores historical task/review/planning docs), `lychee.toml` (CI link config).
+- **decisions.md:** linked ADR-0001 + Tier 1 epic landing entry.
+- Quality: `pnpm typecheck` ✅, `pnpm lint` ✅, `pnpm docs:lint` ✅ (0 errors across 22 docs).
+
+### Tier 1 epic `agent-platform-d87` complete ✅
+
+All four children merged: `7ga` (critic/evaluator) · `fc8` (DoD contract) · `2v6` (observability tools) · `n6t` (docs CI + ADR). Architectural record at `docs/adr/0001-tier1-gap-remediation.md`.
+
+### `agent-platform-2v6` merged to `main` ✅ (earlier in session)
 
 PR #82 (`task/agent-platform-2v6` → `main`) merged at commit `aa935b6`. Landed:
 
@@ -42,33 +59,31 @@ Pre-merge cleanup addressed all 7 PR review threads:
 
 ### Git
 
-- **`main`** — `aa935b6` Merge pull request #82 (agent-platform-2v6)
-- Working tree clean; on `main`, in sync with `origin/main`
-- Stale branch `task/agent-platform-2v6` still exists locally at `919ab9b` (safe to prune after dolt sync)
+- **`main`** — `aa935b6` Merge PR #82 (agent-platform-2v6)
+- **`task/agent-platform-n6t`** — `156df57` (pushed to origin, PR pending: <https://github.com/jwill9999/agent-platform/pull/new/task/agent-platform-n6t>)
+- Stale branch `task/agent-platform-2v6` still exists locally at `919ab9b` (safe to prune)
 
 ### Quality
 
-- Typecheck ✅ Lint ✅ Tests ✅
+- Typecheck ✅ Lint ✅ Tests ✅ Docs lint ✅
 - Sonar (touched files) ✅
 
 ### Key commits
 
-| Commit    | Branch | Description                                            |
-| --------- | ------ | ------------------------------------------------------ |
-| `aa935b6` | `main` | Merge PR #82 — agent-queryable observability tools     |
-| `919ab9b` | (PR)   | fix: address PR review follow-up (Sonar + types + DoD) |
-| `b236b54` | (PR)   | Commit remaining local changes                         |
-| `2eaff1c` | (PR)   | Add observability tools and tighten DoD checks         |
+| Commit    | Branch                    | Description                                                |
+| --------- | ------------------------- | ---------------------------------------------------------- |
+| `156df57` | `task/agent-platform-n6t` | feat(docs): docs-as-record CI + ADR pattern + agent-de-dup |
+| `aa935b6` | `main`                    | Merge PR #82 — agent-queryable observability tools         |
+| `919ab9b` | (PR)                      | fix: address PR review follow-up (Sonar + types + DoD)     |
 
 ---
 
 ## Next (priority order)
 
-1. **Sync beads** — run `bd dolt push` once SSH/network is available so the remote reflects the closed `agent-platform-2v6`
-2. **Prune merged branches** — `git branch -d task/agent-platform-2v6` after dolt sync
-3. **Pick next bd-ready task** (currently unblocked):
-   - `agent-platform-d87` (P1) — Tier 1 epic: gap remediation
-   - `agent-platform-n6t` (P1) — Docs-as-record CI + ADR pattern + de-dup AGENTS/CLAUDE/copilot-instructions
+1. **Open PR for `task/agent-platform-n6t`** — target `main` (per recent practice; epic `d87` was run as direct-to-main per child rather than feature-branch chain)
+2. **Sync beads** — `bd dolt push` next time network is available; closes `n6t` and `d87` on the remote
+3. **Prune merged branches** — `git branch -d task/agent-platform-2v6` after dolt sync; `task/agent-platform-n6t` after its PR merges
+4. **Pick next bd-ready task:**
    - `agent-platform-btm` (P2) — Surface critic iterations visibly in chat UI
 
 ---

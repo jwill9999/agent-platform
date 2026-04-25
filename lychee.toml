@@ -1,0 +1,46 @@
+# Lychee link-checker config — used by `pnpm docs:lint` and the docs-ci workflow.
+# Docs: https://lychee.cli.rs/usage/config/
+
+# Match-only-markdown via the glob args we pass on the command line.
+exclude_path = [
+  "node_modules",
+  "dist",
+  "build",
+  ".next",
+  ".turbo",
+  "coverage",
+  "test-results",
+  "data",
+  "pnpm-lock.yaml",
+  "packages/db/drizzle",
+]
+
+# Ignore localhost, loopback, mailto and known transient hosts.
+exclude = [
+  "^https?://localhost(:\\d+)?(/|$)",
+  "^https?://127\\.0\\.0\\.1(:\\d+)?(/|$)",
+  "^https?://0\\.0\\.0\\.0(:\\d+)?(/|$)",
+  "^mailto:",
+  "^tel:",
+  # Internal repo cross-links handled by the file resolver, not HTTP.
+  "^file://",
+  # MDPI returns 403 to bot user-agents; link is valid in browsers.
+  "^https?://www\\.mdpi\\.com/",
+]
+
+# Be permissive about github.com rate-limits; require a 200/3xx response.
+# 403 added because some publishers (e.g. MDPI, ScienceDirect) reject HEAD/bot UA.
+accept = [200, 206, 301, 302, 303, 304, 307, 308, 403, 429]
+
+# Reasonable timeouts so CI doesn't stall on slow upstreams.
+timeout = 20
+max_retries = 2
+retry_wait_time = 2
+
+# Cache successful look-ups to keep CI fast.
+cache = true
+max_cache_age = "7d"
+
+# Don't fail on transient/network-only errors that are out of our control.
+require_https = false
+no_progress = true
