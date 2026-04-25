@@ -57,17 +57,30 @@ import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgent } from '@/lib/default-agent';
 import { formatFileContext, sanitiseFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
+import { CriticBadges } from '@/components/chat/critic-badges';
+import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
 
 // ---------------------------------------------------------------------------
 // Small presentational components
 // ---------------------------------------------------------------------------
 
-function StatusLabel({ isLoading, sessionReady }: Readonly<{ isLoading: boolean; sessionReady: boolean }>) {
+function StatusLabel({
+  isLoading,
+  sessionReady,
+  criticStatus,
+}: Readonly<{ isLoading: boolean; sessionReady: boolean; criticStatus?: string | null }>) {
   let label: string;
-  if (isLoading) label = 'Thinking...';
+  if (isLoading) label = criticStatus ?? 'Thinking...';
   else if (sessionReady) label = 'Ready';
   else label = 'Connecting…';
-  return <span className="text-xs text-muted-foreground shrink-0">{label}</span>;
+  return (
+    <span
+      data-testid="chat-status-label"
+      className="text-xs text-muted-foreground shrink-0"
+    >
+      {label}
+    </span>
+  );
 }
 
 function AssistantContent({
@@ -77,6 +90,7 @@ function AssistantContent({
   activeFile,
   onApplyCode,
   onCreateFile,
+  criticEvents,
 }: Readonly<{
   message: UIMessage;
   awaiting: boolean;
@@ -84,18 +98,29 @@ function AssistantContent({
   activeFile: { path: string; name: string } | null;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  criticEvents?: readonly CriticEvent[];
 }>) {
-  if (awaiting) return <StreamingAssistantPlaceholder />;
+  if (awaiting) {
+    return (
+      <>
+        {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
+        <StreamingAssistantPlaceholder />
+      </>
+    );
+  }
   const allFiles = activeFile && !contextFiles.some((f) => f.path === activeFile.path)
     ? [...contextFiles, { path: activeFile.path, name: activeFile.name }]
     : [...contextFiles];
   return (
-    <IDEMarkdown
-      content={getMessageText(message)}
-      contextFiles={allFiles}
-      onApplyCode={onApplyCode}
-      onCreateFile={onCreateFile}
-    />
+    <>
+      {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
+      <IDEMarkdown
+        content={getMessageText(message)}
+        contextFiles={allFiles}
+        onApplyCode={onApplyCode}
+        onCreateFile={onCreateFile}
+      />
+    </>
   );
 }
 
@@ -582,6 +607,7 @@ function ChatPanel({
   selectedAgentId,
   onAgentChange,
   sessionReady,
+  criticEventsByMessage,
 }: Readonly<{
   messages: UIMessage[];
   isLoading: boolean;
@@ -599,12 +625,19 @@ function ChatPanel({
   selectedAgentId: string | null;
   onAgentChange: (id: string) => void;
   sessionReady: boolean;
+  criticEventsByMessage: Record<string, CriticEvent[]>;
 }>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+  const lastCriticEvent = lastAssistant
+    ? criticEventsByMessage[lastAssistant.id]?.at(-1)
+    : undefined;
+  const criticStatus = lastCriticEvent ? formatCriticStatus(lastCriticEvent) : null;
 
   return (
     <div className="flex flex-col h-full border-l border-border">
@@ -617,7 +650,7 @@ function ChatPanel({
             onSelect={onAgentChange}
             disabled={isLoading}
           />
-          <StatusLabel isLoading={isLoading} sessionReady={sessionReady} />
+          <StatusLabel isLoading={isLoading} sessionReady={sessionReady} criticStatus={criticStatus} />
         </div>
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary shrink-0" />
@@ -674,6 +707,7 @@ function ChatPanel({
                         activeFile={activeFile ?? null}
                         onApplyCode={onApplyCode}
                         onCreateFile={onCreateFile}
+                        criticEvents={criticEventsByMessage[message.id]}
                       />
                     )}
                   </div>
@@ -872,7 +906,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     return files;
   }, [contextFiles, activeFile]);
 
-  const { messages, sendMessage, status, error: harnessError, setError: setHarnessError } =
+  const { messages, sendMessage, status, error: harnessError, setError: setHarnessError, criticEventsByMessage } =
     useHarnessChat(sessionId);
 
   useEffect(() => {
@@ -1354,6 +1388,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 selectedAgentId={selectedAgentId}
                 onAgentChange={setSelectedAgentId}
                 sessionReady={Boolean(sessionId)}
+                criticEventsByMessage={criticEventsByMessage}
               />
             </ResizablePanel>
           </>
