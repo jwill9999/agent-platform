@@ -22,7 +22,15 @@ export default function HomePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
-  const { messages, sendMessage, status, error, setError } = useHarnessChat(sessionId, isResuming);
+  const {
+    messages,
+    sendMessage,
+    status,
+    error,
+    setError,
+    criticEventsByMessage,
+    thinkingByMessage,
+  } = useHarnessChat(sessionId, isResuming);
   const { sessions, loading: sessionsLoading, refresh: refreshSessions } = useSessions();
   const {
     attachments,
@@ -188,6 +196,8 @@ export default function HomePage() {
             onRemoveAttachment={removeAttachment}
             onClearAttachments={clearAttachments}
             attachmentWarnings={attachmentWarnings}
+            criticEventsByMessage={criticEventsByMessage}
+            thinkingByMessage={thinkingByMessage}
           />
         </div>
       </div>

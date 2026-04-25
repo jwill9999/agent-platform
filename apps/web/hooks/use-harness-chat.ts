@@ -308,5 +308,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     [sessionId, updateAssistantMessage, appendCriticEvent, appendThinking],
   );
 
-  return { messages, sendMessage, status, error, setError, criticEventsByMessage, thinkingByMessage };
+  return {
+    messages,
+    sendMessage,
+    status,
+    error,
+    setError,
+    criticEventsByMessage,
+    thinkingByMessage,
+  };
 }

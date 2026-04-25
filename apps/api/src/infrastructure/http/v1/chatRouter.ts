@@ -180,6 +180,34 @@ function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
   return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
 }
 
+/**
+ * Sanitise replayed history so that no `role:'tool'` message appears without
+ * a preceding assistant message that carries the matching `tool_calls`.
+ *
+ * We do not currently persist assistant `toolCalls` (no DB column), so on
+ * replay every persisted tool message would be orphaned and the OpenAI API
+ * rejects the conversation with:
+ *   "messages with role 'tool' must be a response to a preceding message with 'tool_calls'"
+ *
+ * Until full round-tripping is added (see beads agent-platform-361), strip
+ * tool rows whose preceding assistant message has no `toolCalls`.
+ */
+function stripOrphanToolMessages(history: ChatMessage[]): ChatMessage[] {
+  const cleaned: ChatMessage[] = [];
+  for (const msg of history) {
+    if (msg.role === 'tool') {
+      const prev = cleaned.at(-1);
+      const hasMatchingCall =
+        prev?.role === 'assistant' &&
+        Array.isArray(prev.toolCalls) &&
+        prev.toolCalls.some((c) => c.id === msg.toolCallId);
+      if (!hasMatchingCall) continue;
+    }
+    cleaned.push(msg);
+  }
+  return cleaned;
+}
+
 /** Persist only the new assistant/tool messages the graph appended. */
 function persistNewMessages(
   db: DrizzleDb,
@@ -461,7 +489,7 @@ function buildConversationMessages(
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
 
-    const history = priorMessages.map(dbRecordToChatMessage);
+    const history = stripOrphanToolMessages(priorMessages.map(dbRecordToChatMessage));
     const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
     const counter = createApproximateCounter();
 
