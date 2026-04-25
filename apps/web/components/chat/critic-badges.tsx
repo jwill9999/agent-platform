@@ -5,6 +5,19 @@ import { Check, RefreshCw, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatCriticBadgeLabel, type CriticEvent } from '@/lib/critic-events';
 
+/**
+ * Returns only the final accept event from the critic events array, or null if none.
+ * Suppresses cap_reached and revise events from display.
+ */
+function getFinalAcceptEvent(events: readonly CriticEvent[]): CriticEvent | null {
+  // Find the last accept event (if any)
+  for (let i = events.length - 1; i >= 0; --i) {
+    const ev = events[i];
+    if (ev && ev.kind === 'accept') return ev;
+  }
+  return null;
+}
+
 interface CriticBadgeProps {
   readonly event: CriticEvent;
 }
@@ -53,16 +66,30 @@ export function CriticBadge({ event }: CriticBadgeProps) {
 }
 
 export function CriticBadges({ events }: CriticBadgesProps) {
-  if (events.length === 0) return null;
+  const finalAccept = getFinalAcceptEvent(events);
+  if (!finalAccept) return null;
   return (
     <div
       data-testid="critic-badges"
       className="mb-2 flex flex-wrap gap-1.5"
-      aria-label="Critic iterations"
+      aria-label="Critic review"
     >
-      {events.map((ev, i) => (
-        <CriticBadge key={`${ev.kind}-${ev.iteration ?? i}-${i}`} event={ev} />
-      ))}
+      <CriticBadge key={`accept-${finalAccept.iteration ?? 0}`} event={finalAccept} />
+    </div>
+  );
+}
+
+/**
+ * CriticReviewBlock: renders the critic review summary and score (if present) from the final accept event.
+ */
+export function CriticReviewBlock({ event }: { readonly event: CriticEvent }) {
+  if (!event || event.kind !== 'accept') return null;
+  return (
+    <div className="mb-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3">
+      <div className="font-semibold text-emerald-900 dark:text-emerald-200 mb-1">Critic Review</div>
+      {event.reasons?.length && (
+        <div className="text-sm text-emerald-900 dark:text-emerald-200">{event.reasons}</div>
+      )}
     </div>
   );
 }

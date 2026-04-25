@@ -4,11 +4,18 @@ import { cn } from '@/lib/cn';
 import { User, Sparkles, Paperclip } from 'lucide-react';
 import type { UIMessage } from 'ai';
 import { Markdown } from './markdown';
+import { CriticBadges, CriticReviewBlock } from './critic-badges';
+import { ThinkingBlock } from './thinking-block';
+import type { CriticEvent } from '@/lib/critic-events';
 
 interface MessageProps {
   message: UIMessage;
   /** True while this assistant bubble is waiting for the first streamed token. */
   isAwaitingStreamContent?: boolean;
+  /** Critic lifecycle events emitted for this assistant message (if any). */
+  criticEvents?: readonly CriticEvent[];
+  /** Aggregated thinking-channel text for this assistant message (if any). */
+  thinking?: string;
 }
 
 export function getMessageText(message: UIMessage): string {
@@ -35,10 +42,25 @@ function countContextFiles(content: string): number {
   return matches?.length ?? 0;
 }
 
-export function Message({ message, isAwaitingStreamContent = false }: Readonly<MessageProps>) {
+export function Message({
+  message,
+  isAwaitingStreamContent = false,
+  criticEvents,
+  thinking,
+}: Readonly<MessageProps>) {
   const isUser = message.role === 'user';
   const text = getMessageText(message);
   const contextFileCount = isUser ? countContextFiles(message.content) : 0;
+  const hasCritic = !isUser && criticEvents && criticEvents.length > 0;
+  // Find the final accept event for review block
+  const finalAccept =
+    hasCritic && criticEvents
+      ? criticEvents
+          .slice()
+          .reverse()
+          .find((ev) => ev.kind === 'accept')
+      : null;
+  const hasThinking = !isUser && Boolean(thinking?.trim());
 
   return (
     <div className={cn('flex gap-3 py-6', isUser ? 'justify-end' : 'justify-start')}>
@@ -57,20 +79,23 @@ export function Message({ message, isAwaitingStreamContent = false }: Readonly<M
               : 'bg-card border border-border rounded-bl-md',
           )}
         >
-          {!text && isUser && (
-            <p className="text-sm text-muted-foreground italic">Empty message</p>
+          {/* Show critic review block if final accept event exists */}
+          {finalAccept && <CriticReviewBlock event={finalAccept} />}
+          {/* Show badges only if no accept event (e.g., in-progress) */}
+          {hasCritic && !finalAccept && <CriticBadges events={criticEvents} />}
+          {hasThinking && (
+            <ThinkingBlock content={thinking ?? ''} defaultOpen={isAwaitingStreamContent} />
           )}
+          {!text && isUser && <p className="text-sm text-muted-foreground italic">Empty message</p>}
           {!text && !isUser && isAwaitingStreamContent && (
             <span className="sr-only" aria-busy="true" aria-live="polite">
               Assistant is responding
             </span>
           )}
-          {!text && !isUser && !isAwaitingStreamContent && (
+          {!text && !isUser && !isAwaitingStreamContent && !hasThinking && !hasCritic && (
             <p className="text-sm text-muted-foreground italic">No content</p>
           )}
-          {text && isUser && (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
-          )}
+          {text && isUser && <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>}
           {text && !isUser && <Markdown content={text} />}
         </div>
         {contextFileCount > 0 && (
