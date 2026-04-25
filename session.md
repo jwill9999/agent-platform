@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-25
-- **Session:** `agent-platform-btm` shipped on `task/agent-platform-btm` (commit `a7ffa9a`). Surfaces critic iterations as distinct chat-UI badges + drives StatusLabel from latest critic event.
+- **Session:** `agent-platform-btm` shipped + PR #84 opened. PR review comment addressed in commit `0abddbe` (centralised critic label formatting). Push deferred — sandbox SSH blocked.
 
 ---
 
