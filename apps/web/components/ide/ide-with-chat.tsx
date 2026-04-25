@@ -40,11 +40,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from '@/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { cn } from '@/lib/cn';
 import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
@@ -74,10 +70,7 @@ function StatusLabel({
   else if (sessionReady) label = 'Ready';
   else label = 'Connecting…';
   return (
-    <span
-      data-testid="chat-status-label"
-      className="text-xs text-muted-foreground shrink-0"
-    >
+    <span data-testid="chat-status-label" className="text-xs text-muted-foreground shrink-0">
       {label}
     </span>
   );
@@ -108,9 +101,10 @@ function AssistantContent({
       </>
     );
   }
-  const allFiles = activeFile && !contextFiles.some((f) => f.path === activeFile.path)
-    ? [...contextFiles, { path: activeFile.path, name: activeFile.name }]
-    : [...contextFiles];
+  const allFiles =
+    activeFile && !contextFiles.some((f) => f.path === activeFile.path)
+      ? [...contextFiles, { path: activeFile.path, name: activeFile.name }]
+      : [...contextFiles];
   return (
     <>
       {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
@@ -650,7 +644,11 @@ function ChatPanel({
             onSelect={onAgentChange}
             disabled={isLoading}
           />
-          <StatusLabel isLoading={isLoading} sessionReady={sessionReady} criticStatus={criticStatus} />
+          <StatusLabel
+            isLoading={isLoading}
+            sessionReady={sessionReady}
+            criticStatus={criticStatus}
+          />
         </div>
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary shrink-0" />
@@ -665,9 +663,7 @@ function ChatPanel({
             <div className="text-center py-8">
               <Sparkles className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground mb-2">Ask about your code</p>
-              <p className="text-xs text-muted-foreground">
-                The assistant can see your open file
-              </p>
+              <p className="text-xs text-muted-foreground">The assistant can see your open file</p>
             </div>
           ) : (
             messages.map((message, index) => {
@@ -823,8 +819,7 @@ function ContextActionButtons({
   onAddToContext: (tab: OpenTab) => void;
   onClearContext: () => void;
 }>) {
-  const showPinButton =
-    activeFile && !contextFiles.some((f) => f.path === activeFile.path);
+  const showPinButton = activeFile && !contextFiles.some((f) => f.path === activeFile.path);
   const showClearButton = contextFiles.length > 0;
 
   if (!showPinButton && !showClearButton) return null;
@@ -906,8 +901,14 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     return files;
   }, [contextFiles, activeFile]);
 
-  const { messages, sendMessage, status, error: harnessError, setError: setHarnessError, criticEventsByMessage } =
-    useHarnessChat(sessionId);
+  const {
+    messages,
+    sendMessage,
+    status,
+    error: harnessError,
+    setError: setHarnessError,
+    criticEventsByMessage,
+  } = useHarnessChat(sessionId);
 
   useEffect(() => {
     void (async () => {
@@ -1245,7 +1246,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         <span className="hidden sm:inline">Collapse</span>
                       </Button>
                     )}
-                    {fs.isLoading && <span className="text-xs animate-pulse normal-case tracking-normal">Loading…</span>}
+                    {fs.isLoading && (
+                      <span className="text-xs animate-pulse normal-case tracking-normal">
+                        Loading…
+                      </span>
+                    )}
                   </div>
                 </div>
                 {fs.needsFolderReconnect && (
@@ -1270,31 +1275,27 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     </Button>
                   </div>
                 )}
-                {fs.error && (
-                  <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>
-                )}
+                {fs.error && <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>}
                 <ScrollArea className="flex-1">
                   <div className="pb-4">
                     {filteredFileTree.length === 0 &&
                       !fs.isLoading &&
                       !fs.isDirectoryOpen &&
                       !fs.needsFolderReconnect && (
-                      <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
-                        <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
-                        <p className="text-sm text-muted-foreground">
-                          No folder open
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={fs.openDirectory}
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                          Open Folder
-                        </Button>
-                      </div>
-                    )}
+                        <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
+                          <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
+                          <p className="text-sm text-muted-foreground">No folder open</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={fs.openDirectory}
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                            Open Folder
+                          </Button>
+                        </div>
+                      )}
                     {filteredFileTree.length === 0 &&
                       !fs.isLoading &&
                       fs.isDirectoryOpen &&
