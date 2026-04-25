@@ -25,3 +25,4 @@ Read that file first. The sections it covers:
 - The SonarQube MCP is the preferred analyser; see `.github/instructions/sonarqube_mcp.instructions.md` for the tool-call rules.
 - Prefer Problems + terminal quality commands as the authoritative fallback when MCP is unavailable.
 - Never claim done if the completion-gate status is failed.
+- For frontend or UI work validation, first run `make restart`, confirm containers rebuilt successfully, then run Playwright user-flow actions to verify the UI is working as expected.
