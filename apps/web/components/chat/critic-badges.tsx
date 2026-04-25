@@ -12,8 +12,7 @@ import { formatCriticBadgeLabel, type CriticEvent } from '@/lib/critic-events';
 function getFinalAcceptEvent(events: readonly CriticEvent[]): CriticEvent | null {
   // Find the last accept event (if any)
   for (let i = events.length - 1; i >= 0; --i) {
-    const ev = events[i];
-    if (ev && ev.kind === 'accept') return ev;
+    if (events[i]?.kind === 'accept') return events[i]!;
   }
   return null;
 }
@@ -87,7 +86,7 @@ export function CriticReviewBlock({ event }: { readonly event: CriticEvent }) {
   return (
     <div className="mb-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3">
       <div className="font-semibold text-emerald-900 dark:text-emerald-200 mb-1">Critic Review</div>
-      {event.reasons?.length && (
+      {Boolean(event.reasons && event.reasons.length > 0) && (
         <div className="text-sm text-emerald-900 dark:text-emerald-200">{event.reasons}</div>
       )}
     </div>
