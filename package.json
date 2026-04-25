@@ -17,6 +17,9 @@
     "seed": "pnpm --filter @agent-platform/db run seed",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:install": "playwright install --with-deps chromium",
+    "docs:lint": "pnpm docs:lint:md && pnpm docs:lint:links",
+    "docs:lint:md": "markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#**/node_modules\" \"#dist\" \"#**/dist\" \"#.next\" \"#**/.next\" \"#coverage\" \"#**/coverage\" \"#test-results\" \"#data\" \"#packages/db/drizzle\"",
+    "docs:lint:links": "node scripts/check-doc-links.mjs",
     "prepare": "husky",
     "postinstall": "node scripts/fix-node-pty-helpers.mjs"
   },
@@ -30,6 +33,7 @@
     "eslint": "^9.16.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "markdownlint-cli2": "^0.14.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.0"
