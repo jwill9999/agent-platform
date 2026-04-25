@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import type { MessageRecord } from '@agent-platform/contracts';
 import { apiGet, apiPath } from '@/lib/apiClient';
+import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
+
+export type { CriticEvent } from '@/lib/critic-events';
 
 function makeTextParts(text: string): NonNullable<UIMessage['parts']> {
   return [{ type: 'text', text }];
@@ -68,9 +71,12 @@ function extractTextDelta(o: StreamEvent): string {
   return '';
 }
 
-function renderErrorEvent(o: StreamEvent): { text: string } | { error: string } | null {
+function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.message !== 'string') return null;
   const code = o.code;
+  if (code === 'CRITIC_CAP_REACHED') {
+    return { critic: { kind: 'cap_reached', reasons: o.message } };
+  }
   const isToolError =
     typeof code === 'string' &&
     (code.startsWith('TOOL_') || code.startsWith('MCP_') || code.startsWith('NATIVE_'));
@@ -78,12 +84,26 @@ function renderErrorEvent(o: StreamEvent): { text: string } | { error: string } 
   return { error: o.message };
 }
 
-function renderStreamEvent(o: StreamEvent): { text: string } | { error: string } | null {
+type StreamRenderResult =
+  | { text: string }
+  | { error: string }
+  | { critic: CriticEvent }
+  | { thinking: string }
+  | null;
+
+function renderThinkingEvent(o: StreamEvent): StreamRenderResult {
+  if (typeof o.content !== 'string') return null;
+  const critic = parseCriticContent(o.content);
+  if (critic) return { critic };
+  return { thinking: o.content };
+}
+
+function renderStreamEvent(o: StreamEvent): StreamRenderResult {
   switch (o.type) {
     case 'text':
       return { text: extractTextDelta(o) };
     case 'thinking':
-      return typeof o.content === 'string' ? { text: o.content } : null;
+      return renderThinkingEvent(o);
     case 'code': {
       if (typeof o.content !== 'string') return null;
       const lang = typeof o.language === 'string' ? o.language : '';
@@ -121,6 +141,8 @@ async function readNdjsonStream(
   body: ReadableStream<Uint8Array>,
   onText: (chunk: string) => void,
   onError: (msg: string) => void,
+  onCritic: (event: CriticEvent) => void,
+  onThinking: (chunk: string) => void,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -132,6 +154,8 @@ async function readNdjsonStream(
     const result = renderStreamEvent(ev);
     if (!result) return;
     if ('text' in result) onText(result.text);
+    else if ('thinking' in result) onThinking(result.thinking);
+    else if ('critic' in result) onCritic(result.critic);
     else onError(result.error);
   };
 
@@ -160,6 +184,10 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [status, setStatus] = useState<'ready' | 'streaming'>('ready');
   const [error, setError] = useState<string | null>(null);
+  const [criticEventsByMessage, setCriticEventsByMessage] = useState<Record<string, CriticEvent[]>>(
+    {},
+  );
+  const [thinkingByMessage, setThinkingByMessage] = useState<Record<string, string>>({});
   const resumeRef = useRef(resume);
   resumeRef.current = resume;
 
@@ -167,10 +195,14 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     setError(null);
     if (!sessionId) {
       setMessages([]);
+      setCriticEventsByMessage({});
+      setThinkingByMessage({});
       return;
     }
     if (!resumeRef.current) {
       setMessages([]);
+      setCriticEventsByMessage({});
+      setThinkingByMessage({});
       return;
     }
 
@@ -198,6 +230,18 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   // Extracted to keep sendMessage's nesting depth within 4 levels (sonar S2004).
   const updateAssistantMessage = useCallback((id: string, text: string) => {
     setMessages((prev) => prev.map((m) => (m.id === id ? uiMessage(id, 'assistant', text) : m)));
+  }, []);
+
+  const appendCriticEvent = useCallback((id: string, event: CriticEvent) => {
+    setCriticEventsByMessage((prev) => {
+      const existing = prev[id] ?? [];
+      return { ...prev, [id]: [...existing, event] };
+    });
+  }, []);
+
+  const appendThinking = useCallback((id: string, chunk: string) => {
+    if (!chunk) return;
+    setThinkingByMessage((prev) => ({ ...prev, [id]: (prev[id] ?? '') + chunk }));
   }, []);
 
   const sendMessage = useCallback(
@@ -239,16 +283,38 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
             updateAssistantMessage(assistantId, accumulated);
           },
           (msg) => setError(msg),
+          (event) => appendCriticEvent(assistantId, event),
+          (chunk) => appendThinking(assistantId, chunk),
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        setCriticEventsByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
+        setThinkingByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
       } finally {
         setStatus('ready');
       }
     },
-    [sessionId, updateAssistantMessage],
+    [sessionId, updateAssistantMessage, appendCriticEvent, appendThinking],
   );
 
-  return { messages, sendMessage, status, error, setError };
+  return {
+    messages,
+    sendMessage,
+    status,
+    error,
+    setError,
+    criticEventsByMessage,
+    thinkingByMessage,
+  };
 }

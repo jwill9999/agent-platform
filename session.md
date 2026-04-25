@@ -8,89 +8,59 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-25
-- **Session:** `agent-platform-n6t` shipped on `task/agent-platform-n6t` (commit `156df57`). Last child of Tier 1 epic `agent-platform-d87` — all four children now closed. PR pending.
+- **Session:** `agent-platform-btm` shipped + PR #84 opened. PR review comment addressed in commit `0abddbe` (centralised critic label formatting). Push deferred — sandbox SSH blocked.
 
 ---
 
 ## What happened (this session)
 
-### `agent-platform-n6t` — Docs-as-record CI + ADR pattern + agent-instructions de-dup ✅
+### `agent-platform-btm` — Surface critic iterations visibly in chat UI ✅
 
-Branch `task/agent-platform-n6t` (from `main`), commit `156df57` pushed to `origin`.
+Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ffa9a`.
 
-- **Shared instructions:** `docs/agent-instructions-shared.md` is now the single source of truth (commands, architecture, conventions, env vars, beads/git workflow, completion gate, session protocol).
-- **De-duplication:** `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` reduced to thin wrappers — **582 → 115 lines (80% reduction)**. Beads-integration blocks preserved.
-- **ADR pattern:** `docs/adr/README.md`, `docs/adr/0000-template.md`, `docs/adr/0001-tier1-gap-remediation.md` (records the full Tier 1 epic).
-- **Docs CI:** `.github/workflows/docs-ci.yml` runs `markdownlint-cli2` + `lychee` on PRs touching markdown.
-- **Local gate:** `pnpm docs:lint` chains markdownlint-cli2 with `scripts/check-doc-links.mjs` (Node-based relative-link validator).
-- **Configs:** `.markdownlint-cli2.jsonc` (strict, ignores historical task/review/planning docs), `lychee.toml` (CI link config).
-- **decisions.md:** linked ADR-0001 + Tier 1 epic landing entry.
-- Quality: `pnpm typecheck` ✅, `pnpm lint` ✅, `pnpm docs:lint` ✅ (0 errors across 22 docs).
-
-### Tier 1 epic `agent-platform-d87` complete ✅
-
-All four children merged: `7ga` (critic/evaluator) · `fc8` (DoD contract) · `2v6` (observability tools) · `n6t` (docs CI + ADR). Architectural record at `docs/adr/0001-tier1-gap-remediation.md`.
-
-### `agent-platform-2v6` merged to `main` ✅ (earlier in session)
-
-PR #82 (`task/agent-platform-2v6` → `main`) merged at commit `aa935b6`. Landed:
-
-- `query_logs`, `query_recent_errors`, `inspect_trace` native tools in `packages/harness/src/tools/observabilityTools.ts`
-- Risk-tier 0, session-jailed via closure-bound `sessionId`
-- Schemas added to `packages/contracts`
-- Wired into harness `toolDispatch` with audit logging
-- `plugin-observability` log/trace store backing the tools
-- Tests: harness, plugin-observability, and apps/api integration suites all green
-
-### Review-fix follow-up commit `919ab9b`
-
-Pre-merge cleanup addressed all 7 PR review threads:
-
-- Replaced `window[0]!` non-null assertion in `buildGraph.ts` loop detection with explicit guard
-- Tightened OpenAPI / contracts shapes
-- Strengthened observability store and DoD checks
-- Sonar: 0 findings on touched files; typecheck/lint/tests all passed
+- **Parser:** new `apps/web/lib/critic-events.ts` — `parseCriticContent()` recognises the harness critic node's `thinking` content shapes (`Critic: revise (n/cap) - …`, `Critic: accept on first pass - …`, `Critic: accept after N revision(s) - …`) and returns structured `CriticEvent` (`revise` / `accept` / `cap_reached`). Also `formatCriticStatus()` for the header.
+- **Hook:** `useHarnessChat` now intercepts critic `thinking` events (and `error` with `code === 'CRITIC_CAP_REACHED'`) so they no longer stream into the assistant text. Tracks them per assistant message id and exposes `criticEventsByMessage`.
+- **Component:** new `apps/web/components/chat/critic-badges.tsx` renders chips with distinct colour + icon per state (revise=amber/RefreshCw, accept=emerald/Check, cap_reached=red/AlertTriangle). Reasons surface via `title` tooltip.
+- **Layout:** `AssistantContent` renders `CriticBadges` above markdown / streaming placeholder. `StatusLabel` accepts `criticStatus` and uses it instead of the generic “Thinking…” when a critic event has been received for the active turn.
+- **Tests:** `apps/web/test/critic-events.test.ts` covers parser (revise / accept variants / missing reasons / non-critic discrimination) and status formatter.
+- **Quality:** typecheck ✅, web lint ✅, web tests (29) ✅, full `pnpm -r run test` ✅, Sonar (touched files) 0 findings.
+- **Scope discipline:** zero changes to NDJSON contract / harness public API.
 
 ### Beads
 
-- `agent-platform-2v6` closed locally (dolt remote push deferred — sandbox SSH blocked)
+- `agent-platform-btm` claimed (`in_progress`); will close after commit lands. Remote dolt push deferred (sandbox SSH blocked, same as previous sessions).
 
 ## Current state
 
 ### Git
 
-- **`main`** — `aa935b6` Merge PR #82 (agent-platform-2v6)
-- **`task/agent-platform-n6t`** — `156df57` (pushed to origin, PR pending: <https://github.com/jwill9999/agent-platform/pull/new/task/agent-platform-n6t>)
-- Stale branch `task/agent-platform-2v6` still exists locally at `919ab9b` (safe to prune)
+- **`main`** — unchanged from previous session
+- **`task/agent-platform-btm`** — `a7ffa9a` (local; remote push deferred)
 
 ### Quality
 
-- Typecheck ✅ Lint ✅ Tests ✅ Docs lint ✅
-- Sonar (touched files) ✅
+- Typecheck ✅ Lint ✅ Tests ✅ (workspace-wide)
+- Sonar (touched files) ✅ 0 findings
 
 ### Key commits
 
-| Commit    | Branch                    | Description                                                |
-| --------- | ------------------------- | ---------------------------------------------------------- |
-| `156df57` | `task/agent-platform-n6t` | feat(docs): docs-as-record CI + ADR pattern + agent-de-dup |
-| `aa935b6` | `main`                    | Merge PR #82 — agent-queryable observability tools         |
-| `919ab9b` | (PR)                      | fix: address PR review follow-up (Sonar + types + DoD)     |
+| Commit    | Branch                    | Description                                      |
+| --------- | ------------------------- | ------------------------------------------------ |
+| `a7ffa9a` | `task/agent-platform-btm` | feat(web): critic iteration badges + live status |
 
 ---
 
 ## Next (priority order)
 
-1. **Open PR for `task/agent-platform-n6t`** — target `main` (per recent practice; epic `d87` was run as direct-to-main per child rather than feature-branch chain)
-2. **Sync beads** — `bd dolt push` next time network is available; closes `n6t` and `d87` on the remote
-3. **Prune merged branches** — `git branch -d task/agent-platform-2v6` after dolt sync; `task/agent-platform-n6t` after its PR merges
-4. **Pick next bd-ready task:**
-   - `agent-platform-btm` (P2) — Surface critic iterations visibly in chat UI
+1. **Open PR for `task/agent-platform-btm`** → `main` once network available
+2. **Close `agent-platform-btm` in beads** + dolt push when network available
+3. **Pick next bd-ready task** (`bd ready`)
 
 ---
 
 ## Blockers / questions for owner
 
-- No functional blocker in code. The only caveat is environmental: full API tests require unsandboxed execution because they bind a local port.
+- Sandbox SSH is blocked, so dolt remote push and `git push` cannot run from this session.
 
 ---
 

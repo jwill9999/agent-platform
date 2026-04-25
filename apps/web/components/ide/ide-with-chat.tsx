@@ -40,15 +40,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from '@/components/ui/resizable';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { cn } from '@/lib/cn';
 import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
-import { StreamingAssistantPlaceholder } from '@/components/chat/streaming-placeholder';
 import { Terminal } from '@/components/ide/terminal';
 import { useFileSystem } from '@/hooks/use-file-system';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
@@ -57,17 +52,28 @@ import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgent } from '@/lib/default-agent';
 import { formatFileContext, sanitiseFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
+import { CriticBadges } from '@/components/chat/critic-badges';
+import { ThinkingBlock } from '@/components/chat/thinking-block';
+import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
 
 // ---------------------------------------------------------------------------
 // Small presentational components
 // ---------------------------------------------------------------------------
 
-function StatusLabel({ isLoading, sessionReady }: Readonly<{ isLoading: boolean; sessionReady: boolean }>) {
+function StatusLabel({
+  isLoading,
+  sessionReady,
+  criticStatus,
+}: Readonly<{ isLoading: boolean; sessionReady: boolean; criticStatus?: string | null }>) {
   let label: string;
-  if (isLoading) label = 'Thinking...';
+  if (isLoading) label = criticStatus ?? 'Thinking...';
   else if (sessionReady) label = 'Ready';
   else label = 'Connecting…';
-  return <span className="text-xs text-muted-foreground shrink-0">{label}</span>;
+  return (
+    <span data-testid="chat-status-label" className="text-xs text-muted-foreground shrink-0">
+      {label}
+    </span>
+  );
 }
 
 function AssistantContent({
@@ -77,6 +83,8 @@ function AssistantContent({
   activeFile,
   onApplyCode,
   onCreateFile,
+  criticEvents,
+  thinking,
 }: Readonly<{
   message: UIMessage;
   awaiting: boolean;
@@ -84,18 +92,35 @@ function AssistantContent({
   activeFile: { path: string; name: string } | null;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  criticEvents?: readonly CriticEvent[];
+  thinking?: string;
 }>) {
-  if (awaiting) return <StreamingAssistantPlaceholder />;
-  const allFiles = activeFile && !contextFiles.some((f) => f.path === activeFile.path)
-    ? [...contextFiles, { path: activeFile.path, name: activeFile.name }]
-    : [...contextFiles];
+  if (awaiting) {
+    return (
+      <>
+        {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
+        {thinking ? <ThinkingBlock content={thinking} defaultOpen /> : null}
+        <span className="sr-only" aria-busy="true" aria-live="polite">
+          Assistant is responding
+        </span>
+      </>
+    );
+  }
+  const allFiles =
+    activeFile && !contextFiles.some((f) => f.path === activeFile.path)
+      ? [...contextFiles, { path: activeFile.path, name: activeFile.name }]
+      : [...contextFiles];
   return (
-    <IDEMarkdown
-      content={getMessageText(message)}
-      contextFiles={allFiles}
-      onApplyCode={onApplyCode}
-      onCreateFile={onCreateFile}
-    />
+    <>
+      {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
+      {thinking ? <ThinkingBlock content={thinking} /> : null}
+      <IDEMarkdown
+        content={getMessageText(message)}
+        contextFiles={allFiles}
+        onApplyCode={onApplyCode}
+        onCreateFile={onCreateFile}
+      />
+    </>
   );
 }
 
@@ -582,6 +607,8 @@ function ChatPanel({
   selectedAgentId,
   onAgentChange,
   sessionReady,
+  criticEventsByMessage,
+  thinkingByMessage,
 }: Readonly<{
   messages: UIMessage[];
   isLoading: boolean;
@@ -599,12 +626,20 @@ function ChatPanel({
   selectedAgentId: string | null;
   onAgentChange: (id: string) => void;
   sessionReady: boolean;
+  criticEventsByMessage: Record<string, CriticEvent[]>;
+  thinkingByMessage: Record<string, string>;
 }>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+  const lastCriticEvent = lastAssistant
+    ? criticEventsByMessage[lastAssistant.id]?.at(-1)
+    : undefined;
+  const criticStatus = lastCriticEvent ? formatCriticStatus(lastCriticEvent) : null;
 
   return (
     <div className="flex flex-col h-full border-l border-border">
@@ -617,7 +652,11 @@ function ChatPanel({
             onSelect={onAgentChange}
             disabled={isLoading}
           />
-          <StatusLabel isLoading={isLoading} sessionReady={sessionReady} />
+          <StatusLabel
+            isLoading={isLoading}
+            sessionReady={sessionReady}
+            criticStatus={criticStatus}
+          />
         </div>
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary shrink-0" />
@@ -632,9 +671,7 @@ function ChatPanel({
             <div className="text-center py-8">
               <Sparkles className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground mb-2">Ask about your code</p>
-              <p className="text-xs text-muted-foreground">
-                The assistant can see your open file
-              </p>
+              <p className="text-xs text-muted-foreground">The assistant can see your open file</p>
             </div>
           ) : (
             messages.map((message, index) => {
@@ -674,6 +711,8 @@ function ChatPanel({
                         activeFile={activeFile ?? null}
                         onApplyCode={onApplyCode}
                         onCreateFile={onCreateFile}
+                        criticEvents={criticEventsByMessage[message.id]}
+                        thinking={thinkingByMessage[message.id]}
                       />
                     )}
                   </div>
@@ -789,8 +828,7 @@ function ContextActionButtons({
   onAddToContext: (tab: OpenTab) => void;
   onClearContext: () => void;
 }>) {
-  const showPinButton =
-    activeFile && !contextFiles.some((f) => f.path === activeFile.path);
+  const showPinButton = activeFile && !contextFiles.some((f) => f.path === activeFile.path);
   const showClearButton = contextFiles.length > 0;
 
   if (!showPinButton && !showClearButton) return null;
@@ -872,8 +910,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     return files;
   }, [contextFiles, activeFile]);
 
-  const { messages, sendMessage, status, error: harnessError, setError: setHarnessError } =
-    useHarnessChat(sessionId);
+  const {
+    messages,
+    sendMessage,
+    status,
+    error: harnessError,
+    setError: setHarnessError,
+    criticEventsByMessage,
+    thinkingByMessage,
+  } = useHarnessChat(sessionId);
 
   useEffect(() => {
     void (async () => {
@@ -1211,7 +1256,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         <span className="hidden sm:inline">Collapse</span>
                       </Button>
                     )}
-                    {fs.isLoading && <span className="text-xs animate-pulse normal-case tracking-normal">Loading…</span>}
+                    {fs.isLoading && (
+                      <span className="text-xs animate-pulse normal-case tracking-normal">
+                        Loading…
+                      </span>
+                    )}
                   </div>
                 </div>
                 {fs.needsFolderReconnect && (
@@ -1236,31 +1285,27 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     </Button>
                   </div>
                 )}
-                {fs.error && (
-                  <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>
-                )}
+                {fs.error && <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>}
                 <ScrollArea className="flex-1">
                   <div className="pb-4">
                     {filteredFileTree.length === 0 &&
                       !fs.isLoading &&
                       !fs.isDirectoryOpen &&
                       !fs.needsFolderReconnect && (
-                      <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
-                        <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
-                        <p className="text-sm text-muted-foreground">
-                          No folder open
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={fs.openDirectory}
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                          Open Folder
-                        </Button>
-                      </div>
-                    )}
+                        <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
+                          <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
+                          <p className="text-sm text-muted-foreground">No folder open</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={fs.openDirectory}
+                          >
+                            <FolderOpen className="h-4 w-4" />
+                            Open Folder
+                          </Button>
+                        </div>
+                      )}
                     {filteredFileTree.length === 0 &&
                       !fs.isLoading &&
                       fs.isDirectoryOpen &&
@@ -1354,6 +1399,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 selectedAgentId={selectedAgentId}
                 onAgentChange={setSelectedAgentId}
                 sessionReady={Boolean(sessionId)}
+                criticEventsByMessage={criticEventsByMessage}
+                thinkingByMessage={thinkingByMessage}
               />
             </ResizablePanel>
           </>

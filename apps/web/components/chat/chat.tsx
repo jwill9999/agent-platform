@@ -6,6 +6,7 @@ import { Sparkles } from 'lucide-react';
 import { Message, getMessageText } from './message';
 import { ChatInput } from './chat-input';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
+import type { CriticEvent } from '@/lib/critic-events';
 
 export interface ChatProps {
   messages: UIMessage[];
@@ -23,6 +24,10 @@ export interface ChatProps {
   onClearAttachments?: () => void;
   /** Sanitisation warnings from file validation. */
   attachmentWarnings?: string[];
+  /** Critic lifecycle events keyed by assistant message id. */
+  criticEventsByMessage?: Record<string, readonly CriticEvent[]>;
+  /** Aggregated thinking-channel text keyed by assistant message id. */
+  thinkingByMessage?: Record<string, string>;
 }
 
 export function Chat({
@@ -35,6 +40,8 @@ export function Chat({
   onRemoveAttachment,
   onClearAttachments,
   attachmentWarnings,
+  criticEventsByMessage,
+  thinkingByMessage,
 }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +71,12 @@ export function Chat({
                     message.role === 'assistant' &&
                     index === messages.length - 1 &&
                     !getMessageText(message).trim()
+                  }
+                  criticEvents={
+                    message.role === 'assistant' ? criticEventsByMessage?.[message.id] : undefined
+                  }
+                  thinking={
+                    message.role === 'assistant' ? thinkingByMessage?.[message.id] : undefined
                   }
                 />
               ))}
