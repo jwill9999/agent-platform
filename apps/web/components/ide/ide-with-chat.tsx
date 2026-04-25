@@ -44,7 +44,6 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { cn } from '@/lib/cn';
 import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
-import { StreamingAssistantPlaceholder } from '@/components/chat/streaming-placeholder';
 import { Terminal } from '@/components/ide/terminal';
 import { useFileSystem } from '@/hooks/use-file-system';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
@@ -54,6 +53,7 @@ import { pickDefaultAgent } from '@/lib/default-agent';
 import { formatFileContext, sanitiseFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 import { CriticBadges } from '@/components/chat/critic-badges';
+import { ThinkingBlock } from '@/components/chat/thinking-block';
 import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
 
 // ---------------------------------------------------------------------------
@@ -84,6 +84,7 @@ function AssistantContent({
   onApplyCode,
   onCreateFile,
   criticEvents,
+  thinking,
 }: Readonly<{
   message: UIMessage;
   awaiting: boolean;
@@ -92,12 +93,16 @@ function AssistantContent({
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
   criticEvents?: readonly CriticEvent[];
+  thinking?: string;
 }>) {
   if (awaiting) {
     return (
       <>
         {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
-        <StreamingAssistantPlaceholder />
+        {thinking ? <ThinkingBlock content={thinking} defaultOpen /> : null}
+        <span className="sr-only" aria-busy="true" aria-live="polite">
+          Assistant is responding
+        </span>
       </>
     );
   }
@@ -108,6 +113,7 @@ function AssistantContent({
   return (
     <>
       {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
+      {thinking ? <ThinkingBlock content={thinking} /> : null}
       <IDEMarkdown
         content={getMessageText(message)}
         contextFiles={allFiles}
@@ -602,6 +608,7 @@ function ChatPanel({
   onAgentChange,
   sessionReady,
   criticEventsByMessage,
+  thinkingByMessage,
 }: Readonly<{
   messages: UIMessage[];
   isLoading: boolean;
@@ -620,6 +627,7 @@ function ChatPanel({
   onAgentChange: (id: string) => void;
   sessionReady: boolean;
   criticEventsByMessage: Record<string, CriticEvent[]>;
+  thinkingByMessage: Record<string, string>;
 }>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -704,6 +712,7 @@ function ChatPanel({
                         onApplyCode={onApplyCode}
                         onCreateFile={onCreateFile}
                         criticEvents={criticEventsByMessage[message.id]}
+                        thinking={thinkingByMessage[message.id]}
                       />
                     )}
                   </div>
@@ -908,6 +917,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     error: harnessError,
     setError: setHarnessError,
     criticEventsByMessage,
+    thinkingByMessage,
   } = useHarnessChat(sessionId);
 
   useEffect(() => {
@@ -1390,6 +1400,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 onAgentChange={setSelectedAgentId}
                 sessionReady={Boolean(sessionId)}
                 criticEventsByMessage={criticEventsByMessage}
+                thinkingByMessage={thinkingByMessage}
               />
             </ResizablePanel>
           </>

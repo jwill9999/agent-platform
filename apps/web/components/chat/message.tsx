@@ -4,7 +4,6 @@ import { cn } from '@/lib/cn';
 import { User, Sparkles, Paperclip } from 'lucide-react';
 import type { UIMessage } from 'ai';
 import { Markdown } from './markdown';
-import { StreamingAssistantPlaceholder } from './streaming-placeholder';
 
 interface MessageProps {
   message: UIMessage;
@@ -61,7 +60,11 @@ export function Message({ message, isAwaitingStreamContent = false }: Readonly<M
           {!text && isUser && (
             <p className="text-sm text-muted-foreground italic">Empty message</p>
           )}
-          {!text && !isUser && isAwaitingStreamContent && <StreamingAssistantPlaceholder />}
+          {!text && !isUser && isAwaitingStreamContent && (
+            <span className="sr-only" aria-busy="true" aria-live="polite">
+              Assistant is responding
+            </span>
+          )}
           {!text && !isUser && !isAwaitingStreamContent && (
             <p className="text-sm text-muted-foreground italic">No content</p>
           )}

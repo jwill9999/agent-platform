@@ -84,13 +84,18 @@ function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   return { error: o.message };
 }
 
-type StreamRenderResult = { text: string } | { error: string } | { critic: CriticEvent } | null;
+type StreamRenderResult =
+  | { text: string }
+  | { error: string }
+  | { critic: CriticEvent }
+  | { thinking: string }
+  | null;
 
 function renderThinkingEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.content !== 'string') return null;
   const critic = parseCriticContent(o.content);
   if (critic) return { critic };
-  return { text: o.content };
+  return { thinking: o.content };
 }
 
 function renderStreamEvent(o: StreamEvent): StreamRenderResult {
@@ -137,6 +142,7 @@ async function readNdjsonStream(
   onText: (chunk: string) => void,
   onError: (msg: string) => void,
   onCritic: (event: CriticEvent) => void,
+  onThinking: (chunk: string) => void,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -148,6 +154,7 @@ async function readNdjsonStream(
     const result = renderStreamEvent(ev);
     if (!result) return;
     if ('text' in result) onText(result.text);
+    else if ('thinking' in result) onThinking(result.thinking);
     else if ('critic' in result) onCritic(result.critic);
     else onError(result.error);
   };
@@ -180,6 +187,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const [criticEventsByMessage, setCriticEventsByMessage] = useState<Record<string, CriticEvent[]>>(
     {},
   );
+  const [thinkingByMessage, setThinkingByMessage] = useState<Record<string, string>>({});
   const resumeRef = useRef(resume);
   resumeRef.current = resume;
 
@@ -188,11 +196,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     if (!sessionId) {
       setMessages([]);
       setCriticEventsByMessage({});
+      setThinkingByMessage({});
       return;
     }
     if (!resumeRef.current) {
       setMessages([]);
       setCriticEventsByMessage({});
+      setThinkingByMessage({});
       return;
     }
 
@@ -227,6 +237,11 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       const existing = prev[id] ?? [];
       return { ...prev, [id]: [...existing, event] };
     });
+  }, []);
+
+  const appendThinking = useCallback((id: string, chunk: string) => {
+    if (!chunk) return;
+    setThinkingByMessage((prev) => ({ ...prev, [id]: (prev[id] ?? '') + chunk }));
   }, []);
 
   const sendMessage = useCallback(
@@ -269,6 +284,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           },
           (msg) => setError(msg),
           (event) => appendCriticEvent(assistantId, event),
+          (chunk) => appendThinking(assistantId, chunk),
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -279,12 +295,18 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           delete next[assistantId];
           return next;
         });
+        setThinkingByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
       } finally {
         setStatus('ready');
       }
     },
-    [sessionId, updateAssistantMessage, appendCriticEvent],
+    [sessionId, updateAssistantMessage, appendCriticEvent, appendThinking],
   );
 
-  return { messages, sendMessage, status, error, setError, criticEventsByMessage };
+  return { messages, sendMessage, status, error, setError, criticEventsByMessage, thinkingByMessage };
 }
