@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '../components/chat/chat';
 import { ChatAgentSelector } from '../components/chat/chat-agent-selector';
 import { ChatModelSelector } from '../components/chat/chat-model-selector';
-import { SessionHistoryPanel } from '../components/chat/session-history-panel';
+import { SessionDropdown } from '../components/chat/session-dropdown';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
@@ -145,17 +145,6 @@ export default function HomePage() {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Session history panel */}
-      <SessionHistoryPanel
-        sessions={sessions}
-        agents={agents}
-        activeSessionId={sessionId}
-        onSelectSession={handleSelectSession}
-        onNewChatForAgent={handleNewChatForAgent}
-        loading={sessionsLoading}
-      />
-
-      {/* Main chat area */}
       <div className="flex flex-col flex-1 min-h-0 min-w-0">
         {(loadError || sessionError || error) && (
           <div className="shrink-0 z-50 bg-destructive/15 border-b border-destructive/30 text-destructive px-4 py-2 text-sm">
@@ -182,6 +171,16 @@ export default function HomePage() {
             modelConfigs={modelConfigs}
             selectedId={selectedModelConfigId}
             onSelect={setSelectedModelConfigId}
+            disabled={isLoading}
+          />
+          <SessionDropdown
+            sessions={sessions}
+            agents={agents}
+            activeSessionId={sessionId}
+            selectedAgentId={selectedAgentId}
+            onSelectSession={handleSelectSession}
+            onNewChatForAgent={handleNewChatForAgent}
+            loading={sessionsLoading}
             disabled={isLoading}
           />
         </div>

@@ -7,12 +7,25 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-25
-- **Session:** `agent-platform-btm` shipped + PR #84 opened. PR review comment addressed in commit `0abddbe` (centralised critic label formatting). Push deferred — sandbox SSH blocked.
+- **Date:** 2026-04-26
+- **Session:** UI branch-chain workflow active. `feature/agent-platform-ui-ux` created and pushed. `task/agent-platform-ucg` merged into feature. `task/agent-platform-7d1` implemented and pushed.
 
 ---
 
 ## What happened (this session)
+
+### `agent-platform-7d1` — Remove sessions sidebar; move sessions into dropdown ✅
+
+Branch `task/agent-platform-7d1` (from `feature/agent-platform-ui-ux`), commit `7fce8e7`.
+
+- **UI flow:** Removed dedicated left `SessionHistoryPanel` from chat page.
+- **New component:** Added `apps/web/components/chat/session-dropdown.tsx` with grouped session history under a header dropdown button (`Open sessions menu`).
+- **Switching + create:** Dropdown supports selecting existing sessions and creating a new chat with current/selected agent.
+- **Management path:** Dropdown includes `Manage sessions` entry linking to `/settings/sessions`.
+- **Cleanup:** Removed unused component file `apps/web/components/chat/session-history-panel.tsx`.
+- **E2E:** Added test in `e2e/mvp-e2e.spec.ts` validating sessions moved from panel to header dropdown.
+- **Quality:** `pnpm lint` ✅, `pnpm typecheck` ✅, Sonar touched files ✅ (0 findings on page/dropdown/e2e files).
+- **Known unrelated failure:** Existing E2E seed check (`e2e-specialist` missing) still fails in `e2e/mvp-e2e.spec.ts`.
 
 ### `agent-platform-btm` — Surface critic iterations visibly in chat UI ✅
 
@@ -34,13 +47,14 @@ Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ff
 
 ### Git
 
-- **`main`** — unchanged from previous session
-- **`task/agent-platform-btm`** — `a7ffa9a` (local; remote push deferred)
+- **`feature/agent-platform-ui-ux`** — pushed and up to date with origin
+- **`task/agent-platform-7d1`** — pushed (`7fce8e7`) on top of feature branch
 
 ### Quality
 
-- Typecheck ✅ Lint ✅ Tests ✅ (workspace-wide)
-- Sonar (touched files) ✅ 0 findings
+- Typecheck ✅ Lint ✅
+- Playwright feature test coverage added for sessions dropdown move
+- Unrelated seed fixture failure remains in `e2e/mvp-e2e.spec.ts` (`e2e-specialist` missing)
 
 ### Key commits
 
@@ -52,9 +66,9 @@ Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ff
 
 ## Next (priority order)
 
-1. **Open PR for `task/agent-platform-btm`** → `main` once network available
-2. **Close `agent-platform-btm` in beads** + dolt push when network available
-3. **Pick next bd-ready task** (`bd ready`)
+1. **Open PR for `task/agent-platform-7d1`** → `feature/agent-platform-ui-ux`
+2. **Merge and continue chain with next task branch** (`task/agent-platform-de4` or `task/agent-platform-lt6`) from updated feature
+3. **Resolve or isolate unrelated E2E seed fixture failure** in `e2e/mvp-e2e.spec.ts`
 
 ---
 

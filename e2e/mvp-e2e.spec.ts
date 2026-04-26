@@ -40,6 +40,17 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.locator('h2', { hasText: 'AI Studio' })).toBeVisible();
   });
 
+  test('sessions move from sidebar panel to header dropdown', async ({ page }) => {
+    await page.goto('/');
+
+    await expect(page.getByRole('button', { name: 'Open sessions menu' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Collapse panel' })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Open sessions menu' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Manage sessions' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'New chat with current agent' })).toBeVisible();
+  });
+
   test('sidebar shows Chat/IDE and settings overflow menu', async ({ page }) => {
     await page.goto('/');
 
