@@ -40,6 +40,24 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.locator('h2', { hasText: 'AI Studio' })).toBeVisible();
   });
 
+  test('sidebar shows Chat/IDE and settings overflow menu', async ({ page }) => {
+    await page.goto('/');
+
+    const sidebar = page.locator('aside').first();
+    await expect(sidebar.getByRole('link', { name: 'Chat' })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: 'IDE' })).toBeVisible();
+
+    await expect(sidebar.getByRole('link', { name: 'Agents' })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: 'Tools' })).toHaveCount(0);
+    await expect(sidebar.getByRole('link', { name: 'Sessions' })).toHaveCount(0);
+
+    await sidebar.getByRole('button', { name: 'Open settings menu' }).click();
+
+    await expect(page.getByRole('menuitem', { name: 'Agents' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Tools' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Sessions' })).toBeVisible();
+  });
+
   test('tool_result panel renders (fixture page)', async ({ page }) => {
     await page.goto('/e2e/verify');
     await expect(page.getByRole('heading', { name: 'E2E verify' })).toBeVisible();

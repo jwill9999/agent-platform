@@ -6,20 +6,29 @@ import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import {
   MessageSquare,
-  Bot,
-  Wrench,
-  Server,
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  Code2,
+  Settings,
+  Bot,
   Cpu,
+  Wrench,
+  Hammer,
+  Server,
   Puzzle,
   History,
-  Hammer,
-  Code2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './sidebar-context';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const navigation = [
   {
@@ -34,6 +43,9 @@ const navigation = [
     icon: Code2,
     description: 'Code with AI assistant',
   },
+];
+
+const settingsNavigation = [
   {
     name: 'Agents',
     href: '/settings/agents',
@@ -150,12 +162,40 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-3 border-t border-border">
-        <div
-          className={cn(
-            'flex items-center gap-2',
-            collapsed ? 'flex-col' : 'justify-between',
-          )}
-        >
+        <div className={cn('flex items-center gap-2', collapsed ? 'flex-col' : 'justify-between')}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className={cn('h-9 rounded-lg', collapsed ? 'w-9 px-0' : 'gap-2 px-3')}
+                aria-label="Open settings menu"
+                title="Open settings menu"
+              >
+                <Settings className="h-4 w-4" />
+                {!collapsed && <span className="text-sm">Settings</span>}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align={collapsed ? 'start' : 'end'}>
+              <DropdownMenuLabel>Configuration</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {settingsNavigation.map((item) => {
+                const isActive = pathname.startsWith(item.href);
+
+                return (
+                  <DropdownMenuItem
+                    key={item.name}
+                    asChild
+                    className={isActive ? 'bg-secondary' : ''}
+                  >
+                    <Link href={item.href} className="flex w-full items-center gap-2">
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <ThemeToggle />
           {collapsed && (
             <Button
