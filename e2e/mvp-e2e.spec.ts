@@ -75,4 +75,36 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.locator('.output-tool-result')).toBeVisible();
     await expect(page.locator('.output-tool-result').getByText('e2e-fs:read_file')).toBeVisible();
   });
+
+  test('assistant text renders without bubble while feedback stays visible', async ({ page }) => {
+    await page.goto('/e2e/feedback-only');
+
+    await expect(page.getByRole('heading', { name: 'E2E feedback-only verify' })).toBeVisible();
+    await expect(page.getByText('User message bubble should remain visible.')).toBeVisible();
+
+    await expect(page.getByText(/^Thinking$/)).toBeVisible();
+    await expect(page.getByText('Placement thinking trace.')).toBeVisible();
+
+    await expect(page.locator('strong', { hasText: 'coding class' })).toBeVisible();
+    const programmingBasicsItem = page.locator('li', { hasText: 'Programming basics' });
+    await expect(programmingBasicsItem).toBeVisible();
+
+    await expect(page.getByText('Critic Review')).toBeVisible();
+    await expect(
+      page.getByText('Response accepted by critic. Showing feedback block only.'),
+    ).toBeVisible();
+
+    const thinkingBox = await page.getByText('Placement thinking trace.').boundingBox();
+    const outputBox = await programmingBasicsItem.boundingBox();
+    const criticBox = await page.getByText('Critic Review').boundingBox();
+
+    expect(thinkingBox).not.toBeNull();
+    expect(outputBox).not.toBeNull();
+    expect(criticBox).not.toBeNull();
+
+    expect(thinkingBox!.y).toBeLessThan(outputBox!.y);
+    expect(outputBox!.y).toBeLessThan(criticBox!.y);
+
+    await expect(page.getByTestId('critic-badge')).toHaveCount(0);
+  });
 });

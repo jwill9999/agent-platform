@@ -1,11 +1,11 @@
 'use client';
 
 import { cn } from '@/lib/cn';
-import { User, Sparkles, Paperclip } from 'lucide-react';
+import { User, Paperclip } from 'lucide-react';
 import type { UIMessage } from 'ai';
-import { Markdown } from './markdown';
 import { CriticBadges, CriticReviewBlock } from './critic-badges';
 import { ThinkingBlock } from './thinking-block';
+import { Markdown } from './markdown';
 import type { CriticEvent } from '@/lib/critic-events';
 
 interface MessageProps {
@@ -50,6 +50,7 @@ export function Message({
 }: Readonly<MessageProps>) {
   const isUser = message.role === 'user';
   const text = getMessageText(message);
+  const hasText = Boolean(text.trim());
   const contextFileCount = isUser ? countContextFiles(message.content) : 0;
   const hasCritic = !isUser && criticEvents && criticEvents.length > 0;
   // Find the final accept event for review block
@@ -62,41 +63,37 @@ export function Message({
       : null;
   const hasThinking = !isUser && Boolean(thinking?.trim());
 
-  return (
-    <div className={cn('flex gap-3 py-6', isUser ? 'justify-end' : 'justify-start')}>
-      {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
-          <Sparkles className="h-4 w-4 text-primary" />
+  if (!isUser) {
+    return (
+      <div className="flex justify-start py-6">
+        <div className="flex flex-col max-w-[85%] w-full">
+          {hasThinking && (
+            <ThinkingBlock content={thinking ?? ''} defaultOpen={isAwaitingStreamContent} />
+          )}
+          {hasText && <Markdown content={text} className="text-sm" />}
+          {finalAccept && <CriticReviewBlock event={finalAccept} />}
+          {hasCritic && !finalAccept && <CriticBadges events={criticEvents} />}
+          {!hasText && !finalAccept && !hasCritic && !hasThinking && (
+            <span className="sr-only" aria-busy={isAwaitingStreamContent} aria-live="polite">
+              Assistant feedback pending
+            </span>
+          )}
         </div>
-      )}
+      </div>
+    );
+  }
 
+  return (
+    <div className={cn('flex gap-3 py-6 justify-end')}>
       <div className="flex flex-col items-end max-w-[85%]">
         <div
           className={cn(
             'w-full rounded-2xl px-4 py-3',
-            isUser
-              ? 'bg-primary text-primary-foreground rounded-br-md'
-              : 'bg-card border border-border rounded-bl-md',
+            'bg-primary text-primary-foreground rounded-br-md',
           )}
         >
-          {/* Show critic review block if final accept event exists */}
-          {finalAccept && <CriticReviewBlock event={finalAccept} />}
-          {/* Show badges only if no accept event (e.g., in-progress) */}
-          {hasCritic && !finalAccept && <CriticBadges events={criticEvents} />}
-          {hasThinking && (
-            <ThinkingBlock content={thinking ?? ''} defaultOpen={isAwaitingStreamContent} />
-          )}
-          {!text && isUser && <p className="text-sm text-muted-foreground italic">Empty message</p>}
-          {!text && !isUser && isAwaitingStreamContent && (
-            <span className="sr-only" aria-busy="true" aria-live="polite">
-              Assistant is responding
-            </span>
-          )}
-          {!text && !isUser && !isAwaitingStreamContent && !hasThinking && !hasCritic && (
-            <p className="text-sm text-muted-foreground italic">No content</p>
-          )}
-          {text && isUser && <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>}
-          {text && !isUser && <Markdown content={text} />}
+          {!text && <p className="text-sm text-muted-foreground italic">Empty message</p>}
+          {text && <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>}
         </div>
         {contextFileCount > 0 && (
           <span className="inline-flex items-center gap-1 mt-1 text-xs text-muted-foreground">
