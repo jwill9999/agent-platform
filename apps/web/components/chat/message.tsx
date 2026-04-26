@@ -16,6 +16,8 @@ interface MessageProps {
   criticEvents?: readonly CriticEvent[];
   /** Aggregated thinking-channel text for this assistant message (if any). */
   thinking?: string;
+  /** True while this assistant turn is still receiving streamed content. */
+  isStreaming?: boolean;
 }
 
 export function getMessageText(message: UIMessage): string {
@@ -47,6 +49,7 @@ export function Message({
   isAwaitingStreamContent = false,
   criticEvents,
   thinking,
+  isStreaming = false,
 }: Readonly<MessageProps>) {
   const isUser = message.role === 'user';
   const text = getMessageText(message);
@@ -62,6 +65,7 @@ export function Message({
           .find((ev) => ev.kind === 'accept')
       : null;
   const hasThinking = !isUser && Boolean(thinking?.trim());
+  const showFinalReview = Boolean(finalAccept) && !isStreaming;
 
   if (!isUser) {
     return (
@@ -71,9 +75,9 @@ export function Message({
             <ThinkingBlock content={thinking ?? ''} defaultOpen={isAwaitingStreamContent} />
           )}
           {hasText && <Markdown content={text} className="text-sm" />}
-          {finalAccept && <CriticReviewBlock event={finalAccept} />}
+          {showFinalReview && finalAccept && <CriticReviewBlock event={finalAccept} />}
           {hasCritic && !finalAccept && <CriticBadges events={criticEvents} />}
-          {!hasText && !finalAccept && !hasCritic && !hasThinking && (
+          {!hasText && !showFinalReview && !hasCritic && !hasThinking && (
             <span className="sr-only" aria-busy={isAwaitingStreamContent} aria-live="polite">
               Assistant feedback pending
             </span>

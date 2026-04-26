@@ -29,7 +29,15 @@ const assistantCriticEvents: CriticEvent[] = [
   {
     kind: 'accept',
     iteration: 1,
-    reasons: 'Response accepted by critic. Showing feedback block only.',
+    reasons: 'Response accepted by critic. Showing final assessment.',
+  },
+];
+
+const streamingAssistantCriticEvents: CriticEvent[] = [
+  {
+    kind: 'accept',
+    iteration: 2,
+    reasons: 'This final assessment must remain hidden while streaming.',
   },
 ];
 
@@ -44,6 +52,13 @@ export default function FeedbackOnlyE2ePage() {
           thinking="Placement thinking trace."
           isAwaitingStreamContent
           criticEvents={assistantCriticEvents}
+        />
+        <Message
+          message={assistantMessage}
+          thinking="Streaming turn thinking trace."
+          isAwaitingStreamContent
+          isStreaming
+          criticEvents={streamingAssistantCriticEvents}
         />
       </div>
     </main>

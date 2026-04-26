@@ -8,6 +8,9 @@ import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
 export type { CriticEvent } from '@/lib/critic-events';
 
+const THINKING_PLACEHOLDER = 'The agent is thinking…';
+const THINKING_REVISE_PLACEHOLDER = 'The agent is revising…';
+
 function makeTextParts(text: string): NonNullable<UIMessage['parts']> {
   return [{ type: 'text', text }];
 }
@@ -71,9 +74,13 @@ function extractTextDelta(o: StreamEvent): string {
   return '';
 }
 
+function isDodSummaryText(text: string): boolean {
+  return /^\s*DoD:\s*\d+\/\d+\s+criteria\s+met\s*$/i.test(text.trim());
+}
+
 function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.message !== 'string') return null;
-  const code = o.code;
+  const { code } = o;
   if (code === 'CRITIC_CAP_REACHED') {
     return { critic: { kind: 'cap_reached', reasons: o.message } };
   }
@@ -93,15 +100,24 @@ type StreamRenderResult =
 
 function renderThinkingEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.content !== 'string') return null;
-  const critic = parseCriticContent(o.content);
+  const critic = parseCriticContent(o.content.trimStart());
   if (critic) return { critic };
   return { thinking: o.content };
+}
+
+function renderTextEvent(o: StreamEvent): StreamRenderResult {
+  const text = extractTextDelta(o);
+  if (!text) return null;
+  if (isDodSummaryText(text)) return null;
+  const critic = parseCriticContent(text.trimStart());
+  if (critic) return { critic };
+  return { text };
 }
 
 function renderStreamEvent(o: StreamEvent): StreamRenderResult {
   switch (o.type) {
     case 'text':
-      return { text: extractTextDelta(o) };
+      return renderTextEvent(o);
     case 'thinking':
       return renderThinkingEvent(o);
     case 'code': {
@@ -241,7 +257,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
 
   const appendThinking = useCallback((id: string, chunk: string) => {
     if (!chunk) return;
-    setThinkingByMessage((prev) => ({ ...prev, [id]: (prev[id] ?? '') + chunk }));
+    setThinkingByMessage((prev) => {
+      const current = prev[id] ?? '';
+      if (current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER) {
+        return { ...prev, [id]: chunk };
+      }
+      return { ...prev, [id]: current + chunk };
+    });
   }, []);
 
   const sendMessage = useCallback(
@@ -257,7 +279,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         uiMessage(crypto.randomUUID(), 'user', userVisible),
         uiMessage(assistantId, 'assistant', ''),
       ]);
-      setThinkingByMessage((prev) => ({ ...prev, [assistantId]: 'The agent is thinking…' }));
+      setThinkingByMessage((prev) => ({ ...prev, [assistantId]: THINKING_PLACEHOLDER }));
       setStatus('streaming');
       setError(null);
 
@@ -276,26 +298,45 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         if (!res.body) throw new Error('No response body');
 
         let accumulated = '';
-        let firstTextArrived = false;
+        let pendingRevisionReset = false;
         await readNdjsonStream(
           res.body,
           (chunk) => {
             if (!chunk) return;
-            accumulated += chunk;
-            updateAssistantMessage(assistantId, accumulated);
-            if (!firstTextArrived) {
-              setThinkingByMessage((prev) => {
-                const next = { ...prev };
-                delete next[assistantId];
-                return next;
-              });
-              firstTextArrived = true;
+            if (pendingRevisionReset) {
+              // Keep the previous draft visible until a new revision starts producing text.
+              accumulated = chunk;
+              pendingRevisionReset = false;
+            } else {
+              accumulated += chunk;
             }
           },
           (msg) => setError(msg),
-          (event) => appendCriticEvent(assistantId, event),
+          (event) => {
+            appendCriticEvent(assistantId, event);
+            if (event.kind === 'revise') {
+              // A critic revise starts a fresh draft iteration; replace prior text.
+              pendingRevisionReset = true;
+              setThinkingByMessage((prev) => ({
+                ...prev,
+                [assistantId]: THINKING_REVISE_PLACEHOLDER,
+              }));
+            }
+          },
           (chunk) => appendThinking(assistantId, chunk),
         );
+
+        // Publish a single final answer for the turn after all revisions/streaming settle.
+        updateAssistantMessage(assistantId, accumulated);
+        setThinkingByMessage((prev) => {
+          const current = prev[assistantId];
+          if (current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER) {
+            const next = { ...prev };
+            delete next[assistantId];
+            return next;
+          }
+          return prev;
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));

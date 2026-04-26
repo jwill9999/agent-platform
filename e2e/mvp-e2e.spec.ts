@@ -82,17 +82,21 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.getByRole('heading', { name: 'E2E feedback-only verify' })).toBeVisible();
     await expect(page.getByText('User message bubble should remain visible.')).toBeVisible();
 
-    await expect(page.getByText(/^Thinking$/)).toBeVisible();
+    await expect(page.getByText(/^Thinking$/)).toHaveCount(2);
     await expect(page.getByText('Placement thinking trace.')).toBeVisible();
+    await expect(page.getByText('Streaming turn thinking trace.')).toBeVisible();
 
-    await expect(page.locator('strong', { hasText: 'coding class' })).toBeVisible();
-    const programmingBasicsItem = page.locator('li', { hasText: 'Programming basics' });
+    await expect(page.locator('strong', { hasText: 'coding class' }).first()).toBeVisible();
+    const programmingBasicsItem = page.locator('li', { hasText: 'Programming basics' }).first();
     await expect(programmingBasicsItem).toBeVisible();
 
     await expect(page.getByText('Critic Review')).toBeVisible();
     await expect(
-      page.getByText('Response accepted by critic. Showing feedback block only.'),
+      page.getByText('Response accepted by critic. Showing final assessment.'),
     ).toBeVisible();
+    await expect(
+      page.getByText('This final assessment must remain hidden while streaming.'),
+    ).toHaveCount(0);
 
     const thinkingBox = await page.getByText('Placement thinking trace.').boundingBox();
     const outputBox = await programmingBasicsItem.boundingBox();
