@@ -9,6 +9,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 - **Date:** 2026-04-26
 - **Session:** `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux` and closed in Beads. Next chain task started: `task/agent-platform-de4` claimed (`in_progress`).
+- **Date:** 2026-04-27
+- **Session:** Completed UI input refactor and feedback-only changes; closed `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` in Beads.
 
 ### Session-close guardrail (required)
 
@@ -27,6 +29,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - Beads status updated: `agent-platform-7d1` closed (`Merged into feature/agent-platform-ui-ux`).
 - Next ready task selected and claimed: `agent-platform-de4`.
 - New working branch created from feature: `task/agent-platform-de4`.
+- Completed work on `agent-platform-de4` (feedback-only assistant output, thinking/critic lifecycle fixes) and `agent-platform-lt6` (input refactor). Both branches' changes committed on `task/agent-platform-lt6` and pushed to origin. The beads `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` have been closed locally via `bd close` (remote push for beads may require auth).
 
 ### `agent-platform-7d1` — Remove sessions sidebar; move sessions into dropdown ✅
 
@@ -55,7 +58,13 @@ Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ff
 
 ### Beads
 
-- `agent-platform-btm` claimed (`in_progress`); will close after commit lands. Remote dolt push deferred (sandbox SSH blocked, same as previous sessions).
+Closed beads in this session:
+
+- `agent-platform-de4` — Show feedback-only block for assistant responses (closed)
+- `agent-platform-ucg` — Refactor sidebar to Chat/IDE only with settings overflow (closed)
+- `agent-platform-lt6` — Unify input bar controls for model/agent and attachments (closed)
+
+Note: `bd` closed the beads locally but automatic remote push failed due to SSH/network auth; see Quick commands for manual push guidance.
 
 ## Current state
 
@@ -63,6 +72,8 @@ Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ff
 
 - **`feature/agent-platform-ui-ux`** — pushed and up to date with origin
 - **`task/agent-platform-de4`** — created from feature and active (`in_progress`)
+- **`task/agent-platform-de4`** — completed and merged into `feature/agent-platform-ui-ux` via commits on `task/agent-platform-lt6` (see PR).
+- **`task/agent-platform-lt6`** — completed, committed, and pushed to `origin/task/agent-platform-lt6` (PR opened: https://github.com/jwill9999/agent-platform/pull/88)
 
 ### Quality
 
