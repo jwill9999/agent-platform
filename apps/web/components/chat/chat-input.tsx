@@ -4,8 +4,7 @@ import { useState, useRef, useCallback, type KeyboardEvent, type DragEvent } fro
 import { Send, Loader2, Paperclip, X, FileText, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
-import type { Agent } from '@agent-platform/contracts';
-import type { ModelConfig } from '@agent-platform/contracts';
+import { useAgentModelContext } from './agent-model-context';
 import { ChatAgentSelector } from './chat-agent-selector';
 import { ChatModelSelector } from './chat-model-selector';
 
@@ -24,13 +23,7 @@ interface ChatInputProps {
   onClearAttachments?: () => void;
   /** Sanitisation warnings from file validation. */
   attachmentWarnings?: string[];
-  agents?: Agent[];
-  modelConfigs?: ModelConfig[];
-  selectedAgentId?: string | null;
-  selectedModelConfigId?: string | null;
-  onSelectAgent?: (id: string) => void;
-  onSelectModelConfig?: (id: string | null) => void;
-  selectorDisabled?: boolean;
+  // agent/model selector props removed; use context via `useAgentModelContext()`
 }
 
 export function ChatInput({
@@ -42,13 +35,7 @@ export function ChatInput({
   onRemoveAttachment,
   onClearAttachments,
   attachmentWarnings,
-  agents,
-  modelConfigs,
-  selectedAgentId,
-  selectedModelConfigId,
-  onSelectAgent,
-  onSelectModelConfig,
-  selectorDisabled = false,
+  // agent/model props removed — use context
 }: Readonly<ChatInputProps>) {
   const [input, setInput] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -134,6 +121,8 @@ export function ChatInput({
     },
     [onAddFiles],
   );
+
+  const ctx = useAgentModelContext();
 
   return (
     <div className="border-t border-border/50 bg-background/80 backdrop-blur-sm p-4">
@@ -265,16 +254,16 @@ export function ChatInput({
           <div className="flex items-center gap-3 px-4 py-2 border-t border-border/20 bg-card/0">
             <div className="flex items-center gap-2">
               <ChatAgentSelector
-                agents={agents ?? []}
-                selectedId={selectedAgentId ?? null}
-                onSelect={(id) => onSelectAgent?.(id)}
-                disabled={selectorDisabled || isLoading}
+                agents={ctx.agents ?? []}
+                selectedId={ctx.selectedAgentId ?? null}
+                onSelect={(id) => ctx.onSelectAgent?.(id)}
+                disabled={ctx.selectorDisabled || isLoading}
               />
               <ChatModelSelector
-                modelConfigs={modelConfigs ?? []}
-                selectedId={selectedModelConfigId ?? null}
-                onSelect={(id) => onSelectModelConfig?.(id ?? null)}
-                disabled={selectorDisabled || isLoading}
+                modelConfigs={ctx.modelConfigs ?? []}
+                selectedId={ctx.selectedModelConfigId ?? null}
+                onSelect={ctx.onSelectModelConfig!}
+                disabled={ctx.selectorDisabled || isLoading}
               />
             </div>
           </div>

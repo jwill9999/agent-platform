@@ -3,6 +3,7 @@
 import type { Agent, ModelConfig, SessionRecord } from '@agent-platform/contracts';
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '../components/chat/chat';
+import { AgentModelProvider } from '../components/chat/agent-model-context';
 import { SessionDropdown } from '../components/chat/session-dropdown';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
@@ -171,26 +172,31 @@ export default function HomePage() {
           />
         </div>
         <div className="flex-1 flex flex-col min-h-0">
-          <Chat
-            messages={messages}
-            onSend={handleSend}
-            isLoading={isLoading}
-            canSend={Boolean(sessionId)}
-            attachments={attachments}
-            onAddFiles={addFiles}
-            onRemoveAttachment={removeAttachment}
-            onClearAttachments={clearAttachments}
-            attachmentWarnings={attachmentWarnings}
-            criticEventsByMessage={criticEventsByMessage}
-            thinkingByMessage={thinkingByMessage}
-            agents={agents}
-            modelConfigs={modelConfigs}
-            selectedAgentId={selectedAgentId}
-            selectedModelConfigId={selectedModelConfigId}
-            onSelectAgent={handleAgentChange}
-            onSelectModelConfig={setSelectedModelConfigId}
-            selectorDisabled={isLoading}
-          />
+          <AgentModelProvider
+            value={{
+              agents,
+              modelConfigs,
+              selectedAgentId,
+              selectedModelConfigId,
+              onSelectAgent: handleAgentChange,
+              onSelectModelConfig: setSelectedModelConfigId,
+              selectorDisabled: isLoading,
+            }}
+          >
+            <Chat
+              messages={messages}
+              onSend={handleSend}
+              isLoading={isLoading}
+              canSend={Boolean(sessionId)}
+              attachments={attachments}
+              onAddFiles={addFiles}
+              onRemoveAttachment={removeAttachment}
+              onClearAttachments={clearAttachments}
+              attachmentWarnings={attachmentWarnings}
+              criticEventsByMessage={criticEventsByMessage}
+              thinkingByMessage={thinkingByMessage}
+            />
+          </AgentModelProvider>
         </div>
       </div>
     </div>

@@ -7,8 +7,6 @@ import { Message, getMessageText } from './message';
 import { ChatInput } from './chat-input';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import type { CriticEvent } from '@/lib/critic-events';
-import type { Agent } from '@agent-platform/contracts';
-import type { ModelConfig } from '@agent-platform/contracts';
 
 export interface ChatProps {
   messages: UIMessage[];
@@ -30,13 +28,6 @@ export interface ChatProps {
   criticEventsByMessage?: Record<string, readonly CriticEvent[]>;
   /** Aggregated thinking-channel text keyed by assistant message id. */
   thinkingByMessage?: Record<string, string>;
-  agents?: Agent[];
-  modelConfigs?: ModelConfig[];
-  selectedAgentId?: string | null;
-  selectedModelConfigId?: string | null;
-  onSelectAgent?: (id: string) => void;
-  onSelectModelConfig?: (id: string | null) => void;
-  selectorDisabled?: boolean;
 }
 
 export function Chat({
@@ -51,13 +42,6 @@ export function Chat({
   attachmentWarnings,
   criticEventsByMessage,
   thinkingByMessage,
-  agents,
-  modelConfigs,
-  selectedAgentId,
-  selectedModelConfigId,
-  onSelectAgent,
-  onSelectModelConfig,
-  selectorDisabled,
 }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -115,13 +99,6 @@ export function Chat({
         onRemoveAttachment={onRemoveAttachment}
         onClearAttachments={onClearAttachments}
         attachmentWarnings={attachmentWarnings}
-        agents={agents}
-        modelConfigs={modelConfigs}
-        selectedAgentId={selectedAgentId}
-        selectedModelConfigId={selectedModelConfigId}
-        onSelectAgent={onSelectAgent}
-        onSelectModelConfig={onSelectModelConfig}
-        selectorDisabled={selectorDisabled}
       />
     </div>
   );
