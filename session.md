@@ -8,11 +8,25 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-04-26
-- **Session:** UI branch-chain workflow active. `feature/agent-platform-ui-ux` created and pushed. `task/agent-platform-ucg` merged into feature. `task/agent-platform-7d1` implemented and pushed.
+- **Session:** `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux` and closed in Beads. Next chain task started: `task/agent-platform-de4` claimed (`in_progress`).
+
+### Session-close guardrail (required)
+
+- Local-only changes are not complete.
+- Before ending a task/session, ensure work is committed and pushed to `origin`.
+- Verify the remote branch/ref exists (for example `git ls-remote --heads origin <branch>` or `git status -sb` showing `origin/<branch>` tracking).
+- `--no-verify` is high-risk: it skips Husky/local checks. If used, you must run the skipped build/typecheck/test checks manually and confirm they pass before closing work.
 
 ---
 
 ## What happened (this session)
+
+### Branch chain update ✅
+
+- `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux`.
+- Beads status updated: `agent-platform-7d1` closed (`Merged into feature/agent-platform-ui-ux`).
+- Next ready task selected and claimed: `agent-platform-de4`.
+- New working branch created from feature: `task/agent-platform-de4`.
 
 ### `agent-platform-7d1` — Remove sessions sidebar; move sessions into dropdown ✅
 
@@ -48,7 +62,7 @@ Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ff
 ### Git
 
 - **`feature/agent-platform-ui-ux`** — pushed and up to date with origin
-- **`task/agent-platform-7d1`** — pushed (`7fce8e7`) on top of feature branch
+- **`task/agent-platform-de4`** — created from feature and active (`in_progress`)
 
 ### Quality
 
@@ -66,8 +80,8 @@ Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ff
 
 ## Next (priority order)
 
-1. **Open PR for `task/agent-platform-7d1`** → `feature/agent-platform-ui-ux`
-2. **Merge and continue chain with next task branch** (`task/agent-platform-de4` or `task/agent-platform-lt6`) from updated feature
+1. **Implement `agent-platform-de4`** on `task/agent-platform-de4`
+2. **Open PR for `task/agent-platform-de4`** → `feature/agent-platform-ui-ux`
 3. **Resolve or isolate unrelated E2E seed fixture failure** in `e2e/mvp-e2e.spec.ts`
 
 ---

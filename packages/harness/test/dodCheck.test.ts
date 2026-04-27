@@ -46,7 +46,7 @@ function initialState(overrides: Partial<HarnessStateType> = {}): Record<string,
 }
 
 describe('createDodCheckNode', () => {
-  it('stores a passing contract and emits a summary text line', async () => {
+  it('stores a passing contract without emitting a summary text line', async () => {
     const { emitter, events } = captureEmitter();
     const node = createDodCheckNode({
       emitter,
@@ -65,7 +65,7 @@ describe('createDodCheckNode', () => {
       failedCriteria: [],
     });
     expect(delta.messages).toBeUndefined();
-    expect(events.some((event) => event['type'] === 'text')).toBe(true);
+    expect(events.some((event) => event['type'] === 'text')).toBe(false);
   });
 
   it('injects <dod-failed> feedback while still under the iteration cap', async () => {
@@ -116,7 +116,7 @@ describe('createDodCheckNode', () => {
     });
   });
 
-  it('normalizes inconsistent passed contracts before emitting the summary', async () => {
+  it('normalizes inconsistent passed contracts without emitting a summary', async () => {
     const { emitter, events } = captureEmitter();
     const node = createDodCheckNode({
       emitter,
@@ -134,11 +134,7 @@ describe('createDodCheckNode', () => {
       passed: true,
       failedCriteria: [],
     });
-    expect(
-      events.some(
-        (event) => event['type'] === 'text' && event['content'] === 'DoD: 1/1 criteria met\n',
-      ),
-    ).toBe(true);
+    expect(events.some((event) => event['type'] === 'text')).toBe(false);
   });
 
   it('normalizes invalid failed criteria back to the declared criteria', async () => {

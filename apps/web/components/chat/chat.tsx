@@ -66,6 +66,9 @@ export function Chat({
                 <Message
                   key={message.id}
                   message={message}
+                  isStreaming={
+                    isLoading && message.role === 'assistant' && index === messages.length - 1
+                  }
                   isAwaitingStreamContent={
                     isLoading &&
                     message.role === 'assistant' &&
