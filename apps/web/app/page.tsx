@@ -3,8 +3,6 @@
 import type { Agent, ModelConfig, SessionRecord } from '@agent-platform/contracts';
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '../components/chat/chat';
-import { ChatAgentSelector } from '../components/chat/chat-agent-selector';
-import { ChatModelSelector } from '../components/chat/chat-model-selector';
 import { SessionDropdown } from '../components/chat/session-dropdown';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
@@ -161,18 +159,6 @@ export default function HomePage() {
           </div>
         )}
         <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50">
-          <ChatAgentSelector
-            agents={agents}
-            selectedId={selectedAgentId}
-            onSelect={handleAgentChange}
-            disabled={isLoading}
-          />
-          <ChatModelSelector
-            modelConfigs={modelConfigs}
-            selectedId={selectedModelConfigId}
-            onSelect={setSelectedModelConfigId}
-            disabled={isLoading}
-          />
           <SessionDropdown
             sessions={sessions}
             agents={agents}
@@ -197,6 +183,13 @@ export default function HomePage() {
             attachmentWarnings={attachmentWarnings}
             criticEventsByMessage={criticEventsByMessage}
             thinkingByMessage={thinkingByMessage}
+            agents={agents}
+            modelConfigs={modelConfigs}
+            selectedAgentId={selectedAgentId}
+            selectedModelConfigId={selectedModelConfigId}
+            onSelectAgent={handleAgentChange}
+            onSelectModelConfig={setSelectedModelConfigId}
+            selectorDisabled={isLoading}
           />
         </div>
       </div>

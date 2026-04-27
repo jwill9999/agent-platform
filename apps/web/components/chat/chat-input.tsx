@@ -4,6 +4,10 @@ import { useState, useRef, useCallback, type KeyboardEvent, type DragEvent } fro
 import { Send, Loader2, Paperclip, X, FileText, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
+import type { Agent } from '@agent-platform/contracts';
+import type { ModelConfig } from '@agent-platform/contracts';
+import { ChatAgentSelector } from './chat-agent-selector';
+import { ChatModelSelector } from './chat-model-selector';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -20,6 +24,13 @@ interface ChatInputProps {
   onClearAttachments?: () => void;
   /** Sanitisation warnings from file validation. */
   attachmentWarnings?: string[];
+  agents?: Agent[];
+  modelConfigs?: ModelConfig[];
+  selectedAgentId?: string | null;
+  selectedModelConfigId?: string | null;
+  onSelectAgent?: (id: string) => void;
+  onSelectModelConfig?: (id: string | null) => void;
+  selectorDisabled?: boolean;
 }
 
 export function ChatInput({
@@ -31,6 +42,13 @@ export function ChatInput({
   onRemoveAttachment,
   onClearAttachments,
   attachmentWarnings,
+  agents,
+  modelConfigs,
+  selectedAgentId,
+  selectedModelConfigId,
+  onSelectAgent,
+  onSelectModelConfig,
+  selectorDisabled = false,
 }: Readonly<ChatInputProps>) {
   const [input, setInput] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -186,6 +204,21 @@ export function ChatInput({
 
           {/* Input row */}
           <div className="flex items-end gap-2 px-4 py-3">
+            {/* Agent / Model selectors inside input */}
+            <div className="flex items-center gap-2 pr-2">
+              <ChatAgentSelector
+                agents={agents ?? []}
+                selectedId={selectedAgentId ?? null}
+                onSelect={(id) => onSelectAgent?.(id)}
+                disabled={selectorDisabled || isLoading}
+              />
+              <ChatModelSelector
+                modelConfigs={modelConfigs ?? []}
+                selectedId={selectedModelConfigId ?? null}
+                onSelect={(id) => onSelectModelConfig?.(id ?? null)}
+                disabled={selectorDisabled || isLoading}
+              />
+            </div>
             {/* Attach button */}
             {onAddFiles && (
               <>
