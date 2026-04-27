@@ -10,6 +10,13 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Date:** 2026-04-26
 - **Session:** `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux` and closed in Beads. Next chain task started: `task/agent-platform-de4` claimed (`in_progress`).
 
+### Session-close guardrail (required)
+
+- Local-only changes are not complete.
+- Before ending a task/session, ensure work is committed and pushed to `origin`.
+- Verify the remote branch/ref exists (for example `git ls-remote --heads origin <branch>` or `git status -sb` showing `origin/<branch>` tracking).
+- `--no-verify` is high-risk: it skips Husky/local checks. If used, you must run the skipped build/typecheck/test checks manually and confirm they pass before closing work.
+
 ---
 
 ## What happened (this session)

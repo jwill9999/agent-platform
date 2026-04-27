@@ -26,3 +26,5 @@ Read that file first. The sections it covers:
 - Prefer Problems + terminal quality commands as the authoritative fallback when MCP is unavailable.
 - Never claim done if the completion-gate status is failed.
 - For frontend or UI work validation, first run `make restart`, confirm containers rebuilt successfully, then run Playwright user-flow actions to verify the UI is working as expected.
+- Local-only work is not complete: after creating or updating local files/branches, you must commit and push to `origin`, then verify the remote ref exists (for example with `git ls-remote --heads origin <branch>` or `git status -sb` showing `origin/<branch>` tracking).
+- Treat `git push --no-verify` as a high-risk exception: it bypasses Husky/local verification checks and can allow broken builds/tests to be pushed. Use only as a last resort and run the skipped checks manually before declaring work complete.
