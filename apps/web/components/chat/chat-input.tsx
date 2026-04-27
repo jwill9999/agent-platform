@@ -204,21 +204,6 @@ export function ChatInput({
 
           {/* Input row */}
           <div className="flex items-end gap-2 px-4 py-3">
-            {/* Agent / Model selectors inside input */}
-            <div className="flex items-center gap-2 pr-2">
-              <ChatAgentSelector
-                agents={agents ?? []}
-                selectedId={selectedAgentId ?? null}
-                onSelect={(id) => onSelectAgent?.(id)}
-                disabled={selectorDisabled || isLoading}
-              />
-              <ChatModelSelector
-                modelConfigs={modelConfigs ?? []}
-                selectedId={selectedModelConfigId ?? null}
-                onSelect={(id) => onSelectModelConfig?.(id ?? null)}
-                disabled={selectorDisabled || isLoading}
-              />
-            </div>
             {/* Attach button */}
             {onAddFiles && (
               <>
@@ -275,11 +260,27 @@ export function ChatInput({
               )}
             </button>
           </div>
+
+          {/* Selectors row: placed below the input so the textarea is the primary typing area */}
+          <div className="flex items-center gap-3 px-4 py-2 border-t border-border/20 bg-card/0">
+            <div className="flex items-center gap-2">
+              <ChatAgentSelector
+                agents={agents ?? []}
+                selectedId={selectedAgentId ?? null}
+                onSelect={(id) => onSelectAgent?.(id)}
+                disabled={selectorDisabled || isLoading}
+              />
+              <ChatModelSelector
+                modelConfigs={modelConfigs ?? []}
+                selectedId={selectedModelConfigId ?? null}
+                onSelect={(id) => onSelectModelConfig?.(id ?? null)}
+                disabled={selectorDisabled || isLoading}
+              />
+            </div>
+          </div>
         </section>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          {canSend
-            ? 'Press Enter to send, Shift+Enter for new line'
-            : 'Waiting for chat session…'}
+          {canSend ? 'Press Enter to send, Shift+Enter for new line' : 'Waiting for chat session…'}
         </p>
       </form>
     </div>
