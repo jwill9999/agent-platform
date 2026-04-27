@@ -4,6 +4,9 @@ import { useState, useRef, useCallback, type KeyboardEvent, type DragEvent } fro
 import { Send, Loader2, Paperclip, X, FileText, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
+import { useAgentModelContext } from './agent-model-context';
+import { ChatAgentSelector } from './chat-agent-selector';
+import { ChatModelSelector } from './chat-model-selector';
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -20,6 +23,7 @@ interface ChatInputProps {
   onClearAttachments?: () => void;
   /** Sanitisation warnings from file validation. */
   attachmentWarnings?: string[];
+  // agent/model selector props removed; use context via `useAgentModelContext()`
 }
 
 export function ChatInput({
@@ -31,6 +35,7 @@ export function ChatInput({
   onRemoveAttachment,
   onClearAttachments,
   attachmentWarnings,
+  // agent/model props removed — use context
 }: Readonly<ChatInputProps>) {
   const [input, setInput] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -116,6 +121,8 @@ export function ChatInput({
     },
     [onAddFiles],
   );
+
+  const ctx = useAgentModelContext();
 
   return (
     <div className="border-t border-border/50 bg-background/80 backdrop-blur-sm p-4">
@@ -242,11 +249,27 @@ export function ChatInput({
               )}
             </button>
           </div>
+
+          {/* Selectors row: placed below the input so the textarea is the primary typing area */}
+          <div className="flex items-center gap-3 px-4 py-2 border-t border-border/20 bg-card/0">
+            <div className="flex items-center gap-2">
+              <ChatAgentSelector
+                agents={ctx.agents ?? []}
+                selectedId={ctx.selectedAgentId ?? null}
+                onSelect={(id) => ctx.onSelectAgent?.(id)}
+                disabled={ctx.selectorDisabled || isLoading}
+              />
+              <ChatModelSelector
+                modelConfigs={ctx.modelConfigs ?? []}
+                selectedId={ctx.selectedModelConfigId ?? null}
+                onSelect={ctx.onSelectModelConfig!}
+                disabled={ctx.selectorDisabled || isLoading}
+              />
+            </div>
+          </div>
         </section>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          {canSend
-            ? 'Press Enter to send, Shift+Enter for new line'
-            : 'Waiting for chat session…'}
+          {canSend ? 'Press Enter to send, Shift+Enter for new line' : 'Waiting for chat session…'}
         </p>
       </form>
     </div>
