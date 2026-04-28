@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test('agent and model selectors are inside chat input', async ({ page }) => {
   await page.goto('/');
-  // wait for input to load
+  // wait for app to render and input to load
+  await page.getByRole('heading', { name: 'AI Studio' }).waitFor({ timeout: 10000 });
   const input = page.locator('textarea[placeholder*="Send a message"]');
   await expect(input).toBeVisible();
 

@@ -71,6 +71,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   e2e:
+    needs: docker
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -94,6 +95,19 @@ jobs:
 
       - name: Start API + web (compose profile services)
         run: docker compose --profile services up -d --build
+
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3000/health >/dev/null; then
+              echo "api ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "api did not become ready"
+          docker compose --profile services ps
+          exit 1
 
       - name: Wait for web
         run: |
@@ -123,6 +137,21 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+
+      - name: Collect docker logs
+        if: failure()
+        run: |
+          docker compose --profile services ps > docker-compose-ps.txt || true
+          docker compose logs --no-color api > api-logs.txt || true
+
+      - name: Upload docker logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: docker-logs
+          path: |
+            docker-compose-ps.txt
+            api-logs.txt
 
       - name: Stop compose
         if: always()
