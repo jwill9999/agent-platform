@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { createContext, useContext } from 'react';
 import type { Agent, ModelConfig } from '@agent-platform/contracts';
