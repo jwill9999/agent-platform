@@ -109,7 +109,7 @@ jobs:
           exit 1
 
       - name: E2E seed (default + specialist/MCP/skill)
-        run: docker compose exec -T api sh -c 'E2E_SEED=1 SQLITE_PATH=/data/agent.sqlite node packages/db/dist/seed/run.js'
+        run: docker compose exec -T --env E2E_SEED=1 api node packages/db/dist/seed/run.js
 
       - name: E2E tests
         env:
