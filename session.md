@@ -65,6 +65,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Fixed CI E2E startup for `agent-platform-ws.2` by adding `make workspace-init` before `docker compose up`.
 - **Date:** 2026-04-29
 - **Session:** Completed `agent-platform-ws.3` workspace PathJail/tool-policy enforcement on `task/agent-platform-ws.3`.
+- **Date:** 2026-04-29
+- **Session:** Addressed SonarCloud regex backtracking risk in the `agent-platform-ws.3` bash workspace policy.
 
 ### Session-close guardrail (required)
 
@@ -88,6 +90,8 @@ Branch state: `task/agent-platform-ws.3` contains the `agent-platform-ws.3` impl
 - Kept high-risk `sys_bash` behind HITL approval after workspace-policy checks pass.
 - Updated observability integration coverage to exercise a failing file tool inside `/workspace`, preserving recent-error audit behavior without relying on outside-workspace access.
 - Added unit coverage for bash path extraction, allowed workspace paths, denied shell writes/reads outside the workspace, and denied shell escapes before approval creation.
+- Replaced the bash workspace policy regex parsing with linear character/token scanning to remove SonarCloud's super-linear backtracking risk.
+- Added coverage for redirects without whitespace, quoted redirect targets, and quoted shell separators.
 
 Quality gates passed:
 
@@ -98,13 +102,15 @@ Quality gates passed:
 - `pnpm docs:lint`
 - Focused API check: `pnpm --filter @agent-platform/api exec vitest run test/observability.integration.test.ts`
 - Focused API check: `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
+- Focused harness check: `pnpm --filter @agent-platform/harness run test -- test/bashWorkspacePolicy.test.ts test/toolDispatch.test.ts`
+- Focused harness checks: `pnpm --filter @agent-platform/harness run lint` and `pnpm --filter @agent-platform/harness run typecheck`
 
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/agent-platform-ws.3`
-- **Latest task commit:** `542934f` (`Enforce workspace path policy for shell tools`)
+- **Latest task commit:** `f586e20` (`Avoid regex backtracking in bash workspace policy`)
 - **Feature branch:** `feature/agent-platform-workspace-storage`
 - **Next task in chain:** `agent-platform-ws.4`
 
