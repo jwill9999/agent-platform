@@ -42,6 +42,8 @@ export type ToolDispatchContext = {
   approvalRequests?: {
     create: (request: ApprovalRequestCreateInput) => ApprovalRequest | Promise<ApprovalRequest>;
   };
+  /** Tool call IDs that were already approved by a human and may bypass the approval gate. */
+  approvedToolCallIds?: ReadonlySet<string>;
   /** Resolves a skill by ID for lazy loading (sys_get_skill_detail). */
   skillResolver?: (skillId: string) => Skill | undefined;
 };
@@ -677,7 +679,8 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       const toolMetadata = resolveToolMetadata(call, ctx);
       const approval = evaluateApprovalPolicy(toolMetadata);
-      if (approval.required) {
+      const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+      if (approval.required && !approvedForResume) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
         const output = ctx.approvalRequests

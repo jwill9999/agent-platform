@@ -12,10 +12,16 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
+import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
+import { handleSessionResume, type ChatRouterOptions } from './chatRouter.js';
 import { parseBody, requireParam } from './routerUtils.js';
 
-export function createSessionsRouter(db: DrizzleDb): Router {
+export function createSessionsRouter(
+  db: DrizzleDb,
+  options: ChatRouterOptions & { sessionLock?: SessionLock } = {},
+): Router {
   const router = Router();
+  const sessionLock = options.sessionLock ?? createInProcessSessionLock();
 
   router.get(
     '/',
@@ -52,6 +58,13 @@ export function createSessionsRouter(db: DrizzleDb): Router {
       const body = parseBody(SessionCreateBodySchema, req.body);
       const session = createSession(db, body);
       res.status(201).json({ data: session });
+    }),
+  );
+
+  router.post(
+    '/:id/resume',
+    asyncHandler(async (req, res) => {
+      await handleSessionResume(db, options, sessionLock, req, res);
     }),
   );
 

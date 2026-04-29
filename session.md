@@ -25,6 +25,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Addressed HITL.3 review feedback: pending approvals now audit as pending, approval output has a fallback renderer, and API stream tests assert no assistant text leaks on approval halt.
 - **Date:** 2026-04-29
 - **Session:** HITL.3 was merged into `feature/agent-platform-hitl`; claimed next task `agent-platform-hitl.4` and created `task/agent-platform-hitl.4` from the updated feature branch.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-hitl.4` durable approval resume execution on `task/agent-platform-hitl.4`; ready for PR into `feature/agent-platform-hitl`.
+- **Date:** 2026-04-29
+- **Session:** Queried SonarCloud PR `#93` duplicate-code metrics; refactored shared chat test helpers and amended `agent-platform-hitl.4`.
 
 ### Session-close guardrail (required)
 
@@ -37,24 +41,24 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### HITL epic setup ✅
+### `agent-platform-hitl.4` — Durable approval resume ✅
 
-- Created Beads epic `agent-platform-hitl` and tasks `agent-platform-hitl.1` through `.5`.
-- Added task specs under `docs/tasks/agent-platform-hitl*.md` and indexed the epic in `docs/tasks/README.md`.
-- Created local branch chain: `feature/agent-platform-hitl` then `task/agent-platform-hitl.1`.
-- Claimed and closed `agent-platform-hitl.1` in Beads.
+Branch `task/agent-platform-hitl.4`.
 
-### `agent-platform-hitl.1` — Deny-by-default approval gate ✅
+- Implemented `POST /v1/sessions/:id/resume` for approved/rejected pending HITL tool calls.
+- Added DB support for durable approval `resumedAtMs` claiming and assistant `toolCalls` persistence.
+- Reused the runtime tool-dispatch path so approved calls execute once and then the agent continues from persisted session history.
+- Added migration `packages/db/drizzle/0013_hitl_resume.sql`, contract exports, repository coverage, and API integration coverage.
+- Updated `docs/tasks/agent-platform-hitl.4.md` and closed bead `agent-platform-hitl.4` locally.
 
-Branch `task/agent-platform-hitl.1`.
+### SonarCloud duplicate-code follow-up ✅
 
-- Added `packages/harness/src/security/approvalPolicy.ts` for approval-required, high-risk, and critical tools.
-- Wired `createToolDispatchNode` to gate risky tools before plugin `onToolCall`, audit start, retry, or executor invocation.
-- Passed resolved agent tools from the API chat router so dispatch can evaluate registry/MCP metadata.
-- Added `tool_approval_required` trace events and audit denied entries with risk-tier-aware logging.
-- Added harness tests for high-risk system tools, explicit `requiresApproval`, ordinary low-risk execution, and the policy helper.
-- Addressed review feedback: missing tool metadata now requires approval with high-risk treatment, MCP metadata is covered via context tools, audit logging defaults unknown tools to high risk, and trace risk tiers use the shared `RiskTier` type.
-- Quality: harness tests ✅, harness typecheck ✅, API typecheck ✅, root typecheck ✅, lint ✅, docs lint ✅, full `pnpm test` ✅ when run outside the sandbox port restriction.
+- SonarCloud PR `#93` reported new duplicate lines in:
+  - `apps/api/src/infrastructure/http/v1/chatRouter.ts` — 25 lines
+  - `apps/api/test/sessionChat.integration.test.ts` — 41 lines
+- Refactored `chatRouter.ts` runtime graph/tool-dispatch setup into shared helpers before this handoff.
+- Refactored chat test environment handling into `apps/api/test/support/chatEnv.ts`.
+- Extracted repeated session/approval/event/count helpers from `sessionChat.integration.test.ts`.
 
 ### Beads
 
@@ -63,14 +67,15 @@ Closed beads in this session:
 - `agent-platform-hitl.1` — Add deny-by-default approval gate for risky tools
 - `agent-platform-hitl.2` — Persist approval request records and APIs
 - `agent-platform-hitl.3` — Emit approval-required stream events
+- `agent-platform-hitl.4` — Resume approved tool execution safely
 
 In-progress beads:
 
-- `agent-platform-hitl.4` — Resume approved tool execution safely
+- None
 
 Next blocked bead:
 
-- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage; blocked by `agent-platform-hitl.4`
+- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage; blocked until `agent-platform-hitl.4` is merged into the feature branch
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
@@ -82,8 +87,8 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 - **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.3`** — merged into `feature/agent-platform-hitl` via PR `#92`
-- **`task/agent-platform-hitl.4`** — active branch, selected next task
-- Remote status: local `feature/agent-platform-hitl` is up to date with `origin/feature/agent-platform-hitl` at merge commit `bfc0d13`.
+- **`task/agent-platform-hitl.4`** — active branch, amended local tip `57254c9`
+- Remote status: local branch is `ahead 1, behind 1` versus `origin/task/agent-platform-hitl.4`; amended commit needs `git push --force-with-lease origin task/agent-platform-hitl.4`.
 
 ### Quality
 
@@ -95,22 +100,24 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 - `pnpm format:check` ✅
 - `pnpm docs:lint` ✅
 - `pnpm test` ✅ when escalated to allow local test servers to bind ports
+- `pnpm --filter @agent-platform/db exec vitest run test/messages.test.ts test/approvalRequests.test.ts` ✅
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` ✅ when escalated for local test server binding
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts test/chat.integration.test.ts` ✅ when escalated for local test server binding
 
 ### Key commits
 
-| Commit             | Branch                        | Description                        |
-| ------------------ | ----------------------------- | ---------------------------------- |
-| `bfc0d13`          | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`              |
-| Current branch tip | `task/agent-platform-hitl.4`  | Starting resume approved execution |
+| Commit    | Branch                        | Description               |
+| --------- | ----------------------------- | ------------------------- |
+| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`     |
+| `57254c9` | `task/agent-platform-hitl.4`  | Resume approved execution |
 
 ---
 
 ## Next (priority order)
 
-1. Implement `agent-platform-hitl.4`: durable resume path for approved/rejected pending tool calls.
-2. Persist enough resume state to execute the exact reviewed tool name/args once and make rejection visible to the agent.
-3. Add resume API, duplicate/stale decision handling, session locking coverage, replay-safe message persistence, and approve/reject/retry tests.
-4. After HITL.4 is merged, start `agent-platform-hitl.5` for the frontend approval UX and e2e coverage.
+1. Force-push amended `task/agent-platform-hitl.4` so PR `#93` reruns SonarCloud and pipelines.
+2. Merge PR `#93` into `feature/agent-platform-hitl` after checks pass.
+3. After HITL.4 is merged, start `agent-platform-hitl.5` for frontend approval UX and e2e coverage.
 
 ---
 

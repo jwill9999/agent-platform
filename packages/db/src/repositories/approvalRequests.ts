@@ -5,7 +5,7 @@ import type {
   RiskTier,
 } from '@agent-platform/contracts';
 import { ApprovalRequestSchema, redactArgs } from '@agent-platform/contracts';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import type { DrizzleDb } from '../database.js';
 import * as schema from '../schema.js';
@@ -30,6 +30,16 @@ export class ApprovalRequestTransitionError extends Error {
   }
 }
 
+export class ApprovalRequestAlreadyResumedError extends Error {
+  constructor(
+    readonly id: string,
+    readonly resumedAtMs: number,
+  ) {
+    super(`Approval request ${id} has already been resumed`);
+    this.name = 'ApprovalRequestAlreadyResumedError';
+  }
+}
+
 function rowToContract(row: ApprovalRequestRow): ApprovalRequest {
   return ApprovalRequestSchema.parse({
     id: row.id,
@@ -43,6 +53,7 @@ function rowToContract(row: ApprovalRequestRow): ApprovalRequest {
     status: row.status,
     createdAtMs: row.createdAtMs,
     decidedAtMs: row.decidedAtMs ?? undefined,
+    resumedAtMs: row.resumedAtMs ?? undefined,
     expiresAtMs: row.expiresAtMs ?? undefined,
     decisionReason: row.decisionReason ?? undefined,
   });
@@ -183,4 +194,42 @@ export function expireApprovalRequest(
   reason?: string,
 ): ApprovalRequest {
   return decideApprovalRequest(db, id, 'expired', decidedAtMs, reason);
+}
+
+export function claimApprovalRequestForResume(
+  db: DrizzleDb,
+  id: string,
+  resumedAtMs: number,
+): ApprovalRequest {
+  const current = getApprovalRequest(db, id);
+
+  if (current.resumedAtMs) {
+    throw new ApprovalRequestAlreadyResumedError(id, current.resumedAtMs);
+  }
+
+  if (current.status !== 'approved' && current.status !== 'rejected') {
+    throw new ApprovalRequestTransitionError(id, current.status, 'approved');
+  }
+
+  const result = db
+    .update(schema.approvalRequests)
+    .set({ resumedAtMs })
+    .where(
+      and(
+        eq(schema.approvalRequests.id, id),
+        isNull(schema.approvalRequests.resumedAtMs),
+        inArray(schema.approvalRequests.status, ['approved', 'rejected']),
+      ),
+    )
+    .run();
+
+  if (result.changes === 0) {
+    const latest = getApprovalRequest(db, id);
+    if (latest.resumedAtMs) {
+      throw new ApprovalRequestAlreadyResumedError(id, latest.resumedAtMs);
+    }
+    throw new ApprovalRequestTransitionError(id, latest.status, 'approved');
+  }
+
+  return getApprovalRequest(db, id);
 }

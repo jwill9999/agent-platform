@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { MessageRecord } from '@agent-platform/contracts';
+import type { MessageRecord, PersistedToolCall } from '@agent-platform/contracts';
 import { asc, eq } from 'drizzle-orm';
 
 import type { DrizzleDb } from '../database.js';
@@ -14,6 +14,10 @@ function rowToContract(row: typeof schema.messages.$inferSelect): MessageRecord 
     role: row.role as MessageRecord['role'],
     content: row.content,
     toolCallId: row.toolCallId ?? null,
+    toolCalls:
+      row.toolCallsJson && row.role === 'assistant'
+        ? (JSON.parse(row.toolCallsJson) as PersistedToolCall[])
+        : undefined,
     createdAtMs: row.createdAtMs,
   };
 }
@@ -26,6 +30,7 @@ export function appendMessage(
     role: MessageRecord['role'];
     content: string;
     toolCallId?: string;
+    toolCalls?: PersistedToolCall[];
     id?: string;
   },
 ): MessageRecord {
@@ -39,6 +44,8 @@ export function appendMessage(
       role: input.role,
       content: input.content,
       toolCallId: input.toolCallId ?? null,
+      toolCallsJson:
+        input.role === 'assistant' && input.toolCalls ? JSON.stringify(input.toolCalls) : null,
       createdAtMs: now,
     })
     .run();

@@ -7,6 +7,8 @@ import request from 'supertest';
 import type { Application } from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { restoreChatEnv, snapshotChatEnv } from './support/chatEnv.js';
+
 const mockStreamText = vi.hoisted(() => vi.fn());
 const mockToolCalls = vi.hoisted(() => vi.fn());
 
@@ -33,26 +35,6 @@ vi.mock('@ai-sdk/openai-compatible', () => ({
     (model: string) => ({ provider: name, modelId: model, apiKey, baseURL }),
 }));
 
-const CHAT_ENV_KEYS = [
-  'OPENAI_API_KEY',
-  'AGENT_OPENAI_API_KEY',
-  'OPENAI_ALLOW_LEGACY_ENV',
-] as const;
-
-function snapshotChatEnv(): Map<string, string | undefined> {
-  const snap = new Map<string, string | undefined>();
-  for (const k of CHAT_ENV_KEYS) snap.set(k, process.env[k]);
-  return snap;
-}
-
-function restoreChatEnv(snap: Map<string, string | undefined>) {
-  for (const k of CHAT_ENV_KEYS) {
-    const v = snap.get(k);
-    if (v === undefined) delete process.env[k];
-    else process.env[k] = v;
-  }
-}
-
 async function createSeededApp(
   dirs: string[],
   options: { mockLlm?: boolean } = {},
@@ -68,11 +50,19 @@ async function createSeededApp(
   const { db, sqlite } = openDatabase(sqlitePath);
   runSeed(db);
   const llmReasonNode = async (state: { taskIndex?: number; totalTokensUsed?: number }) => {
-    const calls = mockToolCalls();
-    if (!Array.isArray(calls)) throw new Error('Mock LLM response not configured');
+    const result = mockToolCalls();
+    if (typeof result === 'string') {
+      return {
+        llmOutput: { kind: 'text' as const, content: result },
+        messages: [{ role: 'assistant' as const, content: result }],
+        trace: [{ type: 'llm_call' as const, step: state.taskIndex ?? 0 }],
+        totalTokensUsed: (state.totalTokensUsed ?? 0) + 2,
+      };
+    }
+    if (!Array.isArray(result)) throw new Error('Mock LLM response not configured');
     return {
-      llmOutput: { kind: 'tool_calls' as const, calls },
-      messages: [{ role: 'assistant' as const, content: '', toolCalls: calls }],
+      llmOutput: { kind: 'tool_calls' as const, calls: result },
+      messages: [{ role: 'assistant' as const, content: '', toolCalls: result }],
       trace: [{ type: 'llm_call' as const, step: state.taskIndex ?? 0 }],
       totalTokensUsed: (state.totalTokensUsed ?? 0) + 2,
     };
@@ -97,6 +87,53 @@ function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
     toolCalls: Promise.resolve([{ toolCallId: 'tc-approval', toolName, args }]),
     usage: Promise.resolve({ promptTokens: 1, completionTokens: 1 }),
   });
+}
+
+type TestDb = ReturnType<typeof openDatabase>['db'];
+type ChatEvent = { type: string; approvalRequestId?: string; code?: string };
+
+function parseNdjsonEvents(text: string): ChatEvent[] {
+  return String(text)
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as ChatEvent);
+}
+
+async function createDefaultSession(app: Application): Promise<string> {
+  const sessionRes = await request(app).post('/v1/sessions').send({ agentId: DEFAULT_AGENT_ID });
+  expect(sessionRes.status).toBe(201);
+  return sessionRes.body.data.id;
+}
+
+async function createPendingToolApproval(app: Application, sessionId: string) {
+  mockToolCallStream('sys_bash', { command: 'date' });
+  const chatRes = await request(app)
+    .post('/v1/chat')
+    .send({ sessionId, message: 'Run date' })
+    .expect(200);
+  const events = parseNdjsonEvents(chatRes.text);
+  const approvalEvent = events.find((event) => event.type === 'approval_required');
+  expect(approvalEvent?.approvalRequestId).toEqual(expect.any(String));
+  return { approvalEvent, approvalRequestId: approvalEvent!.approvalRequestId!, events };
+}
+
+async function expectToolExecutionCount(
+  db: TestDb,
+  sessionId: string,
+  status: 'pending' | 'success',
+  expected: number,
+) {
+  const { countToolExecutions } = await import('@agent-platform/db');
+  expect(
+    countToolExecutions(db, {
+      sessionId,
+      toolName: 'sys_bash',
+      status,
+      limit: 10,
+      offset: 0,
+    }),
+  ).toBe(expected);
 }
 
 describe('POST /v1/chat (session-aware)', () => {
@@ -150,13 +187,7 @@ describe('POST /v1/chat (session-aware)', () => {
       delete process.env.AGENT_OPENAI_API_KEY;
       delete process.env.OPENAI_ALLOW_LEGACY_ENV;
 
-      // First create a session
-      const sessionRes = await request(app)
-        .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID })
-        .expect(201);
-
-      const sessionId = sessionRes.body.data.id;
+      const sessionId = await createDefaultSession(app);
 
       const res = await request(app)
         .post('/v1/chat')
@@ -175,13 +206,7 @@ describe('POST /v1/chat (session-aware)', () => {
     try {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
 
-      // Create a session, then delete the agent
-      const sessionRes = await request(app)
-        .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID })
-        .expect(201);
-
-      const sessionId = sessionRes.body.data.id;
+      const sessionId = await createDefaultSession(app);
 
       // Delete agent directly via sqlite (bypass FK checks)
       sqlite.pragma('foreign_keys = OFF');
@@ -206,12 +231,7 @@ describe('POST /v1/chat (session-aware)', () => {
     try {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
 
-      // Create a session
-      const sessionRes = await request(app)
-        .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID })
-        .expect(201);
-      sessionId = sessionRes.body.data.id;
+      sessionId = await createDefaultSession(app);
 
       // Send a message — the graph will likely error (no real LLM) but the user
       // message should already be persisted before graph execution starts.
@@ -244,25 +264,8 @@ describe('POST /v1/chat (session-aware)', () => {
     try {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
 
-      const sessionRes = await request(app)
-        .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID })
-        .expect(201);
-      const sessionId = sessionRes.body.data.id;
-
-      mockToolCallStream('sys_bash', { command: 'date' });
-
-      const res = await request(app)
-        .post('/v1/chat')
-        .send({ sessionId, message: 'Run date' })
-        .expect(200);
-
-      const events = String(res.text)
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { type: string; approvalRequestId?: string });
-      const approvalEvent = events.find((event) => event.type === 'approval_required');
+      const sessionId = await createDefaultSession(app);
+      const { approvalEvent, events } = await createPendingToolApproval(app, sessionId);
 
       expect(approvalEvent).toMatchObject({
         type: 'approval_required',
@@ -273,28 +276,96 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(approvalEvent?.approvalRequestId).toEqual(expect.any(String));
       expect(events.every((event) => event.type !== 'text')).toBe(true);
 
-      const { listApprovalRequests, countToolExecutions } = await import('@agent-platform/db');
+      const { listApprovalRequests } = await import('@agent-platform/db');
       expect(
         listApprovalRequests(db, { sessionId, status: 'pending', limit: 10, offset: 0 }),
       ).toHaveLength(1);
-      expect(
-        countToolExecutions(db, {
-          sessionId,
-          toolName: 'sys_bash',
-          status: 'pending',
-          limit: 10,
-          offset: 0,
-        }),
-      ).toBe(1);
-      expect(
-        countToolExecutions(db, {
-          sessionId,
-          toolName: 'sys_bash',
-          status: 'success',
-          limit: 10,
-          offset: 0,
-        }),
-      ).toBe(0);
+      const messages = await import('@agent-platform/db').then((mod) =>
+        mod.listMessagesBySession(db, sessionId),
+      );
+      expect(messages.find((message) => message.role === 'assistant')?.toolCalls).toEqual([
+        { id: 'tc-approval', name: 'sys_bash', args: { command: 'date' } },
+      ]);
+      await expectToolExecutionCount(db, sessionId, 'pending', 1);
+      await expectToolExecutionCount(db, sessionId, 'success', 0);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('resumes an approved pending tool call exactly once', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionId = await createDefaultSession(app);
+      const { approvalRequestId } = await createPendingToolApproval(app, sessionId);
+
+      await request(app)
+        .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+        .send({ reason: 'ok' })
+        .expect(200);
+
+      mockToolCalls.mockReturnValueOnce('Done with date');
+      const resumeRes = await request(app)
+        .post(`/v1/sessions/${sessionId}/resume`)
+        .send({ approvalRequestId })
+        .expect(200);
+
+      const events = parseNdjsonEvents(resumeRes.text);
+      expect(events.some((event) => event.type === 'tool_result')).toBe(true);
+
+      const { getApprovalRequest, listMessagesBySession } = await import('@agent-platform/db');
+      await expectToolExecutionCount(db, sessionId, 'success', 1);
+      expect(getApprovalRequest(db, approvalRequestId).resumedAtMs).toEqual(expect.any(Number));
+      expect(listMessagesBySession(db, sessionId).map((message) => message.role)).toEqual([
+        'user',
+        'assistant',
+        'tool',
+        'assistant',
+      ]);
+
+      const duplicateResume = await request(app)
+        .post(`/v1/sessions/${sessionId}/resume`)
+        .send({ approvalRequestId })
+        .expect(200);
+      expect(duplicateResume.body.data.resumedAtMs).toEqual(expect.any(Number));
+      await expectToolExecutionCount(db, sessionId, 'success', 1);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('resumes rejected approvals as tool errors visible to the agent', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionId = await createDefaultSession(app);
+      const { approvalRequestId } = await createPendingToolApproval(app, sessionId);
+
+      await request(app)
+        .post(`/v1/approval-requests/${approvalRequestId}/reject`)
+        .send({ reason: 'unsafe' })
+        .expect(200);
+
+      mockToolCalls.mockReturnValueOnce('I will continue without that tool');
+      const resumeRes = await request(app)
+        .post(`/v1/sessions/${sessionId}/resume`)
+        .send({ approvalRequestId })
+        .expect(200);
+      expect(resumeRes.text).toContain('APPROVAL_REJECTED');
+
+      const { listMessagesBySession } = await import('@agent-platform/db');
+      await expectToolExecutionCount(db, sessionId, 'success', 0);
+      const toolMessage = listMessagesBySession(db, sessionId).find(
+        (message) => message.role === 'tool',
+      );
+      expect(toolMessage?.content).toContain('APPROVAL_REJECTED');
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

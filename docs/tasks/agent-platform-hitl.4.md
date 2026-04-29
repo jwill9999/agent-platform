@@ -57,14 +57,14 @@ Implement the durable resume path so an approved pending tool call can continue 
 
 ## Definition of done
 
-- [ ] Approved pending calls resume safely and execute once.
-- [ ] Rejected pending calls produce a useful tool result/error.
-- [ ] Resume state is durable across the original chat HTTP stream ending.
-- [ ] Message persistence is compatible with future turns.
-- [ ] Beads dependencies match this spec.
+- [x] Approved pending calls resume safely and execute once.
+- [x] Rejected pending calls produce a useful tool result/error.
+- [x] Resume state is durable across the original chat HTTP stream ending.
+- [x] Message persistence is compatible with future turns.
+- [x] Beads dependencies match this spec.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-hitl.4` created from `task/agent-platform-hitl.3`.
-- [ ] Tests listed above pass.
-- [ ] `bd close agent-platform-hitl.4 --reason "..."`
+- [x] Branch `task/agent-platform-hitl.4` created from updated `feature/agent-platform-hitl`.
+- [x] Tests listed above pass.
+- [x] `bd close agent-platform-hitl.4 --reason "..."`
