@@ -43,6 +43,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Fixed HITL approval resume to reuse the selected model config and block new prompts while an approval is unresolved.
 - **Date:** 2026-04-29
 - **Session:** Fixed approval-resume draft accumulation across DoD revisions and stopped DoD cap failures from showing as global chat errors.
+- **Date:** 2026-04-29
+- **Session:** Added spacing above the final critic review block in chat output.
 
 ### Session-close guardrail (required)
 
@@ -104,6 +106,7 @@ HITL.5 progress:
 - Blocked the chat composer while an approval card is pending/approving/rejecting/failed to prevent overlapping normal prompts and resume output from interleaving.
 - Reused normal-chat revision reset behavior for approval resume streams so repeated DoD drafts do not concatenate duplicate command output.
 - Rendered `DOD_FAILED` as critic cap metadata rather than a dismissible global error banner.
+- Added top margin to the final critic review block so it no longer sits tight against the assistant answer paragraph.
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
