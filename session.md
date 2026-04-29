@@ -29,6 +29,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-hitl.4` durable approval resume execution on `task/agent-platform-hitl.4`; ready for PR into `feature/agent-platform-hitl`.
 - **Date:** 2026-04-29
 - **Session:** Queried SonarCloud PR `#93` duplicate-code metrics; refactored shared chat test helpers and amended `agent-platform-hitl.4`.
+- **Date:** 2026-04-29
+- **Session:** Refactored `chatRouter.ts` runtime error/finalization helpers to clear remaining SonarCloud duplicate-code block.
 
 ### Session-close guardrail (required)
 
@@ -57,6 +59,7 @@ Branch `task/agent-platform-hitl.4`.
   - `apps/api/src/infrastructure/http/v1/chatRouter.ts` — 25 lines
   - `apps/api/test/sessionChat.integration.test.ts` — 41 lines
 - Refactored `chatRouter.ts` runtime graph/tool-dispatch setup into shared helpers before this handoff.
+- Refactored repeated runtime failure/finalization handling in `chatRouter.ts` after SonarCloud still reported a 25-line duplicate block.
 - Refactored chat test environment handling into `apps/api/test/support/chatEnv.ts`.
 - Extracted repeated session/approval/event/count helpers from `sessionChat.integration.test.ts`.
 

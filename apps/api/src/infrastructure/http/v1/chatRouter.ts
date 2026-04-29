@@ -490,6 +490,54 @@ function buildRuntimeGraph(
   });
 }
 
+async function emitRuntimeFailure(
+  agentCtx: AgentContext,
+  sessionId: string,
+  runId: string,
+  signal: AbortSignal,
+  res: Response,
+  err: unknown,
+) {
+  await safePluginCall(() =>
+    agentCtx.pluginDispatcher.onTaskEnd({
+      sessionId,
+      runId,
+      taskId: runId,
+      ok: false,
+      detail: err instanceof Error ? err.message : String(err),
+    }),
+  );
+  await safePluginCall(() =>
+    agentCtx.pluginDispatcher.onError({
+      sessionId,
+      runId,
+      phase: signal.aborted && signal.reason === 'timeout' ? 'session' : 'unknown',
+      error: err,
+    }),
+  );
+  emitStreamError(res, err, signal);
+}
+
+async function closeRuntimeStream({
+  timeoutId,
+  heartbeatId,
+  release,
+  agentCtx,
+  res,
+}: {
+  timeoutId?: ReturnType<typeof setTimeout>;
+  heartbeatId?: ReturnType<typeof setInterval>;
+  release: () => void;
+  agentCtx: AgentContext;
+  res: Response;
+}) {
+  if (timeoutId) clearTimeout(timeoutId);
+  if (heartbeatId) clearInterval(heartbeatId);
+  release();
+  await destroyAgentContext(agentCtx);
+  if (!res.writableEnded) res.end();
+}
+
 export async function handleSessionResume(
   db: DrizzleDb,
   options: ChatRouterOptions,
@@ -623,30 +671,9 @@ export async function handleSessionResume(
     if (!res.headersSent && err instanceof HttpError) {
       throw err;
     }
-    await safePluginCall(() =>
-      agentCtx.pluginDispatcher.onTaskEnd({
-        sessionId,
-        runId,
-        taskId: runId,
-        ok: false,
-        detail: err instanceof Error ? err.message : String(err),
-      }),
-    );
-    await safePluginCall(() =>
-      agentCtx.pluginDispatcher.onError({
-        sessionId,
-        runId,
-        phase: signal.aborted && signal.reason === 'timeout' ? 'session' : 'unknown',
-        error: err,
-      }),
-    );
-    emitStreamError(res, err, signal);
+    await emitRuntimeFailure(agentCtx, sessionId, runId, signal, res, err);
   } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-    if (heartbeatId) clearInterval(heartbeatId);
-    release();
-    await destroyAgentContext(agentCtx);
-    if (!res.writableEnded) res.end();
+    await closeRuntimeStream({ timeoutId, heartbeatId, release, agentCtx, res });
   }
 }
 
@@ -756,30 +783,9 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           }),
         );
       } catch (err) {
-        await safePluginCall(() =>
-          agentCtx.pluginDispatcher.onTaskEnd({
-            sessionId,
-            runId,
-            taskId: runId,
-            ok: false,
-            detail: err instanceof Error ? err.message : String(err),
-          }),
-        );
-        await safePluginCall(() =>
-          agentCtx.pluginDispatcher.onError({
-            sessionId,
-            runId,
-            phase: signal.aborted && signal.reason === 'timeout' ? 'session' : 'unknown',
-            error: err,
-          }),
-        );
-        emitStreamError(res, err, signal);
+        await emitRuntimeFailure(agentCtx, sessionId, runId, signal, res, err);
       } finally {
-        if (timeoutId) clearTimeout(timeoutId);
-        if (heartbeatId) clearInterval(heartbeatId);
-        release();
-        await destroyAgentContext(agentCtx);
-        if (!res.writableEnded) res.end();
+        await closeRuntimeStream({ timeoutId, heartbeatId, release, agentCtx, res });
       }
     }),
   );
