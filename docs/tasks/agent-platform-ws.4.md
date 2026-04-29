@@ -32,7 +32,7 @@ Add API and UI support for inspecting files in the configured workspace. Users s
 
 | Issue                 | Spec                             |
 | --------------------- | -------------------------------- |
-| `agent-platform-ws.5` | [Spec](./agent-platform-ws.5.md) |
+| `agent-platform-ws.6` | [Spec](./agent-platform-ws.6.md) |
 
 ### Planning notes
 

@@ -57,6 +57,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Started workspace storage epic on `task/agent-platform-ws.1`; documented host workspace conventions and config names for Linux, macOS, and Windows.
 - **Date:** 2026-04-29
 - **Session:** Completed `agent-platform-ws.1a` platform behavior: workspace config resolver, `make workspace-init`, startup lifecycle wiring, and PathJail-backed file path normalization.
+- **Date:** 2026-04-29
+- **Session:** Added backlog task `agent-platform-ws.6` for guarded host workspace data removal on uninstall/reset.
 
 ### Session-close guardrail (required)
 
@@ -80,13 +82,15 @@ Branch state: `codex/workspace-storage-planning` contains planning artifacts onl
   - `agent-platform-ws.2` Mount workspace storage into Docker runtime.
   - `agent-platform-ws.3` Enforce workspace PathJail and tool policy.
   - `agent-platform-ws.4` Expose workspace files in the UI and API.
+  - `agent-platform-ws.6` Add guarded workspace data removal flow.
   - `agent-platform-ws.5` Verify workspace security, HITL, and e2e flows.
 - Added task specs under `docs/tasks/agent-platform-ws*.md`.
 - Planned feature branch: `feature/agent-platform-workspace-storage`.
-- Planned task chain: `task/agent-platform-ws.1` -> `task/agent-platform-ws.1a` -> `task/agent-platform-ws.2` -> `task/agent-platform-ws.3` -> `task/agent-platform-ws.4` -> `task/agent-platform-ws.5`.
+- Planned task chain: `task/agent-platform-ws.1` -> `task/agent-platform-ws.1a` -> `task/agent-platform-ws.2` -> `task/agent-platform-ws.3` -> `task/agent-platform-ws.4` -> `task/agent-platform-ws.6` -> `task/agent-platform-ws.5`.
 - Core design direction: host workspace lives in an OS-conventional app home and mounts into Docker at `/workspace`; app data remains separate; file tools are jailed; high-risk operations keep HITL approval.
   Skills may later guide agents on where to place files, but config, setup, host mapping, and security enforcement belong to the platform.
 - First-run lifecycle commands such as `make up`, `make restart`, `make reset`, and `make new` should invoke workspace setup automatically before Docker starts. A focused setup target such as `make workspace-init` should also exist for manual preparation.
+- Host data removal should be separate from Docker cleanup, use dry-run/confirmation safeguards, and refuse broad unsafe paths.
 
 ### HITL epic complete
 
