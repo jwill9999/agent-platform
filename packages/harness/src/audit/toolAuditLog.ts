@@ -85,6 +85,7 @@ export interface ToolAuditLogger {
     args: Record<string, unknown>,
     agentId: string,
     sessionId: string,
+    riskTier?: RiskTier,
   ): string | null;
 
   /** Log completion of a tool execution. */
@@ -97,6 +98,7 @@ export interface ToolAuditLogger {
     agentId: string,
     sessionId: string,
     reason: string,
+    riskTier?: RiskTier,
   ): void;
 }
 
@@ -104,11 +106,11 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
   const startTimes = new Map<string, number>();
 
   return {
-    logStart(toolName, args, agentId, sessionId) {
-      if (isZeroRisk(toolName)) return null;
+    logStart(toolName, args, agentId, sessionId, riskTierOverride) {
+      const riskTier = riskTierOverride ?? SYSTEM_TOOL_RISK[toolName];
+      if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return null;
 
       const id = randomUUID();
-      const riskTier = SYSTEM_TOOL_RISK[toolName];
       const redacted = redactArgs(args);
       const now = Date.now();
 
@@ -144,11 +146,11 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       });
     },
 
-    logDenied(toolName, args, agentId, sessionId, reason) {
-      if (isZeroRisk(toolName)) return;
+    logDenied(toolName, args, agentId, sessionId, reason, riskTierOverride) {
+      const riskTier = riskTierOverride ?? SYSTEM_TOOL_RISK[toolName];
+      if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return;
 
       const id = randomUUID();
-      const riskTier = SYSTEM_TOOL_RISK[toolName];
       const redacted = redactArgs(args);
       const now = Date.now();
 

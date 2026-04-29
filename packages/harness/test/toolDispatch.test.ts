@@ -5,6 +5,7 @@ import type { Agent, Output } from '@agent-platform/contracts';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { NativeToolExecutor } from '../src/types.js';
+import type { ToolAuditLogger } from '../src/audit/toolAuditLog.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -238,6 +239,121 @@ describe('toolDispatchNode', () => {
       mcpManager: makeMcpManager(),
     };
     await dispatchExpectingError(ctx, { id: 'tc-6', name: 'echo', args: {} }, 'TOOL_NOT_FOUND');
+  });
+
+  it('gates high-risk system tools before execution', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { exitCode: 0 },
+    });
+    const logDenied = vi.fn();
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied,
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-approval',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-approval', name: 'sys_bash', args: { command: 'date' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(logDenied).toHaveBeenCalledWith(
+      'sys_bash',
+      { command: 'date' },
+      'agent-1',
+      'session-approval',
+      'Tool is marked as requiring human approval.',
+      'high',
+    );
+    expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+      error: 'APPROVAL_REQUIRED',
+    });
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({
+        type: 'tool_approval_required',
+        toolId: 'sys_bash',
+        riskTier: 'high',
+      }),
+    );
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({ type: 'tool_dispatch', toolId: 'sys_bash', ok: false }),
+    );
+  });
+
+  it('gates registry tools that explicitly require approval', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'echo',
+      data: 'should not execute',
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      tools: [
+        {
+          id: 'echo',
+          slug: 'echo',
+          name: 'echo',
+          riskTier: 'low',
+          requiresApproval: true,
+        },
+      ],
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-registry-approval', name: 'echo', args: { text: 'hi' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(JSON.parse(result.messages![0]!.content).error).toBe('APPROVAL_REQUIRED');
+  });
+
+  it('continues executing ordinary low-risk registry tools', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'echo',
+      data: 'ok',
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      tools: [{ id: 'echo', slug: 'echo', name: 'echo', riskTier: 'low' }],
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-low-risk', name: 'echo', args: { text: 'hi' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).toHaveBeenCalledWith('echo', { text: 'hi' });
   });
 
   it('handles multiple tool calls in single dispatch', async () => {

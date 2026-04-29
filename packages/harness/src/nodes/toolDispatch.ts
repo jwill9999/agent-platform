@@ -1,4 +1,4 @@
-import type { Agent, Output, Skill } from '@agent-platform/contracts';
+import type { Agent, Output, Skill, Tool as ContractTool } from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
@@ -12,10 +12,11 @@ import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
 import { ToolRateLimiter } from '../security/rateLimiter.js';
-import { isSystemTool, GET_SKILL_DETAIL_ID } from '../systemTools.js';
+import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
 import { scanOutput } from '../security/outputGuard.js';
+import { requiresHumanApproval } from '../security/approvalPolicy.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -23,6 +24,7 @@ import { scanOutput } from '../security/outputGuard.js';
 
 export type ToolDispatchContext = {
   agent: Agent;
+  tools?: readonly ContractTool[];
   mcpManager: McpSessionManager;
   nativeToolExecutor?: NativeToolExecutor;
   emitter?: OutputEmitter;
@@ -166,6 +168,24 @@ async function dispatchSingleTool(
   const parsed = parseToolId(call.name);
   if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, call, ctx, options);
   return dispatchNativeTool(call, ctx);
+}
+
+function resolveToolMetadata(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+): ContractTool | undefined {
+  return (
+    ctx.tools?.find((tool) => tool.id === call.name) ??
+    SYSTEM_TOOLS.find((tool) => tool.id === call.name)
+  );
+}
+
+function buildApprovalRequiredOutput(call: ToolCallIntent, reason: string): Output {
+  return {
+    type: 'error',
+    code: 'APPROVAL_REQUIRED',
+    message: `Tool "${call.name}" requires human approval before execution. ${reason}`,
+  };
 }
 
 /**
@@ -557,10 +577,48 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         continue;
       }
 
+      const toolMetadata = resolveToolMetadata(call, ctx);
+      const approval = toolMetadata
+        ? requiresHumanApproval(toolMetadata)
+        : { required: false as const };
+      if (approval.required) {
+        const reason = approval.reason ?? 'Approval policy requires human review.';
+        const output = buildApprovalRequiredOutput(call, reason);
+        ctx.auditLog?.logDenied(
+          call.name,
+          call.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          reason,
+          approval.riskTier,
+        );
+        await emitToolOutput(ctx, output);
+        toolMessages.push({
+          role: 'tool',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: outputToContent(call.name, output),
+        });
+        traceEvents.push({
+          type: 'tool_approval_required',
+          toolId: call.name,
+          step,
+          riskTier: approval.riskTier,
+        });
+        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        continue;
+      }
+
       await fireToolCallHook(ctx, state, call);
 
       const auditId =
-        ctx.auditLog?.logStart(call.name, call.args, ctx.agent.id, state.sessionId ?? '') ?? null;
+        ctx.auditLog?.logStart(
+          call.name,
+          call.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          toolMetadata?.riskTier,
+        ) ?? null;
 
       const { output, ok, retryCount, images } = await executeToolWithRetry(
         call,
