@@ -7,8 +7,10 @@ import { fileURLToPath } from 'node:url';
 
 import * as schema from '../src/schema.js';
 import {
+  ApprovalRequestAlreadyResumedError,
   ApprovalRequestTransitionError,
   approveApprovalRequest,
+  claimApprovalRequestForResume,
   countApprovalRequests,
   createApprovalRequest,
   expireApprovalRequest,
@@ -118,6 +120,32 @@ describe('approvalRequests repository', () => {
 
     expect(second).toEqual(first);
     expect(() => rejectApprovalRequest(ctx.db, 'approval-1', 5000, 'no')).toThrow(
+      ApprovalRequestTransitionError,
+    );
+  });
+
+  it('claims approved or rejected requests for resume once', () => {
+    createPending(ctx, 'approval-approve');
+    createPending(ctx, 'approval-reject');
+    approveApprovalRequest(ctx.db, 'approval-approve', 3000, 'ok');
+    rejectApprovalRequest(ctx.db, 'approval-reject', 3100, 'unsafe');
+
+    expect(claimApprovalRequestForResume(ctx.db, 'approval-approve', 4000).resumedAtMs).toBe(4000);
+    expect(claimApprovalRequestForResume(ctx.db, 'approval-reject', 4100).resumedAtMs).toBe(4100);
+    expect(() => claimApprovalRequestForResume(ctx.db, 'approval-approve', 5000)).toThrow(
+      ApprovalRequestAlreadyResumedError,
+    );
+  });
+
+  it('does not claim pending or expired approvals for resume', () => {
+    createPending(ctx, 'approval-pending');
+    createPending(ctx, 'approval-expired');
+    expireApprovalRequest(ctx.db, 'approval-expired', 3000, 'old');
+
+    expect(() => claimApprovalRequestForResume(ctx.db, 'approval-pending', 4000)).toThrow(
+      ApprovalRequestTransitionError,
+    );
+    expect(() => claimApprovalRequestForResume(ctx.db, 'approval-expired', 4000)).toThrow(
       ApprovalRequestTransitionError,
     );
   });

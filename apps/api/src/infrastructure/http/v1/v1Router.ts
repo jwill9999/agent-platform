@@ -20,6 +20,7 @@ import { createSkillsRouter } from './skillsRouter.js';
 import { createToolsRouter } from './toolsRouter.js';
 import { createToolExecutionsRouter } from './toolExecutionsRouter.js';
 import { createDynamicRateLimiter } from '../dynamicRateLimiter.js';
+import { createInProcessSessionLock } from '../sessionLock.js';
 
 const observabilityLog = createLogger('api:observability');
 
@@ -41,6 +42,7 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   ];
 
   const rateLimiter = createDynamicRateLimiter();
+  const sessionLock = createInProcessSessionLock();
 
   // Hydrate rate limiter from persisted settings on startup
   const persisted = loadSettings(db);
@@ -57,12 +59,21 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   router.use('/tools', createToolsRouter(db));
   router.use('/mcp-servers', createMcpServersRouter(db));
   router.use('/agents', createAgentsRouter(db));
-  router.use('/sessions', createSessionsRouter(db));
+  router.use(
+    '/sessions',
+    createSessionsRouter(db, {
+      globalPlugins,
+      observabilityStore,
+      sessionLock,
+      ...options.chat,
+    }),
+  );
   router.use(
     '/chat',
     createChatRouter(db, {
       globalPlugins,
       observabilityStore,
+      sessionLock,
       ...options.chat,
     }),
   );

@@ -8,26 +8,7 @@ import type { Application } from 'express';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/infrastructure/http/createApp.js';
-
-const CHAT_ENV_KEYS = [
-  'OPENAI_API_KEY',
-  'AGENT_OPENAI_API_KEY',
-  'OPENAI_ALLOW_LEGACY_ENV',
-] as const;
-
-function snapshotChatEnv(): Map<string, string | undefined> {
-  const snap = new Map<string, string | undefined>();
-  for (const k of CHAT_ENV_KEYS) snap.set(k, process.env[k]);
-  return snap;
-}
-
-function restoreChatEnv(snap: Map<string, string | undefined>) {
-  for (const k of CHAT_ENV_KEYS) {
-    const v = snap.get(k);
-    if (v === undefined) delete process.env[k];
-    else process.env[k] = v;
-  }
-}
+import { restoreChatEnv, snapshotChatEnv } from './support/chatEnv.js';
 
 function createSeededChatApp(dirs: string[]): {
   app: Application;

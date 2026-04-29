@@ -204,6 +204,7 @@ export const messages = sqliteTable('messages', {
   role: text('role').notNull(), // user | assistant | system | tool
   content: text('content').notNull(),
   toolCallId: text('tool_call_id'),
+  toolCallsJson: text('tool_calls_json'),
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
 });
 
@@ -242,6 +243,7 @@ export const approvalRequests = sqliteTable('approval_requests', {
   status: text('status').notNull().default('pending'),
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
   decidedAtMs: integer('decided_at_ms', { mode: 'number' }),
+  resumedAtMs: integer('resumed_at_ms', { mode: 'number' }),
   expiresAtMs: integer('expires_at_ms', { mode: 'number' }),
   decisionReason: text('decision_reason'),
 });

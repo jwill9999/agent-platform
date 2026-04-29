@@ -77,6 +77,22 @@ describe('message repository', () => {
     expect(msgs[0]!.toolCallId).toBe('call-123');
   });
 
+  it('stores assistant tool calls for replay', () => {
+    appendMessage(db, {
+      sessionId,
+      role: 'assistant',
+      content: '',
+      toolCalls: [{ id: 'call-123', name: 'sys_bash', args: { command: 'date' } }],
+    });
+
+    const msgs = listMessagesBySession(db, sessionId);
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]!.role).toBe('assistant');
+    expect(msgs[0]!.toolCalls).toEqual([
+      { id: 'call-123', name: 'sys_bash', args: { command: 'date' } },
+    ]);
+  });
+
   it('returns empty array for session with no messages', () => {
     const msgs = listMessagesBySession(db, sessionId);
     expect(msgs).toEqual([]);
