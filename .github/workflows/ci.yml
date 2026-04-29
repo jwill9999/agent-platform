@@ -4,7 +4,7 @@ on:
   pull_request:
     branches:
       - main
-      - "feature/**"
+      - 'feature/**'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20"
+          node-version: '20'
           cache: pnpm
 
       - name: Install
@@ -71,6 +71,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   e2e:
+    needs: docker
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -83,7 +84,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20"
+          node-version: '20'
           cache: pnpm
 
       - name: Install
@@ -94,6 +95,19 @@ jobs:
 
       - name: Start API + web (compose profile services)
         run: docker compose --profile services up -d --build
+
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3000/health >/dev/null; then
+              echo "api ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "api did not become ready"
+          docker compose --profile services ps
+          exit 1
 
       - name: Wait for web
         run: |
@@ -109,7 +123,7 @@ jobs:
           exit 1
 
       - name: E2E seed (default + specialist/MCP/skill)
-        run: docker compose exec -T api sh -c 'E2E_SEED=1 SQLITE_PATH=/data/agent.sqlite node packages/db/dist/seed/run.js'
+        run: docker compose exec -T --env E2E_SEED=1 api node packages/db/dist/seed/run.js
 
       - name: E2E tests
         env:
@@ -123,6 +137,21 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+
+      - name: Collect docker logs
+        if: failure()
+        run: |
+          docker compose --profile services ps > docker-compose-ps.txt || true
+          docker compose logs --no-color api > api-logs.txt || true
+
+      - name: Upload docker logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: docker-logs
+          path: |
+            docker-compose-ps.txt
+            api-logs.txt
 
       - name: Stop compose
         if: always()
