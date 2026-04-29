@@ -448,6 +448,40 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     [],
   );
 
+  const streamAssistantResponse = useCallback(
+    async (assistantId: string, body: ReadableStream<Uint8Array>): Promise<string> => {
+      let accumulated = '';
+      let pendingRevisionReset = false;
+      await readNdjsonStream(
+        body,
+        (chunk) => {
+          if (!chunk) return;
+          if (pendingRevisionReset) {
+            accumulated = chunk;
+            pendingRevisionReset = false;
+          } else {
+            accumulated += chunk;
+          }
+        },
+        (msg) => setError(msg),
+        (event) => {
+          appendCriticEvent(assistantId, event);
+          if (event.kind === 'revise') {
+            pendingRevisionReset = true;
+            setThinkingByMessage((prev) => ({
+              ...prev,
+              [assistantId]: THINKING_REVISE_PLACEHOLDER,
+            }));
+          }
+        },
+        (chunk) => appendThinking(assistantId, chunk),
+        (event) => appendApprovalRequired(assistantId, event),
+      );
+      return accumulated;
+    },
+    [appendApprovalRequired, appendCriticEvent, appendThinking],
+  );
+
   const sendMessage = useCallback(
     async (messageForApi: string, displayText?: string, modelConfigId?: string | null) => {
       const trimmed = messageForApi.trim();
@@ -479,35 +513,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         if (!res.ok) throw new Error(await parseErrorResponse(res));
         if (!res.body) throw new Error('No response body');
 
-        let accumulated = '';
-        let pendingRevisionReset = false;
-        await readNdjsonStream(
-          res.body,
-          (chunk) => {
-            if (!chunk) return;
-            if (pendingRevisionReset) {
-              // Keep the previous draft visible until a new revision starts producing text.
-              accumulated = chunk;
-              pendingRevisionReset = false;
-            } else {
-              accumulated += chunk;
-            }
-          },
-          (msg) => setError(msg),
-          (event) => {
-            appendCriticEvent(assistantId, event);
-            if (event.kind === 'revise') {
-              // A critic revise starts a fresh draft iteration; replace prior text.
-              pendingRevisionReset = true;
-              setThinkingByMessage((prev) => ({
-                ...prev,
-                [assistantId]: THINKING_REVISE_PLACEHOLDER,
-              }));
-            }
-          },
-          (chunk) => appendThinking(assistantId, chunk),
-          (event) => appendApprovalRequired(assistantId, event),
-        );
+        const accumulated = await streamAssistantResponse(assistantId, res.body);
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
         updateAssistantMessage(assistantId, accumulated);
@@ -545,14 +551,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         setStatus('ready');
       }
     },
-    [
-      sessionId,
-      hasPendingApproval,
-      updateAssistantMessage,
-      appendCriticEvent,
-      appendThinking,
-      appendApprovalRequired,
-    ],
+    [sessionId, hasPendingApproval, updateAssistantMessage, streamAssistantResponse],
   );
 
   const decideApproval = useCallback(
@@ -590,33 +589,8 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         if (!res.ok) throw new Error(await parseErrorResponse(res));
 
         let accumulated = '';
-        let pendingRevisionReset = false;
         if (res.body && !res.headers.get('content-type')?.includes('application/json')) {
-          await readNdjsonStream(
-            res.body,
-            (chunk) => {
-              if (!chunk) return;
-              if (pendingRevisionReset) {
-                accumulated = chunk;
-                pendingRevisionReset = false;
-              } else {
-                accumulated += chunk;
-              }
-            },
-            (msg) => setError(msg),
-            (event) => {
-              appendCriticEvent(assistantId, event);
-              if (event.kind === 'revise') {
-                pendingRevisionReset = true;
-                setThinkingByMessage((prev) => ({
-                  ...prev,
-                  [assistantId]: THINKING_REVISE_PLACEHOLDER,
-                }));
-              }
-            },
-            (chunk) => appendThinking(assistantId, chunk),
-            (event) => appendApprovalRequired(assistantId, event),
-          );
+          accumulated = await streamAssistantResponse(assistantId, res.body);
         }
 
         updateAssistantMessage(assistantId, accumulated);
@@ -640,15 +614,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         setStatus('ready');
       }
     },
-    [
-      sessionId,
-      status,
-      setApprovalStatus,
-      updateAssistantMessage,
-      appendCriticEvent,
-      appendThinking,
-      appendApprovalRequired,
-    ],
+    [sessionId, status, setApprovalStatus, updateAssistantMessage, streamAssistantResponse],
   );
 
   return {

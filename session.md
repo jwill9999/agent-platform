@@ -47,6 +47,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added spacing above the final critic review block in chat output.
 - **Date:** 2026-04-29
 - **Session:** Made shell command failure results feed back to the assistant in plain language instead of raw stdout/stderr/exitCode jargon.
+- **Date:** 2026-04-29
+- **Session:** Refactored duplicated HITL stream/lifecycle handling in `chatRouter.ts` and `use-harness-chat.ts` for SonarCloud PR 94.
 
 ### Session-close guardrail (required)
 
@@ -110,6 +112,7 @@ HITL.5 progress:
 - Rendered `DOD_FAILED` as critic cap metadata rather than a dismissible global error banner.
 - Added top margin to the final critic review block so it no longer sits tight against the assistant answer paragraph.
 - Formatted `sys_bash` tool messages for the follow-up LLM step as plain-language success/failure summaries, reducing raw coding jargon in assistant answers after command errors.
+- Extracted shared approval/chat stream parsing in the web hook and shared NDJSON lifecycle/task-start setup in the API chat router to reduce new-code duplication.
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 

@@ -544,6 +544,38 @@ async function emitRuntimeFailure(
   emitStreamError(res, err, signal);
 }
 
+async function emitTaskStart(agentCtx: AgentContext, sessionId: string, runId: string) {
+  await safePluginCall(() =>
+    agentCtx.pluginDispatcher.onTaskStart({
+      sessionId,
+      runId,
+      planId: runId,
+      taskId: runId,
+      toolIds: agentCtx.tools.map((tool) => tool.id),
+    }),
+  );
+}
+
+function startRuntimeResponse(
+  req: Request,
+  res: Response,
+  controller: AbortController,
+  timeoutMs: number,
+): {
+  timeoutId: ReturnType<typeof setTimeout>;
+  heartbeatId: ReturnType<typeof setInterval>;
+} {
+  prepareNdjsonResponse(res);
+  req.on('close', () => {
+    if (!res.writableFinished) controller.abort('client_disconnect');
+  });
+  const timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
+  const heartbeatId = setInterval(() => {
+    if (!res.writableEnded) res.write('\n');
+  }, 15_000);
+  return { timeoutId, heartbeatId };
+}
+
 async function closeRuntimeStream({
   timeoutId,
   heartbeatId,
@@ -619,26 +651,9 @@ export async function handleSessionResume(
       mapResumeApprovalError(error);
     }
 
-    await safePluginCall(() =>
-      agentCtx.pluginDispatcher.onTaskStart({
-        sessionId,
-        runId,
-        planId: runId,
-        taskId: runId,
-        toolIds: agentCtx.tools.map((tool) => tool.id),
-      }),
-    );
-
-    prepareNdjsonResponse(res);
+    await emitTaskStart(agentCtx, sessionId, runId);
+    ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
     const emitter: OutputEmitter = createNdjsonEmitter(res);
-
-    req.on('close', () => {
-      if (!res.writableFinished) controller.abort('client_disconnect');
-    });
-    timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
-    heartbeatId = setInterval(() => {
-      if (!res.writableEnded) res.write('\n');
-    }, 15_000);
 
     const messages = buildResumeMessages(db, sessionId, agentCtx.systemPrompt, toolCall);
     const initialCount = messages.length;
@@ -753,33 +768,11 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           }),
         );
 
-        prepareNdjsonResponse(res);
+        ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
         const emitter: OutputEmitter = createNdjsonEmitter(res);
         const dispatcher = agentCtx.pluginDispatcher;
 
-        await safePluginCall(() =>
-          dispatcher.onTaskStart({
-            sessionId,
-            runId,
-            planId: runId,
-            taskId: runId,
-            toolIds: agentCtx.tools.map((tool) => tool.id),
-          }),
-        );
-
-        // Abort on client disconnect
-        req.on('close', () => {
-          if (!res.writableFinished) controller.abort('client_disconnect');
-        });
-
-        // Abort on timeout
-        timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
-
-        // Heartbeat: emit empty NDJSON lines to keep the body stream alive
-        // during long MCP tool executions (prevents undici body timeout).
-        heartbeatId = setInterval(() => {
-          if (!res.writableEnded) res.write('\n');
-        }, 15_000);
+        await emitTaskStart(agentCtx, sessionId, runId);
 
         const graph = buildRuntimeGraph(db, agentCtx, runId, sessionId, emitter, options);
 
