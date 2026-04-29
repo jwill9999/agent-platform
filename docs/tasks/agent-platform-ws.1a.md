@@ -25,6 +25,8 @@ The agent should not need a skill or knowledge of the host filesystem to map fil
   - `workspaces/default/scratch/`
   - `workspaces/default/exports/`
   - `logs/`
+- Wire workspace setup into first-run and lifecycle Makefile commands so `make up`, `make restart`, `make reset`, and `make new` prepare the required host directories before Docker starts.
+- Expose a focused setup command, for example `make workspace-init`, for users who want to prepare or inspect the workspace without starting services.
 - Ensure the repo-local `.agent-platform/` fallback is ignored by Git.
 - Ensure file tools accept and return workspace-relative paths where possible.
 - Add initial PathJail enforcement around workspace path resolution.
@@ -54,14 +56,16 @@ This task is the bridge between documentation and runtime wiring. Keep it focuse
 1. Read the workspace convention from `agent-platform-ws.1` and update it if implementation needs a different config name.
 2. Add a small workspace configuration resolver with deterministic defaults for Linux, macOS, Windows, and repo-local dev.
 3. Add setup script or Makefile behavior that creates the required folder tree idempotently.
-4. Wire workspace path normalization through the existing PathJail module.
-5. Update file tool contracts or adapters so user-facing paths are workspace-relative where possible.
-6. Add documentation explaining that agent skills are optional workflow guidance only.
+4. Call that setup from `make up`, `make restart`, `make reset`, and `make new` before `docker compose up`.
+5. Wire workspace path normalization through the existing PathJail module.
+6. Update file tool contracts or adapters so user-facing paths are workspace-relative where possible.
+7. Add documentation explaining that agent skills are optional workflow guidance only.
 
 ## Tests
 
 - Unit tests for OS-specific default path resolution.
 - Unit tests for idempotent directory setup behavior.
+- Makefile or script test showing first-run setup is invoked by the documented startup commands.
 - Unit tests for workspace-relative path normalization.
 - Unit tests for traversal and outside-workspace denial.
 - Formatting and typecheck for changed files.
@@ -70,6 +74,8 @@ This task is the bridge between documentation and runtime wiring. Keep it focuse
 
 - [ ] Config resolves OS-specific host workspace defaults and `/workspace` container default.
 - [ ] Setup scripts create the documented host folder structure.
+- [ ] `make up`, `make restart`, `make reset`, and `make new` run workspace setup automatically.
+- [ ] A focused workspace setup command exists for manual preparation.
 - [ ] `.agent-platform/` dev fallback is ignored by Git.
 - [ ] File tools use workspace-relative paths where possible.
 - [ ] PathJail blocks traversal and outside-workspace paths.

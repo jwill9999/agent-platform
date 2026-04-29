@@ -14,7 +14,8 @@ Mount the configured host workspace into the Docker runtime at `/workspace`, whi
 
 - Mount the host workspace path to `/workspace` in relevant Docker services.
 - Mount app data to a separate container path, for example `/data`.
-- Ensure setup scripts or Makefile targets create required host directories before compose starts.
+- Ensure setup scripts or Makefile targets from `agent-platform-ws.1a` create required host directories before compose starts.
+- Confirm the normal first-run command path requires no manual workspace setup beyond documented env overrides.
 - Keep source code mounts separate from user workspace mounts.
 - Document how to override the workspace host path for Linux, macOS, and Windows.
 - Preserve the existing SQLite/runtime behavior unless intentionally moved and tested.
@@ -40,7 +41,7 @@ Approval and PathJail behavior are not implemented here. This task only makes th
 ## Implementation plan
 
 1. Review `docker-compose.yml`, Dockerfiles, Makefile targets, and seed/reset scripts.
-2. Add directory creation for the configured host paths.
+2. Verify lifecycle targets run the workspace setup prerequisite before compose starts.
 3. Add compose mounts for `/workspace` and separated app data.
 4. Update docs for local startup and path overrides.
 5. Test persistence by creating a file in `/workspace`, restarting Docker, and confirming it remains.
@@ -49,6 +50,7 @@ Approval and PathJail behavior are not implemented here. This task only makes th
 
 - Run Docker compose config validation.
 - Run the documented startup path, preferably `make up` or the closest focused target.
+- Verify a fresh checkout can run the normal startup command without manually creating workspace directories.
 - Verify `/workspace` exists in the API container and persists across restart.
 - Verify app data remains separate from workspace data.
 
@@ -57,6 +59,7 @@ Approval and PathJail behavior are not implemented here. This task only makes th
 - [ ] Host workspace mounts to `/workspace`.
 - [ ] App data mounts separately from user files.
 - [ ] Setup creates required directories.
+- [ ] First-run startup commands perform workspace setup automatically.
 - [ ] Local dev flow is documented and repeatable.
 - [ ] Docker restart preserves files written under `/workspace`.
 

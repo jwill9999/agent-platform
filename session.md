@@ -82,6 +82,7 @@ Branch state: `codex/workspace-storage-planning` contains planning artifacts onl
 - Planned task chain: `task/agent-platform-ws.1` -> `task/agent-platform-ws.1a` -> `task/agent-platform-ws.2` -> `task/agent-platform-ws.3` -> `task/agent-platform-ws.4` -> `task/agent-platform-ws.5`.
 - Core design direction: host workspace lives in an OS-conventional app home and mounts into Docker at `/workspace`; app data remains separate; file tools are jailed; high-risk operations keep HITL approval.
   Skills may later guide agents on where to place files, but config, setup, host mapping, and security enforcement belong to the platform.
+- First-run lifecycle commands such as `make up`, `make restart`, `make reset`, and `make new` should invoke workspace setup automatically before Docker starts. A focused setup target such as `make workspace-init` should also exist for manual preparation.
 
 ### HITL epic complete
 

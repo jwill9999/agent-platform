@@ -35,6 +35,7 @@ This epic does not grant agents broad access to the developer's host filesystem.
   - macOS: `~/Library/Application Support/AgentPlatform`
   - Windows: `%LOCALAPPDATA%\\AgentPlatform`
 - Provide a repo-local development fallback such as `.agent-platform/`, but keep it ignored by Git.
+- First-run Makefile lifecycle commands must prepare the workspace automatically before Docker starts.
 - Enforce PathJail checks before every file operation, including path normalization and symlink traversal.
 - Keep high-risk and explicitly approval-required tools behind HITL. Approval allows the attempted operation; it does not bypass the workspace jail.
 - Audit workspace reads, writes, denials, and approval decisions in human-readable terms.
@@ -75,6 +76,7 @@ Use `feature/agent-platform-workspace-storage` for the integration branch. Each 
 - [ ] All child tasks are closed in Beads.
 - [ ] Host workspace and app data locations are documented for Linux, macOS, and Windows.
 - [ ] Config/setup scripts create the workspace structure without requiring an agent skill.
+- [ ] Normal startup commands perform workspace setup automatically on first run.
 - [ ] Docker mounts the host workspace into `/workspace` and app data into a separate container path.
 - [ ] File-capable tools cannot escape the configured workspace through relative paths, absolute paths, or symlinks.
 - [ ] High-risk shell/file operations keep explicit HITL approval.
