@@ -58,17 +58,24 @@ This is the segment tip. After sign-off, open one PR from `task/agent-platform-w
 
 ## Definition of done
 
-- [ ] Allowed workspace writes succeed.
-- [ ] Outside writes and escape attempts are denied.
-- [ ] Shell/file operations retain HITL.
-- [ ] Audit records and UI output are human-readable.
-- [ ] Docker files persist across restart.
-- [ ] Guarded cleanup behavior is verified.
+- [x] Allowed workspace writes succeed.
+- [x] Outside writes and escape attempts are denied.
+- [x] Shell/file operations retain HITL.
+- [x] Audit records and UI output are human-readable.
+- [x] Docker files persist across restart.
+- [x] Guarded cleanup behavior is verified.
 - [ ] Feature branch CI/CD is green before merge to `main`.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-ws.5` created from `task/agent-platform-ws.6`.
-- [ ] Full applicable quality gate passes.
+- [x] Branch `task/agent-platform-ws.5` created from `task/agent-platform-ws.6`.
+- [x] Full applicable quality gate passes.
 - [ ] PR merged `task/agent-platform-ws.5` -> `feature/agent-platform-workspace-storage`.
 - [ ] `bd close agent-platform-ws.5 --reason "..."`
+
+## Verification added
+
+- `scripts/workspace-compose-verify.mjs` writes a generated workspace file, confirms the API lists and downloads it, confirms traversal and absolute download paths are denied with human-readable messages, and can be rerun after an API restart to prove host-backed persistence.
+- `.github/workflows/ci.yml` runs the compose verification before and after restarting the API container.
+- `e2e/workspace-files.spec.ts` verifies the Settings > Workspace UI shows generated files and downloads them through the BFF.
+- Existing harness/API coverage verifies PathJail escape denial, symlink escape denial, HITL approval gating, approved-tool resume behavior, and human-readable tool failure output.

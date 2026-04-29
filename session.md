@@ -73,6 +73,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-ws.6` guarded workspace data cleanup flow on `task/agent-platform-ws.6`.
 - **Date:** 2026-04-29
 - **Session:** Fixed the `agent-platform-ws.6` E2E pipeline failure in `workspace-init.mjs`; GitHub pipelines are passing.
+- **Date:** 2026-04-29
+- **Session:** Started `agent-platform-ws.5` final workspace verification on `task/agent-platform-ws.5`; added compose persistence/security verification and Workspace UI e2e coverage.
 
 ### Session-close guardrail (required)
 
@@ -85,51 +87,56 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Guarded workspace cleanup
+### Workspace final verification
 
-Branch state: `task/agent-platform-ws.6` contains the `agent-platform-ws.6` implementation.
+Branch state: `task/agent-platform-ws.5` contains the `agent-platform-ws.5` implementation.
 
-- Extracted the workspace setup resolver into `scripts/workspace-config.mjs`.
-- Added `scripts/workspace-clean.mjs` with dry-run output, typed confirmation, `--force`, and unsafe-path refusal.
-- Added Makefile targets: `workspace-clean-dry-run`, `workspace-clean`, and `workspace-clean-force`.
-- Added cleanup safeguard tests covering broad path refusal, nested target deduplication, dry-run no-delete behavior, and force deletion against temporary directories.
-- Documented Docker cleanup versus host data cleanup, including Linux, macOS, Windows, and custom-path behavior.
-- Updated the task spec sign-off for the guarded cleanup task.
-- Fixed the CI/E2E `make workspace-init` failure by restoring the missing `node:path` `join` import after the shared config extraction.
+- Added `scripts/workspace-compose-verify.mjs` for compose-backed API verification of workspace listing, download, traversal/absolute-path denial, and persistence after API restart.
+- Updated `.github/workflows/ci.yml` to run the workspace verification before and after restarting the API container in the E2E job.
+- Added `e2e/workspace-files.spec.ts` to verify Settings > Workspace shows generated files and downloads them through the BFF.
+- Updated the workspace epic/task specs to reflect final verification coverage and completed acceptance criteria that can be proven before feature-branch merge.
+- Existing coverage already verifies PathJail traversal/symlink escape denial, shell workspace policy, HITL approval gating, approval resume, and human-readable tool failure output.
 
 Quality gates passed:
 
+- `make workspace-clean-dry-run`
+- `API_URL=http://127.0.0.1:3000 node scripts/workspace-compose-verify.mjs --write`
+- API restart via `docker compose --profile services restart api`
+- `API_URL=http://127.0.0.1:3000 node scripts/workspace-compose-verify.mjs`
+- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm exec playwright test -c e2e/playwright.config.ts e2e/workspace-files.spec.ts`
+- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e` after running the CI-equivalent seed step.
+- `pnpm exec eslint e2e/workspace-files.spec.ts scripts/workspace-compose-verify.mjs --max-warnings 0`
 - `pnpm format:check`
 - `pnpm docs:lint`
-- `node --test scripts/workspace-clean.test.mjs`
-- `make workspace-clean-dry-run`
-- `AGENT_PLATFORM_HOME=/private/tmp/agent-platform-workspace-init-check node scripts/workspace-init.mjs`
-- GitHub E2E pipelines passed after the workspace-init import fix.
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test` (run with escalation because API Supertest binds local ports)
 
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-ws.6`
-- **Latest task commit:** `3184e66` (`Fix workspace init shared config import`)
+- **Current branch:** `task/agent-platform-ws.5`
+- **Latest task commit:** pending
 - **Feature branch:** `feature/agent-platform-workspace-storage`
-- **Next task in chain:** `agent-platform-ws.5`
+- **Next task in chain:** none; this is the workspace epic tip.
 
 ### Beads
 
+- `agent-platform-ws.5` is claimed and in progress.
 - `agent-platform-ws.6` is closed locally in Beads.
-- `agent-platform-ws.5` is next in the chain.
 
 ### Quality
 
-- Cleanup script tests, docs lint, repo format check, focused workspace-init verification, and GitHub pipelines passed.
+- Compose-backed workspace persistence/security checks and full local e2e passed after CI-equivalent seed.
 
 ---
 
 ## Next (priority order)
 
-1. Sync/push Beads Dolt state from an environment with GitHub SSH/network access if it has not already been pushed.
-2. Continue the chain with `agent-platform-ws.5` from `task/agent-platform-ws.6`.
+1. Commit and push `task/agent-platform-ws.5`.
+2. Open/merge PR `task/agent-platform-ws.5` -> `feature/agent-platform-workspace-storage`.
+3. Close `agent-platform-ws.5` after feature-branch CI is green and sync/push Beads Dolt state.
 
 ---
 

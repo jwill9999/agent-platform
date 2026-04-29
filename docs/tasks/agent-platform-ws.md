@@ -78,12 +78,12 @@ Use `feature/agent-platform-workspace-storage` for the integration branch. Each 
 ## Definition of done
 
 - [ ] All child tasks are closed in Beads.
-- [ ] Host workspace and app data locations are documented for Linux, macOS, and Windows.
-- [ ] Config/setup scripts create the workspace structure without requiring an agent skill.
-- [ ] Normal startup commands perform workspace setup automatically on first run.
-- [ ] Docker mounts the host workspace into `/workspace` and app data into a separate container path.
-- [ ] File-capable tools cannot escape the configured workspace through relative paths, absolute paths, or symlinks.
-- [ ] High-risk shell/file operations keep explicit HITL approval.
-- [ ] Users can inspect and export workspace files from the UI/API.
-- [ ] Users have a guarded, documented way to remove host workspace data when uninstalling.
+- [x] Host workspace and app data locations are documented for Linux, macOS, and Windows.
+- [x] Config/setup scripts create the workspace structure without requiring an agent skill.
+- [x] Normal startup commands perform workspace setup automatically on first run.
+- [x] Docker mounts the host workspace into `/workspace` and app data into a separate container path.
+- [x] File-capable tools cannot escape the configured workspace through relative paths, absolute paths, or symlinks.
+- [x] High-risk shell/file operations keep explicit HITL approval.
+- [x] Users can inspect and export workspace files from the UI/API.
+- [x] Users have a guarded, documented way to remove host workspace data when uninstalling.
 - [ ] Security, persistence, and e2e tests are green on the feature branch before merge to `main`.
