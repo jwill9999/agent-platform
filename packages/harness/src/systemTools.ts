@@ -1,10 +1,12 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
 import type { NativeToolExecutor } from './types.js';
 import { validateBashCommand } from './security/bashGuard.js';
+import { WORKSPACE_ROOT } from './security/mounts.js';
 import {
   ZERO_RISK_TOOLS,
   ZERO_RISK_MAP,
@@ -193,12 +195,13 @@ const MAX_BASH_TIMEOUT_MS = 120_000;
 async function execBash(
   command: string,
   timeoutMs: number,
+  cwd: string,
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((res) => {
     const proc = execFile(
       '/bin/sh',
       ['-c', command],
-      { timeout: timeoutMs, maxBuffer: MAX_OUTPUT_BYTES * 2 },
+      { cwd, timeout: timeoutMs, maxBuffer: MAX_OUTPUT_BYTES * 2 },
       (error, stdout, stderr) => {
         let exitCode = 0;
         if (error) {
@@ -216,7 +219,11 @@ async function execBash(
   });
 }
 
-async function handleBash(toolId: string, args: Record<string, unknown>): Promise<Output> {
+async function handleBash(
+  toolId: string,
+  args: Record<string, unknown>,
+  options: { cwd: string },
+): Promise<Output> {
   const command = stringArg(args, 'command');
   if (!command.trim()) {
     return toolError('INVALID_ARGS', 'command is required');
@@ -229,7 +236,7 @@ async function handleBash(toolId: string, args: Record<string, unknown>): Promis
   const rawTimeout =
     typeof args.timeout_ms === 'number' ? args.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
   const timeoutMs = Math.min(Math.max(rawTimeout, 1000), MAX_BASH_TIMEOUT_MS);
-  const { stdout, stderr, exitCode } = await execBash(command, timeoutMs);
+  const { stdout, stderr, exitCode } = await execBash(command, timeoutMs, options.cwd);
   return toolResult(toolId, { stdout, stderr, exitCode });
 }
 
@@ -291,12 +298,17 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
  */
 export function createSystemToolExecutor(options?: {
   observability?: ObservabilityToolContext;
+  workspaceRoot?: string;
 }): NativeToolExecutor {
+  const configuredWorkspaceRoot = options?.workspaceRoot ?? WORKSPACE_ROOT;
+  const workspaceRoot = existsSync(configuredWorkspaceRoot)
+    ? configuredWorkspaceRoot
+    : process.cwd();
   return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
     // Core tools
     switch (toolId) {
       case ids.bash:
-        return handleBash(toolId, args);
+        return handleBash(toolId, args, { cwd: workspaceRoot });
       case ids.readFile:
         return handleReadFile(toolId, args);
       case ids.writeFile:

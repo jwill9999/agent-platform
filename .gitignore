@@ -15,6 +15,7 @@ dist/
 playwright-report/
 test-results/
 .playwright-mcp/
+.agent-platform/
 
 # Beads / Dolt files (added by bd init)
 .beads-credential-key

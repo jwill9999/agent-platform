@@ -186,11 +186,15 @@ export class PathJail {
   static extractPaths(args: Record<string, unknown>): string[] {
     const paths: string[] = [];
     for (const [key, value] of Object.entries(args)) {
-      if (typeof value === 'string' && PATH_LIKE_KEYS.has(key)) {
+      if (typeof value === 'string' && PathJail.isPathLikeKey(key)) {
         paths.push(value);
       }
     }
     return paths;
+  }
+
+  static isPathLikeKey(key: string): boolean {
+    return PATH_LIKE_KEYS.has(key);
   }
 }
 

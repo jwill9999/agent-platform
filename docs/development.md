@@ -49,25 +49,73 @@ The `make up` target handles the correct sequence automatically:
 
 All Docker targets handle build → start → seed in the correct order.
 
-| Target           | Description                                                    |
-| ---------------- | -------------------------------------------------------------- |
-| `make up`        | Build, start, wait for healthy, seed DB **(default)**          |
-| `make down`      | Stop all services (keeps volumes / DB)                         |
-| `make restart`   | Stop → rebuild → start + seed (keeps DB data)                  |
-| `make reset`     | Wipe DB & volumes → rebuild → start + seed (fresh DB)          |
-| `make new`       | Nuclear: remove volumes + images → rebuild from scratch → seed |
-| `make seed`      | Re-run seed in running API container (idempotent)              |
-| `make build`     | Build Docker images only (no start)                            |
-| `make rebuild`   | Build from scratch — no Docker layer cache                     |
-| `make logs`      | Follow logs for all services                                   |
-| `make logs-api`  | Follow API logs only                                           |
-| `make logs-web`  | Follow web logs only                                           |
-| `make status`    | Show container status and health                               |
-| `make shell-api` | Open a shell in the API container                              |
-| `make shell-web` | Open a shell in the web container                              |
-| `make clean`     | Remove containers, volumes, and locally-built images           |
+| Target                | Description                                                    |
+| --------------------- | -------------------------------------------------------------- |
+| `make up`             | Build, start, wait for healthy, seed DB **(default)**          |
+| `make down`           | Stop all services (keeps volumes / DB)                         |
+| `make restart`        | Stop → rebuild → start + seed (keeps DB data)                  |
+| `make reset`          | Wipe DB & volumes → rebuild → start + seed (fresh DB)          |
+| `make new`            | Nuclear: remove volumes + images → rebuild from scratch → seed |
+| `make workspace-init` | Prepare host workspace directories without starting services   |
+| `make seed`           | Re-run seed in running API container (idempotent)              |
+| `make build`          | Build Docker images only (no start)                            |
+| `make rebuild`        | Build from scratch — no Docker layer cache                     |
+| `make logs`           | Follow logs for all services                                   |
+| `make logs-api`       | Follow API logs only                                           |
+| `make logs-web`       | Follow web logs only                                           |
+| `make status`         | Show container status and health                               |
+| `make shell-api`      | Open a shell in the API container                              |
+| `make shell-web`      | Open a shell in the web container                              |
+| `make clean`          | Remove containers, volumes, and locally-built images           |
 
 Override host ports: `HOST_PORT=4000 WEB_HOST_PORT=4001 make up`
+
+### Workspace Storage
+
+Agent Platform keeps user files in a host-side workspace and exposes that workspace inside Docker at a stable container path, `/workspace`.
+
+See [Workspace Storage](workspace-storage.md) for the full setup, security, UI/API, cleanup, and verification reference.
+
+Default host locations:
+
+| Host OS | Default home                                  |
+| ------- | --------------------------------------------- |
+| Linux   | `~/.agent-platform`                           |
+| macOS   | `~/Library/Application Support/AgentPlatform` |
+| Windows | `%LOCALAPPDATA%\\AgentPlatform`               |
+
+Default layout:
+
+```text
+AgentPlatform/
+  config/
+  data/
+  workspaces/
+    default/
+      uploads/
+      generated/
+      scratch/
+      exports/
+  logs/
+```
+
+Configuration variables:
+
+| Variable                         | Purpose                                               |
+| -------------------------------- | ----------------------------------------------------- |
+| `AGENT_PLATFORM_HOME`            | Override the host-side Agent Platform home directory  |
+| `AGENT_WORKSPACE_HOST_PATH`      | Override the host directory mounted as the workspace  |
+| `AGENT_WORKSPACE_CONTAINER_PATH` | Container workspace path; default `/workspace`        |
+| `AGENT_DATA_HOST_PATH`           | Override host app data directory, separate from files |
+
+For local development, the Makefile and `.env.example` use `./.agent-platform/` as a repo-local fallback. That directory is ignored by Git. `make up`, `make restart`, `make reset`, and `make new` run `make workspace-init` first, so the host directories exist and are writable by the non-root API container before Docker starts. On Docker Desktop for macOS and Windows, ensure the selected host directory is available to Docker file sharing.
+
+Docker mounts:
+
+| Host path                   | Container path | Purpose                                |
+| --------------------------- | -------------- | -------------------------------------- |
+| `AGENT_WORKSPACE_HOST_PATH` | `/workspace`   | User files: uploads, generated, export |
+| `AGENT_DATA_HOST_PATH`      | `/data`        | App/runtime data such as SQLite        |
 
 ### Host-Side Quality Gates
 

@@ -19,6 +19,73 @@ All configuration ultimately flows through environment variables and the Setting
 | `OLLAMA_BASE_URL`        | No       | `http://localhost:11434/v1` | Base URL for the Ollama provider                                                                                     |
 | `NODE_ENV`               | No       | —                           | Set to `production` to disable OpenAPI response validation                                                           |
 
+### Workspace Storage
+
+Workspace storage is the user-file area exposed to agents. The host path is operating-system specific, while the container path is stable so tools, Docker mounts, and tests can target the same location.
+
+See [Workspace Storage](workspace-storage.md) for the full setup, security, UI/API, cleanup, and verification reference.
+
+| Variable                         | Required | Default / convention                      | Description                                                                |
+| -------------------------------- | -------- | ----------------------------------------- | -------------------------------------------------------------------------- |
+| `AGENT_PLATFORM_HOME`            | No       | OS-specific app home                      | Root directory for Agent Platform host-side config, data, workspaces, logs |
+| `AGENT_WORKSPACE_HOST_PATH`      | No       | `$AGENT_PLATFORM_HOME/workspaces/default` | Host directory mounted into the runtime as the user workspace              |
+| `AGENT_WORKSPACE_CONTAINER_PATH` | No       | `/workspace`                              | Stable container path used by file tools and filesystem MCP configuration  |
+| `AGENT_DATA_HOST_PATH`           | No       | `$AGENT_PLATFORM_HOME/data`               | Host directory for app/runtime data separate from user workspace files     |
+
+Default `AGENT_PLATFORM_HOME` conventions:
+
+| Host OS | Default home                                  |
+| ------- | --------------------------------------------- |
+| Linux   | `~/.agent-platform`                           |
+| macOS   | `~/Library/Application Support/AgentPlatform` |
+| Windows | `%LOCALAPPDATA%\\AgentPlatform`               |
+
+Default host layout:
+
+```text
+AgentPlatform/
+  config/
+  data/
+  workspaces/
+    default/
+      uploads/
+      generated/
+      scratch/
+      exports/
+  logs/
+```
+
+For repo-local development, setup may fall back to `./.agent-platform/`; that directory is ignored by Git. Agents should operate on workspace-relative paths under `AGENT_WORKSPACE_CONTAINER_PATH`, not on host-specific paths.
+
+### Workspace Cleanup and Uninstall
+
+Docker cleanup and host data cleanup are deliberately separate:
+
+- `make clean` removes Docker containers, Docker volumes, and locally built images.
+- `make workspace-clean-dry-run` shows the host-side Agent Platform paths that would be removed.
+- `make workspace-clean` removes host-side workspace/data/config/log directories only after a typed confirmation.
+- `make workspace-clean-force` removes host-side workspace/data/config/log directories without prompting and is intended only for automation.
+
+The workspace cleanup command uses the same resolver as `make workspace-init`, so custom `AGENT_PLATFORM_HOME`, `AGENT_WORKSPACE_HOST_PATH`, and `AGENT_DATA_HOST_PATH` values are respected. Dry-run output lists the resolved platform home, workspace host path, data path, workspace container path, resolved directories, and actual removal targets.
+
+Default dry-run commands:
+
+| Host OS | Command                                      | Default host data home                        |
+| ------- | -------------------------------------------- | --------------------------------------------- |
+| Linux   | `make workspace-clean-dry-run`               | `~/.agent-platform`                           |
+| macOS   | `make workspace-clean-dry-run`               | `~/Library/Application Support/AgentPlatform` |
+| Windows | `node scripts/workspace-clean.mjs --dry-run` | `%LOCALAPPDATA%\\AgentPlatform`               |
+
+Default removal commands:
+
+| Host OS | Interactive command                | Non-interactive command                    |
+| ------- | ---------------------------------- | ------------------------------------------ |
+| Linux   | `make workspace-clean`             | `make workspace-clean-force`               |
+| macOS   | `make workspace-clean`             | `make workspace-clean-force`               |
+| Windows | `node scripts/workspace-clean.mjs` | `node scripts/workspace-clean.mjs --force` |
+
+The cleanup script refuses to delete broad or unsafe paths, including an empty path, `/`, a Windows drive root such as `C:\\`, the user home directory, the repository root, and top-level directories. Always run the dry-run command first when using custom host paths.
+
 ### LLM API Keys (API Server)
 
 Keys are resolved in order of precedence:

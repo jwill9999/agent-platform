@@ -18,6 +18,7 @@ import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTi
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
+import { validateBashWorkspacePolicy } from '../security/bashWorkspacePolicy.js';
 import { ToolRateLimiter } from '../security/rateLimiter.js';
 import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
@@ -80,28 +81,46 @@ const TOOL_PATH_OPERATIONS: Record<string, 'read' | 'write'> = {
 async function enforcePathJail(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
-): Promise<Output | null> {
+): Promise<{ output: Output } | { args: Record<string, unknown> } | null> {
   if (!ctx.pathJail) return null;
+
+  if (call.name === 'sys_bash') {
+    const command = typeof call.args.command === 'string' ? call.args.command : '';
+    const result = await validateBashWorkspacePolicy(command, ctx.pathJail);
+    if (!result.allowed) {
+      return {
+        output: {
+          type: 'error',
+          code: 'PATH_ACCESS_DENIED',
+          message: `This shell command tries to access "${result.path}" outside the approved workspace. Use a path under /workspace instead.`,
+        },
+      };
+    }
+    return { args: call.args };
+  }
 
   const operation = TOOL_PATH_OPERATIONS[call.name];
   if (!operation) return null;
 
-  const paths = PathJail.extractPaths(call.args);
-  for (const p of paths) {
+  const resolvedArgs = { ...call.args };
+  for (const [key, value] of Object.entries(call.args)) {
+    if (typeof value !== 'string' || !PathJail.isPathLikeKey(key)) continue;
     try {
-      await ctx.pathJail.enforce(p, operation);
+      resolvedArgs[key] = await ctx.pathJail.enforce(value, operation);
     } catch (err) {
       if (err instanceof PathJailError) {
         return {
-          type: 'error',
-          code: 'PATH_ACCESS_DENIED',
-          message: err.message,
+          output: {
+            type: 'error',
+            code: 'PATH_ACCESS_DENIED',
+            message: err.message,
+          },
         };
       }
       throw err;
     }
   }
-  return null;
+  return { args: resolvedArgs };
 }
 
 /** Dispatch a tool call to an MCP session. */
@@ -173,25 +192,29 @@ async function dispatchSingleTool(
   }
 
   // PathJail: enforce file-path constraints for system tools
+  let safeCall = call;
   if (isSystemTool(call.name)) {
-    const pathError = await enforcePathJail(call, ctx);
-    if (pathError) {
+    const pathResult = await enforcePathJail(call, ctx);
+    if (pathResult && 'output' in pathResult) {
       ctx.auditLog?.logDenied(
         call.name,
         call.args,
         ctx.agent.id,
         '',
-        pathError.type === 'error'
-          ? (pathError.message ?? 'Path access denied')
+        pathResult.output.type === 'error'
+          ? (pathResult.output.message ?? 'Path access denied')
           : 'Path access denied',
       );
-      return { output: pathError, ok: false };
+      return { output: pathResult.output, ok: false };
+    }
+    if (pathResult && 'args' in pathResult) {
+      safeCall = { ...call, args: pathResult.args };
     }
   }
 
-  const parsed = parseToolId(call.name);
-  if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, call, ctx, options);
-  return dispatchNativeTool(call, ctx);
+  const parsed = parseToolId(safeCall.name);
+  if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, safeCall, ctx, options);
+  return dispatchNativeTool(safeCall, ctx);
 }
 
 function resolveToolMetadata(
@@ -726,29 +749,58 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         continue;
       }
 
-      const toolMetadata = resolveToolMetadata(call, ctx);
+      let safeCall = call;
+      if (isSystemTool(call.name)) {
+        const pathResult = await enforcePathJail(call, ctx);
+        if (pathResult && 'output' in pathResult) {
+          const reason =
+            pathResult.output.type === 'error'
+              ? (pathResult.output.message ?? 'Path access denied')
+              : 'Path access denied';
+          ctx.auditLog?.logDenied(
+            call.name,
+            call.args,
+            ctx.agent.id,
+            state.sessionId ?? '',
+            reason,
+          );
+          toolMessages.push({
+            role: 'tool',
+            toolCallId: call.id,
+            toolName: call.name,
+            content: outputToContent(call.name, pathResult.output),
+          });
+          traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+          continue;
+        }
+        if (pathResult && 'args' in pathResult) {
+          safeCall = { ...call, args: pathResult.args };
+        }
+      }
+
+      const toolMetadata = resolveToolMetadata(safeCall, ctx);
       const approval = evaluateApprovalPolicy(toolMetadata);
-      const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+      const approvedForResume = ctx.approvedToolCallIds?.has(safeCall.id) ?? false;
       if (approval.required && !approvedForResume) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
         const output = ctx.approvalRequests
-          ? await createApprovalRequiredOutput(ctx, state, call, riskTier, reason)
-          : buildApprovalRequiredOutput(call, reason);
+          ? await createApprovalRequiredOutput(ctx, state, safeCall, riskTier, reason)
+          : buildApprovalRequiredOutput(safeCall, reason);
 
         await emitToolOutput(ctx, output);
         traceEvents.push({
           type: 'tool_approval_required',
-          toolId: call.name,
+          toolId: safeCall.name,
           step,
           riskTier,
         });
-        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok: false });
 
         if (!ctx.approvalRequests) {
           ctx.auditLog?.logDenied(
-            call.name,
-            call.args,
+            safeCall.name,
+            safeCall.args,
             ctx.agent.id,
             state.sessionId ?? '',
             reason,
@@ -756,16 +808,16 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           );
           toolMessages.push({
             role: 'tool',
-            toolCallId: call.id,
-            toolName: call.name,
-            content: outputToContent(call.name, output),
+            toolCallId: safeCall.id,
+            toolName: safeCall.name,
+            content: outputToContent(safeCall.name, output),
           });
           continue;
         }
 
         ctx.auditLog?.logPendingApproval(
-          call.name,
-          call.args,
+          safeCall.name,
+          safeCall.args,
           ctx.agent.id,
           state.sessionId ?? '',
           riskTier,
@@ -782,19 +834,19 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         };
       }
 
-      await fireToolCallHook(ctx, state, call);
+      await fireToolCallHook(ctx, state, safeCall);
 
       const auditId =
         ctx.auditLog?.logStart(
-          call.name,
-          call.args,
+          safeCall.name,
+          safeCall.args,
           ctx.agent.id,
           state.sessionId ?? '',
           toolMetadata?.riskTier,
         ) ?? null;
 
       const { output, ok, retryCount, images } = await executeToolWithRetry(
-        call,
+        safeCall,
         ctx,
         step,
         agentToolTimeoutMs,
@@ -805,21 +857,21 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       if (auditId && ctx.auditLog) ctx.auditLog.logComplete(auditId, output);
 
-      await fireToolErrorHook(ctx, state, call, output);
+      await fireToolErrorHook(ctx, state, safeCall, output);
 
       await emitToolOutput(ctx, output, images);
 
       // Security scanning (injection detection + credential leak detection)
-      scanToolOutput(call.name, output, traceEvents);
+      scanToolOutput(safeCall.name, output, traceEvents);
 
       toolMessages.push({
         role: 'tool',
-        toolCallId: call.id,
-        toolName: call.name,
-        content: outputToContent(call.name, output),
+        toolCallId: safeCall.id,
+        toolName: safeCall.name,
+        content: outputToContent(safeCall.name, output),
       });
 
-      traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok });
+      traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok });
       totalToolRetries += retryCount;
     }
 
