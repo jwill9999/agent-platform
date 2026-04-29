@@ -79,6 +79,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added user-facing workspace storage documentation and README references for setup, security, cleanup, UI/API, and verification behavior.
 - **Date:** 2026-04-29
 - **Session:** `task/agent-platform-ws.5` merged into `feature/agent-platform-workspace-storage`; removed generated workspace test artifacts from the feature-to-main PR.
+- **Date:** 2026-04-29
+- **Session:** `feature/agent-platform-workspace-storage` merged into `main`; workspace epic and all child tasks are closed in Beads.
 
 ### Session-close guardrail (required)
 
@@ -91,9 +93,9 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Workspace final verification
+### Workspace storage epic landed on main
 
-Branch state: `task/agent-platform-ws.5` contains the `agent-platform-ws.5` implementation.
+Branch state: `main` contains the completed workspace storage epic.
 
 - Added `scripts/workspace-compose-verify.mjs` for compose-backed API verification of workspace listing, download, traversal/absolute-path denial, and persistence after API restart.
 - Updated `.github/workflows/ci.yml` to run the workspace verification before and after restarting the API container in the E2E job.
@@ -101,6 +103,7 @@ Branch state: `task/agent-platform-ws.5` contains the `agent-platform-ws.5` impl
 - Added `docs/workspace-storage.md` as the user-facing reference for host workspace setup, OS-specific locations, security boundaries, UI/API behavior, cleanup/uninstall commands, and verification coverage.
 - Updated `README.md` and existing docs to reference the workspace storage guide and current Makefile workflow.
 - Merged the final workspace task chain into `feature/agent-platform-workspace-storage` through PR #102 and removed generated `.agent-platform/workspaces/default/generated/*` artifacts from version control before main merge.
+- Merged PR #103 from `feature/agent-platform-workspace-storage` into `main`.
 - Updated the workspace epic/task specs to reflect final verification coverage and completed acceptance criteria that can be proven before feature-branch merge.
 - Existing coverage already verifies PathJail traversal/symlink escape denial, shell workspace policy, HITL approval gating, approval resume, and human-readable tool failure output.
 
@@ -123,16 +126,15 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-ws.5`
-- **Latest task commit:** `d3f53ca` (`Verify workspace persistence and e2e flows`)
-- **Feature branch:** `feature/agent-platform-workspace-storage`
-- **Next task in chain:** none; this is the workspace epic tip.
-- **Open PR:** <https://github.com/jwill9999/agent-platform/pull/102>
+- **Current branch:** `main`
+- **Latest landed epic:** `agent-platform-ws` (`feature/agent-platform-workspace-storage` -> `main`)
+- **Next task in chain:** none selected.
+- **Merged PRs:** PR #102 into `feature/agent-platform-workspace-storage`; PR #103 into `main`.
 
 ### Beads
 
-- `agent-platform-ws.5` is claimed and in progress.
-- `agent-platform-ws.6` is closed locally in Beads.
+- `agent-platform-ws` is closed.
+- All seven child tasks are closed: `agent-platform-ws.1`, `agent-platform-ws.1a`, `agent-platform-ws.2`, `agent-platform-ws.3`, `agent-platform-ws.4`, `agent-platform-ws.5`, and `agent-platform-ws.6`.
 
 ### Quality
 
@@ -142,9 +144,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Monitor PR <https://github.com/jwill9999/agent-platform/pull/102>.
-2. Merge PR `task/agent-platform-ws.5` -> `feature/agent-platform-workspace-storage` after CI is green.
-3. Close `agent-platform-ws.5` after the PR merge and sync/push Beads Dolt state.
+1. Pick the next epic or backlog task.
+2. Sync Beads Dolt state if the remote is not already current.
 
 ---
 
