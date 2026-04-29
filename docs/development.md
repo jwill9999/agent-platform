@@ -74,6 +74,8 @@ Override host ports: `HOST_PORT=4000 WEB_HOST_PORT=4001 make up`
 
 Agent Platform keeps user files in a host-side workspace and exposes that workspace inside Docker at a stable container path, `/workspace`.
 
+See [Workspace Storage](workspace-storage.md) for the full setup, security, UI/API, cleanup, and verification reference.
+
 Default host locations:
 
 | Host OS | Default home                                  |

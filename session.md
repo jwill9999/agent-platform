@@ -75,6 +75,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Fixed the `agent-platform-ws.6` E2E pipeline failure in `workspace-init.mjs`; GitHub pipelines are passing.
 - **Date:** 2026-04-29
 - **Session:** Started `agent-platform-ws.5` final workspace verification on `task/agent-platform-ws.5`; added compose persistence/security verification and Workspace UI e2e coverage.
+- **Date:** 2026-04-29
+- **Session:** Added user-facing workspace storage documentation and README references for setup, security, cleanup, UI/API, and verification behavior.
 
 ### Session-close guardrail (required)
 
@@ -94,6 +96,8 @@ Branch state: `task/agent-platform-ws.5` contains the `agent-platform-ws.5` impl
 - Added `scripts/workspace-compose-verify.mjs` for compose-backed API verification of workspace listing, download, traversal/absolute-path denial, and persistence after API restart.
 - Updated `.github/workflows/ci.yml` to run the workspace verification before and after restarting the API container in the E2E job.
 - Added `e2e/workspace-files.spec.ts` to verify Settings > Workspace shows generated files and downloads them through the BFF.
+- Added `docs/workspace-storage.md` as the user-facing reference for host workspace setup, OS-specific locations, security boundaries, UI/API behavior, cleanup/uninstall commands, and verification coverage.
+- Updated `README.md` and existing docs to reference the workspace storage guide and current Makefile workflow.
 - Updated the workspace epic/task specs to reflect final verification coverage and completed acceptance criteria that can be proven before feature-branch merge.
 - Existing coverage already verifies PathJail traversal/symlink escape denial, shell workspace policy, HITL approval gating, approval resume, and human-readable tool failure output.
 
@@ -155,6 +159,7 @@ Quality gates passed:
 | `docs/architecture/message-flow.md`       | Mermaid diagrams: chat → LLM → tools       |
 | `docs/api-reference.md`                   | REST endpoints, error shapes, schemas      |
 | `docs/configuration.md`                   | Env vars, model routing, limits, MCP setup |
+| `docs/workspace-storage.md`               | Workspace setup, security, cleanup, tests  |
 | `docs/planning/lazy-skill-loading.md`     | Lazy skill pattern (planning reference)    |
 | `docs/architecture/lazy-skill-loading.md` | Lazy skill loading implementation guide    |
 | `docs/planning/security.md`               | Threat model (8 categories)                |

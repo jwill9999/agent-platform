@@ -149,6 +149,8 @@ Approval request `argsJson` is always stored and returned with secret-looking ar
 
 ### Workspace Files
 
+See [Workspace Storage](workspace-storage.md) for the host workspace model, security boundaries, UI behavior, cleanup commands, and verification flow.
+
 | Method | Path                           | Description                                         |
 | ------ | ------------------------------ | --------------------------------------------------- |
 | `GET`  | `/v1/workspace/files`          | List files grouped by workspace area                |

@@ -23,6 +23,8 @@ All configuration ultimately flows through environment variables and the Setting
 
 Workspace storage is the user-file area exposed to agents. The host path is operating-system specific, while the container path is stable so tools, Docker mounts, and tests can target the same location.
 
+See [Workspace Storage](workspace-storage.md) for the full setup, security, UI/API, cleanup, and verification reference.
+
 | Variable                         | Required | Default / convention                      | Description                                                                |
 | -------------------------------- | -------- | ----------------------------------------- | -------------------------------------------------------------------------- |
 | `AGENT_PLATFORM_HOME`            | No       | OS-specific app home                      | Root directory for Agent Platform host-side config, data, workspaces, logs |

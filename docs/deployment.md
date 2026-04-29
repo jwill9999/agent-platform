@@ -44,6 +44,8 @@ docker compose --profile services up --build
 
 Workspace storage uses an explicit host directory mounted at `/workspace`. Keep app data separate from user files: app/runtime data belongs under `/data`, while user-created, uploaded, generated, scratch, and exported files belong under `/workspace`.
 
+See [Workspace Storage](workspace-storage.md) for the full setup, security, cleanup, and verification reference.
+
 ### Health Checks
 
 - **API:** `GET /health` — curl-based, 10s interval, 3 retries, 15s start period
@@ -81,6 +83,8 @@ The seed is idempotent — safe to run multiple times.
 | `OPENAI_ALLOW_LEGACY_ENV` | `0`                  | Set `1` to allow `OPENAI_API_KEY` fallback |
 
 ### Workspace Storage Variables
+
+See [Workspace Storage](workspace-storage.md) for host defaults, local development behavior, cleanup commands, and security boundaries.
 
 | Variable                         | Default / convention                      | Description                                      |
 | -------------------------------- | ----------------------------------------- | ------------------------------------------------ |
