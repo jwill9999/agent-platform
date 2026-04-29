@@ -20,20 +20,57 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
    - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-persistence`, `task/agent-platform-mov.1`).
    - **Chained segments (default):** tasks run **in order** on Git. The **first** task in a segment branches from **`feature/<feature-name>`**. **Each following** task branches from the **previous task’s branch** (after that task is complete and pushed). **Intermediate** tasks do **not** get their own PR to `feature`—only the **last task in the segment** opens **one PR** from **`task/<tip>` → `feature/<feature-name>`**, merging the whole chain. Then the **next** segment’s first task branches from the **updated** `feature` branch.
    - **Sign-off:** **unit tests** pass; checklist complete; **`bd close`** per task when its work is done. **PR to `feature`** only on the **segment tip** (unless a spec explicitly says otherwise).
-   - **Release:** when ready, **`feature/<feature-name>` → `main`** via one PR.
+   - **Release:** when ready, run integration testing and ensure CI/CD pipelines are green, then merge **`feature/<feature-name>` → `main`** via one PR.
 
 6. **Template** — Copy [`_template.md`](./_template.md) when creating a new task spec; then wire the Beads issue.
 
+## Expected Beads Schema (required)
+
+All task issues must follow this minimum schema so planning and execution stay consistent.
+
+| Field                 | Required  | Format / rule                                            |
+| --------------------- | --------- | -------------------------------------------------------- |
+| `id`                  | Yes       | Beads issue id (for this repo, `agent-platform-...`)     |
+| `title`               | Yes       | One-line action-oriented task title                      |
+| `type`                | Yes       | `task` (unless explicitly using `bug`/`feature` etc.)    |
+| `priority`            | Yes       | `P0`-`P4`                                                |
+| `status`              | Yes       | `open`, `in_progress`, or `closed`                       |
+| `description`         | Yes       | First line must be `Spec: docs/tasks/<issue-id>.md`      |
+| `acceptance_criteria` | Yes       | Concrete, testable outcomes (not implementation notes)   |
+| `spec file`           | Yes       | Must exist at `docs/tasks/<issue-id>.md`                 |
+| dependencies          | As needed | Model ordering in Beads with `blocks`/`depends-on` edges |
+
+### Required description prefix
+
+Every task description must start with this exact prefix line:
+
+```text
+Spec: docs/tasks/<issue-id>.md
+```
+
+### Creation workflow (required)
+
+1. Create Beads issue.
+2. Create spec file from [`_template.md`](./_template.md) as `docs/tasks/<issue-id>.md`.
+3. Update Beads description so the first line points to the spec file.
+4. Ensure acceptance criteria in Beads and Definition of Done in spec are aligned.
+
+### Validation checklist
+
+- `bd show <issue-id> --json` includes description prefix to spec file.
+- `docs/tasks/<issue-id>.md` exists and includes requirements, tests, DoD, and sign-off.
+- Dependencies in Beads match upstream/downstream sections in the spec.
+
 ## Epic index (task spec files)
 
-| Epic | Beads id | Task spec files |
-|------|----------|-----------------|
-| Foundation | `agent-platform-mov` | `agent-platform-mov.{1-5}.md` |
+| Epic              | Beads id             | Task spec files               |
+| ----------------- | -------------------- | ----------------------------- |
+| Foundation        | `agent-platform-mov` | `agent-platform-mov.{1-5}.md` |
 | Persistence + API | `agent-platform-j9x` | `agent-platform-j9x.{1-4}.md` |
-| Harness | `agent-platform-2tw` | `agent-platform-2tw.{1-5}.md` |
+| Harness           | `agent-platform-2tw` | `agent-platform-2tw.{1-5}.md` |
 | Planner + plugins | `agent-platform-dx3` | `agent-platform-dx3.{1-4}.md` |
-| Frontend | `agent-platform-ast` | `agent-platform-ast.{1-3}.md` |
-| MVP E2E | `agent-platform-o36` | `agent-platform-o36.{1-2}.md` |
+| Frontend          | `agent-platform-ast` | `agent-platform-ast.{1-3}.md` |
+| MVP E2E           | `agent-platform-o36` | `agent-platform-o36.{1-2}.md` |
 
 ## Commands
 

@@ -3,9 +3,8 @@
 import type { Agent, ModelConfig, SessionRecord } from '@agent-platform/contracts';
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '../components/chat/chat';
-import { ChatAgentSelector } from '../components/chat/chat-agent-selector';
-import { ChatModelSelector } from '../components/chat/chat-model-selector';
-import { SessionHistoryPanel } from '../components/chat/session-history-panel';
+import { AgentModelProvider } from '../components/chat/agent-model-context';
+import { SessionDropdown } from '../components/chat/session-dropdown';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
@@ -145,17 +144,6 @@ export default function HomePage() {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Session history panel */}
-      <SessionHistoryPanel
-        sessions={sessions}
-        agents={agents}
-        activeSessionId={sessionId}
-        onSelectSession={handleSelectSession}
-        onNewChatForAgent={handleNewChatForAgent}
-        loading={sessionsLoading}
-      />
-
-      {/* Main chat area */}
       <div className="flex flex-col flex-1 min-h-0 min-w-0">
         {(loadError || sessionError || error) && (
           <div className="shrink-0 z-50 bg-destructive/15 border-b border-destructive/30 text-destructive px-4 py-2 text-sm">
@@ -172,33 +160,43 @@ export default function HomePage() {
           </div>
         )}
         <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50">
-          <ChatAgentSelector
+          <SessionDropdown
+            sessions={sessions}
             agents={agents}
-            selectedId={selectedAgentId}
-            onSelect={handleAgentChange}
-            disabled={isLoading}
-          />
-          <ChatModelSelector
-            modelConfigs={modelConfigs}
-            selectedId={selectedModelConfigId}
-            onSelect={setSelectedModelConfigId}
+            activeSessionId={sessionId}
+            selectedAgentId={selectedAgentId}
+            onSelectSession={handleSelectSession}
+            onNewChatForAgent={handleNewChatForAgent}
+            loading={sessionsLoading}
             disabled={isLoading}
           />
         </div>
         <div className="flex-1 flex flex-col min-h-0">
-          <Chat
-            messages={messages}
-            onSend={handleSend}
-            isLoading={isLoading}
-            canSend={Boolean(sessionId)}
-            attachments={attachments}
-            onAddFiles={addFiles}
-            onRemoveAttachment={removeAttachment}
-            onClearAttachments={clearAttachments}
-            attachmentWarnings={attachmentWarnings}
-            criticEventsByMessage={criticEventsByMessage}
-            thinkingByMessage={thinkingByMessage}
-          />
+          <AgentModelProvider
+            value={{
+              agents,
+              modelConfigs,
+              selectedAgentId,
+              selectedModelConfigId,
+              onSelectAgent: handleAgentChange,
+              onSelectModelConfig: setSelectedModelConfigId,
+              selectorDisabled: isLoading,
+            }}
+          >
+            <Chat
+              messages={messages}
+              onSend={handleSend}
+              isLoading={isLoading}
+              canSend={Boolean(sessionId)}
+              attachments={attachments}
+              onAddFiles={addFiles}
+              onRemoveAttachment={removeAttachment}
+              onClearAttachments={clearAttachments}
+              attachmentWarnings={attachmentWarnings}
+              criticEventsByMessage={criticEventsByMessage}
+              thinkingByMessage={thinkingByMessage}
+            />
+          </AgentModelProvider>
         </div>
       </div>
     </div>

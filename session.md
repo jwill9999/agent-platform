@@ -7,12 +7,42 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-04-25
-- **Session:** `agent-platform-btm` shipped + PR #84 opened. PR review comment addressed in commit `0abddbe` (centralised critic label formatting). Push deferred — sandbox SSH blocked.
+- **Date:** 2026-04-26
+- **Session:** `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux` and closed in Beads. Next chain task started: `task/agent-platform-de4` claimed (`in_progress`).
+- **Date:** 2026-04-27
+- **Session:** Completed UI input refactor and feedback-only changes; closed `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` in Beads.
+
+### Session-close guardrail (required)
+
+- Local-only changes are not complete.
+- Before ending a task/session, ensure work is committed and pushed to `origin`.
+- Verify the remote branch/ref exists (for example `git ls-remote --heads origin <branch>` or `git status -sb` showing `origin/<branch>` tracking).
+- `--no-verify` is high-risk: it skips Husky/local checks. If used, you must run the skipped build/typecheck/test checks manually and confirm they pass before closing work.
 
 ---
 
 ## What happened (this session)
+
+### Branch chain update ✅
+
+- `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux`.
+- Beads status updated: `agent-platform-7d1` closed (`Merged into feature/agent-platform-ui-ux`).
+- Next ready task selected and claimed: `agent-platform-de4`.
+- New working branch created from feature: `task/agent-platform-de4`.
+- Completed work on `agent-platform-de4` (feedback-only assistant output, thinking/critic lifecycle fixes) and `agent-platform-lt6` (input refactor). Both branches' changes committed on `task/agent-platform-lt6` and pushed to origin. The beads `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` have been closed locally via `bd close` (remote push for beads may require auth).
+
+### `agent-platform-7d1` — Remove sessions sidebar; move sessions into dropdown ✅
+
+Branch `task/agent-platform-7d1` (from `feature/agent-platform-ui-ux`), commit `7fce8e7`.
+
+- **UI flow:** Removed dedicated left `SessionHistoryPanel` from chat page.
+- **New component:** Added `apps/web/components/chat/session-dropdown.tsx` with grouped session history under a header dropdown button (`Open sessions menu`).
+- **Switching + create:** Dropdown supports selecting existing sessions and creating a new chat with current/selected agent.
+- **Management path:** Dropdown includes `Manage sessions` entry linking to `/settings/sessions`.
+- **Cleanup:** Removed unused component file `apps/web/components/chat/session-history-panel.tsx`.
+- **E2E:** Added test in `e2e/mvp-e2e.spec.ts` validating sessions moved from panel to header dropdown.
+- **Quality:** `pnpm lint` ✅, `pnpm typecheck` ✅, Sonar touched files ✅ (0 findings on page/dropdown/e2e files).
+- **Known unrelated failure:** Existing E2E seed check (`e2e-specialist` missing) still fails in `e2e/mvp-e2e.spec.ts`.
 
 ### `agent-platform-btm` — Surface critic iterations visibly in chat UI ✅
 
@@ -28,19 +58,28 @@ Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ff
 
 ### Beads
 
-- `agent-platform-btm` claimed (`in_progress`); will close after commit lands. Remote dolt push deferred (sandbox SSH blocked, same as previous sessions).
+Closed beads in this session:
+
+- `agent-platform-de4` — Show feedback-only block for assistant responses (closed)
+- `agent-platform-ucg` — Refactor sidebar to Chat/IDE only with settings overflow (closed)
+- `agent-platform-lt6` — Unify input bar controls for model/agent and attachments (closed)
+
+Note: `bd` closed the beads locally but automatic remote push failed due to SSH/network auth; see Quick commands for manual push guidance.
 
 ## Current state
 
 ### Git
 
-- **`main`** — unchanged from previous session
-- **`task/agent-platform-btm`** — `a7ffa9a` (local; remote push deferred)
+- **`feature/agent-platform-ui-ux`** — pushed and up to date with origin
+- **`task/agent-platform-de4`** — created from feature and active (`in_progress`)
+- **`task/agent-platform-de4`** — completed and merged into `feature/agent-platform-ui-ux` via commits on `task/agent-platform-lt6` (see PR).
+- **`task/agent-platform-lt6`** — completed, committed, and pushed to `origin/task/agent-platform-lt6` (PR opened: https://github.com/jwill9999/agent-platform/pull/88)
 
 ### Quality
 
-- Typecheck ✅ Lint ✅ Tests ✅ (workspace-wide)
-- Sonar (touched files) ✅ 0 findings
+- Typecheck ✅ Lint ✅
+- Playwright feature test coverage added for sessions dropdown move
+- Unrelated seed fixture failure remains in `e2e/mvp-e2e.spec.ts` (`e2e-specialist` missing)
 
 ### Key commits
 
@@ -52,9 +91,9 @@ Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ff
 
 ## Next (priority order)
 
-1. **Open PR for `task/agent-platform-btm`** → `main` once network available
-2. **Close `agent-platform-btm` in beads** + dolt push when network available
-3. **Pick next bd-ready task** (`bd ready`)
+1. **Implement `agent-platform-de4`** on `task/agent-platform-de4`
+2. **Open PR for `task/agent-platform-de4`** → `feature/agent-platform-ui-ux`
+3. **Resolve or isolate unrelated E2E seed fixture failure** in `e2e/mvp-e2e.spec.ts`
 
 ---
 
@@ -97,7 +136,7 @@ pnpm lint        # ESLint (max-warnings 0)
 
 ## UI/UX Ticket Specifications (manual beads reference)
 
-### 1. Display a thinking block with model logic before streaming the answer
+### 1. Display a thinking block with model logic before streaming the answer -completed
 
 **Requirements:**
 
@@ -113,78 +152,16 @@ pnpm lint        # ESLint (max-warnings 0)
 
 ### 2. Refactor sidebar: only show Chat/IDE, move other items to Settings, remove Sessions/Tools
 
-**Requirements:**
-
-- The main sidebar should only display navigation for Chat and IDE.
-- All other navigation items (e.g., Settings, Sessions, Tools) must be moved to a Settings menu or equivalent secondary location.
-- The sidebar must be visually simplified for clarity and space efficiency.
-- Remove any Sessions or Tools entries from the sidebar.
-- Sidebar must remain responsive and accessible.
-  **Definition of Done:**
-- Sidebar shows only Chat/IDE; all other items are accessible via Settings.
-- Playwright test verifies sidebar/menu structure.
-- SonarQube/Problems show no new issues in touched files.
+Tracked in Beads: `agent-platform-ucg`
 
 ### 3. Remove sessions sidebar, move sessions under menu as collapsible agent dropdowns
 
-**Requirements:**
-
-- The dedicated sessions sidebar must be removed from the UI.
-- Sessions should be accessible via a collapsible dropdown menu under the agent or main menu.
-- The dropdown must clearly list available sessions and allow switching between them.
-- The UI must remain clean and uncluttered.
-- All session management actions (e.g., create, switch, delete) must remain accessible.
-  **Definition of Done:**
-- Sessions sidebar is removed; sessions are accessible via menu dropdown.
-- Playwright test covers session dropdown and switching.
-- SonarQube/Problems show no new issues in touched files.
+Tracked in Beads: `agent-platform-7d1`
 
 ### 4. Update chat UI: show only feedback block for agent responses, remove agent bubble, keep user bubble
 
-**Requirements:**
+Tracked in Beads: `agent-platform-de4`
 
-- For agent responses, display only the feedback block (e.g., critic review, thumbs up/down, etc.).
-- Remove the visual agent bubble/avatar for agent responses.
-- User messages must retain their bubble/avatar.
-- The feedback block must be visually distinct and easy to interact with.
-- The UI must remain bright, clean, and minimalistic.
-  **Definition of Done:**
-- Agent bubble is removed; feedback block is shown for agent responses; user bubble is unchanged.
-- Playwright test covers feedback block and bubble visibility.
-- SonarQube/Problems show no new issues in touched files.
+### 5. Refactor input bar controls into unified chat input
 
-### 6. Provide real-time model thinking and events to frontend
-
-**Goal:**
-Enable the backend to emit detailed "thinking" and event streams (e.g., reasoning steps, tool calls, intermediate plans) so the frontend can display what the model is thinking about in real time, not just a placeholder.
-
-**Requirements:**
-
-- Backend must emit NDJSON "thinking" events with meaningful content during the agent's reasoning phase (not just a generic placeholder).
-- Events may include:
-  - Model reasoning steps (e.g., chain-of-thought, plan, scratchpad)
-  - Tool call traces (e.g., which tools are being considered or invoked)
-  - Critic/thinking events (e.g., revise/accept/cap_reached)
-  - Any other intermediate state that helps the user understand the agent's process
-- Events must be streamed before the final answer so the frontend can render them in the thinking block.
-- Ensure no sensitive or internal-only data is leaked in these events.
-- Update documentation to describe the event types and their structure.
-
-**Definition of Done:**
-
-- Frontend thinking block displays real-time model reasoning and events (not just a placeholder) when available.
-- Playwright test verifies that reasoning/events are surfaced in the UI.
-- SonarQube/Problems show no new issues in touched files.
-- Documentation updated to cover new event types and usage.
-
-**Requirements:**
-
-- The chat input bar must include controls for agent/model selection and file attachment.
-- Controls must be integrated into the input bar, not as separate floating elements.
-- The design must remain bright, clean, and minimalistic.
-- File attachment must support common file types and show attached files clearly.
-- Agent/model selection must be intuitive and accessible.
-  **Definition of Done:**
-- Input bar integrates agent/model selection and file attachment; design is bright/clean/simplistic.
-- Playwright test covers input bar controls and interactions.
-- SonarQube/Problems show no new issues in touched files.
+Tracked in Beads: `agent-platform-lt6`

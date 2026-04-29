@@ -16,14 +16,14 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
 
 ### Upstream — must be complete before this task
 
-| Issue | Spec |
-|-------|------|
+| Issue              | Spec                           |
+| ------------------ | ------------------------------ |
 | `agent-platform-…` | [Title](./agent-platform-….md) |
 
 ### Downstream — waiting on this task
 
-| Issue | Spec |
-|-------|------|
+| Issue              | Spec                           |
+| ------------------ | ------------------------------ |
 | `agent-platform-…` | [Title](./agent-platform-….md) |
 
 ### Planning notes
@@ -42,15 +42,15 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 
 **Chained tasks:** **`feature/<feature-name>`** → **`task/<task-1>`** → **`task/<task-2>`** → … → **one PR** from **`task/<last>`** → **`feature/<feature-name>`**.
 
-| Rule | Detail |
-|------|--------|
-| **No `main`** | Never push commits directly to **`main`**. |
-| **First task in segment** | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-persistence`). |
-| **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed. |
-| **Intermediate tasks** | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch. |
-| **Last task in segment** | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment. |
-| **Next segment** | First task branches from **updated** **`feature/<feature-name>`** after the segment PR is merged. |
-| **Release** | When the feature is ready: **`feature/<feature-name>` → `main`** via one PR. |
+| Rule                       | Detail                                                                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **No `main`**              | Never push commits directly to **`main`**.                                                                                       |
+| **First task in segment**  | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-persistence`).                     |
+| **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed.                     |
+| **Intermediate tasks**     | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch. |
+| **Last task in segment**   | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment.                                             |
+| **Next segment**           | First task branches from **updated** **`feature/<feature-name>`** after the segment PR is merged.                                |
+| **Release**                | When the feature is ready: run integration testing and CI/CD, then merge **`feature/<feature-name>` → `main`** via one PR.       |
 
 ## Tests (required before sign-off)
 
@@ -71,9 +71,9 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 - [ ] **Task branch** created from the correct **parent** (`feature/...` or previous **`task/...`**) **before** implementation work
 - [ ] **Unit tests** executed and passing (minimum gate)
 - [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
-- [ ] If **segment tip:** **PR** merged **`task/<tip> → feature/<feature-name>`** (link: _________________) — *if not tip, write “N/A — merge at segment end”*
+- [ ] If **segment tip:** **PR** merged **`task/<tip> → feature/<feature-name>`** (link: **\*\*\*\***\_**\*\*\*\***) — _if not tip, write “N/A — merge at segment end”_
 - [ ] `bd close <issue-id> --reason "…"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
 
-**Reviewer / owner:** _____________________ **Date:** _____________
+**Reviewer / owner:** ****\*\*****\_****\*\***** **Date:** **\*\***\_**\*\***

@@ -186,10 +186,10 @@ function buildFailureNote(contract: DodContract): string {
   return `<dod-failed>\n${failed.join('; ')}\n</dod-failed>`;
 }
 
-function buildSummary(contract: DodContract): string {
-  const failedCount = Math.min(contract.failedCriteria.length, contract.criteria.length);
-  const met = Math.max(contract.criteria.length - failedCount, 0);
-  return `DoD: ${met}/${contract.criteria.length} criteria met`;
+function buildReviseSignal(contract: DodContract, attempt: number, cap: number): string {
+  const failed = contract.failedCriteria.length > 0 ? contract.failedCriteria : contract.criteria;
+  const reasons = failed.join('; ');
+  return `Critic: revise (${attempt}/${cap}) - DoD unmet: ${reasons}`;
 }
 
 export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
@@ -210,7 +210,6 @@ export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
     const capReached = nextDodAttempt >= cap;
 
     if (contract.passed) {
-      await safeEmit(emitter, { type: 'text', content: `${buildSummary(contract)}\n` });
       return { dodContract: contract, trace };
     }
 
@@ -220,9 +219,13 @@ export function createDodCheckNode(options: DodCheckNodeOptions = {}) {
         code: 'DOD_FAILED',
         message: `Definition of Done failed after ${nextDodAttempt} revision attempt(s).`,
       });
-      await safeEmit(emitter, { type: 'text', content: `${buildSummary(contract)}\n` });
       return { dodAttempts: 1, dodContract: contract, trace };
     }
+
+    await safeEmit(emitter, {
+      type: 'thinking',
+      content: buildReviseSignal(contract, nextDodAttempt, cap),
+    });
 
     const feedback: ChatMessage = { role: 'system', content: buildFailureNote(contract) };
 
