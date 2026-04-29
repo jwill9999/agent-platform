@@ -325,6 +325,67 @@ describe('toolDispatchNode', () => {
     expect(result.messages![0]!.content).not.toContain('"exitCode"');
   });
 
+  it('denies shell workspace escapes before creating an approval request', async () => {
+    const workspace = makeTmpDir();
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: '', stderr: '', exitCode: 0 },
+    });
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(makeApprovalRequest()),
+    };
+    const logDenied = vi.fn();
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied,
+      logPendingApproval: vi.fn(),
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      pathJail: new PathJail([
+        { label: 'workspace', hostPath: workspace, permission: 'read_write' },
+      ]),
+      approvalRequests,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    try {
+      const result = await node(
+        makeState({
+          sessionId: 'session-shell-denied',
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [{ id: 'tc-shell-denied', name: 'sys_bash', args: { command: 'touch /tmp/x' } }],
+          },
+        }),
+      );
+
+      expect(nativeExecutor).not.toHaveBeenCalled();
+      expect(approvalRequests.create).not.toHaveBeenCalled();
+      expect(logDenied).toHaveBeenCalledWith(
+        'sys_bash',
+        { command: 'touch /tmp/x' },
+        'agent-1',
+        'session-shell-denied',
+        expect.stringContaining('outside the approved workspace'),
+      );
+      expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+        error: 'PATH_ACCESS_DENIED',
+        message: expect.stringContaining('Use a path under /workspace instead'),
+      });
+      expect(result.trace).toContainEqual(
+        expect.objectContaining({ type: 'tool_dispatch', toolId: 'sys_bash', ok: false }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
   it('rejects tool not in agent allowlist', async () => {
     const ctx: ToolDispatchContext = {
       agent: makeAgent({ allowedToolIds: [], allowedMcpServerIds: [] }),

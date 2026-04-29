@@ -18,6 +18,7 @@ import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTi
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
+import { validateBashWorkspacePolicy } from '../security/bashWorkspacePolicy.js';
 import { ToolRateLimiter } from '../security/rateLimiter.js';
 import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
@@ -82,6 +83,21 @@ async function enforcePathJail(
   ctx: ToolDispatchContext,
 ): Promise<{ output: Output } | { args: Record<string, unknown> } | null> {
   if (!ctx.pathJail) return null;
+
+  if (call.name === 'sys_bash') {
+    const command = typeof call.args.command === 'string' ? call.args.command : '';
+    const result = await validateBashWorkspacePolicy(command, ctx.pathJail);
+    if (!result.allowed) {
+      return {
+        output: {
+          type: 'error',
+          code: 'PATH_ACCESS_DENIED',
+          message: `This shell command tries to access "${result.path}" outside the approved workspace. Use a path under /workspace instead.`,
+        },
+      };
+    }
+    return { args: call.args };
+  }
 
   const operation = TOOL_PATH_OPERATIONS[call.name];
   if (!operation) return null;
@@ -733,29 +749,58 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         continue;
       }
 
-      const toolMetadata = resolveToolMetadata(call, ctx);
+      let safeCall = call;
+      if (isSystemTool(call.name)) {
+        const pathResult = await enforcePathJail(call, ctx);
+        if (pathResult && 'output' in pathResult) {
+          const reason =
+            pathResult.output.type === 'error'
+              ? (pathResult.output.message ?? 'Path access denied')
+              : 'Path access denied';
+          ctx.auditLog?.logDenied(
+            call.name,
+            call.args,
+            ctx.agent.id,
+            state.sessionId ?? '',
+            reason,
+          );
+          toolMessages.push({
+            role: 'tool',
+            toolCallId: call.id,
+            toolName: call.name,
+            content: outputToContent(call.name, pathResult.output),
+          });
+          traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+          continue;
+        }
+        if (pathResult && 'args' in pathResult) {
+          safeCall = { ...call, args: pathResult.args };
+        }
+      }
+
+      const toolMetadata = resolveToolMetadata(safeCall, ctx);
       const approval = evaluateApprovalPolicy(toolMetadata);
-      const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+      const approvedForResume = ctx.approvedToolCallIds?.has(safeCall.id) ?? false;
       if (approval.required && !approvedForResume) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
         const output = ctx.approvalRequests
-          ? await createApprovalRequiredOutput(ctx, state, call, riskTier, reason)
-          : buildApprovalRequiredOutput(call, reason);
+          ? await createApprovalRequiredOutput(ctx, state, safeCall, riskTier, reason)
+          : buildApprovalRequiredOutput(safeCall, reason);
 
         await emitToolOutput(ctx, output);
         traceEvents.push({
           type: 'tool_approval_required',
-          toolId: call.name,
+          toolId: safeCall.name,
           step,
           riskTier,
         });
-        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok: false });
 
         if (!ctx.approvalRequests) {
           ctx.auditLog?.logDenied(
-            call.name,
-            call.args,
+            safeCall.name,
+            safeCall.args,
             ctx.agent.id,
             state.sessionId ?? '',
             reason,
@@ -763,16 +808,16 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           );
           toolMessages.push({
             role: 'tool',
-            toolCallId: call.id,
-            toolName: call.name,
-            content: outputToContent(call.name, output),
+            toolCallId: safeCall.id,
+            toolName: safeCall.name,
+            content: outputToContent(safeCall.name, output),
           });
           continue;
         }
 
         ctx.auditLog?.logPendingApproval(
-          call.name,
-          call.args,
+          safeCall.name,
+          safeCall.args,
           ctx.agent.id,
           state.sessionId ?? '',
           riskTier,
@@ -789,19 +834,19 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         };
       }
 
-      await fireToolCallHook(ctx, state, call);
+      await fireToolCallHook(ctx, state, safeCall);
 
       const auditId =
         ctx.auditLog?.logStart(
-          call.name,
-          call.args,
+          safeCall.name,
+          safeCall.args,
           ctx.agent.id,
           state.sessionId ?? '',
           toolMetadata?.riskTier,
         ) ?? null;
 
       const { output, ok, retryCount, images } = await executeToolWithRetry(
-        call,
+        safeCall,
         ctx,
         step,
         agentToolTimeoutMs,
@@ -812,21 +857,21 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       if (auditId && ctx.auditLog) ctx.auditLog.logComplete(auditId, output);
 
-      await fireToolErrorHook(ctx, state, call, output);
+      await fireToolErrorHook(ctx, state, safeCall, output);
 
       await emitToolOutput(ctx, output, images);
 
       // Security scanning (injection detection + credential leak detection)
-      scanToolOutput(call.name, output, traceEvents);
+      scanToolOutput(safeCall.name, output, traceEvents);
 
       toolMessages.push({
         role: 'tool',
-        toolCallId: call.id,
-        toolName: call.name,
-        content: outputToContent(call.name, output),
+        toolCallId: safeCall.id,
+        toolName: safeCall.name,
+        content: outputToContent(safeCall.name, output),
       });
 
-      traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok });
+      traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok });
       totalToolRetries += retryCount;
     }
 

@@ -1,8 +1,8 @@
 /**
  * Default mount configuration for the agent platform.
  *
- * In Docker: `/workspace` is the main user-file workspace.
- * In dev: falls back to `process.cwd()`.
+ * `/workspace` is the main user-file workspace unless overridden by
+ * `WORKSPACE_ROOT` or `AGENT_WORKSPACE_CONTAINER_PATH`.
  */
 
 import { resolve } from 'node:path';
@@ -18,11 +18,6 @@ export const DEFAULT_MOUNTS: Mount[] = [
   {
     label: 'workspace',
     hostPath: resolve(WORKSPACE_ROOT),
-    permission: 'read_write',
-  },
-  {
-    label: 'tmp',
-    hostPath: '/tmp',
     permission: 'read_write',
   },
 ];
