@@ -35,6 +35,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** HITL.4 was merged into `feature/agent-platform-hitl`; selected `agent-platform-hitl.5` as the next epic task.
 - **Date:** 2026-04-29
 - **Session:** Started HITL.5 frontend approval UX: hook state, inline approval cards, decision/resume handling, and focused tests.
+- **Date:** 2026-04-29
+- **Session:** Fixed OpenAI tool-schema rejection for MCP schemas using unsupported `propertyNames` keyword.
 
 ### Session-close guardrail (required)
 
@@ -90,6 +92,7 @@ HITL.5 progress:
 - Added compact inline approval card rendering for chat assistant turns.
 - Added pending approval hydration for resumed sessions.
 - Added web unit coverage for approval parsing/deduplication and a Playwright fixture for approval card states.
+- Sanitised unsupported `propertyNames` JSON Schema keywords before tools are sent to the LLM; this fixes `browser_drop` schema validation blocking approval UI testing.
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
