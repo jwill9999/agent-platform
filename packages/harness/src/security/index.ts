@@ -1,6 +1,13 @@
 export { PathJail, PathJailError } from './pathJail.js';
 export type { Mount, MountPermission, PathOperation, PathValidationResult } from './pathJail.js';
 export { DEFAULT_MOUNTS, WORKSPACE_ROOT } from './mounts.js';
+export {
+  DEFAULT_WORKSPACE_CONTAINER_PATH,
+  WORKSPACE_SUBDIRECTORIES,
+  defaultPlatformHome,
+  resolveWorkspaceConfig,
+} from './workspaceConfig.js';
+export type { HostPlatform, WorkspaceConfig, WorkspaceEnv } from './workspaceConfig.js';
 export { validateBashCommand, buildAllowlist } from './bashGuard.js';
 export type { BashValidationResult } from './bashGuard.js';
 export { validateUrl } from './urlGuard.js';

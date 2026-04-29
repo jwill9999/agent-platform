@@ -1,4 +1,4 @@
-.PHONY: build rebuild up down restart reset new seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format help
+.PHONY: build rebuild up down restart reset new workspace-init seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format help
 
 # ---------------------------------------------------------------------------
 # Docker-only Makefile — all runtime commands run inside containers.
@@ -21,8 +21,12 @@ build:
 rebuild:
 	$(COMPOSE) build --no-cache
 
+## Prepare host workspace directories
+workspace-init:
+	node scripts/workspace-init.mjs
+
 ## Build, start, wait for healthy, then seed DB (the "just works" command)
-up:
+up: workspace-init
 	$(COMPOSE) up -d --build --wait
 	$(COMPOSE) exec api node packages/db/dist/seed/run.js
 	@echo ""
@@ -39,19 +43,19 @@ down:
 	$(COMPOSE) down
 
 ## Restart: stop → rebuild → start + seed (keeps DB)
-restart:
+restart: workspace-init
 	$(COMPOSE) down
 	$(COMPOSE) up -d --build --wait
 	$(COMPOSE) exec api node packages/db/dist/seed/run.js
 
 ## Wipe DB & volumes, rebuild, start fresh
-reset:
+reset: workspace-init
 	$(COMPOSE) down -v --remove-orphans
 	$(COMPOSE) up -d --build --wait
 	$(COMPOSE) exec api node packages/db/dist/seed/run.js
 
 ## Nuclear: remove everything (volumes + images), rebuild from scratch
-new:
+new: workspace-init
 	$(COMPOSE) down -v --remove-orphans --rmi local
 	$(COMPOSE) build --no-cache
 	$(COMPOSE) up -d --wait
@@ -132,6 +136,7 @@ help:
 	@echo "  make restart   Rebuild & restart (keeps DB)"
 	@echo "  make reset     Wipe DB, rebuild, start fresh"
 	@echo "  make new       Nuclear: wipe everything, rebuild from scratch"
+	@echo "  make workspace-init Prepare host workspace directories"
 	@echo "  make seed      Seed DB in running API container"
 	@echo "  make logs      Follow all service logs"
 	@echo "  make status    Show container health"

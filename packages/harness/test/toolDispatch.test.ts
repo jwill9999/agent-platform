@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+import { mkdirSync, realpathSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createToolDispatchNode, type ToolDispatchContext } from '../src/nodes/toolDispatch.js';
 import type { HarnessStateType } from '../src/graphState.js';
 import type {
@@ -11,6 +14,7 @@ import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { NativeToolExecutor } from '../src/types.js';
 import type { ToolAuditLogger } from '../src/audit/toolAuditLog.js';
+import { PathJail } from '../src/security/pathJail.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,6 +79,15 @@ const makeApprovalRequest = (overrides?: Partial<ApprovalRequest>): ApprovalRequ
   createdAtMs: 1000,
   ...overrides,
 });
+
+function makeTmpDir(): string {
+  const dir = join(
+    tmpdir(),
+    `tool-dispatch-workspace-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
 
 /** Dispatch a single tool call and assert it produces an error result. */
 const dispatchExpectingError = async (
@@ -184,6 +197,82 @@ describe('toolDispatchNode', () => {
     expect(result.messages![0]!.content).toContain('trusted="false"');
     expect(result.messages![0]!.content).toContain('"echoed"');
     expect(result.trace!.some((t: { type: string }) => t.type === 'tool_dispatch')).toBe(true);
+  });
+
+  it('passes workspace-resolved paths to native file tools', async () => {
+    const workspace = makeTmpDir();
+    const expectedPath = join(realpathSync(workspace), 'generated', 'report.md');
+    const nativeResult: Output = { type: 'tool_result', toolId: 'sys_file_exists', data: true };
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_file_exists'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      pathJail: new PathJail([
+        { label: 'workspace', hostPath: workspace, permission: 'read_write' },
+      ]),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    try {
+      await node(
+        makeState({
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              { id: 'tc-file', name: 'sys_file_exists', args: { path: 'generated/report.md' } },
+            ],
+          },
+        }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_file_exists', {
+      path: expectedPath,
+    });
+  });
+
+  it('does not rewrite non-path args that happen to equal a path value', async () => {
+    const workspace = makeTmpDir();
+    const expectedPath = join(realpathSync(workspace), 'notes.txt');
+    const nativeResult: Output = { type: 'tool_result', toolId: 'sys_append_file', data: true };
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_append_file'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      pathJail: new PathJail([
+        { label: 'workspace', hostPath: workspace, permission: 'read_write' },
+      ]),
+      approvedToolCallIds: new Set(['tc-append']),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    try {
+      await node(
+        makeState({
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              {
+                id: 'tc-append',
+                name: 'sys_append_file',
+                args: { path: 'notes.txt', content: 'notes.txt' },
+              },
+            ],
+          },
+        }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_append_file', {
+      path: expectedPath,
+      content: 'notes.txt',
+    });
   });
 
   it('formats approved shell command failures for human-readable follow-up', async () => {

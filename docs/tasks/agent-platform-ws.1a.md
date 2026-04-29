@@ -72,17 +72,17 @@ This task is the bridge between documentation and runtime wiring. Keep it focuse
 
 ## Definition of done
 
-- [ ] Config resolves OS-specific host workspace defaults and `/workspace` container default.
-- [ ] Setup scripts create the documented host folder structure.
-- [ ] `make up`, `make restart`, `make reset`, and `make new` run workspace setup automatically.
-- [ ] A focused workspace setup command exists for manual preparation.
-- [ ] `.agent-platform/` dev fallback is ignored by Git.
-- [ ] File tools use workspace-relative paths where possible.
-- [ ] PathJail blocks traversal and outside-workspace paths.
-- [ ] No agent skill is required for host path mapping, setup, or security.
+- [x] Config resolves OS-specific host workspace defaults and `/workspace` container default.
+- [x] Setup scripts create the documented host folder structure.
+- [x] `make up`, `make restart`, `make reset`, and `make new` run workspace setup automatically.
+- [x] A focused workspace setup command exists for manual preparation.
+- [x] `.agent-platform/` dev fallback is ignored by Git.
+- [x] File tools use workspace-relative paths where possible.
+- [x] PathJail blocks traversal and outside-workspace paths.
+- [x] No agent skill is required for host path mapping, setup, or security.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-ws.1a` created from `task/agent-platform-ws.1`.
-- [ ] Config/setup/PathJail tests pass.
-- [ ] `bd close agent-platform-ws.1a --reason "..."`
+- [x] Branch `task/agent-platform-ws.1a` created from `task/agent-platform-ws.1`.
+- [x] Config/setup/PathJail tests pass.
+- [x] `bd close agent-platform-ws.1a --reason "..."`

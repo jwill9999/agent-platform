@@ -80,28 +80,31 @@ const TOOL_PATH_OPERATIONS: Record<string, 'read' | 'write'> = {
 async function enforcePathJail(
   call: ToolCallIntent,
   ctx: ToolDispatchContext,
-): Promise<Output | null> {
+): Promise<{ output: Output } | { args: Record<string, unknown> } | null> {
   if (!ctx.pathJail) return null;
 
   const operation = TOOL_PATH_OPERATIONS[call.name];
   if (!operation) return null;
 
-  const paths = PathJail.extractPaths(call.args);
-  for (const p of paths) {
+  const resolvedArgs = { ...call.args };
+  for (const [key, value] of Object.entries(call.args)) {
+    if (typeof value !== 'string' || !PathJail.isPathLikeKey(key)) continue;
     try {
-      await ctx.pathJail.enforce(p, operation);
+      resolvedArgs[key] = await ctx.pathJail.enforce(value, operation);
     } catch (err) {
       if (err instanceof PathJailError) {
         return {
-          type: 'error',
-          code: 'PATH_ACCESS_DENIED',
-          message: err.message,
+          output: {
+            type: 'error',
+            code: 'PATH_ACCESS_DENIED',
+            message: err.message,
+          },
         };
       }
       throw err;
     }
   }
-  return null;
+  return { args: resolvedArgs };
 }
 
 /** Dispatch a tool call to an MCP session. */
@@ -173,25 +176,29 @@ async function dispatchSingleTool(
   }
 
   // PathJail: enforce file-path constraints for system tools
+  let safeCall = call;
   if (isSystemTool(call.name)) {
-    const pathError = await enforcePathJail(call, ctx);
-    if (pathError) {
+    const pathResult = await enforcePathJail(call, ctx);
+    if (pathResult && 'output' in pathResult) {
       ctx.auditLog?.logDenied(
         call.name,
         call.args,
         ctx.agent.id,
         '',
-        pathError.type === 'error'
-          ? (pathError.message ?? 'Path access denied')
+        pathResult.output.type === 'error'
+          ? (pathResult.output.message ?? 'Path access denied')
           : 'Path access denied',
       );
-      return { output: pathError, ok: false };
+      return { output: pathResult.output, ok: false };
+    }
+    if (pathResult && 'args' in pathResult) {
+      safeCall = { ...call, args: pathResult.args };
     }
   }
 
-  const parsed = parseToolId(call.name);
-  if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, call, ctx, options);
-  return dispatchNativeTool(call, ctx);
+  const parsed = parseToolId(safeCall.name);
+  if (parsed.kind === 'mcp') return dispatchMcpTool(parsed, safeCall, ctx, options);
+  return dispatchNativeTool(safeCall, ctx);
 }
 
 function resolveToolMetadata(

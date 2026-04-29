@@ -55,6 +55,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Planned next epic `agent-platform-ws` for host workspace storage, with six chained Beads tasks and task specs.
 - **Date:** 2026-04-29
 - **Session:** Started workspace storage epic on `task/agent-platform-ws.1`; documented host workspace conventions and config names for Linux, macOS, and Windows.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.1a` platform behavior: workspace config resolver, `make workspace-init`, startup lifecycle wiring, and PathJail-backed file path normalization.
 
 ### Session-close guardrail (required)
 
@@ -128,7 +130,7 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 
 ### Git
 
-- **Current branch:** `task/agent-platform-ws.1`
+- **Current branch:** `task/agent-platform-ws.1a`
 - **Remote:** task branch pending push at task completion
 - **Feature branch:** `feature/agent-platform-workspace-storage`
 - **Feature merge:** PR `#95` merged `feature/agent-platform-hitl` into `main`
@@ -161,8 +163,8 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 
 ## Next (priority order)
 
-1. Merge `task/agent-platform-ws.1` into `feature/agent-platform-workspace-storage` after review.
-2. Start `agent-platform-ws.1a` from `task/agent-platform-ws.1`.
+1. Continue the chain with `agent-platform-ws.2` from `task/agent-platform-ws.1a`.
+2. Mount the configured host workspace into Docker at `/workspace`, keeping app data separate.
 3. If needed, push Beads Dolt state from an environment with GitHub SSH/network access.
 
 ---

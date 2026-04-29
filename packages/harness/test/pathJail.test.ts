@@ -131,5 +131,10 @@ describe('PathJail', () => {
       const paths = PathJail.extractPaths({ command: 'ls -la', timeout: 5000 });
       expect(paths).toEqual([]);
     });
+
+    it('checks path-like keys directly', () => {
+      expect(PathJail.isPathLikeKey('path')).toBe(true);
+      expect(PathJail.isPathLikeKey('content')).toBe(false);
+    });
   });
 });
