@@ -69,6 +69,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Addressed SonarCloud regex backtracking risk in the `agent-platform-ws.3` bash workspace policy.
 - **Date:** 2026-04-29
 - **Session:** Completed `agent-platform-ws.4` workspace file UI/API on `task/agent-platform-ws.4`.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.6` guarded workspace data cleanup flow on `task/agent-platform-ws.6`.
 
 ### Session-close guardrail (required)
 
@@ -81,56 +83,49 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Workspace file UI/API
+### Guarded workspace cleanup
 
-Branch state: `task/agent-platform-ws.4` contains the `agent-platform-ws.4` implementation.
+Branch state: `task/agent-platform-ws.6` contains the `agent-platform-ws.6` implementation.
 
-- Added shared workspace file contracts for managed areas, file rows, area listings, and list responses.
-- Added `GET /v1/workspace/files` to list `uploads`, `generated`, `scratch`, and `exports` with workspace-relative paths only.
-- Added `GET /v1/workspace/files/download?path=...` to stream safe workspace files as attachments.
-- Enforced PathJail validation for listing and downloads, including traversal, absolute path, directory, and symlink escape denial.
-- Added the Settings > Workspace UI with area summary cards, a file table, refresh/error states, and download actions.
-- Added workspace file formatting helpers and focused web tests.
-- Updated the API reference and task spec sign-off for the workspace file endpoints.
+- Extracted the workspace setup resolver into `scripts/workspace-config.mjs`.
+- Added `scripts/workspace-clean.mjs` with dry-run output, typed confirmation, `--force`, and unsafe-path refusal.
+- Added Makefile targets: `workspace-clean-dry-run`, `workspace-clean`, and `workspace-clean-force`.
+- Added cleanup safeguard tests covering broad path refusal, nested target deduplication, dry-run no-delete behavior, and force deletion against temporary directories.
+- Documented Docker cleanup versus host data cleanup, including Linux, macOS, Windows, and custom-path behavior.
+- Updated the task spec sign-off for the guarded cleanup task.
 
 Quality gates passed:
 
 - `pnpm format:check`
-- `pnpm --filter @agent-platform/contracts run build`
-- `pnpm --filter @agent-platform/contracts run test`
-- `pnpm --filter @agent-platform/api run typecheck`
-- `pnpm --filter @agent-platform/api run lint`
-- `pnpm --filter @agent-platform/api run test` (run with escalation because API Supertest binds local ports)
-- `pnpm --filter @agent-platform/web run typecheck`
-- `pnpm --filter @agent-platform/web run lint`
-- `pnpm --filter @agent-platform/web run test -- test/workspace-files.test.ts`
-- Focused API check: `pnpm --filter @agent-platform/api exec vitest run test/workspaceRouter.test.ts`
+- `pnpm docs:lint`
+- `node --test scripts/workspace-clean.test.mjs`
+- `make workspace-clean-dry-run`
 
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-ws.4`
-- **Latest task commit:** branch HEAD (`Expose workspace files in UI and API`)
+- **Current branch:** `task/agent-platform-ws.6`
+- **Latest task commit:** pending
 - **Feature branch:** `feature/agent-platform-workspace-storage`
-- **Next task in chain:** `agent-platform-ws.6`
+- **Next task in chain:** `agent-platform-ws.5`
 
 ### Beads
 
-- `agent-platform-ws.4` is closed locally in Beads; Dolt auto-push failed due unavailable GitHub SSH/network auth from this environment.
-- `agent-platform-ws.6` is next in the chain.
+- `agent-platform-ws.6` is closed locally in Beads.
+- `agent-platform-ws.5` is next in the chain.
 
 ### Quality
 
-- Affected package typecheck/lint/test and repo format check passed in this session.
+- Cleanup script tests, docs lint, and repo format check passed in this session.
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push `task/agent-platform-ws.4` to `origin`.
+1. Commit and push `task/agent-platform-ws.6` to `origin`.
 2. Sync/push Beads Dolt state from an environment with GitHub SSH/network access.
-3. Continue the chain with `agent-platform-ws.6` from `task/agent-platform-ws.4`.
+3. Continue the chain with `agent-platform-ws.5` from `task/agent-platform-ws.6`.
 
 ---
 

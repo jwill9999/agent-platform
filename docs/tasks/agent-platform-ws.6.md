@@ -58,15 +58,15 @@ This task should reuse the same workspace config resolver introduced in `agent-p
 
 ## Definition of done
 
-- [ ] Dry-run cleanup lists host data paths without deleting them.
-- [ ] Deletion requires explicit confirmation or a force flag.
-- [ ] Unsafe broad paths are refused.
-- [ ] Cleanup uses the same workspace config resolver as setup.
-- [ ] Docs explain Docker resource cleanup versus host data cleanup.
-- [ ] Linux, macOS, Windows, and custom-path behavior is documented.
+- [x] Dry-run cleanup lists host data paths without deleting them.
+- [x] Deletion requires explicit confirmation or a force flag.
+- [x] Unsafe broad paths are refused.
+- [x] Cleanup uses the same workspace config resolver as setup.
+- [x] Docs explain Docker resource cleanup versus host data cleanup.
+- [x] Linux, macOS, Windows, and custom-path behavior is documented.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-ws.6` created from `task/agent-platform-ws.4`.
-- [ ] Cleanup safeguard tests pass.
-- [ ] `bd close agent-platform-ws.6 --reason "..."`
+- [x] Branch `task/agent-platform-ws.6` created from `task/agent-platform-ws.4`.
+- [x] Cleanup safeguard tests pass.
+- [x] `bd close agent-platform-ws.6 --reason "..."`
