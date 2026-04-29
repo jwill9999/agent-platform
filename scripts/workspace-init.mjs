@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -51,6 +51,14 @@ const config = resolveWorkspaceConfig();
 
 for (const directory of config.directories) {
   mkdirSync(directory, { recursive: true });
+}
+
+for (const directory of [
+  config.dataHostPath,
+  config.workspaceHostPath,
+  ...WORKSPACE_CHILD_DIRECTORIES.map((dir) => join(config.workspaceHostPath, dir)),
+]) {
+  chmodSync(directory, 0o777);
 }
 
 console.log('Workspace storage ready');
