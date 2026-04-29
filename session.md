@@ -95,6 +95,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-code-tools.2` on `task/agent-platform-code-tools.2`; documented coding tool contracts, shared evidence artifacts, audit events, and truncation/storage rules.
 - **Date:** 2026-04-30
 - **Session:** Fixed chat UI/model-config override and API-key error leakage on `task/ui-chat-api-key-error-redaction`.
+- **Date:** 2026-04-30
+- **Session:** Follow-up local fix: chat now leaves agents without an assigned model config on the platform default path, and the Next.js BFF no longer injects its own env key as an explicit API override.
 
 ### Session-close guardrail (required)
 
@@ -112,6 +114,15 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 Branch state: `task/ui-chat-api-key-error-redaction` contains an unrelated UI/runtime bug fix before continuing the coding-tools epic.
 
 - Changed the chat page to default the model selector to the selected agent's saved model config instead of blindly using the first stored config as a request override.
+- Follow-up: changed the chat page so agents without an assigned saved model config send no `modelConfigId`, preserving the platform default model/key path.
+- Follow-up: changed the Next.js `/api/chat` proxy so it forwards only an explicit caller `x-openai-key`; it no longer turns `AGENT_OPENAI_API_KEY`/`NEXT_OPENAI_API_KEY` from the web process into an API override.
+- Follow-up: changed the API model resolver so the first saved Settings > Models config with credentials is the platform default before env-var fallback.
+- Follow-up: excluded `**/.next` from Docker build context and removed OpenAI key env injection from the web container so stale web bundles/env cannot override API model resolution.
+- Runtime finding: workspace-storage changed Docker SQLite from named volume `agent-platform_sqlite_data` to host bind mount `.agent-platform/data/agent.sqlite`; the previously saved model configs were still in the old named volume.
+- Migrated only `model_configs` and referenced `secret_refs` from the old named volume DB into the current host-mounted DB. Both restored OpenAI model configs pass `POST /v1/model-configs/:id/test`.
+- Added focused regression tests for model selection precedence and BFF header forwarding.
+- Added a harness regression test proving built-in system tools are passed to the SDK with provider-safe names and strict schemas.
+- Added an API integration test proving chat uses an encrypted saved model config when the agent has no override and no env key is configured.
 - Sanitized streamed NDJSON output, API stream error events, web stream error rendering, and observability task/error events so provider messages cannot leak API-key-shaped values.
 - Added a `MODEL_AUTH_FAILED` stream code for provider authentication failures that happen after NDJSON headers are already sent.
 - Added regression coverage for API post-header auth errors, web stream error rendering, harness NDJSON redaction, output guard OpenAI key detection, and observability redaction.
@@ -121,7 +132,17 @@ Quality gates passed:
 - `pnpm --filter @agent-platform/harness run test -- test/outputGuard.test.ts test/backpressure.test.ts`
 - `pnpm --filter @agent-platform/web run test -- test/use-harness-chat.test.ts`
 - `pnpm --filter @agent-platform/plugin-observability run test -- test/observability.test.ts`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/plugin-observability run test`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/plugin-observability run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/plugin-observability run lint`
 - `pnpm --filter @agent-platform/api run test -- test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
 - `pnpm typecheck`
 - `pnpm lint`
 - `pnpm format:check`
@@ -131,10 +152,10 @@ Quality gates passed:
 ### Git
 
 - **Current branch:** `task/ui-chat-api-key-error-redaction`
-- **Current commit:** `8ce4b45` before the `session.md` amend
+- **Current commit:** `0f62ae0` on origin, with additional local uncommitted follow-up fixes for owner testing
 - **Latest completed task:** `agent-platform-code-tools.2` remains the latest coding-tools epic task
 - **Current work:** UI/runtime bug fix, not part of the coding-tools task chain
-- **Remote sync:** pending until this amended commit is pushed
+- **Remote sync:** intentionally paused; owner requested rebuild/`make restart` testing before any further push
 
 ### Beads
 
@@ -151,8 +172,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push `task/ui-chat-api-key-error-redaction` to `origin`.
-2. Verify the chat UI with a real saved model config in Docker.
+1. Owner rebuilds and tests the local follow-up fix with `make restart`.
+2. If the UI works as expected, commit/push the local follow-up changes on `task/ui-chat-api-key-error-redaction`.
 3. After UI issues are clear, start `agent-platform-code-tools.3` from the `agent-platform-code-tools.2` task tip.
 
 ---

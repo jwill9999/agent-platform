@@ -146,4 +146,24 @@ describe('createObservabilityPlugin', () => {
       }),
     ]);
   });
+
+  it('redacts masked OpenAI provider error keys', async () => {
+    const events: ObservabilityEvent[] = [];
+    const obs = createObservabilityPlugin({ log: (e) => events.push(e) });
+    const d = createPluginDispatcher([obs]);
+    const masked = ['sk-proj-', '*'.repeat(32), 'abcd'].join('');
+
+    await d.onError({
+      sessionId: 's1',
+      runId: 'r1',
+      phase: 'unknown',
+      error: new Error(`Incorrect API key provided: ${masked}`),
+    });
+
+    expect(JSON.stringify(events)).not.toContain(masked);
+    expect(events[0]).toMatchObject({
+      kind: 'error',
+      message: 'Incorrect API key provided: [REDACTED:OpenAI API Key]',
+    });
+  });
 });

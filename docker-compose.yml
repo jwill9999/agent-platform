@@ -42,8 +42,6 @@ services:
       PORT: '3001'
       HOSTNAME: '0.0.0.0'
       API_PROXY_URL: 'http://api:3000'
-      # LLM API key — web BFF forwards this as x-openai-key header to the API.
-      AGENT_OPENAI_API_KEY: '${AGENT_OPENAI_API_KEY:-}'
     depends_on:
       api:
         condition: service_healthy

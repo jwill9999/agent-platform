@@ -11,19 +11,7 @@ import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgent } from '@/lib/default-agent';
-
-function resolveDefaultModelConfigId(
-  agentId: string | null,
-  agentList: readonly Agent[],
-  configList: readonly ModelConfig[],
-): string | null {
-  const agent = agentList.find((candidate) => candidate.id === agentId);
-  const agentConfigId = agent?.modelConfigId;
-  if (agentConfigId && configList.some((config) => config.id === agentConfigId)) {
-    return agentConfigId;
-  }
-  return configList[0]?.id ?? null;
-}
+import { resolveChatModelConfigId } from '@/lib/modelSelection';
 
 export default function HomePage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -76,7 +64,7 @@ export default function HomePage() {
       setSelectedModelConfigId((prev) =>
         prev && withKey.some((config) => config.id === prev)
           ? prev
-          : resolveDefaultModelConfigId(def?.id ?? null, nextAgents, withKey),
+          : resolveChatModelConfigId(def?.id ?? null, nextAgents, withKey),
       );
     } catch (e) {
       setLoadError(e instanceof ApiRequestError ? e.message : String(e));
@@ -119,7 +107,7 @@ export default function HomePage() {
     (agentId: string) => {
       setIsResuming(false);
       setSelectedAgentId(agentId);
-      setSelectedModelConfigId(resolveDefaultModelConfigId(agentId, agents, modelConfigs));
+      setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
     },
     [agents, modelConfigs],
   );
@@ -128,7 +116,7 @@ export default function HomePage() {
     (session: SessionRecord) => {
       setIsResuming(true);
       setSelectedAgentId(session.agentId);
-      setSelectedModelConfigId(resolveDefaultModelConfigId(session.agentId, agents, modelConfigs));
+      setSelectedModelConfigId(resolveChatModelConfigId(session.agentId, agents, modelConfigs));
       setSessionId(session.id);
     },
     [agents, modelConfigs],
@@ -138,7 +126,7 @@ export default function HomePage() {
     (agentId: string) => {
       setIsResuming(false);
       setSelectedAgentId(agentId);
-      setSelectedModelConfigId(resolveDefaultModelConfigId(agentId, agents, modelConfigs));
+      setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
       createSessionForAgent(agentId).catch(() => {});
     },
     [agents, createSessionForAgent, modelConfigs],

@@ -15,7 +15,7 @@ export type { CriticEvent } from '@/lib/critic-events';
 const THINKING_PLACEHOLDER = 'The agent is thinking…';
 const THINKING_REVISE_PLACEHOLDER = 'The agent is revising…';
 const CREDENTIAL_PATTERNS: readonly RegExp[] = [
-  /sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}/g,
+  /sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g,
   /(ghp|gho|ghu|ghs|ghr)_\w{36,}/g,
   /Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g,
 ];

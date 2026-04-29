@@ -69,6 +69,18 @@ describe('harness chat stream parser', () => {
     });
   });
 
+  it('redacts masked API keys from streamed error messages', () => {
+    const masked = ['sk-proj-', '*'.repeat(32), 'abcd'].join('');
+    const result = renderStreamEvent({
+      type: 'error',
+      message: `Incorrect API key provided: ${masked}`,
+    });
+
+    expect(result).toEqual({
+      error: 'Incorrect API key provided: [REDACTED:CREDENTIAL]',
+    });
+  });
+
   it('renders model auth failures as global errors without raw credentials', () => {
     const result = renderStreamEvent({
       type: 'error',

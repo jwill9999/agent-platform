@@ -32,7 +32,7 @@ const CREDENTIAL_PATTERNS: readonly { name: string; pattern: RegExp }[] = [
   { name: 'JWT', pattern: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
   { name: 'Private Key', pattern: /-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/ },
   { name: 'GitHub Token', pattern: /(ghp|gho|ghu|ghs|ghr)_\w{36,}/ },
-  { name: 'OpenAI API Key', pattern: /sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}/ },
+  { name: 'OpenAI API Key', pattern: /sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/ },
   { name: 'Generic API Key', pattern: /(?:api[_-]?key|apikey)\s*[:=]\s*["']?[\w-]{20,}/i },
   { name: 'Generic Secret', pattern: /(?:secret|password)\s*[:=]\s*["']?[^\s"']{8,}/i },
   { name: 'Bearer Token', pattern: /Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/ },

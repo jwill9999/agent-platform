@@ -131,6 +131,13 @@ describe('OutputGuard', () => {
       expect(output).toContain('[REDACTED:OpenAI API Key]');
     });
 
+    it('redacts masked OpenAI API keys from provider errors', () => {
+      const masked = ['sk-proj-', '*'.repeat(32), 'abcd'].join('');
+      const output = redactCredentials(`Incorrect API key provided: ${masked}`);
+      expect(output).not.toContain(masked);
+      expect(output).toContain('[REDACTED:OpenAI API Key]');
+    });
+
     it('preserves non-sensitive content', () => {
       const input = 'Hello world, this is fine.';
       const output = redactCredentials(input);

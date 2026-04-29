@@ -32,16 +32,16 @@ function jsonError(status: number, code: string, message: string): Response {
 }
 
 /**
- * OpenAI key forwarded to the API as `x-openai-key` (same as calling /v1/chat directly).
- * Precedence: browser header → server AGENT_OPENAI_API_KEY → NEXT_OPENAI_API_KEY (local convenience).
- * The API does not read Next's env; without one of these, POST /v1/chat returns MISSING_KEY.
+ * Forward only an explicit caller-provided OpenAI key.
+ *
+ * The API host owns default model/key resolution. Injecting the Next.js process env
+ * here turns every chat into an explicit per-request key override, which bypasses
+ * API-side defaults and saved model config precedence.
  */
 function resolveUpstreamOpenAiKey(req: Request): string | undefined {
   const fromHeader = req.headers.get('x-openai-key')?.trim();
   if (fromHeader) return fromHeader;
-  const agent = process.env.AGENT_OPENAI_API_KEY?.trim();
-  if (agent) return agent;
-  return process.env.NEXT_OPENAI_API_KEY?.trim();
+  return undefined;
 }
 
 export async function POST(req: Request) {

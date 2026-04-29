@@ -21,7 +21,7 @@ function errorMessage(error: unknown): string {
 
 function redactCredentials(content: string): string {
   return content
-    .replace(/sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}/g, '[REDACTED:OpenAI API Key]')
+    .replace(/sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g, '[REDACTED:OpenAI API Key]')
     .replace(/(ghp|gho|ghu|ghs|ghr)_\w{36,}/g, '[REDACTED:GitHub Token]')
     .replace(/Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g, '[REDACTED:Bearer Token]');
 }

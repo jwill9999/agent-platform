@@ -423,6 +423,50 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
+  it('uses the first saved model config as the platform default when an agent has no override', async () => {
+    const envSnap = snapshotChatEnv();
+    const previousMasterKey = process.env.SECRETS_MASTER_KEY;
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      const masterKeyB64 = Buffer.alloc(32, 9).toString('base64');
+      process.env.SECRETS_MASTER_KEY = masterKeyB64;
+      delete process.env.AGENT_OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_ALLOW_LEGACY_ENV;
+
+      createModelConfig(
+        db,
+        {
+          name: 'Platform default',
+          provider: 'openai',
+          model: 'gpt-4.1-mini',
+          apiKey: 'sk-platform-default-test-key',
+        },
+        parseMasterKeyFromBase64(masterKeyB64),
+        1,
+      );
+
+      const sessionId = await createDefaultSession(app);
+      mockToolCalls.mockReturnValueOnce('Used saved default config');
+
+      await request(app).post('/v1/chat').send({ sessionId, message: 'hello' }).expect(200);
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        modelConfig?: { provider: string; model: string; apiKey?: string };
+      };
+      expect(state.modelConfig).toEqual({
+        provider: 'openai',
+        model: 'gpt-4.1-mini',
+        apiKey: 'sk-platform-default-test-key',
+      });
+    } finally {
+      restoreChatEnv(envSnap);
+      if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
+      else process.env.SECRETS_MASTER_KEY = previousMasterKey;
+      closeDatabase(sqlite);
+    }
+  });
+
   it('does not replay unresolved pending approval tool calls into later chat turns', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });

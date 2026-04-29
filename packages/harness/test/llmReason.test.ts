@@ -9,6 +9,7 @@ import {
   setupOpenAiProviderMock,
   mockStreamResult,
 } from './helpers/aiMock.js';
+import { SYSTEM_TOOLS } from '../src/systemTools.js';
 
 // ---------------------------------------------------------------------------
 // Mock the AI SDK before importing the node (delegates to shared helper)
@@ -200,6 +201,31 @@ describe('llmReasonNode', () => {
       tools?: Record<string, { parameters?: unknown }>;
     };
     expect(JSON.stringify(call.tools?.browser_drop?.parameters)).not.toContain('propertyNames');
+  });
+
+  it('passes built-in system tools to the SDK with OpenAI-safe strict schemas', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['using system tools'],
+        usage: { promptTokens: 5, completionTokens: 3 },
+      }),
+    );
+
+    await llmReasonNode(
+      makeState({ toolDefinitions: contractToolsToDefinitions([...SYSTEM_TOOLS]) }),
+    );
+
+    const call = mockStreamText.mock.calls.at(-1)?.[0] as {
+      tools?: Record<string, { parameters?: { jsonSchema?: Record<string, unknown> } }>;
+    };
+    expect(Object.keys(call.tools ?? {})).not.toContain(expect.stringContaining(':'));
+    const bashSchema = call.tools?.sys_bash?.parameters?.jsonSchema;
+    expect(bashSchema).toMatchObject({
+      type: 'object',
+      additionalProperties: false,
+      required: ['command', 'timeout_ms'],
+    });
+    expect(JSON.stringify(call.tools)).not.toContain('propertyNames');
   });
 });
 
