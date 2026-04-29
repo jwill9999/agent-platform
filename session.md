@@ -25,6 +25,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Addressed HITL.3 review feedback: pending approvals now audit as pending, approval output has a fallback renderer, and API stream tests assert no assistant text leaks on approval halt.
 - **Date:** 2026-04-29
 - **Session:** HITL.3 was merged into `feature/agent-platform-hitl`; claimed next task `agent-platform-hitl.4` and created `task/agent-platform-hitl.4` from the updated feature branch.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-hitl.4` durable approval resume execution on `task/agent-platform-hitl.4`; ready for PR into `feature/agent-platform-hitl`.
 
 ### Session-close guardrail (required)
 
@@ -63,14 +65,15 @@ Closed beads in this session:
 - `agent-platform-hitl.1` — Add deny-by-default approval gate for risky tools
 - `agent-platform-hitl.2` — Persist approval request records and APIs
 - `agent-platform-hitl.3` — Emit approval-required stream events
+- `agent-platform-hitl.4` — Resume approved tool execution safely
 
 In-progress beads:
 
-- `agent-platform-hitl.4` — Resume approved tool execution safely
+- None
 
 Next blocked bead:
 
-- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage; blocked by `agent-platform-hitl.4`
+- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage; blocked until `agent-platform-hitl.4` is merged into the feature branch
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
@@ -82,7 +85,7 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 - **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.3`** — merged into `feature/agent-platform-hitl` via PR `#92`
-- **`task/agent-platform-hitl.4`** — active branch, selected next task
+- **`task/agent-platform-hitl.4`** — active branch, implementation complete locally
 - Remote status: local `feature/agent-platform-hitl` is up to date with `origin/feature/agent-platform-hitl` at merge commit `bfc0d13`.
 
 ### Quality
@@ -95,22 +98,22 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 - `pnpm format:check` ✅
 - `pnpm docs:lint` ✅
 - `pnpm test` ✅ when escalated to allow local test servers to bind ports
+- `pnpm --filter @agent-platform/db exec vitest run test/messages.test.ts test/approvalRequests.test.ts` ✅
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` ✅ when escalated for local test server binding
 
 ### Key commits
 
-| Commit             | Branch                        | Description                        |
-| ------------------ | ----------------------------- | ---------------------------------- |
-| `bfc0d13`          | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`              |
-| Current branch tip | `task/agent-platform-hitl.4`  | Starting resume approved execution |
+| Commit             | Branch                        | Description               |
+| ------------------ | ----------------------------- | ------------------------- |
+| `bfc0d13`          | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`     |
+| Current branch tip | `task/agent-platform-hitl.4`  | Resume approved execution |
 
 ---
 
 ## Next (priority order)
 
-1. Implement `agent-platform-hitl.4`: durable resume path for approved/rejected pending tool calls.
-2. Persist enough resume state to execute the exact reviewed tool name/args once and make rejection visible to the agent.
-3. Add resume API, duplicate/stale decision handling, session locking coverage, replay-safe message persistence, and approve/reject/retry tests.
-4. After HITL.4 is merged, start `agent-platform-hitl.5` for the frontend approval UX and e2e coverage.
+1. Open/merge PR from `task/agent-platform-hitl.4` into `feature/agent-platform-hitl`.
+2. After HITL.4 is merged, start `agent-platform-hitl.5` for frontend approval UX and e2e coverage.
 
 ---
 

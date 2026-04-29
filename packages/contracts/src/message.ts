@@ -4,6 +4,13 @@ import { z } from 'zod';
 export const MessageRoleSchema = z.enum(['user', 'assistant', 'system', 'tool']);
 export type MessageRole = z.infer<typeof MessageRoleSchema>;
 
+export const PersistedToolCallSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  args: z.record(z.string(), z.unknown()),
+});
+export type PersistedToolCall = z.infer<typeof PersistedToolCallSchema>;
+
 /** A single message in a conversation history. */
 export const MessageRecordSchema = z.object({
   id: z.string().min(1),
@@ -11,6 +18,7 @@ export const MessageRecordSchema = z.object({
   role: MessageRoleSchema,
   content: z.string(),
   toolCallId: z.string().nullish(),
+  toolCalls: z.array(PersistedToolCallSchema).optional(),
   createdAtMs: z.number().int().nonnegative(),
 });
 

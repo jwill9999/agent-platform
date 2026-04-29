@@ -9,12 +9,17 @@ import {
   insertToolExecution,
   completeToolExecution,
   createApprovalRequest,
+  getApprovalRequest,
+  claimApprovalRequestForResume,
+  ApprovalRequestAlreadyResumedError,
+  ApprovalRequestNotFoundError,
+  ApprovalRequestTransitionError,
   getModelConfig,
   resolveModelConfigKey,
   parseMasterKeyFromBase64,
 } from '@agent-platform/db';
-import type { ContextWindow, MessageRecord } from '@agent-platform/contracts';
-import { DEFAULT_CONTEXT_WINDOW } from '@agent-platform/contracts';
+import type { ApprovalRequest, ContextWindow, MessageRecord } from '@agent-platform/contracts';
+import { DEFAULT_CONTEXT_WINDOW, SessionResumeBodySchema } from '@agent-platform/contracts';
 import {
   buildAgentContext,
   destroyAgentContext,
@@ -33,12 +38,14 @@ import {
   PathJail,
   DEFAULT_MOUNTS,
   createToolAuditLogger,
+  type HarnessStateType,
 } from '@agent-platform/harness';
 import type {
   AgentContext,
   ChatMessage,
   OutputEmitter,
   ToolAuditStore,
+  ToolCallIntent,
 } from '@agent-platform/harness';
 import {
   resolveModelConfig,
@@ -48,14 +55,14 @@ import {
 } from '@agent-platform/model-router';
 import type { ObservabilityStore } from '@agent-platform/plugin-observability';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
-import type { Response, Router } from 'express';
+import type { Request, Response, Router } from 'express';
 import { Router as createRouter } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
-import { createInProcessSessionLock } from '../sessionLock.js';
+import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
 // ---------------------------------------------------------------------------
@@ -88,6 +95,7 @@ export type ChatRouterOptions = {
   observabilityStore?: ObservabilityStore;
   llmReasonNode?: ReturnType<typeof createLlmReasonNode>;
   disableEvaluatorNodes?: boolean;
+  sessionLock?: SessionLock;
 };
 
 /** Derive a human-readable session title from the first user message. */
@@ -176,9 +184,16 @@ function resolveModelOrThrow(
 }
 
 /** Map persisted MessageRecord rows to ChatMessage objects. */
-function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
+export function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
   if (m.role === 'tool' && m.toolCallId) {
     return { role: 'tool', content: m.content, toolCallId: m.toolCallId, toolName: '' };
+  }
+  if (m.role === 'assistant') {
+    return {
+      role: 'assistant',
+      content: m.content,
+      toolCalls: m.toolCalls as ToolCallIntent[] | undefined,
+    };
   }
   return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
 }
@@ -187,13 +202,13 @@ function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
  * Sanitise replayed history so that no `role:'tool'` message appears without
  * a preceding assistant message that carries the matching `tool_calls`.
  *
- * We do not currently persist assistant `toolCalls` (no DB column), so on
- * replay every persisted tool message would be orphaned and the OpenAI API
- * rejects the conversation with:
+ * Older rows may not have persisted assistant `toolCalls`; without them, every
+ * persisted tool message would be orphaned and the OpenAI API rejects the
+ * conversation with:
  *   "messages with role 'tool' must be a response to a preceding message with 'tool_calls'"
  *
- * Until full round-tripping is added (see beads agent-platform-361), strip
- * tool rows whose preceding assistant message has no `toolCalls`.
+ * Strip any legacy orphan rows whose preceding assistant message has no
+ * matching `toolCalls`.
  */
 function stripOrphanToolMessages(history: ChatMessage[]): ChatMessage[] {
   const cleaned: ChatMessage[] = [];
@@ -227,6 +242,7 @@ function persistNewMessages(
         role: msg.role,
         content: msg.content,
         toolCallId: msg.role === 'tool' ? msg.toolCallId : undefined,
+        toolCalls: msg.role === 'assistant' ? msg.toolCalls : undefined,
       });
     }
   });
@@ -262,13 +278,369 @@ function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): voi
   res.write(JSON.stringify(errorEvent) + '\n');
 }
 
+function mapResumeApprovalError(error: unknown): never {
+  const namedError = error instanceof Error ? error : null;
+  if (
+    error instanceof ApprovalRequestNotFoundError ||
+    namedError?.name === 'ApprovalRequestNotFoundError'
+  ) {
+    throw new HttpError(404, 'NOT_FOUND', namedError?.message ?? 'Approval request not found');
+  }
+  if (
+    error instanceof ApprovalRequestAlreadyResumedError ||
+    namedError?.name === 'ApprovalRequestAlreadyResumedError'
+  ) {
+    const resumed = error as ApprovalRequestAlreadyResumedError;
+    throw new HttpError(
+      409,
+      'APPROVAL_ALREADY_RESUMED',
+      namedError?.message ?? 'Approval request has already been resumed',
+      {
+        id: resumed.id,
+        resumedAtMs: resumed.resumedAtMs,
+      },
+    );
+  }
+  if (
+    error instanceof ApprovalRequestTransitionError ||
+    namedError?.name === 'ApprovalRequestTransitionError'
+  ) {
+    const transition = error as ApprovalRequestTransitionError;
+    throw new HttpError(
+      409,
+      'INVALID_APPROVAL_TRANSITION',
+      namedError?.message ?? 'Invalid approval request transition',
+      {
+        id: transition.id,
+        currentStatus: transition.currentStatus,
+        requestedStatus: transition.requestedStatus,
+      },
+    );
+  }
+  throw error;
+}
+
+function parseExecutionPayload(request: ApprovalRequest): ToolCallIntent {
+  if (!request.executionPayloadJson) {
+    throw new HttpError(
+      409,
+      'APPROVAL_RESUME_STATE_MISSING',
+      'Approval request has no durable execution payload',
+    );
+  }
+
+  let parsed: { toolCallId: string; toolName: string; args: Record<string, unknown> };
+  try {
+    parsed = z
+      .object({
+        toolCallId: z.string().min(1),
+        toolName: z.string().min(1),
+        args: z.record(z.string(), z.unknown()).default({}),
+      })
+      .parse(JSON.parse(request.executionPayloadJson));
+  } catch (error) {
+    throw new HttpError(409, 'APPROVAL_RESUME_STATE_INVALID', 'Approval resume state is invalid', {
+      cause: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  if (parsed.toolName !== request.toolName) {
+    throw new HttpError(
+      409,
+      'APPROVAL_RESUME_STATE_MISMATCH',
+      'Approval request payload does not match the reviewed tool',
+    );
+  }
+
+  return {
+    id: parsed.toolCallId,
+    name: parsed.toolName,
+    args: parsed.args,
+  };
+}
+
+function hasAssistantToolCall(history: ChatMessage[], toolCallId: string): boolean {
+  return history.some(
+    (message) =>
+      message.role === 'assistant' &&
+      message.toolCalls?.some((toolCall) => toolCall.id === toolCallId),
+  );
+}
+
+function buildResumeMessages(
+  db: DrizzleDb,
+  sessionId: string,
+  systemPrompt: string,
+  toolCall: ToolCallIntent,
+): ChatMessage[] {
+  const history = stripOrphanToolMessages(
+    listMessagesBySession(db, sessionId).map(dbRecordToChatMessage),
+  );
+  const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...history];
+
+  if (!hasAssistantToolCall(messages, toolCall.id)) {
+    messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+  }
+
+  return messages;
+}
+
+function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalRequest): ChatMessage {
+  return {
+    role: 'tool',
+    toolCallId: toolCall.id,
+    toolName: toolCall.name,
+    content: JSON.stringify({
+      error: 'APPROVAL_REJECTED',
+      message: request.decisionReason
+        ? `Human rejected tool execution: ${request.decisionReason}`
+        : 'Human rejected tool execution.',
+    }),
+  };
+}
+
+function createAuditLog(db: DrizzleDb): ReturnType<typeof createToolAuditLogger> {
+  const auditStore: ToolAuditStore = {
+    insert: (entry) => insertToolExecution(db, entry),
+    complete: (id, data) => completeToolExecution(db, id, data),
+  };
+  return createToolAuditLogger(auditStore);
+}
+
+function buildRuntimeGraph(
+  db: DrizzleDb,
+  agentCtx: AgentContext,
+  runId: string,
+  sessionId: string,
+  emitter: OutputEmitter,
+  options: ChatRouterOptions,
+  approvedToolCallIds?: ReadonlySet<string>,
+) {
+  return buildHarnessGraph({
+    executeTool: async () => ({ ok: true }),
+    llmReasonNode:
+      options.llmReasonNode ??
+      createLlmReasonNode({ emitter, dispatcher: agentCtx.pluginDispatcher }),
+    toolDispatchNode: createToolDispatchNode({
+      agent: agentCtx.agent,
+      tools: agentCtx.tools,
+      mcpManager: agentCtx.mcpManager,
+      nativeToolExecutor: createSystemToolExecutor(
+        options.observabilityStore
+          ? {
+              observability: {
+                store: options.observabilityStore,
+                sessionId,
+                traceId: runId,
+              },
+            }
+          : undefined,
+      ),
+      emitter,
+      dispatcher: agentCtx.pluginDispatcher,
+      pathJail: new PathJail(DEFAULT_MOUNTS),
+      auditLog: createAuditLog(db),
+      approvalRequests: {
+        create: (request) =>
+          createApprovalRequest(db, {
+            id: randomUUID(),
+            ...request,
+          }),
+      },
+      approvedToolCallIds,
+      skillResolver: (id: string) => getSkill(db, id),
+    }),
+    criticNode: options.disableEvaluatorNodes
+      ? undefined
+      : createCriticNode({ emitter, dispatcher: agentCtx.pluginDispatcher }),
+    dodProposeNode: options.disableEvaluatorNodes ? undefined : createDodProposeNode(),
+    dodCheckNode: options.disableEvaluatorNodes
+      ? undefined
+      : createDodCheckNode({ emitter, dispatcher: agentCtx.pluginDispatcher }),
+    dispatcher: agentCtx.pluginDispatcher,
+  });
+}
+
+export async function handleSessionResume(
+  db: DrizzleDb,
+  options: ChatRouterOptions,
+  sessionLock: SessionLock,
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const sessionId = z.string().min(1).parse(req.params['id']);
+  const { approvalRequestId } = parseBody(SessionResumeBodySchema, req.body);
+
+  const session = getSession(db, sessionId);
+  if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
+
+  let approval: ApprovalRequest;
+  try {
+    approval = getApprovalRequest(db, approvalRequestId);
+  } catch (error) {
+    mapResumeApprovalError(error);
+  }
+
+  if (approval.sessionId !== sessionId) {
+    throw new HttpError(404, 'NOT_FOUND', 'Approval request not found for session');
+  }
+
+  if (approval.resumedAtMs) {
+    res.json({ data: approval });
+    return;
+  }
+
+  const toolCall = parseExecutionPayload(approval);
+  const agentCtx = await loadAgentContext(db, session.agentId, {
+    globalPlugins: options.globalPlugins,
+  });
+  const modelCfg = resolveModelOrThrow(db, agentCtx, req.header('x-openai-key'));
+  const { timeoutMs } = agentCtx.agent.executionLimits;
+  const release = await sessionLock.acquire(sessionId, timeoutMs);
+
+  const controller = new AbortController();
+  const { signal } = controller;
+  const runId = randomUUID();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let heartbeatId: ReturnType<typeof setInterval> | undefined;
+
+  try {
+    try {
+      approval = claimApprovalRequestForResume(db, approvalRequestId, Date.now());
+    } catch (error) {
+      mapResumeApprovalError(error);
+    }
+
+    await safePluginCall(() =>
+      agentCtx.pluginDispatcher.onTaskStart({
+        sessionId,
+        runId,
+        planId: runId,
+        taskId: runId,
+        toolIds: agentCtx.tools.map((tool) => tool.id),
+      }),
+    );
+
+    prepareNdjsonResponse(res);
+    const emitter: OutputEmitter = createNdjsonEmitter(res);
+
+    req.on('close', () => {
+      if (!res.writableFinished) controller.abort('client_disconnect');
+    });
+    timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
+    heartbeatId = setInterval(() => {
+      if (!res.writableEnded) res.write('\n');
+    }, 15_000);
+
+    const messages = buildResumeMessages(db, sessionId, agentCtx.systemPrompt, toolCall);
+    const initialCount = messages.length;
+
+    let resumeMessages: ChatMessage[];
+    if (approval.status === 'rejected') {
+      resumeMessages = [buildRejectedToolMessage(toolCall, approval)];
+      await emitter.emit({
+        type: 'error',
+        code: 'APPROVAL_REJECTED',
+        message: 'Human rejected tool execution.',
+      });
+    } else {
+      const dispatchNode = createToolDispatchNode({
+        agent: agentCtx.agent,
+        tools: agentCtx.tools,
+        mcpManager: agentCtx.mcpManager,
+        nativeToolExecutor: createSystemToolExecutor(
+          options.observabilityStore
+            ? {
+                observability: {
+                  store: options.observabilityStore,
+                  sessionId,
+                  traceId: runId,
+                },
+              }
+            : undefined,
+        ),
+        emitter,
+        dispatcher: agentCtx.pluginDispatcher,
+        pathJail: new PathJail(DEFAULT_MOUNTS),
+        auditLog: createAuditLog(db),
+        approvedToolCallIds: new Set([toolCall.id]),
+        skillResolver: (id: string) => getSkill(db, id),
+      });
+      const dispatchState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
+        dropped: 0,
+        contextTokens: 0,
+      });
+      dispatchState.llmOutput = { kind: 'tool_calls', calls: [toolCall] };
+      const dispatchResult = await dispatchNode(dispatchState, {
+        configurable: { thread_id: sessionId, signal },
+      });
+      resumeMessages = dispatchResult.messages ?? [];
+    }
+
+    const graph = buildRuntimeGraph(
+      db,
+      agentCtx,
+      runId,
+      sessionId,
+      emitter,
+      options,
+      new Set([toolCall.id]),
+    );
+    const resumeState = buildInitialState(
+      runId,
+      sessionId,
+      [...messages, ...resumeMessages],
+      agentCtx,
+      modelCfg,
+      { dropped: 0, contextTokens: 0 },
+    );
+
+    const finalState: { messages?: ChatMessage[] } = await graph.invoke(resumeState, {
+      configurable: { thread_id: sessionId, signal },
+    });
+
+    persistNewMessages(db, sessionId, finalState?.messages, initialCount);
+    await safePluginCall(() =>
+      agentCtx.pluginDispatcher.onTaskEnd({ sessionId, runId, taskId: runId, ok: true }),
+    );
+  } catch (err) {
+    if (!res.headersSent && err instanceof HttpError) {
+      throw err;
+    }
+    await safePluginCall(() =>
+      agentCtx.pluginDispatcher.onTaskEnd({
+        sessionId,
+        runId,
+        taskId: runId,
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    await safePluginCall(() =>
+      agentCtx.pluginDispatcher.onError({
+        sessionId,
+        runId,
+        phase: signal.aborted && signal.reason === 'timeout' ? 'session' : 'unknown',
+        error: err,
+      }),
+    );
+    emitStreamError(res, err, signal);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (heartbeatId) clearInterval(heartbeatId);
+    release();
+    await destroyAgentContext(agentCtx);
+    if (!res.writableEnded) res.end();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Router factory
 // ---------------------------------------------------------------------------
 
 export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {}): Router {
   const router = createRouter();
-  const sessionLock = createInProcessSessionLock();
+  const sessionLock = options.sessionLock ?? createInProcessSessionLock();
 
   // Session-aware agent chat (NDJSON stream of Output events)
   router.post(
@@ -519,7 +891,7 @@ function buildInitialState(
   agentCtx: AgentContext,
   modelConfig: { provider: string; model: string; apiKey?: string },
   contextInfo: { dropped: number; contextTokens: number },
-) {
+): HarnessStateType {
   const strategy = agentCtx.agent.contextWindow?.strategy ?? 'truncate';
   const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
   return {
@@ -547,7 +919,14 @@ function buildInitialState(
     recentToolCalls: [],
     totalTokensUsed: 0,
     totalCostUnits: 0,
+    totalToolCalls: 0,
+    loadedSkillIds: [],
+    totalRetries: 0,
     startedAtMs: Date.now(),
     deadlineMs: agentCtx.agent.executionLimits.timeoutMs,
+    iterations: 0,
+    critique: undefined,
+    dodAttempts: 0,
+    dodContract: undefined,
   };
 }

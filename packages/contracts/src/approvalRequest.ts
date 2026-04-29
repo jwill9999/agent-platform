@@ -16,6 +16,7 @@ export const ApprovalRequestSchema = z.object({
   status: ApprovalRequestStatusSchema,
   createdAtMs: z.number(),
   decidedAtMs: z.number().optional(),
+  resumedAtMs: z.number().optional(),
   expiresAtMs: z.number().optional(),
   decisionReason: z.string().optional(),
 });

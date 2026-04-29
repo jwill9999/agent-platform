@@ -17,3 +17,10 @@ export const SessionCreateBodySchema = z.object({
 });
 
 export type SessionCreateBody = z.infer<typeof SessionCreateBodySchema>;
+
+/** POST /v1/sessions/:id/resume body. */
+export const SessionResumeBodySchema = z.object({
+  approvalRequestId: z.string().min(1),
+});
+
+export type SessionResumeBody = z.infer<typeof SessionResumeBodySchema>;
