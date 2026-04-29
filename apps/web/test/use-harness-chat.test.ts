@@ -42,6 +42,21 @@ describe('harness chat stream parser', () => {
     });
   });
 
+  it('renders DoD cap failures as critic status instead of user-facing errors', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      code: 'DOD_FAILED',
+      message: 'Definition of Done failed after 3 revision attempt(s).',
+    });
+
+    expect(result).toEqual({
+      critic: {
+        kind: 'cap_reached',
+        reasons: 'Definition of Done failed after 3 revision attempt(s).',
+      },
+    });
+  });
+
   it('deduplicates repeated approval_required events by request id', () => {
     const first = mergeApprovalEvent([], {
       type: 'approval_required',

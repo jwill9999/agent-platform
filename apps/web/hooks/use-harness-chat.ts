@@ -125,6 +125,9 @@ function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (code === 'CRITIC_CAP_REACHED') {
     return { critic: { kind: 'cap_reached', reasons: o.message } };
   }
+  if (code === 'DOD_FAILED') {
+    return { critic: { kind: 'cap_reached', reasons: o.message } };
+  }
   if (code === 'APPROVAL_REJECTED') {
     return { text: `\n\n[${code}] ${o.message}\n` };
   }
@@ -587,14 +590,30 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         if (!res.ok) throw new Error(await parseErrorResponse(res));
 
         let accumulated = '';
+        let pendingRevisionReset = false;
         if (res.body && !res.headers.get('content-type')?.includes('application/json')) {
           await readNdjsonStream(
             res.body,
             (chunk) => {
-              accumulated += chunk;
+              if (!chunk) return;
+              if (pendingRevisionReset) {
+                accumulated = chunk;
+                pendingRevisionReset = false;
+              } else {
+                accumulated += chunk;
+              }
             },
             (msg) => setError(msg),
-            (event) => appendCriticEvent(assistantId, event),
+            (event) => {
+              appendCriticEvent(assistantId, event);
+              if (event.kind === 'revise') {
+                pendingRevisionReset = true;
+                setThinkingByMessage((prev) => ({
+                  ...prev,
+                  [assistantId]: THINKING_REVISE_PLACEHOLDER,
+                }));
+              }
+            },
             (chunk) => appendThinking(assistantId, chunk),
             (event) => appendApprovalRequired(assistantId, event),
           );
