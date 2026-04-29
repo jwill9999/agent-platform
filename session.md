@@ -61,6 +61,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added backlog task `agent-platform-ws.6` for guarded host workspace data removal on uninstall/reset.
 - **Date:** 2026-04-29
 - **Session:** Completed `agent-platform-ws.2` Docker runtime mount wiring: `/workspace` and `/data` are host-backed through workspace env vars, with compose/docs/tests updated.
+- **Date:** 2026-04-29
+- **Session:** Fixed CI E2E startup for `agent-platform-ws.2` by adding `make workspace-init` before `docker compose up`.
 
 ### Session-close guardrail (required)
 
