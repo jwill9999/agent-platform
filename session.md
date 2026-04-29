@@ -87,7 +87,7 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 - **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.3`** — merged into `feature/agent-platform-hitl` via PR `#92`
-- **`task/agent-platform-hitl.4`** — active branch, amended local tip `57254c9`
+- **`task/agent-platform-hitl.4`** — active branch, amended local tip `43ecad2` before conflict resolution
 - Remote status: local branch is `ahead 1, behind 1` versus `origin/task/agent-platform-hitl.4`; amended commit needs `git push --force-with-lease origin task/agent-platform-hitl.4`.
 
 ### Quality
@@ -106,10 +106,10 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 
 ### Key commits
 
-| Commit    | Branch                        | Description               |
-| --------- | ----------------------------- | ------------------------- |
-| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`     |
-| `57254c9` | `task/agent-platform-hitl.4`  | Resume approved execution |
+| Commit    | Branch                        | Description                                          |
+| --------- | ----------------------------- | ---------------------------------------------------- |
+| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`                                |
+| `43ecad2` | `task/agent-platform-hitl.4`  | Resume approved execution before conflict resolution |
 
 ---
 
