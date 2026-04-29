@@ -63,6 +63,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-ws.2` Docker runtime mount wiring: `/workspace` and `/data` are host-backed through workspace env vars, with compose/docs/tests updated.
 - **Date:** 2026-04-29
 - **Session:** Fixed CI E2E startup for `agent-platform-ws.2` by adding `make workspace-init` before `docker compose up`.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.3` workspace PathJail/tool-policy enforcement on `task/agent-platform-ws.3`.
 
 ### Session-close guardrail (required)
 
@@ -75,111 +77,59 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Workspace storage epic planned
+### Workspace PathJail/tool policy
 
-Branch state: `codex/workspace-storage-planning` contains planning artifacts only.
+Branch state: `task/agent-platform-ws.3` contains the `agent-platform-ws.3` implementation.
 
-- Created Beads epic `agent-platform-ws`: Host workspace storage for user files.
-- Created chained tasks:
-  - `agent-platform-ws.1` Define host workspace home and configuration.
-  - `agent-platform-ws.1a` Add workspace config, setup scripts, and PathJail platform behavior.
-  - `agent-platform-ws.2` Mount workspace storage into Docker runtime.
-  - `agent-platform-ws.3` Enforce workspace PathJail and tool policy.
-  - `agent-platform-ws.4` Expose workspace files in the UI and API.
-  - `agent-platform-ws.6` Add guarded workspace data removal flow.
-  - `agent-platform-ws.5` Verify workspace security, HITL, and e2e flows.
-- Added task specs under `docs/tasks/agent-platform-ws*.md`.
-- Planned feature branch: `feature/agent-platform-workspace-storage`.
-- Planned task chain: `task/agent-platform-ws.1` -> `task/agent-platform-ws.1a` -> `task/agent-platform-ws.2` -> `task/agent-platform-ws.3` -> `task/agent-platform-ws.4` -> `task/agent-platform-ws.6` -> `task/agent-platform-ws.5`.
-- Core design direction: host workspace lives in an OS-conventional app home and mounts into Docker at `/workspace`; app data remains separate; file tools are jailed; high-risk operations keep HITL approval.
-  Skills may later guide agents on where to place files, but config, setup, host mapping, and security enforcement belong to the platform.
-- First-run lifecycle commands such as `make up`, `make restart`, `make reset`, and `make new` should invoke workspace setup automatically before Docker starts. A focused setup target such as `make workspace-init` should also exist for manual preparation.
-- Host data removal should be separate from Docker cleanup, use dry-run/confirmation safeguards, and refuse broad unsafe paths.
+- Added a bash workspace policy that extracts path-bearing shell reads/writes and validates them with PathJail before approval or execution.
+- Denied shell path escapes such as `touch /tmp/x` with a human-readable `PATH_ACCESS_DENIED` error instead of creating an approval request.
+- Removed `/tmp` from default allowed mounts so the default file-tool jail is the explicit workspace mount only.
+- Set `sys_bash` execution cwd to the configured workspace root when it exists, keeping relative shell writes in `/workspace`.
+- Kept high-risk `sys_bash` behind HITL approval after workspace-policy checks pass.
+- Updated observability integration coverage to exercise a failing file tool inside `/workspace`, preserving recent-error audit behavior without relying on outside-workspace access.
+- Added unit coverage for bash path extraction, allowed workspace paths, denied shell writes/reads outside the workspace, and denied shell escapes before approval creation.
 
-### HITL epic complete
+Quality gates passed:
 
-Branch state: `main` is checked out and tracking `origin/main`.
-
-- `feature/agent-platform-hitl` merged into `main` via PR `#95`.
-- `task/agent-platform-hitl.5` merged into the feature branch via PR `#94`.
-- Closed `agent-platform-hitl.5` in Beads.
-- Beads auto-closed parent epic `agent-platform-hitl`; all 5 child tasks are now closed.
-- `bd ready` reports no open issues.
-
-HITL delivered:
-
-- High-risk and explicitly approval-required tools are gated.
-- Approval requests are persisted, queryable, and auditable.
-- Approval-required stream events render inline in the chat UI.
-- Users can approve or reject pending tool calls.
-- Approved/rejected decisions resume the agent flow safely.
-- Approval state survives refresh through pending approval hydration.
-- Shell command failures are summarized to the assistant in plain language instead of raw `stdout`/`stderr`/`exitCode` jargon.
-
-HITL.5 follow-up fixes completed before merge:
-
-- Added approval card state and approve/reject resume handling to `useHarnessChat`.
-- Added compact inline approval card rendering for chat assistant turns.
-- Added pending approval hydration for resumed sessions.
-- Added web unit coverage for approval parsing/deduplication and a Playwright fixture for approval card states.
-- Sanitised unsupported `propertyNames` JSON Schema keywords before tools are sent to the LLM; this fixes `browser_drop` schema validation blocking approval UI testing.
-- Sanitised chat history replay so unresolved pending approval `tool_calls` are not sent back to OpenAI on later normal chat turns.
-- Forwarded the selected model config through approval resume so the resume call does not fall back to a stale/invalid env key after the normal chat turn succeeds.
-- Blocked the chat composer while an approval card is pending/approving/rejecting/failed to prevent overlapping normal prompts and resume output from interleaving.
-- Reused normal-chat revision reset behavior for approval resume streams so repeated DoD drafts do not concatenate duplicate command output.
-- Rendered `DOD_FAILED` as critic cap metadata rather than a dismissible global error banner.
-- Added top margin to the final critic review block so it no longer sits tight against the assistant answer paragraph.
-- Formatted `sys_bash` tool messages for the follow-up LLM step as plain-language success/failure summaries, reducing raw coding jargon in assistant answers after command errors.
-- Extracted shared approval/chat stream parsing in the web hook and shared NDJSON lifecycle/task-start setup in the API chat router to reduce new-code duplication.
-
-Note: Beads changes were applied locally. Beads Dolt auto-push failed because the sandbox could not resolve/authenticate to GitHub over SSH.
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm test` (run with escalation because API Supertest binds local ports)
+- `pnpm docs:lint`
+- Focused API check: `pnpm --filter @agent-platform/api exec vitest run test/observability.integration.test.ts`
+- Focused API check: `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
 
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-ws.2`
-- **Remote:** task branch pending push at task completion
+- **Current branch:** `task/agent-platform-ws.3`
+- **Latest task commit:** `542934f` (`Enforce workspace path policy for shell tools`)
 - **Feature branch:** `feature/agent-platform-workspace-storage`
-- **Feature merge:** PR `#95` merged `feature/agent-platform-hitl` into `main`
-- **Task merges:** HITL.3 PR `#92`, HITL.4 PR `#93`, HITL.5 PR `#94`
+- **Next task in chain:** `agent-platform-ws.4`
+
+### Beads
+
+- `agent-platform-ws.3` is implemented and ready to close after `session.md` is committed/pushed.
+- `agent-platform-ws.4` is unblocked after `agent-platform-ws.3` closes.
 
 ### Quality
 
-- Latest merge commit on `main`: `a00bb39` (`Merge pull request #95 from jwill9999/feature/agent-platform-hitl`)
-- PR `#94` pre-push checks passed before merge: affected API/web build, typecheck, tests.
-- Focused HITL checks passed before merge:
-  - `pnpm --filter @agent-platform/web exec vitest run test/use-harness-chat.test.ts`
-  - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
-  - `pnpm --filter @agent-platform/harness exec vitest run test/toolDispatch.test.ts`
-  - affected package lint/typecheck/format checks
-
-### Key commits
-
-| Commit    | Branch | Description                                    |
-| --------- | ------ | ---------------------------------------------- |
-| `a00bb39` | `main` | Merge HITL feature PR `#95`                    |
-| `4fcc56a` | `main` | Merge HITL.5 task PR `#94` into feature branch |
-| `9119bdf` | `main` | Reduce HITL stream duplication                 |
-| `7d7a931` | `main` | Make shell failure summaries human readable    |
-| `34dc308` | `main` | Add critic review spacing                      |
-| `c1fb201` | `main` | Fix approval resume revision display           |
-| `014e413` | `main` | Fix HITL approval resume model config          |
-| `0802461` | `main` | Sanitise pending approval history              |
+- Repo-level typecheck/lint/format/test/docs gates passed in this session.
 
 ---
 
 ## Next (priority order)
 
-1. Continue the chain with `agent-platform-ws.3` from `task/agent-platform-ws.2`.
-2. Deepen workspace PathJail/tool policy coverage across shell and file operations.
-3. If needed, push Beads Dolt state from an environment with GitHub SSH/network access.
+1. Commit and push the `session.md` handoff update on `task/agent-platform-ws.3`.
+2. Close `agent-platform-ws.3` in Beads, then sync/push Beads Dolt state.
+3. Continue the chain with `agent-platform-ws.4` from `task/agent-platform-ws.3`.
 
 ---
 
 ## Blockers / questions for owner
 
-- No code blockers. Beads local state is updated, but Beads Dolt auto-push failed due GitHub SSH/network access in this sandbox.
+- No code blockers.
 
 ---
 
