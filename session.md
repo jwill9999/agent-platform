@@ -23,6 +23,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-hitl.3` approval-required NDJSON events on `task/agent-platform-hitl.3`; ready for PR into `feature/agent-platform-hitl`.
 - **Date:** 2026-04-29
 - **Session:** Addressed HITL.3 review feedback: pending approvals now audit as pending, approval output has a fallback renderer, and API stream tests assert no assistant text leaks on approval halt.
+- **Date:** 2026-04-29
+- **Session:** HITL.3 was merged into `feature/agent-platform-hitl`; claimed next task `agent-platform-hitl.4` and created `task/agent-platform-hitl.4` from the updated feature branch.
 
 ### Session-close guardrail (required)
 
@@ -64,9 +66,13 @@ Closed beads in this session:
 
 In-progress beads:
 
-- None
+- `agent-platform-hitl.4` — Resume approved tool execution safely
 
-Note: `bd` changes were applied locally, but automatic remote push failed due to SSH/network auth from the sandbox.
+Next blocked bead:
+
+- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage; blocked by `agent-platform-hitl.4`
+
+Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
 ## Current state
 
@@ -75,8 +81,9 @@ Note: `bd` changes were applied locally, but automatic remote push failed due to
 - **`feature/agent-platform-hitl`** — pushed and tracking `origin/feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
-- **`task/agent-platform-hitl.3`** — active branch, PR open as `#92`, review feedback addressed locally
-- Remote refs verified with `git ls-remote --heads origin feature/agent-platform-hitl task/agent-platform-hitl.1`.
+- **`task/agent-platform-hitl.3`** — merged into `feature/agent-platform-hitl` via PR `#92`
+- **`task/agent-platform-hitl.4`** — active branch, selected next task
+- Remote status: local `feature/agent-platform-hitl` is up to date with `origin/feature/agent-platform-hitl` at merge commit `bfc0d13`.
 
 ### Quality
 
@@ -91,23 +98,25 @@ Note: `bd` changes were applied locally, but automatic remote push failed due to
 
 ### Key commits
 
-| Commit             | Branch                       | Description                          |
-| ------------------ | ---------------------------- | ------------------------------------ |
-| Current branch tip | `task/agent-platform-hitl.3` | Emit approval-required NDJSON events |
+| Commit             | Branch                        | Description                        |
+| ------------------ | ----------------------------- | ---------------------------------- |
+| `bfc0d13`          | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`              |
+| Current branch tip | `task/agent-platform-hitl.4`  | Starting resume approved execution |
 
 ---
 
 ## Next (priority order)
 
-1. Push amended `task/agent-platform-hitl.3` review fixes to PR `#92`.
-2. After HITL.3 is merged, create `task/agent-platform-hitl.4` from the updated feature branch.
-3. Implement approval decision resume execution in `agent-platform-hitl.4`.
+1. Implement `agent-platform-hitl.4`: durable resume path for approved/rejected pending tool calls.
+2. Persist enough resume state to execute the exact reviewed tool name/args once and make rejection visible to the agent.
+3. Add resume API, duplicate/stale decision handling, session locking coverage, replay-safe message persistence, and approve/reject/retry tests.
+4. After HITL.4 is merged, start `agent-platform-hitl.5` for the frontend approval UX and e2e coverage.
 
 ---
 
 ## Blockers / questions for owner
 
-- None currently. Beads Dolt push completed after explicit network approval.
+- None for local continuation. Beads Dolt auto-push failed from the sandbox due to GitHub SSH/network access.
 
 ---
 
@@ -122,8 +131,8 @@ Note: `bd` changes were applied locally, but automatic remote push failed due to
 | `docs/planning/lazy-skill-loading.md`     | Lazy skill pattern (planning reference)    |
 | `docs/architecture/lazy-skill-loading.md` | Lazy skill loading implementation guide    |
 | `docs/planning/security.md`               | Threat model (8 categories)                |
-| `docs/tasks/agent-platform-fc8.md`        | DoD contract task spec                     |
-| `docs/tasks/agent-platform-2v6.md`        | Next task in the chain                     |
+| `docs/tasks/agent-platform-hitl.4.md`     | Selected next task: resume HITL execution  |
+| `docs/tasks/agent-platform-hitl.5.md`     | Downstream frontend approval UX task       |
 | `docs/planning/frontend-ui-phases.md`     | Frontend UI phased plan (unblocked)        |
 | `docs/tasks/`                             | Task spec files                            |
 
