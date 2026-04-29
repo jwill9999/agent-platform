@@ -31,6 +31,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Queried SonarCloud PR `#93` duplicate-code metrics; refactored shared chat test helpers and amended `agent-platform-hitl.4`.
 - **Date:** 2026-04-29
 - **Session:** Refactored `chatRouter.ts` runtime error/finalization helpers to clear remaining SonarCloud duplicate-code block.
+- **Date:** 2026-04-29
+- **Session:** HITL.4 was merged into `feature/agent-platform-hitl`; selected `agent-platform-hitl.5` as the next epic task.
 
 ### Session-close guardrail (required)
 
@@ -74,11 +76,11 @@ Closed beads in this session:
 
 In-progress beads:
 
-- None
+- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage
 
-Next blocked bead:
+Selected task:
 
-- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage; blocked until `agent-platform-hitl.4` is merged into the feature branch
+- `agent-platform-hitl.5` — claimed and started on `task/agent-platform-hitl.5`
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
@@ -90,8 +92,9 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 - **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.3`** — merged into `feature/agent-platform-hitl` via PR `#92`
-- **`task/agent-platform-hitl.4`** — active branch, amended local tip `43ecad2` before conflict resolution
-- Remote status: local branch is `ahead 1, behind 1` versus `origin/task/agent-platform-hitl.4`; amended commit needs `git push --force-with-lease origin task/agent-platform-hitl.4`.
+- **`task/agent-platform-hitl.4`** — merged into `feature/agent-platform-hitl` via PR `#93`
+- **`feature/agent-platform-hitl`** — up to date with `origin/feature/agent-platform-hitl` at merge commit `215ac9c`
+- **`task/agent-platform-hitl.5`** — current branch, created from updated `feature/agent-platform-hitl`
 
 ### Quality
 
@@ -109,18 +112,17 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 
 ### Key commits
 
-| Commit    | Branch                        | Description                                          |
-| --------- | ----------------------------- | ---------------------------------------------------- |
-| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`                                |
-| `43ecad2` | `task/agent-platform-hitl.4`  | Resume approved execution before conflict resolution |
+| Commit    | Branch                        | Description           |
+| --------- | ----------------------------- | --------------------- |
+| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92` |
+| `215ac9c` | `feature/agent-platform-hitl` | Merge HITL.4 PR `#93` |
 
 ---
 
 ## Next (priority order)
 
-1. Force-push amended `task/agent-platform-hitl.4` so PR `#93` reruns SonarCloud and pipelines.
-2. Merge PR `#93` into `feature/agent-platform-hitl` after checks pass.
-3. After HITL.4 is merged, start `agent-platform-hitl.5` for frontend approval UX and e2e coverage.
+1. Implement `agent-platform-hitl.5` frontend approval UX and e2e coverage on `task/agent-platform-hitl.5`.
+2. Push `task/agent-platform-hitl.5` and open PR into `feature/agent-platform-hitl` when complete.
 
 ---
 
