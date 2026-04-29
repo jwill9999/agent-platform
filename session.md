@@ -110,8 +110,8 @@ Quality gates passed:
 
 ### Beads
 
-- `agent-platform-ws.3` is implemented and ready to close after `session.md` is committed/pushed.
-- `agent-platform-ws.4` is unblocked after `agent-platform-ws.3` closes.
+- `agent-platform-ws.3` is closed.
+- `agent-platform-ws.4` is ready and unblocked.
 
 ### Quality
 
@@ -121,8 +121,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the `session.md` handoff update on `task/agent-platform-ws.3`.
-2. Close `agent-platform-ws.3` in Beads, then sync/push Beads Dolt state.
+1. Push `task/agent-platform-ws.3` to `origin`.
+2. Sync/push Beads Dolt state from an environment with GitHub SSH/network access if auto-push remains unavailable.
 3. Continue the chain with `agent-platform-ws.4` from `task/agent-platform-ws.3`.
 
 ---
