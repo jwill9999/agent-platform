@@ -19,6 +19,42 @@ All configuration ultimately flows through environment variables and the Setting
 | `OLLAMA_BASE_URL`        | No       | `http://localhost:11434/v1` | Base URL for the Ollama provider                                                                                     |
 | `NODE_ENV`               | No       | —                           | Set to `production` to disable OpenAPI response validation                                                           |
 
+### Workspace Storage
+
+Workspace storage is the user-file area exposed to agents. The host path is operating-system specific, while the container path is stable so tools, Docker mounts, and tests can target the same location.
+
+| Variable                         | Required | Default / convention                      | Description                                                                |
+| -------------------------------- | -------- | ----------------------------------------- | -------------------------------------------------------------------------- |
+| `AGENT_PLATFORM_HOME`            | No       | OS-specific app home                      | Root directory for Agent Platform host-side config, data, workspaces, logs |
+| `AGENT_WORKSPACE_HOST_PATH`      | No       | `$AGENT_PLATFORM_HOME/workspaces/default` | Host directory mounted into the runtime as the user workspace              |
+| `AGENT_WORKSPACE_CONTAINER_PATH` | No       | `/workspace`                              | Stable container path used by file tools and filesystem MCP configuration  |
+| `AGENT_DATA_HOST_PATH`           | No       | `$AGENT_PLATFORM_HOME/data`               | Host directory for app/runtime data separate from user workspace files     |
+
+Default `AGENT_PLATFORM_HOME` conventions:
+
+| Host OS | Default home                                  |
+| ------- | --------------------------------------------- |
+| Linux   | `~/.agent-platform`                           |
+| macOS   | `~/Library/Application Support/AgentPlatform` |
+| Windows | `%LOCALAPPDATA%\\AgentPlatform`               |
+
+Default host layout:
+
+```text
+AgentPlatform/
+  config/
+  data/
+  workspaces/
+    default/
+      uploads/
+      generated/
+      scratch/
+      exports/
+  logs/
+```
+
+For repo-local development, setup may fall back to `./.agent-platform/`; that directory is ignored by Git. Agents should operate on workspace-relative paths under `AGENT_WORKSPACE_CONTAINER_PATH`, not on host-specific paths.
+
 ### LLM API Keys (API Server)
 
 Keys are resolved in order of precedence:

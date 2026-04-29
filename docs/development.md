@@ -69,6 +69,44 @@ All Docker targets handle build → start → seed in the correct order.
 
 Override host ports: `HOST_PORT=4000 WEB_HOST_PORT=4001 make up`
 
+### Workspace Storage
+
+Agent Platform keeps user files in a host-side workspace and exposes that workspace inside Docker at a stable container path, `/workspace`.
+
+Default host locations:
+
+| Host OS | Default home                                  |
+| ------- | --------------------------------------------- |
+| Linux   | `~/.agent-platform`                           |
+| macOS   | `~/Library/Application Support/AgentPlatform` |
+| Windows | `%LOCALAPPDATA%\\AgentPlatform`               |
+
+Default layout:
+
+```text
+AgentPlatform/
+  config/
+  data/
+  workspaces/
+    default/
+      uploads/
+      generated/
+      scratch/
+      exports/
+  logs/
+```
+
+Configuration variables:
+
+| Variable                         | Purpose                                               |
+| -------------------------------- | ----------------------------------------------------- |
+| `AGENT_PLATFORM_HOME`            | Override the host-side Agent Platform home directory  |
+| `AGENT_WORKSPACE_HOST_PATH`      | Override the host directory mounted as the workspace  |
+| `AGENT_WORKSPACE_CONTAINER_PATH` | Container workspace path; default `/workspace`        |
+| `AGENT_DATA_HOST_PATH`           | Override host app data directory, separate from files |
+
+For local development, setup may use `./.agent-platform/` as a repo-local fallback. That directory is ignored by Git. On Docker Desktop for macOS and Windows, ensure the selected host directory is available to Docker file sharing.
+
 ### Host-Side Quality Gates
 
 These run on the host (not in Docker) for fast feedback:

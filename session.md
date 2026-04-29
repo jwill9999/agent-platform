@@ -53,6 +53,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** `feature/agent-platform-hitl` merged into `main`; closed `agent-platform-hitl.5` and auto-closed HITL epic in Beads.
 - **Date:** 2026-04-29
 - **Session:** Planned next epic `agent-platform-ws` for host workspace storage, with six chained Beads tasks and task specs.
+- **Date:** 2026-04-29
+- **Session:** Started workspace storage epic on `task/agent-platform-ws.1`; documented host workspace conventions and config names for Linux, macOS, and Windows.
 
 ### Session-close guardrail (required)
 
@@ -126,8 +128,9 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 
 ### Git
 
-- **Current branch:** `main`
-- **Remote:** `main` tracks `origin/main`
+- **Current branch:** `task/agent-platform-ws.1`
+- **Remote:** task branch pending push at task completion
+- **Feature branch:** `feature/agent-platform-workspace-storage`
 - **Feature merge:** PR `#95` merged `feature/agent-platform-hitl` into `main`
 - **Task merges:** HITL.3 PR `#92`, HITL.4 PR `#93`, HITL.5 PR `#94`
 
@@ -158,8 +161,8 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 
 ## Next (priority order)
 
-1. Create `feature/agent-platform-workspace-storage` from updated `main`.
-2. Start `agent-platform-ws.1` on `task/agent-platform-ws.1`.
+1. Merge `task/agent-platform-ws.1` into `feature/agent-platform-workspace-storage` after review.
+2. Start `agent-platform-ws.1a` from `task/agent-platform-ws.1`.
 3. If needed, push Beads Dolt state from an environment with GitHub SSH/network access.
 
 ---

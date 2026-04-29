@@ -42,6 +42,8 @@ docker compose --profile services up --build
 | `sqlite_data`   | `/data`      | SQLite database persistence       |
 | `e2e_workspace` | `/workspace` | E2E filesystem MCP test workspace |
 
+Future workspace storage uses an explicit host directory mounted at `/workspace`. Keep app data separate from user files: app/runtime data belongs under `/data`, while user-created, uploaded, generated, scratch, and exported files belong under `/workspace`.
+
 ### Health Checks
 
 - **API:** `GET /health` — curl-based, 10s interval, 3 retries, 15s start period
@@ -77,6 +79,36 @@ The seed is idempotent — safe to run multiple times.
 | `SECRETS_MASTER_KEY`      | —                    | Base64 32-byte key for AES-256-GCM secrets |
 | `AGENT_OPENAI_API_KEY`    | —                    | OpenAI API key for chat                    |
 | `OPENAI_ALLOW_LEGACY_ENV` | `0`                  | Set `1` to allow `OPENAI_API_KEY` fallback |
+
+### Workspace Storage Variables
+
+| Variable                         | Default / convention                      | Description                                      |
+| -------------------------------- | ----------------------------------------- | ------------------------------------------------ |
+| `AGENT_PLATFORM_HOME`            | OS-specific app home                      | Host root for config, data, workspaces, and logs |
+| `AGENT_WORKSPACE_HOST_PATH`      | `$AGENT_PLATFORM_HOME/workspaces/default` | Host user workspace directory                    |
+| `AGENT_WORKSPACE_CONTAINER_PATH` | `/workspace`                              | Container workspace path                         |
+| `AGENT_DATA_HOST_PATH`           | `$AGENT_PLATFORM_HOME/data`               | Host app data directory                          |
+
+Host defaults:
+
+| Host OS | Default home                                  |
+| ------- | --------------------------------------------- |
+| Linux   | `~/.agent-platform`                           |
+| macOS   | `~/Library/Application Support/AgentPlatform` |
+| Windows | `%LOCALAPPDATA%\\AgentPlatform`               |
+
+Expected host layout:
+
+```text
+AgentPlatform/
+  config/
+  data/
+  workspaces/default/uploads/
+  workspaces/default/generated/
+  workspaces/default/scratch/
+  workspaces/default/exports/
+  logs/
+```
 
 ### Web Container
 
