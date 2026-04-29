@@ -70,6 +70,7 @@ This is the segment tip. After sign-off, open one PR from `task/agent-platform-w
 
 - [x] Branch `task/agent-platform-ws.5` created from `task/agent-platform-ws.6`.
 - [x] Full applicable quality gate passes.
+- [x] PR opened: <https://github.com/jwill9999/agent-platform/pull/102>
 - [ ] PR merged `task/agent-platform-ws.5` -> `feature/agent-platform-workspace-storage`.
 - [ ] `bd close agent-platform-ws.5 --reason "..."`
 

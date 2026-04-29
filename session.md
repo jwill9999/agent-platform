@@ -117,9 +117,10 @@ Quality gates passed:
 ### Git
 
 - **Current branch:** `task/agent-platform-ws.5`
-- **Latest task commit:** pending
+- **Latest task commit:** `d3f53ca` (`Verify workspace persistence and e2e flows`)
 - **Feature branch:** `feature/agent-platform-workspace-storage`
 - **Next task in chain:** none; this is the workspace epic tip.
+- **Open PR:** <https://github.com/jwill9999/agent-platform/pull/102>
 
 ### Beads
 
@@ -134,9 +135,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push `task/agent-platform-ws.5`.
-2. Open/merge PR `task/agent-platform-ws.5` -> `feature/agent-platform-workspace-storage`.
-3. Close `agent-platform-ws.5` after feature-branch CI is green and sync/push Beads Dolt state.
+1. Monitor PR <https://github.com/jwill9999/agent-platform/pull/102>.
+2. Merge PR `task/agent-platform-ws.5` -> `feature/agent-platform-workspace-storage` after CI is green.
+3. Close `agent-platform-ws.5` after the PR merge and sync/push Beads Dolt state.
 
 ---
 
