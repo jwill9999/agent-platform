@@ -67,6 +67,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-ws.3` workspace PathJail/tool-policy enforcement on `task/agent-platform-ws.3`.
 - **Date:** 2026-04-29
 - **Session:** Addressed SonarCloud regex backtracking risk in the `agent-platform-ws.3` bash workspace policy.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.4` workspace file UI/API on `task/agent-platform-ws.4`.
 
 ### Session-close guardrail (required)
 
@@ -79,57 +81,56 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Workspace PathJail/tool policy
+### Workspace file UI/API
 
-Branch state: `task/agent-platform-ws.3` contains the `agent-platform-ws.3` implementation.
+Branch state: `task/agent-platform-ws.4` contains the `agent-platform-ws.4` implementation.
 
-- Added a bash workspace policy that extracts path-bearing shell reads/writes and validates them with PathJail before approval or execution.
-- Denied shell path escapes such as `touch /tmp/x` with a human-readable `PATH_ACCESS_DENIED` error instead of creating an approval request.
-- Removed `/tmp` from default allowed mounts so the default file-tool jail is the explicit workspace mount only.
-- Set `sys_bash` execution cwd to the configured workspace root when it exists, keeping relative shell writes in `/workspace`.
-- Kept high-risk `sys_bash` behind HITL approval after workspace-policy checks pass.
-- Updated observability integration coverage to exercise a failing file tool inside `/workspace`, preserving recent-error audit behavior without relying on outside-workspace access.
-- Added unit coverage for bash path extraction, allowed workspace paths, denied shell writes/reads outside the workspace, and denied shell escapes before approval creation.
-- Replaced the bash workspace policy regex parsing with linear character/token scanning to remove SonarCloud's super-linear backtracking risk.
-- Added coverage for redirects without whitespace, quoted redirect targets, and quoted shell separators.
+- Added shared workspace file contracts for managed areas, file rows, area listings, and list responses.
+- Added `GET /v1/workspace/files` to list `uploads`, `generated`, `scratch`, and `exports` with workspace-relative paths only.
+- Added `GET /v1/workspace/files/download?path=...` to stream safe workspace files as attachments.
+- Enforced PathJail validation for listing and downloads, including traversal, absolute path, directory, and symlink escape denial.
+- Added the Settings > Workspace UI with area summary cards, a file table, refresh/error states, and download actions.
+- Added workspace file formatting helpers and focused web tests.
+- Updated the API reference and task spec sign-off for the workspace file endpoints.
 
 Quality gates passed:
 
-- `pnpm typecheck`
-- `pnpm lint`
 - `pnpm format:check`
-- `pnpm test` (run with escalation because API Supertest binds local ports)
-- `pnpm docs:lint`
-- Focused API check: `pnpm --filter @agent-platform/api exec vitest run test/observability.integration.test.ts`
-- Focused API check: `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
-- Focused harness check: `pnpm --filter @agent-platform/harness run test -- test/bashWorkspacePolicy.test.ts test/toolDispatch.test.ts`
-- Focused harness checks: `pnpm --filter @agent-platform/harness run lint` and `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/contracts run build`
+- `pnpm --filter @agent-platform/contracts run test`
+- `pnpm --filter @agent-platform/api run typecheck`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/api run test` (run with escalation because API Supertest binds local ports)
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test -- test/workspace-files.test.ts`
+- Focused API check: `pnpm --filter @agent-platform/api exec vitest run test/workspaceRouter.test.ts`
 
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-ws.3`
-- **Latest task commit:** `f586e20` (`Avoid regex backtracking in bash workspace policy`)
+- **Current branch:** `task/agent-platform-ws.4`
+- **Latest task commit:** branch HEAD (`Expose workspace files in UI and API`)
 - **Feature branch:** `feature/agent-platform-workspace-storage`
-- **Next task in chain:** `agent-platform-ws.4`
+- **Next task in chain:** `agent-platform-ws.6`
 
 ### Beads
 
-- `agent-platform-ws.3` is closed.
-- `agent-platform-ws.4` is ready and unblocked.
+- `agent-platform-ws.4` is closed locally in Beads; Dolt auto-push failed due unavailable GitHub SSH/network auth from this environment.
+- `agent-platform-ws.6` is next in the chain.
 
 ### Quality
 
-- Repo-level typecheck/lint/format/test/docs gates passed in this session.
+- Affected package typecheck/lint/test and repo format check passed in this session.
 
 ---
 
 ## Next (priority order)
 
-1. Push `task/agent-platform-ws.3` to `origin`.
-2. Sync/push Beads Dolt state from an environment with GitHub SSH/network access if auto-push remains unavailable.
-3. Continue the chain with `agent-platform-ws.4` from `task/agent-platform-ws.3`.
+1. Commit and push `task/agent-platform-ws.4` to `origin`.
+2. Sync/push Beads Dolt state from an environment with GitHub SSH/network access.
+3. Continue the chain with `agent-platform-ws.6` from `task/agent-platform-ws.4`.
 
 ---
 

@@ -92,3 +92,15 @@ export {
   type ApprovalRequestQuery,
   type ApprovalRequestDecisionBody,
 } from './approvalRequest.js';
+export {
+  WorkspaceAreaSchema,
+  WorkspaceFileKindSchema,
+  WorkspaceFileSchema,
+  WorkspaceAreaListingSchema,
+  WorkspaceFilesResponseSchema,
+  type WorkspaceArea,
+  type WorkspaceFileKind,
+  type WorkspaceFile,
+  type WorkspaceAreaListing,
+  type WorkspaceFilesResponse,
+} from './workspace.js';
