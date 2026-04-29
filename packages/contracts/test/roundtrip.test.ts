@@ -21,6 +21,14 @@ describe('contracts round-trip', () => {
       { type: 'tool_result' as const, toolId: 't1', data: { ok: true } },
       { type: 'error' as const, message: 'bad', code: 'E1' },
       { type: 'thinking' as const, content: '...' },
+      {
+        type: 'approval_required' as const,
+        approvalRequestId: 'approval-1',
+        toolName: 'sys_bash',
+        riskTier: 'high' as const,
+        argsPreview: { command: 'date' },
+        message: 'Tool "sys_bash" requires human approval before execution.',
+      },
     ];
     for (const s of samples) {
       const parsed = OutputSchema.parse(s);

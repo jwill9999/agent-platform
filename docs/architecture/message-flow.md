@@ -347,14 +347,16 @@ flowchart TD
 
 The streaming protocol emits these event types to the client (each as a JSON line):
 
-| Event            | When                         | Key fields                  |
-| ---------------- | ---------------------------- | --------------------------- |
-| `text`           | LLM text delta               | `content`                   |
-| `thinking`       | LLM reasoning delta          | `content`                   |
-| `code`           | Code block                   | `content`, `language`       |
-| `tool_result`    | Tool execution complete      | `toolId`, `data`            |
-| `image`          | Screenshot / image from MCP  | `data` (base64), `mimeType` |
-| `error`          | Fatal or budget limit hit    | `code`, `message`           |
-| `stream_aborted` | Client disconnect or timeout | `reason`                    |
+| Event               | When                                     | Key fields                                                 |
+| ------------------- | ---------------------------------------- | ---------------------------------------------------------- |
+| `text`              | LLM text delta                           | `content`                                                  |
+| `thinking`          | LLM reasoning delta                      | `content`                                                  |
+| `code`              | Code block                               | `content`, `language`                                      |
+| `tool_result`       | Tool execution complete                  | `toolId`, `data`                                           |
+| `image`             | Screenshot / image from MCP              | `data` (base64), `mimeType`                                |
+| `approval_required` | Tool execution paused for human approval | `approvalRequestId`, `toolName`, `riskTier`, `argsPreview` |
+| `error`             | Fatal or budget limit hit                | `code`, `message`                                          |
+| `stream_aborted`    | Client disconnect or timeout             | `reason`                                                   |
 
 The browser (`apps/web/hooks/useHarnessChat.ts`) reads these via `ReadableStream`, parsing each NDJSON line and dispatching to the appropriate UI handler. Tool-scoped errors (codes prefixed `TOOL_`, `MCP_`, `NATIVE_`) are rendered inline; other errors surface as a top-level error banner.
+When a tool emits `approval_required`, the harness creates a pending approval request, halts the current graph run before executing that tool, and skips any remaining tool calls from the same model batch. A later approval/resume flow is responsible for executing the approved tool call.

@@ -181,13 +181,14 @@ For the full implementation guide (architecture decisions, data flow, governor l
 
 The chat response uses **NDJSON** (`application/x-ndjson`). Each line is a JSON event:
 
-| Event            | When                         |
-| ---------------- | ---------------------------- |
-| `text`           | LLM text delta               |
-| `thinking`       | LLM reasoning delta          |
-| `tool_result`    | Tool execution complete      |
-| `error`          | Fatal or budget limit hit    |
-| `stream_aborted` | Client disconnect or timeout |
+| Event               | When                                     |
+| ------------------- | ---------------------------------------- |
+| `text`              | LLM text delta                           |
+| `thinking`          | LLM reasoning delta                      |
+| `tool_result`       | Tool execution complete                  |
+| `approval_required` | Tool execution paused for human approval |
+| `error`             | Fatal or budget limit hit                |
+| `stream_aborted`    | Client disconnect or timeout             |
 
 ## Session Locking
 

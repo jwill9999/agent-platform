@@ -1,4 +1,11 @@
-import type { Agent, Output, Skill, Tool as ContractTool } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ApprovalRequest,
+  Output,
+  RiskTier,
+  Skill,
+  Tool as ContractTool,
+} from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
@@ -31,8 +38,23 @@ export type ToolDispatchContext = {
   dispatcher?: PluginDispatcher;
   pathJail?: PathJail;
   auditLog?: ToolAuditLogger;
+  /** Creates durable pending approval requests for approval-gated tool calls. */
+  approvalRequests?: {
+    create: (request: ApprovalRequestCreateInput) => ApprovalRequest | Promise<ApprovalRequest>;
+  };
   /** Resolves a skill by ID for lazy loading (sys_get_skill_detail). */
   skillResolver?: (skillId: string) => Skill | undefined;
+};
+
+export type ApprovalRequestCreateInput = {
+  sessionId: string;
+  runId: string;
+  agentId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  executionPayloadJson?: string;
+  riskTier: RiskTier;
+  createdAtMs: number;
 };
 
 /** Map system tool IDs to their path operation type for PathJail enforcement. */
@@ -197,6 +219,46 @@ function buildApprovalRequiredOutput(call: ToolCallIntent, reason: string): Outp
   return {
     type: 'error',
     code: 'APPROVAL_REQUIRED',
+    message: `Tool "${call.name}" requires human approval before execution. ${reason}`,
+  };
+}
+
+function parseArgsPreview(argsJson: string): unknown {
+  try {
+    return JSON.parse(argsJson);
+  } catch {
+    return {};
+  }
+}
+
+async function createApprovalRequiredOutput(
+  ctx: ToolDispatchContext,
+  state: HarnessStateType,
+  call: ToolCallIntent,
+  riskTier: RiskTier,
+  reason: string,
+): Promise<Output> {
+  const request = await ctx.approvalRequests!.create({
+    sessionId: state.sessionId ?? '',
+    runId: state.runId,
+    agentId: ctx.agent.id,
+    toolName: call.name,
+    args: call.args,
+    executionPayloadJson: JSON.stringify({
+      toolCallId: call.id,
+      toolName: call.name,
+      args: call.args,
+    }),
+    riskTier,
+    createdAtMs: Date.now(),
+  });
+
+  return {
+    type: 'approval_required',
+    approvalRequestId: request.id,
+    toolName: call.name,
+    riskTier,
+    argsPreview: parseArgsPreview(request.argsJson),
     message: `Tool "${call.name}" requires human approval before execution. ${reason}`,
   };
 }
@@ -617,30 +679,55 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       const approval = evaluateApprovalPolicy(toolMetadata);
       if (approval.required) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
-        const output = buildApprovalRequiredOutput(call, reason);
-        ctx.auditLog?.logDenied(
-          call.name,
-          call.args,
-          ctx.agent.id,
-          state.sessionId ?? '',
-          reason,
-          approval.riskTier,
-        );
+        const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
+        const output = ctx.approvalRequests
+          ? await createApprovalRequiredOutput(ctx, state, call, riskTier, reason)
+          : buildApprovalRequiredOutput(call, reason);
+
         await emitToolOutput(ctx, output);
-        toolMessages.push({
-          role: 'tool',
-          toolCallId: call.id,
-          toolName: call.name,
-          content: outputToContent(call.name, output),
-        });
         traceEvents.push({
           type: 'tool_approval_required',
           toolId: call.name,
           step,
-          riskTier: approval.riskTier,
+          riskTier,
         });
         traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
-        continue;
+
+        if (!ctx.approvalRequests) {
+          ctx.auditLog?.logDenied(
+            call.name,
+            call.args,
+            ctx.agent.id,
+            state.sessionId ?? '',
+            reason,
+            riskTier,
+          );
+          toolMessages.push({
+            role: 'tool',
+            toolCallId: call.id,
+            toolName: call.name,
+            content: outputToContent(call.name, output),
+          });
+          continue;
+        }
+
+        ctx.auditLog?.logPendingApproval(
+          call.name,
+          call.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          riskTier,
+        );
+
+        return {
+          halted: true,
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+          totalToolCalls: toolCallCount,
+          loadedSkillIds: newLoadedSkillIds,
+        };
       }
 
       await fireToolCallHook(ctx, state, call);
