@@ -195,13 +195,15 @@ describe('openApiToToolDefinitions', () => {
     const doc = parse(readFileSync(specPath, 'utf-8'));
     const tools = openApiToToolDefinitions(doc);
 
-    expect(tools.length).toBe(32);
+    expect(tools.length).toBe(37);
 
     const names = tools.map((t) => t.name);
     expect(names).toContain('listAgents');
     expect(names).toContain('createAgent');
     expect(names).toContain('chatStream');
     expect(names).toContain('getSettings');
+    expect(names).toContain('listApprovalRequests');
+    expect(names).toContain('approveApprovalRequest');
     expect(names).toContain('getHealth');
     expect(names).toContain('getReadiness');
 

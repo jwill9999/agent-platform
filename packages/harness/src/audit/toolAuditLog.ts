@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Output, RiskTier } from '@agent-platform/contracts';
+import { redactArgs, type Output, type RiskTier } from '@agent-platform/contracts';
 import { SYSTEM_TOOL_RISK } from '../systemTools.js';
 
 // ---------------------------------------------------------------------------
@@ -36,35 +36,7 @@ export interface ToolAuditStore {
 // Secret redaction
 // ---------------------------------------------------------------------------
 
-const REDACT_KEYS = new Set([
-  'key',
-  'token',
-  'password',
-  'secret',
-  'apikey',
-  'api_key',
-  'authorization',
-  'auth',
-  'credential',
-  'credentials',
-  'access_token',
-  'refresh_token',
-  'private_key',
-]);
-
-export function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(args)) {
-    if (REDACT_KEYS.has(k.toLowerCase())) {
-      result[k] = '[REDACTED]';
-    } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
-      result[k] = redactArgs(v as Record<string, unknown>);
-    } else {
-      result[k] = v;
-    }
-  }
-  return result;
-}
+export { redactArgs } from '@agent-platform/contracts';
 
 // ---------------------------------------------------------------------------
 // Zero-risk check (skip logging for pure compute tools)
@@ -72,6 +44,10 @@ export function redactArgs(args: Record<string, unknown>): Record<string, unknow
 
 function isZeroRisk(toolName: string): boolean {
   return SYSTEM_TOOL_RISK[toolName] === 'zero';
+}
+
+function resolveAuditRiskTier(toolName: string, riskTierOverride?: RiskTier): RiskTier {
+  return riskTierOverride ?? SYSTEM_TOOL_RISK[toolName] ?? 'high';
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +61,7 @@ export interface ToolAuditLogger {
     args: Record<string, unknown>,
     agentId: string,
     sessionId: string,
+    riskTier?: RiskTier,
   ): string | null;
 
   /** Log completion of a tool execution. */
@@ -97,18 +74,28 @@ export interface ToolAuditLogger {
     agentId: string,
     sessionId: string,
     reason: string,
+    riskTier?: RiskTier,
   ): void;
+
+  /** Log a tool call that is pending human approval. */
+  logPendingApproval(
+    toolName: string,
+    args: Record<string, unknown>,
+    agentId: string,
+    sessionId: string,
+    riskTier?: RiskTier,
+  ): string | null;
 }
 
 export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
   const startTimes = new Map<string, number>();
 
   return {
-    logStart(toolName, args, agentId, sessionId) {
-      if (isZeroRisk(toolName)) return null;
+    logStart(toolName, args, agentId, sessionId, riskTierOverride) {
+      const riskTier = resolveAuditRiskTier(toolName, riskTierOverride);
+      if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return null;
 
       const id = randomUUID();
-      const riskTier = SYSTEM_TOOL_RISK[toolName];
       const redacted = redactArgs(args);
       const now = Date.now();
 
@@ -144,11 +131,11 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       });
     },
 
-    logDenied(toolName, args, agentId, sessionId, reason) {
-      if (isZeroRisk(toolName)) return;
+    logDenied(toolName, args, agentId, sessionId, reason, riskTierOverride) {
+      const riskTier = resolveAuditRiskTier(toolName, riskTierOverride);
+      if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return;
 
       const id = randomUUID();
-      const riskTier = SYSTEM_TOOL_RISK[toolName];
       const redacted = redactArgs(args);
       const now = Date.now();
 
@@ -170,6 +157,28 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
         durationMs: 0,
       });
     },
+
+    logPendingApproval(toolName, args, agentId, sessionId, riskTierOverride) {
+      const riskTier = resolveAuditRiskTier(toolName, riskTierOverride);
+      if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return null;
+
+      const id = randomUUID();
+      const redacted = redactArgs(args);
+      const now = Date.now();
+
+      store.insert({
+        id,
+        toolName,
+        agentId,
+        sessionId,
+        argsJson: JSON.stringify(redacted),
+        riskTier,
+        status: 'pending',
+        startedAtMs: now,
+      });
+
+      return id;
+    },
   };
 }
 
@@ -183,5 +192,8 @@ export function createNoopAuditLogger(): ToolAuditLogger {
     },
     logComplete() {},
     logDenied() {},
+    logPendingApproval() {
+      return null;
+    },
   };
 }

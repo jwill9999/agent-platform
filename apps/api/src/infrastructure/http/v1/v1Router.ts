@@ -10,7 +10,8 @@ import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import { Router } from 'express';
 
 import { createAgentsRouter } from './agentsRouter.js';
-import { createChatRouter } from './chatRouter.js';
+import { createApprovalRequestsRouter } from './approvalRequestsRouter.js';
+import { createChatRouter, type ChatRouterOptions } from './chatRouter.js';
 import { createMcpServersRouter } from './mcpServersRouter.js';
 import { createModelConfigsRouter } from './modelConfigsRouter.js';
 import { createSessionsRouter } from './sessionsRouter.js';
@@ -19,10 +20,15 @@ import { createSkillsRouter } from './skillsRouter.js';
 import { createToolsRouter } from './toolsRouter.js';
 import { createToolExecutionsRouter } from './toolExecutionsRouter.js';
 import { createDynamicRateLimiter } from '../dynamicRateLimiter.js';
+import { createInProcessSessionLock } from '../sessionLock.js';
 
 const observabilityLog = createLogger('api:observability');
 
-export function createV1Router(db: DrizzleDb): Router {
+export type V1RouterOptions = {
+  chat?: Pick<ChatRouterOptions, 'llmReasonNode' | 'disableEvaluatorNodes'>;
+};
+
+export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Router {
   const router = Router();
   const observabilityStore = createObservabilityStore();
   const globalPlugins: readonly RegisteredPlugin[] = [
@@ -36,6 +42,7 @@ export function createV1Router(db: DrizzleDb): Router {
   ];
 
   const rateLimiter = createDynamicRateLimiter();
+  const sessionLock = createInProcessSessionLock();
 
   // Hydrate rate limiter from persisted settings on startup
   const persisted = loadSettings(db);
@@ -52,12 +59,22 @@ export function createV1Router(db: DrizzleDb): Router {
   router.use('/tools', createToolsRouter(db));
   router.use('/mcp-servers', createMcpServersRouter(db));
   router.use('/agents', createAgentsRouter(db));
-  router.use('/sessions', createSessionsRouter(db));
+  router.use(
+    '/sessions',
+    createSessionsRouter(db, {
+      globalPlugins,
+      observabilityStore,
+      sessionLock,
+      ...options.chat,
+    }),
+  );
   router.use(
     '/chat',
     createChatRouter(db, {
       globalPlugins,
       observabilityStore,
+      sessionLock,
+      ...options.chat,
     }),
   );
   router.use(
@@ -65,6 +82,7 @@ export function createV1Router(db: DrizzleDb): Router {
     createSettingsRouter(db, (config) => rateLimiter.reconfigure(config)),
   );
   router.use('/tool-executions', createToolExecutionsRouter(db));
+  router.use('/approval-requests', createApprovalRequestsRouter(db));
   router.use('/model-configs', createModelConfigsRouter(db));
 
   return router;

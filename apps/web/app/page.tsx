@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '../components/chat/chat';
 import { AgentModelProvider } from '../components/chat/agent-model-context';
 import { SessionDropdown } from '../components/chat/session-dropdown';
+import type { ApprovalDecision } from '@/hooks/use-harness-chat';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
@@ -29,6 +30,9 @@ export default function HomePage() {
     setError,
     criticEventsByMessage,
     thinkingByMessage,
+    approvalEventsByMessage,
+    decideApproval,
+    hasPendingApproval,
   } = useHarnessChat(sessionId, isResuming);
   const { sessions, loading: sessionsLoading, refresh: refreshSessions } = useSessions();
   const {
@@ -129,6 +133,10 @@ export default function HomePage() {
   );
 
   const isLoading = status === 'streaming';
+  const canSend = Boolean(sessionId) && !hasPendingApproval;
+  const inputStatusText = hasPendingApproval
+    ? 'Resolve the pending approval before sending another message.'
+    : undefined;
 
   const handleSend = useCallback(
     (text: string) => {
@@ -140,6 +148,13 @@ export default function HomePage() {
       clearAttachments();
     },
     [sendMessage, refreshSessions, formattedContext, clearAttachments, selectedModelConfigId],
+  );
+
+  const handleApprovalDecision = useCallback(
+    (approvalRequestId: string, decision: ApprovalDecision) => {
+      decideApproval(approvalRequestId, decision, selectedModelConfigId);
+    },
+    [decideApproval, selectedModelConfigId],
   );
 
   return (
@@ -187,7 +202,8 @@ export default function HomePage() {
               messages={messages}
               onSend={handleSend}
               isLoading={isLoading}
-              canSend={Boolean(sessionId)}
+              canSend={canSend}
+              inputStatusText={inputStatusText}
               attachments={attachments}
               onAddFiles={addFiles}
               onRemoveAttachment={removeAttachment}
@@ -195,6 +211,8 @@ export default function HomePage() {
               attachmentWarnings={attachmentWarnings}
               criticEventsByMessage={criticEventsByMessage}
               thinkingByMessage={thinkingByMessage}
+              approvalEventsByMessage={approvalEventsByMessage}
+              onApprovalDecision={handleApprovalDecision}
             />
           </AgentModelProvider>
         </div>

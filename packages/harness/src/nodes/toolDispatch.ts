@@ -1,4 +1,11 @@
-import type { Agent, Output, Skill } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ApprovalRequest,
+  Output,
+  RiskTier,
+  Skill,
+  Tool as ContractTool,
+} from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
@@ -12,10 +19,11 @@ import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
 import { ToolRateLimiter } from '../security/rateLimiter.js';
-import { isSystemTool, GET_SKILL_DETAIL_ID } from '../systemTools.js';
+import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
 import { scanOutput } from '../security/outputGuard.js';
+import { requiresHumanApproval } from '../security/approvalPolicy.js';
 
 // ---------------------------------------------------------------------------
 // Tool dispatch context (subset of AgentContext needed by the node)
@@ -23,14 +31,32 @@ import { scanOutput } from '../security/outputGuard.js';
 
 export type ToolDispatchContext = {
   agent: Agent;
+  tools?: readonly ContractTool[];
   mcpManager: McpSessionManager;
   nativeToolExecutor?: NativeToolExecutor;
   emitter?: OutputEmitter;
   dispatcher?: PluginDispatcher;
   pathJail?: PathJail;
   auditLog?: ToolAuditLogger;
+  /** Creates durable pending approval requests for approval-gated tool calls. */
+  approvalRequests?: {
+    create: (request: ApprovalRequestCreateInput) => ApprovalRequest | Promise<ApprovalRequest>;
+  };
+  /** Tool call IDs that were already approved by a human and may bypass the approval gate. */
+  approvedToolCallIds?: ReadonlySet<string>;
   /** Resolves a skill by ID for lazy loading (sys_get_skill_detail). */
   skillResolver?: (skillId: string) => Skill | undefined;
+};
+
+export type ApprovalRequestCreateInput = {
+  sessionId: string;
+  runId: string;
+  agentId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  executionPayloadJson?: string;
+  riskTier: RiskTier;
+  createdAtMs: number;
 };
 
 /** Map system tool IDs to their path operation type for PathJail enforcement. */
@@ -168,6 +194,77 @@ async function dispatchSingleTool(
   return dispatchNativeTool(call, ctx);
 }
 
+function resolveToolMetadata(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+): ContractTool | undefined {
+  return (
+    ctx.tools?.find((tool) => tool.id === call.name) ??
+    SYSTEM_TOOLS.find((tool) => tool.id === call.name)
+  );
+}
+
+function evaluateApprovalPolicy(
+  toolMetadata: ContractTool | undefined,
+): ReturnType<typeof requiresHumanApproval> {
+  if (!toolMetadata) {
+    return {
+      required: true,
+      riskTier: 'high',
+      reason: 'Tool metadata is missing; approval policy cannot evaluate risk.',
+    };
+  }
+  return requiresHumanApproval(toolMetadata);
+}
+
+function buildApprovalRequiredOutput(call: ToolCallIntent, reason: string): Output {
+  return {
+    type: 'error',
+    code: 'APPROVAL_REQUIRED',
+    message: `Tool "${call.name}" requires human approval before execution. ${reason}`,
+  };
+}
+
+function parseArgsPreview(argsJson: string): unknown {
+  try {
+    return JSON.parse(argsJson);
+  } catch {
+    return {};
+  }
+}
+
+async function createApprovalRequiredOutput(
+  ctx: ToolDispatchContext,
+  state: HarnessStateType,
+  call: ToolCallIntent,
+  riskTier: RiskTier,
+  reason: string,
+): Promise<Output> {
+  const request = await ctx.approvalRequests!.create({
+    sessionId: state.sessionId ?? '',
+    runId: state.runId,
+    agentId: ctx.agent.id,
+    toolName: call.name,
+    args: call.args,
+    executionPayloadJson: JSON.stringify({
+      toolCallId: call.id,
+      toolName: call.name,
+      args: call.args,
+    }),
+    riskTier,
+    createdAtMs: Date.now(),
+  });
+
+  return {
+    type: 'approval_required',
+    approvalRequestId: request.id,
+    toolName: call.name,
+    riskTier,
+    argsPreview: parseArgsPreview(request.argsJson),
+    message: `Tool "${call.name}" requires human approval before execution. ${reason}`,
+  };
+}
+
 /**
  * Fire onToolCall plugin hook (errors silenced).
  */
@@ -269,8 +366,57 @@ function outputToContent(toolName: string, output: Output): string {
   if (output.type === 'error')
     return JSON.stringify({ error: output.code, message: output.message });
   // Wrap successful tool results as untrusted content
-  if (output.type === 'tool_result') return wrapToolResult(toolName, JSON.stringify(output.data));
+  if (output.type === 'tool_result') {
+    const content =
+      toolName === 'sys_bash'
+        ? formatShellResultForModel(output.data)
+        : JSON.stringify(output.data);
+    return wrapToolResult(toolName, content);
+  }
   return JSON.stringify(output);
+}
+
+function isShellResult(
+  data: unknown,
+): data is { stdout: string; stderr: string; exitCode: number } {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    !Array.isArray(data) &&
+    typeof (data as { stdout?: unknown }).stdout === 'string' &&
+    typeof (data as { stderr?: unknown }).stderr === 'string' &&
+    typeof (data as { exitCode?: unknown }).exitCode === 'number'
+  );
+}
+
+function formatShellResultForModel(data: unknown): string {
+  if (!isShellResult(data)) return JSON.stringify(data);
+
+  const stdout = data.stdout.trim();
+  const stderr = data.stderr.trim();
+  const status =
+    data.exitCode === 0
+      ? 'The command completed successfully.'
+      : `The command did not complete successfully. It exited with code ${data.exitCode}.`;
+  const parts = [status];
+
+  if (stdout) {
+    parts.push(`Output:\n${stdout}`);
+  }
+
+  if (stderr) {
+    parts.push(`Error output:\n${stderr}`);
+  }
+
+  if (!stdout && !stderr) {
+    parts.push('The command produced no output.');
+  }
+
+  parts.push(
+    'When answering the user, summarize this result in plain English. Do not expose raw field names like stdout, stderr, or exitCode unless the user explicitly asks for raw JSON.',
+  );
+
+  return parts.join('\n\n');
 }
 
 /** Scan tool output for security issues and emit trace events. */
@@ -545,6 +691,29 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
       rateLimiter.record(call.name);
 
+      if (!isToolExecutionAllowed(ctx.agent, call.name)) {
+        const output: Output = {
+          type: 'error',
+          code: 'TOOL_NOT_ALLOWED',
+          message: `Tool "${call.name}" is not in the agent's allowlist`,
+        };
+        ctx.auditLog?.logDenied(
+          call.name,
+          call.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          'Tool not in agent allowlist',
+        );
+        toolMessages.push({
+          role: 'tool',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: outputToContent(call.name, output),
+        });
+        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        continue;
+      }
+
       // Intercept sys_get_skill_detail — handled inline with governor
       const allLoadedIds = [...(state.loadedSkillIds ?? []), ...newLoadedSkillIds];
       const skillResult = handleGetSkillDetail(call, ctx, allLoadedIds);
@@ -557,10 +726,72 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         continue;
       }
 
+      const toolMetadata = resolveToolMetadata(call, ctx);
+      const approval = evaluateApprovalPolicy(toolMetadata);
+      const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+      if (approval.required && !approvedForResume) {
+        const reason = approval.reason ?? 'Approval policy requires human review.';
+        const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
+        const output = ctx.approvalRequests
+          ? await createApprovalRequiredOutput(ctx, state, call, riskTier, reason)
+          : buildApprovalRequiredOutput(call, reason);
+
+        await emitToolOutput(ctx, output);
+        traceEvents.push({
+          type: 'tool_approval_required',
+          toolId: call.name,
+          step,
+          riskTier,
+        });
+        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+
+        if (!ctx.approvalRequests) {
+          ctx.auditLog?.logDenied(
+            call.name,
+            call.args,
+            ctx.agent.id,
+            state.sessionId ?? '',
+            reason,
+            riskTier,
+          );
+          toolMessages.push({
+            role: 'tool',
+            toolCallId: call.id,
+            toolName: call.name,
+            content: outputToContent(call.name, output),
+          });
+          continue;
+        }
+
+        ctx.auditLog?.logPendingApproval(
+          call.name,
+          call.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          riskTier,
+        );
+
+        return {
+          halted: true,
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+          totalToolCalls: toolCallCount,
+          loadedSkillIds: newLoadedSkillIds,
+        };
+      }
+
       await fireToolCallHook(ctx, state, call);
 
       const auditId =
-        ctx.auditLog?.logStart(call.name, call.args, ctx.agent.id, state.sessionId ?? '') ?? null;
+        ctx.auditLog?.logStart(
+          call.name,
+          call.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          toolMetadata?.riskTier,
+        ) ?? null;
 
       const { output, ok, retryCount, images } = await executeToolWithRetry(
         call,

@@ -84,7 +84,7 @@ export function CriticBadges({ events }: CriticBadgesProps) {
 export function CriticReviewBlock({ event }: { readonly event: CriticEvent }) {
   if (!event || event.kind !== 'accept') return null;
   return (
-    <div className="mb-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3">
+    <div className="mt-3 mb-2 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 p-3">
       <div className="font-semibold text-emerald-900 dark:text-emerald-200 mb-1">Critic Review</div>
       {Boolean(event.reasons && event.reasons.length > 0) && (
         <div className="text-sm text-emerald-900 dark:text-emerald-200">{event.reasons}</div>

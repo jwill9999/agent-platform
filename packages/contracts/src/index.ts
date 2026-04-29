@@ -27,15 +27,19 @@ export {
   MessageRecordSchema,
   MessageCreateBodySchema,
   MessageRoleSchema,
+  PersistedToolCallSchema,
   type MessageRecord,
   type MessageCreateBody,
   type MessageRole,
+  type PersistedToolCall,
 } from './message.js';
 export {
   SessionCreateBodySchema,
   SessionRecordSchema,
+  SessionResumeBodySchema,
   type SessionCreateBody,
   type SessionRecord,
+  type SessionResumeBody,
 } from './session.js';
 export { SkillSchema, SkillCreateBodySchema, type Skill, type SkillCreateBody } from './skill.js';
 export { SecretRefSchema, type SecretRef } from './secrets.js';
@@ -69,6 +73,7 @@ export {
   type PlatformSettingsUpdate,
 } from './settings.js';
 export { DodContractSchema, type DodContract } from './dod.js';
+export { redactArgs } from './redaction.js';
 export {
   ToolExecutionSchema,
   ToolExecutionStatusSchema,
@@ -77,3 +82,13 @@ export {
   type ToolExecutionStatus,
   type ToolExecutionQuery,
 } from './toolExecution.js';
+export {
+  ApprovalRequestSchema,
+  ApprovalRequestStatusSchema,
+  ApprovalRequestQuerySchema,
+  ApprovalRequestDecisionBodySchema,
+  type ApprovalRequest,
+  type ApprovalRequestStatus,
+  type ApprovalRequestQuery,
+  type ApprovalRequestDecisionBody,
+} from './approvalRequest.js';

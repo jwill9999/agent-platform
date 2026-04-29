@@ -109,6 +109,17 @@ describe('createToolAuditLogger', () => {
     expect(completions[0]!.data.durationMs).toBeGreaterThanOrEqual(0);
   });
 
+  it('defaults unknown tool audit entries to high risk', () => {
+    const { store, entries } = createMemoryStore();
+    const logger = createToolAuditLogger(store);
+
+    const id = logger.logStart('dynamic_tool', { value: 1 }, 'agent-1', 'session-1');
+
+    expect(id).toBeTruthy();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.riskTier).toBe('high');
+  });
+
   it('skips zero-risk tools', () => {
     const { store, entries } = createMemoryStore();
     const logger = createToolAuditLogger(store);
@@ -162,6 +173,26 @@ describe('createToolAuditLogger', () => {
     logger.logDenied('sys_json_parse', {}, 'a', 's', 'some reason');
     expect(entries).toHaveLength(0);
   });
+
+  it('logPendingApproval creates a pending entry without completing it', () => {
+    const { store, entries, completions } = createMemoryStore();
+    const logger = createToolAuditLogger(store);
+
+    const id = logger.logPendingApproval('sys_bash', { command: 'date' }, 'a', 's', 'high');
+
+    expect(id).toBeTruthy();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      id,
+      toolName: 'sys_bash',
+      agentId: 'a',
+      sessionId: 's',
+      riskTier: 'high',
+      status: 'pending',
+    });
+    expect(JSON.parse(entries[0]!.argsJson)).toEqual({ command: 'date' });
+    expect(completions).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -178,5 +209,6 @@ describe('createNoopAuditLogger', () => {
     const logger = createNoopAuditLogger();
     logger.logComplete('some-id', { type: 'tool_result', data: 'ok' });
     logger.logDenied('sys_bash', {}, 'a', 's', 'reason');
+    expect(logger.logPendingApproval('sys_bash', {}, 'a', 's')).toBeNull();
   });
 });

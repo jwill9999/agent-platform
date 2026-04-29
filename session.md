@@ -11,6 +11,44 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux` and closed in Beads. Next chain task started: `task/agent-platform-de4` claimed (`in_progress`).
 - **Date:** 2026-04-27
 - **Session:** Completed UI input refactor and feedback-only changes; closed `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` in Beads.
+- **Date:** 2026-04-29
+- **Session:** Created HITL epic/task specs and branches; completed `agent-platform-hitl.1` deny-by-default approval gate on `task/agent-platform-hitl.1`.
+- **Date:** 2026-04-29
+- **Session:** Addressed Sourcery review feedback for HITL.1 approval gating and audit risk-tier handling.
+- **Date:** 2026-04-29
+- **Session:** HITL.1 was merged into `feature/agent-platform-hitl`; completed `agent-platform-hitl.2` approval request persistence/API on `task/agent-platform-hitl.2`.
+- **Date:** 2026-04-29
+- **Session:** HITL.2 was merged into `feature/agent-platform-hitl`; started `agent-platform-hitl.3` on `task/agent-platform-hitl.3`.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-hitl.3` approval-required NDJSON events on `task/agent-platform-hitl.3`; ready for PR into `feature/agent-platform-hitl`.
+- **Date:** 2026-04-29
+- **Session:** Addressed HITL.3 review feedback: pending approvals now audit as pending, approval output has a fallback renderer, and API stream tests assert no assistant text leaks on approval halt.
+- **Date:** 2026-04-29
+- **Session:** HITL.3 was merged into `feature/agent-platform-hitl`; claimed next task `agent-platform-hitl.4` and created `task/agent-platform-hitl.4` from the updated feature branch.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-hitl.4` durable approval resume execution on `task/agent-platform-hitl.4`; ready for PR into `feature/agent-platform-hitl`.
+- **Date:** 2026-04-29
+- **Session:** Queried SonarCloud PR `#93` duplicate-code metrics; refactored shared chat test helpers and amended `agent-platform-hitl.4`.
+- **Date:** 2026-04-29
+- **Session:** Refactored `chatRouter.ts` runtime error/finalization helpers to clear remaining SonarCloud duplicate-code block.
+- **Date:** 2026-04-29
+- **Session:** HITL.4 was merged into `feature/agent-platform-hitl`; selected `agent-platform-hitl.5` as the next epic task.
+- **Date:** 2026-04-29
+- **Session:** Started HITL.5 frontend approval UX: hook state, inline approval cards, decision/resume handling, and focused tests.
+- **Date:** 2026-04-29
+- **Session:** Fixed OpenAI tool-schema rejection for MCP schemas using unsupported `propertyNames` keyword.
+- **Date:** 2026-04-29
+- **Session:** Fixed replay of unresolved pending approval tool calls causing OpenAI missing tool response errors.
+- **Date:** 2026-04-29
+- **Session:** Fixed HITL approval resume to reuse the selected model config and block new prompts while an approval is unresolved.
+- **Date:** 2026-04-29
+- **Session:** Fixed approval-resume draft accumulation across DoD revisions and stopped DoD cap failures from showing as global chat errors.
+- **Date:** 2026-04-29
+- **Session:** Added spacing above the final critic review block in chat output.
+- **Date:** 2026-04-29
+- **Session:** Made shell command failure results feed back to the assistant in plain language instead of raw stdout/stderr/exitCode jargon.
+- **Date:** 2026-04-29
+- **Session:** Refactored duplicated HITL stream/lifecycle handling in `chatRouter.ts` and `use-harness-chat.ts` for SonarCloud PR 94.
 
 ### Session-close guardrail (required)
 
@@ -23,83 +61,107 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Branch chain update ✅
+### `agent-platform-hitl.4` — Durable approval resume ✅
 
-- `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux`.
-- Beads status updated: `agent-platform-7d1` closed (`Merged into feature/agent-platform-ui-ux`).
-- Next ready task selected and claimed: `agent-platform-de4`.
-- New working branch created from feature: `task/agent-platform-de4`.
-- Completed work on `agent-platform-de4` (feedback-only assistant output, thinking/critic lifecycle fixes) and `agent-platform-lt6` (input refactor). Both branches' changes committed on `task/agent-platform-lt6` and pushed to origin. The beads `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` have been closed locally via `bd close` (remote push for beads may require auth).
+Branch `task/agent-platform-hitl.4`.
 
-### `agent-platform-7d1` — Remove sessions sidebar; move sessions into dropdown ✅
+- Implemented `POST /v1/sessions/:id/resume` for approved/rejected pending HITL tool calls.
+- Added DB support for durable approval `resumedAtMs` claiming and assistant `toolCalls` persistence.
+- Reused the runtime tool-dispatch path so approved calls execute once and then the agent continues from persisted session history.
+- Added migration `packages/db/drizzle/0013_hitl_resume.sql`, contract exports, repository coverage, and API integration coverage.
+- Updated `docs/tasks/agent-platform-hitl.4.md` and closed bead `agent-platform-hitl.4` locally.
 
-Branch `task/agent-platform-7d1` (from `feature/agent-platform-ui-ux`), commit `7fce8e7`.
+### SonarCloud duplicate-code follow-up ✅
 
-- **UI flow:** Removed dedicated left `SessionHistoryPanel` from chat page.
-- **New component:** Added `apps/web/components/chat/session-dropdown.tsx` with grouped session history under a header dropdown button (`Open sessions menu`).
-- **Switching + create:** Dropdown supports selecting existing sessions and creating a new chat with current/selected agent.
-- **Management path:** Dropdown includes `Manage sessions` entry linking to `/settings/sessions`.
-- **Cleanup:** Removed unused component file `apps/web/components/chat/session-history-panel.tsx`.
-- **E2E:** Added test in `e2e/mvp-e2e.spec.ts` validating sessions moved from panel to header dropdown.
-- **Quality:** `pnpm lint` ✅, `pnpm typecheck` ✅, Sonar touched files ✅ (0 findings on page/dropdown/e2e files).
-- **Known unrelated failure:** Existing E2E seed check (`e2e-specialist` missing) still fails in `e2e/mvp-e2e.spec.ts`.
-
-### `agent-platform-btm` — Surface critic iterations visibly in chat UI ✅
-
-Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ffa9a`.
-
-- **Parser:** new `apps/web/lib/critic-events.ts` — `parseCriticContent()` recognises the harness critic node's `thinking` content shapes (`Critic: revise (n/cap) - …`, `Critic: accept on first pass - …`, `Critic: accept after N revision(s) - …`) and returns structured `CriticEvent` (`revise` / `accept` / `cap_reached`). Also `formatCriticStatus()` for the header.
-- **Hook:** `useHarnessChat` now intercepts critic `thinking` events (and `error` with `code === 'CRITIC_CAP_REACHED'`) so they no longer stream into the assistant text. Tracks them per assistant message id and exposes `criticEventsByMessage`.
-- **Component:** new `apps/web/components/chat/critic-badges.tsx` renders chips with distinct colour + icon per state (revise=amber/RefreshCw, accept=emerald/Check, cap_reached=red/AlertTriangle). Reasons surface via `title` tooltip.
-- **Layout:** `AssistantContent` renders `CriticBadges` above markdown / streaming placeholder. `StatusLabel` accepts `criticStatus` and uses it instead of the generic “Thinking…” when a critic event has been received for the active turn.
-- **Tests:** `apps/web/test/critic-events.test.ts` covers parser (revise / accept variants / missing reasons / non-critic discrimination) and status formatter.
-- **Quality:** typecheck ✅, web lint ✅, web tests (29) ✅, full `pnpm -r run test` ✅, Sonar (touched files) 0 findings.
-- **Scope discipline:** zero changes to NDJSON contract / harness public API.
+- SonarCloud PR `#93` reported new duplicate lines in:
+  - `apps/api/src/infrastructure/http/v1/chatRouter.ts` — 25 lines
+  - `apps/api/test/sessionChat.integration.test.ts` — 41 lines
+- Refactored `chatRouter.ts` runtime graph/tool-dispatch setup into shared helpers before this handoff.
+- Refactored repeated runtime failure/finalization handling in `chatRouter.ts` after SonarCloud still reported a 25-line duplicate block.
+- Refactored chat test environment handling into `apps/api/test/support/chatEnv.ts`.
+- Extracted repeated session/approval/event/count helpers from `sessionChat.integration.test.ts`.
 
 ### Beads
 
 Closed beads in this session:
 
-- `agent-platform-de4` — Show feedback-only block for assistant responses (closed)
-- `agent-platform-ucg` — Refactor sidebar to Chat/IDE only with settings overflow (closed)
-- `agent-platform-lt6` — Unify input bar controls for model/agent and attachments (closed)
+- `agent-platform-hitl.1` — Add deny-by-default approval gate for risky tools
+- `agent-platform-hitl.2` — Persist approval request records and APIs
+- `agent-platform-hitl.3` — Emit approval-required stream events
+- `agent-platform-hitl.4` — Resume approved tool execution safely
 
-Note: `bd` closed the beads locally but automatic remote push failed due to SSH/network auth; see Quick commands for manual push guidance.
+In-progress beads:
+
+- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage
+
+Selected task:
+
+- `agent-platform-hitl.5` — claimed and started on `task/agent-platform-hitl.5`
+
+HITL.5 progress:
+
+- Added approval card state and approve/reject resume handling to `useHarnessChat`.
+- Added compact inline approval card rendering for chat assistant turns.
+- Added pending approval hydration for resumed sessions.
+- Added web unit coverage for approval parsing/deduplication and a Playwright fixture for approval card states.
+- Sanitised unsupported `propertyNames` JSON Schema keywords before tools are sent to the LLM; this fixes `browser_drop` schema validation blocking approval UI testing.
+- Sanitised chat history replay so unresolved pending approval `tool_calls` are not sent back to OpenAI on later normal chat turns.
+- Forwarded the selected model config through approval resume so the resume call does not fall back to a stale/invalid env key after the normal chat turn succeeds.
+- Blocked the chat composer while an approval card is pending/approving/rejecting/failed to prevent overlapping normal prompts and resume output from interleaving.
+- Reused normal-chat revision reset behavior for approval resume streams so repeated DoD drafts do not concatenate duplicate command output.
+- Rendered `DOD_FAILED` as critic cap metadata rather than a dismissible global error banner.
+- Added top margin to the final critic review block so it no longer sits tight against the assistant answer paragraph.
+- Formatted `sys_bash` tool messages for the follow-up LLM step as plain-language success/failure summaries, reducing raw coding jargon in assistant answers after command errors.
+- Extracted shared approval/chat stream parsing in the web hook and shared NDJSON lifecycle/task-start setup in the API chat router to reduce new-code duplication.
+
+Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
 ## Current state
 
 ### Git
 
-- **`feature/agent-platform-ui-ux`** — pushed and up to date with origin
-- **`task/agent-platform-de4`** — created from feature and active (`in_progress`)
-- **`task/agent-platform-de4`** — completed and merged into `feature/agent-platform-ui-ux` via commits on `task/agent-platform-lt6` (see PR).
-- **`task/agent-platform-lt6`** — completed, committed, and pushed to `origin/task/agent-platform-lt6` (PR opened: https://github.com/jwill9999/agent-platform/pull/88)
+- **`feature/agent-platform-hitl`** — pushed and tracking `origin/feature/agent-platform-hitl`
+- **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
+- **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
+- **`task/agent-platform-hitl.3`** — merged into `feature/agent-platform-hitl` via PR `#92`
+- **`task/agent-platform-hitl.4`** — merged into `feature/agent-platform-hitl` via PR `#93`
+- **`feature/agent-platform-hitl`** — up to date with `origin/feature/agent-platform-hitl` at merge commit `215ac9c`
+- **`task/agent-platform-hitl.5`** — current branch, created from updated `feature/agent-platform-hitl`
 
 ### Quality
 
-- Typecheck ✅ Lint ✅
-- Playwright feature test coverage added for sessions dropdown move
-- Unrelated seed fixture failure remains in `e2e/mvp-e2e.spec.ts` (`e2e-specialist` missing)
+- `pnpm --filter @agent-platform/harness run test` ✅
+- `pnpm --filter @agent-platform/harness run typecheck` ✅
+- `pnpm --filter @agent-platform/api run typecheck` ✅
+- `pnpm typecheck` ✅
+- `pnpm lint` ✅
+- `pnpm format:check` ✅
+- `pnpm docs:lint` ✅
+- `pnpm test` ✅ when escalated to allow local test servers to bind ports
+- `pnpm --filter @agent-platform/db exec vitest run test/messages.test.ts test/approvalRequests.test.ts` ✅
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` ✅ when escalated for local test server binding
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts test/chat.integration.test.ts` ✅ when escalated for local test server binding
 
 ### Key commits
 
-| Commit    | Branch                    | Description                                      |
-| --------- | ------------------------- | ------------------------------------------------ |
-| `a7ffa9a` | `task/agent-platform-btm` | feat(web): critic iteration badges + live status |
+| Commit    | Branch                        | Description           |
+| --------- | ----------------------------- | --------------------- |
+| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92` |
+| `215ac9c` | `feature/agent-platform-hitl` | Merge HITL.4 PR `#93` |
 
 ---
 
 ## Next (priority order)
 
-1. **Implement `agent-platform-de4`** on `task/agent-platform-de4`
-2. **Open PR for `task/agent-platform-de4`** → `feature/agent-platform-ui-ux`
-3. **Resolve or isolate unrelated E2E seed fixture failure** in `e2e/mvp-e2e.spec.ts`
+1. Implement `agent-platform-hitl.5` frontend approval UX and e2e coverage on `task/agent-platform-hitl.5`.
+2. Add/verify full end-to-end approve/reject workflow coverage against the real API path.
+3. Push `task/agent-platform-hitl.5` and open PR into `feature/agent-platform-hitl` when complete.
 
 ---
 
 ## Blockers / questions for owner
 
-- Sandbox SSH is blocked, so dolt remote push and `git push` cannot run from this session.
+- None for local continuation. Beads Dolt auto-push failed from the sandbox due to GitHub SSH/network access.
 
 ---
 
@@ -114,8 +176,8 @@ Note: `bd` closed the beads locally but automatic remote push failed due to SSH/
 | `docs/planning/lazy-skill-loading.md`     | Lazy skill pattern (planning reference)    |
 | `docs/architecture/lazy-skill-loading.md` | Lazy skill loading implementation guide    |
 | `docs/planning/security.md`               | Threat model (8 categories)                |
-| `docs/tasks/agent-platform-fc8.md`        | DoD contract task spec                     |
-| `docs/tasks/agent-platform-2v6.md`        | Next task in the chain                     |
+| `docs/tasks/agent-platform-hitl.4.md`     | Selected next task: resume HITL execution  |
+| `docs/tasks/agent-platform-hitl.5.md`     | Downstream frontend approval UX task       |
 | `docs/planning/frontend-ui-phases.md`     | Frontend UI phased plan (unblocked)        |
 | `docs/tasks/`                             | Task spec files                            |
 

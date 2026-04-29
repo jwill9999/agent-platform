@@ -1,10 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createToolDispatchNode, type ToolDispatchContext } from '../src/nodes/toolDispatch.js';
 import type { HarnessStateType } from '../src/graphState.js';
-import type { Agent, Output } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ApprovalRequest,
+  Output,
+  Tool as ContractTool,
+} from '@agent-platform/contracts';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { NativeToolExecutor } from '../src/types.js';
+import type { ToolAuditLogger } from '../src/audit/toolAuditLog.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -20,6 +26,14 @@ const makeAgent = (overrides?: Partial<Agent>): Agent => ({
   allowedToolIds: ['echo'],
   allowedMcpServerIds: ['mcp-fs'],
   executionLimits: { maxSteps: 10 },
+  ...overrides,
+});
+
+const makeTool = (overrides?: Partial<ContractTool>): ContractTool => ({
+  id: 'echo',
+  slug: 'echo',
+  name: 'echo',
+  riskTier: 'low',
   ...overrides,
 });
 
@@ -46,6 +60,21 @@ const makeMcpManager = (
   ({
     getSession: (id: string) => sessionMap[id],
   }) as unknown as McpSessionManager;
+
+const makeApprovalRequest = (overrides?: Partial<ApprovalRequest>): ApprovalRequest => ({
+  id: 'approval-1',
+  sessionId: 'session-approval',
+  runId: 'run-1',
+  agentId: 'agent-1',
+  toolName: 'sys_bash',
+  argsJson: '{"command":"date"}',
+  executionPayloadJson:
+    '{"toolCallId":"tc-approval","toolName":"sys_bash","args":{"command":"date"}}',
+  riskTier: 'high',
+  status: 'pending',
+  createdAtMs: 1000,
+  ...overrides,
+});
 
 /** Dispatch a single tool call and assert it produces an error result. */
 const dispatchExpectingError = async (
@@ -96,6 +125,7 @@ describe('toolDispatchNode', () => {
     const callFn = vi.fn().mockResolvedValue({ output: mcpResult, images: [] });
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
+      tools: [makeTool({ id: 'mcp-fs:readFile', slug: 'mcp-fs-read-file', name: 'readFile' })],
       mcpManager: makeMcpManager({ 'mcp-fs': { callToolAsOutput: callFn } }),
     };
     const node = createToolDispatchNode(ctx);
@@ -129,6 +159,7 @@ describe('toolDispatchNode', () => {
     const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
+      tools: [makeTool()],
       mcpManager: makeMcpManager(),
       nativeToolExecutor: nativeExecutor,
     };
@@ -155,6 +186,56 @@ describe('toolDispatchNode', () => {
     expect(result.trace!.some((t: { type: string }) => t.type === 'tool_dispatch')).toBe(true);
   });
 
+  it('formats approved shell command failures for human-readable follow-up', async () => {
+    const nativeResult: Output = {
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: {
+        stdout: '',
+        stderr: 'touch: /workspace/hitl-approval-test.txt: Permission denied',
+        exitCode: 1,
+      },
+    };
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      tools: [
+        makeTool({
+          id: 'sys_bash',
+          slug: 'sys-bash',
+          name: 'sys_bash',
+          riskTier: 'high',
+          requiresApproval: true,
+        }),
+      ],
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvedToolCallIds: new Set(['tc-shell']),
+    };
+    const node = createToolDispatchNode(ctx);
+    const result = await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [
+            {
+              id: 'tc-shell',
+              name: 'sys_bash',
+              args: { command: 'touch /workspace/hitl-approval-test.txt' },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(result.messages![0]!.content).toContain('The command did not complete successfully.');
+    expect(result.messages![0]!.content).toContain(
+      'touch: /workspace/hitl-approval-test.txt: Permission denied',
+    );
+    expect(result.messages![0]!.content).not.toContain('"stderr"');
+    expect(result.messages![0]!.content).not.toContain('"exitCode"');
+  });
+
   it('rejects tool not in agent allowlist', async () => {
     const ctx: ToolDispatchContext = {
       agent: makeAgent({ allowedToolIds: [], allowedMcpServerIds: [] }),
@@ -170,6 +251,7 @@ describe('toolDispatchNode', () => {
   it('returns error when MCP session is not found', async () => {
     const ctx: ToolDispatchContext = {
       agent: makeAgent({ allowedMcpServerIds: ['missing-server'] }),
+      tools: [makeTool({ id: 'missing-server:tool', slug: 'missing-server-tool', name: 'tool' })],
       mcpManager: makeMcpManager({}),
     };
     await dispatchExpectingError(
@@ -183,6 +265,7 @@ describe('toolDispatchNode', () => {
     const nativeExecutor: NativeToolExecutor = vi.fn().mockRejectedValue(new Error('boom'));
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
+      tools: [makeTool()],
       mcpManager: makeMcpManager(),
       nativeToolExecutor: nativeExecutor,
     };
@@ -203,6 +286,7 @@ describe('toolDispatchNode', () => {
     });
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
+      tools: [makeTool()],
       mcpManager: makeMcpManager(),
       nativeToolExecutor: nativeExecutor,
       dispatcher: createPluginDispatcher([{ onError }]),
@@ -235,9 +319,294 @@ describe('toolDispatchNode', () => {
   it('returns error when no native executor and tool is plain', async () => {
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
+      tools: [makeTool()],
       mcpManager: makeMcpManager(),
     };
     await dispatchExpectingError(ctx, { id: 'tc-6', name: 'echo', args: {} }, 'TOOL_NOT_FOUND');
+  });
+
+  it('gates high-risk system tools before execution', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { exitCode: 0 },
+    });
+    const logDenied = vi.fn();
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied,
+      logPendingApproval: vi.fn(),
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-approval',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-approval', name: 'sys_bash', args: { command: 'date' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(logDenied).toHaveBeenCalledWith(
+      'sys_bash',
+      { command: 'date' },
+      'agent-1',
+      'session-approval',
+      'Tool is marked as requiring human approval.',
+      'high',
+    );
+    expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+      error: 'APPROVAL_REQUIRED',
+    });
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({
+        type: 'tool_approval_required',
+        toolId: 'sys_bash',
+        riskTier: 'high',
+      }),
+    );
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({ type: 'tool_dispatch', toolId: 'sys_bash', ok: false }),
+    );
+  });
+
+  it('creates and emits approval_required events without executing the gated tool', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { exitCode: 0 },
+    });
+    const emitted: Output[] = [];
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(makeApprovalRequest()),
+    };
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied: vi.fn(),
+      logPendingApproval: vi.fn().mockReturnValue('audit-approval'),
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      emitter: { emit: (event) => emitted.push(event), end: vi.fn() },
+      approvalRequests,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-approval',
+        runId: 'run-1',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [
+            { id: 'tc-approval', name: 'sys_bash', args: { command: 'date' } },
+            { id: 'tc-later', name: 'echo', args: { text: 'skip me' } },
+          ],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(approvalRequests.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-approval',
+        runId: 'run-1',
+        agentId: 'agent-1',
+        toolName: 'sys_bash',
+        args: { command: 'date' },
+        riskTier: 'high',
+      }),
+    );
+    expect(auditLog.logPendingApproval).toHaveBeenCalledWith(
+      'sys_bash',
+      { command: 'date' },
+      'agent-1',
+      'session-approval',
+      'high',
+    );
+    expect(auditLog.logDenied).not.toHaveBeenCalled();
+    expect(emitted).toEqual([
+      {
+        type: 'approval_required',
+        approvalRequestId: 'approval-1',
+        toolName: 'sys_bash',
+        riskTier: 'high',
+        argsPreview: { command: 'date' },
+        message: expect.stringContaining('requires human approval'),
+      },
+    ]);
+    expect(result).toMatchObject({ halted: true, messages: [] });
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({
+        type: 'tool_approval_required',
+        toolId: 'sys_bash',
+        riskTier: 'high',
+      }),
+    );
+  });
+
+  it('gates registry tools that explicitly require approval', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'echo',
+      data: 'should not execute',
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      tools: [
+        {
+          id: 'echo',
+          slug: 'echo',
+          name: 'echo',
+          riskTier: 'low',
+          requiresApproval: true,
+        },
+      ],
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-registry-approval', name: 'echo', args: { text: 'hi' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(JSON.parse(result.messages![0]!.content).error).toBe('APPROVAL_REQUIRED');
+  });
+
+  it('gates MCP tools using discovered metadata from context tools', async () => {
+    const callFn = vi.fn().mockResolvedValue({
+      output: { type: 'tool_result', toolId: 'mcp-fs:deleteFile', data: 'deleted' },
+      images: [],
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      tools: [
+        makeTool({
+          id: 'mcp-fs:deleteFile',
+          slug: 'mcp-fs-delete-file',
+          name: 'deleteFile',
+          riskTier: 'high',
+        }),
+      ],
+      mcpManager: makeMcpManager({ 'mcp-fs': { callToolAsOutput: callFn } }),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-mcp-approval', name: 'mcp-fs:deleteFile', args: { path: 'x' } }],
+        },
+      }),
+    );
+
+    expect(callFn).not.toHaveBeenCalled();
+    expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+      error: 'APPROVAL_REQUIRED',
+    });
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({
+        type: 'tool_approval_required',
+        toolId: 'mcp-fs:deleteFile',
+        riskTier: 'high',
+      }),
+    );
+  });
+
+  it('continues executing ordinary low-risk registry tools', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'echo',
+      data: 'ok',
+    });
+    const auditLog = {
+      logStart: vi.fn().mockReturnValue('audit-low'),
+      logComplete: vi.fn(),
+      logDenied: vi.fn(),
+      logPendingApproval: vi.fn(),
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      tools: [makeTool()],
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-low-risk', name: 'echo', args: { text: 'hi' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).toHaveBeenCalledWith('echo', { text: 'hi' });
+    expect(auditLog.logStart).toHaveBeenCalledWith('echo', { text: 'hi' }, 'agent-1', '', 'low');
+    expect(auditLog.logComplete).toHaveBeenCalledWith(
+      'audit-low',
+      expect.objectContaining({ type: 'tool_result' }),
+    );
+  });
+
+  it('requires approval when allowlisted tool metadata is missing', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'echo',
+      data: 'should not execute',
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-missing-metadata', name: 'echo', args: { text: 'hi' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+      error: 'APPROVAL_REQUIRED',
+      message: expect.stringContaining('Tool metadata is missing'),
+    });
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({
+        type: 'tool_approval_required',
+        toolId: 'echo',
+        riskTier: 'high',
+      }),
+    );
   });
 
   it('handles multiple tool calls in single dispatch', async () => {
@@ -247,6 +616,7 @@ describe('toolDispatchNode', () => {
     const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
+      tools: [makeTool({ id: 'mcp-fs:ls', slug: 'mcp-fs-ls', name: 'ls' }), makeTool()],
       mcpManager: makeMcpManager({ 'mcp-fs': { callToolAsOutput: callFn } }),
       nativeToolExecutor: nativeExecutor,
     };
@@ -273,6 +643,7 @@ describe('toolDispatchNode', () => {
     const callFn = vi.fn().mockRejectedValue(new Error('timeout'));
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
+      tools: [makeTool({ id: 'mcp-fs:read', slug: 'mcp-fs-read', name: 'read' })],
       mcpManager: makeMcpManager({ 'mcp-fs': { callToolAsOutput: callFn } }),
     };
     await dispatchExpectingError(
@@ -321,6 +692,7 @@ describe('toolDispatchNode', () => {
     const executor: NativeToolExecutor = vi.fn().mockResolvedValue(toolOutput);
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
+      tools: [makeTool()],
       mcpManager: makeMcpManager(),
       nativeToolExecutor: executor,
     };
@@ -347,6 +719,7 @@ describe('toolDispatchNode', () => {
       agent: makeAgent({
         executionLimits: { maxSteps: 10, toolRateLimitPerMinute: 2 },
       }),
+      tools: [makeTool()],
       mcpManager: makeMcpManager(),
       nativeToolExecutor: executor,
     };
@@ -391,6 +764,7 @@ describe('toolDispatchNode', () => {
         allowedToolIds: ['echo', 'other'],
         executionLimits: { maxSteps: 10, toolRateLimitPerMinute: 1 },
       }),
+      tools: [makeTool(), makeTool({ id: 'other', slug: 'other', name: 'other' })],
       mcpManager: makeMcpManager(),
       nativeToolExecutor: executor,
     };

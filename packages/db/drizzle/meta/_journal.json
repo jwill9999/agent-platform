@@ -85,6 +85,20 @@
       "when": 1777000000000,
       "tag": "0011_add_model_configs",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1777100000000,
+      "tag": "0012_add_approval_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1777200000000,
+      "tag": "0013_hitl_resume",
+      "breakpoints": true
     }
   ]
 }

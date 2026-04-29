@@ -42,47 +42,52 @@ The Next.js BFF exposes two proxy layers to the browser:
 - **`/api/chat`** — dedicated BFF route with its own Zod validation, timeout, and error handling; proxies to `POST /v1/chat`.
 - **`/api/v1/[...path]`** — catch-all proxy that forwards any `/v1` request to the API verbatim.
 
-| Endpoint                          | Frontend | curl / API-only | Notes                                        |
-| --------------------------------- | :------: | :-------------: | -------------------------------------------- |
-| `POST /v1/chat`                   |    ✅    |       ✅        | Primary chat — via dedicated `/api/chat` BFF |
-| `GET /v1/agents`                  |    ✅    |       ✅        | Agent dashboard, agent editor, home page     |
-| `POST /v1/agents`                 |    ✅    |       ✅        | Agent editor, duplicate                      |
-| `PUT /v1/agents/:id`              |    ✅    |       ✅        | Agent editor                                 |
-| `DELETE /v1/agents/:id`           |    ✅    |       ✅        | Agent dashboard                              |
-| `GET /v1/sessions`                |    ✅    |       ✅        | Sessions page                                |
-| `POST /v1/sessions`               |    ✅    |       ✅        | Home page, IDE chat                          |
-| `GET /v1/skills`                  |    ✅    |       ✅        | Skills dashboard, agent editor               |
-| `POST /v1/skills`                 |    ✅    |       ✅        | Skills dashboard                             |
-| `PUT /v1/skills/:id`              |    ✅    |       ✅        | Skills dashboard                             |
-| `DELETE /v1/skills/:id`           |    ✅    |       ✅        | Skills dashboard                             |
-| `GET /v1/tools`                   |    ✅    |       ✅        | Tools dashboard                              |
-| `POST /v1/tools`                  |    ✅    |       ✅        | Tools dashboard                              |
-| `PUT /v1/tools/:id`               |    ✅    |       ✅        | Tools dashboard                              |
-| `DELETE /v1/tools/:id`            |    ✅    |       ✅        | Tools dashboard                              |
-| `GET /v1/mcp-servers`             |    ✅    |       ✅        | MCP dashboard, agent editor                  |
-| `POST /v1/mcp-servers`            |    ✅    |       ✅        | MCP dashboard                                |
-| `PUT /v1/mcp-servers/:id`         |    ✅    |       ✅        | MCP dashboard                                |
-| `DELETE /v1/mcp-servers/:id`      |    ✅    |       ✅        | MCP dashboard                                |
-| `POST /v1/mcp-servers/:id/test`   |    ✅    |       ✅        | MCP dashboard — connection test              |
-| `GET /v1/agents/:id`              |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/skills/:id`              |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/tools/:id`               |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/mcp-servers/:id`         |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/sessions/:id`            |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `PUT /v1/sessions/:id`            |    —     |       ✅        | Update session (no UI)                       |
-| `DELETE /v1/sessions/:id`         |    —     |       ✅        | Delete session (no UI)                       |
-| `GET /v1/model-configs`           |    ✅    |       ✅        | Model configs dashboard                      |
-| `POST /v1/model-configs`          |    ✅    |       ✅        | Model configs dashboard — create             |
-| `PUT /v1/model-configs/:id`       |    ✅    |       ✅        | Model configs dashboard — edit               |
-| `DELETE /v1/model-configs/:id`    |    ✅    |       ✅        | Model configs dashboard — delete             |
-| `POST /v1/model-configs/:id/test` |    ✅    |       ✅        | Model configs dashboard — test connection    |
-| `GET /v1/model-configs/:id`       |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/settings`                |    —     |       ✅        | Platform settings — API / automation only    |
-| `PUT /v1/settings/:key`           |    —     |       ✅        | Set a setting — API / automation only        |
-| `DELETE /v1/settings/:key`        |    —     |       ✅        | Delete a setting — API / automation only     |
-| `GET /v1/tool-executions`         |    —     |       ✅        | Audit log query — API / automation only      |
-| `POST /v1/chat/stream`            |    —     |       ✅        | ⚠️ Deprecated legacy pass-through            |
-| `GET /health`                     |    —     |       ✅        | Health check (outside `/v1`)                 |
+| Endpoint                                 | Frontend | curl / API-only | Notes                                        |
+| ---------------------------------------- | :------: | :-------------: | -------------------------------------------- |
+| `POST /v1/chat`                          |    ✅    |       ✅        | Primary chat — via dedicated `/api/chat` BFF |
+| `GET /v1/agents`                         |    ✅    |       ✅        | Agent dashboard, agent editor, home page     |
+| `POST /v1/agents`                        |    ✅    |       ✅        | Agent editor, duplicate                      |
+| `PUT /v1/agents/:id`                     |    ✅    |       ✅        | Agent editor                                 |
+| `DELETE /v1/agents/:id`                  |    ✅    |       ✅        | Agent dashboard                              |
+| `GET /v1/sessions`                       |    ✅    |       ✅        | Sessions page                                |
+| `POST /v1/sessions`                      |    ✅    |       ✅        | Home page, IDE chat                          |
+| `GET /v1/skills`                         |    ✅    |       ✅        | Skills dashboard, agent editor               |
+| `POST /v1/skills`                        |    ✅    |       ✅        | Skills dashboard                             |
+| `PUT /v1/skills/:id`                     |    ✅    |       ✅        | Skills dashboard                             |
+| `DELETE /v1/skills/:id`                  |    ✅    |       ✅        | Skills dashboard                             |
+| `GET /v1/tools`                          |    ✅    |       ✅        | Tools dashboard                              |
+| `POST /v1/tools`                         |    ✅    |       ✅        | Tools dashboard                              |
+| `PUT /v1/tools/:id`                      |    ✅    |       ✅        | Tools dashboard                              |
+| `DELETE /v1/tools/:id`                   |    ✅    |       ✅        | Tools dashboard                              |
+| `GET /v1/mcp-servers`                    |    ✅    |       ✅        | MCP dashboard, agent editor                  |
+| `POST /v1/mcp-servers`                   |    ✅    |       ✅        | MCP dashboard                                |
+| `PUT /v1/mcp-servers/:id`                |    ✅    |       ✅        | MCP dashboard                                |
+| `DELETE /v1/mcp-servers/:id`             |    ✅    |       ✅        | MCP dashboard                                |
+| `POST /v1/mcp-servers/:id/test`          |    ✅    |       ✅        | MCP dashboard — connection test              |
+| `GET /v1/agents/:id`                     |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/skills/:id`                     |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/tools/:id`                      |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/mcp-servers/:id`                |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/sessions/:id`                   |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `PUT /v1/sessions/:id`                   |    —     |       ✅        | Update session (no UI)                       |
+| `DELETE /v1/sessions/:id`                |    —     |       ✅        | Delete session (no UI)                       |
+| `GET /v1/model-configs`                  |    ✅    |       ✅        | Model configs dashboard                      |
+| `POST /v1/model-configs`                 |    ✅    |       ✅        | Model configs dashboard — create             |
+| `PUT /v1/model-configs/:id`              |    ✅    |       ✅        | Model configs dashboard — edit               |
+| `DELETE /v1/model-configs/:id`           |    ✅    |       ✅        | Model configs dashboard — delete             |
+| `POST /v1/model-configs/:id/test`        |    ✅    |       ✅        | Model configs dashboard — test connection    |
+| `GET /v1/model-configs/:id`              |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/settings`                       |    —     |       ✅        | Platform settings — API / automation only    |
+| `PUT /v1/settings/:key`                  |    —     |       ✅        | Set a setting — API / automation only        |
+| `DELETE /v1/settings/:key`               |    —     |       ✅        | Delete a setting — API / automation only     |
+| `GET /v1/tool-executions`                |    —     |       ✅        | Audit log query — API / automation only      |
+| `GET /v1/approval-requests`              |    —     |       ✅        | HITL approval request query                  |
+| `GET /v1/approval-requests/:id`          |    —     |       ✅        | HITL approval request detail                 |
+| `POST /v1/approval-requests/:id/approve` |    —     |       ✅        | Approve pending HITL request                 |
+| `POST /v1/approval-requests/:id/reject`  |    —     |       ✅        | Reject pending HITL request                  |
+| `POST /v1/approval-requests/:id/expire`  |    —     |       ✅        | Expire pending HITL request                  |
+| `POST /v1/chat/stream`                   |    —     |       ✅        | ⚠️ Deprecated legacy pass-through            |
+| `GET /health`                            |    —     |       ✅        | Health check (outside `/v1`)                 |
 
 > **Note:** The catch-all BFF proxy makes all `/v1` endpoints technically reachable from the browser. The "—" entries above simply have no UI that calls them today.
 
@@ -119,6 +124,26 @@ Built-in observability tools exposed by `GET /v1/tools`:
 | `sys_inspect_trace`       | `inspect_trace`       | `traceId?`                   | `{ traceId, total, truncated, events }` |
 
 All three observability tools are read-only, zero-risk system tools. They are jailed to the current API session, and `inspect_trace` defaults to the current run when `traceId` is omitted.
+
+### Approval Requests
+
+| Method | Path                                | Description                        |
+| ------ | ----------------------------------- | ---------------------------------- |
+| `GET`  | `/v1/approval-requests`             | List approval requests             |
+| `GET`  | `/v1/approval-requests/:id`         | Get approval request by ID         |
+| `POST` | `/v1/approval-requests/:id/approve` | Approve a pending approval request |
+| `POST` | `/v1/approval-requests/:id/reject`  | Reject a pending approval request  |
+| `POST` | `/v1/approval-requests/:id/expire`  | Expire a pending approval request  |
+
+Query filters: `sessionId`, `runId`, `agentId`, `toolName`, `riskTier`, `status`, `limit`, `offset`.
+
+Decision body schema:
+
+```json
+{ "reason": "Optional human-readable reason" }
+```
+
+Approval request `argsJson` is always stored and returned with secret-looking argument keys redacted. Valid statuses are `pending`, `approved`, `rejected`, and `expired`. Pending requests can move to any terminal status; terminal requests are idempotent for the same status and reject flip-flops.
 
 ### MCP Servers
 
@@ -243,13 +268,16 @@ The primary chat endpoint. Runs the full agent harness (ReAct loop, tool dispatc
 
 **Response:** NDJSON stream. Each line is a JSON object with a `type` field:
 
-| Event            | When                         | Key fields        |
-| ---------------- | ---------------------------- | ----------------- |
-| `text`           | LLM text delta               | `content`         |
-| `thinking`       | LLM reasoning delta          | `content`         |
-| `tool_result`    | Tool execution complete      | `toolId`, `data`  |
-| `error`          | Fatal or budget limit hit    | `code`, `message` |
-| `stream_aborted` | Client disconnect or timeout | `reason`          |
+| Event               | When                                     | Key fields                                                 |
+| ------------------- | ---------------------------------------- | ---------------------------------------------------------- |
+| `text`              | LLM text delta                           | `content`                                                  |
+| `thinking`          | LLM reasoning delta                      | `content`                                                  |
+| `tool_result`       | Tool execution complete                  | `toolId`, `data`                                           |
+| `approval_required` | Tool execution paused for human approval | `approvalRequestId`, `toolName`, `riskTier`, `argsPreview` |
+| `error`             | Fatal or budget limit hit                | `code`, `message`                                          |
+| `stream_aborted`    | Client disconnect or timeout             | `reason`                                                   |
+
+When `approval_required` is emitted, the harness has created a pending approval request and stopped before executing that tool. Remaining tool calls in the same model batch are skipped; approval/resume execution is handled by the HITL resume flow.
 
 **Error responses (pre-stream):**
 
