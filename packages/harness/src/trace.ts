@@ -1,3 +1,5 @@
+import type { RiskTier } from '@agent-platform/contracts';
+
 /** Observability events emitted by the harness graph (append-only in state). */
 export type TraceEvent =
   | { type: 'graph_start'; runId: string }
@@ -10,6 +12,7 @@ export type TraceEvent =
       tokenUsage?: { promptTokens: number; completionTokens: number };
     }
   | { type: 'tool_dispatch'; toolId: string; step: number; ok: boolean }
+  | { type: 'tool_approval_required'; toolId: string; step: number; riskTier?: RiskTier }
   | { type: 'tool_timeout'; toolId: string; step: number; timeoutMs: number }
   | { type: 'llm_retry'; step: number; attempt: number; error: string; delayMs: number }
   | {

@@ -344,6 +344,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           llmReasonNode: createLlmReasonNode({ emitter, dispatcher }),
           toolDispatchNode: createToolDispatchNode({
             agent: agentCtx.agent,
+            tools: agentCtx.tools,
             mcpManager: agentCtx.mcpManager,
             nativeToolExecutor: createSystemToolExecutor(
               options.observabilityStore

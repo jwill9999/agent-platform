@@ -43,6 +43,7 @@ function makeAgent(overrides?: Partial<Record<string, unknown>>) {
 function makeToolDispatchCtx(executorFn: ReturnType<typeof vi.fn>): ToolDispatchContext {
   return {
     agent: makeAgent(),
+    tools: [{ id: 'echo', slug: 'echo', name: 'echo', riskTier: 'low' }],
     mcpManager: { getSession: () => undefined } as unknown as McpSessionManager,
     nativeToolExecutor: executorFn,
   };

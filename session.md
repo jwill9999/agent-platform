@@ -11,6 +11,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux` and closed in Beads. Next chain task started: `task/agent-platform-de4` claimed (`in_progress`).
 - **Date:** 2026-04-27
 - **Session:** Completed UI input refactor and feedback-only changes; closed `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` in Beads.
+- **Date:** 2026-04-29
+- **Session:** Created HITL epic/task specs and branches; completed `agent-platform-hitl.1` deny-by-default approval gate on `task/agent-platform-hitl.1`.
+- **Date:** 2026-04-29
+- **Session:** Addressed Sourcery review feedback for HITL.1 approval gating and audit risk-tier handling.
 
 ### Session-close guardrail (required)
 
@@ -23,83 +27,70 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Branch chain update ✅
+### HITL epic setup ✅
 
-- `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux`.
-- Beads status updated: `agent-platform-7d1` closed (`Merged into feature/agent-platform-ui-ux`).
-- Next ready task selected and claimed: `agent-platform-de4`.
-- New working branch created from feature: `task/agent-platform-de4`.
-- Completed work on `agent-platform-de4` (feedback-only assistant output, thinking/critic lifecycle fixes) and `agent-platform-lt6` (input refactor). Both branches' changes committed on `task/agent-platform-lt6` and pushed to origin. The beads `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` have been closed locally via `bd close` (remote push for beads may require auth).
+- Created Beads epic `agent-platform-hitl` and tasks `agent-platform-hitl.1` through `.5`.
+- Added task specs under `docs/tasks/agent-platform-hitl*.md` and indexed the epic in `docs/tasks/README.md`.
+- Created local branch chain: `feature/agent-platform-hitl` then `task/agent-platform-hitl.1`.
+- Claimed and closed `agent-platform-hitl.1` in Beads.
 
-### `agent-platform-7d1` — Remove sessions sidebar; move sessions into dropdown ✅
+### `agent-platform-hitl.1` — Deny-by-default approval gate ✅
 
-Branch `task/agent-platform-7d1` (from `feature/agent-platform-ui-ux`), commit `7fce8e7`.
+Branch `task/agent-platform-hitl.1`.
 
-- **UI flow:** Removed dedicated left `SessionHistoryPanel` from chat page.
-- **New component:** Added `apps/web/components/chat/session-dropdown.tsx` with grouped session history under a header dropdown button (`Open sessions menu`).
-- **Switching + create:** Dropdown supports selecting existing sessions and creating a new chat with current/selected agent.
-- **Management path:** Dropdown includes `Manage sessions` entry linking to `/settings/sessions`.
-- **Cleanup:** Removed unused component file `apps/web/components/chat/session-history-panel.tsx`.
-- **E2E:** Added test in `e2e/mvp-e2e.spec.ts` validating sessions moved from panel to header dropdown.
-- **Quality:** `pnpm lint` ✅, `pnpm typecheck` ✅, Sonar touched files ✅ (0 findings on page/dropdown/e2e files).
-- **Known unrelated failure:** Existing E2E seed check (`e2e-specialist` missing) still fails in `e2e/mvp-e2e.spec.ts`.
-
-### `agent-platform-btm` — Surface critic iterations visibly in chat UI ✅
-
-Branch `task/agent-platform-btm` (from `main`, after `7ga` merged), commit `a7ffa9a`.
-
-- **Parser:** new `apps/web/lib/critic-events.ts` — `parseCriticContent()` recognises the harness critic node's `thinking` content shapes (`Critic: revise (n/cap) - …`, `Critic: accept on first pass - …`, `Critic: accept after N revision(s) - …`) and returns structured `CriticEvent` (`revise` / `accept` / `cap_reached`). Also `formatCriticStatus()` for the header.
-- **Hook:** `useHarnessChat` now intercepts critic `thinking` events (and `error` with `code === 'CRITIC_CAP_REACHED'`) so they no longer stream into the assistant text. Tracks them per assistant message id and exposes `criticEventsByMessage`.
-- **Component:** new `apps/web/components/chat/critic-badges.tsx` renders chips with distinct colour + icon per state (revise=amber/RefreshCw, accept=emerald/Check, cap_reached=red/AlertTriangle). Reasons surface via `title` tooltip.
-- **Layout:** `AssistantContent` renders `CriticBadges` above markdown / streaming placeholder. `StatusLabel` accepts `criticStatus` and uses it instead of the generic “Thinking…” when a critic event has been received for the active turn.
-- **Tests:** `apps/web/test/critic-events.test.ts` covers parser (revise / accept variants / missing reasons / non-critic discrimination) and status formatter.
-- **Quality:** typecheck ✅, web lint ✅, web tests (29) ✅, full `pnpm -r run test` ✅, Sonar (touched files) 0 findings.
-- **Scope discipline:** zero changes to NDJSON contract / harness public API.
+- Added `packages/harness/src/security/approvalPolicy.ts` for approval-required, high-risk, and critical tools.
+- Wired `createToolDispatchNode` to gate risky tools before plugin `onToolCall`, audit start, retry, or executor invocation.
+- Passed resolved agent tools from the API chat router so dispatch can evaluate registry/MCP metadata.
+- Added `tool_approval_required` trace events and audit denied entries with risk-tier-aware logging.
+- Added harness tests for high-risk system tools, explicit `requiresApproval`, ordinary low-risk execution, and the policy helper.
+- Addressed review feedback: missing tool metadata now requires approval with high-risk treatment, MCP metadata is covered via context tools, audit logging defaults unknown tools to high risk, and trace risk tiers use the shared `RiskTier` type.
+- Quality: harness tests ✅, harness typecheck ✅, API typecheck ✅, root typecheck ✅, lint ✅, docs lint ✅, full `pnpm test` ✅ when run outside the sandbox port restriction.
 
 ### Beads
 
 Closed beads in this session:
 
-- `agent-platform-de4` — Show feedback-only block for assistant responses (closed)
-- `agent-platform-ucg` — Refactor sidebar to Chat/IDE only with settings overflow (closed)
-- `agent-platform-lt6` — Unify input bar controls for model/agent and attachments (closed)
+- `agent-platform-hitl.1` — Add deny-by-default approval gate for risky tools
 
-Note: `bd` closed the beads locally but automatic remote push failed due to SSH/network auth; see Quick commands for manual push guidance.
+Note: `bd` changes were applied locally, but automatic remote push failed due to SSH/network auth from the sandbox.
 
 ## Current state
 
 ### Git
 
-- **`feature/agent-platform-ui-ux`** — pushed and up to date with origin
-- **`task/agent-platform-de4`** — created from feature and active (`in_progress`)
-- **`task/agent-platform-de4`** — completed and merged into `feature/agent-platform-ui-ux` via commits on `task/agent-platform-lt6` (see PR).
-- **`task/agent-platform-lt6`** — completed, committed, and pushed to `origin/task/agent-platform-lt6` (PR opened: https://github.com/jwill9999/agent-platform/pull/88)
+- **`feature/agent-platform-hitl`** — pushed and tracking `origin/feature/agent-platform-hitl`
+- **`task/agent-platform-hitl.1`** — active branch, pushed and tracking `origin/task/agent-platform-hitl.1`
+- Remote refs verified with `git ls-remote --heads origin feature/agent-platform-hitl task/agent-platform-hitl.1`.
 
 ### Quality
 
-- Typecheck ✅ Lint ✅
-- Playwright feature test coverage added for sessions dropdown move
-- Unrelated seed fixture failure remains in `e2e/mvp-e2e.spec.ts` (`e2e-specialist` missing)
+- `pnpm --filter @agent-platform/harness run test` ✅
+- `pnpm --filter @agent-platform/harness run typecheck` ✅
+- `pnpm --filter @agent-platform/api run typecheck` ✅
+- `pnpm typecheck` ✅
+- `pnpm lint` ✅
+- `pnpm run docs:lint:md` ✅
+- `pnpm test` ✅ when escalated to allow local test servers to bind ports
 
 ### Key commits
 
-| Commit    | Branch                    | Description                                      |
-| --------- | ------------------------- | ------------------------------------------------ |
-| `a7ffa9a` | `task/agent-platform-btm` | feat(web): critic iteration badges + live status |
+| Commit             | Branch                       | Description            |
+| ------------------ | ---------------------------- | ---------------------- |
+| Current branch tip | `task/agent-platform-hitl.1` | Add HITL approval gate |
 
 ---
 
 ## Next (priority order)
 
-1. **Implement `agent-platform-de4`** on `task/agent-platform-de4`
-2. **Open PR for `task/agent-platform-de4`** → `feature/agent-platform-ui-ux`
-3. **Resolve or isolate unrelated E2E seed fixture failure** in `e2e/mvp-e2e.spec.ts`
+1. Open a PR from `task/agent-platform-hitl.1` into `feature/agent-platform-hitl`.
+2. Watch GitHub Actions for the task branch and fix any CI failures.
+3. Start `agent-platform-hitl.2` on `task/agent-platform-hitl.2` after task-one CI is green.
 
 ---
 
 ## Blockers / questions for owner
 
-- Sandbox SSH is blocked, so dolt remote push and `git push` cannot run from this session.
+- None currently. Beads Dolt push completed after explicit network approval.
 
 ---
 
