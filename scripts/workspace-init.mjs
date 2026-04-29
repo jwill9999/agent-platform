@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { chmodSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { WORKSPACE_CHILD_DIRECTORIES, resolveWorkspaceConfig } from './workspace-config.mjs';
 
