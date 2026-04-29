@@ -93,6 +93,9 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Prepare workspace storage
+        run: make workspace-init
+
       - name: Start API + web (compose profile services)
         run: docker compose --profile services up -d --build
 
@@ -124,6 +127,32 @@ jobs:
 
       - name: E2E seed (default + specialist/MCP/skill)
         run: docker compose exec -T --env E2E_SEED=1 api node packages/db/dist/seed/run.js
+
+      - name: Workspace persistence/security check
+        env:
+          API_URL: http://127.0.0.1:3000
+        run: node scripts/workspace-compose-verify.mjs --write
+
+      - name: Restart API for workspace persistence check
+        run: docker compose --profile services restart api
+
+      - name: Wait for API after restart
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 2 http://127.0.0.1:3000/health >/dev/null; then
+              echo "api ready after restart"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "api did not become ready after restart"
+          docker compose --profile services ps
+          exit 1
+
+      - name: Verify workspace file persisted after restart
+        env:
+          API_URL: http://127.0.0.1:3000
+        run: node scripts/workspace-compose-verify.mjs
 
       - name: E2E tests
         env:

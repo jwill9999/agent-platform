@@ -21,6 +21,7 @@ This epic covers:
 - File and shell tool policy that keeps user file operations jailed to the workspace.
 - Human-in-the-loop approval where file or shell operations are high risk.
 - UI/API affordances for inspecting and exporting workspace files.
+- A guarded cleanup/removal flow for host-side workspace data.
 - Security, persistence, and end-to-end tests.
 
 This epic does not grant agents broad access to the developer's host filesystem. Access is limited to the configured workspace mount unless a later ADR explicitly expands the policy.
@@ -40,6 +41,7 @@ This epic does not grant agents broad access to the developer's host filesystem.
 - Keep high-risk and explicitly approval-required tools behind HITL. Approval allows the attempted operation; it does not bypass the workspace jail.
 - Audit workspace reads, writes, denials, and approval decisions in human-readable terms.
 - Skills may guide file organization later, but skills must not own host path mapping, setup, or security enforcement.
+- Host data deletion must be explicit, guarded, and documented separately from Docker cleanup.
 
 ## Child tasks
 
@@ -50,6 +52,7 @@ This epic does not grant agents broad access to the developer's host filesystem.
 | `agent-platform-ws.2`  | Mount workspace storage into Docker runtime                         | [Spec](./agent-platform-ws.2.md)  |
 | `agent-platform-ws.3`  | Enforce workspace PathJail and tool policy                          | [Spec](./agent-platform-ws.3.md)  |
 | `agent-platform-ws.4`  | Expose workspace files in the UI and API                            | [Spec](./agent-platform-ws.4.md)  |
+| `agent-platform-ws.6`  | Add guarded workspace data removal flow                             | [Spec](./agent-platform-ws.6.md)  |
 | `agent-platform-ws.5`  | Verify workspace security, HITL, and e2e flows                      | [Spec](./agent-platform-ws.5.md)  |
 
 ## Dependency order
@@ -62,6 +65,7 @@ agent-platform-ws.1
   -> agent-platform-ws.2
   -> agent-platform-ws.3
   -> agent-platform-ws.4
+  -> agent-platform-ws.6
   -> agent-platform-ws.5
 ```
 
@@ -74,11 +78,12 @@ Use `feature/agent-platform-workspace-storage` for the integration branch. Each 
 ## Definition of done
 
 - [ ] All child tasks are closed in Beads.
-- [ ] Host workspace and app data locations are documented for Linux, macOS, and Windows.
-- [ ] Config/setup scripts create the workspace structure without requiring an agent skill.
-- [ ] Normal startup commands perform workspace setup automatically on first run.
-- [ ] Docker mounts the host workspace into `/workspace` and app data into a separate container path.
-- [ ] File-capable tools cannot escape the configured workspace through relative paths, absolute paths, or symlinks.
-- [ ] High-risk shell/file operations keep explicit HITL approval.
-- [ ] Users can inspect and export workspace files from the UI/API.
+- [x] Host workspace and app data locations are documented for Linux, macOS, and Windows.
+- [x] Config/setup scripts create the workspace structure without requiring an agent skill.
+- [x] Normal startup commands perform workspace setup automatically on first run.
+- [x] Docker mounts the host workspace into `/workspace` and app data into a separate container path.
+- [x] File-capable tools cannot escape the configured workspace through relative paths, absolute paths, or symlinks.
+- [x] High-risk shell/file operations keep explicit HITL approval.
+- [x] Users can inspect and export workspace files from the UI/API.
+- [x] Users have a guarded, documented way to remove host workspace data when uninstalling.
 - [ ] Security, persistence, and e2e tests are green on the feature branch before merge to `main`.

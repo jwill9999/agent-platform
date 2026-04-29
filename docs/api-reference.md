@@ -86,6 +86,8 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `POST /v1/approval-requests/:id/approve` |    —     |       ✅        | Approve pending HITL request                 |
 | `POST /v1/approval-requests/:id/reject`  |    —     |       ✅        | Reject pending HITL request                  |
 | `POST /v1/approval-requests/:id/expire`  |    —     |       ✅        | Expire pending HITL request                  |
+| `GET /v1/workspace/files`                |    ✅    |       ✅        | List workspace files by managed area         |
+| `GET /v1/workspace/files/download`       |    ✅    |       ✅        | Download a safe workspace-relative file      |
 | `POST /v1/chat/stream`                   |    —     |       ✅        | ⚠️ Deprecated legacy pass-through            |
 | `GET /health`                            |    —     |       ✅        | Health check (outside `/v1`)                 |
 
@@ -144,6 +146,44 @@ Decision body schema:
 ```
 
 Approval request `argsJson` is always stored and returned with secret-looking argument keys redacted. Valid statuses are `pending`, `approved`, `rejected`, and `expired`. Pending requests can move to any terminal status; terminal requests are idempotent for the same status and reject flip-flops.
+
+### Workspace Files
+
+See [Workspace Storage](workspace-storage.md) for the host workspace model, security boundaries, UI behavior, cleanup commands, and verification flow.
+
+| Method | Path                           | Description                                         |
+| ------ | ------------------------------ | --------------------------------------------------- |
+| `GET`  | `/v1/workspace/files`          | List files grouped by workspace area                |
+| `GET`  | `/v1/workspace/files/download` | Download a workspace-relative file with `?path=...` |
+
+`GET /v1/workspace/files` returns the managed workspace areas `uploads`, `generated`, `scratch`, and `exports`. The response uses workspace-relative paths only:
+
+```json
+{
+  "data": {
+    "areas": [
+      {
+        "area": "generated",
+        "label": "Generated",
+        "path": "generated",
+        "files": [
+          {
+            "name": "summary.txt",
+            "path": "generated/reports/summary.txt",
+            "area": "generated",
+            "kind": "file",
+            "size": 12,
+            "modifiedAt": "2026-04-29T12:00:00.000Z"
+          }
+        ]
+      }
+    ],
+    "totalFiles": 1
+  }
+}
+```
+
+`GET /v1/workspace/files/download?path=generated/reports/summary.txt` streams the file as an attachment. Absolute paths, traversal paths, directories, and symlink escapes are rejected with human-readable errors.
 
 ### MCP Servers
 

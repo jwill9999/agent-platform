@@ -32,7 +32,7 @@ Add API and UI support for inspecting files in the configured workspace. Users s
 
 | Issue                 | Spec                             |
 | --------------------- | -------------------------------- |
-| `agent-platform-ws.5` | [Spec](./agent-platform-ws.5.md) |
+| `agent-platform-ws.6` | [Spec](./agent-platform-ws.6.md) |
 
 ### Planning notes
 
@@ -57,14 +57,14 @@ Prefer dense, practical UI over a marketing-style file browser. The workspace su
 
 ## Definition of done
 
-- [ ] UI/API list workspace files and show created outputs.
-- [ ] Users can download/export safe workspace files.
-- [ ] Uploads, generated files, scratch files, and exports are represented clearly.
-- [ ] Operations cannot escape the workspace.
-- [ ] Errors are human-readable.
+- [x] UI/API list workspace files and show created outputs.
+- [x] Users can download/export safe workspace files.
+- [x] Uploads, generated files, scratch files, and exports are represented clearly.
+- [x] Operations cannot escape the workspace.
+- [x] Errors are human-readable.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-ws.4` created from `task/agent-platform-ws.3`.
-- [ ] API/web tests pass.
-- [ ] `bd close agent-platform-ws.4 --reason "..."`
+- [x] Branch `task/agent-platform-ws.4` created from `task/agent-platform-ws.3`.
+- [x] API/web tests pass.
+- [x] `bd close agent-platform-ws.4 --reason "..."`

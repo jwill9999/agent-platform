@@ -6,7 +6,7 @@ Composable agent harness for building, configuring, and running AI agents. Built
 
 Prerequisites: **Node.js 20** (see `.nvmrc`), **pnpm** 9+. The Makefile loads **nvm** when present and runs **`nvm install`** from the repo root so the **`.nvmrc`** version is installed (if needed) and selected before any `node`/`pnpm` step.
 
-### First time (install, build, seed DB, run API + web)
+### First time (prepare workspace, build, seed DB, run API + web)
 
 From the repo root:
 
@@ -14,9 +14,13 @@ From the repo root:
 make
 ```
 
-This is the same as **`make setup`**: runs **`make install`** then **`make up`**. The **`up`** target builds the monorepo, frees ports **3000** / **3001**, runs **`pnpm seed`** (seeded **Personal assistant** + **Coding** specialist + demo data — idempotent), then starts the **API** on port **3000** and the **Next.js** app on **3001**.
+This runs **`make up`** by default. The **`up`** target prepares the host workspace, builds the Docker images, starts the API and web containers, waits for healthchecks, then seeds demo data inside the API container.
 
-Alternatively, step by step: `make install` then `make up`.
+When complete:
+
+- **API:** `http://localhost:3000`
+- **Web:** `http://localhost:3001`
+- **Workspace:** host-backed under `.agent-platform/workspaces/default` for local development and mounted into the API container at `/workspace`
 
 ### Restart without wiping the database
 
@@ -36,26 +40,30 @@ make new
 
 ### Other useful targets
 
-| Command      | Purpose                                                                      |
-| ------------ | ---------------------------------------------------------------------------- |
-| `make up`    | Build, free ports, seed, start API + web (no `pnpm install`)                 |
-| `make down`  | Stop processes on **PORT** / **WEB_PORT** (default 3000 / 3001)              |
-| `make reset` | Same as `up` but after **`reset-db`** (wipe SQLite only — no `pnpm install`) |
+| Command                        | Purpose                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------- |
+| `make up`                      | Prepare workspace, build, start API + web, seed DB                         |
+| `make down`                    | Stop containers while keeping Docker volumes and host workspace data       |
+| `make reset`                   | Wipe Docker DB/volumes, then rebuild, start, and seed                      |
+| `make workspace-init`          | Prepare host workspace/data directories without starting services          |
+| `make workspace-clean-dry-run` | Preview host workspace/data/config/log cleanup targets                     |
+| `make workspace-clean`         | Remove host workspace/data/config/log directories after typed confirmation |
 
-See [Development Guide](docs/development.md) for prerequisites, env vars (**`SQLITE_PATH`**, **`SECRETS_MASTER_KEY`**), tests, and Docker.
+See [Development Guide](docs/development.md) for prerequisites, env vars, tests, and Docker.
 
 ## Documentation
 
-| Guide                                             | Description                                     |
-| ------------------------------------------------- | ----------------------------------------------- |
-| [Architecture](docs/architecture.md)              | System design, package roles, data flow         |
-| [Message Flow](docs/architecture/message-flow.md) | Mermaid diagrams: chat → security → LLM → tools |
-| [API Reference](docs/api-reference.md)            | REST endpoints, error shapes, schemas           |
-| [Database](docs/database.md)                      | Schema, migrations, secret storage              |
-| [Development](docs/development.md)                | Local setup, build, test, lint commands         |
-| [Deployment](docs/deployment.md)                  | Docker, environment variables, production       |
-| [Configuration](docs/configuration.md)            | Env vars, model routing, limits, MCP, security  |
-| [Plugin Guide](docs/plugin-guide.md)              | Plugin hooks and authoring                      |
+| Guide                                             | Description                                             |
+| ------------------------------------------------- | ------------------------------------------------------- |
+| [Architecture](docs/architecture.md)              | System design, package roles, data flow                 |
+| [Message Flow](docs/architecture/message-flow.md) | Mermaid diagrams: chat → security → LLM → tools         |
+| [API Reference](docs/api-reference.md)            | REST endpoints, error shapes, schemas                   |
+| [Database](docs/database.md)                      | Schema, migrations, secret storage                      |
+| [Development](docs/development.md)                | Local setup, build, test, lint commands                 |
+| [Deployment](docs/deployment.md)                  | Docker, environment variables, production               |
+| [Configuration](docs/configuration.md)            | Env vars, model routing, limits, MCP, security          |
+| [Workspace Storage](docs/workspace-storage.md)    | Host workspace setup, security, cleanup, and validation |
+| [Plugin Guide](docs/plugin-guide.md)              | Plugin hooks and authoring                              |
 
 ## Project Layout
 
@@ -66,6 +74,7 @@ packages/         Shared libraries (contracts, db, harness, model-router, mcp-ad
   harness/src/security/  Security guards: PathJail, bash guard, injection/output/MCP trust guards
 docs/             Documentation (architecture, API, config, message flow diagrams)
 e2e/              Playwright E2E tests
+scripts/          Workspace setup, cleanup, and compose verification helpers
 ```
 
 See [Architecture](docs/architecture.md) for the full package dependency graph.

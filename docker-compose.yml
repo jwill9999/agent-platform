@@ -4,55 +4,52 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${HOST_PORT:-3000}:3000"
+      - '${HOST_PORT:-3000}:3000'
     # Chromium (used by Playwright MCP) needs >64MB shared memory for rendering.
     shm_size: '256mb'
     environment:
-      PORT: "3000"
-      HOST: "0.0.0.0"
+      PORT: '3000'
+      HOST: '0.0.0.0'
       # SQLite file path inside the container; persisted on named volume below.
-      SQLITE_PATH: "/data/agent.sqlite"
+      SQLITE_PATH: '/data/agent.sqlite'
       # LLM API key — resolved from root .env file (see .env.example).
-      AGENT_OPENAI_API_KEY: "${AGENT_OPENAI_API_KEY:-}"
+      AGENT_OPENAI_API_KEY: '${AGENT_OPENAI_API_KEY:-}'
       # Base64-encoded 32-byte key for AES-256-GCM secret storage.
       # Required to store/use API keys in model configs.
       # Generate with: openssl rand -base64 32
       # The fallback below is a dev-only default — override in .env for production.
-      SECRETS_MASTER_KEY: "${SECRETS_MASTER_KEY:-kDa9TbuIXhrZFMHkn3Y90FCTfvCwA7d1armHBgdNp/o=}"
+      SECRETS_MASTER_KEY: '${SECRETS_MASTER_KEY:-kDa9TbuIXhrZFMHkn3Y90FCTfvCwA7d1armHBgdNp/o=}'
     volumes:
-      - sqlite_data:/data
-      # E2E filesystem MCP seed expects a mount at /workspace (see packages/db e2e seed).
-      - e2e_workspace:/workspace:rw
+      # App/runtime data is separate from user workspace files.
+      - '${AGENT_DATA_HOST_PATH:-./.agent-platform/data}:/data'
+      # User workspace files are host-backed and visible inside the runtime at /workspace.
+      - '${AGENT_WORKSPACE_HOST_PATH:-./.agent-platform/workspaces/default}:${AGENT_WORKSPACE_CONTAINER_PATH:-/workspace}:rw'
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:3000/health']
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 15s
 
   web:
-    profiles: ["services"]
+    profiles: ['services']
     build:
       context: .
       dockerfile: Dockerfile.web
     ports:
-      - "${WEB_HOST_PORT:-3001}:3001"
+      - '${WEB_HOST_PORT:-3001}:3001'
     environment:
-      PORT: "3001"
-      HOSTNAME: "0.0.0.0"
-      API_PROXY_URL: "http://api:3000"
+      PORT: '3001'
+      HOSTNAME: '0.0.0.0'
+      API_PROXY_URL: 'http://api:3000'
       # LLM API key — web BFF forwards this as x-openai-key header to the API.
-      AGENT_OPENAI_API_KEY: "${AGENT_OPENAI_API_KEY:-}"
+      AGENT_OPENAI_API_KEY: '${AGENT_OPENAI_API_KEY:-}'
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/"]
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3001/']
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
-
-volumes:
-  sqlite_data:
-  e2e_workspace:

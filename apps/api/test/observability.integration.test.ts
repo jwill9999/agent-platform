@@ -194,7 +194,7 @@ describe('observability tools (integration)', () => {
     try {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
 
-      const missingPath = path.join(process.cwd(), 'definitely-missing-observability.txt');
+      const missingPath = '/workspace/definitely-missing-observability.txt';
       harnessMockState.missingPath = missingPath;
 
       const sessionRes = await request(app)

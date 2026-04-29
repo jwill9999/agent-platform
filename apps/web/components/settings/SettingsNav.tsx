@@ -5,6 +5,7 @@ const links = [
   { href: '/settings/mcp-servers', label: 'MCP servers' },
   { href: '/settings/agents', label: 'Agents' },
   { href: '/settings/tools', label: 'Tools' },
+  { href: '/settings/workspace', label: 'Workspace' },
   { href: '/settings/sessions', label: 'Sessions' },
   { href: '/settings/plugins', label: 'Plugins' },
   { href: '/settings/models', label: 'Models' },

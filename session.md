@@ -53,6 +53,30 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** `feature/agent-platform-hitl` merged into `main`; closed `agent-platform-hitl.5` and auto-closed HITL epic in Beads.
 - **Date:** 2026-04-29
 - **Session:** Planned next epic `agent-platform-ws` for host workspace storage, with six chained Beads tasks and task specs.
+- **Date:** 2026-04-29
+- **Session:** Started workspace storage epic on `task/agent-platform-ws.1`; documented host workspace conventions and config names for Linux, macOS, and Windows.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.1a` platform behavior: workspace config resolver, `make workspace-init`, startup lifecycle wiring, and PathJail-backed file path normalization.
+- **Date:** 2026-04-29
+- **Session:** Added backlog task `agent-platform-ws.6` for guarded host workspace data removal on uninstall/reset.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.2` Docker runtime mount wiring: `/workspace` and `/data` are host-backed through workspace env vars, with compose/docs/tests updated.
+- **Date:** 2026-04-29
+- **Session:** Fixed CI E2E startup for `agent-platform-ws.2` by adding `make workspace-init` before `docker compose up`.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.3` workspace PathJail/tool-policy enforcement on `task/agent-platform-ws.3`.
+- **Date:** 2026-04-29
+- **Session:** Addressed SonarCloud regex backtracking risk in the `agent-platform-ws.3` bash workspace policy.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.4` workspace file UI/API on `task/agent-platform-ws.4`.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.6` guarded workspace data cleanup flow on `task/agent-platform-ws.6`.
+- **Date:** 2026-04-29
+- **Session:** Fixed the `agent-platform-ws.6` E2E pipeline failure in `workspace-init.mjs`; GitHub pipelines are passing.
+- **Date:** 2026-04-29
+- **Session:** Started `agent-platform-ws.5` final workspace verification on `task/agent-platform-ws.5`; added compose persistence/security verification and Workspace UI e2e coverage.
+- **Date:** 2026-04-29
+- **Session:** Added user-facing workspace storage documentation and README references for setup, security, cleanup, UI/API, and verification behavior.
 
 ### Session-close guardrail (required)
 
@@ -65,108 +89,65 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Workspace storage epic planned
+### Workspace final verification
 
-Branch state: `codex/workspace-storage-planning` contains planning artifacts only.
+Branch state: `task/agent-platform-ws.5` contains the `agent-platform-ws.5` implementation.
 
-- Created Beads epic `agent-platform-ws`: Host workspace storage for user files.
-- Created chained tasks:
-  - `agent-platform-ws.1` Define host workspace home and configuration.
-  - `agent-platform-ws.1a` Add workspace config, setup scripts, and PathJail platform behavior.
-  - `agent-platform-ws.2` Mount workspace storage into Docker runtime.
-  - `agent-platform-ws.3` Enforce workspace PathJail and tool policy.
-  - `agent-platform-ws.4` Expose workspace files in the UI and API.
-  - `agent-platform-ws.5` Verify workspace security, HITL, and e2e flows.
-- Added task specs under `docs/tasks/agent-platform-ws*.md`.
-- Planned feature branch: `feature/agent-platform-workspace-storage`.
-- Planned task chain: `task/agent-platform-ws.1` -> `task/agent-platform-ws.1a` -> `task/agent-platform-ws.2` -> `task/agent-platform-ws.3` -> `task/agent-platform-ws.4` -> `task/agent-platform-ws.5`.
-- Core design direction: host workspace lives in an OS-conventional app home and mounts into Docker at `/workspace`; app data remains separate; file tools are jailed; high-risk operations keep HITL approval.
-  Skills may later guide agents on where to place files, but config, setup, host mapping, and security enforcement belong to the platform.
-- First-run lifecycle commands such as `make up`, `make restart`, `make reset`, and `make new` should invoke workspace setup automatically before Docker starts. A focused setup target such as `make workspace-init` should also exist for manual preparation.
+- Added `scripts/workspace-compose-verify.mjs` for compose-backed API verification of workspace listing, download, traversal/absolute-path denial, and persistence after API restart.
+- Updated `.github/workflows/ci.yml` to run the workspace verification before and after restarting the API container in the E2E job.
+- Added `e2e/workspace-files.spec.ts` to verify Settings > Workspace shows generated files and downloads them through the BFF.
+- Added `docs/workspace-storage.md` as the user-facing reference for host workspace setup, OS-specific locations, security boundaries, UI/API behavior, cleanup/uninstall commands, and verification coverage.
+- Updated `README.md` and existing docs to reference the workspace storage guide and current Makefile workflow.
+- Updated the workspace epic/task specs to reflect final verification coverage and completed acceptance criteria that can be proven before feature-branch merge.
+- Existing coverage already verifies PathJail traversal/symlink escape denial, shell workspace policy, HITL approval gating, approval resume, and human-readable tool failure output.
 
-### HITL epic complete
+Quality gates passed:
 
-Branch state: `main` is checked out and tracking `origin/main`.
-
-- `feature/agent-platform-hitl` merged into `main` via PR `#95`.
-- `task/agent-platform-hitl.5` merged into the feature branch via PR `#94`.
-- Closed `agent-platform-hitl.5` in Beads.
-- Beads auto-closed parent epic `agent-platform-hitl`; all 5 child tasks are now closed.
-- `bd ready` reports no open issues.
-
-HITL delivered:
-
-- High-risk and explicitly approval-required tools are gated.
-- Approval requests are persisted, queryable, and auditable.
-- Approval-required stream events render inline in the chat UI.
-- Users can approve or reject pending tool calls.
-- Approved/rejected decisions resume the agent flow safely.
-- Approval state survives refresh through pending approval hydration.
-- Shell command failures are summarized to the assistant in plain language instead of raw `stdout`/`stderr`/`exitCode` jargon.
-
-HITL.5 follow-up fixes completed before merge:
-
-- Added approval card state and approve/reject resume handling to `useHarnessChat`.
-- Added compact inline approval card rendering for chat assistant turns.
-- Added pending approval hydration for resumed sessions.
-- Added web unit coverage for approval parsing/deduplication and a Playwright fixture for approval card states.
-- Sanitised unsupported `propertyNames` JSON Schema keywords before tools are sent to the LLM; this fixes `browser_drop` schema validation blocking approval UI testing.
-- Sanitised chat history replay so unresolved pending approval `tool_calls` are not sent back to OpenAI on later normal chat turns.
-- Forwarded the selected model config through approval resume so the resume call does not fall back to a stale/invalid env key after the normal chat turn succeeds.
-- Blocked the chat composer while an approval card is pending/approving/rejecting/failed to prevent overlapping normal prompts and resume output from interleaving.
-- Reused normal-chat revision reset behavior for approval resume streams so repeated DoD drafts do not concatenate duplicate command output.
-- Rendered `DOD_FAILED` as critic cap metadata rather than a dismissible global error banner.
-- Added top margin to the final critic review block so it no longer sits tight against the assistant answer paragraph.
-- Formatted `sys_bash` tool messages for the follow-up LLM step as plain-language success/failure summaries, reducing raw coding jargon in assistant answers after command errors.
-- Extracted shared approval/chat stream parsing in the web hook and shared NDJSON lifecycle/task-start setup in the API chat router to reduce new-code duplication.
-
-Note: Beads changes were applied locally. Beads Dolt auto-push failed because the sandbox could not resolve/authenticate to GitHub over SSH.
+- `make workspace-clean-dry-run`
+- `API_URL=http://127.0.0.1:3000 node scripts/workspace-compose-verify.mjs --write`
+- API restart via `docker compose --profile services restart api`
+- `API_URL=http://127.0.0.1:3000 node scripts/workspace-compose-verify.mjs`
+- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm exec playwright test -c e2e/playwright.config.ts e2e/workspace-files.spec.ts`
+- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e` after running the CI-equivalent seed step.
+- `pnpm exec eslint e2e/workspace-files.spec.ts scripts/workspace-compose-verify.mjs --max-warnings 0`
+- `pnpm format:check`
+- `pnpm docs:lint`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test` (run with escalation because API Supertest binds local ports)
 
 ## Current state
 
 ### Git
 
-- **Current branch:** `main`
-- **Remote:** `main` tracks `origin/main`
-- **Feature merge:** PR `#95` merged `feature/agent-platform-hitl` into `main`
-- **Task merges:** HITL.3 PR `#92`, HITL.4 PR `#93`, HITL.5 PR `#94`
+- **Current branch:** `task/agent-platform-ws.5`
+- **Latest task commit:** `d3f53ca` (`Verify workspace persistence and e2e flows`)
+- **Feature branch:** `feature/agent-platform-workspace-storage`
+- **Next task in chain:** none; this is the workspace epic tip.
+- **Open PR:** <https://github.com/jwill9999/agent-platform/pull/102>
+
+### Beads
+
+- `agent-platform-ws.5` is claimed and in progress.
+- `agent-platform-ws.6` is closed locally in Beads.
 
 ### Quality
 
-- Latest merge commit on `main`: `a00bb39` (`Merge pull request #95 from jwill9999/feature/agent-platform-hitl`)
-- PR `#94` pre-push checks passed before merge: affected API/web build, typecheck, tests.
-- Focused HITL checks passed before merge:
-  - `pnpm --filter @agent-platform/web exec vitest run test/use-harness-chat.test.ts`
-  - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
-  - `pnpm --filter @agent-platform/harness exec vitest run test/toolDispatch.test.ts`
-  - affected package lint/typecheck/format checks
-
-### Key commits
-
-| Commit    | Branch | Description                                    |
-| --------- | ------ | ---------------------------------------------- |
-| `a00bb39` | `main` | Merge HITL feature PR `#95`                    |
-| `4fcc56a` | `main` | Merge HITL.5 task PR `#94` into feature branch |
-| `9119bdf` | `main` | Reduce HITL stream duplication                 |
-| `7d7a931` | `main` | Make shell failure summaries human readable    |
-| `34dc308` | `main` | Add critic review spacing                      |
-| `c1fb201` | `main` | Fix approval resume revision display           |
-| `014e413` | `main` | Fix HITL approval resume model config          |
-| `0802461` | `main` | Sanitise pending approval history              |
+- Compose-backed workspace persistence/security checks and full local e2e passed after CI-equivalent seed.
 
 ---
 
 ## Next (priority order)
 
-1. Create `feature/agent-platform-workspace-storage` from updated `main`.
-2. Start `agent-platform-ws.1` on `task/agent-platform-ws.1`.
-3. If needed, push Beads Dolt state from an environment with GitHub SSH/network access.
+1. Monitor PR <https://github.com/jwill9999/agent-platform/pull/102>.
+2. Merge PR `task/agent-platform-ws.5` -> `feature/agent-platform-workspace-storage` after CI is green.
+3. Close `agent-platform-ws.5` after the PR merge and sync/push Beads Dolt state.
 
 ---
 
 ## Blockers / questions for owner
 
-- No code blockers. Beads local state is updated, but Beads Dolt auto-push failed due GitHub SSH/network access in this sandbox.
+- No code blockers.
 
 ---
 
@@ -178,6 +159,7 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 | `docs/architecture/message-flow.md`       | Mermaid diagrams: chat → LLM → tools       |
 | `docs/api-reference.md`                   | REST endpoints, error shapes, schemas      |
 | `docs/configuration.md`                   | Env vars, model routing, limits, MCP setup |
+| `docs/workspace-storage.md`               | Workspace setup, security, cleanup, tests  |
 | `docs/planning/lazy-skill-loading.md`     | Lazy skill pattern (planning reference)    |
 | `docs/architecture/lazy-skill-loading.md` | Lazy skill loading implementation guide    |
 | `docs/planning/security.md`               | Threat model (8 categories)                |

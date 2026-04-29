@@ -63,14 +63,14 @@ If the implementation chooses different env var names, update this spec and the 
 
 ## Definition of done
 
-- [ ] Linux, macOS, and Windows host path conventions are documented.
-- [ ] Env/config names are defined.
-- [ ] Default directory layout is specified.
-- [ ] Repo-local dev fallback is ignored by Git.
-- [ ] No new agent write behavior is enabled.
+- [x] Linux, macOS, and Windows host path conventions are documented.
+- [x] Env/config names are defined.
+- [x] Default directory layout is specified.
+- [x] Repo-local dev fallback is ignored by Git.
+- [x] No new agent write behavior is enabled.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-ws.1` created from `feature/agent-platform-workspace-storage`.
-- [ ] Relevant docs/config formatting checks pass.
-- [ ] `bd close agent-platform-ws.1 --reason "..."`
+- [x] Branch `task/agent-platform-ws.1` created from `feature/agent-platform-workspace-storage`.
+- [x] Relevant docs/config formatting checks pass.
+- [x] `bd close agent-platform-ws.1 --reason "..."`

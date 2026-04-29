@@ -18,6 +18,7 @@ Complete the epic by verifying workspace persistence, security boundaries, HITL 
 - Confirm high-risk shell/file operations retain HITL approval.
 - Confirm approval allows only the approved attempted operation and does not bypass PathJail.
 - Confirm audit records and UI output are human-readable.
+- Confirm guarded host data cleanup dry-run and refusal behavior.
 - Update docs if the implementation diverged from earlier task specs.
 
 ## Dependency order
@@ -26,7 +27,7 @@ Complete the epic by verifying workspace persistence, security boundaries, HITL 
 
 | Issue                 | Spec                             |
 | --------------------- | -------------------------------- |
-| `agent-platform-ws.4` | [Spec](./agent-platform-ws.4.md) |
+| `agent-platform-ws.6` | [Spec](./agent-platform-ws.6.md) |
 
 ### Downstream - waiting on this task
 
@@ -52,20 +53,30 @@ This is the segment tip. After sign-off, open one PR from `task/agent-platform-w
 - HITL: high-risk shell/file operations require approval.
 - E2E: user asks agent to create a workspace file, approves if required, sees the file in UI, and downloads/exports it.
 - Docker persistence: file remains after restart.
+- Cleanup: dry-run lists host data paths, unsafe paths are refused, and deletion requires confirmation or force.
 - Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, and relevant e2e checks.
 
 ## Definition of done
 
-- [ ] Allowed workspace writes succeed.
-- [ ] Outside writes and escape attempts are denied.
-- [ ] Shell/file operations retain HITL.
-- [ ] Audit records and UI output are human-readable.
-- [ ] Docker files persist across restart.
+- [x] Allowed workspace writes succeed.
+- [x] Outside writes and escape attempts are denied.
+- [x] Shell/file operations retain HITL.
+- [x] Audit records and UI output are human-readable.
+- [x] Docker files persist across restart.
+- [x] Guarded cleanup behavior is verified.
 - [ ] Feature branch CI/CD is green before merge to `main`.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-ws.5` created from `task/agent-platform-ws.4`.
-- [ ] Full applicable quality gate passes.
+- [x] Branch `task/agent-platform-ws.5` created from `task/agent-platform-ws.6`.
+- [x] Full applicable quality gate passes.
+- [x] PR opened: <https://github.com/jwill9999/agent-platform/pull/102>
 - [ ] PR merged `task/agent-platform-ws.5` -> `feature/agent-platform-workspace-storage`.
 - [ ] `bd close agent-platform-ws.5 --reason "..."`
+
+## Verification added
+
+- `scripts/workspace-compose-verify.mjs` writes a generated workspace file, confirms the API lists and downloads it, confirms traversal and absolute download paths are denied with human-readable messages, and can be rerun after an API restart to prove host-backed persistence.
+- `.github/workflows/ci.yml` runs the compose verification before and after restarting the API container.
+- `e2e/workspace-files.spec.ts` verifies the Settings > Workspace UI shows generated files and downloads them through the BFF.
+- Existing harness/API coverage verifies PathJail escape denial, symlink escape denial, HITL approval gating, approved-tool resume behavior, and human-readable tool failure output.

@@ -56,15 +56,15 @@ Approval and PathJail behavior are not implemented here. This task only makes th
 
 ## Definition of done
 
-- [ ] Host workspace mounts to `/workspace`.
-- [ ] App data mounts separately from user files.
-- [ ] Setup creates required directories.
-- [ ] First-run startup commands perform workspace setup automatically.
-- [ ] Local dev flow is documented and repeatable.
-- [ ] Docker restart preserves files written under `/workspace`.
+- [x] Host workspace mounts to `/workspace`.
+- [x] App data mounts separately from user files.
+- [x] Setup creates required directories.
+- [x] First-run startup commands perform workspace setup automatically.
+- [x] Local dev flow is documented and repeatable.
+- [x] Docker restart preserves files written under `/workspace`.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-ws.2` created from `task/agent-platform-ws.1a`.
-- [ ] Docker/config checks pass.
-- [ ] `bd close agent-platform-ws.2 --reason "..."`
+- [x] Branch `task/agent-platform-ws.2` created from `task/agent-platform-ws.1a`.
+- [x] Docker/config checks pass.
+- [x] `bd close agent-platform-ws.2 --reason "..."`

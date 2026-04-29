@@ -85,7 +85,18 @@ export {
   MEDIUM_RISK_IDS,
   executeMediumRiskTool,
 } from './tools/index.js';
-export { PathJail, PathJailError, DEFAULT_MOUNTS, WORKSPACE_ROOT } from './security/index.js';
+export {
+  PathJail,
+  PathJailError,
+  DEFAULT_MOUNTS,
+  WORKSPACE_ROOT,
+  DEFAULT_WORKSPACE_CONTAINER_PATH,
+  WORKSPACE_CHILD_DIRECTORIES,
+  WORKSPACE_SUBDIRECTORIES,
+  defaultPlatformHome,
+  resolveWorkspaceConfig,
+} from './security/index.js';
+export type { HostPlatform, WorkspaceConfig, WorkspaceEnv } from './security/index.js';
 export { validateBashCommand, buildAllowlist } from './security/index.js';
 export { validateUrl } from './security/index.js';
 export { ToolRateLimiter } from './security/index.js';

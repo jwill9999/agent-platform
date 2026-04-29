@@ -18,6 +18,7 @@ import {
   Server,
   Puzzle,
   History,
+  FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './sidebar-context';
@@ -69,6 +70,12 @@ const settingsNavigation = [
     href: '/settings/tools',
     icon: Hammer,
     description: 'Configure tools',
+  },
+  {
+    name: 'Workspace',
+    href: '/settings/workspace',
+    icon: FolderOpen,
+    description: 'Inspect files',
   },
   {
     name: 'MCP Servers',
