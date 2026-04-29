@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   AgentSchema,
+  ApprovalRequestDecisionBodySchema,
+  ApprovalRequestQuerySchema,
+  ApprovalRequestSchema,
   CriticVerdictSchema,
   ExecutionLimitsSchema,
   HealthResponseSchema,
@@ -106,5 +109,32 @@ describe('contracts round-trip', () => {
         maxCriticIterations: -1,
       }),
     ).toThrow();
+  });
+
+  it('ApprovalRequest schemas round-trip and validate decisions', () => {
+    const request = ApprovalRequestSchema.parse({
+      id: 'approval-1',
+      sessionId: 'session-1',
+      runId: 'run-1',
+      agentId: 'agent-1',
+      toolName: 'sys_bash',
+      argsJson: '{"command":"date"}',
+      executionPayloadJson: '{"toolCallId":"tc-1"}',
+      riskTier: 'high',
+      status: 'pending',
+      createdAtMs: 1000,
+      expiresAtMs: 2000,
+    });
+
+    expect(ApprovalRequestSchema.parse(structuredClone(request))).toEqual(request);
+    expect(ApprovalRequestQuerySchema.parse({ status: 'pending', limit: '10' })).toMatchObject({
+      status: 'pending',
+      limit: 10,
+      offset: 0,
+    });
+    expect(ApprovalRequestDecisionBodySchema.parse({ reason: 'approved by user' })).toEqual({
+      reason: 'approved by user',
+    });
+    expect(() => ApprovalRequestSchema.parse({ ...request, status: 'done' })).toThrow();
   });
 });

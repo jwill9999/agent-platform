@@ -228,3 +228,20 @@ export const toolExecutions = sqliteTable('tool_executions', {
   completedAtMs: integer('completed_at_ms', { mode: 'number' }),
   durationMs: integer('duration_ms', { mode: 'number' }),
 });
+
+/** Durable human approval requests for tool execution. */
+export const approvalRequests = sqliteTable('approval_requests', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull(),
+  runId: text('run_id').notNull(),
+  agentId: text('agent_id').notNull(),
+  toolName: text('tool_name').notNull(),
+  argsJson: text('args_json').notNull(),
+  executionPayloadJson: text('execution_payload_json'),
+  riskTier: text('risk_tier').notNull(),
+  status: text('status').notNull().default('pending'),
+  createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+  decidedAtMs: integer('decided_at_ms', { mode: 'number' }),
+  expiresAtMs: integer('expires_at_ms', { mode: 'number' }),
+  decisionReason: text('decision_reason'),
+});

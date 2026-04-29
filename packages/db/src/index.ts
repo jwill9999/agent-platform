@@ -13,4 +13,5 @@ export * from './repositories/modelConfigs.js';
 export * from './repositories/registry.js';
 export * from './repositories/settings.js';
 export * from './repositories/toolExecutions.js';
+export * from './repositories/approvalRequests.js';
 export * from './slug.js';

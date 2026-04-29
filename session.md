@@ -15,6 +15,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Created HITL epic/task specs and branches; completed `agent-platform-hitl.1` deny-by-default approval gate on `task/agent-platform-hitl.1`.
 - **Date:** 2026-04-29
 - **Session:** Addressed Sourcery review feedback for HITL.1 approval gating and audit risk-tier handling.
+- **Date:** 2026-04-29
+- **Session:** HITL.1 was merged into `feature/agent-platform-hitl`; completed `agent-platform-hitl.2` approval request persistence/API on `task/agent-platform-hitl.2`.
 
 ### Session-close guardrail (required)
 
@@ -51,6 +53,11 @@ Branch `task/agent-platform-hitl.1`.
 Closed beads in this session:
 
 - `agent-platform-hitl.1` — Add deny-by-default approval gate for risky tools
+- `agent-platform-hitl.2` — Persist approval request records and APIs
+
+In-progress beads:
+
+- None.
 
 Note: `bd` changes were applied locally, but automatic remote push failed due to SSH/network auth from the sandbox.
 
@@ -59,7 +66,8 @@ Note: `bd` changes were applied locally, but automatic remote push failed due to
 ### Git
 
 - **`feature/agent-platform-hitl`** — pushed and tracking `origin/feature/agent-platform-hitl`
-- **`task/agent-platform-hitl.1`** — active branch, pushed and tracking `origin/task/agent-platform-hitl.1`
+- **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
+- **`task/agent-platform-hitl.2`** — active branch, pushed and tracking `origin/task/agent-platform-hitl.2`
 - Remote refs verified with `git ls-remote --heads origin feature/agent-platform-hitl task/agent-platform-hitl.1`.
 
 ### Quality
@@ -74,17 +82,17 @@ Note: `bd` changes were applied locally, but automatic remote push failed due to
 
 ### Key commits
 
-| Commit             | Branch                       | Description            |
-| ------------------ | ---------------------------- | ---------------------- |
-| Current branch tip | `task/agent-platform-hitl.1` | Add HITL approval gate |
+| Commit             | Branch                       | Description                      |
+| ------------------ | ---------------------------- | -------------------------------- |
+| Current branch tip | `task/agent-platform-hitl.2` | Approval request persistence/API |
 
 ---
 
 ## Next (priority order)
 
-1. Open a PR from `task/agent-platform-hitl.1` into `feature/agent-platform-hitl`.
+1. Open a PR from `task/agent-platform-hitl.2` into `feature/agent-platform-hitl`.
 2. Watch GitHub Actions for the task branch and fix any CI failures.
-3. Start `agent-platform-hitl.2` on `task/agent-platform-hitl.2` after task-one CI is green.
+3. After CI/merge, start `agent-platform-hitl.3` on a new task branch from the updated feature branch.
 
 ---
 

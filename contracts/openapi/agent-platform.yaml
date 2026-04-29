@@ -36,6 +36,8 @@ tags:
     description: Streaming agent chat execution
   - name: settings
     description: Platform settings (rate limits, cost budgets)
+  - name: approval-requests
+    description: Human approval request workflow
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -715,6 +717,170 @@ paths:
                   data:
                     $ref: '#/components/schemas/PlatformSettings'
 
+  # ── Approval Requests ───────────────────────────────────────────────────
+  /v1/approval-requests:
+    get:
+      operationId: listApprovalRequests
+      summary: List approval requests
+      tags: [approval-requests]
+      parameters:
+        - name: sessionId
+          in: query
+          schema:
+            type: string
+        - name: runId
+          in: query
+          schema:
+            type: string
+        - name: agentId
+          in: query
+          schema:
+            type: string
+        - name: toolName
+          in: query
+          schema:
+            type: string
+        - name: riskTier
+          in: query
+          schema:
+            $ref: '#/components/schemas/RiskTier'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ApprovalRequestStatus'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Matching approval requests
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, total, limit, offset]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApprovalRequest'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+  /v1/approval-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      operationId: getApprovalRequest
+      summary: Get approval request by ID
+      tags: [approval-requests]
+      responses:
+        '200':
+          description: Approval request found
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApprovalRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/approval-requests/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      operationId: approveApprovalRequest
+      summary: Approve pending approval request
+      tags: [approval-requests]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequestDecisionBody'
+      responses:
+        '200':
+          description: Approval request approved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApprovalRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/approval-requests/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      operationId: rejectApprovalRequest
+      summary: Reject pending approval request
+      tags: [approval-requests]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequestDecisionBody'
+      responses:
+        '200':
+          description: Approval request rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApprovalRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/approval-requests/{id}/expire:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      operationId: expireApprovalRequest
+      summary: Expire pending approval request
+      tags: [approval-requests]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequestDecisionBody'
+      responses:
+        '200':
+          description: Approval request expired
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApprovalRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
 # ---------------------------------------------------------------------------
 # Components
 # ---------------------------------------------------------------------------
@@ -1324,3 +1490,60 @@ components:
               type: number
               minimum: 0
               maximum: 1
+
+    # -- Approval Requests --
+    RiskTier:
+      type: string
+      enum: [zero, low, medium, high, critical]
+
+    ApprovalRequestStatus:
+      type: string
+      enum: [pending, approved, rejected, expired]
+
+    ApprovalRequest:
+      type: object
+      required: [id, sessionId, runId, agentId, toolName, argsJson, riskTier, status, createdAtMs]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        sessionId:
+          type: string
+          minLength: 1
+        runId:
+          type: string
+          minLength: 1
+        agentId:
+          type: string
+          minLength: 1
+        toolName:
+          type: string
+          minLength: 1
+        argsJson:
+          type: string
+          description: Redacted JSON string of the requested tool arguments.
+        executionPayloadJson:
+          type: string
+          description: Optional serialized payload for later approved execution resume.
+        riskTier:
+          $ref: '#/components/schemas/RiskTier'
+        status:
+          $ref: '#/components/schemas/ApprovalRequestStatus'
+        createdAtMs:
+          type: integer
+          minimum: 0
+        decidedAtMs:
+          type: integer
+          minimum: 0
+        expiresAtMs:
+          type: integer
+          minimum: 0
+        decisionReason:
+          type: string
+
+    ApprovalRequestDecisionBody:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
