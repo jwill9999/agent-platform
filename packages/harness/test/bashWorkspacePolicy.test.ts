@@ -41,11 +41,30 @@ describe('bash workspace policy', () => {
       path: 'reports/out.txt',
       operation: 'write',
     });
+    expect(extractBashPathAccesses('echo hi >reports/no-space.txt')).toContainEqual({
+      path: 'reports/no-space.txt',
+      operation: 'write',
+    });
+    expect(extractBashPathAccesses('echo hi 2> "reports/error log.txt"')).toContainEqual({
+      path: 'reports/error log.txt',
+      operation: 'write',
+    });
     expect(extractBashPathAccesses('cp input.txt generated/output.txt')).toEqual([
       { path: 'generated/output.txt', operation: 'write' },
     ]);
     expect(extractBashPathAccesses('touch /tmp/out.txt')).toEqual([
       { path: '/tmp/out.txt', operation: 'write' },
+    ]);
+  });
+
+  it('splits shell segments without treating quoted separators as operators', () => {
+    expect(
+      extractBashPathAccesses(
+        'echo "a | b && c" > generated/output.txt && cat generated/input.txt',
+      ),
+    ).toEqual([
+      { path: 'generated/output.txt', operation: 'write' },
+      { path: 'generated/input.txt', operation: 'read' },
     ]);
   });
 
