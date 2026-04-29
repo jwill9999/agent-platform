@@ -81,6 +81,14 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** `task/agent-platform-ws.5` merged into `feature/agent-platform-workspace-storage`; removed generated workspace test artifacts from the feature-to-main PR.
 - **Date:** 2026-04-29
 - **Session:** `feature/agent-platform-workspace-storage` merged into `main`; workspace epic and all child tasks are closed in Beads.
+- **Date:** 2026-04-29
+- **Session:** Started post-epic harness capability review; converted top-level architecture diagrams to Mermaid and added a coding/general automation gap-analysis report.
+- **Date:** 2026-04-29
+- **Session:** Added memory management architecture covering short-term memory, long-term memory, and self-learning from mistakes.
+- **Date:** 2026-04-29
+- **Session:** Created Highest-Value Additions epics in Beads and added matching epic specification files under `docs/tasks/`.
+- **Date:** 2026-04-29
+- **Session:** Broke down `agent-platform-code-tools` into seven Beads child tasks with detailed linked specs.
 
 ### Session-close guardrail (required)
 
@@ -144,8 +152,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Pick the next epic or backlog task.
-2. Sync Beads Dolt state if the remote is not already current.
+1. Review `docs/planning/harness-gap-analysis-2026-04-29.md`.
+2. Review `docs/planning/memory-management.md`.
+3. Run `bd dolt push` to sync the newly-created coding tool child tasks if not already done.
+4. Choose whether to start `agent-platform-code-tools.1` or decompose `agent-platform-memory` next.
 
 ---
 

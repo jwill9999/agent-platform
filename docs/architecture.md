@@ -10,65 +10,63 @@ For the complete message lifecycle (request → security checks → LLM → tool
 
 ## System Diagram
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    apps/web (Next.js 15)             │
-│               Chat UI + BFF proxy (:3001)            │
-└──────────────────────┬──────────────────────────────┘
-                       │ /api/chat → POST /v1/chat
-┌──────────────────────▼──────────────────────────────┐
-│                    apps/api (Express)                 │
-│               REST JSON API (:3000)                  │
-│  ┌────────────────────────────────────────────────┐  │
-│  │  interfaces/http  →  application  →  infra/db  │  │
-│  └────────────────────────────────────────────────┘  │
-└──────────────────────┬──────────────────────────────┘
-                       │
-        ┌──────────────┼──────────────┐
-        ▼              ▼              ▼
-   ┌─────────┐  ┌───────────┐  ┌──────────┐
-   │ harness  │  │model-router│  │    db    │
-   │(LangGraph│  │ (Vercel AI │  │ (Drizzle │
-   │  graph)  │  │   SDK)     │  │ + SQLite)│
-   └────┬─────┘  └───────────┘  └──────────┘
-        │
-   ┌────┼──────────┐
-   ▼               ▼
-┌───────────┐ ┌──────────┐
-│mcp-adapter│ │ security │
-│ (MCP tool │ │ (guards, │
-│  bridge)  │ │  scans)  │
-└───────────┘ └──────────┘
+```mermaid
+flowchart TB
+    Web["apps/web<br/>Next.js chat UI + BFF<br/>:3001"]
+    Api["apps/api<br/>Express REST API<br/>:3000"]
+
+    subgraph ApiLayers["API Layers"]
+        Http["interfaces/http<br/>routes + middleware"]
+        App["application<br/>use cases"]
+        Infra["infrastructure<br/>db + terminal + MCP"]
+        Http --> App --> Infra
+    end
+
+    subgraph Runtime["Runtime Packages"]
+        Harness["packages/harness<br/>LangGraph execution graph"]
+        Router["packages/model-router<br/>provider/model/key routing"]
+        Db["packages/db<br/>Drizzle + SQLite + secrets"]
+        Mcp["packages/mcp-adapter<br/>MCP sessions + tool calls"]
+        Security["security modules<br/>PathJail, HITL, guards"]
+        Plugins["plugin packages<br/>session + observability"]
+    end
+
+    Web -->|"/api/chat → POST /v1/chat"| Api
+    Api --> ApiLayers
+    ApiLayers --> Harness
+    ApiLayers --> Router
+    ApiLayers --> Db
+    Harness --> Mcp
+    Harness --> Security
+    Harness --> Plugins
+    Harness --> Router
+    Harness --> Db
 ```
 
 ## Package Dependency Graph
 
-```
-apps/api
-  ├── packages/db              (Drizzle ORM, SQLite)
-  ├── packages/contracts       (Zod schemas)
-  ├── packages/harness         (LangGraph agent graph)
-  ├── packages/model-router    (LLM provider routing)
-  ├── packages/planner         (LLM planning layer)
-  ├── packages/logger          (Structured logging)
-  └── packages/agent-validation
+```mermaid
+flowchart LR
+    Api["apps/api"] --> Db["packages/db"]
+    Api --> Contracts["packages/contracts"]
+    Api --> Harness["packages/harness"]
+    Api --> Router["packages/model-router"]
+    Api --> Planner["packages/planner"]
+    Api --> Logger["packages/logger"]
+    Api --> Validation["packages/agent-validation"]
 
-apps/web
-  └── packages/contracts
+    Web["apps/web"] --> Contracts
 
-packages/harness
-  ├── packages/contracts
-  ├── packages/model-router
-  ├── packages/mcp-adapter
-  ├── packages/plugin-sdk
-  ├── packages/planner
-  └── packages/logger
+    Harness --> Contracts
+    Harness --> Router
+    Harness --> Mcp["packages/mcp-adapter"]
+    Harness --> PluginSdk["packages/plugin-sdk"]
+    Harness --> Planner
+    Harness --> Logger
 
-packages/plugin-sdk
-  └── packages/contracts
-
-packages/mcp-adapter
-  └── packages/contracts
+    PluginSdk --> Contracts
+    Mcp --> Contracts
+    Validation --> Contracts
 ```
 
 ## Shared Packages
@@ -89,28 +87,29 @@ packages/mcp-adapter
 
 ## Data Flow
 
-```
-User message
-  → Next.js BFF (/api/chat)
-    → API POST /v1/chat (NDJSON stream)
-      → Zod validate → load session → session lock
-        → buildAgentContext
-          → register global observability plugin + session-scoped in-memory store
-          → 🔒 MCP Trust Guard filters tools
-          → 🔒 Security reinforcement on system prompt
-        → buildWindowedContext (system + history within budget)
-          → harness ReAct loop
-            → LLM streamText (model-router) + budget checks
-              → tool calls
-                → 🔒 Allowlist → PathJail → MCP/native dispatch
-                → observability hooks record session/task/prompt/tool/error events
-                → 🔒 Injection scan → credential scan → wrap result
-              → 🔒 Loop detection → step limit
-              → 🔍 Critic / evaluator (accept | revise loop, capped by maxCriticIterations)
-              → ✅ Definition-of-Done propose + check (retry until pass or cap exhaustion)
-              → built-in `query_logs` / `query_recent_errors` / `inspect_trace` tools read the same session store
-            → streaming NDJSON text/tool_result events to UI
-      → persist messages → release lock → close MCP sessions
+```mermaid
+flowchart TD
+    User["User message"] --> Bff["Next.js BFF<br/>/api/chat"]
+    Bff --> ApiChat["API POST /v1/chat<br/>NDJSON stream"]
+    ApiChat --> Validate["Zod validate<br/>load session<br/>acquire session lock"]
+    Validate --> Context["buildAgentContext"]
+    Context --> Obs["Register observability plugin<br/>session-scoped store"]
+    Context --> Trust["MCP Trust Guard filters tools"]
+    Context --> Prompt["Append security reinforcement"]
+    Prompt --> Window["buildWindowedContext<br/>system + history within budget"]
+    Window --> React["Harness ReAct loop"]
+    React --> Llm["LLM streamText<br/>model-router + budget checks"]
+    Llm -->|"tool calls"| Dispatch["Tool dispatch"]
+    Dispatch --> Allow["Allowlist + risk policy + HITL"]
+    Allow --> Jail["PathJail + bash workspace policy"]
+    Jail --> Execute["MCP/native/system tool execution"]
+    Execute --> Scan["Injection scan<br/>credential scan<br/>untrusted wrapper"]
+    Scan --> React
+    Llm -->|"draft answer"| Critic["Critic evaluator<br/>accept or revise"]
+    Critic --> Dod["Definition-of-Done check"]
+    Dod --> Persist["Persist assistant/tool messages"]
+    Persist --> Cleanup["Release lock<br/>close MCP sessions"]
+    Cleanup --> Ui["Stream end to UI"]
 ```
 
 > For the full lifecycle with all security checkpoints and error handling, see **[Message Flow](architecture/message-flow.md)**.
@@ -193,5 +192,66 @@ The chat response uses **NDJSON** (`application/x-ndjson`). Each line is a JSON 
 ## Session Locking
 
 In-process mutex per `sessionId`. Returns `409 SESSION_BUSY` if a second request arrives for the same session while one is in progress. The lock is always released in the `finally` block.
+
+## Capability Map
+
+This JSON map is intentionally compact and agent-readable. Update it when new first-class runtime capabilities are added.
+
+```json
+{
+  "runtime": {
+    "execution": ["react_loop", "plan_mode_stub", "critic_loop", "definition_of_done_gate"],
+    "streaming": ["ndjson_text", "thinking", "tool_result", "approval_required", "error"],
+    "state": ["sqlite_sessions", "session_lock", "windowed_context", "workspace_storage"]
+  },
+  "tooling": {
+    "zero_risk": [
+      "generate_uuid",
+      "get_current_time",
+      "json_parse",
+      "json_stringify",
+      "regex_match",
+      "regex_replace",
+      "count_tokens",
+      "base64_encode",
+      "base64_decode",
+      "hash_string",
+      "template_render"
+    ],
+    "filesystem": [
+      "read_file",
+      "write_file",
+      "list_files",
+      "file_exists",
+      "file_info",
+      "find_files",
+      "append_file",
+      "copy_file",
+      "create_directory",
+      "download_file"
+    ],
+    "runtime": ["bash"],
+    "network": ["http_request"],
+    "observability": ["query_logs", "query_recent_errors", "inspect_trace"],
+    "extension": ["mcp_tools", "registry_tools", "lazy_skill_loading"]
+  },
+  "safety": {
+    "pre_execution": ["agent_allowlist", "risk_tier_policy", "human_in_the_loop"],
+    "filesystem": ["PathJail", "bash_workspace_policy", "workspace_relative_paths"],
+    "network": ["url_guard", "outbound_body_secret_scan"],
+    "post_execution": ["prompt_injection_scan", "credential_scan", "untrusted_output_wrap"],
+    "graph": ["max_steps", "max_tokens", "max_cost", "tool_rate_limit", "loop_detection"]
+  },
+  "known_missing": [
+    "native_patch_tool",
+    "background_process_manager",
+    "browser_automation_tool",
+    "scheduled_task_runner",
+    "persistent_semantic_memory",
+    "multi_agent_orchestration",
+    "git_pr_ci_feedback_loop"
+  ]
+}
+```
 
 For the full architecture philosophy, see `docs/planning/architecture.md`.

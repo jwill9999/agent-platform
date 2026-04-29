@@ -53,17 +53,19 @@ See [Development Guide](docs/development.md) for prerequisites, env vars, tests,
 
 ## Documentation
 
-| Guide                                             | Description                                             |
-| ------------------------------------------------- | ------------------------------------------------------- |
-| [Architecture](docs/architecture.md)              | System design, package roles, data flow                 |
-| [Message Flow](docs/architecture/message-flow.md) | Mermaid diagrams: chat → security → LLM → tools         |
-| [API Reference](docs/api-reference.md)            | REST endpoints, error shapes, schemas                   |
-| [Database](docs/database.md)                      | Schema, migrations, secret storage                      |
-| [Development](docs/development.md)                | Local setup, build, test, lint commands                 |
-| [Deployment](docs/deployment.md)                  | Docker, environment variables, production               |
-| [Configuration](docs/configuration.md)            | Env vars, model routing, limits, MCP, security          |
-| [Workspace Storage](docs/workspace-storage.md)    | Host workspace setup, security, cleanup, and validation |
-| [Plugin Guide](docs/plugin-guide.md)              | Plugin hooks and authoring                              |
+| Guide                                                                    | Description                                                           |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| [Architecture](docs/architecture.md)                                     | System design, package roles, data flow                               |
+| [Message Flow](docs/architecture/message-flow.md)                        | Mermaid diagrams: chat → security → LLM → tools                       |
+| [API Reference](docs/api-reference.md)                                   | REST endpoints, error shapes, schemas                                 |
+| [Database](docs/database.md)                                             | Schema, migrations, secret storage                                    |
+| [Development](docs/development.md)                                       | Local setup, build, test, lint commands                               |
+| [Deployment](docs/deployment.md)                                         | Docker, environment variables, production                             |
+| [Configuration](docs/configuration.md)                                   | Env vars, model routing, limits, MCP, security                        |
+| [Workspace Storage](docs/workspace-storage.md)                           | Host workspace setup, security, cleanup, and validation               |
+| [Harness Gap Analysis](docs/planning/harness-gap-analysis-2026-04-29.md) | Capability gaps and recommended roadmap for coding/general automation |
+| [Memory Management](docs/planning/memory-management.md)                  | Short-term, long-term, and self-learning memory architecture          |
+| [Plugin Guide](docs/plugin-guide.md)                                     | Plugin hooks and authoring                                            |
 
 ## Project Layout
 
