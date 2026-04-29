@@ -49,6 +49,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Made shell command failure results feed back to the assistant in plain language instead of raw stdout/stderr/exitCode jargon.
 - **Date:** 2026-04-29
 - **Session:** Refactored duplicated HITL stream/lifecycle handling in `chatRouter.ts` and `use-harness-chat.ts` for SonarCloud PR 94.
+- **Date:** 2026-04-29
+- **Session:** `feature/agent-platform-hitl` merged into `main`; closed `agent-platform-hitl.5` and auto-closed HITL epic in Beads.
 
 ### Session-close guardrail (required)
 
@@ -61,44 +63,27 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### `agent-platform-hitl.4` — Durable approval resume ✅
+### HITL epic complete ✅
 
-Branch `task/agent-platform-hitl.4`.
+Branch state: `main` is checked out and tracking `origin/main`.
 
-- Implemented `POST /v1/sessions/:id/resume` for approved/rejected pending HITL tool calls.
-- Added DB support for durable approval `resumedAtMs` claiming and assistant `toolCalls` persistence.
-- Reused the runtime tool-dispatch path so approved calls execute once and then the agent continues from persisted session history.
-- Added migration `packages/db/drizzle/0013_hitl_resume.sql`, contract exports, repository coverage, and API integration coverage.
-- Updated `docs/tasks/agent-platform-hitl.4.md` and closed bead `agent-platform-hitl.4` locally.
+- `feature/agent-platform-hitl` merged into `main` via PR `#95`.
+- `task/agent-platform-hitl.5` merged into the feature branch via PR `#94`.
+- Closed `agent-platform-hitl.5` in Beads.
+- Beads auto-closed parent epic `agent-platform-hitl`; all 5 child tasks are now closed.
+- `bd ready` reports no open issues.
 
-### SonarCloud duplicate-code follow-up ✅
+HITL delivered:
 
-- SonarCloud PR `#93` reported new duplicate lines in:
-  - `apps/api/src/infrastructure/http/v1/chatRouter.ts` — 25 lines
-  - `apps/api/test/sessionChat.integration.test.ts` — 41 lines
-- Refactored `chatRouter.ts` runtime graph/tool-dispatch setup into shared helpers before this handoff.
-- Refactored repeated runtime failure/finalization handling in `chatRouter.ts` after SonarCloud still reported a 25-line duplicate block.
-- Refactored chat test environment handling into `apps/api/test/support/chatEnv.ts`.
-- Extracted repeated session/approval/event/count helpers from `sessionChat.integration.test.ts`.
+- High-risk and explicitly approval-required tools are gated.
+- Approval requests are persisted, queryable, and auditable.
+- Approval-required stream events render inline in the chat UI.
+- Users can approve or reject pending tool calls.
+- Approved/rejected decisions resume the agent flow safely.
+- Approval state survives refresh through pending approval hydration.
+- Shell command failures are summarized to the assistant in plain language instead of raw `stdout`/`stderr`/`exitCode` jargon.
 
-### Beads
-
-Closed beads in this session:
-
-- `agent-platform-hitl.1` — Add deny-by-default approval gate for risky tools
-- `agent-platform-hitl.2` — Persist approval request records and APIs
-- `agent-platform-hitl.3` — Emit approval-required stream events
-- `agent-platform-hitl.4` — Resume approved tool execution safely
-
-In-progress beads:
-
-- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage
-
-Selected task:
-
-- `agent-platform-hitl.5` — claimed and started on `task/agent-platform-hitl.5`
-
-HITL.5 progress:
+HITL.5 follow-up fixes completed before merge:
 
 - Added approval card state and approve/reject resume handling to `useHarnessChat`.
 - Added compact inline approval card rendering for chat assistant turns.
@@ -114,54 +99,52 @@ HITL.5 progress:
 - Formatted `sys_bash` tool messages for the follow-up LLM step as plain-language success/failure summaries, reducing raw coding jargon in assistant answers after command errors.
 - Extracted shared approval/chat stream parsing in the web hook and shared NDJSON lifecycle/task-start setup in the API chat router to reduce new-code duplication.
 
-Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
+Note: Beads changes were applied locally. Beads Dolt auto-push failed because the sandbox could not resolve/authenticate to GitHub over SSH.
 
 ## Current state
 
 ### Git
 
-- **`feature/agent-platform-hitl`** — pushed and tracking `origin/feature/agent-platform-hitl`
-- **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
-- **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
-- **`task/agent-platform-hitl.3`** — merged into `feature/agent-platform-hitl` via PR `#92`
-- **`task/agent-platform-hitl.4`** — merged into `feature/agent-platform-hitl` via PR `#93`
-- **`feature/agent-platform-hitl`** — up to date with `origin/feature/agent-platform-hitl` at merge commit `215ac9c`
-- **`task/agent-platform-hitl.5`** — current branch, created from updated `feature/agent-platform-hitl`
+- **Current branch:** `main`
+- **Remote:** `main` tracks `origin/main`
+- **Feature merge:** PR `#95` merged `feature/agent-platform-hitl` into `main`
+- **Task merges:** HITL.3 PR `#92`, HITL.4 PR `#93`, HITL.5 PR `#94`
 
 ### Quality
 
-- `pnpm --filter @agent-platform/harness run test` ✅
-- `pnpm --filter @agent-platform/harness run typecheck` ✅
-- `pnpm --filter @agent-platform/api run typecheck` ✅
-- `pnpm typecheck` ✅
-- `pnpm lint` ✅
-- `pnpm format:check` ✅
-- `pnpm docs:lint` ✅
-- `pnpm test` ✅ when escalated to allow local test servers to bind ports
-- `pnpm --filter @agent-platform/db exec vitest run test/messages.test.ts test/approvalRequests.test.ts` ✅
-- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` ✅ when escalated for local test server binding
-- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts test/chat.integration.test.ts` ✅ when escalated for local test server binding
+- Latest merge commit on `main`: `a00bb39` (`Merge pull request #95 from jwill9999/feature/agent-platform-hitl`)
+- PR `#94` pre-push checks passed before merge: affected API/web build, typecheck, tests.
+- Focused HITL checks passed before merge:
+  - `pnpm --filter @agent-platform/web exec vitest run test/use-harness-chat.test.ts`
+  - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
+  - `pnpm --filter @agent-platform/harness exec vitest run test/toolDispatch.test.ts`
+  - affected package lint/typecheck/format checks
 
 ### Key commits
 
-| Commit    | Branch                        | Description           |
-| --------- | ----------------------------- | --------------------- |
-| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92` |
-| `215ac9c` | `feature/agent-platform-hitl` | Merge HITL.4 PR `#93` |
+| Commit    | Branch | Description                                    |
+| --------- | ------ | ---------------------------------------------- |
+| `a00bb39` | `main` | Merge HITL feature PR `#95`                    |
+| `4fcc56a` | `main` | Merge HITL.5 task PR `#94` into feature branch |
+| `9119bdf` | `main` | Reduce HITL stream duplication                 |
+| `7d7a931` | `main` | Make shell failure summaries human readable    |
+| `34dc308` | `main` | Add critic review spacing                      |
+| `c1fb201` | `main` | Fix approval resume revision display           |
+| `014e413` | `main` | Fix HITL approval resume model config          |
+| `0802461` | `main` | Sanitise pending approval history              |
 
 ---
 
 ## Next (priority order)
 
-1. Implement `agent-platform-hitl.5` frontend approval UX and e2e coverage on `task/agent-platform-hitl.5`.
-2. Add/verify full end-to-end approve/reject workflow coverage against the real API path.
-3. Push `task/agent-platform-hitl.5` and open PR into `feature/agent-platform-hitl` when complete.
+1. Pick the next epic/task with `bd ready` after Beads remote sync is available.
+2. If needed, push Beads Dolt state from an environment with GitHub SSH/network access.
 
 ---
 
 ## Blockers / questions for owner
 
-- None for local continuation. Beads Dolt auto-push failed from the sandbox due to GitHub SSH/network access.
+- No code blockers. Beads local state is updated, but Beads Dolt auto-push failed due GitHub SSH/network access in this sandbox.
 
 ---
 
@@ -176,8 +159,8 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 | `docs/planning/lazy-skill-loading.md`     | Lazy skill pattern (planning reference)    |
 | `docs/architecture/lazy-skill-loading.md` | Lazy skill loading implementation guide    |
 | `docs/planning/security.md`               | Threat model (8 categories)                |
-| `docs/tasks/agent-platform-hitl.4.md`     | Selected next task: resume HITL execution  |
-| `docs/tasks/agent-platform-hitl.5.md`     | Downstream frontend approval UX task       |
+| `docs/tasks/agent-platform-hitl.md`       | Completed HITL epic                        |
+| `docs/tasks/agent-platform-hitl.5.md`     | Final completed HITL frontend task         |
 | `docs/planning/frontend-ui-phases.md`     | Frontend UI phased plan (unblocked)        |
 | `docs/tasks/`                             | Task spec files                            |
 
