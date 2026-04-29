@@ -109,6 +109,17 @@ describe('createToolAuditLogger', () => {
     expect(completions[0]!.data.durationMs).toBeGreaterThanOrEqual(0);
   });
 
+  it('defaults unknown tool audit entries to high risk', () => {
+    const { store, entries } = createMemoryStore();
+    const logger = createToolAuditLogger(store);
+
+    const id = logger.logStart('dynamic_tool', { value: 1 }, 'agent-1', 'session-1');
+
+    expect(id).toBeTruthy();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.riskTier).toBe('high');
+  });
+
   it('skips zero-risk tools', () => {
     const { store, entries } = createMemoryStore();
     const logger = createToolAuditLogger(store);

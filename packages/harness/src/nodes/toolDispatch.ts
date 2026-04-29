@@ -180,6 +180,19 @@ function resolveToolMetadata(
   );
 }
 
+function evaluateApprovalPolicy(
+  toolMetadata: ContractTool | undefined,
+): ReturnType<typeof requiresHumanApproval> {
+  if (!toolMetadata) {
+    return {
+      required: true,
+      riskTier: 'high',
+      reason: 'Tool metadata is missing; approval policy cannot evaluate risk.',
+    };
+  }
+  return requiresHumanApproval(toolMetadata);
+}
+
 function buildApprovalRequiredOutput(call: ToolCallIntent, reason: string): Output {
   return {
     type: 'error',
@@ -565,6 +578,29 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
       rateLimiter.record(call.name);
 
+      if (!isToolExecutionAllowed(ctx.agent, call.name)) {
+        const output: Output = {
+          type: 'error',
+          code: 'TOOL_NOT_ALLOWED',
+          message: `Tool "${call.name}" is not in the agent's allowlist`,
+        };
+        ctx.auditLog?.logDenied(
+          call.name,
+          call.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          'Tool not in agent allowlist',
+        );
+        toolMessages.push({
+          role: 'tool',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: outputToContent(call.name, output),
+        });
+        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        continue;
+      }
+
       // Intercept sys_get_skill_detail — handled inline with governor
       const allLoadedIds = [...(state.loadedSkillIds ?? []), ...newLoadedSkillIds];
       const skillResult = handleGetSkillDetail(call, ctx, allLoadedIds);
@@ -578,9 +614,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
 
       const toolMetadata = resolveToolMetadata(call, ctx);
-      const approval = toolMetadata
-        ? requiresHumanApproval(toolMetadata)
-        : { required: false as const };
+      const approval = evaluateApprovalPolicy(toolMetadata);
       if (approval.required) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const output = buildApprovalRequiredOutput(call, reason);

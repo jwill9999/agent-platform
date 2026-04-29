@@ -4,7 +4,7 @@ import { createToolDispatchNode } from '../src/nodes/toolDispatch.js';
 import { buildHarnessGraph } from '../src/buildGraph.js';
 import type { HarnessStateType } from '../src/graphState.js';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
-import type { Agent, ExecutionLimits, Plan } from '@agent-platform/contracts';
+import type { Agent, ExecutionLimits, Plan, Tool as ContractTool } from '@agent-platform/contracts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,6 +54,10 @@ const stubAgent: Agent = {
   allowedMcpServerIds: [],
   executionLimits: baseState.limits as ExecutionLimits,
 };
+
+const testTools: ContractTool[] = [
+  { id: 'test-tool', slug: 'test-tool', name: 'test-tool', riskTier: 'low' },
+];
 
 // ---------------------------------------------------------------------------
 // Mock streamText for llmReason tests
@@ -142,6 +146,7 @@ describe('plugin dispatch: toolDispatch', () => {
     const dispatcher = mockDispatcher();
     const node = createToolDispatchNode({
       agent: stubAgent,
+      tools: testTools,
       mcpManager: baseMcpManager as never,
       dispatcher,
     });
@@ -172,6 +177,7 @@ describe('plugin dispatch: toolDispatch', () => {
 
     const node = createToolDispatchNode({
       agent: stubAgent,
+      tools: testTools,
       mcpManager: baseMcpManager as never,
       dispatcher,
     });

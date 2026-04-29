@@ -13,6 +13,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed UI input refactor and feedback-only changes; closed `agent-platform-de4`, `agent-platform-ucg`, and `agent-platform-lt6` in Beads.
 - **Date:** 2026-04-29
 - **Session:** Created HITL epic/task specs and branches; completed `agent-platform-hitl.1` deny-by-default approval gate on `task/agent-platform-hitl.1`.
+- **Date:** 2026-04-29
+- **Session:** Addressed Sourcery review feedback for HITL.1 approval gating and audit risk-tier handling.
 
 ### Session-close guardrail (required)
 
@@ -41,6 +43,7 @@ Branch `task/agent-platform-hitl.1`.
 - Passed resolved agent tools from the API chat router so dispatch can evaluate registry/MCP metadata.
 - Added `tool_approval_required` trace events and audit denied entries with risk-tier-aware logging.
 - Added harness tests for high-risk system tools, explicit `requiresApproval`, ordinary low-risk execution, and the policy helper.
+- Addressed review feedback: missing tool metadata now requires approval with high-risk treatment, MCP metadata is covered via context tools, audit logging defaults unknown tools to high risk, and trace risk tiers use the shared `RiskTier` type.
 - Quality: harness tests ✅, harness typecheck ✅, API typecheck ✅, root typecheck ✅, lint ✅, docs lint ✅, full `pnpm test` ✅ when run outside the sandbox port restriction.
 
 ### Beads

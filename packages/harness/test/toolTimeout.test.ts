@@ -161,6 +161,7 @@ describe('toolDispatch with timeout', () => {
 
     const ctx: ToolDispatchContext = {
       agent: makeAgent({ toolTimeoutMs: 50 }),
+      tools: [{ id: 'echo', slug: 'echo', name: 'echo', riskTier: 'low' }],
       mcpManager: { getSession: () => undefined } as unknown as McpSessionManager,
       nativeToolExecutor: executorFn,
     };
@@ -191,6 +192,7 @@ describe('toolDispatch with timeout', () => {
 
     const ctx: ToolDispatchContext = {
       agent: makeAgent({ toolTimeoutMs: 5_000 }),
+      tools: [{ id: 'echo', slug: 'echo', name: 'echo', riskTier: 'low' }],
       mcpManager: { getSession: () => undefined } as unknown as McpSessionManager,
       nativeToolExecutor: executorFn,
     };

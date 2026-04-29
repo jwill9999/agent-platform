@@ -74,6 +74,10 @@ function isZeroRisk(toolName: string): boolean {
   return SYSTEM_TOOL_RISK[toolName] === 'zero';
 }
 
+function resolveAuditRiskTier(toolName: string, riskTierOverride?: RiskTier): RiskTier {
+  return riskTierOverride ?? SYSTEM_TOOL_RISK[toolName] ?? 'high';
+}
+
 // ---------------------------------------------------------------------------
 // Audit logger
 // ---------------------------------------------------------------------------
@@ -107,7 +111,7 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
 
   return {
     logStart(toolName, args, agentId, sessionId, riskTierOverride) {
-      const riskTier = riskTierOverride ?? SYSTEM_TOOL_RISK[toolName];
+      const riskTier = resolveAuditRiskTier(toolName, riskTierOverride);
       if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return null;
 
       const id = randomUUID();
@@ -147,7 +151,7 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
     },
 
     logDenied(toolName, args, agentId, sessionId, reason, riskTierOverride) {
-      const riskTier = riskTierOverride ?? SYSTEM_TOOL_RISK[toolName];
+      const riskTier = resolveAuditRiskTier(toolName, riskTierOverride);
       if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return;
 
       const id = randomUUID();
