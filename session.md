@@ -89,6 +89,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Created Highest-Value Additions epics in Beads and added matching epic specification files under `docs/tasks/`.
 - **Date:** 2026-04-29
 - **Session:** Broke down `agent-platform-code-tools` into seven Beads child tasks with detailed linked specs.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-code-tools.1` on `task/agent-platform-code-tools.1`; added coding runtime baseline policy, API runner CLI installs, runtime verification wiring, and documentation links.
 
 ### Session-close guardrail (required)
 
@@ -154,8 +156,8 @@ Quality gates passed:
 
 1. Review `docs/planning/harness-gap-analysis-2026-04-29.md`.
 2. Review `docs/planning/memory-management.md`.
-3. Run `bd dolt push` to sync the newly-created coding tool child tasks if not already done.
-4. Choose whether to start `agent-platform-code-tools.1` or decompose `agent-platform-memory` next.
+3. Complete and merge `agent-platform-code-tools.1`, then branch `agent-platform-code-tools.2` from the task tip.
+4. Run `bd dolt push` if Beads auto-push reports remote sync failure.
 
 ---
 

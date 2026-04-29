@@ -1,4 +1,4 @@
-.PHONY: build rebuild up down restart reset new workspace-init workspace-clean-dry-run workspace-clean workspace-clean-force seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format help
+.PHONY: build rebuild up down restart reset new workspace-init workspace-clean-dry-run workspace-clean workspace-clean-force coding-runtime-verify seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format help
 
 # ---------------------------------------------------------------------------
 # Docker-only Makefile — all runtime commands run inside containers.
@@ -44,6 +44,10 @@ workspace-clean:
 ## Remove host workspace/data without prompting (automation only)
 workspace-clean-force:
 	node scripts/workspace-clean.mjs --force
+
+## Verify required coding-agent CLI tools inside the running API container
+coding-runtime-verify:
+	$(COMPOSE) exec -T api node scripts/coding-runtime-verify.mjs
 
 ## Build, start, wait for healthy, then seed DB (the "just works" command)
 up: workspace-init
@@ -160,6 +164,7 @@ help:
 	@echo "  make workspace-clean-dry-run Show host data cleanup targets"
 	@echo "  make workspace-clean Remove host data after typed confirmation"
 	@echo "  make workspace-clean-force Remove host data without prompting"
+	@echo "  make coding-runtime-verify Verify coding CLI baseline in API container"
 	@echo "  make seed      Seed DB in running API container"
 	@echo "  make logs      Follow all service logs"
 	@echo "  make status    Show container health"

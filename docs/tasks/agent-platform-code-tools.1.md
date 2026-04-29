@@ -52,7 +52,7 @@ Beads dependency: `agent-platform-code-tools.2` depends on this task.
 ## Tests And Verification
 
 - Docs lint passes.
-- Runtime baseline verification command is documented.
+- Runtime baseline verification command is documented as `make coding-runtime-verify`.
 - Follow-up tasks can reference the policy without redefining CLI access.
 
 ## Definition Of Done
@@ -60,5 +60,6 @@ Beads dependency: `agent-platform-code-tools.2` depends on this task.
 - CLI baseline and policy are documented.
 - Typed-wrapper candidates are identified.
 - High-risk CLI actions have explicit approval policy.
-- Runtime verification expectations are clear enough to implement.
+- Runtime verification is implemented and wired into CI.
+- API runner image installs the required CLI baseline.
 - Beads task and spec agree on scope and acceptance criteria.
