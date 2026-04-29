@@ -366,8 +366,57 @@ function outputToContent(toolName: string, output: Output): string {
   if (output.type === 'error')
     return JSON.stringify({ error: output.code, message: output.message });
   // Wrap successful tool results as untrusted content
-  if (output.type === 'tool_result') return wrapToolResult(toolName, JSON.stringify(output.data));
+  if (output.type === 'tool_result') {
+    const content =
+      toolName === 'sys_bash'
+        ? formatShellResultForModel(output.data)
+        : JSON.stringify(output.data);
+    return wrapToolResult(toolName, content);
+  }
   return JSON.stringify(output);
+}
+
+function isShellResult(
+  data: unknown,
+): data is { stdout: string; stderr: string; exitCode: number } {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    !Array.isArray(data) &&
+    typeof (data as { stdout?: unknown }).stdout === 'string' &&
+    typeof (data as { stderr?: unknown }).stderr === 'string' &&
+    typeof (data as { exitCode?: unknown }).exitCode === 'number'
+  );
+}
+
+function formatShellResultForModel(data: unknown): string {
+  if (!isShellResult(data)) return JSON.stringify(data);
+
+  const stdout = data.stdout.trim();
+  const stderr = data.stderr.trim();
+  const status =
+    data.exitCode === 0
+      ? 'The command completed successfully.'
+      : `The command did not complete successfully. It exited with code ${data.exitCode}.`;
+  const parts = [status];
+
+  if (stdout) {
+    parts.push(`Output:\n${stdout}`);
+  }
+
+  if (stderr) {
+    parts.push(`Error output:\n${stderr}`);
+  }
+
+  if (!stdout && !stderr) {
+    parts.push('The command produced no output.');
+  }
+
+  parts.push(
+    'When answering the user, summarize this result in plain English. Do not expose raw field names like stdout, stderr, or exitCode unless the user explicitly asks for raw JSON.',
+  );
+
+  return parts.join('\n\n');
 }
 
 /** Scan tool output for security issues and emit trace events. */

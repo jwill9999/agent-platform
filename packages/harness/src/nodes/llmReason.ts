@@ -74,6 +74,14 @@ const STRICT_ANY_PRIMITIVE: unknown[] = [
   { type: 'null' },
 ];
 
+const UNSUPPORTED_STRICT_SCHEMA_KEYS = new Set(['propertyNames']);
+
+function copySupportedSchemaKeys(schema: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(schema).filter(([key]) => !UNSUPPORTED_STRICT_SCHEMA_KEYS.has(key)),
+  );
+}
+
 /**
  * Wrap a schema in `anyOf: [schema, {type:'null'}]` unless it is already nullable.
  * Used for optional properties that strict mode forces into `required`.
@@ -113,7 +121,7 @@ function makeNullable(schema: unknown): unknown {
 function makeStrictSchema(schema: unknown): unknown {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
   const s = schema as Record<string, unknown>;
-  const result: Record<string, unknown> = { ...s };
+  const result: Record<string, unknown> = copySupportedSchemaKeys(s);
 
   // Rule 1 — typeless, bare schema → anyOf with primitives (covers e.g. `data` in json_stringify).
   if (!s['type'] && !s['anyOf'] && !s['oneOf'] && !s['allOf'] && !s['$ref']) {

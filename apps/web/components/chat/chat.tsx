@@ -7,6 +7,7 @@ import { Message, getMessageText } from './message';
 import { ChatInput } from './chat-input';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import type { CriticEvent } from '@/lib/critic-events';
+import type { ApprovalCardState, ApprovalDecision } from '@/hooks/use-harness-chat';
 
 export interface ChatProps {
   messages: UIMessage[];
@@ -14,6 +15,8 @@ export interface ChatProps {
   isLoading: boolean;
   /** When false, input is disabled until a session id exists. */
   canSend?: boolean;
+  /** Optional input helper text shown below the composer. */
+  inputStatusText?: string;
   /** Context attachments (optional — pass to enable attachment UI). */
   attachments?: AttachmentEntry[];
   /** Callback when user picks or drops files. */
@@ -28,6 +31,10 @@ export interface ChatProps {
   criticEventsByMessage?: Record<string, readonly CriticEvent[]>;
   /** Aggregated thinking-channel text keyed by assistant message id. */
   thinkingByMessage?: Record<string, string>;
+  /** Approval requests keyed by assistant message id. */
+  approvalEventsByMessage?: Record<string, readonly ApprovalCardState[]>;
+  /** User decision handler for approval requests. */
+  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }
 
 export function Chat({
@@ -35,6 +42,7 @@ export function Chat({
   onSend,
   isLoading,
   canSend = true,
+  inputStatusText,
   attachments,
   onAddFiles,
   onRemoveAttachment,
@@ -42,6 +50,8 @@ export function Chat({
   attachmentWarnings,
   criticEventsByMessage,
   thinkingByMessage,
+  approvalEventsByMessage,
+  onApprovalDecision,
 }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +61,7 @@ export function Chat({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages, approvalEventsByMessage, scrollToBottom]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-gradient-to-b from-background to-secondary/20">
@@ -81,6 +91,10 @@ export function Chat({
                   thinking={
                     message.role === 'assistant' ? thinkingByMessage?.[message.id] : undefined
                   }
+                  approvals={
+                    message.role === 'assistant' ? approvalEventsByMessage?.[message.id] : undefined
+                  }
+                  onApprovalDecision={onApprovalDecision}
                 />
               ))}
               <div ref={messagesEndRef} className="h-4" />
@@ -94,6 +108,7 @@ export function Chat({
         onSend={onSend}
         isLoading={isLoading}
         canSend={canSend}
+        statusText={inputStatusText}
         attachments={attachments}
         onAddFiles={onAddFiles}
         onRemoveAttachment={onRemoveAttachment}

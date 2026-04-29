@@ -31,6 +31,24 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Queried SonarCloud PR `#93` duplicate-code metrics; refactored shared chat test helpers and amended `agent-platform-hitl.4`.
 - **Date:** 2026-04-29
 - **Session:** Refactored `chatRouter.ts` runtime error/finalization helpers to clear remaining SonarCloud duplicate-code block.
+- **Date:** 2026-04-29
+- **Session:** HITL.4 was merged into `feature/agent-platform-hitl`; selected `agent-platform-hitl.5` as the next epic task.
+- **Date:** 2026-04-29
+- **Session:** Started HITL.5 frontend approval UX: hook state, inline approval cards, decision/resume handling, and focused tests.
+- **Date:** 2026-04-29
+- **Session:** Fixed OpenAI tool-schema rejection for MCP schemas using unsupported `propertyNames` keyword.
+- **Date:** 2026-04-29
+- **Session:** Fixed replay of unresolved pending approval tool calls causing OpenAI missing tool response errors.
+- **Date:** 2026-04-29
+- **Session:** Fixed HITL approval resume to reuse the selected model config and block new prompts while an approval is unresolved.
+- **Date:** 2026-04-29
+- **Session:** Fixed approval-resume draft accumulation across DoD revisions and stopped DoD cap failures from showing as global chat errors.
+- **Date:** 2026-04-29
+- **Session:** Added spacing above the final critic review block in chat output.
+- **Date:** 2026-04-29
+- **Session:** Made shell command failure results feed back to the assistant in plain language instead of raw stdout/stderr/exitCode jargon.
+- **Date:** 2026-04-29
+- **Session:** Refactored duplicated HITL stream/lifecycle handling in `chatRouter.ts` and `use-harness-chat.ts` for SonarCloud PR 94.
 
 ### Session-close guardrail (required)
 
@@ -74,11 +92,27 @@ Closed beads in this session:
 
 In-progress beads:
 
-- None
+- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage
 
-Next blocked bead:
+Selected task:
 
-- `agent-platform-hitl.5` — Build frontend approval UX and e2e coverage; blocked until `agent-platform-hitl.4` is merged into the feature branch
+- `agent-platform-hitl.5` — claimed and started on `task/agent-platform-hitl.5`
+
+HITL.5 progress:
+
+- Added approval card state and approve/reject resume handling to `useHarnessChat`.
+- Added compact inline approval card rendering for chat assistant turns.
+- Added pending approval hydration for resumed sessions.
+- Added web unit coverage for approval parsing/deduplication and a Playwright fixture for approval card states.
+- Sanitised unsupported `propertyNames` JSON Schema keywords before tools are sent to the LLM; this fixes `browser_drop` schema validation blocking approval UI testing.
+- Sanitised chat history replay so unresolved pending approval `tool_calls` are not sent back to OpenAI on later normal chat turns.
+- Forwarded the selected model config through approval resume so the resume call does not fall back to a stale/invalid env key after the normal chat turn succeeds.
+- Blocked the chat composer while an approval card is pending/approving/rejecting/failed to prevent overlapping normal prompts and resume output from interleaving.
+- Reused normal-chat revision reset behavior for approval resume streams so repeated DoD drafts do not concatenate duplicate command output.
+- Rendered `DOD_FAILED` as critic cap metadata rather than a dismissible global error banner.
+- Added top margin to the final critic review block so it no longer sits tight against the assistant answer paragraph.
+- Formatted `sys_bash` tool messages for the follow-up LLM step as plain-language success/failure summaries, reducing raw coding jargon in assistant answers after command errors.
+- Extracted shared approval/chat stream parsing in the web hook and shared NDJSON lifecycle/task-start setup in the API chat router to reduce new-code duplication.
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
@@ -90,8 +124,9 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 - **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.3`** — merged into `feature/agent-platform-hitl` via PR `#92`
-- **`task/agent-platform-hitl.4`** — active branch, amended local tip `43ecad2` before conflict resolution
-- Remote status: local branch is `ahead 1, behind 1` versus `origin/task/agent-platform-hitl.4`; amended commit needs `git push --force-with-lease origin task/agent-platform-hitl.4`.
+- **`task/agent-platform-hitl.4`** — merged into `feature/agent-platform-hitl` via PR `#93`
+- **`feature/agent-platform-hitl`** — up to date with `origin/feature/agent-platform-hitl` at merge commit `215ac9c`
+- **`task/agent-platform-hitl.5`** — current branch, created from updated `feature/agent-platform-hitl`
 
 ### Quality
 
@@ -109,18 +144,18 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 
 ### Key commits
 
-| Commit    | Branch                        | Description                                          |
-| --------- | ----------------------------- | ---------------------------------------------------- |
-| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92`                                |
-| `43ecad2` | `task/agent-platform-hitl.4`  | Resume approved execution before conflict resolution |
+| Commit    | Branch                        | Description           |
+| --------- | ----------------------------- | --------------------- |
+| `bfc0d13` | `feature/agent-platform-hitl` | Merge HITL.3 PR `#92` |
+| `215ac9c` | `feature/agent-platform-hitl` | Merge HITL.4 PR `#93` |
 
 ---
 
 ## Next (priority order)
 
-1. Force-push amended `task/agent-platform-hitl.4` so PR `#93` reruns SonarCloud and pipelines.
-2. Merge PR `#93` into `feature/agent-platform-hitl` after checks pass.
-3. After HITL.4 is merged, start `agent-platform-hitl.5` for frontend approval UX and e2e coverage.
+1. Implement `agent-platform-hitl.5` frontend approval UX and e2e coverage on `task/agent-platform-hitl.5`.
+2. Add/verify full end-to-end approve/reject workflow coverage against the real API path.
+3. Push `task/agent-platform-hitl.5` and open PR into `feature/agent-platform-hitl` when complete.
 
 ---
 

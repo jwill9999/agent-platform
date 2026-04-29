@@ -164,6 +164,43 @@ describe('llmReasonNode', () => {
       }),
     );
   });
+
+  it('strips unsupported schema keywords from nested tool definitions', async () => {
+    mockStreamText.mockReturnValueOnce(
+      mockStreamResult({
+        textChunks: ['using tools'],
+        usage: { promptTokens: 5, completionTokens: 3 },
+      }),
+    );
+
+    const toolDefs: ToolDefinition[] = [
+      {
+        name: 'browser_drop',
+        description: 'Drop browser data',
+        parameters: {
+          type: 'object',
+          properties: {
+            data: {
+              anyOf: [
+                {
+                  type: 'object',
+                  propertyNames: { pattern: '^[a-z]+$' },
+                  additionalProperties: { type: 'string' },
+                },
+              ],
+            },
+          },
+        },
+      },
+    ];
+
+    await llmReasonNode(makeState({ toolDefinitions: toolDefs }));
+
+    const call = mockStreamText.mock.calls.at(-1)?.[0] as {
+      tools?: Record<string, { parameters?: unknown }>;
+    };
+    expect(JSON.stringify(call.tools?.browser_drop?.parameters)).not.toContain('propertyNames');
+  });
 });
 
 // ---------------------------------------------------------------------------

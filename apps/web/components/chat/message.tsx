@@ -7,6 +7,8 @@ import { CriticBadges, CriticReviewBlock } from './critic-badges';
 import { ThinkingBlock } from './thinking-block';
 import { Markdown } from './markdown';
 import type { CriticEvent } from '@/lib/critic-events';
+import { ApprovalCard } from './approval-card';
+import type { ApprovalCardState, ApprovalDecision } from '@/hooks/use-harness-chat';
 
 interface MessageProps {
   message: UIMessage;
@@ -18,6 +20,10 @@ interface MessageProps {
   thinking?: string;
   /** True while this assistant turn is still receiving streamed content. */
   isStreaming?: boolean;
+  /** Approval requests emitted for this assistant turn. */
+  approvals?: readonly ApprovalCardState[];
+  /** User decision handler for approval requests. */
+  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }
 
 export function getMessageText(message: UIMessage): string {
@@ -50,6 +56,8 @@ export function Message({
   criticEvents,
   thinking,
   isStreaming = false,
+  approvals,
+  onApprovalDecision,
 }: Readonly<MessageProps>) {
   const isUser = message.role === 'user';
   const text = getMessageText(message);
@@ -65,6 +73,7 @@ export function Message({
           .find((ev) => ev.kind === 'accept')
       : null;
   const hasThinking = !isUser && Boolean(thinking?.trim());
+  const hasApprovals = !isUser && approvals && approvals.length > 0;
   const showFinalReview = Boolean(finalAccept) && !isStreaming;
 
   if (!isUser) {
@@ -75,9 +84,17 @@ export function Message({
             <ThinkingBlock content={thinking ?? ''} defaultOpen={isAwaitingStreamContent} />
           )}
           {hasText && <Markdown content={text} className="text-sm" />}
+          {hasApprovals &&
+            approvals.map((approval) => (
+              <ApprovalCard
+                key={approval.approvalRequestId}
+                approval={approval}
+                onDecision={onApprovalDecision}
+              />
+            ))}
           {showFinalReview && finalAccept && <CriticReviewBlock event={finalAccept} />}
           {hasCritic && !finalAccept && <CriticBadges events={criticEvents} />}
-          {!hasText && !showFinalReview && !hasCritic && !hasThinking && (
+          {!hasText && !showFinalReview && !hasCritic && !hasThinking && !hasApprovals && (
             <span className="sr-only" aria-busy={isAwaitingStreamContent} aria-live="polite">
               Assistant feedback pending
             </span>

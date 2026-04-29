@@ -2,7 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { closeDatabase, DEFAULT_AGENT_ID, openDatabase, runSeed } from '@agent-platform/db';
+import {
+  closeDatabase,
+  createModelConfig,
+  DEFAULT_AGENT_ID,
+  openDatabase,
+  parseMasterKeyFromBase64,
+  runSeed,
+} from '@agent-platform/db';
 import request from 'supertest';
 import type { Application } from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -50,7 +57,7 @@ async function createSeededApp(
   const { db, sqlite } = openDatabase(sqlitePath);
   runSeed(db);
   const llmReasonNode = async (state: { taskIndex?: number; totalTokensUsed?: number }) => {
-    const result = mockToolCalls();
+    const result = mockToolCalls(state);
     if (typeof result === 'string') {
       return {
         llmOutput: { kind: 'text' as const, content: result },
@@ -333,6 +340,77 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(200);
       expect(duplicateResume.body.data.resumedAtMs).toEqual(expect.any(Number));
       await expectToolExecutionCount(db, sessionId, 'success', 1);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('uses the selected model config when resuming an approved tool call', async () => {
+    const envSnap = snapshotChatEnv();
+    const previousMasterKey = process.env.SECRETS_MASTER_KEY;
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      const masterKeyB64 = Buffer.alloc(32, 7).toString('base64');
+      process.env.SECRETS_MASTER_KEY = masterKeyB64;
+      const modelConfig = createModelConfig(
+        db,
+        {
+          name: 'Selected test config',
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          apiKey: 'sk-selected-test-key',
+        },
+        parseMasterKeyFromBase64(masterKeyB64),
+        1,
+      );
+
+      process.env.AGENT_OPENAI_API_KEY = 'sk-env-key-for-initial-chat';
+      const sessionId = await createDefaultSession(app);
+      const { approvalRequestId } = await createPendingToolApproval(app, sessionId);
+
+      await request(app)
+        .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+        .send({ reason: 'ok' })
+        .expect(200);
+
+      delete process.env.AGENT_OPENAI_API_KEY;
+      mockToolCalls.mockReturnValueOnce('Done with selected model config');
+
+      const resumeRes = await request(app)
+        .post(`/v1/sessions/${sessionId}/resume`)
+        .set('x-model-config-id', modelConfig.id)
+        .send({ approvalRequestId })
+        .expect(200);
+
+      expect(resumeRes.text).toContain('tool_result');
+    } finally {
+      restoreChatEnv(envSnap);
+      if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
+      else process.env.SECRETS_MASTER_KEY = previousMasterKey;
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('does not replay unresolved pending approval tool calls into later chat turns', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionId = await createDefaultSession(app);
+      await createPendingToolApproval(app, sessionId);
+
+      mockToolCalls.mockReturnValueOnce('I can continue without replaying pending tool calls');
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Continue without approving yet' })
+        .expect(200);
+
+      const followUpState = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; toolCalls?: unknown[] }>;
+      };
+      expect(followUpState.messages?.some((message) => message.toolCalls?.length)).toBe(false);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);
