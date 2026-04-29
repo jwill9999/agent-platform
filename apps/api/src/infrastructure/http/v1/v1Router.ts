@@ -11,7 +11,7 @@ import { Router } from 'express';
 
 import { createAgentsRouter } from './agentsRouter.js';
 import { createApprovalRequestsRouter } from './approvalRequestsRouter.js';
-import { createChatRouter } from './chatRouter.js';
+import { createChatRouter, type ChatRouterOptions } from './chatRouter.js';
 import { createMcpServersRouter } from './mcpServersRouter.js';
 import { createModelConfigsRouter } from './modelConfigsRouter.js';
 import { createSessionsRouter } from './sessionsRouter.js';
@@ -23,7 +23,11 @@ import { createDynamicRateLimiter } from '../dynamicRateLimiter.js';
 
 const observabilityLog = createLogger('api:observability');
 
-export function createV1Router(db: DrizzleDb): Router {
+export type V1RouterOptions = {
+  chat?: Pick<ChatRouterOptions, 'llmReasonNode' | 'disableEvaluatorNodes'>;
+};
+
+export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Router {
   const router = Router();
   const observabilityStore = createObservabilityStore();
   const globalPlugins: readonly RegisteredPlugin[] = [
@@ -59,6 +63,7 @@ export function createV1Router(db: DrizzleDb): Router {
     createChatRouter(db, {
       globalPlugins,
       observabilityStore,
+      ...options.chat,
     }),
   );
   router.use(

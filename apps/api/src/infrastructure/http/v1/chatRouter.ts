@@ -8,6 +8,7 @@ import {
   withTransaction,
   insertToolExecution,
   completeToolExecution,
+  createApprovalRequest,
   getModelConfig,
   resolveModelConfigKey,
   parseMasterKeyFromBase64,
@@ -82,9 +83,11 @@ const LegacyChatStreamBodySchema = z.object({
 
 const MAX_TITLE_LENGTH = 80;
 
-type ChatRouterOptions = {
+export type ChatRouterOptions = {
   globalPlugins?: readonly RegisteredPlugin[];
   observabilityStore?: ObservabilityStore;
+  llmReasonNode?: ReturnType<typeof createLlmReasonNode>;
+  disableEvaluatorNodes?: boolean;
 };
 
 /** Derive a human-readable session title from the first user message. */
@@ -341,7 +344,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
 
         const graph = buildHarnessGraph({
           executeTool: async () => ({ ok: true }),
-          llmReasonNode: createLlmReasonNode({ emitter, dispatcher }),
+          llmReasonNode: options.llmReasonNode ?? createLlmReasonNode({ emitter, dispatcher }),
           toolDispatchNode: createToolDispatchNode({
             agent: agentCtx.agent,
             tools: agentCtx.tools,
@@ -361,11 +364,22 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
             dispatcher,
             pathJail: new PathJail(DEFAULT_MOUNTS),
             auditLog,
+            approvalRequests: {
+              create: (request) =>
+                createApprovalRequest(db, {
+                  id: randomUUID(),
+                  ...request,
+                }),
+            },
             skillResolver: (id: string) => getSkill(db, id),
           }),
-          criticNode: createCriticNode({ emitter, dispatcher }),
-          dodProposeNode: createDodProposeNode(),
-          dodCheckNode: createDodCheckNode({ emitter, dispatcher }),
+          criticNode: options.disableEvaluatorNodes
+            ? undefined
+            : createCriticNode({ emitter, dispatcher }),
+          dodProposeNode: options.disableEvaluatorNodes ? undefined : createDodProposeNode(),
+          dodCheckNode: options.disableEvaluatorNodes
+            ? undefined
+            : createDodCheckNode({ emitter, dispatcher }),
           dispatcher,
         });
 

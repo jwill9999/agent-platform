@@ -64,14 +64,14 @@ Extend contracts, harness output, and chat streaming so pending tool approvals a
 
 ## Definition of done
 
-- [ ] Approval-required stream event is part of the shared contract.
-- [ ] Approval request is persisted before the event is emitted.
-- [ ] Tool execution does not happen before approval.
-- [ ] Parser/docs understand the new event.
-- [ ] Beads dependencies match this spec.
+- [x] Approval-required stream event is part of the shared contract.
+- [x] Approval request is persisted before the event is emitted.
+- [x] Tool execution does not happen before approval.
+- [x] Parser/docs understand the new event.
+- [x] Beads dependencies match this spec.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-hitl.3` created from `task/agent-platform-hitl.2`.
-- [ ] Tests listed above pass.
-- [ ] `bd close agent-platform-hitl.3 --reason "..."`
+- [x] Branch `task/agent-platform-hitl.3` created from updated `feature/agent-platform-hitl` after HITL.2 merge.
+- [x] Tests listed above pass.
+- [x] `bd close agent-platform-hitl.3 --reason "..."`

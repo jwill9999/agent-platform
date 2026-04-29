@@ -17,6 +17,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Addressed Sourcery review feedback for HITL.1 approval gating and audit risk-tier handling.
 - **Date:** 2026-04-29
 - **Session:** HITL.1 was merged into `feature/agent-platform-hitl`; completed `agent-platform-hitl.2` approval request persistence/API on `task/agent-platform-hitl.2`.
+- **Date:** 2026-04-29
+- **Session:** HITL.2 was merged into `feature/agent-platform-hitl`; started `agent-platform-hitl.3` on `task/agent-platform-hitl.3`.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-hitl.3` approval-required NDJSON events on `task/agent-platform-hitl.3`; ready for PR into `feature/agent-platform-hitl`.
+- **Date:** 2026-04-29
+- **Session:** Addressed HITL.3 review feedback: pending approvals now audit as pending, approval output has a fallback renderer, and API stream tests assert no assistant text leaks on approval halt.
 
 ### Session-close guardrail (required)
 
@@ -54,10 +60,11 @@ Closed beads in this session:
 
 - `agent-platform-hitl.1` — Add deny-by-default approval gate for risky tools
 - `agent-platform-hitl.2` — Persist approval request records and APIs
+- `agent-platform-hitl.3` — Emit approval-required stream events
 
 In-progress beads:
 
-- None.
+- None
 
 Note: `bd` changes were applied locally, but automatic remote push failed due to SSH/network auth from the sandbox.
 
@@ -67,7 +74,8 @@ Note: `bd` changes were applied locally, but automatic remote push failed due to
 
 - **`feature/agent-platform-hitl`** — pushed and tracking `origin/feature/agent-platform-hitl`
 - **`task/agent-platform-hitl.1`** — merged into `feature/agent-platform-hitl`
-- **`task/agent-platform-hitl.2`** — active branch, pushed and tracking `origin/task/agent-platform-hitl.2`
+- **`task/agent-platform-hitl.2`** — merged into `feature/agent-platform-hitl`
+- **`task/agent-platform-hitl.3`** — active branch, PR open as `#92`, review feedback addressed locally
 - Remote refs verified with `git ls-remote --heads origin feature/agent-platform-hitl task/agent-platform-hitl.1`.
 
 ### Quality
@@ -77,22 +85,23 @@ Note: `bd` changes were applied locally, but automatic remote push failed due to
 - `pnpm --filter @agent-platform/api run typecheck` ✅
 - `pnpm typecheck` ✅
 - `pnpm lint` ✅
-- `pnpm run docs:lint:md` ✅
+- `pnpm format:check` ✅
+- `pnpm docs:lint` ✅
 - `pnpm test` ✅ when escalated to allow local test servers to bind ports
 
 ### Key commits
 
-| Commit             | Branch                       | Description                      |
-| ------------------ | ---------------------------- | -------------------------------- |
-| Current branch tip | `task/agent-platform-hitl.2` | Approval request persistence/API |
+| Commit             | Branch                       | Description                          |
+| ------------------ | ---------------------------- | ------------------------------------ |
+| Current branch tip | `task/agent-platform-hitl.3` | Emit approval-required NDJSON events |
 
 ---
 
 ## Next (priority order)
 
-1. Open a PR from `task/agent-platform-hitl.2` into `feature/agent-platform-hitl`.
-2. Watch GitHub Actions for the task branch and fix any CI failures.
-3. After CI/merge, start `agent-platform-hitl.3` on a new task branch from the updated feature branch.
+1. Push amended `task/agent-platform-hitl.3` review fixes to PR `#92`.
+2. After HITL.3 is merged, create `task/agent-platform-hitl.4` from the updated feature branch.
+3. Implement approval decision resume execution in `agent-platform-hitl.4`.
 
 ---
 

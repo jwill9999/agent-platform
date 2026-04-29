@@ -5,9 +5,33 @@ import path from 'node:path';
 import { closeDatabase, DEFAULT_AGENT_ID, openDatabase, runSeed } from '@agent-platform/db';
 import request from 'supertest';
 import type { Application } from 'express';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createApp } from '../src/infrastructure/http/createApp.js';
+const mockStreamText = vi.hoisted(() => vi.fn());
+const mockToolCalls = vi.hoisted(() => vi.fn());
+
+vi.mock('ai', () => ({
+  streamText: (...args: unknown[]) => mockStreamText(...args),
+  jsonSchema: (schema: unknown) => ({ type: 'json-schema', jsonSchema: schema }),
+}));
+
+vi.mock('@ai-sdk/openai', () => ({
+  createOpenAI:
+    ({ apiKey }: { apiKey: string }) =>
+    (model: string) => ({ provider: 'openai', modelId: model, apiKey }),
+}));
+
+vi.mock('@ai-sdk/anthropic', () => ({
+  createAnthropic:
+    ({ apiKey }: { apiKey: string }) =>
+    (model: string) => ({ provider: 'anthropic', modelId: model, apiKey }),
+}));
+
+vi.mock('@ai-sdk/openai-compatible', () => ({
+  createOpenAICompatible:
+    ({ name, apiKey, baseURL }: { name: string; apiKey: string; baseURL: string }) =>
+    (model: string) => ({ provider: name, modelId: model, apiKey, baseURL }),
+}));
 
 const CHAT_ENV_KEYS = [
   'OPENAI_API_KEY',
@@ -29,23 +53,58 @@ function restoreChatEnv(snap: Map<string, string | undefined>) {
   }
 }
 
-function createSeededApp(dirs: string[]): {
+async function createSeededApp(
+  dirs: string[],
+  options: { mockLlm?: boolean } = {},
+): Promise<{
   app: Application;
   db: ReturnType<typeof openDatabase>['db'];
   sqlite: ReturnType<typeof openDatabase>['sqlite'];
-} {
+}> {
+  const { createApp } = await import('../src/infrastructure/http/createApp.js');
   const dir = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-session-chat-'));
   dirs.push(dir);
   const sqlitePath = path.join(dir, 'db.sqlite');
   const { db, sqlite } = openDatabase(sqlitePath);
   runSeed(db);
-  return { app: createApp({ db }), db, sqlite };
+  const llmReasonNode = async (state: { taskIndex?: number; totalTokensUsed?: number }) => {
+    const calls = mockToolCalls();
+    if (!Array.isArray(calls)) throw new Error('Mock LLM response not configured');
+    return {
+      llmOutput: { kind: 'tool_calls' as const, calls },
+      messages: [{ role: 'assistant' as const, content: '', toolCalls: calls }],
+      trace: [{ type: 'llm_call' as const, step: state.taskIndex ?? 0 }],
+      totalTokensUsed: (state.totalTokensUsed ?? 0) + 2,
+    };
+  };
+  return {
+    app: createApp({
+      db,
+      ...(options.mockLlm ? { v1: { chat: { llmReasonNode, disableEvaluatorNodes: true } } } : {}),
+    }),
+    db,
+    sqlite,
+  };
+}
+
+function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
+  mockToolCalls.mockReturnValueOnce([{ id: 'tc-approval', name: toolName, args }]);
+  mockStreamText.mockReturnValueOnce({
+    textStream: (async function* () {})(),
+    fullStream: (async function* () {})(),
+    text: Promise.resolve(''),
+    reasoning: Promise.resolve(undefined),
+    toolCalls: Promise.resolve([{ toolCallId: 'tc-approval', toolName, args }]),
+    usage: Promise.resolve({ promptTokens: 1, completionTokens: 1 }),
+  });
 }
 
 describe('POST /v1/chat (session-aware)', () => {
   const dirs: string[] = [];
 
   afterEach(() => {
+    mockStreamText.mockReset();
+    mockToolCalls.mockReset();
     for (const d of dirs) {
       try {
         rmSync(d, { recursive: true, force: true });
@@ -57,7 +116,7 @@ describe('POST /v1/chat (session-aware)', () => {
   });
 
   it('returns 400 for invalid request body', async () => {
-    const { app, sqlite } = createSeededApp(dirs);
+    const { app, sqlite } = await createSeededApp(dirs);
     try {
       const res = await request(app).post('/v1/chat').send({ bad: 'body' }).expect(400);
       expect(res.body.error?.code).toBe('VALIDATION_ERROR');
@@ -68,7 +127,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
   it('returns 404 when session does not exist', async () => {
     const envSnap = snapshotChatEnv();
-    const { app, sqlite } = createSeededApp(dirs);
+    const { app, sqlite } = await createSeededApp(dirs);
     try {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
       const res = await request(app)
@@ -85,7 +144,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
   it('returns 400 when no API key is configured', async () => {
     const envSnap = snapshotChatEnv();
-    const { app, sqlite } = createSeededApp(dirs);
+    const { app, sqlite } = await createSeededApp(dirs);
     try {
       delete process.env.OPENAI_API_KEY;
       delete process.env.AGENT_OPENAI_API_KEY;
@@ -112,7 +171,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
   it('returns 404 when agent for session does not exist', async () => {
     const envSnap = snapshotChatEnv();
-    const { app, sqlite } = createSeededApp(dirs);
+    const { app, sqlite } = await createSeededApp(dirs);
     try {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
 
@@ -142,7 +201,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
   it('persists user messages to conversation history', async () => {
     const envSnap = snapshotChatEnv();
-    const { app, db, sqlite } = createSeededApp(dirs);
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     let sessionId = '';
     try {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
@@ -173,6 +232,69 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(userMsg).toBeDefined();
       expect(userMsg!.content).toBe('Hello agent');
       expect(userMsg!.sessionId).toBe(sessionId);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('streams approval_required when a tool needs human approval', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionRes = await request(app)
+        .post('/v1/sessions')
+        .send({ agentId: DEFAULT_AGENT_ID })
+        .expect(201);
+      const sessionId = sessionRes.body.data.id;
+
+      mockToolCallStream('sys_bash', { command: 'date' });
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Run date' })
+        .expect(200);
+
+      const events = String(res.text)
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { type: string; approvalRequestId?: string });
+      const approvalEvent = events.find((event) => event.type === 'approval_required');
+
+      expect(approvalEvent).toMatchObject({
+        type: 'approval_required',
+        toolName: 'sys_bash',
+        riskTier: 'high',
+        argsPreview: { command: 'date' },
+      });
+      expect(approvalEvent?.approvalRequestId).toEqual(expect.any(String));
+      expect(events.every((event) => event.type !== 'text')).toBe(true);
+
+      const { listApprovalRequests, countToolExecutions } = await import('@agent-platform/db');
+      expect(
+        listApprovalRequests(db, { sessionId, status: 'pending', limit: 10, offset: 0 }),
+      ).toHaveLength(1);
+      expect(
+        countToolExecutions(db, {
+          sessionId,
+          toolName: 'sys_bash',
+          status: 'pending',
+          limit: 10,
+          offset: 0,
+        }),
+      ).toBe(1);
+      expect(
+        countToolExecutions(db, {
+          sessionId,
+          toolName: 'sys_bash',
+          status: 'success',
+          limit: 10,
+          offset: 0,
+        }),
+      ).toBe(0);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

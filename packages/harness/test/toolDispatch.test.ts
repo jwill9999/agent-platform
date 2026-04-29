@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createToolDispatchNode, type ToolDispatchContext } from '../src/nodes/toolDispatch.js';
 import type { HarnessStateType } from '../src/graphState.js';
-import type { Agent, Output, Tool as ContractTool } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ApprovalRequest,
+  Output,
+  Tool as ContractTool,
+} from '@agent-platform/contracts';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { NativeToolExecutor } from '../src/types.js';
@@ -55,6 +60,21 @@ const makeMcpManager = (
   ({
     getSession: (id: string) => sessionMap[id],
   }) as unknown as McpSessionManager;
+
+const makeApprovalRequest = (overrides?: Partial<ApprovalRequest>): ApprovalRequest => ({
+  id: 'approval-1',
+  sessionId: 'session-approval',
+  runId: 'run-1',
+  agentId: 'agent-1',
+  toolName: 'sys_bash',
+  argsJson: '{"command":"date"}',
+  executionPayloadJson:
+    '{"toolCallId":"tc-approval","toolName":"sys_bash","args":{"command":"date"}}',
+  riskTier: 'high',
+  status: 'pending',
+  createdAtMs: 1000,
+  ...overrides,
+});
 
 /** Dispatch a single tool call and assert it produces an error result. */
 const dispatchExpectingError = async (
@@ -266,6 +286,7 @@ describe('toolDispatchNode', () => {
       logStart: vi.fn(),
       logComplete: vi.fn(),
       logDenied,
+      logPendingApproval: vi.fn(),
     } satisfies ToolAuditLogger;
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),
@@ -306,6 +327,85 @@ describe('toolDispatchNode', () => {
     );
     expect(result.trace).toContainEqual(
       expect.objectContaining({ type: 'tool_dispatch', toolId: 'sys_bash', ok: false }),
+    );
+  });
+
+  it('creates and emits approval_required events without executing the gated tool', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { exitCode: 0 },
+    });
+    const emitted: Output[] = [];
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(makeApprovalRequest()),
+    };
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied: vi.fn(),
+      logPendingApproval: vi.fn().mockReturnValue('audit-approval'),
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      emitter: { emit: (event) => emitted.push(event), end: vi.fn() },
+      approvalRequests,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-approval',
+        runId: 'run-1',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [
+            { id: 'tc-approval', name: 'sys_bash', args: { command: 'date' } },
+            { id: 'tc-later', name: 'echo', args: { text: 'skip me' } },
+          ],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(approvalRequests.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-approval',
+        runId: 'run-1',
+        agentId: 'agent-1',
+        toolName: 'sys_bash',
+        args: { command: 'date' },
+        riskTier: 'high',
+      }),
+    );
+    expect(auditLog.logPendingApproval).toHaveBeenCalledWith(
+      'sys_bash',
+      { command: 'date' },
+      'agent-1',
+      'session-approval',
+      'high',
+    );
+    expect(auditLog.logDenied).not.toHaveBeenCalled();
+    expect(emitted).toEqual([
+      {
+        type: 'approval_required',
+        approvalRequestId: 'approval-1',
+        toolName: 'sys_bash',
+        riskTier: 'high',
+        argsPreview: { command: 'date' },
+        message: expect.stringContaining('requires human approval'),
+      },
+    ]);
+    expect(result).toMatchObject({ halted: true, messages: [] });
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({
+        type: 'tool_approval_required',
+        toolId: 'sys_bash',
+        riskTier: 'high',
+      }),
     );
   });
 
@@ -395,6 +495,7 @@ describe('toolDispatchNode', () => {
       logStart: vi.fn().mockReturnValue('audit-low'),
       logComplete: vi.fn(),
       logDenied: vi.fn(),
+      logPendingApproval: vi.fn(),
     } satisfies ToolAuditLogger;
     const ctx: ToolDispatchContext = {
       agent: makeAgent(),

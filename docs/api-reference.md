@@ -268,13 +268,16 @@ The primary chat endpoint. Runs the full agent harness (ReAct loop, tool dispatc
 
 **Response:** NDJSON stream. Each line is a JSON object with a `type` field:
 
-| Event            | When                         | Key fields        |
-| ---------------- | ---------------------------- | ----------------- |
-| `text`           | LLM text delta               | `content`         |
-| `thinking`       | LLM reasoning delta          | `content`         |
-| `tool_result`    | Tool execution complete      | `toolId`, `data`  |
-| `error`          | Fatal or budget limit hit    | `code`, `message` |
-| `stream_aborted` | Client disconnect or timeout | `reason`          |
+| Event               | When                                     | Key fields                                                 |
+| ------------------- | ---------------------------------------- | ---------------------------------------------------------- |
+| `text`              | LLM text delta                           | `content`                                                  |
+| `thinking`          | LLM reasoning delta                      | `content`                                                  |
+| `tool_result`       | Tool execution complete                  | `toolId`, `data`                                           |
+| `approval_required` | Tool execution paused for human approval | `approvalRequestId`, `toolName`, `riskTier`, `argsPreview` |
+| `error`             | Fatal or budget limit hit                | `code`, `message`                                          |
+| `stream_aborted`    | Client disconnect or timeout             | `reason`                                                   |
+
+When `approval_required` is emitted, the harness has created a pending approval request and stopped before executing that tool. Remaining tool calls in the same model batch are skipped; approval/resume execution is handled by the HITL resume flow.
 
 **Error responses (pre-stream):**
 

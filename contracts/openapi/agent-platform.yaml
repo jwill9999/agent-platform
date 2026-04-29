@@ -1369,6 +1369,7 @@ components:
         - $ref: '#/components/schemas/OutputToolResult'
         - $ref: '#/components/schemas/OutputError'
         - $ref: '#/components/schemas/OutputThinking'
+        - $ref: '#/components/schemas/OutputApprovalRequired'
       discriminator:
         propertyName: type
         mapping:
@@ -1377,6 +1378,7 @@ components:
           tool_result: '#/components/schemas/OutputToolResult'
           error: '#/components/schemas/OutputError'
           thinking: '#/components/schemas/OutputThinking'
+          approval_required: '#/components/schemas/OutputApprovalRequired'
 
     OutputText:
       type: object
@@ -1431,6 +1433,23 @@ components:
           type: string
           enum: [thinking]
         content:
+          type: string
+
+    OutputApprovalRequired:
+      type: object
+      required: [type, approvalRequestId, toolName, argsPreview]
+      properties:
+        type:
+          type: string
+          enum: [approval_required]
+        approvalRequestId:
+          type: string
+        toolName:
+          type: string
+        riskTier:
+          $ref: '#/components/schemas/RiskTier'
+        argsPreview: {}
+        message:
           type: string
 
     # -- Settings --

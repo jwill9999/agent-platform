@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RiskTierSchema } from './tool.js';
 
 /** Stream / API payload union for chat and tool events. */
 export const OutputSchema = z.discriminatedUnion('type', [
@@ -30,6 +31,14 @@ export const OutputSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('thinking'),
     content: z.string(),
+  }),
+  z.object({
+    type: z.literal('approval_required'),
+    approvalRequestId: z.string().min(1),
+    toolName: z.string().min(1),
+    riskTier: RiskTierSchema.optional(),
+    argsPreview: z.unknown(),
+    message: z.string().optional(),
   }),
 ]);
 

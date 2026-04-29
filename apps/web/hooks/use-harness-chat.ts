@@ -44,7 +44,20 @@ interface StreamEvent {
   language?: string;
   code?: string;
   mimeType?: string;
+  approvalRequestId?: string;
+  toolName?: string;
+  riskTier?: string;
+  argsPreview?: unknown;
 }
+
+export type ApprovalRequiredStreamEvent = {
+  type: 'approval_required';
+  approvalRequestId: string;
+  toolName: string;
+  riskTier?: string;
+  argsPreview: unknown;
+  message?: string;
+};
 
 function formatToolResultPreview(data: unknown, maxLen = 6000): string {
   if (typeof data === 'string') return data.length > maxLen ? `${data.slice(0, maxLen)}…` : data;
@@ -91,11 +104,12 @@ function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   return { error: o.message };
 }
 
-type StreamRenderResult =
+export type StreamRenderResult =
   | { text: string }
   | { error: string }
   | { critic: CriticEvent }
   | { thinking: string }
+  | { approvalRequired: ApprovalRequiredStreamEvent }
   | null;
 
 function renderThinkingEvent(o: StreamEvent): StreamRenderResult {
@@ -114,7 +128,7 @@ function renderTextEvent(o: StreamEvent): StreamRenderResult {
   return { text };
 }
 
-function renderStreamEvent(o: StreamEvent): StreamRenderResult {
+export function renderStreamEvent(o: StreamEvent): StreamRenderResult {
   switch (o.type) {
     case 'text':
       return renderTextEvent(o);
@@ -136,6 +150,19 @@ function renderStreamEvent(o: StreamEvent): StreamRenderResult {
     }
     case 'error':
       return renderErrorEvent(o);
+    case 'approval_required':
+      return typeof o.approvalRequestId === 'string' && typeof o.toolName === 'string'
+        ? {
+            approvalRequired: {
+              type: 'approval_required',
+              approvalRequestId: o.approvalRequestId,
+              toolName: o.toolName,
+              argsPreview: o.argsPreview,
+              ...(typeof o.riskTier === 'string' ? { riskTier: o.riskTier } : {}),
+              ...(typeof o.message === 'string' ? { message: o.message } : {}),
+            },
+          }
+        : null;
     default:
       return null;
   }
@@ -159,6 +186,7 @@ async function readNdjsonStream(
   onError: (msg: string) => void,
   onCritic: (event: CriticEvent) => void,
   onThinking: (chunk: string) => void,
+  onApprovalRequired: (event: ApprovalRequiredStreamEvent) => void,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -172,6 +200,7 @@ async function readNdjsonStream(
     if ('text' in result) onText(result.text);
     else if ('thinking' in result) onThinking(result.thinking);
     else if ('critic' in result) onCritic(result.critic);
+    else if ('approvalRequired' in result) onApprovalRequired(result.approvalRequired);
     else onError(result.error);
   };
 
@@ -204,6 +233,9 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     {},
   );
   const [thinkingByMessage, setThinkingByMessage] = useState<Record<string, string>>({});
+  const [approvalEventsByMessage, setApprovalEventsByMessage] = useState<
+    Record<string, ApprovalRequiredStreamEvent[]>
+  >({});
   const resumeRef = useRef(resume);
   resumeRef.current = resume;
 
@@ -213,12 +245,14 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setMessages([]);
       setCriticEventsByMessage({});
       setThinkingByMessage({});
+      setApprovalEventsByMessage({});
       return;
     }
     if (!resumeRef.current) {
       setMessages([]);
       setCriticEventsByMessage({});
       setThinkingByMessage({});
+      setApprovalEventsByMessage({});
       return;
     }
 
@@ -263,6 +297,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         return { ...prev, [id]: chunk };
       }
       return { ...prev, [id]: current + chunk };
+    });
+  }, []);
+
+  const appendApprovalRequired = useCallback((id: string, event: ApprovalRequiredStreamEvent) => {
+    setApprovalEventsByMessage((prev) => {
+      const existing = prev[id] ?? [];
+      return { ...prev, [id]: [...existing, event] };
     });
   }, []);
 
@@ -324,6 +365,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
             }
           },
           (chunk) => appendThinking(assistantId, chunk),
+          (event) => appendApprovalRequired(assistantId, event),
         );
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
@@ -352,11 +394,17 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           delete next[assistantId];
           return next;
         });
+        setApprovalEventsByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
       } finally {
         setStatus('ready');
       }
     },
-    [sessionId, updateAssistantMessage, appendCriticEvent, appendThinking],
+    [sessionId, updateAssistantMessage, appendCriticEvent, appendThinking, appendApprovalRequired],
   );
 
   return {
@@ -367,5 +415,6 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     setError,
     criticEventsByMessage,
     thinkingByMessage,
+    approvalEventsByMessage,
   };
 }

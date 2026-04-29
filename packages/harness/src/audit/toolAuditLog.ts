@@ -76,6 +76,15 @@ export interface ToolAuditLogger {
     reason: string,
     riskTier?: RiskTier,
   ): void;
+
+  /** Log a tool call that is pending human approval. */
+  logPendingApproval(
+    toolName: string,
+    args: Record<string, unknown>,
+    agentId: string,
+    sessionId: string,
+    riskTier?: RiskTier,
+  ): string | null;
 }
 
 export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
@@ -148,6 +157,28 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
         durationMs: 0,
       });
     },
+
+    logPendingApproval(toolName, args, agentId, sessionId, riskTierOverride) {
+      const riskTier = resolveAuditRiskTier(toolName, riskTierOverride);
+      if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return null;
+
+      const id = randomUUID();
+      const redacted = redactArgs(args);
+      const now = Date.now();
+
+      store.insert({
+        id,
+        toolName,
+        agentId,
+        sessionId,
+        argsJson: JSON.stringify(redacted),
+        riskTier,
+        status: 'pending',
+        startedAtMs: now,
+      });
+
+      return id;
+    },
   };
 }
 
@@ -161,5 +192,8 @@ export function createNoopAuditLogger(): ToolAuditLogger {
     },
     logComplete() {},
     logDenied() {},
+    logPendingApproval() {
+      return null;
+    },
   };
 }

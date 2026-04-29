@@ -117,6 +117,29 @@ export function OutputRenderer({ output, showThinking }: Props) {
           />
         </div>
       );
+    case 'approval_required':
+      return (
+        <div
+          className="output-approval-required"
+          role="status"
+          style={{
+            margin: '0.5rem 0',
+            padding: '0.75rem',
+            borderRadius: 8,
+            border: '1px solid #facc15',
+            background: '#fefce8',
+            color: '#713f12',
+            fontSize: '0.875rem',
+          }}
+        >
+          <strong style={{ display: 'block', marginBottom: '0.25rem' }}>Approval required</strong>
+          <div>
+            <code>{output.toolName}</code>
+            {output.riskTier ? ` · ${output.riskTier}` : null}
+          </div>
+          {output.message ? <div style={{ marginTop: '0.35rem' }}>{output.message}</div> : null}
+        </div>
+      );
     default: {
       const _exhaustive: never = output;
       return _exhaustive;

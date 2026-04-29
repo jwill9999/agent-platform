@@ -6,9 +6,9 @@ import { errorMiddleware } from './errorMiddleware.js';
 import { createHealthRouter } from './healthRouter.js';
 import { mountOpenApiValidation, openApiValidationErrorHandler } from './openApiValidation.js';
 import { mountSwaggerUI } from './swagger.js';
-import { createV1Router } from './v1/v1Router.js';
+import { createV1Router, type V1RouterOptions } from './v1/v1Router.js';
 
-export function createApp(options: { db: DrizzleDb | null }): Application {
+export function createApp(options: { db: DrizzleDb | null; v1?: V1RouterOptions }): Application {
   const app = express();
 
   // Trust first proxy hop (Next.js BFF / Docker network) so express-rate-limit
@@ -24,7 +24,7 @@ export function createApp(options: { db: DrizzleDb | null }): Application {
   mountOpenApiValidation(app);
 
   if (options.db) {
-    app.use('/v1', createV1Router(options.db));
+    app.use('/v1', createV1Router(options.db, options.v1));
   }
 
   app.use(openApiValidationErrorHandler);
