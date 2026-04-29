@@ -99,6 +99,7 @@ export {
 export type { HostPlatform, WorkspaceConfig, WorkspaceEnv } from './security/index.js';
 export { validateBashCommand, buildAllowlist } from './security/index.js';
 export { validateUrl } from './security/index.js';
+export { redactCredentials } from './security/index.js';
 export { ToolRateLimiter } from './security/index.js';
 export type {
   Mount,

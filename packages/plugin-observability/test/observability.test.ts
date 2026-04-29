@@ -113,4 +113,37 @@ describe('createObservabilityPlugin', () => {
       message: 'store boom',
     });
   });
+
+  it('redacts credential-shaped values from task and error events', async () => {
+    const events: ObservabilityEvent[] = [];
+    const obs = createObservabilityPlugin({ log: (e) => events.push(e) });
+    const d = createPluginDispatcher([obs]);
+    const openAiKey = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
+
+    await d.onTaskEnd({
+      sessionId: 's1',
+      runId: 'r1',
+      taskId: 't1',
+      ok: false,
+      detail: `Incorrect API key provided: ${openAiKey}`,
+    });
+    await d.onError({
+      sessionId: 's1',
+      runId: 'r1',
+      phase: 'unknown',
+      error: new Error(`Incorrect API key provided: ${openAiKey}`),
+    });
+
+    expect(JSON.stringify(events)).not.toContain(openAiKey);
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: 'task_end',
+        detail: 'Incorrect API key provided: [REDACTED:OpenAI API Key]',
+      }),
+      expect.objectContaining({
+        kind: 'error',
+        message: 'Incorrect API key provided: [REDACTED:OpenAI API Key]',
+      }),
+    ]);
+  });
 });

@@ -93,6 +93,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-code-tools.1` on `task/agent-platform-code-tools.1`; added coding runtime baseline policy, API runner CLI installs, runtime verification wiring, and documentation links.
 - **Date:** 2026-04-29
 - **Session:** Completed `agent-platform-code-tools.2` on `task/agent-platform-code-tools.2`; documented coding tool contracts, shared evidence artifacts, audit events, and truncation/storage rules.
+- **Date:** 2026-04-30
+- **Session:** Fixed chat UI/model-config override and API-key error leakage on `task/ui-chat-api-key-error-redaction`.
 
 ### Session-close guardrail (required)
 
@@ -105,48 +107,53 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Coding tool contracts documented
+### Chat UI model-config and stream error handling fixed
 
-Branch state: `task/agent-platform-code-tools.2` contains the completed second task in the structured coding tool pack chain.
+Branch state: `task/ui-chat-api-key-error-redaction` contains an unrelated UI/runtime bug fix before continuing the coding-tools epic.
 
-- Added `docs/coding-tool-contracts.md` as the implementation reference for structured edit, read-only git, governed test runner, repository map, and code search tools.
-- Defined stable tool names, tool kinds, risk tiers, approval policy, shared `CodingEvidenceSchema`, artifact schema, result envelope, error codes, audit event mapping, and truncation/artifact storage rules.
-- Documented critic and Definition-of-Done evidence consumption rules, including the future `DodContractSchema.structuredEvidence` extension.
-- Linked the contract reference from `docs/coding-runtime.md` and `docs/tasks/agent-platform-code-tools.2.md`.
-- Closed `agent-platform-code-tools.2` locally in Beads. Beads Dolt auto-push failed because GitHub DNS/network access was unavailable in the sandbox.
+- Changed the chat page to default the model selector to the selected agent's saved model config instead of blindly using the first stored config as a request override.
+- Sanitized streamed NDJSON output, API stream error events, web stream error rendering, and observability task/error events so provider messages cannot leak API-key-shaped values.
+- Added a `MODEL_AUTH_FAILED` stream code for provider authentication failures that happen after NDJSON headers are already sent.
+- Added regression coverage for API post-header auth errors, web stream error rendering, harness NDJSON redaction, output guard OpenAI key detection, and observability redaction.
 
 Quality gates passed:
 
-- `pnpm docs:lint`
+- `pnpm --filter @agent-platform/harness run test -- test/outputGuard.test.ts test/backpressure.test.ts`
+- `pnpm --filter @agent-platform/web run test -- test/use-harness-chat.test.ts`
+- `pnpm --filter @agent-platform/plugin-observability run test -- test/observability.test.ts`
+- `pnpm --filter @agent-platform/api run test -- test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
 
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-code-tools.2`
-- **Current commit:** `28c842d` before the `session.md` amend
-- **Latest completed task:** `agent-platform-code-tools.2`
-- **Next task in chain:** `agent-platform-code-tools.3` from the task-2 tip
-- **Remote sync:** pending; network/DNS blocked GitHub access during this session
+- **Current branch:** `task/ui-chat-api-key-error-redaction`
+- **Current commit:** `8ce4b45` before the `session.md` amend
+- **Latest completed task:** `agent-platform-code-tools.2` remains the latest coding-tools epic task
+- **Current work:** UI/runtime bug fix, not part of the coding-tools task chain
+- **Remote sync:** pending until this amended commit is pushed
 
 ### Beads
 
-- `agent-platform-code-tools.2` is closed locally.
+- `agent-platform-code-tools.2` is closed.
 - `agent-platform-code-tools.3` is the next downstream task.
-- Beads Dolt remote push still needs to run when network access is available.
+- No new Beads issue was created for the UI bug fix.
 
 ### Quality
 
-- Documentation lint and relative-link checks passed.
-- No code files changed, so SonarQube/Problems/code quality gate was not required.
+- Code quality gates passed for the touched API, web, harness, and observability files.
+- SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
 
 ---
 
 ## Next (priority order)
 
-1. Re-run `bd dolt push` once GitHub network/DNS access is available.
-2. Push `task/agent-platform-code-tools.2` to `origin`.
-3. Start `agent-platform-code-tools.3` from the task-2 tip and implement the structured edit/apply patch tool against `docs/coding-tool-contracts.md`.
+1. Push `task/ui-chat-api-key-error-redaction` to `origin`.
+2. Verify the chat UI with a real saved model config in Docker.
+3. After UI issues are clear, start `agent-platform-code-tools.3` from the `agent-platform-code-tools.2` task tip.
 
 ---
 

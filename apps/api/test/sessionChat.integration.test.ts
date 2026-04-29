@@ -97,7 +97,7 @@ function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
 }
 
 type TestDb = ReturnType<typeof openDatabase>['db'];
-type ChatEvent = { type: string; approvalRequestId?: string; code?: string };
+type ChatEvent = { type: string; approvalRequestId?: string; code?: string; message?: string };
 
 function parseNdjsonEvents(text: string): ChatEvent[] {
   return String(text)
@@ -259,6 +259,37 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(userMsg).toBeDefined();
       expect(userMsg!.content).toBe('Hello agent');
       expect(userMsg!.sessionId).toBe(sessionId);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('redacts provider auth failures emitted after NDJSON headers are sent', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    const openAiKey = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+      mockToolCalls.mockImplementationOnce(() => {
+        throw new Error(`Incorrect API key provided: ${openAiKey}`);
+      });
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'hello' })
+        .expect(200);
+      const events = parseNdjsonEvents(res.text);
+      const error = events.find((event) => event.type === 'error');
+
+      expect(error).toMatchObject({
+        type: 'error',
+        code: 'MODEL_AUTH_FAILED',
+        message:
+          'The model provider rejected the configured API key. Check the selected model config or server environment key.',
+      });
+      expect(res.text).not.toContain(openAiKey);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

@@ -15,8 +15,15 @@ export type ObservabilityPluginOptions = Readonly<{
 }>;
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
+  if (error instanceof Error) return redactCredentials(error.message);
+  return redactCredentials(String(error));
+}
+
+function redactCredentials(content: string): string {
+  return content
+    .replace(/sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}/g, '[REDACTED:OpenAI API Key]')
+    .replace(/(ghp|gho|ghu|ghs|ghr)_\w{36,}/g, '[REDACTED:GitHub Token]')
+    .replace(/Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g, '[REDACTED:Bearer Token]');
 }
 
 function emitEvent(
@@ -94,7 +101,7 @@ export function createObservabilityPlugin(options: ObservabilityPluginOptions): 
           runId: ctx.runId,
           taskId: ctx.taskId,
           ok: ctx.ok,
-          detail: ctx.detail,
+          ...(ctx.detail ? { detail: redactCredentials(ctx.detail) } : {}),
         },
         options,
       );

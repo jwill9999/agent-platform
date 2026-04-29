@@ -38,6 +38,7 @@ import {
   PathJail,
   DEFAULT_MOUNTS,
   createToolAuditLogger,
+  redactCredentials,
   type HarnessStateType,
 } from '@agent-platform/harness';
 import type {
@@ -297,11 +298,27 @@ function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): voi
     return;
   }
 
+  const rawMessage = err instanceof Error ? err.message : 'Graph execution failed';
+  const authError = isProviderAuthError(rawMessage);
+  const message = authError
+    ? 'The model provider rejected the configured API key. Check the selected model config or server environment key.'
+    : redactCredentials(rawMessage);
   const errorEvent = {
     type: 'error' as const,
-    message: err instanceof Error ? err.message : 'Graph execution failed',
+    ...(authError ? { code: 'MODEL_AUTH_FAILED' as const } : {}),
+    message,
   };
   res.write(JSON.stringify(errorEvent) + '\n');
+}
+
+function isProviderAuthError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('incorrect api key') ||
+    lower.includes('invalid api key') ||
+    lower.includes('authentication') ||
+    lower.includes('unauthorized')
+  );
 }
 
 function mapResumeApprovalError(error: unknown): never {
