@@ -29,6 +29,8 @@ export default function HomePage() {
     setError,
     criticEventsByMessage,
     thinkingByMessage,
+    approvalEventsByMessage,
+    decideApproval,
   } = useHarnessChat(sessionId, isResuming);
   const { sessions, loading: sessionsLoading, refresh: refreshSessions } = useSessions();
   const {
@@ -195,6 +197,8 @@ export default function HomePage() {
               attachmentWarnings={attachmentWarnings}
               criticEventsByMessage={criticEventsByMessage}
               thinkingByMessage={thinkingByMessage}
+              approvalEventsByMessage={approvalEventsByMessage}
+              onApprovalDecision={decideApproval}
             />
           </AgentModelProvider>
         </div>

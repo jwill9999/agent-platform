@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
-import type { MessageRecord } from '@agent-platform/contracts';
-import { apiGet, apiPath } from '@/lib/apiClient';
+import type {
+  ApprovalRequest,
+  ApprovalRequestStatus,
+  MessageRecord,
+} from '@agent-platform/contracts';
+import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
 export type { CriticEvent } from '@/lib/critic-events';
@@ -59,6 +63,23 @@ export type ApprovalRequiredStreamEvent = {
   message?: string;
 };
 
+export type ApprovalCardStatus =
+  | 'pending'
+  | 'approving'
+  | 'rejecting'
+  | 'approved'
+  | 'rejected'
+  | 'expired'
+  | 'executed'
+  | 'failed';
+
+export type ApprovalCardState = ApprovalRequiredStreamEvent & {
+  status: ApprovalCardStatus;
+  error?: string;
+};
+
+export type ApprovalDecision = 'approve' | 'reject';
+
 function formatToolResultPreview(data: unknown, maxLen = 6000): string {
   if (typeof data === 'string') return data.length > maxLen ? `${data.slice(0, maxLen)}…` : data;
   try {
@@ -96,6 +117,9 @@ function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   const { code } = o;
   if (code === 'CRITIC_CAP_REACHED') {
     return { critic: { kind: 'cap_reached', reasons: o.message } };
+  }
+  if (code === 'APPROVAL_REJECTED') {
+    return { text: `\n\n[${code}] ${o.message}\n` };
   }
   const isToolError =
     typeof code === 'string' &&
@@ -215,6 +239,69 @@ async function readNdjsonStream(
   if (buffer.trim()) processLine(buffer);
 }
 
+function parseApprovalArgs(argsJson: string): unknown {
+  try {
+    return JSON.parse(argsJson);
+  } catch {
+    return argsJson;
+  }
+}
+
+function approvalStatusFromRecord(status: ApprovalRequestStatus): ApprovalCardStatus {
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'expired') return 'expired';
+  return 'pending';
+}
+
+function approvalFromRecord(request: ApprovalRequest): ApprovalCardState {
+  return {
+    type: 'approval_required',
+    approvalRequestId: request.id,
+    toolName: request.toolName,
+    riskTier: request.riskTier,
+    argsPreview: parseApprovalArgs(request.argsJson),
+    status: request.resumedAtMs ? 'executed' : approvalStatusFromRecord(request.status),
+  };
+}
+
+export function mergeApprovalEvent(
+  existing: readonly ApprovalCardState[],
+  event: ApprovalRequiredStreamEvent,
+): ApprovalCardState[] {
+  const next: ApprovalCardState = { ...event, status: 'pending' };
+  const index = existing.findIndex(
+    (approval) => approval.approvalRequestId === event.approvalRequestId,
+  );
+  if (index === -1) return [...existing, next];
+  return existing.map((approval, i) => (i === index ? { ...approval, ...next } : approval));
+}
+
+function updateApprovalStatus(
+  approvals: readonly ApprovalCardState[],
+  approvalRequestId: string,
+  status: ApprovalCardStatus,
+  error?: string,
+): ApprovalCardState[] {
+  return approvals.map((approval) =>
+    approval.approvalRequestId === approvalRequestId
+      ? { ...approval, status, ...(error ? { error } : { error: undefined }) }
+      : approval,
+  );
+}
+
+async function listPendingApprovals(sessionId: string): Promise<ApprovalRequest[]> {
+  const params = new URLSearchParams({ sessionId, status: 'pending' });
+  const res = await fetch(`${apiPath('approval-requests')}?${params.toString()}`, {
+    cache: 'no-store',
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || `Approval requests failed (${res.status})`);
+  if (!text.trim()) return [];
+  const json = JSON.parse(text) as { data?: ApprovalRequest[] };
+  return json.data ?? [];
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -234,7 +321,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   );
   const [thinkingByMessage, setThinkingByMessage] = useState<Record<string, string>>({});
   const [approvalEventsByMessage, setApprovalEventsByMessage] = useState<
-    Record<string, ApprovalRequiredStreamEvent[]>
+    Record<string, ApprovalCardState[]>
   >({});
   const resumeRef = useRef(resume);
   resumeRef.current = resume;
@@ -264,6 +351,18 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           .map(messageRecordToUi)
           .filter((m): m is UIMessage => m !== null);
         setMessages(uiMsgs);
+        return listPendingApprovals(sessionId).then((approvals) => ({ uiMsgs, approvals }));
+      })
+      .then((result) => {
+        if (cancelled || !result) return;
+        const assistant = [...result.uiMsgs]
+          .reverse()
+          .find((message) => message.role === 'assistant');
+        if (!assistant || result.approvals.length === 0) return;
+        setApprovalEventsByMessage((prev) => ({
+          ...prev,
+          [assistant.id]: result.approvals.map(approvalFromRecord),
+        }));
       })
       .catch((e: unknown) => {
         if (!cancelled) {
@@ -303,9 +402,29 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const appendApprovalRequired = useCallback((id: string, event: ApprovalRequiredStreamEvent) => {
     setApprovalEventsByMessage((prev) => {
       const existing = prev[id] ?? [];
-      return { ...prev, [id]: [...existing, event] };
+      return { ...prev, [id]: mergeApprovalEvent(existing, event) };
     });
   }, []);
+
+  const setApprovalStatus = useCallback(
+    (approvalRequestId: string, status: ApprovalCardStatus, errorMessage?: string) => {
+      setApprovalEventsByMessage((prev) => {
+        const next = { ...prev };
+        for (const [messageId, approvals] of Object.entries(next)) {
+          if (approvals.some((approval) => approval.approvalRequestId === approvalRequestId)) {
+            next[messageId] = updateApprovalStatus(
+              approvals,
+              approvalRequestId,
+              status,
+              errorMessage,
+            );
+          }
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   const sendMessage = useCallback(
     async (messageForApi: string, displayText?: string, modelConfigId?: string | null) => {
@@ -407,9 +526,83 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     [sessionId, updateAssistantMessage, appendCriticEvent, appendThinking, appendApprovalRequired],
   );
 
+  const decideApproval = useCallback(
+    async (approvalRequestId: string, decision: ApprovalDecision) => {
+      if (!sessionId || status === 'streaming') return;
+      const inFlightStatus = decision === 'approve' ? 'approving' : 'rejecting';
+      const terminalStatus = decision === 'approve' ? 'executed' : 'rejected';
+      setApprovalStatus(approvalRequestId, inFlightStatus);
+      setStatus('streaming');
+      setError(null);
+
+      const assistantId = crypto.randomUUID();
+      setMessages((prev) => [...prev, uiMessage(assistantId, 'assistant', '')]);
+      setThinkingByMessage((prev) => ({ ...prev, [assistantId]: THINKING_PLACEHOLDER }));
+
+      try {
+        await apiPost<ApprovalRequest>(
+          apiPath('approval-requests', approvalRequestId, decision),
+          {},
+        );
+        setApprovalStatus(approvalRequestId, decision === 'approve' ? 'approved' : 'rejected');
+
+        const res = await fetch(apiPath('sessions', sessionId, 'resume'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approvalRequestId }),
+        });
+        if (!res.ok) throw new Error(await parseErrorResponse(res));
+
+        let accumulated = '';
+        if (res.body && !res.headers.get('content-type')?.includes('application/json')) {
+          await readNdjsonStream(
+            res.body,
+            (chunk) => {
+              accumulated += chunk;
+            },
+            (msg) => setError(msg),
+            (event) => appendCriticEvent(assistantId, event),
+            (chunk) => appendThinking(assistantId, chunk),
+            (event) => appendApprovalRequired(assistantId, event),
+          );
+        }
+
+        updateAssistantMessage(assistantId, accumulated);
+        setApprovalStatus(approvalRequestId, terminalStatus);
+        setThinkingByMessage((prev) => {
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setApprovalStatus(approvalRequestId, 'failed', message);
+        setError(message);
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        setThinkingByMessage((prev) => {
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
+      } finally {
+        setStatus('ready');
+      }
+    },
+    [
+      sessionId,
+      status,
+      setApprovalStatus,
+      updateAssistantMessage,
+      appendCriticEvent,
+      appendThinking,
+      appendApprovalRequired,
+    ],
+  );
+
   return {
     messages,
     sendMessage,
+    decideApproval,
     status,
     error,
     setError,

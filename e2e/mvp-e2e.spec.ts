@@ -111,4 +111,18 @@ test.describe('MVP E2E (compose-backed)', () => {
 
     await expect(page.getByTestId('critic-badge')).toHaveCount(0);
   });
+
+  test('approval card renders pending and terminal states (fixture page)', async ({ page }) => {
+    await page.goto('/e2e/approval-card');
+
+    await expect(page.getByRole('heading', { name: 'E2E approval-card verify' })).toBeVisible();
+    await expect(page.getByTestId('approval-card')).toHaveCount(2);
+    await expect(page.getByLabel('Approval required for sys_bash').first()).toContainText(
+      'Pending',
+    );
+    await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reject' })).toBeVisible();
+    await expect(page.getByText('[REDACTED]')).toBeVisible();
+    await expect(page.getByText('Executed')).toBeVisible();
+  });
 });

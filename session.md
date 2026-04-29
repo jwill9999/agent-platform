@@ -33,6 +33,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Refactored `chatRouter.ts` runtime error/finalization helpers to clear remaining SonarCloud duplicate-code block.
 - **Date:** 2026-04-29
 - **Session:** HITL.4 was merged into `feature/agent-platform-hitl`; selected `agent-platform-hitl.5` as the next epic task.
+- **Date:** 2026-04-29
+- **Session:** Started HITL.5 frontend approval UX: hook state, inline approval cards, decision/resume handling, and focused tests.
 
 ### Session-close guardrail (required)
 
@@ -82,6 +84,13 @@ Selected task:
 
 - `agent-platform-hitl.5` — claimed and started on `task/agent-platform-hitl.5`
 
+HITL.5 progress:
+
+- Added approval card state and approve/reject resume handling to `useHarnessChat`.
+- Added compact inline approval card rendering for chat assistant turns.
+- Added pending approval hydration for resumed sessions.
+- Added web unit coverage for approval parsing/deduplication and a Playwright fixture for approval card states.
+
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
 ## Current state
@@ -122,7 +131,8 @@ Note: `bd` changes were applied locally, but automatic remote push failed becaus
 ## Next (priority order)
 
 1. Implement `agent-platform-hitl.5` frontend approval UX and e2e coverage on `task/agent-platform-hitl.5`.
-2. Push `task/agent-platform-hitl.5` and open PR into `feature/agent-platform-hitl` when complete.
+2. Add/verify full end-to-end approve/reject workflow coverage against the real API path.
+3. Push `task/agent-platform-hitl.5` and open PR into `feature/agent-platform-hitl` when complete.
 
 ---
 
