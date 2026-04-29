@@ -69,6 +69,7 @@ export {
   type PlatformSettingsUpdate,
 } from './settings.js';
 export { DodContractSchema, type DodContract } from './dod.js';
+export { redactArgs } from './redaction.js';
 export {
   ToolExecutionSchema,
   ToolExecutionStatusSchema,
@@ -77,3 +78,13 @@ export {
   type ToolExecutionStatus,
   type ToolExecutionQuery,
 } from './toolExecution.js';
+export {
+  ApprovalRequestSchema,
+  ApprovalRequestStatusSchema,
+  ApprovalRequestQuerySchema,
+  ApprovalRequestDecisionBodySchema,
+  type ApprovalRequest,
+  type ApprovalRequestStatus,
+  type ApprovalRequestQuery,
+  type ApprovalRequestDecisionBody,
+} from './approvalRequest.js';

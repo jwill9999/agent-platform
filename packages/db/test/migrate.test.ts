@@ -36,6 +36,7 @@ describe('migrations', () => {
     expect(names).toContain('skills');
     expect(names).toContain('mcp_servers');
     expect(names).toContain('sessions');
+    expect(names).toContain('approval_requests');
     expect(names).toContain('chat_metadata');
     expect(names).toContain('plugin_catalog_refs');
     closeDatabase(sqlite);

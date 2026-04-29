@@ -68,15 +68,15 @@ Add durable approval request contracts, database storage, repositories, and API 
 
 ## Definition of done
 
-- [ ] Approval request contract and API routes exist.
-- [ ] Approval requests persist in SQLite.
-- [ ] Args shown through API are redacted.
-- [ ] Terminal decision transitions are idempotent and safe.
-- [ ] API docs mention approval request endpoints.
-- [ ] Beads dependencies match this spec.
+- [x] Approval request contract and API routes exist.
+- [x] Approval requests persist in SQLite.
+- [x] Args shown through API are redacted.
+- [x] Terminal decision transitions are idempotent and safe.
+- [x] API docs mention approval request endpoints.
+- [x] Beads dependencies match this spec.
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-hitl.2` created from `task/agent-platform-hitl.1`.
-- [ ] Tests listed above pass.
-- [ ] `bd close agent-platform-hitl.2 --reason "..."`
+- [x] Branch `task/agent-platform-hitl.2` created from updated `feature/agent-platform-hitl`.
+- [x] Tests listed above pass.
+- [x] `bd close agent-platform-hitl.2 --reason "..."`

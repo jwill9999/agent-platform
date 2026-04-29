@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Output, RiskTier } from '@agent-platform/contracts';
+import { redactArgs, type Output, type RiskTier } from '@agent-platform/contracts';
 import { SYSTEM_TOOL_RISK } from '../systemTools.js';
 
 // ---------------------------------------------------------------------------
@@ -36,35 +36,7 @@ export interface ToolAuditStore {
 // Secret redaction
 // ---------------------------------------------------------------------------
 
-const REDACT_KEYS = new Set([
-  'key',
-  'token',
-  'password',
-  'secret',
-  'apikey',
-  'api_key',
-  'authorization',
-  'auth',
-  'credential',
-  'credentials',
-  'access_token',
-  'refresh_token',
-  'private_key',
-]);
-
-export function redactArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(args)) {
-    if (REDACT_KEYS.has(k.toLowerCase())) {
-      result[k] = '[REDACTED]';
-    } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
-      result[k] = redactArgs(v as Record<string, unknown>);
-    } else {
-      result[k] = v;
-    }
-  }
-  return result;
-}
+export { redactArgs } from '@agent-platform/contracts';
 
 // ---------------------------------------------------------------------------
 // Zero-risk check (skip logging for pure compute tools)
