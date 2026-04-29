@@ -91,6 +91,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Broke down `agent-platform-code-tools` into seven Beads child tasks with detailed linked specs.
 - **Date:** 2026-04-29
 - **Session:** Completed `agent-platform-code-tools.1` on `task/agent-platform-code-tools.1`; added coding runtime baseline policy, API runner CLI installs, runtime verification wiring, and documentation links.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-code-tools.2` on `task/agent-platform-code-tools.2`; documented coding tool contracts, shared evidence artifacts, audit events, and truncation/storage rules.
 
 ### Session-close guardrail (required)
 
@@ -103,61 +105,48 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Workspace storage epic landed on main
+### Coding tool contracts documented
 
-Branch state: `main` contains the completed workspace storage epic.
+Branch state: `task/agent-platform-code-tools.2` contains the completed second task in the structured coding tool pack chain.
 
-- Added `scripts/workspace-compose-verify.mjs` for compose-backed API verification of workspace listing, download, traversal/absolute-path denial, and persistence after API restart.
-- Updated `.github/workflows/ci.yml` to run the workspace verification before and after restarting the API container in the E2E job.
-- Added `e2e/workspace-files.spec.ts` to verify Settings > Workspace shows generated files and downloads them through the BFF.
-- Added `docs/workspace-storage.md` as the user-facing reference for host workspace setup, OS-specific locations, security boundaries, UI/API behavior, cleanup/uninstall commands, and verification coverage.
-- Updated `README.md` and existing docs to reference the workspace storage guide and current Makefile workflow.
-- Merged the final workspace task chain into `feature/agent-platform-workspace-storage` through PR #102 and removed generated `.agent-platform/workspaces/default/generated/*` artifacts from version control before main merge.
-- Merged PR #103 from `feature/agent-platform-workspace-storage` into `main`.
-- Updated the workspace epic/task specs to reflect final verification coverage and completed acceptance criteria that can be proven before feature-branch merge.
-- Existing coverage already verifies PathJail traversal/symlink escape denial, shell workspace policy, HITL approval gating, approval resume, and human-readable tool failure output.
+- Added `docs/coding-tool-contracts.md` as the implementation reference for structured edit, read-only git, governed test runner, repository map, and code search tools.
+- Defined stable tool names, tool kinds, risk tiers, approval policy, shared `CodingEvidenceSchema`, artifact schema, result envelope, error codes, audit event mapping, and truncation/artifact storage rules.
+- Documented critic and Definition-of-Done evidence consumption rules, including the future `DodContractSchema.structuredEvidence` extension.
+- Linked the contract reference from `docs/coding-runtime.md` and `docs/tasks/agent-platform-code-tools.2.md`.
+- Closed `agent-platform-code-tools.2` locally in Beads. Beads Dolt auto-push failed because GitHub DNS/network access was unavailable in the sandbox.
 
 Quality gates passed:
 
-- `make workspace-clean-dry-run`
-- `API_URL=http://127.0.0.1:3000 node scripts/workspace-compose-verify.mjs --write`
-- API restart via `docker compose --profile services restart api`
-- `API_URL=http://127.0.0.1:3000 node scripts/workspace-compose-verify.mjs`
-- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm exec playwright test -c e2e/playwright.config.ts e2e/workspace-files.spec.ts`
-- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e` after running the CI-equivalent seed step.
-- `pnpm exec eslint e2e/workspace-files.spec.ts scripts/workspace-compose-verify.mjs --max-warnings 0`
-- `pnpm format:check`
 - `pnpm docs:lint`
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm test` (run with escalation because API Supertest binds local ports)
 
 ## Current state
 
 ### Git
 
-- **Current branch:** `main`
-- **Latest landed epic:** `agent-platform-ws` (`feature/agent-platform-workspace-storage` -> `main`)
-- **Next task in chain:** none selected.
-- **Merged PRs:** PR #102 into `feature/agent-platform-workspace-storage`; PR #103 into `main`.
+- **Current branch:** `task/agent-platform-code-tools.2`
+- **Current commit:** `28c842d` before the `session.md` amend
+- **Latest completed task:** `agent-platform-code-tools.2`
+- **Next task in chain:** `agent-platform-code-tools.3` from the task-2 tip
+- **Remote sync:** pending; network/DNS blocked GitHub access during this session
 
 ### Beads
 
-- `agent-platform-ws` is closed.
-- All seven child tasks are closed: `agent-platform-ws.1`, `agent-platform-ws.1a`, `agent-platform-ws.2`, `agent-platform-ws.3`, `agent-platform-ws.4`, `agent-platform-ws.5`, and `agent-platform-ws.6`.
+- `agent-platform-code-tools.2` is closed locally.
+- `agent-platform-code-tools.3` is the next downstream task.
+- Beads Dolt remote push still needs to run when network access is available.
 
 ### Quality
 
-- Compose-backed workspace persistence/security checks and full local e2e passed after CI-equivalent seed.
+- Documentation lint and relative-link checks passed.
+- No code files changed, so SonarQube/Problems/code quality gate was not required.
 
 ---
 
 ## Next (priority order)
 
-1. Review `docs/planning/harness-gap-analysis-2026-04-29.md`.
-2. Review `docs/planning/memory-management.md`.
-3. Complete and merge `agent-platform-code-tools.1`, then branch `agent-platform-code-tools.2` from the task tip.
-4. Run `bd dolt push` if Beads auto-push reports remote sync failure.
+1. Re-run `bd dolt push` once GitHub network/DNS access is available.
+2. Push `task/agent-platform-code-tools.2` to `origin`.
+3. Start `agent-platform-code-tools.3` from the task-2 tip and implement the structured edit/apply patch tool against `docs/coding-tool-contracts.md`.
 
 ---
 
