@@ -70,3 +70,4 @@ This task should reuse the same workspace config resolver introduced in `agent-p
 - [x] Branch `task/agent-platform-ws.6` created from `task/agent-platform-ws.4`.
 - [x] Cleanup safeguard tests pass.
 - [x] `bd close agent-platform-ws.6 --reason "..."`
+- [x] CI pipelines pass after fixing the shared workspace config import in `scripts/workspace-init.mjs`.

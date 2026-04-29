@@ -71,6 +71,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-ws.4` workspace file UI/API on `task/agent-platform-ws.4`.
 - **Date:** 2026-04-29
 - **Session:** Completed `agent-platform-ws.6` guarded workspace data cleanup flow on `task/agent-platform-ws.6`.
+- **Date:** 2026-04-29
+- **Session:** Fixed the `agent-platform-ws.6` E2E pipeline failure in `workspace-init.mjs`; GitHub pipelines are passing.
 
 ### Session-close guardrail (required)
 
@@ -93,6 +95,7 @@ Branch state: `task/agent-platform-ws.6` contains the `agent-platform-ws.6` impl
 - Added cleanup safeguard tests covering broad path refusal, nested target deduplication, dry-run no-delete behavior, and force deletion against temporary directories.
 - Documented Docker cleanup versus host data cleanup, including Linux, macOS, Windows, and custom-path behavior.
 - Updated the task spec sign-off for the guarded cleanup task.
+- Fixed the CI/E2E `make workspace-init` failure by restoring the missing `node:path` `join` import after the shared config extraction.
 
 Quality gates passed:
 
@@ -100,13 +103,15 @@ Quality gates passed:
 - `pnpm docs:lint`
 - `node --test scripts/workspace-clean.test.mjs`
 - `make workspace-clean-dry-run`
+- `AGENT_PLATFORM_HOME=/private/tmp/agent-platform-workspace-init-check node scripts/workspace-init.mjs`
+- GitHub E2E pipelines passed after the workspace-init import fix.
 
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/agent-platform-ws.6`
-- **Latest task commit:** pending
+- **Latest task commit:** `3184e66` (`Fix workspace init shared config import`)
 - **Feature branch:** `feature/agent-platform-workspace-storage`
 - **Next task in chain:** `agent-platform-ws.5`
 
@@ -117,15 +122,14 @@ Quality gates passed:
 
 ### Quality
 
-- Cleanup script tests, docs lint, and repo format check passed in this session.
+- Cleanup script tests, docs lint, repo format check, focused workspace-init verification, and GitHub pipelines passed.
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push `task/agent-platform-ws.6` to `origin`.
-2. Sync/push Beads Dolt state from an environment with GitHub SSH/network access.
-3. Continue the chain with `agent-platform-ws.5` from `task/agent-platform-ws.6`.
+1. Sync/push Beads Dolt state from an environment with GitHub SSH/network access if it has not already been pushed.
+2. Continue the chain with `agent-platform-ws.5` from `task/agent-platform-ws.6`.
 
 ---
 
