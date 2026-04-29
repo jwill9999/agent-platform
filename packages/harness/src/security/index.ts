@@ -3,6 +3,7 @@ export type { Mount, MountPermission, PathOperation, PathValidationResult } from
 export { DEFAULT_MOUNTS, WORKSPACE_ROOT } from './mounts.js';
 export {
   DEFAULT_WORKSPACE_CONTAINER_PATH,
+  WORKSPACE_CHILD_DIRECTORIES,
   WORKSPACE_SUBDIRECTORIES,
   defaultPlatformHome,
   resolveWorkspaceConfig,

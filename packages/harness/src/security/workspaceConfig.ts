@@ -3,15 +3,8 @@ import { resolve, join } from 'node:path';
 
 export const DEFAULT_WORKSPACE_CONTAINER_PATH = '/workspace';
 
-export const WORKSPACE_SUBDIRECTORIES = [
-  'config',
-  'data',
-  'workspaces/default/uploads',
-  'workspaces/default/generated',
-  'workspaces/default/scratch',
-  'workspaces/default/exports',
-  'logs',
-] as const;
+export const WORKSPACE_SUBDIRECTORIES = ['config', 'logs'] as const;
+export const WORKSPACE_CHILD_DIRECTORIES = ['uploads', 'generated', 'scratch', 'exports'] as const;
 
 export type HostPlatform = 'linux' | 'darwin' | 'win32';
 
@@ -81,6 +74,11 @@ export function resolveWorkspaceConfig(options?: {
     workspaceHostPath,
     workspaceContainerPath,
     dataHostPath,
-    directories: WORKSPACE_SUBDIRECTORIES.map((dir) => join(platformHome, dir)),
+    directories: [
+      ...WORKSPACE_SUBDIRECTORIES.map((dir) => join(platformHome, dir)),
+      dataHostPath,
+      workspaceHostPath,
+      ...WORKSPACE_CHILD_DIRECTORIES.map((dir) => join(workspaceHostPath, dir)),
+    ],
   };
 }

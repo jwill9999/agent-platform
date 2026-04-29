@@ -4,15 +4,8 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const DEFAULT_WORKSPACE_CONTAINER_PATH = '/workspace';
-const WORKSPACE_SUBDIRECTORIES = [
-  'config',
-  'data',
-  'workspaces/default/uploads',
-  'workspaces/default/generated',
-  'workspaces/default/scratch',
-  'workspaces/default/exports',
-  'logs',
-];
+const WORKSPACE_SUBDIRECTORIES = ['config', 'logs'];
+const WORKSPACE_CHILD_DIRECTORIES = ['uploads', 'generated', 'scratch', 'exports'];
 
 function nonEmpty(value) {
   const trimmed = value?.trim();
@@ -45,7 +38,12 @@ function resolveWorkspaceConfig(env = process.env) {
     workspaceHostPath,
     dataHostPath,
     workspaceContainerPath,
-    directories: WORKSPACE_SUBDIRECTORIES.map((dir) => join(platformHome, dir)),
+    directories: [
+      ...WORKSPACE_SUBDIRECTORIES.map((dir) => join(platformHome, dir)),
+      dataHostPath,
+      workspaceHostPath,
+      ...WORKSPACE_CHILD_DIRECTORIES.map((dir) => join(workspaceHostPath, dir)),
+    ],
   };
 }
 

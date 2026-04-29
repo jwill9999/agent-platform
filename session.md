@@ -59,6 +59,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-ws.1a` platform behavior: workspace config resolver, `make workspace-init`, startup lifecycle wiring, and PathJail-backed file path normalization.
 - **Date:** 2026-04-29
 - **Session:** Added backlog task `agent-platform-ws.6` for guarded host workspace data removal on uninstall/reset.
+- **Date:** 2026-04-29
+- **Session:** Completed `agent-platform-ws.2` Docker runtime mount wiring: `/workspace` and `/data` are host-backed through workspace env vars, with compose/docs/tests updated.
 
 ### Session-close guardrail (required)
 
@@ -134,7 +136,7 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 
 ### Git
 
-- **Current branch:** `task/agent-platform-ws.1a`
+- **Current branch:** `task/agent-platform-ws.2`
 - **Remote:** task branch pending push at task completion
 - **Feature branch:** `feature/agent-platform-workspace-storage`
 - **Feature merge:** PR `#95` merged `feature/agent-platform-hitl` into `main`
@@ -167,8 +169,8 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 
 ## Next (priority order)
 
-1. Continue the chain with `agent-platform-ws.2` from `task/agent-platform-ws.1a`.
-2. Mount the configured host workspace into Docker at `/workspace`, keeping app data separate.
+1. Continue the chain with `agent-platform-ws.3` from `task/agent-platform-ws.2`.
+2. Deepen workspace PathJail/tool policy coverage across shell and file operations.
 3. If needed, push Beads Dolt state from an environment with GitHub SSH/network access.
 
 ---

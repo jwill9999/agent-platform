@@ -6,6 +6,14 @@
 # ---------------------------------------------------------------------------
 
 COMPOSE := docker compose --profile services
+AGENT_PLATFORM_HOME ?= $(CURDIR)/.agent-platform
+AGENT_WORKSPACE_HOST_PATH ?= $(AGENT_PLATFORM_HOME)/workspaces/default
+AGENT_WORKSPACE_CONTAINER_PATH ?= /workspace
+AGENT_DATA_HOST_PATH ?= $(AGENT_PLATFORM_HOME)/data
+export AGENT_PLATFORM_HOME
+export AGENT_WORKSPACE_HOST_PATH
+export AGENT_WORKSPACE_CONTAINER_PATH
+export AGENT_DATA_HOST_PATH
 
 .DEFAULT_GOAL := up
 

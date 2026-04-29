@@ -106,7 +106,14 @@ Configuration variables:
 | `AGENT_WORKSPACE_CONTAINER_PATH` | Container workspace path; default `/workspace`        |
 | `AGENT_DATA_HOST_PATH`           | Override host app data directory, separate from files |
 
-For local development, setup may use `./.agent-platform/` as a repo-local fallback. That directory is ignored by Git. On Docker Desktop for macOS and Windows, ensure the selected host directory is available to Docker file sharing.
+For local development, the Makefile and `.env.example` use `./.agent-platform/` as a repo-local fallback. That directory is ignored by Git. `make up`, `make restart`, `make reset`, and `make new` run `make workspace-init` first, so the host directories exist before Docker starts. On Docker Desktop for macOS and Windows, ensure the selected host directory is available to Docker file sharing.
+
+Docker mounts:
+
+| Host path                   | Container path | Purpose                                |
+| --------------------------- | -------------- | -------------------------------------- |
+| `AGENT_WORKSPACE_HOST_PATH` | `/workspace`   | User files: uploads, generated, export |
+| `AGENT_DATA_HOST_PATH`      | `/data`        | App/runtime data such as SQLite        |
 
 ### Host-Side Quality Gates
 

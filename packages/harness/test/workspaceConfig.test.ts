@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { join, resolve } from 'node:path';
 import {
   DEFAULT_WORKSPACE_CONTAINER_PATH,
+  WORKSPACE_CHILD_DIRECTORIES,
   WORKSPACE_SUBDIRECTORIES,
   defaultPlatformHome,
   resolveWorkspaceConfig,
@@ -56,8 +57,31 @@ describe('workspaceConfig', () => {
       env: { AGENT_PLATFORM_HOME: '/tmp/platform-home' },
     });
 
-    expect(config.directories).toEqual(
-      WORKSPACE_SUBDIRECTORIES.map((dir) => join('/tmp/platform-home', dir)),
-    );
+    expect(config.directories).toEqual([
+      ...WORKSPACE_SUBDIRECTORIES.map((dir) => join('/tmp/platform-home', dir)),
+      '/tmp/platform-home/data',
+      '/tmp/platform-home/workspaces/default',
+      ...WORKSPACE_CHILD_DIRECTORIES.map((dir) =>
+        join('/tmp/platform-home', 'workspaces', 'default', dir),
+      ),
+    ]);
+  });
+
+  it('creates workspace child directories under a custom workspace path', () => {
+    const config = resolveWorkspaceConfig({
+      platform: 'linux',
+      env: {
+        AGENT_PLATFORM_HOME: '/tmp/platform-home',
+        AGENT_WORKSPACE_HOST_PATH: '/tmp/custom-workspace',
+        AGENT_DATA_HOST_PATH: '/tmp/custom-data',
+      },
+    });
+
+    expect(config.directories).toEqual([
+      ...WORKSPACE_SUBDIRECTORIES.map((dir) => join('/tmp/platform-home', dir)),
+      '/tmp/custom-data',
+      '/tmp/custom-workspace',
+      ...WORKSPACE_CHILD_DIRECTORIES.map((dir) => join('/tmp/custom-workspace', dir)),
+    ]);
   });
 });

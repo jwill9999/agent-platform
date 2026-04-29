@@ -37,12 +37,12 @@ docker compose --profile services up --build
 
 ### Volumes
 
-| Volume          | Mount        | Purpose                           |
-| --------------- | ------------ | --------------------------------- |
-| `sqlite_data`   | `/data`      | SQLite database persistence       |
-| `e2e_workspace` | `/workspace` | E2E filesystem MCP test workspace |
+| Source env var              | Mount        | Purpose                      |
+| --------------------------- | ------------ | ---------------------------- |
+| `AGENT_DATA_HOST_PATH`      | `/data`      | App/runtime data persistence |
+| `AGENT_WORKSPACE_HOST_PATH` | `/workspace` | User workspace files         |
 
-Future workspace storage uses an explicit host directory mounted at `/workspace`. Keep app data separate from user files: app/runtime data belongs under `/data`, while user-created, uploaded, generated, scratch, and exported files belong under `/workspace`.
+Workspace storage uses an explicit host directory mounted at `/workspace`. Keep app data separate from user files: app/runtime data belongs under `/data`, while user-created, uploaded, generated, scratch, and exported files belong under `/workspace`.
 
 ### Health Checks
 
