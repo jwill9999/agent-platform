@@ -39,9 +39,9 @@ None.
 
 ### Downstream - waiting on this task
 
-| Issue                 | Spec                             |
-| --------------------- | -------------------------------- |
-| `agent-platform-ws.2` | [Spec](./agent-platform-ws.2.md) |
+| Issue                  | Spec                              |
+| ---------------------- | --------------------------------- |
+| `agent-platform-ws.1a` | [Spec](./agent-platform-ws.1a.md) |
 
 ### Planning notes
 

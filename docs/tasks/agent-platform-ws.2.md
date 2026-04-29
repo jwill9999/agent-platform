@@ -23,9 +23,9 @@ Mount the configured host workspace into the Docker runtime at `/workspace`, whi
 
 ### Upstream - must be complete before this task
 
-| Issue                 | Spec                             |
-| --------------------- | -------------------------------- |
-| `agent-platform-ws.1` | [Spec](./agent-platform-ws.1.md) |
+| Issue                  | Spec                              |
+| ---------------------- | --------------------------------- |
+| `agent-platform-ws.1a` | [Spec](./agent-platform-ws.1a.md) |
 
 ### Downstream - waiting on this task
 
@@ -62,6 +62,6 @@ Approval and PathJail behavior are not implemented here. This task only makes th
 
 ## Sign-off
 
-- [ ] Branch `task/agent-platform-ws.2` created from `task/agent-platform-ws.1`.
+- [ ] Branch `task/agent-platform-ws.2` created from `task/agent-platform-ws.1a`.
 - [ ] Docker/config checks pass.
 - [ ] `bd close agent-platform-ws.2 --reason "..."`

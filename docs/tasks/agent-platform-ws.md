@@ -16,6 +16,7 @@ The design must work across Linux, macOS, and Windows. The host path may differ 
 This epic covers:
 
 - A documented host workspace home and configuration convention.
+- Platform-owned config resolution, setup scripts, and initial PathJail workspace boundaries.
 - Docker runtime mounts for user files and app data.
 - File and shell tool policy that keeps user file operations jailed to the workspace.
 - Human-in-the-loop approval where file or shell operations are high risk.
@@ -37,16 +38,18 @@ This epic does not grant agents broad access to the developer's host filesystem.
 - Enforce PathJail checks before every file operation, including path normalization and symlink traversal.
 - Keep high-risk and explicitly approval-required tools behind HITL. Approval allows the attempted operation; it does not bypass the workspace jail.
 - Audit workspace reads, writes, denials, and approval decisions in human-readable terms.
+- Skills may guide file organization later, but skills must not own host path mapping, setup, or security enforcement.
 
 ## Child tasks
 
-| Issue                 | Title                                          | Spec                             |
-| --------------------- | ---------------------------------------------- | -------------------------------- |
-| `agent-platform-ws.1` | Define host workspace home and configuration   | [Spec](./agent-platform-ws.1.md) |
-| `agent-platform-ws.2` | Mount workspace storage into Docker runtime    | [Spec](./agent-platform-ws.2.md) |
-| `agent-platform-ws.3` | Enforce workspace PathJail and tool policy     | [Spec](./agent-platform-ws.3.md) |
-| `agent-platform-ws.4` | Expose workspace files in the UI and API       | [Spec](./agent-platform-ws.4.md) |
-| `agent-platform-ws.5` | Verify workspace security, HITL, and e2e flows | [Spec](./agent-platform-ws.5.md) |
+| Issue                  | Title                                                               | Spec                              |
+| ---------------------- | ------------------------------------------------------------------- | --------------------------------- |
+| `agent-platform-ws.1`  | Define host workspace home and configuration                        | [Spec](./agent-platform-ws.1.md)  |
+| `agent-platform-ws.1a` | Add workspace config, setup scripts, and PathJail platform behavior | [Spec](./agent-platform-ws.1a.md) |
+| `agent-platform-ws.2`  | Mount workspace storage into Docker runtime                         | [Spec](./agent-platform-ws.2.md)  |
+| `agent-platform-ws.3`  | Enforce workspace PathJail and tool policy                          | [Spec](./agent-platform-ws.3.md)  |
+| `agent-platform-ws.4`  | Expose workspace files in the UI and API                            | [Spec](./agent-platform-ws.4.md)  |
+| `agent-platform-ws.5`  | Verify workspace security, HITL, and e2e flows                      | [Spec](./agent-platform-ws.5.md)  |
 
 ## Dependency order
 
@@ -54,6 +57,7 @@ Execution order is enforced in Beads:
 
 ```text
 agent-platform-ws.1
+  -> agent-platform-ws.1a
   -> agent-platform-ws.2
   -> agent-platform-ws.3
   -> agent-platform-ws.4
@@ -70,6 +74,7 @@ Use `feature/agent-platform-workspace-storage` for the integration branch. Each 
 
 - [ ] All child tasks are closed in Beads.
 - [ ] Host workspace and app data locations are documented for Linux, macOS, and Windows.
+- [ ] Config/setup scripts create the workspace structure without requiring an agent skill.
 - [ ] Docker mounts the host workspace into `/workspace` and app data into a separate container path.
 - [ ] File-capable tools cannot escape the configured workspace through relative paths, absolute paths, or symlinks.
 - [ ] High-risk shell/file operations keep explicit HITL approval.

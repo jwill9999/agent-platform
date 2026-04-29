@@ -52,7 +52,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Date:** 2026-04-29
 - **Session:** `feature/agent-platform-hitl` merged into `main`; closed `agent-platform-hitl.5` and auto-closed HITL epic in Beads.
 - **Date:** 2026-04-29
-- **Session:** Planned next epic `agent-platform-ws` for host workspace storage, with five chained Beads tasks and task specs.
+- **Session:** Planned next epic `agent-platform-ws` for host workspace storage, with six chained Beads tasks and task specs.
 
 ### Session-close guardrail (required)
 
@@ -72,14 +72,16 @@ Branch state: `codex/workspace-storage-planning` contains planning artifacts onl
 - Created Beads epic `agent-platform-ws`: Host workspace storage for user files.
 - Created chained tasks:
   - `agent-platform-ws.1` Define host workspace home and configuration.
+  - `agent-platform-ws.1a` Add workspace config, setup scripts, and PathJail platform behavior.
   - `agent-platform-ws.2` Mount workspace storage into Docker runtime.
   - `agent-platform-ws.3` Enforce workspace PathJail and tool policy.
   - `agent-platform-ws.4` Expose workspace files in the UI and API.
   - `agent-platform-ws.5` Verify workspace security, HITL, and e2e flows.
 - Added task specs under `docs/tasks/agent-platform-ws*.md`.
 - Planned feature branch: `feature/agent-platform-workspace-storage`.
-- Planned task chain: `task/agent-platform-ws.1` -> `task/agent-platform-ws.2` -> `task/agent-platform-ws.3` -> `task/agent-platform-ws.4` -> `task/agent-platform-ws.5`.
+- Planned task chain: `task/agent-platform-ws.1` -> `task/agent-platform-ws.1a` -> `task/agent-platform-ws.2` -> `task/agent-platform-ws.3` -> `task/agent-platform-ws.4` -> `task/agent-platform-ws.5`.
 - Core design direction: host workspace lives in an OS-conventional app home and mounts into Docker at `/workspace`; app data remains separate; file tools are jailed; high-risk operations keep HITL approval.
+  Skills may later guide agents on where to place files, but config, setup, host mapping, and security enforcement belong to the platform.
 
 ### HITL epic complete
 
