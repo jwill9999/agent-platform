@@ -186,6 +186,56 @@ describe('toolDispatchNode', () => {
     expect(result.trace!.some((t: { type: string }) => t.type === 'tool_dispatch')).toBe(true);
   });
 
+  it('formats approved shell command failures for human-readable follow-up', async () => {
+    const nativeResult: Output = {
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: {
+        stdout: '',
+        stderr: 'touch: /workspace/hitl-approval-test.txt: Permission denied',
+        exitCode: 1,
+      },
+    };
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      tools: [
+        makeTool({
+          id: 'sys_bash',
+          slug: 'sys-bash',
+          name: 'sys_bash',
+          riskTier: 'high',
+          requiresApproval: true,
+        }),
+      ],
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvedToolCallIds: new Set(['tc-shell']),
+    };
+    const node = createToolDispatchNode(ctx);
+    const result = await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [
+            {
+              id: 'tc-shell',
+              name: 'sys_bash',
+              args: { command: 'touch /workspace/hitl-approval-test.txt' },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(result.messages![0]!.content).toContain('The command did not complete successfully.');
+    expect(result.messages![0]!.content).toContain(
+      'touch: /workspace/hitl-approval-test.txt: Permission denied',
+    );
+    expect(result.messages![0]!.content).not.toContain('"stderr"');
+    expect(result.messages![0]!.content).not.toContain('"exitCode"');
+  });
+
   it('rejects tool not in agent allowlist', async () => {
     const ctx: ToolDispatchContext = {
       agent: makeAgent({ allowedToolIds: [], allowedMcpServerIds: [] }),

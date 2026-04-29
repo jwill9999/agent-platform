@@ -45,6 +45,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Fixed approval-resume draft accumulation across DoD revisions and stopped DoD cap failures from showing as global chat errors.
 - **Date:** 2026-04-29
 - **Session:** Added spacing above the final critic review block in chat output.
+- **Date:** 2026-04-29
+- **Session:** Made shell command failure results feed back to the assistant in plain language instead of raw stdout/stderr/exitCode jargon.
 
 ### Session-close guardrail (required)
 
@@ -107,6 +109,7 @@ HITL.5 progress:
 - Reused normal-chat revision reset behavior for approval resume streams so repeated DoD drafts do not concatenate duplicate command output.
 - Rendered `DOD_FAILED` as critic cap metadata rather than a dismissible global error banner.
 - Added top margin to the final critic review block so it no longer sits tight against the assistant answer paragraph.
+- Formatted `sys_bash` tool messages for the follow-up LLM step as plain-language success/failure summaries, reducing raw coding jargon in assistant answers after command errors.
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 
