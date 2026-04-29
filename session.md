@@ -77,6 +77,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Started `agent-platform-ws.5` final workspace verification on `task/agent-platform-ws.5`; added compose persistence/security verification and Workspace UI e2e coverage.
 - **Date:** 2026-04-29
 - **Session:** Added user-facing workspace storage documentation and README references for setup, security, cleanup, UI/API, and verification behavior.
+- **Date:** 2026-04-29
+- **Session:** `task/agent-platform-ws.5` merged into `feature/agent-platform-workspace-storage`; removed generated workspace test artifacts from the feature-to-main PR.
 
 ### Session-close guardrail (required)
 
@@ -98,6 +100,7 @@ Branch state: `task/agent-platform-ws.5` contains the `agent-platform-ws.5` impl
 - Added `e2e/workspace-files.spec.ts` to verify Settings > Workspace shows generated files and downloads them through the BFF.
 - Added `docs/workspace-storage.md` as the user-facing reference for host workspace setup, OS-specific locations, security boundaries, UI/API behavior, cleanup/uninstall commands, and verification coverage.
 - Updated `README.md` and existing docs to reference the workspace storage guide and current Makefile workflow.
+- Merged the final workspace task chain into `feature/agent-platform-workspace-storage` through PR #102 and removed generated `.agent-platform/workspaces/default/generated/*` artifacts from version control before main merge.
 - Updated the workspace epic/task specs to reflect final verification coverage and completed acceptance criteria that can be proven before feature-branch merge.
 - Existing coverage already verifies PathJail traversal/symlink escape denial, shell workspace policy, HITL approval gating, approval resume, and human-readable tool failure output.
 
