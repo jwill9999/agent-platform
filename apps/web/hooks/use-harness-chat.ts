@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import type {
   ApprovalRequest,
@@ -79,6 +79,13 @@ export type ApprovalCardState = ApprovalRequiredStreamEvent & {
 };
 
 export type ApprovalDecision = 'approve' | 'reject';
+
+const BLOCKING_APPROVAL_STATUSES = new Set<ApprovalCardStatus>([
+  'pending',
+  'approving',
+  'rejecting',
+  'failed',
+]);
 
 function formatToolResultPreview(data: unknown, maxLen = 6000): string {
   if (typeof data === 'string') return data.length > maxLen ? `${data.slice(0, maxLen)}…` : data;
@@ -290,6 +297,14 @@ function updateApprovalStatus(
   );
 }
 
+export function hasBlockingApprovalEvents(
+  approvalsByMessage: Record<string, readonly ApprovalCardState[]>,
+): boolean {
+  return Object.values(approvalsByMessage).some((approvals) =>
+    approvals.some((approval) => BLOCKING_APPROVAL_STATUSES.has(approval.status)),
+  );
+}
+
 async function listPendingApprovals(sessionId: string): Promise<ApprovalRequest[]> {
   const params = new URLSearchParams({ sessionId, status: 'pending' });
   const res = await fetch(`${apiPath('approval-requests')}?${params.toString()}`, {
@@ -323,6 +338,10 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const [approvalEventsByMessage, setApprovalEventsByMessage] = useState<
     Record<string, ApprovalCardState[]>
   >({});
+  const hasPendingApproval = useMemo(
+    () => hasBlockingApprovalEvents(approvalEventsByMessage),
+    [approvalEventsByMessage],
+  );
   const resumeRef = useRef(resume);
   resumeRef.current = resume;
 
@@ -429,7 +448,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const sendMessage = useCallback(
     async (messageForApi: string, displayText?: string, modelConfigId?: string | null) => {
       const trimmed = messageForApi.trim();
-      if (!sessionId || !trimmed) return;
+      if (!sessionId || !trimmed || hasPendingApproval) return;
 
       const userVisible = displayText ?? trimmed;
       const assistantId = crypto.randomUUID();
@@ -523,11 +542,22 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         setStatus('ready');
       }
     },
-    [sessionId, updateAssistantMessage, appendCriticEvent, appendThinking, appendApprovalRequired],
+    [
+      sessionId,
+      hasPendingApproval,
+      updateAssistantMessage,
+      appendCriticEvent,
+      appendThinking,
+      appendApprovalRequired,
+    ],
   );
 
   const decideApproval = useCallback(
-    async (approvalRequestId: string, decision: ApprovalDecision) => {
+    async (
+      approvalRequestId: string,
+      decision: ApprovalDecision,
+      modelConfigId?: string | null,
+    ) => {
       if (!sessionId || status === 'streaming') return;
       const inFlightStatus = decision === 'approve' ? 'approving' : 'rejecting';
       const terminalStatus = decision === 'approve' ? 'executed' : 'rejected';
@@ -548,7 +578,10 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
 
         const res = await fetch(apiPath('sessions', sessionId, 'resume'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(modelConfigId ? { 'x-model-config-id': modelConfigId } : {}),
+          },
           body: JSON.stringify({ approvalRequestId }),
         });
         if (!res.ok) throw new Error(await parseErrorResponse(res));
@@ -609,5 +642,6 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     criticEventsByMessage,
     thinkingByMessage,
     approvalEventsByMessage,
+    hasPendingApproval,
   };
 }

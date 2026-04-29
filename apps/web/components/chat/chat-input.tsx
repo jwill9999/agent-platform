@@ -13,6 +13,8 @@ interface ChatInputProps {
   isLoading: boolean;
   /** When false, sending is blocked (e.g. session not ready yet). */
   canSend?: boolean;
+  /** Optional status text shown below the composer. */
+  statusText?: string;
   /** Attached files/snippets (optional — pass to enable attachment UI). */
   attachments?: AttachmentEntry[];
   /** Callback when user picks or drops files. */
@@ -30,6 +32,7 @@ export function ChatInput({
   onSend,
   isLoading,
   canSend = true,
+  statusText,
   attachments,
   onAddFiles,
   onRemoveAttachment,
@@ -269,7 +272,10 @@ export function ChatInput({
           </div>
         </section>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          {canSend ? 'Press Enter to send, Shift+Enter for new line' : 'Waiting for chat session…'}
+          {statusText ??
+            (canSend
+              ? 'Press Enter to send, Shift+Enter for new line'
+              : 'Waiting for chat session…')}
         </p>
       </form>
     </div>

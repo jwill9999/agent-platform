@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { mergeApprovalEvent, renderStreamEvent } from '../hooks/use-harness-chat';
+import {
+  hasBlockingApprovalEvents,
+  mergeApprovalEvent,
+  renderStreamEvent,
+} from '../hooks/use-harness-chat';
 
 describe('harness chat stream parser', () => {
   it('keeps approval_required metadata separate from assistant text', () => {
@@ -60,5 +64,37 @@ describe('harness chat stream parser', () => {
       status: 'pending',
       argsPreview: { command: 'pwd' },
     });
+  });
+
+  it('treats unresolved approval cards as send blockers', () => {
+    expect(
+      hasBlockingApprovalEvents({
+        'message-1': [
+          {
+            type: 'approval_required',
+            approvalRequestId: 'approval-1',
+            toolName: 'sys_bash',
+            riskTier: 'high',
+            argsPreview: { command: 'date' },
+            status: 'pending',
+          },
+        ],
+      }),
+    ).toBe(true);
+
+    expect(
+      hasBlockingApprovalEvents({
+        'message-1': [
+          {
+            type: 'approval_required',
+            approvalRequestId: 'approval-1',
+            toolName: 'sys_bash',
+            riskTier: 'high',
+            argsPreview: { command: 'date' },
+            status: 'executed',
+          },
+        ],
+      }),
+    ).toBe(false);
   });
 });

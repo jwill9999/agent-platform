@@ -39,6 +39,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Fixed OpenAI tool-schema rejection for MCP schemas using unsupported `propertyNames` keyword.
 - **Date:** 2026-04-29
 - **Session:** Fixed replay of unresolved pending approval tool calls causing OpenAI missing tool response errors.
+- **Date:** 2026-04-29
+- **Session:** Fixed HITL approval resume to reuse the selected model config and block new prompts while an approval is unresolved.
 
 ### Session-close guardrail (required)
 
@@ -96,6 +98,8 @@ HITL.5 progress:
 - Added web unit coverage for approval parsing/deduplication and a Playwright fixture for approval card states.
 - Sanitised unsupported `propertyNames` JSON Schema keywords before tools are sent to the LLM; this fixes `browser_drop` schema validation blocking approval UI testing.
 - Sanitised chat history replay so unresolved pending approval `tool_calls` are not sent back to OpenAI on later normal chat turns.
+- Forwarded the selected model config through approval resume so the resume call does not fall back to a stale/invalid env key after the normal chat turn succeeds.
+- Blocked the chat composer while an approval card is pending/approving/rejecting/failed to prevent overlapping normal prompts and resume output from interleaving.
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 

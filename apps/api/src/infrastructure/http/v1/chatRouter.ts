@@ -597,7 +597,12 @@ export async function handleSessionResume(
   const agentCtx = await loadAgentContext(db, session.agentId, {
     globalPlugins: options.globalPlugins,
   });
-  const modelCfg = resolveModelOrThrow(db, agentCtx, req.header('x-openai-key'));
+  const modelCfg = resolveModelOrThrow(
+    db,
+    agentCtx,
+    req.header('x-openai-key'),
+    req.header('x-model-config-id') || undefined,
+  );
   const { timeoutMs } = agentCtx.agent.executionLimits;
   const release = await sessionLock.acquire(sessionId, timeoutMs);
 

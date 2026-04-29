@@ -15,6 +15,8 @@ export interface ChatProps {
   isLoading: boolean;
   /** When false, input is disabled until a session id exists. */
   canSend?: boolean;
+  /** Optional input helper text shown below the composer. */
+  inputStatusText?: string;
   /** Context attachments (optional — pass to enable attachment UI). */
   attachments?: AttachmentEntry[];
   /** Callback when user picks or drops files. */
@@ -40,6 +42,7 @@ export function Chat({
   onSend,
   isLoading,
   canSend = true,
+  inputStatusText,
   attachments,
   onAddFiles,
   onRemoveAttachment,
@@ -89,9 +92,7 @@ export function Chat({
                     message.role === 'assistant' ? thinkingByMessage?.[message.id] : undefined
                   }
                   approvals={
-                    message.role === 'assistant'
-                      ? approvalEventsByMessage?.[message.id]
-                      : undefined
+                    message.role === 'assistant' ? approvalEventsByMessage?.[message.id] : undefined
                   }
                   onApprovalDecision={onApprovalDecision}
                 />
@@ -107,6 +108,7 @@ export function Chat({
         onSend={onSend}
         isLoading={isLoading}
         canSend={canSend}
+        statusText={inputStatusText}
         attachments={attachments}
         onAddFiles={onAddFiles}
         onRemoveAttachment={onRemoveAttachment}
