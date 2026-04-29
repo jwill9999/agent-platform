@@ -50,7 +50,7 @@ async function createSeededApp(
   const { db, sqlite } = openDatabase(sqlitePath);
   runSeed(db);
   const llmReasonNode = async (state: { taskIndex?: number; totalTokensUsed?: number }) => {
-    const result = mockToolCalls();
+    const result = mockToolCalls(state);
     if (typeof result === 'string') {
       return {
         llmOutput: { kind: 'text' as const, content: result },
@@ -333,6 +333,31 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(200);
       expect(duplicateResume.body.data.resumedAtMs).toEqual(expect.any(Number));
       await expectToolExecutionCount(db, sessionId, 'success', 1);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('does not replay unresolved pending approval tool calls into later chat turns', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionId = await createDefaultSession(app);
+      await createPendingToolApproval(app, sessionId);
+
+      mockToolCalls.mockReturnValueOnce('I can continue without replaying pending tool calls');
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Continue without approving yet' })
+        .expect(200);
+
+      const followUpState = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; toolCalls?: unknown[] }>;
+      };
+      expect(followUpState.messages?.some((message) => message.toolCalls?.length)).toBe(false);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

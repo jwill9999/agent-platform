@@ -37,6 +37,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Started HITL.5 frontend approval UX: hook state, inline approval cards, decision/resume handling, and focused tests.
 - **Date:** 2026-04-29
 - **Session:** Fixed OpenAI tool-schema rejection for MCP schemas using unsupported `propertyNames` keyword.
+- **Date:** 2026-04-29
+- **Session:** Fixed replay of unresolved pending approval tool calls causing OpenAI missing tool response errors.
 
 ### Session-close guardrail (required)
 
@@ -93,6 +95,7 @@ HITL.5 progress:
 - Added pending approval hydration for resumed sessions.
 - Added web unit coverage for approval parsing/deduplication and a Playwright fixture for approval card states.
 - Sanitised unsupported `propertyNames` JSON Schema keywords before tools are sent to the LLM; this fixes `browser_drop` schema validation blocking approval UI testing.
+- Sanitised chat history replay so unresolved pending approval `tool_calls` are not sent back to OpenAI on later normal chat turns.
 
 Note: `bd` changes were applied locally, but automatic remote push failed because the sandbox could not resolve/authenticate to GitHub.
 

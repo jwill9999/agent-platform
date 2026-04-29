@@ -199,20 +199,46 @@ export function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
 }
 
 /**
- * Sanitise replayed history so that no `role:'tool'` message appears without
- * a preceding assistant message that carries the matching `tool_calls`.
+ * Sanitise replayed history so that persisted tool-call conversations satisfy
+ * OpenAI's adjacency rule:
+ *   assistant(tool_calls=[a,b]) → tool(a) → tool(b)
  *
- * Older rows may not have persisted assistant `toolCalls`; without them, every
- * persisted tool message would be orphaned and the OpenAI API rejects the
- * conversation with:
- *   "messages with role 'tool' must be a response to a preceding message with 'tool_calls'"
+ * Pending approval turns intentionally have an assistant `tool_calls` row with
+ * no tool result yet. Those rows must not be replayed during a later normal
+ * chat request, or OpenAI rejects the entire conversation. The resume endpoint
+ * appends the reviewed assistant tool call at the end immediately before it
+ * dispatches the matching tool result.
  *
- * Strip any legacy orphan rows whose preceding assistant message has no
- * matching `toolCalls`.
+ * Older rows may also lack persisted assistant `toolCalls`; strip any orphan
+ * tool rows that cannot be paired with the immediately preceding assistant.
  */
-function stripOrphanToolMessages(history: ChatMessage[]): ChatMessage[] {
+function sanitiseToolCallHistory(history: ChatMessage[]): ChatMessage[] {
   const cleaned: ChatMessage[] = [];
-  for (const msg of history) {
+  for (let i = 0; i < history.length; i += 1) {
+    const msg = history[i]!;
+    if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
+      const toolCalls = msg.toolCalls;
+      const toolResults: ChatMessage[] = [];
+      let cursor = i + 1;
+      for (const toolCall of toolCalls) {
+        const candidate = history[cursor];
+        if (candidate?.role !== 'tool' || candidate.toolCallId !== toolCall.id) {
+          toolResults.length = 0;
+          break;
+        }
+        toolResults.push({
+          ...candidate,
+          toolName: candidate.toolName || toolCall.name,
+        });
+        cursor += 1;
+      }
+      if (toolResults.length === toolCalls.length) {
+        cleaned.push(msg, ...toolResults);
+        i = cursor - 1;
+      }
+      continue;
+    }
+
     if (msg.role === 'tool') {
       const prev = cleaned.at(-1);
       const hasMatchingCall =
@@ -373,7 +399,7 @@ function buildResumeMessages(
   systemPrompt: string,
   toolCall: ToolCallIntent,
 ): ChatMessage[] {
-  const history = stripOrphanToolMessages(
+  const history = sanitiseToolCallHistory(
     listMessagesBySession(db, sessionId).map(dbRecordToChatMessage),
   );
   const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...history];
@@ -852,7 +878,7 @@ function buildConversationMessages(
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
 
-    const history = stripOrphanToolMessages(priorMessages.map(dbRecordToChatMessage));
+    const history = sanitiseToolCallHistory(priorMessages.map(dbRecordToChatMessage));
     const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
     const counter = createApproximateCounter();
 
