@@ -51,6 +51,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Refactored duplicated HITL stream/lifecycle handling in `chatRouter.ts` and `use-harness-chat.ts` for SonarCloud PR 94.
 - **Date:** 2026-04-29
 - **Session:** `feature/agent-platform-hitl` merged into `main`; closed `agent-platform-hitl.5` and auto-closed HITL epic in Beads.
+- **Date:** 2026-04-29
+- **Session:** Planned next epic `agent-platform-ws` for host workspace storage, with five chained Beads tasks and task specs.
 
 ### Session-close guardrail (required)
 
@@ -63,7 +65,23 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### HITL epic complete ✅
+### Workspace storage epic planned
+
+Branch state: `codex/workspace-storage-planning` contains planning artifacts only.
+
+- Created Beads epic `agent-platform-ws`: Host workspace storage for user files.
+- Created chained tasks:
+  - `agent-platform-ws.1` Define host workspace home and configuration.
+  - `agent-platform-ws.2` Mount workspace storage into Docker runtime.
+  - `agent-platform-ws.3` Enforce workspace PathJail and tool policy.
+  - `agent-platform-ws.4` Expose workspace files in the UI and API.
+  - `agent-platform-ws.5` Verify workspace security, HITL, and e2e flows.
+- Added task specs under `docs/tasks/agent-platform-ws*.md`.
+- Planned feature branch: `feature/agent-platform-workspace-storage`.
+- Planned task chain: `task/agent-platform-ws.1` -> `task/agent-platform-ws.2` -> `task/agent-platform-ws.3` -> `task/agent-platform-ws.4` -> `task/agent-platform-ws.5`.
+- Core design direction: host workspace lives in an OS-conventional app home and mounts into Docker at `/workspace`; app data remains separate; file tools are jailed; high-risk operations keep HITL approval.
+
+### HITL epic complete
 
 Branch state: `main` is checked out and tracking `origin/main`.
 
@@ -137,8 +155,9 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 
 ## Next (priority order)
 
-1. Pick the next epic/task with `bd ready` after Beads remote sync is available.
-2. If needed, push Beads Dolt state from an environment with GitHub SSH/network access.
+1. Create `feature/agent-platform-workspace-storage` from updated `main`.
+2. Start `agent-platform-ws.1` on `task/agent-platform-ws.1`.
+3. If needed, push Beads Dolt state from an environment with GitHub SSH/network access.
 
 ---
 
@@ -161,6 +180,7 @@ Note: Beads changes were applied locally. Beads Dolt auto-push failed because th
 | `docs/planning/security.md`               | Threat model (8 categories)                |
 | `docs/tasks/agent-platform-hitl.md`       | Completed HITL epic                        |
 | `docs/tasks/agent-platform-hitl.5.md`     | Final completed HITL frontend task         |
+| `docs/tasks/agent-platform-ws.md`         | Planned workspace storage epic             |
 | `docs/planning/frontend-ui-phases.md`     | Frontend UI phased plan (unblocked)        |
 | `docs/tasks/`                             | Task spec files                            |
 

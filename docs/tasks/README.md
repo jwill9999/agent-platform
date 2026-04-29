@@ -72,6 +72,7 @@ Spec: docs/tasks/<issue-id>.md
 | Frontend          | `agent-platform-ast`  | `agent-platform-ast.{1-3}.md`  |
 | MVP E2E           | `agent-platform-o36`  | `agent-platform-o36.{1-2}.md`  |
 | HITL approvals    | `agent-platform-hitl` | `agent-platform-hitl.{1-5}.md` |
+| Workspace storage | `agent-platform-ws`   | `agent-platform-ws.{1-5}.md`   |
 
 ## Commands
 
