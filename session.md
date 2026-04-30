@@ -119,8 +119,6 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Implemented `agent-platform-code-tools.5` governed quality-gate runner on `task/agent-platform-code-tools.5`.
 - **Date:** 2026-04-30
 - **Session:** Completed `agent-platform-code-tools.5` governed quality-gate runner; Beads is closed/synced and the branch is ready for PR after push.
-- **Date:** 2026-04-30
-- **Session:** Follow-up IDE manual-test fix: guarded the native folder picker so repeated Open Folder clicks cannot raise "File picker already active".
 
 ### Session-close guardrail (required)
 
@@ -248,13 +246,6 @@ Quality gates passed:
 - Completed broad terminal quality gates for `.5`.
 - Closed `agent-platform-code-tools.5` in Beads and synced Beads/Dolt.
 
-### IDE folder picker follow-up fixed
-
-- During manual testing, repeated Open Folder clicks in the frontend IDE could call `showDirectoryPicker` while the native picker was still open.
-- Added explicit `isOpeningDirectory` state and a ref guard in `useFileSystem.openDirectory`.
-- Disabled IDE Open Folder/Refresh/Restore-folder controls while the picker or file-tree load is busy.
-- Suppressed the browser's transient `InvalidStateError` for already-active picker prompts when one slips through.
-
 ## Current state
 
 ### Git
@@ -262,8 +253,8 @@ Quality gates passed:
 - **Current branch:** `task/agent-platform-code-tools.5`
 - **Current commit:** `164b93f` (`Claim code tools governed test runner task`) plus local uncommitted completed `.5` implementation
 - **Latest completed task:** `agent-platform-code-tools.5` closed in Beads
-- **Current work:** Follow-up IDE folder picker fix on `task/agent-platform-code-tools.5`
-- **Remote sync:** Beads/Dolt is synced; branch includes `.5` implementation and pending folder-picker follow-up commit.
+- **Current work:** Commit and push `task/agent-platform-code-tools.5`
+- **Remote sync:** Beads/Dolt is synced; implementation commit and branch push are next.
 
 ### Beads
 
@@ -335,18 +326,12 @@ Quality gates passed:
   - `pnpm docs:lint`
   - `pnpm exec prettier --check session.md`
   - `git diff --check`
-- IDE folder picker follow-up checks passed:
-  - `pnpm --filter @agent-platform/web run typecheck`
-  - `pnpm --filter @agent-platform/web run lint`
-  - `pnpm --filter @agent-platform/web run test`
-  - `pnpm exec prettier --check apps/web/hooks/use-file-system.ts apps/web/components/ide/ide-with-chat.tsx`
-  - `git diff --check`
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push the IDE folder picker follow-up on `task/agent-platform-code-tools.5`.
+1. Commit and push `task/agent-platform-code-tools.5`.
 2. Open or arrange the PR for `.5` into the coding-tools chain.
 3. After `.5`, next downstream task is `agent-platform-code-tools.6`: repository map and code search.
 

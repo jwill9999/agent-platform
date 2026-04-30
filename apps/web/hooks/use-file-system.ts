@@ -37,8 +37,6 @@ export interface UseFileSystemReturn {
   fileTree: FileNode[];
   /** Whether the tree is currently loading */
   isLoading: boolean;
-  /** Whether the native directory picker is currently open */
-  isOpeningDirectory: boolean;
   /** Error message if any */
   error: string | null;
   /** Open a directory picker and load the tree */
@@ -271,14 +269,12 @@ async function restorePersistedFolder(
 export function useFileSystem(): UseFileSystemReturn {
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOpeningDirectory, setIsOpeningDirectory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rootName, setRootName] = useState<string | null>(null);
   const [isDirectoryOpen, setIsDirectoryOpen] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
 
   const rootHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
-  const directoryPickerActiveRef = useRef(false);
   /** Bumps on each loadTree start; only the latest completion may commit state (avoids races with restore vs picker). */
   const loadGenerationRef = useRef(0);
   /**
@@ -423,15 +419,6 @@ export function useFileSystem(): UseFileSystemReturn {
       return;
     }
 
-    if (directoryPickerActiveRef.current) {
-      fsDebugLog('picker:already_active');
-      return;
-    }
-
-    directoryPickerActiveRef.current = true;
-    setIsOpeningDirectory(true);
-    setError(null);
-
     try {
       const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
       fsDebugLog('picker:resolved', handle.name);
@@ -447,20 +434,9 @@ export function useFileSystem(): UseFileSystemReturn {
         fsDebugLog('picker:cancelled');
         return;
       }
-      if (
-        err instanceof DOMException &&
-        err.name === 'InvalidStateError' &&
-        err.message.includes('picker already active')
-      ) {
-        fsDebugLog('picker:already_active_error');
-        return;
-      }
       const message = err instanceof Error ? err.message : 'Failed to open directory';
       fsDebugLog('picker:error', message);
       setError(message);
-    } finally {
-      directoryPickerActiveRef.current = false;
-      setIsOpeningDirectory(false);
     }
   }, [loadTree, clearReconnectState]);
 
@@ -511,7 +487,6 @@ export function useFileSystem(): UseFileSystemReturn {
     rootName,
     fileTree,
     isLoading,
-    isOpeningDirectory,
     error,
     openDirectory,
     readFile,
