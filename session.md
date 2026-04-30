@@ -145,6 +145,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Remembered future epic refinement workflow: review specs/tickets with owner before moving epics from refinement/planning to ready.
 - **Date:** 2026-04-30
 - **Session:** Started memory epic setup: created `feature/agent-platform-memory`, created `task/agent-platform-memory.1`, created seven memory child tasks/specs, and claimed `.1`.
+- **Date:** 2026-04-30
+- **Session:** Paused before implementing `agent-platform-memory.1`; remembered long-term memory v1 should use a relational store with optional links, not a graph database.
 
 ### Session-close guardrail (required)
 
@@ -344,6 +346,8 @@ Quality gates passed:
   - `docs/tasks/agent-platform-memory.6.md`
   - `docs/tasks/agent-platform-memory.7.md`
 - Created matching Beads child tasks, linked them under `agent-platform-memory`, chained dependencies from `.1` through `.7`, claimed `agent-platform-memory.1`, and synced Beads/Dolt.
+- Long-term memory planning decision: v1 should use a relational SQLite/Postgres-compatible memory table with scope, kind, review status, confidence/source metadata, tags/metadata, expiry, and optional `memory_links` for graph-like relationships. Do not introduce a graph database initially; consider vector search or graph traversal later if retrieval needs prove it.
+- Added Beads memory `memory-epic-planning-decision-start-long-term-memory` with this direction.
 
 ## Current state
 
@@ -353,7 +357,7 @@ Quality gates passed:
 - **Current base:** `main` / `feature/agent-platform-memory` after code-tools merge and planning follow-ups.
 - **Latest completed task:** `agent-platform-code-tools.7` coding tool visibility and E2E validation
 - **Current work:** `agent-platform-memory.1` memory contracts, schema, repository, and policy model is claimed.
-- **Remote sync:** Beads/Dolt is synced after creating memory child tasks and claiming `.1`; task branch should be pushed after this setup commit.
+- **Remote sync:** Beads/Dolt is synced after creating memory child tasks, claiming `.1`, and recording the long-term memory store decision.
 
 ### Beads
 
@@ -475,9 +479,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push the memory setup commit on `task/agent-platform-memory.1`.
+1. Resume on `task/agent-platform-memory.1`.
 2. Refine `agent-platform-memory.1` with the owner before implementation if needed.
-3. Implement `agent-platform-memory.1`: shared contracts, DB schema/repository, and policy model.
+3. Implement `agent-platform-memory.1`: shared contracts, relational DB schema/repository, policy model, and optional memory link model.
 
 ---
 
