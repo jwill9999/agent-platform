@@ -105,6 +105,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Addressed SonarCloud hotspot `javascript:S4036` by using a fixed absolute sqlite3 path for runtime-config backup.
 - **Date:** 2026-04-30
 - **Session:** Completed `agent-platform-code-tools.3` structured edit tool on `task/agent-platform-code-tools.3`.
+- **Date:** 2026-04-30
+- **Session:** Follow-up Sonar cleanup on `task/agent-platform-code-tools.3`: deduplicated coding-envelope audit log tests.
 
 ### Session-close guardrail (required)
 
@@ -203,15 +205,19 @@ Quality gates passed:
 - MCP trust guard now prevents MCP tools from shadowing `coding_apply_patch`.
 - Added regression coverage for schema round-trips, coding tool allowlist behavior, dry-run/apply/create, binary denial, traversal denial, symlink denial, and coding audit statuses.
 
+### Sonar duplicate-code follow-up
+
+- Refactored duplicated coding-envelope setup in `packages/harness/test/toolAuditLog.test.ts` into a shared helper while keeping distinct error/denied status assertions.
+
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/agent-platform-code-tools.3`
-- **Current commit:** local uncommitted implementation of `agent-platform-code-tools.3`
-- **Latest completed task:** `agent-platform-code-tools.3` closed in Beads; pending commit/push
-- **Current work:** Structured coding edit tool
-- **Remote sync:** next step is to close Beads, commit, and push `task/agent-platform-code-tools.3`.
+- **Current commit:** `e600a74` follow-up Sonar duplicate-code cleanup, pending session handoff amend/push
+- **Latest completed task:** `agent-platform-code-tools.3` closed in Beads
+- **Current work:** Structured coding edit tool branch follow-up
+- **Remote sync:** next step is to amend this session update into the follow-up commit and push `task/agent-platform-code-tools.3`.
 
 ### Beads
 
@@ -238,12 +244,17 @@ Quality gates passed:
   - `pnpm lint`
   - `pnpm format:check`
   - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
+- Sonar duplicate-code follow-up checks passed:
+  - `pnpm --filter @agent-platform/harness run test -- test/toolAuditLog.test.ts`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm exec prettier --check packages/harness/test/toolAuditLog.test.ts`
+  - `git diff --check`
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push `task/agent-platform-code-tools.3`.
+1. Push `task/agent-platform-code-tools.3`.
 2. Open/arrange PR from `task/agent-platform-code-tools.3` into the code-tools chain branch as needed.
 3. Next downstream task after merge: `agent-platform-code-tools.4` read-only git tools.
 

@@ -31,6 +31,28 @@ function createMemoryStore() {
   return { store, entries, completions };
 }
 
+function completeCodingEnvelope(
+  evidenceStatus: 'failed' | 'denied',
+  error: { code: string; message: string },
+) {
+  const { store, completions } = createMemoryStore();
+  const logger = createToolAuditLogger(store);
+
+  const id = logger.logStart('coding_apply_patch', { operations: [] }, 'agent-1', 'session-1');
+  const output: Output = {
+    type: 'tool_result',
+    toolId: 'coding_apply_patch',
+    data: {
+      ok: false,
+      evidence: { status: evidenceStatus },
+      error,
+    },
+  };
+  logger.logComplete(id!, output);
+
+  return completions;
+}
+
 // ---------------------------------------------------------------------------
 // redactArgs
 // ---------------------------------------------------------------------------
@@ -141,39 +163,19 @@ describe('createToolAuditLogger', () => {
   });
 
   it('logs failed coding envelopes as error status', () => {
-    const { store, completions } = createMemoryStore();
-    const logger = createToolAuditLogger(store);
-
-    const id = logger.logStart('coding_apply_patch', { operations: [] }, 'agent-1', 'session-1');
-    const output: Output = {
-      type: 'tool_result',
-      toolId: 'coding_apply_patch',
-      data: {
-        ok: false,
-        evidence: { status: 'failed' },
-        error: { code: 'PATCH_DOES_NOT_APPLY', message: 'Patch does not apply' },
-      },
-    };
-    logger.logComplete(id!, output);
+    const completions = completeCodingEnvelope('failed', {
+      code: 'PATCH_DOES_NOT_APPLY',
+      message: 'Patch does not apply',
+    });
 
     expect(completions[0]!.data.status).toBe('error');
   });
 
   it('logs denied coding envelopes as denied status', () => {
-    const { store, completions } = createMemoryStore();
-    const logger = createToolAuditLogger(store);
-
-    const id = logger.logStart('coding_apply_patch', { operations: [] }, 'agent-1', 'session-1');
-    const output: Output = {
-      type: 'tool_result',
-      toolId: 'coding_apply_patch',
-      data: {
-        ok: false,
-        evidence: { status: 'denied' },
-        error: { code: 'BINARY_FILE_DENIED', message: 'Refusing binary file' },
-      },
-    };
-    logger.logComplete(id!, output);
+    const completions = completeCodingEnvelope('denied', {
+      code: 'BINARY_FILE_DENIED',
+      message: 'Refusing binary file',
+    });
 
     expect(completions[0]!.data.status).toBe('denied');
   });
