@@ -206,7 +206,7 @@ export const CodingRunQualityGateInputSchema = z
     repoPath: z.string().min(1).default('.'),
     packageName: z
       .string()
-      .regex(/^@agent-platform\/[a-z0-9-]+$/)
+      .regex(/^(@agent-platform\/[a-z0-9-]+|(?:apps|packages)\/[a-z0-9-]+)$/)
       .optional(),
     timeoutMs: z.number().int().positive().max(600_000).default(120_000),
     maxOutputBytes: z.number().int().positive().max(100_000).default(20_000),

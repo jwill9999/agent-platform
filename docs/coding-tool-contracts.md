@@ -301,7 +301,10 @@ export const CodingTestProfileSchema = z.enum([
 
 export const CodingRunTestsInputSchema = z.object({
   profile: CodingTestProfileSchema,
-  packageName: z.string().optional(),
+  packageName: z
+    .string()
+    .regex(/^(@agent-platform\/[a-z0-9-]+|(?:apps|packages)\/[a-z0-9-]+)$/)
+    .optional(),
   path: z.string().optional(),
   timeoutMs: z.number().int().min(1000).max(600000).optional(),
 });

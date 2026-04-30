@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { constants, existsSync } from 'node:fs';
-import { access, realpath } from 'node:fs/promises';
-import { isAbsolute, relative, resolve } from 'node:path';
+import { access, readFile, realpath } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import {
   CodingRunQualityGateInputSchema,
@@ -55,7 +55,7 @@ export const QUALITY_GATE_TOOLS: readonly ContractTool[] = [
           packageName: {
             type: 'string',
             description:
-              'Optional package filter for package-supported profiles, e.g. @agent-platform/harness.',
+              'Optional package filter for package-supported profiles, e.g. @agent-platform/harness, apps/web, or packages/harness.',
           },
           timeoutMs: {
             type: 'number',
@@ -188,6 +188,30 @@ function buildCommand(
     throw new Error(`Profile "${profile}" does not have a root script mapping`);
   }
   return { bin: pnpmBin, args: [script], display: ['pnpm', script] };
+}
+
+async function normalizePackageName(
+  repoPath: string,
+  packageName?: string,
+): Promise<string | undefined> {
+  if (!packageName) return undefined;
+  if (packageName.startsWith('@agent-platform/')) return packageName;
+
+  const packageJsonPath = join(repoPath, packageName, 'package.json');
+  let raw: string;
+  try {
+    raw = await readFile(packageJsonPath, 'utf-8');
+  } catch {
+    throw new Error(`Package path "${packageName}" does not contain a readable package.json`);
+  }
+
+  const parsed = JSON.parse(raw) as { name?: unknown };
+  if (typeof parsed.name !== 'string' || !/^@agent-platform\/[a-z0-9-]+$/.test(parsed.name)) {
+    throw new Error(
+      `Package path "${packageName}" does not define an @agent-platform package name`,
+    );
+  }
+  return parsed.name;
 }
 
 function tailUtf8(value: string, maxBytes: number): { content: string; truncated: boolean } {
@@ -331,11 +355,8 @@ async function handleRunQualityGate(
   try {
     const input = CodingRunQualityGateInputSchema.parse(args);
     const repoPath = await resolveRepoPath(input.repoPath, options);
-    const command = buildCommand(
-      input.profile,
-      input.packageName,
-      resolvePnpmBin(options?.pnpmBin),
-    );
+    const packageName = await normalizePackageName(repoPath, input.packageName);
+    const command = buildCommand(input.profile, packageName, resolvePnpmBin(options?.pnpmBin));
     const timeoutMs = Math.min(input.timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);
     const maxOutputBytes = Math.min(input.maxOutputBytes ?? DEFAULT_OUTPUT_BYTES, MAX_OUTPUT_BYTES);
     const commandResult = await runCommand(command, repoPath, timeoutMs);
@@ -351,7 +372,7 @@ async function handleRunQualityGate(
         : `Quality gate "${input.profile}" failed with exit code ${commandResult.exitCode}.`;
     const result = CodingRunQualityGateResultSchema.parse({
       profile: input.profile,
-      packageName: input.packageName,
+      packageName,
       repoPath,
       command: command.display,
       exitCode: commandResult.exitCode,

@@ -123,6 +123,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Reverted IDE folder-picker follow-up commits and disabled runtime chat evaluator nodes so internal DoD/critic JSON cannot replace normal assistant responses.
 - **Date:** 2026-04-30
 - **Session:** Created follow-up `agent-platform-ide-rethink` to reassess the browser IDE/code viewing direction before further implementation.
+- **Date:** 2026-04-30
+- **Session:** Fixed quality-gate package filters so chat agents can run lint/typecheck/build/test when they infer workspace paths such as `apps/web`.
 
 ### Session-close guardrail (required)
 
@@ -218,6 +220,26 @@ Quality gates passed:
 - The tool supports exact text replacement, create/append behavior when `oldText` is omitted, dry-run previews, changed-file output, diff stats, inline diff evidence, and coding evidence envelopes.
 - Dispatch now enforces PathJail on nested patch operation paths before native execution and rejects traversal/symlink escapes before mutation.
 - Audit logging now records `ok: false` coding envelopes as `error` or `denied` instead of `success`.
+
+### Quality gate workspace path filters fixed
+
+Follow-up from manual UI testing on `task/agent-platform-code-tools.5`: chat could call `run_quality_gate`, but lint requests inferred from UI/file context could send a safe workspace path such as `apps/web` as `packageName`. The tool contract only accepted scoped pnpm package names like `@agent-platform/web`, so validation denied the run before lint started.
+
+- Extended the quality-gate input schema to accept `@agent-platform/<name>`, `apps/<name>`, and `packages/<name>`.
+- Added runtime normalization from workspace package paths to the package name in that path's `package.json`.
+- Kept execution constrained to pnpm allowlisted profiles and validated `@agent-platform/*` package names before command construction.
+- Added harness coverage proving `packageName: "apps/web"` runs as `pnpm --filter @agent-platform/web run lint`.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/contracts run build`
+- `pnpm --filter @agent-platform/contracts run typecheck`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+- `pnpm --filter @agent-platform/harness exec vitest run test/qualityGateTool.test.ts`
+- `pnpm exec prettier --check packages/contracts/src/codingTool.ts packages/harness/src/tools/qualityGateTool.ts packages/harness/test/qualityGateTool.test.ts docs/coding-tool-contracts.md`
+- `git diff --check`
 - MCP trust guard now prevents MCP tools from shadowing `coding_apply_patch`.
 - Added regression coverage for schema round-trips, coding tool allowlist behavior, dry-run/apply/create, binary denial, traversal denial, symlink denial, and coding audit statuses.
 

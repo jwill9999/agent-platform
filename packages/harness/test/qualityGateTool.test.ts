@@ -54,6 +54,28 @@ describe('quality gate tool', () => {
       ),
       'utf-8',
     );
+    await writeFile(
+      join(repoPath, 'pnpm-workspace.yaml'),
+      'packages:\n  - apps/*\n  - packages/*\n',
+      'utf-8',
+    );
+    await mkdir(join(repoPath, 'apps', 'web'), { recursive: true });
+    await writeFile(
+      join(repoPath, 'apps', 'web', 'package.json'),
+      JSON.stringify(
+        {
+          name: '@agent-platform/web',
+          private: true,
+          type: 'module',
+          scripts: {
+            lint: 'node -e "console.log(\'web lint passed\')"',
+          },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
   });
 
   afterEach(async () => {
@@ -79,7 +101,7 @@ describe('quality gate tool', () => {
       ),
     );
 
-    expect(data.ok).toBe(true);
+    expect(data.ok, JSON.stringify(data, null, 2)).toBe(true);
     expect(data.result).toMatchObject({
       profile: 'test',
       exitCode: 0,
@@ -131,7 +153,7 @@ describe('quality gate tool', () => {
     );
     const result = data.result as { stdoutTail: string; truncated: boolean };
 
-    expect(data.ok).toBe(true);
+    expect(data.ok, JSON.stringify(data, null, 2)).toBe(true);
     expect(result.truncated).toBe(true);
     expect(result.stdoutTail.length).toBeLessThan(200);
   });
@@ -161,6 +183,24 @@ describe('quality gate tool', () => {
 
     expect(data.ok).toBe(false);
     expect(String(data.message)).toContain('does not support packageName');
+  });
+
+  it('normalizes workspace package paths before running package profiles', async () => {
+    const data = toolResult(
+      await executeQualityGateTool(
+        QUALITY_GATE_IDS.runQualityGate,
+        { profile: 'lint', repoPath, packageName: 'apps/web' },
+        { workspaceRoot, pnpmBin: pnpmBin() },
+      ),
+    );
+
+    expect(data.ok, JSON.stringify(data, null, 2)).toBe(true);
+    expect(data.result).toMatchObject({
+      profile: 'lint',
+      packageName: '@agent-platform/web',
+      command: ['pnpm', '--filter', '@agent-platform/web', 'run', 'lint'],
+    });
+    expect(String((data.result as { stdoutTail: string }).stdoutTail)).toContain('web lint passed');
   });
 
   it('denies repositories outside the workspace', async () => {
