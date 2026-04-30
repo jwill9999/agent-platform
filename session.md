@@ -139,6 +139,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added backlog task `agent-platform-context-optimisation` for context window/token-budget optimisation after memory foundations exist.
 - **Date:** 2026-04-30
 - **Session:** Added backlog task `agent-platform-llm-observability-export` for OpenTelemetry/OpenInference-compatible export strategy for LLM/context/memory observability.
+- **Date:** 2026-04-30
+- **Session:** Added backlog task `agent-platform-improvement-goals` for a limited observability-driven self-improvement loop with reviewed candidates.
 
 ### Session-close guardrail (required)
 
@@ -321,6 +323,7 @@ Quality gates passed:
 - Captured `agent-platform-active-project` as a follow-up for active project defaults so users do not need to type `/workspace/...` paths in normal coding workflows.
 - Captured `agent-platform-context-optimisation` as a follow-up for context window management and token-budget optimisation. This should be picked up after the memory epic has short-term working memory and prompt memory bundle foundations.
 - Captured `agent-platform-llm-observability-export` as a follow-up for vendor-neutral LLM observability export strategy. The intended direction is platform-native canonical events first, optional Phoenix/Langfuse/Helicone-style export adapters later.
+- Captured `agent-platform-improvement-goals` as a follow-up for monitored goals and reviewed self-improvement candidates. First pass should start with one narrow objective and no autonomous changes.
 
 ## Current state
 
@@ -344,6 +347,7 @@ Quality gates passed:
 - New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
+- New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 - New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
 
