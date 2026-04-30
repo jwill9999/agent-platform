@@ -67,6 +67,14 @@ function isFileSystemAccessSupported(): boolean {
   return globalThis.window !== undefined && 'showDirectoryPicker' in globalThis.window;
 }
 
+function isDirectoryPromptAlreadyActiveError(err: unknown): boolean {
+  return (
+    err instanceof DOMException &&
+    err.name === 'InvalidStateError' &&
+    err.message.toLowerCase().includes('picker already active')
+  );
+}
+
 // ---------------------------------------------------------------------------
 // IndexedDB persistence for FileSystemDirectoryHandle
 // ---------------------------------------------------------------------------
@@ -278,7 +286,7 @@ export function useFileSystem(): UseFileSystemReturn {
   const [isSupported, setIsSupported] = useState(false);
 
   const rootHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
-  const directoryPickerActiveRef = useRef(false);
+  const directoryAccessPromptActiveRef = useRef(false);
   /** Bumps on each loadTree start; only the latest completion may commit state (avoids races with restore vs picker). */
   const loadGenerationRef = useRef(0);
   /**
@@ -370,6 +378,11 @@ export function useFileSystem(): UseFileSystemReturn {
   }, [loadTree]);
 
   const reconnectFolder = useCallback(async () => {
+    if (directoryAccessPromptActiveRef.current) {
+      fsDebugLog('reconnect:prompt_already_active');
+      return;
+    }
+
     const handle = pendingRestoreHandleRef.current ?? (await loadPersistedHandle());
     if (!handle) {
       clearReconnectState();
@@ -380,6 +393,8 @@ export function useFileSystem(): UseFileSystemReturn {
       return;
     }
 
+    directoryAccessPromptActiveRef.current = true;
+    setIsOpeningDirectory(true);
     setError(null);
     const h = handle as FSHandleWithPermission;
     try {
@@ -389,6 +404,7 @@ export function useFileSystem(): UseFileSystemReturn {
       }
       if (rw === 'granted') {
         userPickedFolderThisSessionRef.current = false;
+        setIsOpeningDirectory(false);
         await loadTree(handle, 'restore');
         await persistHandle(handle);
         clearReconnectState();
@@ -402,6 +418,7 @@ export function useFileSystem(): UseFileSystemReturn {
       }
       if (r === 'granted') {
         userPickedFolderThisSessionRef.current = false;
+        setIsOpeningDirectory(false);
         await loadTree(handle, 'restore');
         await persistHandle(handle);
         clearReconnectState();
@@ -411,9 +428,16 @@ export function useFileSystem(): UseFileSystemReturn {
 
       setError('Permission was not granted. Try Open Folder again.');
     } catch (err) {
+      if (isDirectoryPromptAlreadyActiveError(err)) {
+        fsDebugLog('reconnect:prompt_already_active_error');
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to restore folder';
       fsDebugLog('reconnect:error', message);
       setError(message);
+    } finally {
+      directoryAccessPromptActiveRef.current = false;
+      setIsOpeningDirectory(false);
     }
   }, [loadTree, clearReconnectState]);
 
@@ -423,18 +447,20 @@ export function useFileSystem(): UseFileSystemReturn {
       return;
     }
 
-    if (directoryPickerActiveRef.current) {
+    if (directoryAccessPromptActiveRef.current) {
       fsDebugLog('picker:already_active');
       return;
     }
 
-    directoryPickerActiveRef.current = true;
+    directoryAccessPromptActiveRef.current = true;
     setIsOpeningDirectory(true);
     setError(null);
 
     try {
       const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
       fsDebugLog('picker:resolved', handle.name);
+      directoryAccessPromptActiveRef.current = false;
+      setIsOpeningDirectory(false);
       // Before loadTree: block mount-time restore from applying a stale persisted handle after this.
       userPickedFolderThisSessionRef.current = true;
       await loadTree(handle, 'picker');
@@ -447,11 +473,7 @@ export function useFileSystem(): UseFileSystemReturn {
         fsDebugLog('picker:cancelled');
         return;
       }
-      if (
-        err instanceof DOMException &&
-        err.name === 'InvalidStateError' &&
-        err.message.includes('picker already active')
-      ) {
+      if (isDirectoryPromptAlreadyActiveError(err)) {
         fsDebugLog('picker:already_active_error');
         return;
       }
@@ -459,7 +481,7 @@ export function useFileSystem(): UseFileSystemReturn {
       fsDebugLog('picker:error', message);
       setError(message);
     } finally {
-      directoryPickerActiveRef.current = false;
+      directoryAccessPromptActiveRef.current = false;
       setIsOpeningDirectory(false);
     }
   }, [loadTree, clearReconnectState]);
