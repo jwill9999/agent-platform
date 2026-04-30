@@ -97,6 +97,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Fixed chat UI/model-config override and API-key error leakage on `task/ui-chat-api-key-error-redaction`.
 - **Date:** 2026-04-30
 - **Session:** Follow-up local fix: chat now leaves agents without an assigned model config on the platform default path, and the Next.js BFF no longer injects its own env key as an explicit API override.
+- **Date:** 2026-04-30
+- **Session:** Added ignored local runtime-config backup/restore support for encrypted saved model configs, agent model assignments, and MCP server assignments.
 
 ### Session-close guardrail (required)
 
@@ -127,6 +129,18 @@ Branch state: `task/ui-chat-api-key-error-redaction` contains an unrelated UI/ru
 - Added a `MODEL_AUTH_FAILED` stream code for provider authentication failures that happen after NDJSON headers are already sent.
 - Added regression coverage for API post-header auth errors, web stream error rendering, harness NDJSON redaction, output guard OpenAI key detection, and observability redaction.
 
+### Local runtime config backup added
+
+Follow-up owner request: preserve local default agent/model/API-key/MCP setup across accidental DB wipes without committing secrets or encrypted secret material to Git.
+
+- Added `scripts/runtime-config-backup.mjs` with `backup` and `restore` actions.
+- Added `make runtime-config-backup` and `make runtime-config-restore`.
+- Backup writes to ignored `.agent-platform/backups/runtime-config.sqlite` by default.
+- Backup captures saved `model_configs`, referenced encrypted `secret_refs`, agent `model_config_id` assignments, `mcp_servers`, and `agent_mcp_servers`.
+- Restore copies encrypted secret envelopes as-is; it does not decrypt or print API keys.
+- Set local runtime data so seeded Personal assistant uses `gpt-5.4-nano` and seeded Coding uses `gpt-5.4`, then created a local ignored backup containing 2 model configs, 2 encrypted secret refs, 2 MCP servers, 1 agent MCP assignment, and 2 agent model assignments.
+- Documented the recovery flow in `docs/workspace-storage.md`: `make reset`, `make runtime-config-restore`, `make restart`.
+
 Quality gates passed:
 
 - `pnpm --filter @agent-platform/harness run test -- test/outputGuard.test.ts test/backpressure.test.ts`
@@ -146,16 +160,22 @@ Quality gates passed:
 - `pnpm typecheck`
 - `pnpm lint`
 - `pnpm format:check`
+- `node --test scripts/runtime-config-backup.test.mjs scripts/workspace-clean.test.mjs`
+- `node --check scripts/runtime-config-backup.mjs`
+- `node --check scripts/runtime-config-backup.test.mjs`
+- `pnpm exec prettier --check scripts/runtime-config-backup.mjs scripts/runtime-config-backup.test.mjs docs/workspace-storage.md`
+- `make runtime-config-backup`
+- Restore smoke check against `/private/tmp/agent-platform-restore-check.sqlite`
 
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/ui-chat-api-key-error-redaction`
-- **Current commit:** `0f62ae0` on origin, with additional local uncommitted follow-up fixes for owner testing
+- **Current commit:** `5b2ffc1` on origin, with additional local uncommitted runtime-config backup follow-up changes
 - **Latest completed task:** `agent-platform-code-tools.2` remains the latest coding-tools epic task
 - **Current work:** UI/runtime bug fix, not part of the coding-tools task chain
-- **Remote sync:** intentionally paused; owner requested rebuild/`make restart` testing before any further push
+- **Remote sync:** next step is to commit and push the runtime-config backup follow-up on the same test branch.
 
 ### Beads
 
@@ -172,9 +192,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Owner rebuilds and tests the local follow-up fix with `make restart`.
-2. If the UI works as expected, commit/push the local follow-up changes on `task/ui-chat-api-key-error-redaction`.
-3. After UI issues are clear, start `agent-platform-code-tools.3` from the `agent-platform-code-tools.2` task tip.
+1. Commit and push the runtime-config backup follow-up on `task/ui-chat-api-key-error-redaction`.
+2. After UI/runtime backup work is clear, start `agent-platform-code-tools.3` from the `agent-platform-code-tools.2` task tip.
 
 ---
 

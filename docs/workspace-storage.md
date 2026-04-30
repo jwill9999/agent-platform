@@ -29,6 +29,7 @@ Default layout:
 
 ```text
 AgentPlatform/
+  backups/
   config/
   data/
   workspaces/
@@ -50,6 +51,26 @@ AgentPlatform/
 | `AGENT_DATA_HOST_PATH`           | `$AGENT_PLATFORM_HOME/data`               | Host app/runtime data directory                  |
 
 `make workspace-init` resolves these values, creates the required directory structure, and validates that the paths are usable before Docker starts. `make up`, `make restart`, `make reset`, and `make new` run workspace initialization automatically.
+
+## Runtime Config Backup
+
+Local development can keep an ignored backup of the saved runtime configuration in
+`$AGENT_PLATFORM_HOME/backups/runtime-config.sqlite`.
+
+| Command                       | Purpose                                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `make runtime-config-backup`  | Back up saved model configs, encrypted API key refs, agent model assignments, MCP servers, and agent MCP assignments |
+| `make runtime-config-restore` | Restore those rows into the current runtime DB after `make reset`, `make new`, or accidental DB deletion             |
+
+The backup copies encrypted `secret_refs` rows exactly as stored in SQLite. It does not decrypt or print API keys, and the default local `.agent-platform/` directory is ignored by Git.
+
+Recommended recovery flow after a DB wipe:
+
+```bash
+make reset
+make runtime-config-restore
+make restart
+```
 
 ## Security
 
