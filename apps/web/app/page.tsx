@@ -31,6 +31,7 @@ export default function HomePage() {
     setError,
     criticEventsByMessage,
     thinkingByMessage,
+    toolEventsByMessage,
     approvalEventsByMessage,
     decideApproval,
     hasPendingApproval,
@@ -211,6 +212,7 @@ export default function HomePage() {
               attachmentWarnings={attachmentWarnings}
               criticEventsByMessage={criticEventsByMessage}
               thinkingByMessage={thinkingByMessage}
+              toolEventsByMessage={toolEventsByMessage}
               approvalEventsByMessage={approvalEventsByMessage}
               onApprovalDecision={handleApprovalDecision}
             />

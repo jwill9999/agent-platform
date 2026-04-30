@@ -7,7 +7,7 @@ import { Message, getMessageText } from './message';
 import { ChatInput } from './chat-input';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import type { CriticEvent } from '@/lib/critic-events';
-import type { ApprovalCardState, ApprovalDecision } from '@/hooks/use-harness-chat';
+import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
 
 export interface ChatProps {
   messages: UIMessage[];
@@ -31,6 +31,8 @@ export interface ChatProps {
   criticEventsByMessage?: Record<string, readonly CriticEvent[]>;
   /** Aggregated thinking-channel text keyed by assistant message id. */
   thinkingByMessage?: Record<string, string>;
+  /** Tool execution events keyed by assistant message id. */
+  toolEventsByMessage?: Record<string, readonly ToolTraceEvent[]>;
   /** Approval requests keyed by assistant message id. */
   approvalEventsByMessage?: Record<string, readonly ApprovalCardState[]>;
   /** User decision handler for approval requests. */
@@ -50,6 +52,7 @@ export function Chat({
   attachmentWarnings,
   criticEventsByMessage,
   thinkingByMessage,
+  toolEventsByMessage,
   approvalEventsByMessage,
   onApprovalDecision,
 }: Readonly<ChatProps>) {
@@ -90,6 +93,9 @@ export function Chat({
                   }
                   thinking={
                     message.role === 'assistant' ? thinkingByMessage?.[message.id] : undefined
+                  }
+                  toolEvents={
+                    message.role === 'assistant' ? toolEventsByMessage?.[message.id] : undefined
                   }
                   approvals={
                     message.role === 'assistant' ? approvalEventsByMessage?.[message.id] : undefined

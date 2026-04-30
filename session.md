@@ -131,6 +131,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Closed out `agent-platform-code-tools.5` after green pipelines; claimed `agent-platform-code-tools.6` and created `task/agent-platform-code-tools.6` from the `.5` chain tip.
 - **Date:** 2026-04-30
 - **Session:** Implemented `agent-platform-code-tools.6` repository map, code search, and related-test discovery tools on `task/agent-platform-code-tools.6`.
+- **Date:** 2026-04-30
+- **Session:** Started `agent-platform-code-tools.7` on `task/agent-platform-code-tools.7`; changed chat tool activity to render separately from final assistant text and collapse after completion.
 
 ### Session-close guardrail (required)
 
@@ -301,15 +303,23 @@ Quality gates passed:
 - `find_related_tests` maps source files to likely tests by basename and repository proximity, returning bounded structured evidence.
 - Added shared contracts, schema round-trip coverage, harness tool tests, MCP shadowing protection, docs, and system tool registration.
 
+### Coding tool visibility follow-up started
+
+- Manual chat testing against `/workspace/scratch/demo-app` proved the `.6` repo discovery tools work when the target app is inside the runtime workspace.
+- Finding: recoverable tool failures such as `WRITE_FAILED` / `ENOENT` were being surfaced as global chat errors even when the agent recovered and completed the task.
+- Finding: streamed `tool_result` events were appended into the assistant's final markdown answer, leaving large tool-call JSON blocks permanently visible.
+- Started `.7` and changed the web chat stream parser so tool-call placeholders, tool results, and recoverable tool errors are tracked as tool activity instead of answer text.
+- Added a compact tool activity block that is open while streaming and collapses by default after the assistant answer completes, while remaining expandable for auditability.
+
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-code-tools.6`
-- **Current base:** `e0a385f Update session for code tools six`
+- **Current branch:** `task/agent-platform-code-tools.7`
+- **Current base:** `465273b Implement repo discovery tools`
 - **Latest completed task:** `agent-platform-code-tools.6` repository map and code search
-- **Current work:** `.6` implementation complete and closed in Beads; commit and push this branch.
-- **Remote sync:** Beads/Dolt is synced after closing `.6`; branch should be pushed after this session update commit.
+- **Current work:** `.7` coding tools visibility and E2E validation is in progress; first UI/tool-activity fix is ready for manual test.
+- **Remote sync:** Beads/Dolt is synced after claiming `.7`; branch should be pushed after this session update commit.
 
 ### Beads
 
@@ -318,7 +328,7 @@ Quality gates passed:
 - `agent-platform-code-tools.4` is closed.
 - `agent-platform-code-tools.5` is closed.
 - `agent-platform-code-tools.6` is closed.
-- `agent-platform-code-tools.7` is open and blocked only by `.6` completion.
+- `agent-platform-code-tools.7` is claimed and in progress.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 - New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
 
@@ -409,13 +419,21 @@ Quality gates passed:
   - `pnpm lint`
   - `pnpm format:check`
   - `pnpm test` (run with escalation because API Supertest binds local ports)
+- `.7` tool-activity UI focused checks passed:
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run test -- test/use-harness-chat.test.ts`
+  - `pnpm docs:lint`
+  - `pnpm exec prettier --check apps/web/hooks/use-harness-chat.ts apps/web/components/chat/chat.tsx apps/web/components/chat/message.tsx apps/web/components/chat/tool-trace-block.tsx apps/web/app/page.tsx apps/web/test/use-harness-chat.test.ts docs/tasks/agent-platform-code-tools.7.md`
+  - `pnpm exec prettier --check session.md docs/tasks/agent-platform-code-tools.7.md`
+  - `git diff --check`
 
 ---
 
 ## Next (priority order)
 
-1. Push the completed `task/agent-platform-code-tools.6` branch.
-2. After pipelines pass, claim `agent-platform-code-tools.7`: coding tools visibility and E2E validation.
+1. Push `task/agent-platform-code-tools.7` with the tool-activity chat UI fix.
+2. Manual test the chat flow with `/workspace/scratch/demo-app`: create app, map repo, search symbol, find related tests.
 3. Keep the IDE/file-tree integration as a separate follow-up under `agent-platform-ide-rethink`.
 
 ---

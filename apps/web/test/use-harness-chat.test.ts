@@ -42,6 +42,54 @@ describe('harness chat stream parser', () => {
     });
   });
 
+  it('keeps tool results separate from assistant text', () => {
+    const result = renderStreamEvent({
+      type: 'tool_result',
+      toolId: 'sys_write_file',
+      data: { written: true, path: '/workspace/scratch/demo-app/src/app.ts' },
+    });
+
+    expect(result).toEqual({
+      toolTrace: {
+        type: 'result',
+        toolId: 'sys_write_file',
+        data: { written: true, path: '/workspace/scratch/demo-app/src/app.ts' },
+        status: 'success',
+      },
+    });
+    expect(result).not.toHaveProperty('text');
+  });
+
+  it('keeps recoverable tool errors out of the global chat error', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      code: 'WRITE_FAILED',
+      message: "ENOENT: no such file or directory, open '/workspace/scratch/demo-app/src/app.ts'",
+    });
+
+    expect(result).toEqual({
+      toolTrace: {
+        type: 'error',
+        code: 'WRITE_FAILED',
+        message: "ENOENT: no such file or directory, open '/workspace/scratch/demo-app/src/app.ts'",
+      },
+    });
+  });
+
+  it('keeps tool-call placeholders separate from assistant text', () => {
+    const result = renderStreamEvent({
+      type: 'text',
+      content: 'Calling tool: Write a file...',
+    });
+
+    expect(result).toEqual({
+      toolTrace: {
+        type: 'status',
+        label: 'Calling tool: Write a file...',
+      },
+    });
+  });
+
   it('renders DoD cap failures as critic status instead of user-facing errors', () => {
     const result = renderStreamEvent({
       type: 'error',
