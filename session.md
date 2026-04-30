@@ -141,6 +141,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added backlog task `agent-platform-llm-observability-export` for OpenTelemetry/OpenInference-compatible export strategy for LLM/context/memory observability.
 - **Date:** 2026-04-30
 - **Session:** Added backlog task `agent-platform-improvement-goals` for a limited observability-driven self-improvement loop with reviewed candidates.
+- **Date:** 2026-04-30
+- **Session:** Remembered future epic refinement workflow: review specs/tickets with owner before moving epics from refinement/planning to ready.
 
 ### Session-close guardrail (required)
 
@@ -324,6 +326,7 @@ Quality gates passed:
 - Captured `agent-platform-context-optimisation` as a follow-up for context window management and token-budget optimisation. This should be picked up after the memory epic has short-term working memory and prompt memory bundle foundations.
 - Captured `agent-platform-llm-observability-export` as a follow-up for vendor-neutral LLM observability export strategy. The intended direction is platform-native canonical events first, optional Phoenix/Langfuse/Helicone-style export adapters later.
 - Captured `agent-platform-improvement-goals` as a follow-up for monitored goals and reviewed self-improvement candidates. First pass should start with one narrow objective and no autonomous changes.
+- Added Beads memory `when-creating-new-epics-schedule-or-explicitly-run`: new epics should have a refinement session with the owner before implementation, including ticket/spec review, requirement changes, tradeoff discussion, and moving from refinement/planning to ready only after that review.
 
 ## Current state
 
@@ -350,6 +353,7 @@ Quality gates passed:
 - New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 - New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
+- Process note: before starting future epics, run a refinement session with the owner to review and adjust tickets/specs before marking the epic ready.
 
 ### Quality
 
