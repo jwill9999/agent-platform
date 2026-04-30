@@ -135,6 +135,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Started `agent-platform-code-tools.7` on `task/agent-platform-code-tools.7`; changed chat tool activity to render separately from final assistant text and collapse after completion.
 - **Date:** 2026-04-30
 - **Session:** Closed `agent-platform-code-tools.7`; the structured coding tool pack epic auto-closed at 7/7 complete after green pipelines.
+- **Date:** 2026-04-30
+- **Session:** Added backlog task `agent-platform-context-optimisation` for context window/token-budget optimisation after memory foundations exist.
 
 ### Session-close guardrail (required)
 
@@ -315,6 +317,7 @@ Quality gates passed:
 - Pipeline checks passed green on `task/agent-platform-code-tools.7`.
 - Closed `.7` in Beads; `agent-platform-code-tools` auto-closed with all seven child tasks complete.
 - Captured `agent-platform-active-project` as a follow-up for active project defaults so users do not need to type `/workspace/...` paths in normal coding workflows.
+- Captured `agent-platform-context-optimisation` as a follow-up for context window management and token-budget optimisation. This should be picked up after the memory epic has short-term working memory and prompt memory bundle foundations.
 
 ## Current state
 
@@ -336,6 +339,7 @@ Quality gates passed:
 - `agent-platform-code-tools.7` is closed.
 - `agent-platform-code-tools` epic is closed.
 - New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
+- New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 - New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
 
