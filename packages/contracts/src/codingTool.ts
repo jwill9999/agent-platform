@@ -93,3 +93,98 @@ export const CodingApplyPatchResultSchema = z.object({
     .optional(),
 });
 export type CodingApplyPatchResult = z.infer<typeof CodingApplyPatchResultSchema>;
+
+export const CodingGitStatusInputSchema = z.object({
+  repoPath: z.string().min(1).default('.'),
+});
+export type CodingGitStatusInput = z.infer<typeof CodingGitStatusInputSchema>;
+
+export const CodingGitDiffInputSchema = z.object({
+  repoPath: z.string().min(1).default('.'),
+  path: z.string().min(1).optional(),
+  staged: z.boolean().default(false),
+  maxBytes: z.number().int().positive().max(100_000).default(20_000),
+});
+export type CodingGitDiffInput = z.infer<typeof CodingGitDiffInputSchema>;
+
+export const CodingGitLogInputSchema = z.object({
+  repoPath: z.string().min(1).default('.'),
+  ref: z.string().min(1).optional(),
+  maxCount: z.number().int().positive().max(50).default(10),
+});
+export type CodingGitLogInput = z.infer<typeof CodingGitLogInputSchema>;
+
+export const CodingGitBranchInfoInputSchema = z.object({
+  repoPath: z.string().min(1).default('.'),
+});
+export type CodingGitBranchInfoInput = z.infer<typeof CodingGitBranchInfoInputSchema>;
+
+export const CodingGitChangedFilesInputSchema = z.object({
+  repoPath: z.string().min(1).default('.'),
+});
+export type CodingGitChangedFilesInput = z.infer<typeof CodingGitChangedFilesInputSchema>;
+
+export const CodingGitFileChangeSchema = z.object({
+  path: z.string(),
+  status: z.string(),
+  staged: z.boolean(),
+  unstaged: z.boolean(),
+});
+export type CodingGitFileChange = z.infer<typeof CodingGitFileChangeSchema>;
+
+export const CodingGitStatusResultSchema = z.object({
+  repoPath: z.string(),
+  branch: z.string(),
+  head: z.string().optional(),
+  clean: z.boolean(),
+  ahead: z.number().int().min(0).default(0),
+  behind: z.number().int().min(0).default(0),
+  changedFiles: z.array(CodingGitFileChangeSchema),
+});
+export type CodingGitStatusResult = z.infer<typeof CodingGitStatusResultSchema>;
+
+export const CodingGitDiffResultSchema = z.object({
+  repoPath: z.string(),
+  staged: z.boolean(),
+  path: z.string().optional(),
+  diff: z.string(),
+  sizeBytes: z.number().int().min(0),
+  truncated: z.boolean(),
+  filesChanged: z.number().int().min(0),
+});
+export type CodingGitDiffResult = z.infer<typeof CodingGitDiffResultSchema>;
+
+export const CodingGitLogEntrySchema = z.object({
+  hash: z.string(),
+  shortHash: z.string(),
+  author: z.string(),
+  authoredAt: z.string(),
+  subject: z.string(),
+});
+export type CodingGitLogEntry = z.infer<typeof CodingGitLogEntrySchema>;
+
+export const CodingGitLogResultSchema = z.object({
+  repoPath: z.string(),
+  ref: z.string().optional(),
+  commits: z.array(CodingGitLogEntrySchema),
+  truncated: z.boolean(),
+});
+export type CodingGitLogResult = z.infer<typeof CodingGitLogResultSchema>;
+
+export const CodingGitBranchInfoResultSchema = z.object({
+  repoPath: z.string(),
+  branch: z.string(),
+  head: z.string().optional(),
+  upstream: z.string().optional(),
+  ahead: z.number().int().min(0).default(0),
+  behind: z.number().int().min(0).default(0),
+});
+export type CodingGitBranchInfoResult = z.infer<typeof CodingGitBranchInfoResultSchema>;
+
+export const CodingGitChangedFilesResultSchema = z.object({
+  repoPath: z.string(),
+  count: z.number().int().min(0),
+  files: z.array(CodingGitFileChangeSchema),
+  truncated: z.boolean(),
+});
+export type CodingGitChangedFilesResult = z.infer<typeof CodingGitChangedFilesResultSchema>;

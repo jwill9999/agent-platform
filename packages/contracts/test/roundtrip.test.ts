@@ -6,6 +6,11 @@ import {
   ApprovalRequestSchema,
   CodingApplyPatchInputSchema,
   CodingApplyPatchResultSchema,
+  CodingGitBranchInfoResultSchema,
+  CodingGitChangedFilesResultSchema,
+  CodingGitDiffResultSchema,
+  CodingGitLogResultSchema,
+  CodingGitStatusResultSchema,
   CodingToolEnvelopeSchema,
   CriticVerdictSchema,
   ExecutionLimitsSchema,
@@ -192,5 +197,67 @@ describe('contracts round-trip', () => {
       },
     });
     expect(CodingToolEnvelopeSchema.parse(structuredClone(envelope))).toEqual(envelope);
+  });
+
+  it('Coding git result schemas round-trip', () => {
+    const fileChange = { path: 'src/index.ts', status: 'M', staged: true, unstaged: false };
+
+    const status = CodingGitStatusResultSchema.parse({
+      repoPath: '/workspace/repo',
+      branch: 'main',
+      head: 'abc123',
+      clean: false,
+      ahead: 1,
+      behind: 0,
+      changedFiles: [fileChange],
+    });
+    expect(CodingGitStatusResultSchema.parse(structuredClone(status))).toEqual(status);
+
+    const diff = CodingGitDiffResultSchema.parse({
+      repoPath: '/workspace/repo',
+      staged: false,
+      path: 'src/index.ts',
+      diff: 'diff --git a/src/index.ts b/src/index.ts',
+      sizeBytes: 42,
+      truncated: false,
+      filesChanged: 1,
+    });
+    expect(CodingGitDiffResultSchema.parse(structuredClone(diff))).toEqual(diff);
+
+    const log = CodingGitLogResultSchema.parse({
+      repoPath: '/workspace/repo',
+      ref: 'HEAD',
+      commits: [
+        {
+          hash: 'abcdef',
+          shortHash: 'abcdef',
+          author: 'Test User',
+          authoredAt: '2026-04-30T00:00:00Z',
+          subject: 'Initial commit',
+        },
+      ],
+      truncated: false,
+    });
+    expect(CodingGitLogResultSchema.parse(structuredClone(log))).toEqual(log);
+
+    const branch = CodingGitBranchInfoResultSchema.parse({
+      repoPath: '/workspace/repo',
+      branch: 'main',
+      head: 'abcdef',
+      upstream: 'origin/main',
+      ahead: 0,
+      behind: 0,
+    });
+    expect(CodingGitBranchInfoResultSchema.parse(structuredClone(branch))).toEqual(branch);
+
+    const changedFiles = CodingGitChangedFilesResultSchema.parse({
+      repoPath: '/workspace/repo',
+      count: 1,
+      files: [fileChange],
+      truncated: false,
+    });
+    expect(CodingGitChangedFilesResultSchema.parse(structuredClone(changedFiles))).toEqual(
+      changedFiles,
+    );
   });
 });

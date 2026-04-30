@@ -18,6 +18,7 @@ export {
   CODING_EDIT_MAP,
   executeCodingEditTool,
 } from './codingEditTool.js';
+export { GIT_TOOLS, GIT_TOOL_IDS, GIT_TOOL_MAP, executeGitTool } from './gitTools.js';
 export {
   OBSERVABILITY_TOOLS,
   OBSERVABILITY_IDS,

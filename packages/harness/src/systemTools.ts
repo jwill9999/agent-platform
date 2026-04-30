@@ -24,6 +24,9 @@ import {
   CODING_EDIT_TOOLS,
   CODING_EDIT_MAP,
   executeCodingEditTool,
+  GIT_TOOLS,
+  GIT_TOOL_MAP,
+  executeGitTool,
 } from './tools/index.js';
 import {
   SYSTEM_TOOL_PREFIX,
@@ -60,6 +63,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   ...LOW_RISK_MAP,
   ...MEDIUM_RISK_MAP,
   ...CODING_EDIT_MAP,
+  ...GIT_TOOL_MAP,
 } as const;
 
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
@@ -157,6 +161,8 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...MEDIUM_RISK_TOOLS,
   // Coding tools (bounded edits with structured evidence)
   ...CODING_EDIT_TOOLS,
+  // Read-only git inspection tools
+  ...GIT_TOOLS,
   // Lazy skill loading — fetch full skill instructions on demand
   {
     id: ids.getSkillDetail,
@@ -341,6 +347,9 @@ export function createSystemToolExecutor(options?: {
 
     const codingEditResult = await executeCodingEditTool(toolId, args, { workspaceRoot });
     if (codingEditResult) return codingEditResult;
+
+    const gitResult = await executeGitTool(toolId, args, { workspaceRoot });
+    if (gitResult) return gitResult;
 
     return {
       type: 'error',

@@ -109,6 +109,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Follow-up Sonar cleanup on `task/agent-platform-code-tools.3`: deduplicated coding-envelope audit log tests.
 - **Date:** 2026-04-30
 - **Session:** Verified `agent-platform-code-tools.3` is closed, pushed, and paused before starting `agent-platform-code-tools.4`.
+- **Date:** 2026-04-30
+- **Session:** Started `agent-platform-code-tools.4` on `task/agent-platform-code-tools.4`; implemented read-only git status/diff/log/branch/changed-file tools with focused tests.
+- **Date:** 2026-04-30
+- **Session:** Completed `agent-platform-code-tools.4` read-only git tools on `task/agent-platform-code-tools.4`.
 
 ### Session-close guardrail (required)
 
@@ -211,21 +215,33 @@ Quality gates passed:
 
 - Refactored duplicated coding-envelope setup in `packages/harness/test/toolAuditLog.test.ts` into a shared helper while keeping distinct error/denied status assertions.
 
+### Read-only git tools implemented
+
+- Created `task/agent-platform-code-tools.4` from the pushed `.3` chain tip.
+- Claimed `agent-platform-code-tools.4` in Beads and synced Beads/Dolt.
+- Added structured contracts for git status, diff, log, branch info, and changed-file result payloads.
+- Added low-risk built-in tools: `sys_git_status`, `sys_git_diff`, `sys_git_log`, `sys_git_branch_info`, and `sys_git_changed_files`.
+- Git tools use absolute `/usr/bin/git`, bounded output, workspace/repository scoping, structured coding evidence envelopes, and no mutating git commands.
+- PathJail now treats `repoPath` as path-like, dispatch read-enforces all git tools, and MCP trust guard blocks git tool name shadowing.
+- Added temporary-repo regression tests for clean/dirty status, staged/unstaged/untracked files, bounded diff truncation, log, branch info, non-repo denial, outside-workspace denial, and unknown tool IDs.
+- Closed `agent-platform-code-tools.4` in Beads and synced Beads/Dolt.
+
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-code-tools.3`
-- **Current commit:** `75480a1` follow-up Sonar duplicate-code cleanup
-- **Latest completed task:** `agent-platform-code-tools.3` closed in Beads
-- **Current work:** Paused after structured coding edit tool completion
-- **Remote sync:** `task/agent-platform-code-tools.3` is pushed and tracking `origin/task/agent-platform-code-tools.3`.
+- **Current branch:** `task/agent-platform-code-tools.4`
+- **Current commit:** local uncommitted implementation of read-only git tools
+- **Latest completed task:** `agent-platform-code-tools.4` closed in Beads
+- **Current work:** Ready to commit and push `agent-platform-code-tools.4`
+- **Remote sync:** branch not pushed yet; commit and push are next.
 
 ### Beads
 
 - `agent-platform-code-tools.2` is closed.
 - `agent-platform-code-tools.3` is closed.
-- `agent-platform-code-tools.4` is the next blocked/unlocked downstream task: read-only git tools. It has not been claimed or branched yet.
+- `agent-platform-code-tools.4` is closed.
+- `agent-platform-code-tools.5` is next in the chain: governed test runner. It has not been claimed or branched yet.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 
 ### Quality
@@ -252,14 +268,32 @@ Quality gates passed:
   - `pnpm --filter @agent-platform/harness run lint`
   - `pnpm exec prettier --check packages/harness/test/toolAuditLog.test.ts`
   - `git diff --check`
+- Read-only git tool focused checks passed:
+  - `pnpm --filter @agent-platform/contracts build`
+  - `pnpm --filter @agent-platform/contracts run typecheck`
+  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+  - `pnpm --filter @agent-platform/harness run build`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run test -- test/gitTools.test.ts test/lowRiskTools.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts`
+  - `pnpm --filter @agent-platform/contracts run lint`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm exec prettier --check packages/harness/src/tools/gitTools.ts packages/harness/test/gitTools.test.ts`
+- Broad `.4` completion checks passed:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
+  - `pnpm docs:lint`
+  - `pnpm exec prettier --check session.md`
+  - `git diff --check`
 
 ---
 
 ## Next (priority order)
 
-1. Open/arrange PR from `task/agent-platform-code-tools.3` into the code-tools chain branch as needed.
-2. After `.3` is merged, branch `task/agent-platform-code-tools.4` from the updated `.3` chain tip.
-3. Claim and start `agent-platform-code-tools.4`: read-only git tools.
+1. Commit and push `task/agent-platform-code-tools.4`.
+2. Open/arrange PR from `task/agent-platform-code-tools.4` into the code-tools chain branch as needed.
+3. Next downstream task after merge: `agent-platform-code-tools.5` governed test runner.
 
 ---
 
