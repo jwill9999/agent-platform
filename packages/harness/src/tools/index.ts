@@ -12,6 +12,13 @@ export {
   executeMediumRiskTool,
 } from './mediumRiskTools.js';
 export {
+  CODING_APPLY_PATCH_ID,
+  CODING_EDIT_TOOLS,
+  CODING_EDIT_IDS,
+  CODING_EDIT_MAP,
+  executeCodingEditTool,
+} from './codingEditTool.js';
+export {
   OBSERVABILITY_TOOLS,
   OBSERVABILITY_IDS,
   OBSERVABILITY_MAP,

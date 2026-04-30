@@ -61,6 +61,30 @@ export {
   type ToolCreateBody,
   type RiskTier,
 } from './tool.js';
+export {
+  CodingToolKindSchema,
+  CodingToolStatusSchema,
+  CodingArtifactKindSchema,
+  CodingArtifactStorageSchema,
+  CodingArtifactSchema,
+  CodingEvidenceSchema,
+  CodingToolErrorSchema,
+  CodingToolEnvelopeSchema,
+  CodingPatchOperationSchema,
+  CodingApplyPatchInputSchema,
+  CodingApplyPatchResultSchema,
+  type CodingToolKind,
+  type CodingToolStatus,
+  type CodingArtifactKind,
+  type CodingArtifactStorage,
+  type CodingArtifact,
+  type CodingEvidence,
+  type CodingToolError,
+  type CodingToolEnvelope,
+  type CodingPatchOperation,
+  type CodingApplyPatchInput,
+  type CodingApplyPatchResult,
+} from './codingTool.js';
 export { openApiToToolDefinitions, type OpenApiToolDefinition } from './openapi.js';
 export {
   RateLimitSettingsSchema,

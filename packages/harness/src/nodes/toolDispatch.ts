@@ -21,6 +21,7 @@ import { PathJail, PathJailError } from '../security/pathJail.js';
 import { validateBashWorkspacePolicy } from '../security/bashWorkspacePolicy.js';
 import { ToolRateLimiter } from '../security/rateLimiter.js';
 import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
+import { CODING_APPLY_PATCH_ID } from '../tools/index.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
 import { scanOutput } from '../security/outputGuard.js';
@@ -83,6 +84,40 @@ async function enforcePathJail(
   ctx: ToolDispatchContext,
 ): Promise<{ output: Output } | { args: Record<string, unknown> } | null> {
   if (!ctx.pathJail) return null;
+
+  if (call.name === CODING_APPLY_PATCH_ID) {
+    const operations = Array.isArray(call.args.operations) ? call.args.operations : [];
+    const resolvedOperations: unknown[] = [];
+    for (const operation of operations) {
+      if (typeof operation !== 'object' || operation === null || Array.isArray(operation)) {
+        resolvedOperations.push(operation);
+        continue;
+      }
+      const op = operation as Record<string, unknown>;
+      if (typeof op.path !== 'string') {
+        resolvedOperations.push(operation);
+        continue;
+      }
+      try {
+        resolvedOperations.push({
+          ...op,
+          path: await ctx.pathJail.enforce(op.path, 'write'),
+        });
+      } catch (err) {
+        if (err instanceof PathJailError) {
+          return {
+            output: {
+              type: 'error',
+              code: 'PATH_ACCESS_DENIED',
+              message: err.message,
+            },
+          };
+        }
+        throw err;
+      }
+    }
+    return { args: { ...call.args, operations: resolvedOperations } };
+  }
 
   if (call.name === 'sys_bash') {
     const command = typeof call.args.command === 'string' ? call.args.command : '';
@@ -169,11 +204,25 @@ async function dispatchNativeTool(
   }
   try {
     const result = await ctx.nativeToolExecutor(call.name, call.args);
-    return { output: result, ok: result.type !== 'error' };
+    return { output: result, ok: isOutputOk(result) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { output: { type: 'error', code: 'NATIVE_TOOL_FAILED', message }, ok: false };
   }
+}
+
+function isOutputOk(output: Output): boolean {
+  if (output.type === 'error') return false;
+  if (
+    output.type === 'tool_result' &&
+    typeof output.data === 'object' &&
+    output.data !== null &&
+    !Array.isArray(output.data) &&
+    (output.data as { ok?: unknown }).ok === false
+  ) {
+    return false;
+  }
+  return true;
 }
 
 async function dispatchSingleTool(

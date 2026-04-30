@@ -21,6 +21,9 @@ import {
   MEDIUM_RISK_TOOLS,
   MEDIUM_RISK_MAP,
   executeMediumRiskTool,
+  CODING_EDIT_TOOLS,
+  CODING_EDIT_MAP,
+  executeCodingEditTool,
 } from './tools/index.js';
 import {
   SYSTEM_TOOL_PREFIX,
@@ -56,6 +59,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   ...OBSERVABILITY_MAP,
   ...LOW_RISK_MAP,
   ...MEDIUM_RISK_MAP,
+  ...CODING_EDIT_MAP,
 } as const;
 
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
@@ -151,6 +155,8 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...LOW_RISK_TOOLS,
   // New medium-risk tools (write I/O + network, PathJail + URL guard enforced)
   ...MEDIUM_RISK_TOOLS,
+  // Coding tools (bounded edits with structured evidence)
+  ...CODING_EDIT_TOOLS,
   // Lazy skill loading — fetch full skill instructions on demand
   {
     id: ids.getSkillDetail,
@@ -332,6 +338,9 @@ export function createSystemToolExecutor(options?: {
     // Medium-risk tools (async, write I/O + network)
     const mediumResult = await executeMediumRiskTool(toolId, args);
     if (mediumResult) return mediumResult;
+
+    const codingEditResult = await executeCodingEditTool(toolId, args, { workspaceRoot });
+    if (codingEditResult) return codingEditResult;
 
     return {
       type: 'error',

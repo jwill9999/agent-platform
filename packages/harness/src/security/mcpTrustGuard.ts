@@ -61,6 +61,7 @@ const SYSTEM_TOOL_NAMES = new Set([
   'create_directory',
   'http_request',
   'download_file',
+  'coding_apply_patch',
   'run_command',
   'execute',
   'delete_file',

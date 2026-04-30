@@ -103,6 +103,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Created Beads follow-up `agent-platform-runtime-backup-auto` and task spec for stage-two automatic runtime-config backup refresh.
 - **Date:** 2026-04-30
 - **Session:** Addressed SonarCloud hotspot `javascript:S4036` by using a fixed absolute sqlite3 path for runtime-config backup.
+- **Date:** 2026-04-30
+- **Session:** Completed `agent-platform-code-tools.3` structured edit tool on `task/agent-platform-code-tools.3`.
 
 ### Session-close guardrail (required)
 
@@ -190,33 +192,60 @@ Quality gates passed:
 - Added `SQLITE3_BIN` override support only when set to an absolute path.
 - Added regression coverage that relative command overrides are rejected.
 
+### Structured coding edit tool implemented
+
+- Created `task/agent-platform-code-tools.3` from `task/agent-platform-code-tools.2`.
+- Added shared coding tool schemas in `packages/contracts/src/codingTool.ts`.
+- Added built-in `coding_apply_patch` as a medium-risk structured edit tool.
+- The tool supports exact text replacement, create/append behavior when `oldText` is omitted, dry-run previews, changed-file output, diff stats, inline diff evidence, and coding evidence envelopes.
+- Dispatch now enforces PathJail on nested patch operation paths before native execution and rejects traversal/symlink escapes before mutation.
+- Audit logging now records `ok: false` coding envelopes as `error` or `denied` instead of `success`.
+- MCP trust guard now prevents MCP tools from shadowing `coding_apply_patch`.
+- Added regression coverage for schema round-trips, coding tool allowlist behavior, dry-run/apply/create, binary denial, traversal denial, symlink denial, and coding audit statuses.
+
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/ui-chat-api-key-error-redaction`
-- **Current commit:** `06ea811` on origin, with additional local uncommitted SonarCloud hotspot fix changes
-- **Latest completed task:** `agent-platform-code-tools.2` remains the latest coding-tools epic task
-- **Current work:** UI/runtime bug fix, not part of the coding-tools task chain
-- **Remote sync:** next step is to commit and push the SonarCloud hotspot fix on the same test branch.
+- **Current branch:** `task/agent-platform-code-tools.3`
+- **Current commit:** local uncommitted implementation of `agent-platform-code-tools.3`
+- **Latest completed task:** `agent-platform-code-tools.3` closed in Beads; pending commit/push
+- **Current work:** Structured coding edit tool
+- **Remote sync:** next step is to close Beads, commit, and push `task/agent-platform-code-tools.3`.
 
 ### Beads
 
 - `agent-platform-code-tools.2` is closed.
-- `agent-platform-code-tools.3` is the next downstream task.
+- `agent-platform-code-tools.3` is closed.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 
 ### Quality
 
-- Code quality gates passed for the touched API, web, harness, and observability files.
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
+- Structured edit checks passed:
+  - `pnpm --filter @agent-platform/contracts build`
+  - `pnpm --filter @agent-platform/agent-validation build`
+  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+  - `pnpm --filter @agent-platform/agent-validation run test -- test/allowlists.test.ts`
+  - `pnpm --filter @agent-platform/harness run test -- test/codingEditTool.test.ts test/toolAuditLog.test.ts test/mediumRiskTools.test.ts test/toolDispatch.test.ts`
+  - `pnpm --filter @agent-platform/contracts run typecheck`
+  - `pnpm --filter @agent-platform/agent-validation run typecheck`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/contracts run lint`
+  - `pnpm --filter @agent-platform/agent-validation run lint`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
 
 ---
 
 ## Next (priority order)
 
-1. Push the SonarCloud hotspot fix on `task/ui-chat-api-key-error-redaction`.
-2. After UI/runtime backup work is clear, start `agent-platform-code-tools.3` from the `agent-platform-code-tools.2` task tip.
+1. Commit and push `task/agent-platform-code-tools.3`.
+2. Open/arrange PR from `task/agent-platform-code-tools.3` into the code-tools chain branch as needed.
+3. Next downstream task after merge: `agent-platform-code-tools.4` read-only git tools.
 
 ---
 

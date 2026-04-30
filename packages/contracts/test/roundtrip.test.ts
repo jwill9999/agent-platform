@@ -4,6 +4,9 @@ import {
   ApprovalRequestDecisionBodySchema,
   ApprovalRequestQuerySchema,
   ApprovalRequestSchema,
+  CodingApplyPatchInputSchema,
+  CodingApplyPatchResultSchema,
+  CodingToolEnvelopeSchema,
   CriticVerdictSchema,
   ExecutionLimitsSchema,
   HealthResponseSchema,
@@ -144,5 +147,50 @@ describe('contracts round-trip', () => {
       reason: 'approved by user',
     });
     expect(() => ApprovalRequestSchema.parse({ ...request, status: 'done' })).toThrow();
+  });
+
+  it('Coding apply patch schemas round-trip', () => {
+    const input = CodingApplyPatchInputSchema.parse({
+      reason: 'Update greeting',
+      dryRun: true,
+      operations: [{ path: 'src/example.ts', oldText: 'hello', newText: 'hello world' }],
+    });
+    expect(CodingApplyPatchInputSchema.parse(structuredClone(input))).toEqual(input);
+
+    const result = CodingApplyPatchResultSchema.parse({
+      dryRun: true,
+      changedFiles: ['src/example.ts'],
+      createdFiles: [],
+      deletedFiles: [],
+      diffStat: { filesChanged: 1, insertions: 1, deletions: 1 },
+    });
+    expect(CodingApplyPatchResultSchema.parse(structuredClone(result))).toEqual(result);
+
+    const envelope = CodingToolEnvelopeSchema.parse({
+      ok: true,
+      result,
+      evidence: {
+        kind: 'edit',
+        summary: 'Dry run would change 1 file.',
+        riskTier: 'medium',
+        status: 'succeeded',
+        sourceTool: 'coding_apply_patch',
+        startedAtMs: 1000,
+        completedAtMs: 1010,
+        durationMs: 10,
+        artifacts: [
+          {
+            kind: 'diff',
+            label: 'Patch diff',
+            storage: 'inline',
+            mimeType: 'text/x-diff',
+            content: '--- a/src/example.ts\n+++ b/src/example.ts',
+            sizeBytes: 43,
+            truncated: false,
+          },
+        ],
+      },
+    });
+    expect(CodingToolEnvelopeSchema.parse(structuredClone(envelope))).toEqual(envelope);
   });
 });

@@ -29,6 +29,10 @@ describe('allowlists', () => {
     expect(isToolExecutionAllowed(baseAgent, 'nope')).toBe(false);
   });
 
+  it('allows built-in structured coding tools regardless of allowlist', () => {
+    expect(isToolExecutionAllowed(baseAgent, 'coding_apply_patch')).toBe(true);
+  });
+
   it('allows MCP composite tool when server id is allowlisted', () => {
     expect(isToolExecutionAllowed(baseAgent, 'mcp-fs:read')).toBe(true);
     expect(isToolExecutionAllowed(baseAgent, 'other:read')).toBe(false);
