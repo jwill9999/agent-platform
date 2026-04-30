@@ -143,6 +143,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added backlog task `agent-platform-improvement-goals` for a limited observability-driven self-improvement loop with reviewed candidates.
 - **Date:** 2026-04-30
 - **Session:** Remembered future epic refinement workflow: review specs/tickets with owner before moving epics from refinement/planning to ready.
+- **Date:** 2026-04-30
+- **Session:** Started memory epic setup: created `feature/agent-platform-memory`, created `task/agent-platform-memory.1`, created seven memory child tasks/specs, and claimed `.1`.
 
 ### Session-close guardrail (required)
 
@@ -328,15 +330,30 @@ Quality gates passed:
 - Captured `agent-platform-improvement-goals` as a follow-up for monitored goals and reviewed self-improvement candidates. First pass should start with one narrow objective and no autonomous changes.
 - Added Beads memory `when-creating-new-epics-schedule-or-explicitly-run`: new epics should have a refinement session with the owner before implementation, including ticket/spec review, requirement changes, tradeoff discussion, and moving from refinement/planning to ready only after that review.
 
+### Memory epic started
+
+- Confirmed `agent-platform-code-tools` is closed with all seven child tasks complete.
+- Created and pushed `feature/agent-platform-memory` from the updated `main`.
+- Created `task/agent-platform-memory.1` from the memory feature branch.
+- Created memory child specs:
+  - `docs/tasks/agent-platform-memory.1.md`
+  - `docs/tasks/agent-platform-memory.2.md`
+  - `docs/tasks/agent-platform-memory.3.md`
+  - `docs/tasks/agent-platform-memory.4.md`
+  - `docs/tasks/agent-platform-memory.5.md`
+  - `docs/tasks/agent-platform-memory.6.md`
+  - `docs/tasks/agent-platform-memory.7.md`
+- Created matching Beads child tasks, linked them under `agent-platform-memory`, chained dependencies from `.1` through `.7`, claimed `agent-platform-memory.1`, and synced Beads/Dolt.
+
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-code-tools.7`
-- **Current base:** `7249457 Collapse chat tool activity`
+- **Current branch:** `task/agent-platform-memory.1`
+- **Current base:** `main` / `feature/agent-platform-memory` after code-tools merge and planning follow-ups.
 - **Latest completed task:** `agent-platform-code-tools.7` coding tool visibility and E2E validation
-- **Current work:** Code-tools epic is complete. No further child task exists on this epic.
-- **Remote sync:** Beads/Dolt is synced after closing `.7`; branch should be pushed after this session update commit.
+- **Current work:** `agent-platform-memory.1` memory contracts, schema, repository, and policy model is claimed.
+- **Remote sync:** Beads/Dolt is synced after creating memory child tasks and claiming `.1`; task branch should be pushed after this setup commit.
 
 ### Beads
 
@@ -347,6 +364,9 @@ Quality gates passed:
 - `agent-platform-code-tools.6` is closed.
 - `agent-platform-code-tools.7` is closed.
 - `agent-platform-code-tools` epic is closed.
+- `agent-platform-memory` epic is open.
+- `agent-platform-memory.1` is claimed and in progress.
+- `agent-platform-memory.2` through `.7` are open and chained behind `.1`.
 - New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
@@ -455,9 +475,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the `.7` closeout/session update on `task/agent-platform-code-tools.7`.
-2. Decide next epic/task to start. Ready candidates include `agent-platform-active-project`, `agent-platform-research-tools`, `agent-platform-browser-tools`, and `agent-platform-memory`.
-3. Keep the IDE/file-tree integration as a separate follow-up under `agent-platform-ide-rethink`.
+1. Push the memory setup commit on `task/agent-platform-memory.1`.
+2. Refine `agent-platform-memory.1` with the owner before implementation if needed.
+3. Implement `agent-platform-memory.1`: shared contracts, DB schema/repository, and policy model.
 
 ---
 
