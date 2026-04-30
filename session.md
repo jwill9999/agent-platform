@@ -99,6 +99,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Follow-up local fix: chat now leaves agents without an assigned model config on the platform default path, and the Next.js BFF no longer injects its own env key as an explicit API override.
 - **Date:** 2026-04-30
 - **Session:** Added ignored local runtime-config backup/restore support for encrypted saved model configs, agent model assignments, and MCP server assignments.
+- **Date:** 2026-04-30
+- **Session:** Created Beads follow-up `agent-platform-runtime-backup-auto` and task spec for stage-two automatic runtime-config backup refresh.
 
 ### Session-close guardrail (required)
 
@@ -167,6 +169,12 @@ Quality gates passed:
 - `make runtime-config-backup`
 - Restore smoke check against `/private/tmp/agent-platform-restore-check.sqlite`
 
+### Runtime backup automation follow-up tracked
+
+- Created Beads task `agent-platform-runtime-backup-auto`.
+- Added `docs/tasks/agent-platform-runtime-backup-auto.md` describing the stage-two automation work: refresh the ignored local runtime-config backup after successful model config, agent assignment, MCP server, and agent MCP assignment writes.
+- Synced Beads/Dolt remote state with `bd dolt push`.
+
 ## Current state
 
 ### Git
@@ -181,7 +189,7 @@ Quality gates passed:
 
 - `agent-platform-code-tools.2` is closed.
 - `agent-platform-code-tools.3` is the next downstream task.
-- No new Beads issue was created for the UI bug fix.
+- New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 
 ### Quality
 
@@ -192,7 +200,7 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the runtime-config backup follow-up on `task/ui-chat-api-key-error-redaction`.
+1. Push the runtime backup automation follow-up spec commit on `task/ui-chat-api-key-error-redaction`.
 2. After UI/runtime backup work is clear, start `agent-platform-code-tools.3` from the `agent-platform-code-tools.2` task tip.
 
 ---
