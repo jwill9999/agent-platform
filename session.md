@@ -133,6 +133,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Implemented `agent-platform-code-tools.6` repository map, code search, and related-test discovery tools on `task/agent-platform-code-tools.6`.
 - **Date:** 2026-04-30
 - **Session:** Started `agent-platform-code-tools.7` on `task/agent-platform-code-tools.7`; changed chat tool activity to render separately from final assistant text and collapse after completion.
+- **Date:** 2026-04-30
+- **Session:** Closed `agent-platform-code-tools.7`; the structured coding tool pack epic auto-closed at 7/7 complete after green pipelines.
 
 ### Session-close guardrail (required)
 
@@ -310,16 +312,19 @@ Quality gates passed:
 - Finding: streamed `tool_result` events were appended into the assistant's final markdown answer, leaving large tool-call JSON blocks permanently visible.
 - Started `.7` and changed the web chat stream parser so tool-call placeholders, tool results, and recoverable tool errors are tracked as tool activity instead of answer text.
 - Added a compact tool activity block that is open while streaming and collapses by default after the assistant answer completes, while remaining expandable for auditability.
+- Pipeline checks passed green on `task/agent-platform-code-tools.7`.
+- Closed `.7` in Beads; `agent-platform-code-tools` auto-closed with all seven child tasks complete.
+- Captured `agent-platform-active-project` as a follow-up for active project defaults so users do not need to type `/workspace/...` paths in normal coding workflows.
 
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/agent-platform-code-tools.7`
-- **Current base:** `465273b Implement repo discovery tools`
-- **Latest completed task:** `agent-platform-code-tools.6` repository map and code search
-- **Current work:** `.7` coding tools visibility and E2E validation is in progress; first UI/tool-activity fix is ready for manual test.
-- **Remote sync:** Beads/Dolt is synced after claiming `.7`; branch should be pushed after this session update commit.
+- **Current base:** `7249457 Collapse chat tool activity`
+- **Latest completed task:** `agent-platform-code-tools.7` coding tool visibility and E2E validation
+- **Current work:** Code-tools epic is complete. No further child task exists on this epic.
+- **Remote sync:** Beads/Dolt is synced after closing `.7`; branch should be pushed after this session update commit.
 
 ### Beads
 
@@ -328,7 +333,9 @@ Quality gates passed:
 - `agent-platform-code-tools.4` is closed.
 - `agent-platform-code-tools.5` is closed.
 - `agent-platform-code-tools.6` is closed.
-- `agent-platform-code-tools.7` is claimed and in progress.
+- `agent-platform-code-tools.7` is closed.
+- `agent-platform-code-tools` epic is closed.
+- New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 - New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
 
@@ -432,8 +439,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push `task/agent-platform-code-tools.7` with the tool-activity chat UI fix.
-2. Manual test the chat flow with `/workspace/scratch/demo-app`: create app, map repo, search symbol, find related tests.
+1. Commit and push the `.7` closeout/session update on `task/agent-platform-code-tools.7`.
+2. Decide next epic/task to start. Ready candidates include `agent-platform-active-project`, `agent-platform-research-tools`, `agent-platform-browser-tools`, and `agent-platform-memory`.
 3. Keep the IDE/file-tree integration as a separate follow-up under `agent-platform-ide-rethink`.
 
 ---
