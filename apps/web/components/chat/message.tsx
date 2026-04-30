@@ -8,7 +8,8 @@ import { ThinkingBlock } from './thinking-block';
 import { Markdown } from './markdown';
 import type { CriticEvent } from '@/lib/critic-events';
 import { ApprovalCard } from './approval-card';
-import type { ApprovalCardState, ApprovalDecision } from '@/hooks/use-harness-chat';
+import { ToolTraceBlock } from './tool-trace-block';
+import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
 
 interface MessageProps {
   message: UIMessage;
@@ -18,6 +19,8 @@ interface MessageProps {
   criticEvents?: readonly CriticEvent[];
   /** Aggregated thinking-channel text for this assistant message (if any). */
   thinking?: string;
+  /** Tool execution events emitted for this assistant turn. */
+  toolEvents?: readonly ToolTraceEvent[];
   /** True while this assistant turn is still receiving streamed content. */
   isStreaming?: boolean;
   /** Approval requests emitted for this assistant turn. */
@@ -55,6 +58,7 @@ export function Message({
   isAwaitingStreamContent = false,
   criticEvents,
   thinking,
+  toolEvents,
   isStreaming = false,
   approvals,
   onApprovalDecision,
@@ -64,6 +68,7 @@ export function Message({
   const hasText = Boolean(text.trim());
   const contextFileCount = isUser ? countContextFiles(message.content) : 0;
   const hasCritic = !isUser && criticEvents && criticEvents.length > 0;
+  const hasToolEvents = !isUser && toolEvents && toolEvents.length > 0;
   // Find the final accept event for review block
   const finalAccept =
     hasCritic && criticEvents
@@ -83,6 +88,7 @@ export function Message({
           {hasThinking && (
             <ThinkingBlock content={thinking ?? ''} defaultOpen={isAwaitingStreamContent} />
           )}
+          {hasToolEvents && <ToolTraceBlock events={toolEvents ?? []} isStreaming={isStreaming} />}
           {hasText && <Markdown content={text} className="text-sm" />}
           {hasApprovals &&
             approvals.map((approval) => (
@@ -94,11 +100,16 @@ export function Message({
             ))}
           {showFinalReview && finalAccept && <CriticReviewBlock event={finalAccept} />}
           {hasCritic && !finalAccept && <CriticBadges events={criticEvents} />}
-          {!hasText && !showFinalReview && !hasCritic && !hasThinking && !hasApprovals && (
-            <span className="sr-only" aria-busy={isAwaitingStreamContent} aria-live="polite">
-              Assistant feedback pending
-            </span>
-          )}
+          {!hasText &&
+            !showFinalReview &&
+            !hasCritic &&
+            !hasThinking &&
+            !hasToolEvents &&
+            !hasApprovals && (
+              <span className="sr-only" aria-busy={isAwaitingStreamContent} aria-live="polite">
+                Assistant feedback pending
+              </span>
+            )}
         </div>
       </div>
     );

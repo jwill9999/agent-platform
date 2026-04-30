@@ -7,6 +7,8 @@
 
 Define the contracts for the coding tool pack before implementation. The contract layer should describe inputs, outputs, risk tiers, audit events, and evidence artifacts consumed by critic and Definition-of-Done checks.
 
+Contract reference: [Coding Tool Contracts](../coding-tool-contracts.md).
+
 ## Requirements
 
 - Define tool contracts for structured edits, git inspection, test runner, repository map, and code search.
@@ -58,3 +60,8 @@ Beads dependency: this task depends on `agent-platform-code-tools.1`; `agent-pla
 - Evidence artifact shape is documented.
 - Risk/audit model is documented.
 - No implementation begins before contracts are agreed.
+
+## Outcome
+
+- Contract documentation is defined in `docs/coding-tool-contracts.md`.
+- Runtime baseline links to the contract reference.

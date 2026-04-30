@@ -120,7 +120,7 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       const startMs = startTimes.get(id) ?? now;
       startTimes.delete(id);
 
-      const status = output.type === 'error' ? 'error' : 'success';
+      const status = outputToAuditStatus(output);
       const resultJson = JSON.stringify(output.type === 'tool_result' ? output.data : output);
 
       store.complete(id, {
@@ -180,6 +180,21 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       return id;
     },
   };
+}
+
+function outputToAuditStatus(output: Output): 'success' | 'error' | 'denied' {
+  if (output.type === 'error') return 'error';
+  if (
+    output.type === 'tool_result' &&
+    typeof output.data === 'object' &&
+    output.data !== null &&
+    !Array.isArray(output.data) &&
+    (output.data as { ok?: unknown }).ok === false
+  ) {
+    const evidence = (output.data as { evidence?: { status?: unknown } }).evidence;
+    return evidence?.status === 'denied' ? 'denied' : 'error';
+  }
+  return 'success';
 }
 
 /**

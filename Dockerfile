@@ -24,7 +24,9 @@ RUN pnpm -r run build
 RUN pnpm prune --prod
 
 FROM node:20-alpine AS runner
-RUN apk add --no-cache curl chromium \
+RUN apk add --no-cache curl chromium git ripgrep jq make file diffutils coreutils \
+  && corepack enable \
+  && corepack prepare pnpm@9.15.4 --activate \
   && addgroup -g 10001 -S appuser \
   && adduser -S -u 10001 -G appuser appuser
 WORKDIR /app

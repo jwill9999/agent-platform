@@ -11,6 +11,7 @@ import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgent } from '@/lib/default-agent';
+import { resolveChatModelConfigId } from '@/lib/modelSelection';
 
 export default function HomePage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -30,6 +31,7 @@ export default function HomePage() {
     setError,
     criticEventsByMessage,
     thinkingByMessage,
+    toolEventsByMessage,
     approvalEventsByMessage,
     decideApproval,
     hasPendingApproval,
@@ -54,27 +56,17 @@ export default function HomePage() {
       const nextAgents = agentList ?? [];
       setAgents(nextAgents);
       const def = pickDefaultAgent(nextAgents);
+      const withKey = (configList ?? []).filter((c) => c.hasApiKey);
       if (def) {
         setSelectedAgentId((prev) => prev ?? def.id);
       }
-      // Only show configs that have an API key stored; pre-select the first one
-      const withKey = (configList ?? []).filter((c) => c.hasApiKey);
+      // Only show configs that have an API key stored; default to the selected agent's config.
       setModelConfigs(withKey);
-      setSelectedModelConfigId((prev) => {
-        if (prev == null) {
-          // No previous selection: default to the first available config (if any)
-          return withKey[0]?.id ?? null;
-        }
-
-        // Keep previous selection only if it still exists in the new list
-        const stillExists = withKey.some((c) => c.id === prev);
-        if (stillExists) {
-          return prev;
-        }
-
-        // Previous selection is gone: fall back to the first config (or null)
-        return withKey[0]?.id ?? null;
-      });
+      setSelectedModelConfigId((prev) =>
+        prev && withKey.some((config) => config.id === prev)
+          ? prev
+          : resolveChatModelConfigId(def?.id ?? null, nextAgents, withKey),
+      );
     } catch (e) {
       setLoadError(e instanceof ApiRequestError ? e.message : String(e));
     }
@@ -112,24 +104,33 @@ export default function HomePage() {
     }
   }, [selectedAgentId, createSessionForAgent, isResuming]);
 
-  const handleAgentChange = useCallback((agentId: string) => {
-    setIsResuming(false);
-    setSelectedAgentId(agentId);
-  }, []);
+  const handleAgentChange = useCallback(
+    (agentId: string) => {
+      setIsResuming(false);
+      setSelectedAgentId(agentId);
+      setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
+    },
+    [agents, modelConfigs],
+  );
 
-  const handleSelectSession = useCallback((session: SessionRecord) => {
-    setIsResuming(true);
-    setSelectedAgentId(session.agentId);
-    setSessionId(session.id);
-  }, []);
+  const handleSelectSession = useCallback(
+    (session: SessionRecord) => {
+      setIsResuming(true);
+      setSelectedAgentId(session.agentId);
+      setSelectedModelConfigId(resolveChatModelConfigId(session.agentId, agents, modelConfigs));
+      setSessionId(session.id);
+    },
+    [agents, modelConfigs],
+  );
 
   const handleNewChatForAgent = useCallback(
     (agentId: string) => {
       setIsResuming(false);
       setSelectedAgentId(agentId);
+      setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
       createSessionForAgent(agentId).catch(() => {});
     },
-    [createSessionForAgent],
+    [agents, createSessionForAgent, modelConfigs],
   );
 
   const isLoading = status === 'streaming';
@@ -211,6 +212,7 @@ export default function HomePage() {
               attachmentWarnings={attachmentWarnings}
               criticEventsByMessage={criticEventsByMessage}
               thinkingByMessage={thinkingByMessage}
+              toolEventsByMessage={toolEventsByMessage}
               approvalEventsByMessage={approvalEventsByMessage}
               onApprovalDecision={handleApprovalDecision}
             />
