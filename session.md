@@ -127,6 +127,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Fixed quality-gate package filters so chat agents can run lint/typecheck/build/test when they infer workspace paths such as `apps/web`.
 - **Date:** 2026-04-30
 - **Session:** Fixed CI unit-test failure in `qualityGateTool.test.ts` by resolving pnpm from absolute npm/pnpm environment paths before local fallback paths.
+- **Date:** 2026-04-30
+- **Session:** Closed out `agent-platform-code-tools.5` after green pipelines; claimed `agent-platform-code-tools.6` and created `task/agent-platform-code-tools.6` from the `.5` chain tip.
 
 ### Session-close guardrail (required)
 
@@ -282,15 +284,21 @@ Quality gates passed:
 - Added API regression coverage proving the chat runtime does not run DoD criteria-generation prompts and does not persist streamed criteria JSON as the assistant response.
 - Created Beads follow-up `agent-platform-ide-rethink` with spec `docs/tasks/agent-platform-ide-rethink.md` for deciding whether to keep the bespoke browser IDE, integrate a proven editor/file browser, or rely on repository tools plus external IDE workflows.
 
+### Quality-gate follow-ups completed
+
+- Fixed quality-gate package filters so chat agents can send workspace paths like `apps/web` or `packages/harness`; the tool normalizes those paths to scoped pnpm package names before running allowlisted profiles.
+- Fixed the GitHub Actions unit-test failure where `qualityGateTool.test.ts` only looked for Homebrew/system pnpm locations; tests now resolve absolute `npm_execpath` or `PNPM_HOME/pnpm` before local fallback paths.
+- Latest `.5` pipeline was green after commit `8e27369`.
+
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-code-tools.5`
-- **Current commit:** `f121bfb` plus local reverts/chat evaluator fix pending commit
+- **Current branch:** `task/agent-platform-code-tools.6`
+- **Current base:** `8e27369 Resolve pnpm path in quality gate tests`
 - **Latest completed task:** `agent-platform-code-tools.5` closed in Beads
-- **Current work:** Commit and push the chat runtime evaluator fix/reverts on `task/agent-platform-code-tools.5`
-- **Remote sync:** Beads/Dolt is synced; branch is ahead locally with IDE reverts and chat runtime fix.
+- **Current work:** `agent-platform-code-tools.6` repository map and code search
+- **Remote sync:** Beads/Dolt is synced; `.6` branch has just been created from `.5` and should be pushed after this session update commit.
 
 ### Beads
 
@@ -298,7 +306,7 @@ Quality gates passed:
 - `agent-platform-code-tools.3` is closed.
 - `agent-platform-code-tools.4` is closed.
 - `agent-platform-code-tools.5` is closed.
-- `agent-platform-code-tools.6` is the next downstream task and is not claimed yet.
+- `agent-platform-code-tools.6` is claimed and in progress.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 - New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
 
@@ -367,14 +375,19 @@ Quality gates passed:
   - `pnpm --filter @agent-platform/api run typecheck`
   - `pnpm --filter @agent-platform/api run lint`
   - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
+- Quality-gate package-path and CI follow-up checks passed:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/qualityGateTool.test.ts`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm test` (run with escalation because API Supertest binds local ports)
+  - pre-push harness build/typecheck/test
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push the chat runtime evaluator fix/reverts on `task/agent-platform-code-tools.5`.
-2. Open or arrange the PR for `.5` into the coding-tools chain.
-3. After `.5`, next downstream task is `agent-platform-code-tools.6`: repository map and code search.
+1. Commit and push this session update on `task/agent-platform-code-tools.6`.
+2. Start `agent-platform-code-tools.6`: repository map generation, code search, and related-test discovery tools.
+3. Keep the IDE/file-tree integration as a separate follow-up under `agent-platform-ide-rethink`.
 
 ---
 
