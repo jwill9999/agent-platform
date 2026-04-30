@@ -15,6 +15,7 @@ import {
   ApprovalRequestNotFoundError,
   ApprovalRequestTransitionError,
   getModelConfig,
+  listModelConfigs,
   resolveModelConfigKey,
   parseMasterKeyFromBase64,
 } from '@agent-platform/db';
@@ -38,6 +39,7 @@ import {
   PathJail,
   DEFAULT_MOUNTS,
   createToolAuditLogger,
+  redactCredentials,
   type HarnessStateType,
 } from '@agent-platform/harness';
 import type {
@@ -130,7 +132,8 @@ async function loadAgentContext(
  * Precedence (highest → lowest):
  *  1. `requestModelConfigId` — per-request override from the chat UI picker
  *  2. `agentCtx.agent.modelConfigId` — agent's saved config
- *  3. `agentCtx.agent.modelOverride` + `headerKey` (x-openai-key) + env-var chain
+ *  3. First saved model config with credentials — platform default from Settings > Models
+ *  4. `agentCtx.agent.modelOverride` + `headerKey` (x-openai-key) + env-var chain
  *
  * Single-user MVP note: model configs are not scoped per-user. If multi-tenancy is
  * added in future, enforce that `effectiveModelConfigId` belongs to the requesting user
@@ -170,6 +173,26 @@ function resolveModelOrThrow(
       apiKey = resolveModelConfigKey(db, effectiveModelConfigId, masterKey);
     }
     return { provider: cfg.provider, model: cfg.model, apiKey };
+  }
+
+  const defaultModelConfig = listModelConfigs(db).find(
+    (config) => config.hasApiKey || config.provider === 'ollama',
+  );
+  if (defaultModelConfig) {
+    let apiKey: string | undefined;
+    if (defaultModelConfig.hasApiKey) {
+      const masterKeyB64 = process.env['SECRETS_MASTER_KEY'];
+      if (!masterKeyB64) {
+        throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
+      }
+      const masterKey = parseMasterKeyFromBase64(masterKeyB64);
+      apiKey = resolveModelConfigKey(db, defaultModelConfig.id, masterKey);
+    }
+    return {
+      provider: defaultModelConfig.provider,
+      model: defaultModelConfig.model,
+      apiKey,
+    };
   }
 
   // Fall back to free-form modelOverride + env-var chain.
@@ -297,11 +320,27 @@ function emitStreamError(res: Response, err: unknown, signal?: AbortSignal): voi
     return;
   }
 
+  const rawMessage = err instanceof Error ? err.message : 'Graph execution failed';
+  const authError = isProviderAuthError(rawMessage);
+  const message = authError
+    ? 'The model provider rejected the configured API key. Check the selected model config or server environment key.'
+    : redactCredentials(rawMessage);
   const errorEvent = {
     type: 'error' as const,
-    message: err instanceof Error ? err.message : 'Graph execution failed',
+    ...(authError ? { code: 'MODEL_AUTH_FAILED' as const } : {}),
+    message,
   };
   res.write(JSON.stringify(errorEvent) + '\n');
+}
+
+function isProviderAuthError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('incorrect api key') ||
+    lower.includes('invalid api key') ||
+    lower.includes('authentication') ||
+    lower.includes('unauthorized')
+  );
 }
 
 function mapResumeApprovalError(error: unknown): never {

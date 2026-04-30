@@ -57,6 +57,44 @@ describe('harness chat stream parser', () => {
     });
   });
 
+  it('redacts API keys from streamed error messages', () => {
+    const openAiKey = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
+    const result = renderStreamEvent({
+      type: 'error',
+      message: `Incorrect API key provided: ${openAiKey}`,
+    });
+
+    expect(result).toEqual({
+      error: 'Incorrect API key provided: [REDACTED:CREDENTIAL]',
+    });
+  });
+
+  it('redacts masked API keys from streamed error messages', () => {
+    const masked = ['sk-proj-', '*'.repeat(32), 'abcd'].join('');
+    const result = renderStreamEvent({
+      type: 'error',
+      message: `Incorrect API key provided: ${masked}`,
+    });
+
+    expect(result).toEqual({
+      error: 'Incorrect API key provided: [REDACTED:CREDENTIAL]',
+    });
+  });
+
+  it('renders model auth failures as global errors without raw credentials', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      code: 'MODEL_AUTH_FAILED',
+      message:
+        'The model provider rejected the configured API key. Check the selected model config or server environment key.',
+    });
+
+    expect(result).toEqual({
+      error:
+        'The model provider rejected the configured API key. Check the selected model config or server environment key.',
+    });
+  });
+
   it('deduplicates repeated approval_required events by request id', () => {
     const first = mergeApprovalEvent([], {
       type: 'approval_required',

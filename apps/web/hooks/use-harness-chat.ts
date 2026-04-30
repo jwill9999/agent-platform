@@ -14,6 +14,18 @@ export type { CriticEvent } from '@/lib/critic-events';
 
 const THINKING_PLACEHOLDER = 'The agent is thinking…';
 const THINKING_REVISE_PLACEHOLDER = 'The agent is revising…';
+const CREDENTIAL_PATTERNS: readonly RegExp[] = [
+  /sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g,
+  /(ghp|gho|ghu|ghs|ghr)_\w{36,}/g,
+  /Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g,
+];
+
+function redactDisplayText(text: string): string {
+  return CREDENTIAL_PATTERNS.reduce(
+    (current, pattern) => current.replace(pattern, '[REDACTED:CREDENTIAL]'),
+    text,
+  );
+}
 
 function makeTextParts(text: string): NonNullable<UIMessage['parts']> {
   return [{ type: 'text', text }];
@@ -122,20 +134,24 @@ function isDodSummaryText(text: string): boolean {
 function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.message !== 'string') return null;
   const { code } = o;
+  const message = redactDisplayText(o.message);
   if (code === 'CRITIC_CAP_REACHED') {
-    return { critic: { kind: 'cap_reached', reasons: o.message } };
+    return { critic: { kind: 'cap_reached', reasons: message } };
   }
   if (code === 'DOD_FAILED') {
-    return { critic: { kind: 'cap_reached', reasons: o.message } };
+    return { critic: { kind: 'cap_reached', reasons: message } };
   }
   if (code === 'APPROVAL_REJECTED') {
-    return { text: `\n\n[${code}] ${o.message}\n` };
+    return { text: `\n\n[${code}] ${message}\n` };
+  }
+  if (code === 'MODEL_AUTH_FAILED') {
+    return { error: message };
   }
   const isToolError =
     typeof code === 'string' &&
     (code.startsWith('TOOL_') || code.startsWith('MCP_') || code.startsWith('NATIVE_'));
-  if (isToolError) return { text: `\n\n[${code}] ${o.message}\n` };
-  return { error: o.message };
+  if (isToolError) return { text: `\n\n[${code}] ${message}\n` };
+  return { error: message };
 }
 
 export type StreamRenderResult =

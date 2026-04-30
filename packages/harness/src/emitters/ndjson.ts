@@ -2,6 +2,16 @@ import type { Writable } from 'node:stream';
 import { once } from 'node:events';
 import type { Output } from '@agent-platform/contracts';
 import type { OutputEmitter } from '../types.js';
+import { redactCredentials } from '../security/outputGuard.js';
+
+function redactStrings(value: unknown): unknown {
+  if (typeof value === 'string') return redactCredentials(value);
+  if (Array.isArray(value)) return value.map(redactStrings);
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, redactStrings(entry)]),
+  );
+}
 
 /**
  * Creates an OutputEmitter that writes NDJSON (newline-delimited JSON)
@@ -16,7 +26,7 @@ export function createNdjsonEmitter(stream: Writable): OutputEmitter {
   return {
     async emit(event: Output): Promise<void> {
       if (!stream.writable) return;
-      const data = JSON.stringify(event) + '\n';
+      const data = JSON.stringify(redactStrings(event)) + '\n';
       const canWrite = stream.write(data);
       if (!canWrite && stream.writable) {
         await once(stream, 'drain');

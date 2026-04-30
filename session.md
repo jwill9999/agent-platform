@@ -93,6 +93,16 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-code-tools.1` on `task/agent-platform-code-tools.1`; added coding runtime baseline policy, API runner CLI installs, runtime verification wiring, and documentation links.
 - **Date:** 2026-04-29
 - **Session:** Completed `agent-platform-code-tools.2` on `task/agent-platform-code-tools.2`; documented coding tool contracts, shared evidence artifacts, audit events, and truncation/storage rules.
+- **Date:** 2026-04-30
+- **Session:** Fixed chat UI/model-config override and API-key error leakage on `task/ui-chat-api-key-error-redaction`.
+- **Date:** 2026-04-30
+- **Session:** Follow-up local fix: chat now leaves agents without an assigned model config on the platform default path, and the Next.js BFF no longer injects its own env key as an explicit API override.
+- **Date:** 2026-04-30
+- **Session:** Added ignored local runtime-config backup/restore support for encrypted saved model configs, agent model assignments, and MCP server assignments.
+- **Date:** 2026-04-30
+- **Session:** Created Beads follow-up `agent-platform-runtime-backup-auto` and task spec for stage-two automatic runtime-config backup refresh.
+- **Date:** 2026-04-30
+- **Session:** Addressed SonarCloud hotspot `javascript:S4036` by using a fixed absolute sqlite3 path for runtime-config backup.
 
 ### Session-close guardrail (required)
 
@@ -105,48 +115,108 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Coding tool contracts documented
+### Chat UI model-config and stream error handling fixed
 
-Branch state: `task/agent-platform-code-tools.2` contains the completed second task in the structured coding tool pack chain.
+Branch state: `task/ui-chat-api-key-error-redaction` contains an unrelated UI/runtime bug fix before continuing the coding-tools epic.
 
-- Added `docs/coding-tool-contracts.md` as the implementation reference for structured edit, read-only git, governed test runner, repository map, and code search tools.
-- Defined stable tool names, tool kinds, risk tiers, approval policy, shared `CodingEvidenceSchema`, artifact schema, result envelope, error codes, audit event mapping, and truncation/artifact storage rules.
-- Documented critic and Definition-of-Done evidence consumption rules, including the future `DodContractSchema.structuredEvidence` extension.
-- Linked the contract reference from `docs/coding-runtime.md` and `docs/tasks/agent-platform-code-tools.2.md`.
-- Closed `agent-platform-code-tools.2` locally in Beads. Beads Dolt auto-push failed because GitHub DNS/network access was unavailable in the sandbox.
+- Changed the chat page to default the model selector to the selected agent's saved model config instead of blindly using the first stored config as a request override.
+- Follow-up: changed the chat page so agents without an assigned saved model config send no `modelConfigId`, preserving the platform default model/key path.
+- Follow-up: changed the Next.js `/api/chat` proxy so it forwards only an explicit caller `x-openai-key`; it no longer turns `AGENT_OPENAI_API_KEY`/`NEXT_OPENAI_API_KEY` from the web process into an API override.
+- Follow-up: changed the API model resolver so the first saved Settings > Models config with credentials is the platform default before env-var fallback.
+- Follow-up: excluded `**/.next` from Docker build context and removed OpenAI key env injection from the web container so stale web bundles/env cannot override API model resolution.
+- Runtime finding: workspace-storage changed Docker SQLite from named volume `agent-platform_sqlite_data` to host bind mount `.agent-platform/data/agent.sqlite`; the previously saved model configs were still in the old named volume.
+- Migrated only `model_configs` and referenced `secret_refs` from the old named volume DB into the current host-mounted DB. Both restored OpenAI model configs pass `POST /v1/model-configs/:id/test`.
+- Added focused regression tests for model selection precedence and BFF header forwarding.
+- Added a harness regression test proving built-in system tools are passed to the SDK with provider-safe names and strict schemas.
+- Added an API integration test proving chat uses an encrypted saved model config when the agent has no override and no env key is configured.
+- Sanitized streamed NDJSON output, API stream error events, web stream error rendering, and observability task/error events so provider messages cannot leak API-key-shaped values.
+- Added a `MODEL_AUTH_FAILED` stream code for provider authentication failures that happen after NDJSON headers are already sent.
+- Added regression coverage for API post-header auth errors, web stream error rendering, harness NDJSON redaction, output guard OpenAI key detection, and observability redaction.
+
+### Local runtime config backup added
+
+Follow-up owner request: preserve local default agent/model/API-key/MCP setup across accidental DB wipes without committing secrets or encrypted secret material to Git.
+
+- Added `scripts/runtime-config-backup.mjs` with `backup` and `restore` actions.
+- Added `make runtime-config-backup` and `make runtime-config-restore`.
+- Backup writes to ignored `.agent-platform/backups/runtime-config.sqlite` by default.
+- Backup captures saved `model_configs`, referenced encrypted `secret_refs`, agent `model_config_id` assignments, `mcp_servers`, and `agent_mcp_servers`.
+- Restore copies encrypted secret envelopes as-is; it does not decrypt or print API keys.
+- Set local runtime data so seeded Personal assistant uses `gpt-5.4-nano` and seeded Coding uses `gpt-5.4`, then created a local ignored backup containing 2 model configs, 2 encrypted secret refs, 2 MCP servers, 1 agent MCP assignment, and 2 agent model assignments.
+- Documented the recovery flow in `docs/workspace-storage.md`: `make reset`, `make runtime-config-restore`, `make restart`.
 
 Quality gates passed:
 
-- `pnpm docs:lint`
+- `pnpm --filter @agent-platform/harness run test -- test/outputGuard.test.ts test/backpressure.test.ts`
+- `pnpm --filter @agent-platform/web run test -- test/use-harness-chat.test.ts`
+- `pnpm --filter @agent-platform/plugin-observability run test -- test/observability.test.ts`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/plugin-observability run test`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/plugin-observability run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/plugin-observability run lint`
+- `pnpm --filter @agent-platform/api run test -- test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `node --test scripts/runtime-config-backup.test.mjs scripts/workspace-clean.test.mjs`
+- `node --check scripts/runtime-config-backup.mjs`
+- `node --check scripts/runtime-config-backup.test.mjs`
+- `pnpm exec prettier --check scripts/runtime-config-backup.mjs scripts/runtime-config-backup.test.mjs docs/workspace-storage.md`
+- `make runtime-config-backup`
+- Restore smoke check against `/private/tmp/agent-platform-restore-check.sqlite`
+- SonarCloud hotspot fix checks:
+  - `node --test scripts/runtime-config-backup.test.mjs scripts/workspace-clean.test.mjs`
+  - `node --check scripts/runtime-config-backup.mjs`
+  - `pnpm exec prettier --check scripts/runtime-config-backup.mjs scripts/runtime-config-backup.test.mjs`
+  - `pnpm lint`
+  - `git diff --check`
+
+### Runtime backup automation follow-up tracked
+
+- Created Beads task `agent-platform-runtime-backup-auto`.
+- Added `docs/tasks/agent-platform-runtime-backup-auto.md` describing the stage-two automation work: refresh the ignored local runtime-config backup after successful model config, agent assignment, MCP server, and agent MCP assignment writes.
+- Synced Beads/Dolt remote state with `bd dolt push`.
+
+### SonarCloud runtime backup hotspot fixed
+
+- SonarCloud hotspot `AZ3btIyTPSDrC3lo9zwa` flagged `scripts/runtime-config-backup.mjs` for searching OS commands via `PATH`.
+- Updated runtime-config backup to invoke `/usr/bin/sqlite3` by default instead of `sqlite3`.
+- Added `SQLITE3_BIN` override support only when set to an absolute path.
+- Added regression coverage that relative command overrides are rejected.
 
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-code-tools.2`
-- **Current commit:** `28c842d` before the `session.md` amend
-- **Latest completed task:** `agent-platform-code-tools.2`
-- **Next task in chain:** `agent-platform-code-tools.3` from the task-2 tip
-- **Remote sync:** pending; network/DNS blocked GitHub access during this session
+- **Current branch:** `task/ui-chat-api-key-error-redaction`
+- **Current commit:** `06ea811` on origin, with additional local uncommitted SonarCloud hotspot fix changes
+- **Latest completed task:** `agent-platform-code-tools.2` remains the latest coding-tools epic task
+- **Current work:** UI/runtime bug fix, not part of the coding-tools task chain
+- **Remote sync:** next step is to commit and push the SonarCloud hotspot fix on the same test branch.
 
 ### Beads
 
-- `agent-platform-code-tools.2` is closed locally.
+- `agent-platform-code-tools.2` is closed.
 - `agent-platform-code-tools.3` is the next downstream task.
-- Beads Dolt remote push still needs to run when network access is available.
+- New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 
 ### Quality
 
-- Documentation lint and relative-link checks passed.
-- No code files changed, so SonarQube/Problems/code quality gate was not required.
+- Code quality gates passed for the touched API, web, harness, and observability files.
+- SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
 
 ---
 
 ## Next (priority order)
 
-1. Re-run `bd dolt push` once GitHub network/DNS access is available.
-2. Push `task/agent-platform-code-tools.2` to `origin`.
-3. Start `agent-platform-code-tools.3` from the task-2 tip and implement the structured edit/apply patch tool against `docs/coding-tool-contracts.md`.
+1. Push the SonarCloud hotspot fix on `task/ui-chat-api-key-error-redaction`.
+2. After UI/runtime backup work is clear, start `agent-platform-code-tools.3` from the `agent-platform-code-tools.2` task tip.
 
 ---
 
