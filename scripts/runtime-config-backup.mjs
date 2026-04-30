@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
@@ -8,6 +8,7 @@ import { resolveWorkspaceConfig } from './workspace-config.mjs';
 
 export const DEFAULT_BACKUP_NAME = 'runtime-config.sqlite';
 export const DEFAULT_DB_NAME = 'agent.sqlite';
+export const DEFAULT_SQLITE3_BIN = '/usr/bin/sqlite3';
 
 const BACKUP_SCHEMA = `
 CREATE TABLE secret_refs (
@@ -57,10 +58,21 @@ function quoteSql(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
-function runSqlite(dbPath, sql) {
-  const result = spawnSync('sqlite3', ['-batch', dbPath], {
+export function resolveSqlite3Bin(env = process.env) {
+  const configured = env.SQLITE3_BIN?.trim();
+  if (!configured) return DEFAULT_SQLITE3_BIN;
+  if (!isAbsolute(configured)) {
+    throw new Error('SQLITE3_BIN must be an absolute path when set.');
+  }
+  return configured;
+}
+
+function runSqlite(dbPath, sql, options = {}) {
+  const sqlite3Bin = resolveSqlite3Bin(options.env);
+  const result = spawnSync(sqlite3Bin, ['-batch', dbPath], {
     input: sql,
     encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin' },
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {

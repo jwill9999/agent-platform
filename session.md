@@ -101,6 +101,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added ignored local runtime-config backup/restore support for encrypted saved model configs, agent model assignments, and MCP server assignments.
 - **Date:** 2026-04-30
 - **Session:** Created Beads follow-up `agent-platform-runtime-backup-auto` and task spec for stage-two automatic runtime-config backup refresh.
+- **Date:** 2026-04-30
+- **Session:** Addressed SonarCloud hotspot `javascript:S4036` by using a fixed absolute sqlite3 path for runtime-config backup.
 
 ### Session-close guardrail (required)
 
@@ -168,6 +170,12 @@ Quality gates passed:
 - `pnpm exec prettier --check scripts/runtime-config-backup.mjs scripts/runtime-config-backup.test.mjs docs/workspace-storage.md`
 - `make runtime-config-backup`
 - Restore smoke check against `/private/tmp/agent-platform-restore-check.sqlite`
+- SonarCloud hotspot fix checks:
+  - `node --test scripts/runtime-config-backup.test.mjs scripts/workspace-clean.test.mjs`
+  - `node --check scripts/runtime-config-backup.mjs`
+  - `pnpm exec prettier --check scripts/runtime-config-backup.mjs scripts/runtime-config-backup.test.mjs`
+  - `pnpm lint`
+  - `git diff --check`
 
 ### Runtime backup automation follow-up tracked
 
@@ -175,15 +183,22 @@ Quality gates passed:
 - Added `docs/tasks/agent-platform-runtime-backup-auto.md` describing the stage-two automation work: refresh the ignored local runtime-config backup after successful model config, agent assignment, MCP server, and agent MCP assignment writes.
 - Synced Beads/Dolt remote state with `bd dolt push`.
 
+### SonarCloud runtime backup hotspot fixed
+
+- SonarCloud hotspot `AZ3btIyTPSDrC3lo9zwa` flagged `scripts/runtime-config-backup.mjs` for searching OS commands via `PATH`.
+- Updated runtime-config backup to invoke `/usr/bin/sqlite3` by default instead of `sqlite3`.
+- Added `SQLITE3_BIN` override support only when set to an absolute path.
+- Added regression coverage that relative command overrides are rejected.
+
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/ui-chat-api-key-error-redaction`
-- **Current commit:** `5b2ffc1` on origin, with additional local uncommitted runtime-config backup follow-up changes
+- **Current commit:** `06ea811` on origin, with additional local uncommitted SonarCloud hotspot fix changes
 - **Latest completed task:** `agent-platform-code-tools.2` remains the latest coding-tools epic task
 - **Current work:** UI/runtime bug fix, not part of the coding-tools task chain
-- **Remote sync:** next step is to commit and push the runtime-config backup follow-up on the same test branch.
+- **Remote sync:** next step is to commit and push the SonarCloud hotspot fix on the same test branch.
 
 ### Beads
 
@@ -200,7 +215,7 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push the runtime backup automation follow-up spec commit on `task/ui-chat-api-key-error-redaction`.
+1. Push the SonarCloud hotspot fix on `task/ui-chat-api-key-error-redaction`.
 2. After UI/runtime backup work is clear, start `agent-platform-code-tools.3` from the `agent-platform-code-tools.2` task tip.
 
 ---

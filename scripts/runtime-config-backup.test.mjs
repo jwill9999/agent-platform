@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
-import { backupRuntimeConfig, restoreRuntimeConfig } from './runtime-config-backup.mjs';
+import {
+  DEFAULT_SQLITE3_BIN,
+  backupRuntimeConfig,
+  resolveSqlite3Bin,
+  restoreRuntimeConfig,
+} from './runtime-config-backup.mjs';
 
 function runSqlite(dbPath, sql) {
   const result = spawnSync('sqlite3', ['-batch', dbPath], {
@@ -78,6 +83,15 @@ CREATE TABLE agent_mcp_servers (
 `,
   );
 }
+
+test('resolveSqlite3Bin uses a fixed absolute default and rejects relative overrides', () => {
+  assert.equal(resolveSqlite3Bin({}), DEFAULT_SQLITE3_BIN);
+  assert.equal(
+    resolveSqlite3Bin({ SQLITE3_BIN: '/opt/sqlite/bin/sqlite3' }),
+    '/opt/sqlite/bin/sqlite3',
+  );
+  assert.throws(() => resolveSqlite3Bin({ SQLITE3_BIN: 'sqlite3' }), /absolute path/);
+});
 
 test('backup and restore preserve encrypted model config and MCP assignments', async () =>
   withTempDir(async (dir) => {
