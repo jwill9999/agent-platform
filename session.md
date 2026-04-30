@@ -123,6 +123,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Follow-up IDE manual-test fix: guarded the native folder picker so repeated Open Folder clicks cannot raise "File picker already active".
 - **Date:** 2026-04-30
 - **Session:** Follow-up IDE folder-picker state fix: split picker-open state from tree loading/restore prompts and added stable Open Folder/Restore Folder test ids.
+- **Date:** 2026-04-30
+- **Session:** Follow-up IDE folder-picker permission fix: folder open/restore now request read access first and defer write permission until file save.
 
 ### Session-close guardrail (required)
 
@@ -259,6 +261,8 @@ Quality gates passed:
 - Follow-up: cleared `isOpeningDirectory` immediately after the native picker resolves so the UI moves from `Opening...` to tree `Loading...` instead of appearing stuck.
 - Follow-up: applied the same active-prompt guard to restore/reconnect permission prompts.
 - Follow-up: added `data-testid="ide-open-folder-button"` and `data-testid="ide-restore-folder-button"` for stable manual/debug automation.
+- Follow-up: changed Open Folder and Restore Folder to request read access first, avoiding a `readwrite` permission prompt before the tree can load.
+- Follow-up: file write permission is now requested lazily during Save.
 
 ## Current state
 
@@ -267,8 +271,8 @@ Quality gates passed:
 - **Current branch:** `task/agent-platform-code-tools.5`
 - **Current commit:** `164b93f` (`Claim code tools governed test runner task`) plus local uncommitted completed `.5` implementation
 - **Latest completed task:** `agent-platform-code-tools.5` closed in Beads
-- **Current work:** Follow-up IDE folder picker state fix on `task/agent-platform-code-tools.5`
-- **Remote sync:** Beads/Dolt is synced; branch includes `.5` implementation and pending folder-picker state follow-up commit.
+- **Current work:** Follow-up IDE folder picker permission fix on `task/agent-platform-code-tools.5`
+- **Remote sync:** Beads/Dolt is synced; branch includes `.5` implementation and pending folder-picker permission follow-up commit.
 
 ### Beads
 
@@ -352,12 +356,16 @@ Quality gates passed:
   - `pnpm --filter @agent-platform/web run test`
   - `pnpm exec prettier --check apps/web/hooks/use-file-system.ts session.md`
   - `git diff --check`
+- IDE folder picker permission follow-up checks passed:
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run test`
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push the IDE folder picker state follow-up on `task/agent-platform-code-tools.5`.
+1. Commit and push the IDE folder picker permission follow-up on `task/agent-platform-code-tools.5`.
 2. Open or arrange the PR for `.5` into the coding-tools chain.
 3. After `.5`, next downstream task is `agent-platform-code-tools.6`: repository map and code search.
 

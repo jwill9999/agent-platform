@@ -12,6 +12,10 @@ interface FSHandleWithPermission extends FileSystemDirectoryHandle {
   queryPermission(desc: PermissionDescriptor): Promise<PermissionState>;
   requestPermission(desc: PermissionDescriptor): Promise<PermissionState>;
 }
+interface FSFileHandleWithPermission extends FileSystemFileHandle {
+  queryPermission(desc: PermissionDescriptor): Promise<PermissionState>;
+  requestPermission(desc: PermissionDescriptor): Promise<PermissionState>;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -218,24 +222,30 @@ async function buildTree(
 
 type RestoreResult = { needsReconnect: true; handle: FileSystemDirectoryHandle } | null;
 
-/** Try to obtain permission for a mode, returning true if granted. */
-async function tryPermission(
+/** Check existing permission for a mode. Mount-time restore cannot rely on user-gesture prompts. */
+async function hasPermission(
   h: FSHandleWithPermission,
   mode: 'readwrite' | 'read',
   isCancelled: () => boolean,
 ): Promise<boolean> {
   const perm = await h.queryPermission({ mode });
   if (isCancelled()) return false;
-  if (perm === 'granted') return true;
-  if (perm !== 'prompt') return false;
-  try {
-    const result = await h.requestPermission({ mode });
-    if (isCancelled()) return false;
-    return result === 'granted';
-  } catch {
-    fsDebugLog(`restore:requestPermission_${mode}_threw`);
-    return false;
-  }
+  return perm === 'granted';
+}
+
+async function requestReadPermission(h: FSHandleWithPermission): Promise<boolean> {
+  const current = await h.queryPermission({ mode: 'read' });
+  if (current === 'granted') return true;
+  if (current !== 'prompt') return false;
+  return (await h.requestPermission({ mode: 'read' })) === 'granted';
+}
+
+async function requestFileWritePermission(handle: FileSystemFileHandle): Promise<boolean> {
+  const h = handle as FSFileHandleWithPermission;
+  const current = await h.queryPermission({ mode: 'readwrite' });
+  if (current === 'granted') return true;
+  if (current !== 'prompt') return false;
+  return (await h.requestPermission({ mode: 'readwrite' })) === 'granted';
 }
 
 async function restorePersistedFolder(
@@ -252,16 +262,15 @@ async function restorePersistedFolder(
   fsDebugLog('restore:idb_hit', handle.name);
   const h = handle as FSHandleWithPermission;
 
-  // Try read/write first, then fall back to read-only
-  if (await tryPermission(h, 'readwrite', isCancelled)) {
+  if (await hasPermission(h, 'read', isCancelled)) {
     if (!isCancelled()) await loadTree(handle, 'restore');
     return null;
   }
   if (isCancelled()) return null;
 
-  if (await tryPermission(h, 'read', isCancelled)) {
+  if (await hasPermission(h, 'readwrite', isCancelled)) {
     if (!isCancelled()) {
-      fsDebugLog('restore:read_only');
+      fsDebugLog('restore:readwrite_existing');
       await loadTree(handle, 'restore');
     }
     return null;
@@ -398,25 +407,7 @@ export function useFileSystem(): UseFileSystemReturn {
     setError(null);
     const h = handle as FSHandleWithPermission;
     try {
-      let rw = await h.queryPermission({ mode: 'readwrite' });
-      if (rw !== 'granted') {
-        rw = await h.requestPermission({ mode: 'readwrite' });
-      }
-      if (rw === 'granted') {
-        userPickedFolderThisSessionRef.current = false;
-        setIsOpeningDirectory(false);
-        await loadTree(handle, 'restore');
-        await persistHandle(handle);
-        clearReconnectState();
-        fsDebugLog('reconnect:ok_readwrite');
-        return;
-      }
-
-      let r = await h.queryPermission({ mode: 'read' });
-      if (r !== 'granted') {
-        r = await h.requestPermission({ mode: 'read' });
-      }
-      if (r === 'granted') {
+      if (await requestReadPermission(h)) {
         userPickedFolderThisSessionRef.current = false;
         setIsOpeningDirectory(false);
         await loadTree(handle, 'restore');
@@ -457,7 +448,7 @@ export function useFileSystem(): UseFileSystemReturn {
     setError(null);
 
     try {
-      const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
+      const handle = await globalThis.window.showDirectoryPicker({ mode: 'read' });
       fsDebugLog('picker:resolved', handle.name);
       directoryAccessPromptActiveRef.current = false;
       setIsOpeningDirectory(false);
@@ -501,6 +492,11 @@ export function useFileSystem(): UseFileSystemReturn {
     if (handle?.kind !== 'file') return false;
 
     try {
+      if (!(await requestFileWritePermission(handle))) {
+        setError('Write permission was not granted for this file.');
+        return false;
+      }
+
       const writable = await handle.createWritable();
       await writable.write(content);
       await writable.close();
