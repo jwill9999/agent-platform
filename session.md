@@ -115,6 +115,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Completed `agent-platform-code-tools.4` read-only git tools on `task/agent-platform-code-tools.4`.
 - **Date:** 2026-04-30
 - **Session:** `task/agent-platform-code-tools.4` pipelines are green; claimed `agent-platform-code-tools.5` and created `task/agent-platform-code-tools.5`.
+- **Date:** 2026-04-30
+- **Session:** Implemented `agent-platform-code-tools.5` governed quality-gate runner on `task/agent-platform-code-tools.5`.
+- **Date:** 2026-04-30
+- **Session:** Completed `agent-platform-code-tools.5` governed quality-gate runner; Beads is closed/synced and the branch is ready for PR after push.
 
 ### Session-close guardrail (required)
 
@@ -233,24 +237,32 @@ Quality gates passed:
 
 - Claimed `agent-platform-code-tools.5` in Beads and synced Beads/Dolt.
 - Created `task/agent-platform-code-tools.5` from the `.4` chain tip.
-- No `.5` implementation work has started yet.
+- Added strict shared contracts for `run_quality_gate` input/output, profiles, failures, command display, timeout status, and bounded stdout/stderr tails.
+- Added medium-risk built-in tool `sys_run_quality_gate` / `run_quality_gate`.
+- The runner uses fixed profile-to-script mappings (`test`, `typecheck`, `lint`, `format`, `docs`, `build`, `e2e`), `execFile` without a shell, fixed absolute `pnpm` discovery, timeout controls, output truncation, and structured coding evidence.
+- Arbitrary command-shaped input is denied by strict schema validation; package filters are limited to package-supported profiles.
+- PathJail read-enforces `repoPath`, and MCP trust guard prevents MCP tools from shadowing `run_quality_gate`.
+- Added regression tests for allowed passing runs, non-zero exits with failure summaries, timeout, truncation, arbitrary-command denial, unsupported package filters, workspace escape denial, registration, and unknown tool IDs.
+- Completed broad terminal quality gates for `.5`.
+- Closed `agent-platform-code-tools.5` in Beads and synced Beads/Dolt.
 
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/agent-platform-code-tools.5`
-- **Current commit:** `412496f` (`Implement read-only git tools`) inherited from `.4`
-- **Latest completed task:** `agent-platform-code-tools.4` closed in Beads and green in CI
-- **Current work:** `agent-platform-code-tools.5` governed test runner, claimed but not implemented
-- **Remote sync:** branch not pushed yet; session handoff/Beads claim commit and push are next.
+- **Current commit:** `164b93f` (`Claim code tools governed test runner task`) plus local uncommitted completed `.5` implementation
+- **Latest completed task:** `agent-platform-code-tools.5` closed in Beads
+- **Current work:** Commit and push `task/agent-platform-code-tools.5`
+- **Remote sync:** Beads/Dolt is synced; implementation commit and branch push are next.
 
 ### Beads
 
 - `agent-platform-code-tools.2` is closed.
 - `agent-platform-code-tools.3` is closed.
 - `agent-platform-code-tools.4` is closed.
-- `agent-platform-code-tools.5` is claimed and in progress.
+- `agent-platform-code-tools.5` is closed.
+- `agent-platform-code-tools.6` is the next downstream task and is not claimed yet.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 
 ### Quality
@@ -296,13 +308,31 @@ Quality gates passed:
   - `pnpm exec prettier --check session.md`
   - `git diff --check`
 - `.4` GitHub pipelines passed green after push.
+- Governed test runner focused checks passed:
+  - `pnpm --filter @agent-platform/contracts build`
+  - `pnpm --filter @agent-platform/contracts run typecheck`
+  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+  - `pnpm --filter @agent-platform/contracts run lint`
+  - `pnpm --filter @agent-platform/harness run build`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run test -- test/qualityGateTool.test.ts test/mediumRiskTools.test.ts test/toolAuditLog.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm exec prettier --check packages/contracts/src/codingTool.ts packages/harness/src/tools/qualityGateTool.ts packages/harness/test/qualityGateTool.test.ts`
+- Broad `.5` completion checks passed:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
+  - `pnpm docs:lint`
+  - `pnpm exec prettier --check session.md`
+  - `git diff --check`
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push the `.5` branch handoff/Beads claim state.
-2. Start implementation for `agent-platform-code-tools.5`: governed test runner.
+1. Commit and push `task/agent-platform-code-tools.5`.
+2. Open or arrange the PR for `.5` into the coding-tools chain.
 3. After `.5`, next downstream task is `agent-platform-code-tools.6`: repository map and code search.
 
 ---

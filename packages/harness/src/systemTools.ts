@@ -27,6 +27,9 @@ import {
   GIT_TOOLS,
   GIT_TOOL_MAP,
   executeGitTool,
+  QUALITY_GATE_TOOLS,
+  QUALITY_GATE_MAP,
+  executeQualityGateTool,
 } from './tools/index.js';
 import {
   SYSTEM_TOOL_PREFIX,
@@ -64,6 +67,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   ...MEDIUM_RISK_MAP,
   ...CODING_EDIT_MAP,
   ...GIT_TOOL_MAP,
+  ...QUALITY_GATE_MAP,
 } as const;
 
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
@@ -163,6 +167,8 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...CODING_EDIT_TOOLS,
   // Read-only git inspection tools
   ...GIT_TOOLS,
+  // Governed build/test runner
+  ...QUALITY_GATE_TOOLS,
   // Lazy skill loading — fetch full skill instructions on demand
   {
     id: ids.getSkillDetail,
@@ -350,6 +356,9 @@ export function createSystemToolExecutor(options?: {
 
     const gitResult = await executeGitTool(toolId, args, { workspaceRoot });
     if (gitResult) return gitResult;
+
+    const qualityGateResult = await executeQualityGateTool(toolId, args, { workspaceRoot });
+    if (qualityGateResult) return qualityGateResult;
 
     return {
       type: 'error',

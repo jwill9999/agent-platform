@@ -63,6 +63,7 @@ const SYSTEM_TOOL_NAMES = new Set([
   'git_log',
   'git_branch_info',
   'git_changed_files',
+  'run_quality_gate',
   'create_directory',
   'http_request',
   'download_file',

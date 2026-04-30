@@ -85,6 +85,10 @@ export {
   CodingGitLogResultSchema,
   CodingGitBranchInfoResultSchema,
   CodingGitChangedFilesResultSchema,
+  CodingQualityGateProfileSchema,
+  CodingRunQualityGateInputSchema,
+  CodingQualityGateFailureSchema,
+  CodingRunQualityGateResultSchema,
   type CodingToolKind,
   type CodingToolStatus,
   type CodingArtifactKind,
@@ -108,6 +112,10 @@ export {
   type CodingGitLogResult,
   type CodingGitBranchInfoResult,
   type CodingGitChangedFilesResult,
+  type CodingQualityGateProfile,
+  type CodingRunQualityGateInput,
+  type CodingQualityGateFailure,
+  type CodingRunQualityGateResult,
 } from './codingTool.js';
 export { openApiToToolDefinitions, type OpenApiToolDefinition } from './openapi.js';
 export {

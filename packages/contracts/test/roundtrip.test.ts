@@ -11,6 +11,8 @@ import {
   CodingGitDiffResultSchema,
   CodingGitLogResultSchema,
   CodingGitStatusResultSchema,
+  CodingRunQualityGateInputSchema,
+  CodingRunQualityGateResultSchema,
   CodingToolEnvelopeSchema,
   CriticVerdictSchema,
   ExecutionLimitsSchema,
@@ -259,5 +261,31 @@ describe('contracts round-trip', () => {
     expect(CodingGitChangedFilesResultSchema.parse(structuredClone(changedFiles))).toEqual(
       changedFiles,
     );
+  });
+
+  it('Coding quality gate schemas round-trip', () => {
+    const input = CodingRunQualityGateInputSchema.parse({
+      profile: 'test',
+      repoPath: '.',
+      packageName: '@agent-platform/harness',
+      timeoutMs: 120_000,
+      maxOutputBytes: 20_000,
+    });
+    expect(CodingRunQualityGateInputSchema.parse(structuredClone(input))).toEqual(input);
+
+    const result = CodingRunQualityGateResultSchema.parse({
+      profile: 'test',
+      packageName: '@agent-platform/harness',
+      repoPath: '/workspace/repo',
+      command: ['pnpm', '--filter', '@agent-platform/harness', 'run', 'test'],
+      exitCode: 1,
+      timedOut: false,
+      durationMs: 1250,
+      stdoutTail: 'FAIL test/example.test.ts',
+      stderrTail: '',
+      truncated: false,
+      failures: [{ message: 'FAIL test/example.test.ts', file: 'test/example.test.ts' }],
+    });
+    expect(CodingRunQualityGateResultSchema.parse(structuredClone(result))).toEqual(result);
   });
 });

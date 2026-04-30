@@ -20,6 +20,13 @@ export {
 } from './codingEditTool.js';
 export { GIT_TOOLS, GIT_TOOL_IDS, GIT_TOOL_MAP, executeGitTool } from './gitTools.js';
 export {
+  QUALITY_GATE_TOOL_ID,
+  QUALITY_GATE_TOOLS,
+  QUALITY_GATE_IDS,
+  QUALITY_GATE_MAP,
+  executeQualityGateTool,
+} from './qualityGateTool.js';
+export {
   OBSERVABILITY_TOOLS,
   OBSERVABILITY_IDS,
   OBSERVABILITY_MAP,
