@@ -1,7 +1,7 @@
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -13,8 +13,13 @@ import {
 } from '../src/tools/qualityGateTool.js';
 
 function pnpmBin(): string {
-  const found = ['/opt/homebrew/bin/pnpm', '/usr/local/bin/pnpm', '/usr/bin/pnpm'].find((path) =>
-    existsSync(path),
+  const envCandidates = [
+    process.env['npm_execpath'],
+    process.env['PNPM_HOME'] ? join(process.env['PNPM_HOME'], 'pnpm') : undefined,
+  ];
+  const fixedCandidates = ['/opt/homebrew/bin/pnpm', '/usr/local/bin/pnpm', '/usr/bin/pnpm'];
+  const found = [...envCandidates, ...fixedCandidates].find(
+    (path): path is string => Boolean(path) && isAbsolute(path) && existsSync(path),
   );
   if (!found) throw new Error('No fixed pnpm binary found for tests');
   return found;

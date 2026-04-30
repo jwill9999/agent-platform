@@ -125,6 +125,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Created follow-up `agent-platform-ide-rethink` to reassess the browser IDE/code viewing direction before further implementation.
 - **Date:** 2026-04-30
 - **Session:** Fixed quality-gate package filters so chat agents can run lint/typecheck/build/test when they infer workspace paths such as `apps/web`.
+- **Date:** 2026-04-30
+- **Session:** Fixed CI unit-test failure in `qualityGateTool.test.ts` by resolving pnpm from absolute npm/pnpm environment paths before local fallback paths.
 
 ### Session-close guardrail (required)
 
