@@ -17,10 +17,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { restoreChatEnv, snapshotChatEnv } from './support/chatEnv.js';
 
 const mockStreamText = vi.hoisted(() => vi.fn());
+const mockGenerateText = vi.hoisted(() => vi.fn());
 const mockToolCalls = vi.hoisted(() => vi.fn());
 
 vi.mock('ai', () => ({
   streamText: (...args: unknown[]) => mockStreamText(...args),
+  generateText: (...args: unknown[]) => mockGenerateText(...args),
   jsonSchema: (schema: unknown) => ({ type: 'json-schema', jsonSchema: schema }),
 }));
 
@@ -44,7 +46,7 @@ vi.mock('@ai-sdk/openai-compatible', () => ({
 
 async function createSeededApp(
   dirs: string[],
-  options: { mockLlm?: boolean } = {},
+  options: { mockLlm?: boolean; disableEvaluatorNodes?: boolean } = {},
 ): Promise<{
   app: Application;
   db: ReturnType<typeof openDatabase>['db'];
@@ -77,7 +79,16 @@ async function createSeededApp(
   return {
     app: createApp({
       db,
-      ...(options.mockLlm ? { v1: { chat: { llmReasonNode, disableEvaluatorNodes: true } } } : {}),
+      ...(options.mockLlm
+        ? {
+            v1: {
+              chat: {
+                llmReasonNode,
+                disableEvaluatorNodes: options.disableEvaluatorNodes ?? true,
+              },
+            },
+          }
+        : {}),
     }),
     db,
     sqlite,
@@ -97,7 +108,7 @@ function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
 }
 
 type TestDb = ReturnType<typeof openDatabase>['db'];
-type ChatEvent = { type: string; approvalRequestId?: string; code?: string };
+type ChatEvent = { type: string; approvalRequestId?: string; code?: string; message?: string };
 
 function parseNdjsonEvents(text: string): ChatEvent[] {
   return String(text)
@@ -148,6 +159,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
   afterEach(() => {
     mockStreamText.mockReset();
+    mockGenerateText.mockReset();
     mockToolCalls.mockReset();
     for (const d of dirs) {
       try {
@@ -231,6 +243,46 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
+  it('does not run DoD criteria generation in the user-facing chat runtime', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, {
+      mockLlm: true,
+      disableEvaluatorNodes: false,
+    });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      mockToolCalls.mockReturnValueOnce('Hello from chat');
+      mockGenerateText.mockResolvedValue({
+        text: JSON.stringify({ verdict: 'accept', reasons: [] }),
+      });
+
+      const sessionId = await createDefaultSession(app);
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'test' })
+        .expect(200);
+
+      expect(res.text).not.toContain('"criteria"');
+      const messagesRes = await request(app).get(`/v1/sessions/${sessionId}/messages`).expect(200);
+      expect(messagesRes.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ role: 'assistant', content: 'Hello from chat' }),
+        ]),
+      );
+      const evaluatorPrompts = mockGenerateText.mock.calls
+        .flatMap((call) => {
+          const arg = call[0] as { messages?: Array<{ content?: string }> };
+          return arg.messages?.map((message) => message.content ?? '') ?? [];
+        })
+        .join('\n');
+      expect(evaluatorPrompts).not.toContain('Return JSON only with shape {"criteria"');
+      expect(evaluatorPrompts).not.toContain('Return JSON only matching {"criteria"');
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
   it('persists user messages to conversation history', async () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
@@ -259,6 +311,37 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(userMsg).toBeDefined();
       expect(userMsg!.content).toBe('Hello agent');
       expect(userMsg!.sessionId).toBe(sessionId);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('redacts provider auth failures emitted after NDJSON headers are sent', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    const openAiKey = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+      mockToolCalls.mockImplementationOnce(() => {
+        throw new Error(`Incorrect API key provided: ${openAiKey}`);
+      });
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'hello' })
+        .expect(200);
+      const events = parseNdjsonEvents(res.text);
+      const error = events.find((event) => event.type === 'error');
+
+      expect(error).toMatchObject({
+        type: 'error',
+        code: 'MODEL_AUTH_FAILED',
+        message:
+          'The model provider rejected the configured API key. Check the selected model config or server environment key.',
+      });
+      expect(res.text).not.toContain(openAiKey);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);
@@ -384,6 +467,50 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(200);
 
       expect(resumeRes.text).toContain('tool_result');
+    } finally {
+      restoreChatEnv(envSnap);
+      if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
+      else process.env.SECRETS_MASTER_KEY = previousMasterKey;
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('uses the first saved model config as the platform default when an agent has no override', async () => {
+    const envSnap = snapshotChatEnv();
+    const previousMasterKey = process.env.SECRETS_MASTER_KEY;
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      const masterKeyB64 = Buffer.alloc(32, 9).toString('base64');
+      process.env.SECRETS_MASTER_KEY = masterKeyB64;
+      delete process.env.AGENT_OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_ALLOW_LEGACY_ENV;
+
+      createModelConfig(
+        db,
+        {
+          name: 'Platform default',
+          provider: 'openai',
+          model: 'gpt-4.1-mini',
+          apiKey: 'sk-platform-default-test-key',
+        },
+        parseMasterKeyFromBase64(masterKeyB64),
+        1,
+      );
+
+      const sessionId = await createDefaultSession(app);
+      mockToolCalls.mockReturnValueOnce('Used saved default config');
+
+      await request(app).post('/v1/chat').send({ sessionId, message: 'hello' }).expect(200);
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        modelConfig?: { provider: string; model: string; apiKey?: string };
+      };
+      expect(state.modelConfig).toEqual({
+        provider: 'openai',
+        model: 'gpt-4.1-mini',
+        apiKey: 'sk-platform-default-test-key',
+      });
     } finally {
       restoreChatEnv(envSnap);
       if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;

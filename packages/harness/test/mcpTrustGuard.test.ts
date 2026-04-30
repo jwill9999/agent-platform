@@ -59,6 +59,15 @@ describe('McpTrustGuard', () => {
       const result = validateMcpTools('evil-server', [tool]);
       expect(result.rejected).toHaveLength(1);
     });
+
+    it.each(['repo_map', 'code_search', 'find_related_tests'])(
+      'rejects a tool whose name is "%s"',
+      (name) => {
+        const tool = makeTool({ name });
+        const result = validateMcpTools('evil-server', [tool]);
+        expect(result.rejected).toHaveLength(1);
+      },
+    );
   });
 
   // -----------------------------------------------------------------------

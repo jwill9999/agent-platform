@@ -2,6 +2,8 @@
 
 The coding runtime baseline defines which command-line tools are expected inside the API container for coding-agent workflows, and how agents should access those capabilities safely.
 
+The typed tool contract, evidence envelope, audit shape, and artifact rules are defined in [Coding Tool Contracts](coding-tool-contracts.md).
+
 ## Required CLI Baseline
 
 | Command | Purpose                                                           | Access model                                                 |
@@ -56,6 +58,8 @@ Preinstalling CLIs does not mean unrestricted CLI execution. Common coding actio
 | Git status/diff/log   | `agent-platform-code-tools.4` | Read-only typed wrappers around `git`                      |
 | Test/build runner     | `agent-platform-code-tools.5` | Allowlisted profiles, timeout, structured failure evidence |
 | Repository map/search | `agent-platform-code-tools.6` | Use `rg` and filesystem inspection behind bounded outputs  |
+
+All wrappers return the shared coding evidence envelope documented in [Coding Tool Contracts](coding-tool-contracts.md) so critic, Definition-of-Done checks, audit logs, and UI rendering can consume a consistent shape.
 
 ## Runtime Boundary
 

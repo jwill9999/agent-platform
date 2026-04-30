@@ -4,6 +4,22 @@ import {
   ApprovalRequestDecisionBodySchema,
   ApprovalRequestQuerySchema,
   ApprovalRequestSchema,
+  CodingApplyPatchInputSchema,
+  CodingApplyPatchResultSchema,
+  CodingGitBranchInfoResultSchema,
+  CodingGitChangedFilesResultSchema,
+  CodingGitDiffResultSchema,
+  CodingGitLogResultSchema,
+  CodingGitStatusResultSchema,
+  CodingRunQualityGateInputSchema,
+  CodingRunQualityGateResultSchema,
+  CodingRepoMapInputSchema,
+  CodingRepoMapResultSchema,
+  CodingCodeSearchInputSchema,
+  CodingCodeSearchResultSchema,
+  CodingFindRelatedTestsInputSchema,
+  CodingFindRelatedTestsResultSchema,
+  CodingToolEnvelopeSchema,
   CriticVerdictSchema,
   ExecutionLimitsSchema,
   HealthResponseSchema,
@@ -144,5 +160,199 @@ describe('contracts round-trip', () => {
       reason: 'approved by user',
     });
     expect(() => ApprovalRequestSchema.parse({ ...request, status: 'done' })).toThrow();
+  });
+
+  it('Coding apply patch schemas round-trip', () => {
+    const input = CodingApplyPatchInputSchema.parse({
+      reason: 'Update greeting',
+      dryRun: true,
+      operations: [{ path: 'src/example.ts', oldText: 'hello', newText: 'hello world' }],
+    });
+    expect(CodingApplyPatchInputSchema.parse(structuredClone(input))).toEqual(input);
+
+    const result = CodingApplyPatchResultSchema.parse({
+      dryRun: true,
+      changedFiles: ['src/example.ts'],
+      createdFiles: [],
+      deletedFiles: [],
+      diffStat: { filesChanged: 1, insertions: 1, deletions: 1 },
+    });
+    expect(CodingApplyPatchResultSchema.parse(structuredClone(result))).toEqual(result);
+
+    const envelope = CodingToolEnvelopeSchema.parse({
+      ok: true,
+      result,
+      evidence: {
+        kind: 'edit',
+        summary: 'Dry run would change 1 file.',
+        riskTier: 'medium',
+        status: 'succeeded',
+        sourceTool: 'coding_apply_patch',
+        startedAtMs: 1000,
+        completedAtMs: 1010,
+        durationMs: 10,
+        artifacts: [
+          {
+            kind: 'diff',
+            label: 'Patch diff',
+            storage: 'inline',
+            mimeType: 'text/x-diff',
+            content: '--- a/src/example.ts\n+++ b/src/example.ts',
+            sizeBytes: 43,
+            truncated: false,
+          },
+        ],
+      },
+    });
+    expect(CodingToolEnvelopeSchema.parse(structuredClone(envelope))).toEqual(envelope);
+  });
+
+  it('Coding git result schemas round-trip', () => {
+    const fileChange = { path: 'src/index.ts', status: 'M', staged: true, unstaged: false };
+
+    const status = CodingGitStatusResultSchema.parse({
+      repoPath: '/workspace/repo',
+      branch: 'main',
+      head: 'abc123',
+      clean: false,
+      ahead: 1,
+      behind: 0,
+      changedFiles: [fileChange],
+    });
+    expect(CodingGitStatusResultSchema.parse(structuredClone(status))).toEqual(status);
+
+    const diff = CodingGitDiffResultSchema.parse({
+      repoPath: '/workspace/repo',
+      staged: false,
+      path: 'src/index.ts',
+      diff: 'diff --git a/src/index.ts b/src/index.ts',
+      sizeBytes: 42,
+      truncated: false,
+      filesChanged: 1,
+    });
+    expect(CodingGitDiffResultSchema.parse(structuredClone(diff))).toEqual(diff);
+
+    const log = CodingGitLogResultSchema.parse({
+      repoPath: '/workspace/repo',
+      ref: 'HEAD',
+      commits: [
+        {
+          hash: 'abcdef',
+          shortHash: 'abcdef',
+          author: 'Test User',
+          authoredAt: '2026-04-30T00:00:00Z',
+          subject: 'Initial commit',
+        },
+      ],
+      truncated: false,
+    });
+    expect(CodingGitLogResultSchema.parse(structuredClone(log))).toEqual(log);
+
+    const branch = CodingGitBranchInfoResultSchema.parse({
+      repoPath: '/workspace/repo',
+      branch: 'main',
+      head: 'abcdef',
+      upstream: 'origin/main',
+      ahead: 0,
+      behind: 0,
+    });
+    expect(CodingGitBranchInfoResultSchema.parse(structuredClone(branch))).toEqual(branch);
+
+    const changedFiles = CodingGitChangedFilesResultSchema.parse({
+      repoPath: '/workspace/repo',
+      count: 1,
+      files: [fileChange],
+      truncated: false,
+    });
+    expect(CodingGitChangedFilesResultSchema.parse(structuredClone(changedFiles))).toEqual(
+      changedFiles,
+    );
+  });
+
+  it('Coding quality gate schemas round-trip', () => {
+    const input = CodingRunQualityGateInputSchema.parse({
+      profile: 'test',
+      repoPath: '.',
+      packageName: '@agent-platform/harness',
+      timeoutMs: 120_000,
+      maxOutputBytes: 20_000,
+    });
+    expect(CodingRunQualityGateInputSchema.parse(structuredClone(input))).toEqual(input);
+
+    const result = CodingRunQualityGateResultSchema.parse({
+      profile: 'test',
+      packageName: '@agent-platform/harness',
+      repoPath: '/workspace/repo',
+      command: ['pnpm', '--filter', '@agent-platform/harness', 'run', 'test'],
+      exitCode: 1,
+      timedOut: false,
+      durationMs: 1250,
+      stdoutTail: 'FAIL test/example.test.ts',
+      stderrTail: '',
+      truncated: false,
+      failures: [{ message: 'FAIL test/example.test.ts', file: 'test/example.test.ts' }],
+    });
+    expect(CodingRunQualityGateResultSchema.parse(structuredClone(result))).toEqual(result);
+  });
+
+  it('Coding repository discovery schemas round-trip', () => {
+    const repoMapInput = CodingRepoMapInputSchema.parse({
+      repoPath: '.',
+      maxDepth: 4,
+      maxFiles: 200,
+    });
+    expect(CodingRepoMapInputSchema.parse(structuredClone(repoMapInput))).toEqual(repoMapInput);
+
+    const repoMap = CodingRepoMapResultSchema.parse({
+      repoPath: '/workspace/repo',
+      totalFiles: 2,
+      totalDirectories: 1,
+      files: [
+        { path: 'apps/web', kind: 'directory' },
+        { path: 'apps/web/package.json', kind: 'file', sizeBytes: 42 },
+      ],
+      packageBoundaries: [{ path: 'apps/web', name: '@agent-platform/web', kind: 'app' }],
+      testDirectories: ['apps/web/test'],
+      ignoredDirectories: ['node_modules'],
+      truncated: false,
+    });
+    expect(CodingRepoMapResultSchema.parse(structuredClone(repoMap))).toEqual(repoMap);
+
+    const searchInput = CodingCodeSearchInputSchema.parse({
+      repoPath: '.',
+      query: 'render',
+      regex: false,
+      caseSensitive: false,
+      maxResults: 50,
+    });
+    expect(CodingCodeSearchInputSchema.parse(structuredClone(searchInput))).toEqual(searchInput);
+
+    const search = CodingCodeSearchResultSchema.parse({
+      repoPath: '/workspace/repo',
+      query: 'render',
+      regex: false,
+      matches: [{ path: 'apps/web/src/page.tsx', line: 7, column: 3, snippet: 'render()' }],
+      searchedFiles: 10,
+      truncated: false,
+    });
+    expect(CodingCodeSearchResultSchema.parse(structuredClone(search))).toEqual(search);
+
+    const relatedInput = CodingFindRelatedTestsInputSchema.parse({
+      repoPath: '.',
+      path: 'apps/web/src/page.tsx',
+      maxResults: 20,
+    });
+    expect(CodingFindRelatedTestsInputSchema.parse(structuredClone(relatedInput))).toEqual(
+      relatedInput,
+    );
+
+    const related = CodingFindRelatedTestsResultSchema.parse({
+      repoPath: '/workspace/repo',
+      path: 'apps/web/src/page.tsx',
+      tests: [{ path: 'apps/web/test/page.test.tsx', reason: 'same basename' }],
+      searchedFiles: 10,
+      truncated: false,
+    });
+    expect(CodingFindRelatedTestsResultSchema.parse(structuredClone(related))).toEqual(related);
   });
 });

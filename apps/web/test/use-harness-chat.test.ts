@@ -42,6 +42,54 @@ describe('harness chat stream parser', () => {
     });
   });
 
+  it('keeps tool results separate from assistant text', () => {
+    const result = renderStreamEvent({
+      type: 'tool_result',
+      toolId: 'sys_write_file',
+      data: { written: true, path: '/workspace/scratch/demo-app/src/app.ts' },
+    });
+
+    expect(result).toEqual({
+      toolTrace: {
+        type: 'result',
+        toolId: 'sys_write_file',
+        data: { written: true, path: '/workspace/scratch/demo-app/src/app.ts' },
+        status: 'success',
+      },
+    });
+    expect(result).not.toHaveProperty('text');
+  });
+
+  it('keeps recoverable tool errors out of the global chat error', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      code: 'WRITE_FAILED',
+      message: "ENOENT: no such file or directory, open '/workspace/scratch/demo-app/src/app.ts'",
+    });
+
+    expect(result).toEqual({
+      toolTrace: {
+        type: 'error',
+        code: 'WRITE_FAILED',
+        message: "ENOENT: no such file or directory, open '/workspace/scratch/demo-app/src/app.ts'",
+      },
+    });
+  });
+
+  it('keeps tool-call placeholders separate from assistant text', () => {
+    const result = renderStreamEvent({
+      type: 'text',
+      content: 'Calling tool: Write a file...',
+    });
+
+    expect(result).toEqual({
+      toolTrace: {
+        type: 'status',
+        label: 'Calling tool: Write a file...',
+      },
+    });
+  });
+
   it('renders DoD cap failures as critic status instead of user-facing errors', () => {
     const result = renderStreamEvent({
       type: 'error',
@@ -54,6 +102,44 @@ describe('harness chat stream parser', () => {
         kind: 'cap_reached',
         reasons: 'Definition of Done failed after 3 revision attempt(s).',
       },
+    });
+  });
+
+  it('redacts API keys from streamed error messages', () => {
+    const openAiKey = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
+    const result = renderStreamEvent({
+      type: 'error',
+      message: `Incorrect API key provided: ${openAiKey}`,
+    });
+
+    expect(result).toEqual({
+      error: 'Incorrect API key provided: [REDACTED:CREDENTIAL]',
+    });
+  });
+
+  it('redacts masked API keys from streamed error messages', () => {
+    const masked = ['sk-proj-', '*'.repeat(32), 'abcd'].join('');
+    const result = renderStreamEvent({
+      type: 'error',
+      message: `Incorrect API key provided: ${masked}`,
+    });
+
+    expect(result).toEqual({
+      error: 'Incorrect API key provided: [REDACTED:CREDENTIAL]',
+    });
+  });
+
+  it('renders model auth failures as global errors without raw credentials', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      code: 'MODEL_AUTH_FAILED',
+      message:
+        'The model provider rejected the configured API key. Check the selected model config or server environment key.',
+    });
+
+    expect(result).toEqual({
+      error:
+        'The model provider rejected the configured API key. Check the selected model config or server environment key.',
     });
   });
 

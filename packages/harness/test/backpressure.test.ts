@@ -107,6 +107,23 @@ describe('backpressure-aware NDJSON emitter', () => {
     emitter.end();
   });
 
+  it('redacts credential-shaped strings before streaming NDJSON', async () => {
+    const stream = new PassThrough();
+    const chunks: string[] = [];
+    stream.on('data', (chunk) => chunks.push(chunk.toString()));
+    const emitter = createNdjsonEmitter(stream);
+    const openAiKey = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
+
+    await emitter.emit({
+      type: 'error',
+      message: `Incorrect API key provided: ${openAiKey}`,
+    });
+
+    const event = JSON.parse(chunks.join('').trim()) as { message: string };
+    expect(event.message).not.toContain(openAiKey);
+    expect(event.message).toContain('[REDACTED:OpenAI API Key]');
+  });
+
   it('returns a promise from emit', () => {
     const stream = new PassThrough();
     const emitter = createNdjsonEmitter(stream);

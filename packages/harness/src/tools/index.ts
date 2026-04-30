@@ -12,6 +12,27 @@ export {
   executeMediumRiskTool,
 } from './mediumRiskTools.js';
 export {
+  CODING_APPLY_PATCH_ID,
+  CODING_EDIT_TOOLS,
+  CODING_EDIT_IDS,
+  CODING_EDIT_MAP,
+  executeCodingEditTool,
+} from './codingEditTool.js';
+export { GIT_TOOLS, GIT_TOOL_IDS, GIT_TOOL_MAP, executeGitTool } from './gitTools.js';
+export {
+  QUALITY_GATE_TOOL_ID,
+  QUALITY_GATE_TOOLS,
+  QUALITY_GATE_IDS,
+  QUALITY_GATE_MAP,
+  executeQualityGateTool,
+} from './qualityGateTool.js';
+export {
+  REPO_DISCOVERY_TOOLS,
+  REPO_DISCOVERY_TOOL_IDS,
+  REPO_DISCOVERY_TOOL_MAP,
+  executeRepoDiscoveryTool,
+} from './repoDiscoveryTools.js';
+export {
   OBSERVABILITY_TOOLS,
   OBSERVABILITY_IDS,
   OBSERVABILITY_MAP,

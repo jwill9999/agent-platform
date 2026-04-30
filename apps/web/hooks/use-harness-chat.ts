@@ -14,6 +14,18 @@ export type { CriticEvent } from '@/lib/critic-events';
 
 const THINKING_PLACEHOLDER = 'The agent is thinking…';
 const THINKING_REVISE_PLACEHOLDER = 'The agent is revising…';
+const CREDENTIAL_PATTERNS: readonly RegExp[] = [
+  /sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g,
+  /(ghp|gho|ghu|ghs|ghr)_\w{36,}/g,
+  /Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g,
+];
+
+function redactDisplayText(text: string): string {
+  return CREDENTIAL_PATTERNS.reduce(
+    (current, pattern) => current.replace(pattern, '[REDACTED:CREDENTIAL]'),
+    text,
+  );
+}
 
 function makeTextParts(text: string): NonNullable<UIMessage['parts']> {
   return [{ type: 'text', text }];
@@ -80,22 +92,17 @@ export type ApprovalCardState = ApprovalRequiredStreamEvent & {
 
 export type ApprovalDecision = 'approve' | 'reject';
 
+export type ToolTraceEvent =
+  | { type: 'status'; label: string }
+  | { type: 'result'; toolId: string; data: unknown; status: 'success' | 'error' | 'denied' }
+  | { type: 'error'; code?: string; message: string };
+
 const BLOCKING_APPROVAL_STATUSES = new Set<ApprovalCardStatus>([
   'pending',
   'approving',
   'rejecting',
   'failed',
 ]);
-
-function formatToolResultPreview(data: unknown, maxLen = 6000): string {
-  if (typeof data === 'string') return data.length > maxLen ? `${data.slice(0, maxLen)}…` : data;
-  try {
-    const s = JSON.stringify(data, null, 2);
-    return s.length > maxLen ? `${s.slice(0, maxLen)}\n… (truncated)` : s;
-  } catch {
-    return String(data);
-  }
-}
 
 function parseStreamEvent(line: string): StreamEvent | null {
   if (!line.trim()) return null;
@@ -119,23 +126,63 @@ function isDodSummaryText(text: string): boolean {
   return /^\s*DoD:\s*\d+\/\d+\s+criteria\s+met\s*$/i.test(text.trim());
 }
 
+function parseToolStatusText(text: string): ToolTraceEvent | null {
+  const trimmed = text.trim();
+  if (!/^Calling tools?:/i.test(trimmed)) return null;
+  return { type: 'status', label: trimmed };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toolResultStatus(data: unknown): 'success' | 'error' | 'denied' {
+  if (!isRecord(data)) return 'success';
+  if (data.ok === false) {
+    const evidence = data.evidence;
+    return isRecord(evidence) && evidence.status === 'denied' ? 'denied' : 'error';
+  }
+  if ('error' in data) return 'error';
+  if (typeof data.exitCode === 'number' && data.exitCode !== 0) return 'error';
+  return 'success';
+}
+
+function isRecoverableToolErrorCode(code: unknown): code is string {
+  if (typeof code !== 'string') return false;
+  if (code === 'MODEL_AUTH_FAILED' || code === 'DOD_FAILED' || code === 'CRITIC_CAP_REACHED') {
+    return false;
+  }
+  return (
+    code === 'INVALID_ARGS' ||
+    code === 'CONTENT_TOO_LARGE' ||
+    code === 'PATH_ACCESS_DENIED' ||
+    code === 'BASH_COMMAND_BLOCKED' ||
+    code === 'QUALITY_GATE_DENIED' ||
+    code.endsWith('_FAILED') ||
+    code.startsWith('TOOL_') ||
+    code.startsWith('MCP_') ||
+    code.startsWith('NATIVE_')
+  );
+}
+
 function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.message !== 'string') return null;
   const { code } = o;
+  const message = redactDisplayText(o.message);
   if (code === 'CRITIC_CAP_REACHED') {
-    return { critic: { kind: 'cap_reached', reasons: o.message } };
+    return { critic: { kind: 'cap_reached', reasons: message } };
   }
   if (code === 'DOD_FAILED') {
-    return { critic: { kind: 'cap_reached', reasons: o.message } };
+    return { critic: { kind: 'cap_reached', reasons: message } };
   }
   if (code === 'APPROVAL_REJECTED') {
-    return { text: `\n\n[${code}] ${o.message}\n` };
+    return { text: `\n\n[${code}] ${message}\n` };
   }
-  const isToolError =
-    typeof code === 'string' &&
-    (code.startsWith('TOOL_') || code.startsWith('MCP_') || code.startsWith('NATIVE_'));
-  if (isToolError) return { text: `\n\n[${code}] ${o.message}\n` };
-  return { error: o.message };
+  if (code === 'MODEL_AUTH_FAILED') {
+    return { error: message };
+  }
+  if (isRecoverableToolErrorCode(code)) return { toolTrace: { type: 'error', code, message } };
+  return { error: message };
 }
 
 export type StreamRenderResult =
@@ -143,6 +190,7 @@ export type StreamRenderResult =
   | { error: string }
   | { critic: CriticEvent }
   | { thinking: string }
+  | { toolTrace: ToolTraceEvent }
   | { approvalRequired: ApprovalRequiredStreamEvent }
   | null;
 
@@ -157,6 +205,8 @@ function renderTextEvent(o: StreamEvent): StreamRenderResult {
   const text = extractTextDelta(o);
   if (!text) return null;
   if (isDodSummaryText(text)) return null;
+  const toolStatus = parseToolStatusText(text);
+  if (toolStatus) return { toolTrace: toolStatus };
   const critic = parseCriticContent(text.trimStart());
   if (critic) return { critic };
   return { text };
@@ -179,8 +229,14 @@ export function renderStreamEvent(o: StreamEvent): StreamRenderResult {
         : null;
     case 'tool_result': {
       if (typeof o.toolId !== 'string') return null;
-      const body = formatToolResultPreview(o.data);
-      return { text: `\n\n**${o.toolId}**\n\`\`\`json\n${body}\n\`\`\`\n` };
+      return {
+        toolTrace: {
+          type: 'result',
+          toolId: o.toolId,
+          data: o.data,
+          status: toolResultStatus(o.data),
+        },
+      };
     }
     case 'error':
       return renderErrorEvent(o);
@@ -220,6 +276,7 @@ async function readNdjsonStream(
   onError: (msg: string) => void,
   onCritic: (event: CriticEvent) => void,
   onThinking: (chunk: string) => void,
+  onToolTrace: (event: ToolTraceEvent) => void,
   onApprovalRequired: (event: ApprovalRequiredStreamEvent) => void,
 ): Promise<void> {
   const reader = body.getReader();
@@ -233,6 +290,7 @@ async function readNdjsonStream(
     if (!result) return;
     if ('text' in result) onText(result.text);
     else if ('thinking' in result) onThinking(result.thinking);
+    else if ('toolTrace' in result) onToolTrace(result.toolTrace);
     else if ('critic' in result) onCritic(result.critic);
     else if ('approvalRequired' in result) onApprovalRequired(result.approvalRequired);
     else onError(result.error);
@@ -338,6 +396,9 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     {},
   );
   const [thinkingByMessage, setThinkingByMessage] = useState<Record<string, string>>({});
+  const [toolEventsByMessage, setToolEventsByMessage] = useState<Record<string, ToolTraceEvent[]>>(
+    {},
+  );
   const [approvalEventsByMessage, setApprovalEventsByMessage] = useState<
     Record<string, ApprovalCardState[]>
   >({});
@@ -354,6 +415,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setMessages([]);
       setCriticEventsByMessage({});
       setThinkingByMessage({});
+      setToolEventsByMessage({});
       setApprovalEventsByMessage({});
       return;
     }
@@ -361,6 +423,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setMessages([]);
       setCriticEventsByMessage({});
       setThinkingByMessage({});
+      setToolEventsByMessage({});
       setApprovalEventsByMessage({});
       return;
     }
@@ -421,6 +484,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     });
   }, []);
 
+  const appendToolTrace = useCallback((id: string, event: ToolTraceEvent) => {
+    setToolEventsByMessage((prev) => {
+      const existing = prev[id] ?? [];
+      return { ...prev, [id]: [...existing, event] };
+    });
+  }, []);
+
   const appendApprovalRequired = useCallback((id: string, event: ApprovalRequiredStreamEvent) => {
     setApprovalEventsByMessage((prev) => {
       const existing = prev[id] ?? [];
@@ -475,11 +545,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           }
         },
         (chunk) => appendThinking(assistantId, chunk),
+        (event) => appendToolTrace(assistantId, event),
         (event) => appendApprovalRequired(assistantId, event),
       );
       return accumulated;
     },
-    [appendApprovalRequired, appendCriticEvent, appendThinking],
+    [appendApprovalRequired, appendCriticEvent, appendThinking, appendToolTrace],
   );
 
   const sendMessage = useCallback(
@@ -536,6 +607,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           return next;
         });
         setThinkingByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
+        setToolEventsByMessage((prev) => {
           if (!(assistantId in prev)) return prev;
           const next = { ...prev };
           delete next[assistantId];
@@ -610,6 +687,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           delete next[assistantId];
           return next;
         });
+        setToolEventsByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
       } finally {
         setStatus('ready');
       }
@@ -626,6 +709,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     setError,
     criticEventsByMessage,
     thinkingByMessage,
+    toolEventsByMessage,
     approvalEventsByMessage,
     hasPendingApproval,
   };

@@ -3,6 +3,7 @@ import { parseToolId } from './toolId.js';
 
 /** System tool IDs are always allowed regardless of agent allowlists. */
 const SYSTEM_TOOL_PREFIX = 'sys_';
+const CODING_TOOL_PREFIX = 'coding_';
 
 /** Skill id must appear on the agent allowlist. */
 export function isSkillAllowed(agent: Agent, skillId: string): boolean {
@@ -11,12 +12,14 @@ export function isSkillAllowed(agent: Agent, skillId: string): boolean {
 
 /**
  * Tool execution is allowed if:
- * - tool id starts with `sys_` (built-in system tools), or
+ * - tool id starts with `sys_` (built-in system tools),
+ * - tool id starts with `coding_` (built-in structured coding tools), or
  * - plain tool id is listed in `allowedToolIds`, or
  * - composite MCP id `server:tool` and `server` is in `allowedMcpServerIds`.
  */
 export function isToolExecutionAllowed(agent: Agent, toolId: string): boolean {
   if (toolId.startsWith(SYSTEM_TOOL_PREFIX)) return true;
+  if (toolId.startsWith(CODING_TOOL_PREFIX)) return true;
   const parsed = parseToolId(toolId);
   if (parsed.kind === 'plain') {
     return agent.allowedToolIds.includes(parsed.toolId);

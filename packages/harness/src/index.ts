@@ -81,6 +81,15 @@ export {
   LOW_RISK_TOOLS,
   LOW_RISK_IDS,
   executeLowRiskTool,
+  GIT_TOOLS,
+  GIT_TOOL_IDS,
+  executeGitTool,
+  QUALITY_GATE_TOOLS,
+  QUALITY_GATE_IDS,
+  executeQualityGateTool,
+  REPO_DISCOVERY_TOOLS,
+  REPO_DISCOVERY_TOOL_IDS,
+  executeRepoDiscoveryTool,
   MEDIUM_RISK_TOOLS,
   MEDIUM_RISK_IDS,
   executeMediumRiskTool,
@@ -99,6 +108,7 @@ export {
 export type { HostPlatform, WorkspaceConfig, WorkspaceEnv } from './security/index.js';
 export { validateBashCommand, buildAllowlist } from './security/index.js';
 export { validateUrl } from './security/index.js';
+export { redactCredentials } from './security/index.js';
 export { ToolRateLimiter } from './security/index.js';
 export type {
   Mount,

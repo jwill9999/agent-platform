@@ -9,6 +9,7 @@ const JWT_PARTS = [
 ];
 const EXAMPLE_JWT = JWT_PARTS.join('.');
 const EXAMPLE_PASSWORD = ['s3cret', 'P@ss!'].join('');
+const EXAMPLE_OPENAI_KEY = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
 
 describe('OutputGuard', () => {
   // -----------------------------------------------------------------------
@@ -35,6 +36,12 @@ describe('OutputGuard', () => {
     it('detects GitHub tokens (ghp_)', () => {
       const result = scanOutput('GITHUB_TOKEN=ghp_ABCDEFghijklmnop1234567890abcdef1234567890');
       expect(result.safe).toBe(false);
+    });
+
+    it('detects OpenAI API keys', () => {
+      const result = scanOutput(`Incorrect API key provided: ${EXAMPLE_OPENAI_KEY}`);
+      expect(result.safe).toBe(false);
+      expect(result.issues.some((issue) => issue.includes('OpenAI'))).toBe(true);
     });
 
     it('detects private key blocks', () => {
@@ -116,6 +123,19 @@ describe('OutputGuard', () => {
       const output = redactCredentials(input);
       expect(output).not.toContain('ghp_ABCDEFghijklmnop1234567890abcdef1234567890');
       expect(output).toContain('[REDACTED:');
+    });
+
+    it('redacts OpenAI API keys from provider errors', () => {
+      const output = redactCredentials(`Incorrect API key provided: ${EXAMPLE_OPENAI_KEY}`);
+      expect(output).not.toContain(EXAMPLE_OPENAI_KEY);
+      expect(output).toContain('[REDACTED:OpenAI API Key]');
+    });
+
+    it('redacts masked OpenAI API keys from provider errors', () => {
+      const masked = ['sk-proj-', '*'.repeat(32), 'abcd'].join('');
+      const output = redactCredentials(`Incorrect API key provided: ${masked}`);
+      expect(output).not.toContain(masked);
+      expect(output).toContain('[REDACTED:OpenAI API Key]');
     });
 
     it('preserves non-sensitive content', () => {

@@ -201,6 +201,8 @@ export class PathJail {
 /** Keys that are treated as file paths in tool arguments. */
 const PATH_LIKE_KEYS = new Set([
   'path',
+  'repoPath',
+  'repo_path',
   'file',
   'filePath',
   'file_path',
