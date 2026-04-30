@@ -435,7 +435,6 @@ function IDEToolbar({
           </DialogContent>
         </Dialog>
         <Button
-          data-testid="ide-open-folder-button"
           variant="outline"
           size="sm"
           className="gap-2"
@@ -1283,7 +1282,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                       after refresh (browser permission).
                     </p>
                     <Button
-                      data-testid="ide-restore-folder-button"
                       type="button"
                       size="sm"
                       variant="secondary"
