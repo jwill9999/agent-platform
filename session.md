@@ -119,6 +119,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Implemented `agent-platform-code-tools.5` governed quality-gate runner on `task/agent-platform-code-tools.5`.
 - **Date:** 2026-04-30
 - **Session:** Completed `agent-platform-code-tools.5` governed quality-gate runner; Beads is closed/synced and the branch is ready for PR after push.
+- **Date:** 2026-04-30
+- **Session:** Reverted IDE folder-picker follow-up commits and disabled runtime chat evaluator nodes so internal DoD/critic JSON cannot replace normal assistant responses.
+- **Date:** 2026-04-30
+- **Session:** Created follow-up `agent-platform-ide-rethink` to reassess the browser IDE/code viewing direction before further implementation.
 
 ### Session-close guardrail (required)
 
@@ -246,15 +250,23 @@ Quality gates passed:
 - Completed broad terminal quality gates for `.5`.
 - Closed `agent-platform-code-tools.5` in Beads and synced Beads/Dolt.
 
+### Chat runtime evaluator leak fixed
+
+- Manual testing found chat could return internal DoD criteria JSON, for example `{"criteria":[...]}`, instead of a normal assistant response.
+- Reverted the three IDE folder-picker follow-up commits on `task/agent-platform-code-tools.5`; the bespoke IDE folder tree work is paused for a separate product/architecture rethink.
+- Disabled critic/DoD evaluator nodes in the user-facing runtime chat graph for now, so the main assistant response is the only model output streamed back to chat.
+- Added API regression coverage proving the chat runtime does not run DoD criteria-generation prompts and does not persist streamed criteria JSON as the assistant response.
+- Created Beads follow-up `agent-platform-ide-rethink` with spec `docs/tasks/agent-platform-ide-rethink.md` for deciding whether to keep the bespoke browser IDE, integrate a proven editor/file browser, or rely on repository tools plus external IDE workflows.
+
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/agent-platform-code-tools.5`
-- **Current commit:** `164b93f` (`Claim code tools governed test runner task`) plus local uncommitted completed `.5` implementation
+- **Current commit:** `f121bfb` plus local reverts/chat evaluator fix pending commit
 - **Latest completed task:** `agent-platform-code-tools.5` closed in Beads
-- **Current work:** Commit and push `task/agent-platform-code-tools.5`
-- **Remote sync:** Beads/Dolt is synced; implementation commit and branch push are next.
+- **Current work:** Commit and push the chat runtime evaluator fix/reverts on `task/agent-platform-code-tools.5`
+- **Remote sync:** Beads/Dolt is synced; branch is ahead locally with IDE reverts and chat runtime fix.
 
 ### Beads
 
@@ -264,6 +276,7 @@ Quality gates passed:
 - `agent-platform-code-tools.5` is closed.
 - `agent-platform-code-tools.6` is the next downstream task and is not claimed yet.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
+- New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
 
 ### Quality
 
@@ -326,12 +339,16 @@ Quality gates passed:
   - `pnpm docs:lint`
   - `pnpm exec prettier --check session.md`
   - `git diff --check`
+- Chat runtime evaluator fix checks passed:
+  - `pnpm --filter @agent-platform/api run typecheck`
+  - `pnpm --filter @agent-platform/api run lint`
+  - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push `task/agent-platform-code-tools.5`.
+1. Commit and push the chat runtime evaluator fix/reverts on `task/agent-platform-code-tools.5`.
 2. Open or arrange the PR for `.5` into the coding-tools chain.
 3. After `.5`, next downstream task is `agent-platform-code-tools.6`: repository map and code search.
 

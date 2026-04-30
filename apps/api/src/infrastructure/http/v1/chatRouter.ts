@@ -28,9 +28,6 @@ import {
   buildHarnessGraph,
   createLlmReasonNode,
   createToolDispatchNode,
-  createCriticNode,
-  createDodCheckNode,
-  createDodProposeNode,
   createNdjsonEmitter,
   contractToolsToDefinitions,
   createApproximateCounter,
@@ -544,13 +541,13 @@ function buildRuntimeGraph(
       options,
       approvedToolCallIds,
     }),
-    criticNode: options.disableEvaluatorNodes
-      ? undefined
-      : createCriticNode({ emitter, dispatcher }),
-    dodProposeNode: options.disableEvaluatorNodes ? undefined : createDodProposeNode(),
-    dodCheckNode: options.disableEvaluatorNodes
-      ? undefined
-      : createDodCheckNode({ emitter, dispatcher }),
+    // Keep evaluator nodes out of the user-facing chat runtime for now. The
+    // DoD proposer/checker use JSON-only internal prompts, and the critic makes
+    // a second model call; both can surface internal evaluator output or errors
+    // instead of a normal assistant response when they fail.
+    criticNode: undefined,
+    dodProposeNode: undefined,
+    dodCheckNode: undefined,
     dispatcher,
   });
 }

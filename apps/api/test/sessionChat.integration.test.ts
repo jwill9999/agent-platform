@@ -17,10 +17,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { restoreChatEnv, snapshotChatEnv } from './support/chatEnv.js';
 
 const mockStreamText = vi.hoisted(() => vi.fn());
+const mockGenerateText = vi.hoisted(() => vi.fn());
 const mockToolCalls = vi.hoisted(() => vi.fn());
 
 vi.mock('ai', () => ({
   streamText: (...args: unknown[]) => mockStreamText(...args),
+  generateText: (...args: unknown[]) => mockGenerateText(...args),
   jsonSchema: (schema: unknown) => ({ type: 'json-schema', jsonSchema: schema }),
 }));
 
@@ -44,7 +46,7 @@ vi.mock('@ai-sdk/openai-compatible', () => ({
 
 async function createSeededApp(
   dirs: string[],
-  options: { mockLlm?: boolean } = {},
+  options: { mockLlm?: boolean; disableEvaluatorNodes?: boolean } = {},
 ): Promise<{
   app: Application;
   db: ReturnType<typeof openDatabase>['db'];
@@ -77,7 +79,16 @@ async function createSeededApp(
   return {
     app: createApp({
       db,
-      ...(options.mockLlm ? { v1: { chat: { llmReasonNode, disableEvaluatorNodes: true } } } : {}),
+      ...(options.mockLlm
+        ? {
+            v1: {
+              chat: {
+                llmReasonNode,
+                disableEvaluatorNodes: options.disableEvaluatorNodes ?? true,
+              },
+            },
+          }
+        : {}),
     }),
     db,
     sqlite,
@@ -148,6 +159,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
   afterEach(() => {
     mockStreamText.mockReset();
+    mockGenerateText.mockReset();
     mockToolCalls.mockReset();
     for (const d of dirs) {
       try {
@@ -225,6 +237,46 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(404);
       expect(res.body.error?.code).toBe('NOT_FOUND');
       expect(res.body.error?.message).toContain('Agent');
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('does not run DoD criteria generation in the user-facing chat runtime', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, {
+      mockLlm: true,
+      disableEvaluatorNodes: false,
+    });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      mockToolCalls.mockReturnValueOnce('Hello from chat');
+      mockGenerateText.mockResolvedValue({
+        text: JSON.stringify({ verdict: 'accept', reasons: [] }),
+      });
+
+      const sessionId = await createDefaultSession(app);
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'test' })
+        .expect(200);
+
+      expect(res.text).not.toContain('"criteria"');
+      const messagesRes = await request(app).get(`/v1/sessions/${sessionId}/messages`).expect(200);
+      expect(messagesRes.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ role: 'assistant', content: 'Hello from chat' }),
+        ]),
+      );
+      const evaluatorPrompts = mockGenerateText.mock.calls
+        .flatMap((call) => {
+          const arg = call[0] as { messages?: Array<{ content?: string }> };
+          return arg.messages?.map((message) => message.content ?? '') ?? [];
+        })
+        .join('\n');
+      expect(evaluatorPrompts).not.toContain('Return JSON only with shape {"criteria"');
+      expect(evaluatorPrompts).not.toContain('Return JSON only matching {"criteria"');
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);
