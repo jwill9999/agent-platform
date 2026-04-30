@@ -17,12 +17,13 @@ All coding tools are first-class harness tools. Their names are stable because a
 | Tool name            | Kind       | Risk tier | Approval | Purpose                                                 |
 | -------------------- | ---------- | --------- | -------- | ------------------------------------------------------- |
 | `coding_apply_patch` | `edit`     | `medium`  | No       | Apply deterministic workspace-bounded patches           |
-| `coding_git_status`  | `git`      | `low`     | No       | Return porcelain status and branch metadata             |
-| `coding_git_diff`    | `git`      | `low`     | No       | Return bounded diffs for workspace/repo paths           |
-| `coding_git_log`     | `git`      | `low`     | No       | Return bounded commit history                           |
-| `coding_run_tests`   | `test`     | `medium`  | No       | Run allowlisted quality/test profiles with timeouts     |
-| `coding_repo_map`    | `repo_map` | `low`     | No       | Return bounded repository structure and package signals |
-| `coding_code_search` | `search`   | `low`     | No       | Search code with bounded matches and context            |
+| `git_status`         | `git`      | `low`     | No       | Return porcelain status and branch metadata             |
+| `git_diff`           | `git`      | `low`     | No       | Return bounded diffs for workspace/repo paths           |
+| `git_log`            | `git`      | `low`     | No       | Return bounded commit history                           |
+| `run_quality_gate`   | `test`     | `medium`  | No       | Run allowlisted quality/test profiles with timeouts     |
+| `repo_map`           | `repo_map` | `low`     | No       | Return bounded repository structure and package signals |
+| `code_search`        | `search`   | `low`     | No       | Search code with bounded matches and context            |
+| `find_related_tests` | `search`   | `low`     | No       | Find likely tests for a source file                     |
 
 The tool pack intentionally excludes `git commit`, `git push`, dependency installation, and deployment. Those remain high or critical risk shell operations that require human approval under [Coding Runtime Baseline](coding-runtime.md).
 
@@ -359,9 +360,9 @@ Evidence requirements:
 
 ```ts
 export const CodingRepoMapInputSchema = z.object({
-  maxDepth: z.number().int().min(1).max(8).default(4),
-  maxEntries: z.number().int().min(1).max(2000).default(500),
-  includeFiles: z.boolean().default(true),
+  repoPath: z.string().min(1).default('.'),
+  maxDepth: z.number().int().positive().max(10).default(4),
+  maxFiles: z.number().int().positive().max(1000).default(200),
 });
 ```
 
@@ -369,17 +370,26 @@ export const CodingRepoMapInputSchema = z.object({
 
 ```ts
 export const CodingRepoMapResultSchema = z.object({
-  root: z.string(),
-  entries: z.array(
+  repoPath: z.string(),
+  totalFiles: z.number().int().min(0),
+  totalDirectories: z.number().int().min(0),
+  files: z.array(
     z.object({
       path: z.string(),
       kind: z.enum(['file', 'directory']),
       sizeBytes: z.number().int().min(0).optional(),
     }),
   ),
-  packageManagers: z.array(z.string()).default([]),
-  languages: z.array(z.string()).default([]),
-  truncated: z.boolean().default(false),
+  packageBoundaries: z.array(
+    z.object({
+      path: z.string(),
+      name: z.string().optional(),
+      kind: z.enum(['app', 'package', 'workspace', 'unknown']),
+    }),
+  ),
+  testDirectories: z.array(z.string()),
+  ignoredDirectories: z.array(z.string()),
+  truncated: z.boolean(),
 });
 ```
 
@@ -396,12 +406,12 @@ Evidence requirements:
 
 ```ts
 export const CodingCodeSearchInputSchema = z.object({
-  pattern: z.string().min(1).max(500),
-  paths: z.array(z.string()).default([]),
-  literal: z.boolean().default(false),
+  repoPath: z.string().min(1).default('.'),
+  query: z.string().min(1).max(500),
+  regex: z.boolean().default(false),
   caseSensitive: z.boolean().default(false),
-  maxMatches: z.number().int().min(1).max(1000).default(200),
-  contextLines: z.number().int().min(0).max(5).default(2),
+  maxResults: z.number().int().positive().max(200).default(50),
+  maxFileBytes: z.number().int().positive().max(1000000).default(250000),
 });
 ```
 
@@ -409,17 +419,48 @@ export const CodingCodeSearchInputSchema = z.object({
 
 ```ts
 export const CodingCodeSearchResultSchema = z.object({
+  repoPath: z.string(),
+  query: z.string(),
+  regex: z.boolean(),
   matches: z.array(
     z.object({
       path: z.string(),
-      line: z.number().int().min(1),
-      column: z.number().int().min(1).optional(),
-      text: z.string(),
-      before: z.array(z.string()).default([]),
-      after: z.array(z.string()).default([]),
+      line: z.number().int().positive(),
+      column: z.number().int().positive(),
+      snippet: z.string(),
     }),
   ),
-  truncated: z.boolean().default(false),
+  searchedFiles: z.number().int().min(0),
+  truncated: z.boolean(),
+});
+```
+
+## Related Test Discovery Contract
+
+### Input
+
+```ts
+export const CodingFindRelatedTestsInputSchema = z.object({
+  repoPath: z.string().min(1).default('.'),
+  path: z.string().min(1),
+  maxResults: z.number().int().positive().max(100).default(20),
+});
+```
+
+### Result
+
+```ts
+export const CodingFindRelatedTestsResultSchema = z.object({
+  repoPath: z.string(),
+  path: z.string(),
+  tests: z.array(
+    z.object({
+      path: z.string(),
+      reason: z.string(),
+    }),
+  ),
+  searchedFiles: z.number().int().min(0),
+  truncated: z.boolean(),
 });
 ```
 

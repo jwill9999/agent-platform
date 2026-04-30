@@ -79,6 +79,9 @@ const TOOL_PATH_OPERATIONS: Record<string, 'read' | 'write'> = {
   sys_git_branch_info: 'read',
   sys_git_changed_files: 'read',
   sys_run_quality_gate: 'read',
+  sys_repo_map: 'read',
+  sys_code_search: 'read',
+  sys_find_related_tests: 'read',
 };
 
 // ---------------------------------------------------------------------------

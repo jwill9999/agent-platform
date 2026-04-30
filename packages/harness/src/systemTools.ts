@@ -30,6 +30,9 @@ import {
   QUALITY_GATE_TOOLS,
   QUALITY_GATE_MAP,
   executeQualityGateTool,
+  REPO_DISCOVERY_TOOLS,
+  REPO_DISCOVERY_TOOL_MAP,
+  executeRepoDiscoveryTool,
 } from './tools/index.js';
 import {
   SYSTEM_TOOL_PREFIX,
@@ -68,6 +71,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   ...CODING_EDIT_MAP,
   ...GIT_TOOL_MAP,
   ...QUALITY_GATE_MAP,
+  ...REPO_DISCOVERY_TOOL_MAP,
 } as const;
 
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
@@ -169,6 +173,8 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...GIT_TOOLS,
   // Governed build/test runner
   ...QUALITY_GATE_TOOLS,
+  // Repository discovery and bounded code search
+  ...REPO_DISCOVERY_TOOLS,
   // Lazy skill loading — fetch full skill instructions on demand
   {
     id: ids.getSkillDetail,
@@ -359,6 +365,9 @@ export function createSystemToolExecutor(options?: {
 
     const qualityGateResult = await executeQualityGateTool(toolId, args, { workspaceRoot });
     if (qualityGateResult) return qualityGateResult;
+
+    const repoDiscoveryResult = await executeRepoDiscoveryTool(toolId, args, { workspaceRoot });
+    if (repoDiscoveryResult) return repoDiscoveryResult;
 
     return {
       type: 'error',

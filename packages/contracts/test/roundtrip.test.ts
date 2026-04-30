@@ -13,6 +13,12 @@ import {
   CodingGitStatusResultSchema,
   CodingRunQualityGateInputSchema,
   CodingRunQualityGateResultSchema,
+  CodingRepoMapInputSchema,
+  CodingRepoMapResultSchema,
+  CodingCodeSearchInputSchema,
+  CodingCodeSearchResultSchema,
+  CodingFindRelatedTestsInputSchema,
+  CodingFindRelatedTestsResultSchema,
   CodingToolEnvelopeSchema,
   CriticVerdictSchema,
   ExecutionLimitsSchema,
@@ -287,5 +293,66 @@ describe('contracts round-trip', () => {
       failures: [{ message: 'FAIL test/example.test.ts', file: 'test/example.test.ts' }],
     });
     expect(CodingRunQualityGateResultSchema.parse(structuredClone(result))).toEqual(result);
+  });
+
+  it('Coding repository discovery schemas round-trip', () => {
+    const repoMapInput = CodingRepoMapInputSchema.parse({
+      repoPath: '.',
+      maxDepth: 4,
+      maxFiles: 200,
+    });
+    expect(CodingRepoMapInputSchema.parse(structuredClone(repoMapInput))).toEqual(repoMapInput);
+
+    const repoMap = CodingRepoMapResultSchema.parse({
+      repoPath: '/workspace/repo',
+      totalFiles: 2,
+      totalDirectories: 1,
+      files: [
+        { path: 'apps/web', kind: 'directory' },
+        { path: 'apps/web/package.json', kind: 'file', sizeBytes: 42 },
+      ],
+      packageBoundaries: [{ path: 'apps/web', name: '@agent-platform/web', kind: 'app' }],
+      testDirectories: ['apps/web/test'],
+      ignoredDirectories: ['node_modules'],
+      truncated: false,
+    });
+    expect(CodingRepoMapResultSchema.parse(structuredClone(repoMap))).toEqual(repoMap);
+
+    const searchInput = CodingCodeSearchInputSchema.parse({
+      repoPath: '.',
+      query: 'render',
+      regex: false,
+      caseSensitive: false,
+      maxResults: 50,
+    });
+    expect(CodingCodeSearchInputSchema.parse(structuredClone(searchInput))).toEqual(searchInput);
+
+    const search = CodingCodeSearchResultSchema.parse({
+      repoPath: '/workspace/repo',
+      query: 'render',
+      regex: false,
+      matches: [{ path: 'apps/web/src/page.tsx', line: 7, column: 3, snippet: 'render()' }],
+      searchedFiles: 10,
+      truncated: false,
+    });
+    expect(CodingCodeSearchResultSchema.parse(structuredClone(search))).toEqual(search);
+
+    const relatedInput = CodingFindRelatedTestsInputSchema.parse({
+      repoPath: '.',
+      path: 'apps/web/src/page.tsx',
+      maxResults: 20,
+    });
+    expect(CodingFindRelatedTestsInputSchema.parse(structuredClone(relatedInput))).toEqual(
+      relatedInput,
+    );
+
+    const related = CodingFindRelatedTestsResultSchema.parse({
+      repoPath: '/workspace/repo',
+      path: 'apps/web/src/page.tsx',
+      tests: [{ path: 'apps/web/test/page.test.tsx', reason: 'same basename' }],
+      searchedFiles: 10,
+      truncated: false,
+    });
+    expect(CodingFindRelatedTestsResultSchema.parse(structuredClone(related))).toEqual(related);
   });
 });

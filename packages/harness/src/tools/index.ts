@@ -27,6 +27,12 @@ export {
   executeQualityGateTool,
 } from './qualityGateTool.js';
 export {
+  REPO_DISCOVERY_TOOLS,
+  REPO_DISCOVERY_TOOL_IDS,
+  REPO_DISCOVERY_TOOL_MAP,
+  executeRepoDiscoveryTool,
+} from './repoDiscoveryTools.js';
+export {
   OBSERVABILITY_TOOLS,
   OBSERVABILITY_IDS,
   OBSERVABILITY_MAP,

@@ -235,3 +235,92 @@ export const CodingRunQualityGateResultSchema = z.object({
   failures: z.array(CodingQualityGateFailureSchema),
 });
 export type CodingRunQualityGateResult = z.infer<typeof CodingRunQualityGateResultSchema>;
+
+export const CodingRepoMapInputSchema = z
+  .object({
+    repoPath: z.string().min(1).default('.'),
+    maxDepth: z.number().int().positive().max(10).default(4),
+    maxFiles: z.number().int().positive().max(1_000).default(200),
+  })
+  .strict();
+export type CodingRepoMapInput = z.infer<typeof CodingRepoMapInputSchema>;
+
+export const CodingRepoMapFileSchema = z.object({
+  path: z.string(),
+  kind: z.enum(['file', 'directory']),
+  sizeBytes: z.number().int().min(0).optional(),
+});
+export type CodingRepoMapFile = z.infer<typeof CodingRepoMapFileSchema>;
+
+export const CodingRepoPackageBoundarySchema = z.object({
+  path: z.string(),
+  name: z.string().optional(),
+  kind: z.enum(['app', 'package', 'workspace', 'unknown']),
+});
+export type CodingRepoPackageBoundary = z.infer<typeof CodingRepoPackageBoundarySchema>;
+
+export const CodingRepoMapResultSchema = z.object({
+  repoPath: z.string(),
+  totalFiles: z.number().int().min(0),
+  totalDirectories: z.number().int().min(0),
+  files: z.array(CodingRepoMapFileSchema),
+  packageBoundaries: z.array(CodingRepoPackageBoundarySchema),
+  testDirectories: z.array(z.string()),
+  ignoredDirectories: z.array(z.string()),
+  truncated: z.boolean(),
+});
+export type CodingRepoMapResult = z.infer<typeof CodingRepoMapResultSchema>;
+
+export const CodingCodeSearchInputSchema = z
+  .object({
+    repoPath: z.string().min(1).default('.'),
+    query: z.string().min(1).max(500),
+    regex: z.boolean().default(false),
+    caseSensitive: z.boolean().default(false),
+    maxResults: z.number().int().positive().max(200).default(50),
+    maxFileBytes: z.number().int().positive().max(1_000_000).default(250_000),
+  })
+  .strict();
+export type CodingCodeSearchInput = z.infer<typeof CodingCodeSearchInputSchema>;
+
+export const CodingCodeSearchMatchSchema = z.object({
+  path: z.string(),
+  line: z.number().int().positive(),
+  column: z.number().int().positive(),
+  snippet: z.string(),
+});
+export type CodingCodeSearchMatch = z.infer<typeof CodingCodeSearchMatchSchema>;
+
+export const CodingCodeSearchResultSchema = z.object({
+  repoPath: z.string(),
+  query: z.string(),
+  regex: z.boolean(),
+  matches: z.array(CodingCodeSearchMatchSchema),
+  searchedFiles: z.number().int().min(0),
+  truncated: z.boolean(),
+});
+export type CodingCodeSearchResult = z.infer<typeof CodingCodeSearchResultSchema>;
+
+export const CodingFindRelatedTestsInputSchema = z
+  .object({
+    repoPath: z.string().min(1).default('.'),
+    path: z.string().min(1),
+    maxResults: z.number().int().positive().max(100).default(20),
+  })
+  .strict();
+export type CodingFindRelatedTestsInput = z.infer<typeof CodingFindRelatedTestsInputSchema>;
+
+export const CodingRelatedTestSchema = z.object({
+  path: z.string(),
+  reason: z.string(),
+});
+export type CodingRelatedTest = z.infer<typeof CodingRelatedTestSchema>;
+
+export const CodingFindRelatedTestsResultSchema = z.object({
+  repoPath: z.string(),
+  path: z.string(),
+  tests: z.array(CodingRelatedTestSchema),
+  searchedFiles: z.number().int().min(0),
+  truncated: z.boolean(),
+});
+export type CodingFindRelatedTestsResult = z.infer<typeof CodingFindRelatedTestsResultSchema>;

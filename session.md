@@ -129,6 +129,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Fixed CI unit-test failure in `qualityGateTool.test.ts` by resolving pnpm from absolute npm/pnpm environment paths before local fallback paths.
 - **Date:** 2026-04-30
 - **Session:** Closed out `agent-platform-code-tools.5` after green pipelines; claimed `agent-platform-code-tools.6` and created `task/agent-platform-code-tools.6` from the `.5` chain tip.
+- **Date:** 2026-04-30
+- **Session:** Implemented `agent-platform-code-tools.6` repository map, code search, and related-test discovery tools on `task/agent-platform-code-tools.6`.
 
 ### Session-close guardrail (required)
 
@@ -290,15 +292,24 @@ Quality gates passed:
 - Fixed the GitHub Actions unit-test failure where `qualityGateTool.test.ts` only looked for Homebrew/system pnpm locations; tests now resolve absolute `npm_execpath` or `PNPM_HOME/pnpm` before local fallback paths.
 - Latest `.5` pipeline was green after commit `8e27369`.
 
+### Repository discovery tools implemented
+
+- Added low-risk built-in tools `sys_repo_map` / `repo_map`, `sys_code_search` / `code_search`, and `sys_find_related_tests` / `find_related_tests`.
+- Repository discovery uses a bounded Node walker, skips symlinks, excludes ignored directories such as `.git`, `.agent-platform`, `.next`, `dist`, `coverage`, `node_modules`, and `test-results`, and enforces workspace scoping through PathJail dispatch checks.
+- `repo_map` returns bounded file summaries, package boundaries, detected test directories, ignored directory names, total counts, and truncation state.
+- `code_search` supports literal and explicit regex search with bounded file bytes, result counts, snippets, line/column locations, and structured search evidence.
+- `find_related_tests` maps source files to likely tests by basename and repository proximity, returning bounded structured evidence.
+- Added shared contracts, schema round-trip coverage, harness tool tests, MCP shadowing protection, docs, and system tool registration.
+
 ## Current state
 
 ### Git
 
 - **Current branch:** `task/agent-platform-code-tools.6`
-- **Current base:** `8e27369 Resolve pnpm path in quality gate tests`
-- **Latest completed task:** `agent-platform-code-tools.5` closed in Beads
-- **Current work:** `agent-platform-code-tools.6` repository map and code search
-- **Remote sync:** Beads/Dolt is synced; `.6` branch has just been created from `.5` and should be pushed after this session update commit.
+- **Current base:** `e0a385f Update session for code tools six`
+- **Latest completed task:** `agent-platform-code-tools.6` repository map and code search
+- **Current work:** `.6` implementation complete and closed in Beads; commit and push this branch.
+- **Remote sync:** Beads/Dolt is synced after closing `.6`; branch should be pushed after this session update commit.
 
 ### Beads
 
@@ -306,7 +317,8 @@ Quality gates passed:
 - `agent-platform-code-tools.3` is closed.
 - `agent-platform-code-tools.4` is closed.
 - `agent-platform-code-tools.5` is closed.
-- `agent-platform-code-tools.6` is claimed and in progress.
+- `agent-platform-code-tools.6` is closed.
+- `agent-platform-code-tools.7` is open and blocked only by `.6` completion.
 - New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
 - New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
 
@@ -380,13 +392,30 @@ Quality gates passed:
   - `pnpm --filter @agent-platform/harness run lint`
   - `pnpm test` (run with escalation because API Supertest binds local ports)
   - pre-push harness build/typecheck/test
+- Repository discovery focused checks passed:
+  - `pnpm --filter @agent-platform/contracts run build`
+  - `pnpm --filter @agent-platform/contracts run typecheck`
+  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run build`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm --filter @agent-platform/harness exec vitest run test/repoDiscoveryTools.test.ts test/mcpTrustGuard.test.ts`
+  - `pnpm --filter @agent-platform/harness run test -- test/repoDiscoveryTools.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts test/lowRiskTools.test.ts`
+  - `pnpm docs:lint`
+  - `pnpm exec prettier --check docs/coding-tool-contracts.md packages/contracts/src/codingTool.ts packages/harness/src/tools/repoDiscoveryTools.ts packages/harness/test/repoDiscoveryTools.test.ts packages/contracts/test/roundtrip.test.ts`
+  - `git diff --check`
+- Broad `.6` completion checks passed:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test` (run with escalation because API Supertest binds local ports)
 
 ---
 
 ## Next (priority order)
 
-1. Commit and push this session update on `task/agent-platform-code-tools.6`.
-2. Start `agent-platform-code-tools.6`: repository map generation, code search, and related-test discovery tools.
+1. Push the completed `task/agent-platform-code-tools.6` branch.
+2. After pipelines pass, claim `agent-platform-code-tools.7`: coding tools visibility and E2E validation.
 3. Keep the IDE/file-tree integration as a separate follow-up under `agent-platform-ide-rethink`.
 
 ---
