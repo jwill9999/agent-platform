@@ -39,6 +39,8 @@ describe('migrations', () => {
     expect(names).toContain('approval_requests');
     expect(names).toContain('chat_metadata');
     expect(names).toContain('plugin_catalog_refs');
+    expect(names).toContain('memories');
+    expect(names).toContain('memory_links');
     closeDatabase(sqlite);
   });
 });

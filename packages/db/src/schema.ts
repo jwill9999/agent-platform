@@ -1,4 +1,12 @@
-import { integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 /**
  * Secret registry: label + optional **ciphertext-only** material (AES-256-GCM envelope).
@@ -247,3 +255,58 @@ export const approvalRequests = sqliteTable('approval_requests', {
   expiresAtMs: integer('expires_at_ms', { mode: 'number' }),
   decisionReason: text('decision_reason'),
 });
+
+/** Scoped long-term memory records. Prompt retrieval is intentionally added in later tasks. */
+export const memories = sqliteTable(
+  'memories',
+  {
+    id: text('id').primaryKey(),
+    scope: text('scope').notNull(),
+    scopeId: text('scope_id'),
+    kind: text('kind').notNull(),
+    status: text('status').notNull().default('pending'),
+    reviewStatus: text('review_status').notNull().default('unreviewed'),
+    content: text('content').notNull(),
+    confidence: real('confidence').notNull().default(0.5),
+    sourceKind: text('source_kind').notNull(),
+    sourceId: text('source_id'),
+    sourceLabel: text('source_label'),
+    sourceMetadataJson: text('source_metadata_json').notNull().default('{}'),
+    tagsJson: text('tags_json').notNull().default('[]'),
+    metadataJson: text('metadata_json').notNull().default('{}'),
+    safetyState: text('safety_state').notNull().default('unchecked'),
+    createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+    updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+    expiresAtMs: integer('expires_at_ms', { mode: 'number' }),
+    reviewedAtMs: integer('reviewed_at_ms', { mode: 'number' }),
+    reviewedBy: text('reviewed_by'),
+  },
+  (t) => ({
+    scopeIdx: index('memories_scope_idx').on(t.scope, t.scopeId),
+    kindIdx: index('memories_kind_idx').on(t.kind),
+    statusIdx: index('memories_status_idx').on(t.status),
+    reviewStatusIdx: index('memories_review_status_idx').on(t.reviewStatus),
+    expiresAtIdx: index('memories_expires_at_idx').on(t.expiresAtMs),
+    sourceIdx: index('memories_source_idx').on(t.sourceKind, t.sourceId),
+  }),
+);
+
+/** Optional links between memories for future retrieval/ranking work. */
+export const memoryLinks = sqliteTable(
+  'memory_links',
+  {
+    sourceMemoryId: text('source_memory_id')
+      .notNull()
+      .references(() => memories.id, { onDelete: 'cascade' }),
+    targetMemoryId: text('target_memory_id')
+      .notNull()
+      .references(() => memories.id, { onDelete: 'cascade' }),
+    relation: text('relation').notNull(),
+    metadataJson: text('metadata_json').notNull().default('{}'),
+    createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.sourceMemoryId, t.targetMemoryId, t.relation] }),
+    targetIdx: index('memory_links_target_idx').on(t.targetMemoryId),
+  }),
+);

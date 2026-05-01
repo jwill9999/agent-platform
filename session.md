@@ -147,6 +147,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Started memory epic setup: created `feature/agent-platform-memory`, created `task/agent-platform-memory.1`, created seven memory child tasks/specs, and claimed `.1`.
 - **Date:** 2026-04-30
 - **Session:** Paused before implementing `agent-platform-memory.1`; remembered long-term memory v1 should use a relational store with optional links, not a graph database.
+- **Date:** 2026-05-01
+- **Session:** Implemented `agent-platform-memory.1` memory contracts, SQLite schema/migration, repository CRUD/query APIs, metadata redaction, relationship links, tests, and docs on `task/agent-platform-memory.1`.
 
 ### Session-close guardrail (required)
 
@@ -158,6 +160,27 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Memory foundation implemented
+
+Branch state: `task/agent-platform-memory.1` contains the first memory epic task.
+
+- Added shared memory contracts for scopes, kinds, status, review status, source metadata, confidence, expiry, and safety state.
+- Added `memories` and `memory_links` SQLite tables plus repository APIs for create/read/update/delete/query/count and memory links.
+- Repository queries support scope, kind, status, review status, confidence floor, source kind/id, source metadata, tags, and expiry filtering.
+- Metadata redaction happens before persistence for common secret-bearing keys, including nested objects and arrays.
+- Added `docs/memory.md` describing the v1 relational model, storage boundary, and explicit no-automatic-prompt-retrieval decision.
+- Added focused contract and DB tests for round-trip validation, CRUD/query, expiry filtering, metadata redaction, migration, and link cascade behavior.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+- `pnpm --filter @agent-platform/db run test -- test/memories.test.ts test/migrate.test.ts`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm test` (run with escalation because Supertest API tests bind local HTTP listeners)
+- `pnpm docs:lint`
 
 ### Chat UI model-config and stream error handling fixed
 

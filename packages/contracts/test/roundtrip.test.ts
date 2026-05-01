@@ -23,6 +23,10 @@ import {
   CriticVerdictSchema,
   ExecutionLimitsSchema,
   HealthResponseSchema,
+  MemoryCreateBodySchema,
+  MemoryLinkSchema,
+  MemoryQuerySchema,
+  MemoryRecordSchema,
   OutputSchema,
   PlanSchema,
   SecretRefSchema,
@@ -160,6 +164,70 @@ describe('contracts round-trip', () => {
       reason: 'approved by user',
     });
     expect(() => ApprovalRequestSchema.parse({ ...request, status: 'done' })).toThrow();
+  });
+
+  it('Memory schemas round-trip and enforce scoped policy', () => {
+    const record = MemoryRecordSchema.parse({
+      id: 'memory-1',
+      scope: 'project',
+      scopeId: 'project-1',
+      kind: 'decision',
+      status: 'approved',
+      reviewStatus: 'approved',
+      content: 'Use relational memory storage for v1.',
+      confidence: 0.9,
+      source: {
+        kind: 'user',
+        id: 'message-1',
+        metadata: { channel: 'chat' },
+      },
+      tags: ['architecture'],
+      metadata: { ticket: 'agent-platform-memory.1' },
+      safetyState: 'safe',
+      createdAtMs: 1000,
+      updatedAtMs: 1000,
+    });
+    expect(MemoryRecordSchema.parse(structuredClone(record))).toEqual(record);
+
+    const createBody = MemoryCreateBodySchema.parse({
+      scope: 'global',
+      kind: 'preference',
+      content: 'Prefer concise answers.',
+      source: { kind: 'manual' },
+    });
+    expect(createBody).toMatchObject({
+      scope: 'global',
+      kind: 'preference',
+      status: 'pending',
+      reviewStatus: 'unreviewed',
+      confidence: 0.5,
+    });
+
+    expect(() =>
+      MemoryCreateBodySchema.parse({
+        scope: 'session',
+        kind: 'fact',
+        content: 'Missing scope id.',
+        source: { kind: 'manual' },
+      }),
+    ).toThrow();
+
+    expect(
+      MemoryQuerySchema.parse({ minConfidence: '0.75', includeExpired: 'true' }),
+    ).toMatchObject({
+      minConfidence: 0.75,
+      includeExpired: true,
+      limit: 100,
+      offset: 0,
+    });
+
+    const link = MemoryLinkSchema.parse({
+      sourceMemoryId: 'memory-1',
+      targetMemoryId: 'memory-2',
+      relation: 'supports',
+      createdAtMs: 1000,
+    });
+    expect(MemoryLinkSchema.parse(structuredClone(link))).toEqual(link);
   });
 
   it('Coding apply patch schemas round-trip', () => {
