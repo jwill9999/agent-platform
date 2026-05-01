@@ -22,11 +22,14 @@ import {
   parseMasterKeyFromBase64,
   upsertWorkingMemoryArtifact,
   createMemoryCandidates,
+  retrievePromptMemories,
+  formatPromptMemoryBundle,
 } from '@agent-platform/db';
 import type {
   ApprovalRequest,
   ContextWindow,
   MessageRecord,
+  PromptMemoryBundle,
   WorkingMemoryToolSummary,
 } from '@agent-platform/contracts';
 import {
@@ -547,6 +550,12 @@ function withWorkingMemoryPrompt(systemPrompt: string, summary?: string): string
   return `${systemPrompt}\n\n${buildWorkingMemoryPrompt(summary)}`;
 }
 
+function withPromptMemoryBundle(systemPrompt: string, bundle: PromptMemoryBundle): string {
+  const prompt = formatPromptMemoryBundle(bundle);
+  if (!prompt) return systemPrompt;
+  return `${systemPrompt}\n\n${prompt}`;
+}
+
 function refreshWorkingMemory({
   db,
   sessionId,
@@ -961,9 +970,10 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
 
         const graph = buildRuntimeGraph(db, agentCtx, runId, sessionId, emitter, options);
 
-        const { messages, dropped, contextTokens } = buildConversationMessages(
+        const { messages, dropped, contextTokens, memoryBundle } = buildConversationMessages(
           db,
           sessionId,
+          session.agentId,
           message,
           agentCtx.systemPrompt,
           agentCtx.agent.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
@@ -976,6 +986,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         const initialState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
           dropped,
           contextTokens,
+          memoryBundle,
         });
 
         const finalState: { messages?: ChatMessage[] } = await graph.invoke(initialState, {
@@ -1061,21 +1072,41 @@ function prepareNdjsonResponse(res: Response): void {
 function buildConversationMessages(
   db: DrizzleDb,
   sessionId: string,
+  agentId: string,
   newMessage: string,
   systemPrompt: string,
   contextWindow: ContextWindow,
-): { messages: ChatMessage[]; dropped: number; contextTokens: number } {
+): {
+  messages: ChatMessage[];
+  dropped: number;
+  contextTokens: number;
+  memoryBundle: PromptMemoryBundle;
+} {
   return withTransaction(db, (tx) => {
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
     const workingMemory = getWorkingMemoryArtifact(tx, sessionId);
+    const memoryBundle = retrievePromptMemories(tx, {
+      scope: {
+        sessionId,
+        agentId,
+        projectId: workingMemory?.activeProject,
+      },
+      query: newMessage,
+    });
 
     const history = sanitiseToolCallHistory(priorMessages.map(dbRecordToChatMessage));
     const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
     const counter = createApproximateCounter();
-    const effectiveSystemPrompt = withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary);
+    const effectiveSystemPrompt = withPromptMemoryBundle(
+      withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary),
+      memoryBundle,
+    );
 
-    return buildWindowedContext(effectiveSystemPrompt, history, userMsg, contextWindow, counter);
+    return {
+      ...buildWindowedContext(effectiveSystemPrompt, history, userMsg, contextWindow, counter),
+      memoryBundle,
+    };
   });
 }
 
@@ -1085,10 +1116,11 @@ function buildInitialState(
   messages: ChatMessage[],
   agentCtx: AgentContext,
   modelConfig: { provider: string; model: string; apiKey?: string },
-  contextInfo: { dropped: number; contextTokens: number },
+  contextInfo: { dropped: number; contextTokens: number; memoryBundle?: PromptMemoryBundle },
 ): HarnessStateType {
   const strategy = agentCtx.agent.contextWindow?.strategy ?? 'truncate';
   const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
+  const memoryBundle = contextInfo.memoryBundle;
   return {
     trace: [
       {
@@ -1098,6 +1130,15 @@ function buildInitialState(
         messagesIncluded: messages.length - 2, // exclude system + new user message
         strategy,
       },
+      ...(memoryBundle
+        ? [
+            {
+              type: 'memory_retrieval' as const,
+              included: memoryBundle.includedCount,
+              omitted: memoryBundle.omitted,
+            },
+          ]
+        : []),
     ],
     plan: null,
     taskIndex: 0,

@@ -17,10 +17,10 @@ Retrieve approved, relevant memories into prompt bundles with source metadata an
 
 ## Implementation Plan
 
-1. Add memory retrieval service and ranking filters.
-2. Add prompt bundle formatting.
-3. Integrate retrieval into prompt/context construction behind a feature-safe policy.
-4. Add observability trace events for memory retrieval decisions.
+1. Add memory retrieval service and ranking filters. **Done.**
+2. Add prompt bundle formatting. **Done.**
+3. Integrate retrieval into prompt/context construction behind a feature-safe policy. **Done.**
+4. Add observability trace events for memory retrieval decisions. **Done.**
 
 ## Tests And Verification
 
@@ -34,3 +34,10 @@ Retrieve approved, relevant memories into prompt bundles with source metadata an
 - Approved memories can inform prompts with clear source metadata.
 - Retrieval is conservative, test-covered, and traceable.
 - Stale or unsafe memory is excluded.
+
+## Implementation Notes
+
+- Retrieval is bounded to global, current session, current agent, and explicitly known current project scope.
+- Only approved/reviewed memories are eligible; pending candidates remain review-only.
+- Prompt bundles include source metadata and are appended after short-term working memory in the system prompt.
+- A `memory_retrieval` trace event records included and omitted counts.

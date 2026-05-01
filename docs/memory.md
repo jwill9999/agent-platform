@@ -6,7 +6,7 @@ The memory system now has three separate layers:
 - Short-term working memory in `working_memory_artifacts`.
 - Pending candidate memories extracted from corrections, failures, remediations, and explicit remember instructions.
 
-Long-term memories are not automatically retrieved into prompts yet. Working memory is session-scoped and can be injected into the current session prompt to preserve task continuity across long conversations and resume flows.
+Approved long-term memories can be retrieved into prompt bundles when they match the current turn and scope. Working memory is session-scoped and can be injected into the current session prompt to preserve task continuity across long conversations and resume flows.
 
 ## Record Shape
 
@@ -64,6 +64,14 @@ The v1 extractor looks for:
 
 Candidate metadata includes rationale, evidence excerpts, and the suggested scope. Candidate content is credential-scanned before storage. Credential-like strings are redacted and the memory is marked `safetyState: redacted`.
 
-## Retrieval Boundary
+## Prompt Retrieval
 
-Durable long-term memory still has no automatic retrieval in this increment. Pending candidates are not retrieved. Later tasks should make long-term retrieval explicit, auditable, and policy-gated before any durable memory content is inserted into model context.
+The chat runtime retrieves approved long-term memories into a bounded prompt bundle. Retrieval is intentionally conservative:
+
+- Only `status: approved` and `reviewStatus: approved` memories are considered.
+- Expired memories, low-confidence memories, `unchecked` memories, and `blocked` memories are excluded.
+- Scope is limited to global, current session, current agent, and current project only when an explicit project id is known.
+- Ranking uses current user-message relevance, tags, confidence, recency, and memory kind.
+- Prompt entries include source kind/id/label, confidence, memory kind, and scope.
+
+Pending candidate memories are not retrieved. The runtime records a `memory_retrieval` trace event with included and omitted counts so retrieval decisions are auditable without logging full prompt content.

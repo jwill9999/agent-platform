@@ -27,6 +27,7 @@ import {
   MemoryCandidateExtractionInputSchema,
   MemoryCreateBodySchema,
   MemoryLinkSchema,
+  PromptMemoryBundleSchema,
   MemoryQuerySchema,
   MemoryRecordSchema,
   WorkingMemoryArtifactSchema,
@@ -232,6 +233,26 @@ describe('contracts round-trip', () => {
       createdAtMs: 1000,
     });
     expect(MemoryLinkSchema.parse(structuredClone(link))).toEqual(link);
+
+    const promptBundle = PromptMemoryBundleSchema.parse({
+      items: [
+        {
+          id: 'memory-1',
+          scope: 'project',
+          scopeId: 'project-1',
+          kind: 'decision',
+          content: 'Use relational memory storage for v1.',
+          confidence: 0.9,
+          source: { kind: 'user', id: 'message-1', label: 'reviewed user message' },
+          tags: ['architecture'],
+          updatedAtMs: 1000,
+          score: 0.81,
+        },
+      ],
+      includedCount: 1,
+      omitted: { expired: 0, lowConfidence: 0, unsafe: 0, notRelevant: 2, crossScope: 0 },
+    });
+    expect(PromptMemoryBundleSchema.parse(structuredClone(promptBundle))).toEqual(promptBundle);
   });
 
   it('Working memory schemas round-trip and bound summaries', () => {

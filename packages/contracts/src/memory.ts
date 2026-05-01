@@ -167,6 +167,37 @@ export const MemoryLinkSchema = z.object({
   createdAtMs: z.number().int().nonnegative(),
 });
 
+export const PromptMemorySourceSchema = z.object({
+  kind: MemorySourceKindSchema,
+  id: z.string().min(1).optional(),
+  label: z.string().min(1).optional(),
+});
+
+export const PromptMemoryItemSchema = z.object({
+  id: z.string().min(1),
+  scope: MemoryScopeSchema,
+  scopeId: z.string().min(1).optional(),
+  kind: MemoryKindSchema,
+  content: z.string().min(1).max(2000),
+  confidence: z.number().min(0).max(1),
+  source: PromptMemorySourceSchema,
+  tags: z.array(z.string().min(1)).default([]),
+  updatedAtMs: z.number().int().nonnegative(),
+  score: z.number().nonnegative(),
+});
+
+export const PromptMemoryBundleSchema = z.object({
+  items: z.array(PromptMemoryItemSchema).default([]),
+  includedCount: z.number().int().nonnegative(),
+  omitted: z.object({
+    expired: z.number().int().nonnegative().default(0),
+    lowConfidence: z.number().int().nonnegative().default(0),
+    unsafe: z.number().int().nonnegative().default(0),
+    notRelevant: z.number().int().nonnegative().default(0),
+    crossScope: z.number().int().nonnegative().default(0),
+  }),
+});
+
 export const WorkingMemoryToolSummarySchema = z.object({
   toolName: z.string().min(1),
   ok: z.boolean(),
@@ -275,6 +306,9 @@ export type MemoryUpdateBody = z.infer<typeof MemoryUpdateBodySchema>;
 export type MemoryQuery = z.infer<typeof MemoryQuerySchema>;
 export type MemoryQueryInput = z.input<typeof MemoryQuerySchema>;
 export type MemoryLink = z.infer<typeof MemoryLinkSchema>;
+export type PromptMemorySource = z.infer<typeof PromptMemorySourceSchema>;
+export type PromptMemoryItem = z.infer<typeof PromptMemoryItemSchema>;
+export type PromptMemoryBundle = z.infer<typeof PromptMemoryBundleSchema>;
 export type WorkingMemoryToolSummary = z.infer<typeof WorkingMemoryToolSummarySchema>;
 export type WorkingMemoryArtifact = z.infer<typeof WorkingMemoryArtifactSchema>;
 export type WorkingMemoryUpdateBody = z.infer<typeof WorkingMemoryUpdateBodySchema>;

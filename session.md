@@ -159,6 +159,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Reduced SonarCloud new-code duplication for `agent-platform-memory.3` by extracting shared memory contract shapes, working-memory persistence mapping, and DB test fixtures.
 - **Date:** 2026-05-01
 - **Session:** Closed out `agent-platform-memory.3` after green pipelines, claimed `agent-platform-memory.4`, and created `task/agent-platform-memory.4`. Implementation has not started.
+- **Date:** 2026-05-02
+- **Session:** Implemented `agent-platform-memory.4` approved long-term memory retrieval with conservative ranking, prompt bundle formatting, chat prompt integration, trace metadata, tests, and docs.
 
 ### Session-close guardrail (required)
 

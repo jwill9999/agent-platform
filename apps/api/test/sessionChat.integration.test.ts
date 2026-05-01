@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import {
   closeDatabase,
+  createMemory,
   createModelConfig,
   DEFAULT_AGENT_ID,
   openDatabase,
@@ -561,6 +562,68 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(followUpState.messages?.[0]?.content).toContain('Short-term working memory');
       expect(followUpState.messages?.[0]?.content).toContain(
         'Goal: Implement agent-platform-memory.2 for agent-platform',
+      );
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('includes approved prompt memories with retrieval trace metadata', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+      createMemory(
+        db,
+        {
+          scope: 'agent',
+          scopeId: DEFAULT_AGENT_ID,
+          kind: 'decision',
+          status: 'approved',
+          reviewStatus: 'approved',
+          content: 'Memory retrieval must include source metadata in prompt bundles.',
+          confidence: 0.91,
+          source: { kind: 'manual', id: 'review-1', label: 'approved review' },
+          tags: ['retrieval'],
+          safetyState: 'safe',
+        },
+        { id: 'approved-memory', nowMs: 1000 },
+      );
+      createMemory(
+        db,
+        {
+          scope: 'agent',
+          scopeId: DEFAULT_AGENT_ID,
+          kind: 'decision',
+          status: 'pending',
+          reviewStatus: 'unreviewed',
+          content: 'Pending memory retrieval should not appear in prompts.',
+          source: { kind: 'manual' },
+          tags: ['retrieval'],
+          safetyState: 'safe',
+        },
+        { id: 'pending-memory', nowMs: 1000 },
+      );
+
+      mockToolCalls.mockReturnValueOnce('Using approved memory.');
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'How should memory retrieval prompt bundles work?' })
+        .expect(200);
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; content: string }>;
+        trace?: Array<{ type: string; included?: number }>;
+      };
+      const systemPrompt = state.messages?.[0]?.content ?? '';
+      expect(systemPrompt).toContain('Long-term approved memories');
+      expect(systemPrompt).toContain('Memory retrieval must include source metadata');
+      expect(systemPrompt).toContain('sourceId=review-1');
+      expect(systemPrompt).not.toContain('Pending memory retrieval should not appear');
+      expect(state.trace).toContainEqual(
+        expect.objectContaining({ type: 'memory_retrieval', included: 1 }),
       );
     } finally {
       restoreChatEnv(envSnap);
