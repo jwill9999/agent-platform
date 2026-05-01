@@ -2,6 +2,7 @@ import { SessionCreateBodySchema, SessionRecordSchema } from '@agent-platform/co
 import {
   createSession,
   deleteSession,
+  getWorkingMemoryArtifact,
   getSession,
   listMessagesBySession,
   listSessions,
@@ -49,6 +50,16 @@ export function createSessionsRouter(
       const all = listMessagesBySession(db, id);
       const visible = all.filter((m) => m.role === 'user' || m.role === 'assistant');
       res.json({ data: visible });
+    }),
+  );
+
+  router.get(
+    '/:id/working-memory',
+    asyncHandler(async (req, res) => {
+      const id = requireParam(req.params, 'id');
+      const session = getSession(db, id);
+      if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
+      res.json({ data: getWorkingMemoryArtifact(db, id) ?? null });
     }),
   );
 

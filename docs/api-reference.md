@@ -69,6 +69,7 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `GET /v1/tools/:id`                      |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
 | `GET /v1/mcp-servers/:id`                |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
 | `GET /v1/sessions/:id`                   |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/sessions/:id/working-memory`    |    —     |       ✅        | Inspect session-scoped working memory        |
 | `PUT /v1/sessions/:id`                   |    —     |       ✅        | Update session (no UI)                       |
 | `DELETE /v1/sessions/:id`                |    —     |       ✅        | Delete session (no UI)                       |
 | `GET /v1/model-configs`                  |    ✅    |       ✅        | Model configs dashboard                      |
@@ -272,15 +273,18 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 
 ### Sessions
 
-| Method   | Path               | Description                         |
-| -------- | ------------------ | ----------------------------------- |
-| `GET`    | `/v1/sessions`     | List sessions (filter: `?agentId=`) |
-| `GET`    | `/v1/sessions/:id` | Get session by ID                   |
-| `POST`   | `/v1/sessions`     | Create a session                    |
-| `PUT`    | `/v1/sessions/:id` | Update a session                    |
-| `DELETE` | `/v1/sessions/:id` | Delete a session                    |
+| Method   | Path                              | Description                         |
+| -------- | --------------------------------- | ----------------------------------- |
+| `GET`    | `/v1/sessions`                    | List sessions (filter: `?agentId=`) |
+| `GET`    | `/v1/sessions/:id`                | Get session by ID                   |
+| `GET`    | `/v1/sessions/:id/working-memory` | Get session working memory artifact |
+| `POST`   | `/v1/sessions`                    | Create a session                    |
+| `PUT`    | `/v1/sessions/:id`                | Update a session                    |
+| `DELETE` | `/v1/sessions/:id`                | Delete a session                    |
 
 Body schema: `SessionCreateBodySchema` — requires `agentId`. Agent must exist (FK constraint → 404 on missing).
+
+`GET /v1/sessions/:id/working-memory` returns `{ "data": null }` until the session has completed at least one chat or resume turn that produced working-memory state. When present, the artifact is scoped to the session and contains the current goal, active project/task, key decisions, important files, bounded tool summaries, blockers, pending approval IDs, next action, and a compact summary used for session continuity.
 
 ### Chat
 

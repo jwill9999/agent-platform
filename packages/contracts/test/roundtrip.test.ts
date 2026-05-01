@@ -27,6 +27,8 @@ import {
   MemoryLinkSchema,
   MemoryQuerySchema,
   MemoryRecordSchema,
+  WorkingMemoryArtifactSchema,
+  WorkingMemoryUpdateBodySchema,
   OutputSchema,
   PlanSchema,
   SecretRefSchema,
@@ -228,6 +230,45 @@ describe('contracts round-trip', () => {
       createdAtMs: 1000,
     });
     expect(MemoryLinkSchema.parse(structuredClone(link))).toEqual(link);
+  });
+
+  it('Working memory schemas round-trip and bound summaries', () => {
+    const artifact = WorkingMemoryArtifactSchema.parse({
+      sessionId: 'session-1',
+      runId: 'run-1',
+      currentGoal: 'Implement working memory.',
+      activeProject: 'agent-platform',
+      activeTask: 'agent-platform-memory.2',
+      decisions: ['Keep short-term state session scoped.'],
+      importantFiles: ['packages/db/src/repositories/workingMemory.ts'],
+      toolsUsed: ['sys_read_file'],
+      toolSummaries: [
+        {
+          toolName: 'sys_read_file',
+          ok: true,
+          summary: 'Read a repository file.',
+          atMs: 1000,
+        },
+      ],
+      blockers: ['Waiting for review'],
+      pendingApprovalIds: ['approval-1'],
+      nextAction: 'Run focused tests.',
+      summary: 'Goal: Implement working memory. Next: Run focused tests.',
+      createdAtMs: 1000,
+      updatedAtMs: 2000,
+    });
+    expect(WorkingMemoryArtifactSchema.parse(structuredClone(artifact))).toEqual(artifact);
+
+    const update = WorkingMemoryUpdateBodySchema.parse({
+      sessionId: 'session-1',
+      currentGoal: 'Continue the task.',
+      toolsUsed: ['sys_list_files'],
+    });
+    expect(update).toEqual({
+      sessionId: 'session-1',
+      currentGoal: 'Continue the task.',
+      toolsUsed: ['sys_list_files'],
+    });
   });
 
   it('Coding apply patch schemas round-trip', () => {

@@ -310,3 +310,24 @@ export const memoryLinks = sqliteTable(
     targetIdx: index('memory_links_target_idx').on(t.targetMemoryId),
   }),
 );
+
+/** Short-term session/run working state. Not promoted to durable long-term memory. */
+export const workingMemoryArtifacts = sqliteTable('working_memory_artifacts', {
+  sessionId: text('session_id')
+    .primaryKey()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  runId: text('run_id'),
+  currentGoal: text('current_goal'),
+  activeProject: text('active_project'),
+  activeTask: text('active_task'),
+  decisionsJson: text('decisions_json').notNull().default('[]'),
+  importantFilesJson: text('important_files_json').notNull().default('[]'),
+  toolsUsedJson: text('tools_used_json').notNull().default('[]'),
+  toolSummariesJson: text('tool_summaries_json').notNull().default('[]'),
+  blockersJson: text('blockers_json').notNull().default('[]'),
+  pendingApprovalIdsJson: text('pending_approval_ids_json').notNull().default('[]'),
+  nextAction: text('next_action'),
+  summary: text('summary').notNull().default(''),
+  createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+  updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+});

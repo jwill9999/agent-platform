@@ -41,6 +41,7 @@ describe('migrations', () => {
     expect(names).toContain('plugin_catalog_refs');
     expect(names).toContain('memories');
     expect(names).toContain('memory_links');
+    expect(names).toContain('working_memory_artifacts');
     closeDatabase(sqlite);
   });
 });

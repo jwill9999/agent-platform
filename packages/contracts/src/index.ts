@@ -164,6 +164,9 @@ export {
   MemoryUpdateBodySchema,
   MemoryQuerySchema,
   MemoryLinkSchema,
+  WorkingMemoryToolSummarySchema,
+  WorkingMemoryArtifactSchema,
+  WorkingMemoryUpdateBodySchema,
   type MemoryScope,
   type MemoryKind,
   type MemoryStatus,
@@ -179,6 +182,9 @@ export {
   type MemoryQuery,
   type MemoryQueryInput,
   type MemoryLink,
+  type WorkingMemoryToolSummary,
+  type WorkingMemoryArtifact,
+  type WorkingMemoryUpdateBody,
 } from './memory.js';
 export {
   ToolExecutionSchema,

@@ -10,16 +10,24 @@ import {
   completeToolExecution,
   createApprovalRequest,
   getApprovalRequest,
+  getWorkingMemoryArtifact,
   claimApprovalRequestForResume,
   ApprovalRequestAlreadyResumedError,
   ApprovalRequestNotFoundError,
   ApprovalRequestTransitionError,
   getModelConfig,
+  listApprovalRequests,
   listModelConfigs,
   resolveModelConfigKey,
   parseMasterKeyFromBase64,
+  upsertWorkingMemoryArtifact,
 } from '@agent-platform/db';
-import type { ApprovalRequest, ContextWindow, MessageRecord } from '@agent-platform/contracts';
+import type {
+  ApprovalRequest,
+  ContextWindow,
+  MessageRecord,
+  WorkingMemoryToolSummary,
+} from '@agent-platform/contracts';
 import { DEFAULT_CONTEXT_WINDOW, SessionResumeBodySchema } from '@agent-platform/contracts';
 import {
   buildAgentContext,
@@ -461,6 +469,118 @@ function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalReq
   };
 }
 
+function truncate(value: string, maxLength: number): string {
+  const compact = value.trim().replaceAll(/\s+/g, ' ');
+  return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength - 1)}…`;
+}
+
+function extractImportantFiles(text: string): string[] {
+  const matches = text.matchAll(/\b(?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]+\b/g);
+  return [...matches].map((match) => match[0]).slice(0, 10);
+}
+
+function extractActiveTask(text: string): string | undefined {
+  return text.match(/\bagent-platform-[\w.-]+\b/)?.[0];
+}
+
+function extractDecisions(text: string): string[] {
+  return text
+    .split(/[.!?\n]/)
+    .map((part) => part.trim())
+    .filter((part) => /\b(decided|decision|use|keep|will)\b/i.test(part))
+    .map((part) => truncate(part, 500))
+    .slice(0, 5);
+}
+
+function summarizeToolContent(content: string): { ok: boolean; summary: string } {
+  let ok = true;
+  let summary = content;
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const obj = parsed as { error?: unknown; message?: unknown };
+      if (typeof obj.error === 'string') {
+        ok = false;
+        summary = typeof obj.message === 'string' ? `${obj.error}: ${obj.message}` : obj.error;
+      } else {
+        summary = 'Tool returned structured data.';
+      }
+    }
+  } catch {
+    summary = content.replaceAll(/<tool_result[^>]*>|<\/tool_result>/g, '');
+  }
+  return { ok, summary: truncate(summary, 500) };
+}
+
+function deriveToolSummaries(messages: ChatMessage[]): WorkingMemoryToolSummary[] {
+  const atMs = Date.now();
+  return messages
+    .filter((message): message is Extract<ChatMessage, { role: 'tool' }> => message.role === 'tool')
+    .map((message) => {
+      const { ok, summary } = summarizeToolContent(message.content);
+      return { toolName: message.toolName || 'unknown_tool', ok, summary, atMs };
+    })
+    .slice(0, 12);
+}
+
+function buildWorkingMemoryPrompt(summary: string): string {
+  return [
+    'Short-term working memory for this session follows.',
+    'Use it only for continuity. Do not treat it as durable facts or user-approved long-term memory.',
+    summary,
+  ].join('\n');
+}
+
+function withWorkingMemoryPrompt(systemPrompt: string, summary?: string): string {
+  if (!summary?.trim()) return systemPrompt;
+  return `${systemPrompt}\n\n${buildWorkingMemoryPrompt(summary)}`;
+}
+
+function refreshWorkingMemory({
+  db,
+  sessionId,
+  runId,
+  userMessage,
+  newMessages,
+}: {
+  db: DrizzleDb;
+  sessionId: string;
+  runId: string;
+  userMessage: string;
+  newMessages: ChatMessage[];
+}) {
+  const visibleText = [userMessage, ...newMessages.map((message) => message.content)].join('\n');
+  const toolSummaries = deriveToolSummaries(newMessages);
+  const pendingApprovals = listApprovalRequests(db, {
+    sessionId,
+    status: 'pending',
+    limit: 20,
+    offset: 0,
+  });
+  const assistantText = [...newMessages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.content.trim())?.content;
+  const blockers = pendingApprovals.map(
+    (approval) => `Pending approval for ${approval.toolName} (${approval.id})`,
+  );
+  const toolsUsed = toolSummaries.map((summary) => summary.toolName);
+
+  upsertWorkingMemoryArtifact(db, {
+    sessionId,
+    runId,
+    currentGoal: truncate(userMessage, 500),
+    activeProject: visibleText.includes('agent-platform') ? 'agent-platform' : undefined,
+    activeTask: extractActiveTask(visibleText),
+    decisions: extractDecisions(visibleText),
+    importantFiles: extractImportantFiles(visibleText),
+    toolsUsed,
+    toolSummaries,
+    blockers,
+    pendingApprovalIds: pendingApprovals.map((approval) => approval.id),
+    nextAction: assistantText ? truncate(assistantText, 500) : 'Continue the session.',
+  });
+}
+
 function createAuditLog(db: DrizzleDb): ReturnType<typeof createToolAuditLogger> {
   const auditStore: ToolAuditStore = {
     insert: (entry) => insertToolExecution(db, entry),
@@ -746,6 +866,13 @@ export async function handleSessionResume(
     });
 
     persistNewMessages(db, sessionId, finalState?.messages, initialCount);
+    refreshWorkingMemory({
+      db,
+      sessionId,
+      runId,
+      userMessage: 'Resume reviewed tool call.',
+      newMessages: finalState?.messages?.slice(initialCount) ?? [],
+    });
     await safePluginCall(() =>
       agentCtx.pluginDispatcher.onTaskEnd({ sessionId, runId, taskId: runId, ok: true }),
     );
@@ -834,6 +961,13 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         });
 
         persistNewMessages(db, sessionId, finalState?.messages, messages.length);
+        refreshWorkingMemory({
+          db,
+          sessionId,
+          runId,
+          userMessage: message,
+          newMessages: finalState?.messages?.slice(messages.length) ?? [],
+        });
         await safePluginCall(() =>
           dispatcher.onTaskEnd({
             sessionId,
@@ -911,12 +1045,14 @@ function buildConversationMessages(
   return withTransaction(db, (tx) => {
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
+    const workingMemory = getWorkingMemoryArtifact(tx, sessionId);
 
     const history = sanitiseToolCallHistory(priorMessages.map(dbRecordToChatMessage));
     const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
     const counter = createApproximateCounter();
+    const effectiveSystemPrompt = withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary);
 
-    return buildWindowedContext(systemPrompt, history, userMsg, contextWindow, counter);
+    return buildWindowedContext(effectiveSystemPrompt, history, userMsg, contextWindow, counter);
   });
 }
 

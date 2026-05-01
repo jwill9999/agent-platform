@@ -167,6 +167,47 @@ export const MemoryLinkSchema = z.object({
   createdAtMs: z.number().int().nonnegative(),
 });
 
+export const WorkingMemoryToolSummarySchema = z.object({
+  toolName: z.string().min(1),
+  ok: z.boolean(),
+  summary: z.string().max(500),
+  atMs: z.number().int().nonnegative(),
+});
+
+export const WorkingMemoryArtifactSchema = z.object({
+  sessionId: z.string().min(1),
+  runId: z.string().min(1).optional(),
+  currentGoal: z.string().max(500).optional(),
+  activeProject: z.string().max(200).optional(),
+  activeTask: z.string().max(200).optional(),
+  decisions: z.array(z.string().max(500)).default([]),
+  importantFiles: z.array(z.string().max(500)).default([]),
+  toolsUsed: z.array(z.string().min(1)).default([]),
+  toolSummaries: z.array(WorkingMemoryToolSummarySchema).default([]),
+  blockers: z.array(z.string().max(500)).default([]),
+  pendingApprovalIds: z.array(z.string().min(1)).default([]),
+  nextAction: z.string().max(500).optional(),
+  summary: z.string().max(1200).default(''),
+  createdAtMs: z.number().int().nonnegative(),
+  updatedAtMs: z.number().int().nonnegative(),
+});
+
+export const WorkingMemoryUpdateBodySchema = z.object({
+  sessionId: z.string().min(1),
+  runId: z.string().min(1).optional(),
+  currentGoal: z.string().max(500).optional(),
+  activeProject: z.string().max(200).optional(),
+  activeTask: z.string().max(200).optional(),
+  decisions: z.array(z.string().max(500)).optional(),
+  importantFiles: z.array(z.string().max(500)).optional(),
+  toolsUsed: z.array(z.string().min(1)).optional(),
+  toolSummaries: z.array(WorkingMemoryToolSummarySchema).optional(),
+  blockers: z.array(z.string().max(500)).optional(),
+  pendingApprovalIds: z.array(z.string().min(1)).optional(),
+  nextAction: z.string().max(500).optional(),
+  summary: z.string().max(1200).optional(),
+});
+
 export type MemoryScope = z.infer<typeof MemoryScopeSchema>;
 export type MemoryKind = z.infer<typeof MemoryKindSchema>;
 export type MemoryStatus = z.infer<typeof MemoryStatusSchema>;
@@ -182,3 +223,6 @@ export type MemoryUpdateBody = z.infer<typeof MemoryUpdateBodySchema>;
 export type MemoryQuery = z.infer<typeof MemoryQuerySchema>;
 export type MemoryQueryInput = z.input<typeof MemoryQuerySchema>;
 export type MemoryLink = z.infer<typeof MemoryLinkSchema>;
+export type WorkingMemoryToolSummary = z.infer<typeof WorkingMemoryToolSummarySchema>;
+export type WorkingMemoryArtifact = z.infer<typeof WorkingMemoryArtifactSchema>;
+export type WorkingMemoryUpdateBody = z.infer<typeof WorkingMemoryUpdateBodySchema>;

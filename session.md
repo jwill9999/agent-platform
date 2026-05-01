@@ -149,6 +149,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Paused before implementing `agent-platform-memory.1`; remembered long-term memory v1 should use a relational store with optional links, not a graph database.
 - **Date:** 2026-05-01
 - **Session:** Implemented `agent-platform-memory.1` memory contracts, SQLite schema/migration, repository CRUD/query APIs, metadata redaction, relationship links, tests, and docs on `task/agent-platform-memory.1`.
+- **Date:** 2026-05-01
+- **Session:** Implemented `agent-platform-memory.2` short-term session working memory artifacts, prompt continuity hook, inspectable API endpoint, tests, and docs on `task/agent-platform-memory.2`.
 
 ### Session-close guardrail (required)
 
@@ -160,6 +162,31 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Short-term working memory implemented
+
+Branch state: `task/agent-platform-memory.2` contains the second memory epic task.
+
+- Added shared working-memory contracts for session-scoped artifacts and bounded tool summaries.
+- Added `working_memory_artifacts` SQLite table plus repository APIs for get/upsert/delete with merge/de-dupe behavior.
+- Chat and resume flows now refresh session working memory after successful graph runs.
+- Prompt building now appends a compact short-term working-memory summary to the system prompt when a session artifact exists.
+- Added `GET /v1/sessions/:id/working-memory` so the artifact is inspectable through the API.
+- Working memory captures current goal, active project/task, decisions, important files, tool names, bounded tool summaries, blockers, pending approval IDs, next action, and a compact summary.
+- Tool payloads are summarized before persistence; raw tool output is not copied wholesale.
+- Updated `docs/memory.md` and `docs/api-reference.md` for the working-memory layer and endpoint.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+- `pnpm --filter @agent-platform/db run test -- test/workingMemory.test.ts test/migrate.test.ts`
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm docs:lint`
+- `pnpm test`
+- `pnpm build`
 
 ### Memory foundation implemented
 

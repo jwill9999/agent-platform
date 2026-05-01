@@ -1,6 +1,11 @@
 # Memory Model
 
-The first memory increment adds the shared contract and SQLite persistence model only. Memory records are not automatically retrieved into prompts in this task.
+The memory system now has two separate layers:
+
+- Durable long-term memories in `memories` and `memory_links`.
+- Short-term working memory in `working_memory_artifacts`.
+
+Long-term memories are not automatically retrieved into prompts yet. Working memory is session-scoped and can be injected into the current session prompt to preserve task continuity across long conversations and resume flows.
 
 ## Record Shape
 
@@ -23,6 +28,21 @@ Memory records are stored in `memories`. Optional relationships are stored in `m
 
 Repository queries support scope, kind, status, review status, confidence floor, source kind/id, source metadata filters, tags, and expiry filtering. Expired memories are excluded unless `includeExpired` is set.
 
+## Working Memory
+
+Working memory artifacts are stored in `working_memory_artifacts` and keyed by `sessionId`. They capture transient task state:
+
+- Current goal, active project, and active task.
+- Key decisions inferred from recent user/assistant turns.
+- Important file references.
+- Tool names used and bounded tool summaries.
+- Pending approval IDs and blockers.
+- Next expected action.
+
+Working memory is inspectable through `GET /v1/sessions/:id/working-memory`. It is intentionally not a durable knowledge base and is not promoted into `memories` automatically.
+
+Tool outputs are summarized before persistence. Raw tool payloads are not copied wholesale into working memory.
+
 ## Retrieval Boundary
 
-This task deliberately does not add prompt injection or automatic retrieval. Later tasks should make retrieval explicit, auditable, and policy-gated before any memory content is inserted into model context.
+Durable long-term memory still has no automatic retrieval in this increment. Later tasks should make long-term retrieval explicit, auditable, and policy-gated before any durable memory content is inserted into model context.
