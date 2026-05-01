@@ -7,6 +7,7 @@ import type {
   MemorySafetyState,
 } from '@agent-platform/contracts';
 import {
+  compactText,
   ExtractedMemoryCandidateSchema,
   MemoryCandidateExtractionInputSchema,
 } from '@agent-platform/contracts';
@@ -34,7 +35,6 @@ const EXPLICIT_REMEMBER_RE =
 const CORRECTION_RE =
   /\b(?:actually|correction|to be clear|instead|not quite|wrong|should have|should be|do not|don't)\b/i;
 const REMEDIATION_RE = /\b(?:fixed|resolved|corrected|updated|passing|green|works now)\b/i;
-const PROJECT_HINT_RE = /\bagent-platform\b|(?:^|\s)(?:apps|packages|docs|scripts)\//i;
 
 export interface CreateMemoryCandidatesOptions {
   nowMs?: number;
@@ -47,11 +47,6 @@ interface RedactedText {
 
 type JsonObject = Record<string, unknown>;
 
-function truncate(value: string, maxLength: number): string {
-  const compact = value.trim().replaceAll(/\s+/g, ' ');
-  return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength - 3)}...`;
-}
-
 function stripUndefined(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripUndefined);
   if (typeof value !== 'object' || value === null) return value;
@@ -63,14 +58,16 @@ function stripUndefined(value: unknown): unknown {
   return clean;
 }
 
+function globalPattern(pattern: RegExp): RegExp {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  return new RegExp(pattern.source, flags);
+}
+
 function redactCandidateText(content: string): RedactedText {
   let result = content;
   let wasRedacted = false;
   for (const { name, pattern } of CREDENTIAL_PATTERNS) {
-    const next = result.replace(
-      new RegExp(pattern.source, pattern.flags + 'g'),
-      `[REDACTED:${name}]`,
-    );
+    const next = result.replace(globalPattern(pattern), `[REDACTED:${name}]`);
     wasRedacted ||= next !== result;
     result = next;
   }
@@ -83,16 +80,14 @@ function inferKind(content: string): MemoryKind {
   return 'working_note';
 }
 
-function inferScope(input: MemoryCandidateExtractionInput, content: string) {
-  if (input.projectId || PROJECT_HINT_RE.test(content)) {
-    return { scope: 'project' as const, scopeId: input.projectId ?? 'agent-platform' };
-  }
+function inferScope(input: MemoryCandidateExtractionInput) {
+  if (input.projectId) return { scope: 'project' as const, scopeId: input.projectId };
   if (input.agentId) return { scope: 'agent' as const, scopeId: input.agentId };
   return { scope: 'session' as const, scopeId: input.sessionId };
 }
 
 function evidenceFor(message: MemoryCandidateMessage): MemoryCandidateEvidence {
-  const redacted = redactCandidateText(truncate(message.content, 1000));
+  const redacted = redactCandidateText(compactText(message.content, 1000));
   return {
     kind:
       message.role === 'tool'
@@ -142,10 +137,10 @@ function candidateFrom({
   tags: string[];
   evidence?: MemoryCandidateEvidence[];
 }): ExtractedMemoryCandidate {
-  const redacted = redactCandidateText(truncate(content, 2000));
+  const redacted = redactCandidateText(compactText(content, 2000));
   const redactedEvidence = redactEvidence(evidence ?? [evidenceFor(message)]);
   return ExtractedMemoryCandidateSchema.parse({
-    ...inferScope(input, redacted.content),
+    ...inferScope(input),
     kind,
     content: redacted.content,
     confidence,
@@ -221,7 +216,7 @@ function repeatedFailureCandidates(
     );
   const bySignature = new Map<string, Array<{ message: MemoryCandidateMessage; error: string }>>();
   for (const failure of failures) {
-    const signature = truncate(failure.error.toLowerCase(), 120);
+    const signature = compactText(failure.error.toLowerCase(), 120);
     bySignature.set(signature, [...(bySignature.get(signature) ?? []), failure]);
   }
 

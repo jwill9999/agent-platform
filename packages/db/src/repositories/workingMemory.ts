@@ -49,6 +49,8 @@ function uniqueBounded(values: readonly string[], maxItems = MAX_LIST_ITEMS): st
 }
 
 function mergeStrings(existing: readonly string[], incoming: readonly string[] | undefined) {
+  if (incoming === undefined) return [...existing];
+  if (incoming.length === 0) return [];
   return uniqueBounded([...(incoming ?? []), ...existing]);
 }
 
@@ -56,6 +58,8 @@ function mergeToolSummaries(
   existing: readonly WorkingMemoryToolSummary[],
   incoming: readonly WorkingMemoryToolSummary[] | undefined,
 ): WorkingMemoryToolSummary[] {
+  if (incoming === undefined) return [...existing];
+  if (incoming.length === 0) return [];
   const merged = [...(incoming ?? []), ...existing];
   const seen = new Set<string>();
   const result: WorkingMemoryToolSummary[] = [];

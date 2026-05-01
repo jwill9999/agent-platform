@@ -94,6 +94,44 @@ describe('working memory repository', () => {
     expect(updated.updatedAtMs).toBe(2000);
   });
 
+  it('treats undefined lists as keep existing and empty lists as clear', () => {
+    upsertWorkingMemoryArtifact(
+      db,
+      {
+        sessionId,
+        decisions: ['Keep this decision'],
+        importantFiles: ['packages/db/src/repositories/workingMemory.ts'],
+        toolsUsed: ['sys_read_file'],
+        toolSummaries: [
+          { toolName: 'sys_read_file', ok: true, summary: 'Read working memory.', atMs: 1000 },
+        ],
+      },
+      1000,
+    );
+
+    const kept = upsertWorkingMemoryArtifact(db, { sessionId, currentGoal: 'Continue' }, 2000);
+    expect(kept.decisions).toEqual(['Keep this decision']);
+    expect(kept.importantFiles).toEqual(['packages/db/src/repositories/workingMemory.ts']);
+    expect(kept.toolsUsed).toEqual(['sys_read_file']);
+    expect(kept.toolSummaries).toHaveLength(1);
+
+    const cleared = upsertWorkingMemoryArtifact(
+      db,
+      {
+        sessionId,
+        decisions: [],
+        importantFiles: [],
+        toolsUsed: [],
+        toolSummaries: [],
+      },
+      3000,
+    );
+    expect(cleared.decisions).toEqual([]);
+    expect(cleared.importantFiles).toEqual([]);
+    expect(cleared.toolsUsed).toEqual([]);
+    expect(cleared.toolSummaries).toEqual([]);
+  });
+
   it('is deleted when the owning session is deleted', () => {
     upsertWorkingMemoryArtifact(db, { sessionId, currentGoal: 'Temporary state' }, 1000);
     expect(getWorkingMemoryArtifact(db, sessionId)).toBeDefined();

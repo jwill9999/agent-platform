@@ -1,6 +1,6 @@
 # Memory Model
 
-The memory system now has two separate layers:
+The memory system now has three separate layers:
 
 - Durable long-term memories in `memories` and `memory_links`.
 - Short-term working memory in `working_memory_artifacts`.

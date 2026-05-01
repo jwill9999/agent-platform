@@ -45,7 +45,11 @@ describe('memory repository', () => {
         reviewStatus: 'approved',
         content: 'Use relational storage for memory v1.',
         confidence: 0.92,
-        source: { kind: 'user', id: 'message-1', metadata: { ticket: 'memory.1' } },
+        source: {
+          kind: 'user',
+          id: 'message-1',
+          metadata: { ticket: 'memory.1', 'review.key': 'dotted' },
+        },
         tags: ['architecture', 'memory', 'quoted "tag"'],
         metadata: { owner: 'platform' },
         safetyState: 'safe',
@@ -73,6 +77,7 @@ describe('memory repository', () => {
     expect(queryMemories(db, { tag: 'quoted "tag"' })).toHaveLength(1);
     expect(queryMemories(db, { tag: 'memo' })).toEqual([]);
     expect(queryMemories(db, { sourceMetadata: { ticket: 'memory.1' } })).toHaveLength(1);
+    expect(queryMemories(db, { sourceMetadata: { 'review.key': 'dotted' } })).toHaveLength(1);
     expect(countMemories(db, { scope: 'agent', scopeId: 'agent-1' })).toBe(1);
 
     const updated = updateMemory(db, first.id, {

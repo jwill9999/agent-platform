@@ -49,8 +49,8 @@ describe('memory candidate extraction', () => {
 
     expect(memories).toHaveLength(1);
     expect(memories[0]).toMatchObject({
-      scope: 'project',
-      scopeId: 'agent-platform',
+      scope: 'agent',
+      scopeId: 'agent-1',
       kind: 'decision',
       status: 'pending',
       reviewStatus: 'unreviewed',
@@ -62,7 +62,7 @@ describe('memory candidate extraction', () => {
     expect(memories[0]?.metadata).toMatchObject({
       candidate: true,
       rationale: 'The user explicitly asked the agent to remember this information.',
-      scopeSuggestion: { scope: 'project', scopeId: 'agent-platform' },
+      scopeSuggestion: { scope: 'agent', scopeId: 'agent-1' },
     });
   });
 

@@ -29,7 +29,11 @@ import type {
   MessageRecord,
   WorkingMemoryToolSummary,
 } from '@agent-platform/contracts';
-import { DEFAULT_CONTEXT_WINDOW, SessionResumeBodySchema } from '@agent-platform/contracts';
+import {
+  compactText,
+  DEFAULT_CONTEXT_WINDOW,
+  SessionResumeBodySchema,
+} from '@agent-platform/contracts';
 import {
   buildAgentContext,
   destroyAgentContext,
@@ -470,11 +474,6 @@ function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalReq
   };
 }
 
-function truncate(value: string, maxLength: number): string {
-  const compact = value.trim().replaceAll(/\s+/g, ' ');
-  return compact.length <= maxLength ? compact : `${compact.slice(0, maxLength - 1)}…`;
-}
-
 function extractImportantFiles(text: string): string[] {
   const matches = text.matchAll(/\b(?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]+\b/g);
   return [...matches].map((match) => match[0]).slice(0, 10);
@@ -489,7 +488,7 @@ function extractDecisions(text: string): string[] {
     .split(/[.!?\n]/)
     .map((part) => part.trim())
     .filter((part) => /\b(decided|decision|use|keep|will)\b/i.test(part))
-    .map((part) => truncate(part, 500))
+    .map((part) => compactText(part, 500))
     .slice(0, 5);
 }
 
@@ -510,7 +509,7 @@ function summarizeToolContent(content: string): { ok: boolean; summary: string }
   } catch {
     summary = content.replaceAll(/<tool_result[^>]*>|<\/tool_result>/g, '');
   }
-  return { ok, summary: truncate(summary, 500) };
+  return { ok, summary: compactText(summary, 500) };
 }
 
 function deriveToolSummaries(messages: ChatMessage[]): WorkingMemoryToolSummary[] {
@@ -582,8 +581,7 @@ function refreshWorkingMemory({
   upsertWorkingMemoryArtifact(db, {
     sessionId,
     runId,
-    currentGoal: truncate(userMessage, 500),
-    activeProject: visibleText.includes('agent-platform') ? 'agent-platform' : undefined,
+    currentGoal: compactText(userMessage, 500),
     activeTask: extractActiveTask(visibleText),
     decisions: extractDecisions(visibleText),
     importantFiles: extractImportantFiles(visibleText),
@@ -591,7 +589,7 @@ function refreshWorkingMemory({
     toolSummaries,
     blockers,
     pendingApprovalIds: pendingApprovals.map((approval) => approval.id),
-    nextAction: assistantText ? truncate(assistantText, 500) : 'Continue the session.',
+    nextAction: assistantText ? compactText(assistantText, 500) : 'Continue the session.',
   });
 
   createMemoryCandidates(db, {

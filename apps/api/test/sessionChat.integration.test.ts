@@ -541,7 +541,6 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(memoryRes.body.data).toMatchObject({
         sessionId,
         currentGoal: 'Implement agent-platform-memory.2 for agent-platform',
-        activeProject: 'agent-platform',
         activeTask: 'agent-platform-memory.2',
         nextAction:
           'Decision: keep the working memory session scoped. Next update packages/db/src/repositories/workingMemory.ts.',
@@ -632,8 +631,8 @@ describe('POST /v1/chat (session-aware)', () => {
       });
       expect(candidates).toHaveLength(1);
       expect(candidates[0]).toMatchObject({
-        scope: 'project',
-        scopeId: 'agent-platform',
+        scope: 'agent',
+        scopeId: DEFAULT_AGENT_ID,
         status: 'pending',
         reviewStatus: 'unreviewed',
         content: 'that agent-platform should keep memory retrieval auditable.',

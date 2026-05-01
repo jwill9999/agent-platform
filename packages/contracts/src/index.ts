@@ -194,6 +194,7 @@ export {
   type MemoryCandidateMessage,
   type MemoryCandidateExtractionInput,
 } from './memory.js';
+export { compactText } from './text.js';
 export {
   ToolExecutionSchema,
   ToolExecutionStatusSchema,

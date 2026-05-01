@@ -153,6 +153,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Implemented `agent-platform-memory.2` short-term session working memory artifacts, prompt continuity hook, inspectable API endpoint, tests, and docs on `task/agent-platform-memory.2`.
 - **Date:** 2026-05-01
 - **Session:** Implemented `agent-platform-memory.3` pending memory candidate extraction from explicit remember instructions, corrections, repeated failures, and remediations on `task/agent-platform-memory.3`.
+- **Date:** 2026-05-01
+- **Session:** Addressed review feedback for `agent-platform-memory.3`: shared text compaction, safer credential regex flags, escaped source-metadata JSON paths, non-hardcoded candidate scoping, explicit working-memory list clearing, and docs/session typo fixes.
 
 ### Session-close guardrail (required)
 
@@ -432,7 +434,7 @@ Quality gates passed:
 - **Current branch:** `task/agent-platform-memory.1`
 - **Current base:** `main` / `feature/agent-platform-memory` after code-tools merge and planning follow-ups.
 - **Latest completed task:** `agent-platform-code-tools.7` coding tool visibility and E2E validation
-- **Current work:** `agent-platform-memory.1` memory contracts, schema, repository, and policy model is claimed.
+- **Current work:** `agent-platform-memory.1` memory contracts, schema, repository, and policy model has been claimed.
 - **Remote sync:** Beads/Dolt is synced after creating memory child tasks, claiming `.1`, and recording the long-term memory store decision.
 
 ### Beads

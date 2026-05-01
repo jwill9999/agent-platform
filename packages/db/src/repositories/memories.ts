@@ -260,8 +260,9 @@ function buildMemoryConditions(query: MemoryQuery, nowMs: number) {
   }
   if (query.sourceMetadata) {
     for (const [key, value] of Object.entries(query.sourceMetadata)) {
+      const jsonPath = `$."${key.replaceAll(/["\\]/g, '\\$&')}"`;
       conditions.push(
-        sql`json_extract(${schema.memories.sourceMetadataJson}, ${`$.${key}`}) = ${value}`,
+        sql`json_extract(${schema.memories.sourceMetadataJson}, ${jsonPath}) = ${value}`,
       );
     }
   }
