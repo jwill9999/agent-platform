@@ -17,6 +17,19 @@ import {
   updateMemory,
 } from '../src/repositories/memories.js';
 
+type MemoryInput = Parameters<typeof createMemory>[1];
+
+function memoryInput(overrides: Partial<MemoryInput>): MemoryInput {
+  return {
+    scope: 'project',
+    scopeId: 'project-1',
+    kind: 'decision',
+    content: 'Use relational storage for memory v1.',
+    source: { kind: 'manual' },
+    ...overrides,
+  };
+}
+
 describe('memory repository', () => {
   let db: DrizzleDb;
   let sqlite: ReturnType<typeof openDatabase>['sqlite'];
@@ -37,13 +50,10 @@ describe('memory repository', () => {
   it('creates, reads, updates, queries, counts, and deletes scoped memories', () => {
     const first = createMemory(
       db,
-      {
-        scope: 'project',
-        scopeId: 'project-1',
+      memoryInput({
         kind: 'decision',
         status: 'approved',
         reviewStatus: 'approved',
-        content: 'Use relational storage for memory v1.',
         confidence: 0.92,
         source: {
           kind: 'user',
@@ -53,19 +63,19 @@ describe('memory repository', () => {
         tags: ['architecture', 'memory', 'quoted "tag"'],
         metadata: { owner: 'platform' },
         safetyState: 'safe',
-      },
+      }),
       { id: 'memory-1', nowMs: 1000 },
     );
     createMemory(
       db,
-      {
+      memoryInput({
         scope: 'agent',
         scopeId: 'agent-1',
         kind: 'preference',
         content: 'Prefer short final summaries.',
         confidence: 0.6,
         source: { kind: 'manual' },
-      },
+      }),
       { id: 'memory-2', nowMs: 2000 },
     );
 
@@ -97,25 +107,27 @@ describe('memory repository', () => {
   it('filters expired memories unless explicitly included', () => {
     createMemory(
       db,
-      {
+      memoryInput({
         scope: 'global',
+        scopeId: undefined,
         kind: 'fact',
         content: 'Expired note.',
         confidence: 0.8,
         source: { kind: 'manual' },
         expiresAtMs: 1500,
-      },
+      }),
       { id: 'expired', nowMs: 1000 },
     );
     createMemory(
       db,
-      {
+      memoryInput({
         scope: 'global',
+        scopeId: undefined,
         kind: 'fact',
         content: 'Current note.',
         confidence: 0.8,
         source: { kind: 'manual' },
-      },
+      }),
       { id: 'current', nowMs: 2000 },
     );
 
@@ -132,7 +144,7 @@ describe('memory repository', () => {
   it('redacts sensitive source metadata and memory metadata before persistence', () => {
     const memory = createMemory(
       db,
-      {
+      memoryInput({
         scope: 'session',
         scopeId: 'session-1',
         kind: 'failure_learning',
@@ -147,7 +159,7 @@ describe('memory repository', () => {
           },
         },
         metadata: { authorization: 'Bearer secret', safe: 'value' },
-      },
+      }),
       { id: 'redacted', nowMs: 1000 },
     );
 
@@ -161,7 +173,7 @@ describe('memory repository', () => {
 
     const literalMarker = createMemory(
       db,
-      {
+      memoryInput({
         scope: 'session',
         scopeId: 'session-1',
         kind: 'working_note',
@@ -170,7 +182,7 @@ describe('memory repository', () => {
           kind: 'manual',
           metadata: { note: '[REDACTED]' },
         },
-      },
+      }),
       { id: 'literal-marker', nowMs: 1000 },
     );
 
@@ -181,24 +193,19 @@ describe('memory repository', () => {
   it('stores links between memories and cascades them on delete', () => {
     createMemory(
       db,
-      {
-        scope: 'project',
-        scopeId: 'project-1',
-        kind: 'decision',
+      memoryInput({
         content: 'Initial decision.',
         source: { kind: 'manual' },
-      },
+      }),
       { id: 'source', nowMs: 1000 },
     );
     createMemory(
       db,
-      {
-        scope: 'project',
-        scopeId: 'project-1',
+      memoryInput({
         kind: 'correction',
         content: 'Later correction.',
         source: { kind: 'manual' },
-      },
+      }),
       { id: 'target', nowMs: 1000 },
     );
 

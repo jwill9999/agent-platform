@@ -57,6 +57,19 @@ const ScopeShape = {
   scope: MemoryScopeSchema,
   scopeId: z.string().min(1).optional(),
 };
+const MemoryBaseShape = {
+  kind: MemoryKindSchema,
+  content: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  source: MemorySourceSchema,
+  tags: z.array(z.string().min(1)).default([]),
+  metadata: z.record(JsonValueSchema).default({}),
+};
+const ReviewMetadataShape = {
+  expiresAtMs: z.number().int().positive().optional(),
+  reviewedAtMs: z.number().int().nonnegative().optional(),
+  reviewedBy: z.string().min(1).optional(),
+};
 
 function validateScopedMemory(value: {
   scope: z.infer<typeof MemoryScopeSchema>;
@@ -76,20 +89,13 @@ export const MemoryRecordSchema = z
   .object({
     id: z.string().min(1),
     ...ScopeShape,
-    kind: MemoryKindSchema,
+    ...MemoryBaseShape,
     status: MemoryStatusSchema,
     reviewStatus: MemoryReviewStatusSchema,
-    content: z.string().min(1),
-    confidence: z.number().min(0).max(1),
-    source: MemorySourceSchema,
-    tags: z.array(z.string().min(1)).default([]),
-    metadata: z.record(JsonValueSchema).default({}),
     safetyState: MemorySafetyStateSchema,
     createdAtMs: z.number().int().nonnegative(),
     updatedAtMs: z.number().int().nonnegative(),
-    expiresAtMs: z.number().int().positive().optional(),
-    reviewedAtMs: z.number().int().nonnegative().optional(),
-    reviewedBy: z.string().min(1).optional(),
+    ...ReviewMetadataShape,
   })
   .superRefine((value, ctx) => {
     if (!validateScopedMemory(value)) {
@@ -104,18 +110,12 @@ export const MemoryRecordSchema = z
 export const MemoryCreateBodySchema = z
   .object({
     ...ScopeShape,
-    kind: MemoryKindSchema,
+    ...MemoryBaseShape,
     status: MemoryStatusSchema.default('pending'),
     reviewStatus: MemoryReviewStatusSchema.default('unreviewed'),
-    content: z.string().min(1),
     confidence: z.number().min(0).max(1).default(0.5),
-    source: MemorySourceSchema,
-    tags: z.array(z.string().min(1)).default([]),
-    metadata: z.record(JsonValueSchema).default({}),
     safetyState: MemorySafetyStateSchema.default('unchecked'),
-    expiresAtMs: z.number().int().positive().optional(),
-    reviewedAtMs: z.number().int().nonnegative().optional(),
-    reviewedBy: z.string().min(1).optional(),
+    ...ReviewMetadataShape,
   })
   .superRefine((value, ctx) => {
     if (!validateScopedMemory(value)) {
@@ -174,19 +174,31 @@ export const WorkingMemoryToolSummarySchema = z.object({
   atMs: z.number().int().nonnegative(),
 });
 
-export const WorkingMemoryArtifactSchema = z.object({
-  sessionId: z.string().min(1),
-  runId: z.string().min(1).optional(),
+const WorkingMemoryTextShape = {
   currentGoal: z.string().max(500).optional(),
   activeProject: z.string().max(200).optional(),
   activeTask: z.string().max(200).optional(),
-  decisions: z.array(z.string().max(500)).default([]),
-  importantFiles: z.array(z.string().max(500)).default([]),
-  toolsUsed: z.array(z.string().min(1)).default([]),
-  toolSummaries: z.array(WorkingMemoryToolSummarySchema).default([]),
-  blockers: z.array(z.string().max(500)).default([]),
-  pendingApprovalIds: z.array(z.string().min(1)).default([]),
   nextAction: z.string().max(500).optional(),
+};
+const WorkingMemoryListShape = {
+  decisions: z.array(z.string().max(500)),
+  importantFiles: z.array(z.string().max(500)),
+  toolsUsed: z.array(z.string().min(1)),
+  toolSummaries: z.array(WorkingMemoryToolSummarySchema),
+  blockers: z.array(z.string().max(500)),
+  pendingApprovalIds: z.array(z.string().min(1)),
+};
+
+export const WorkingMemoryArtifactSchema = z.object({
+  sessionId: z.string().min(1),
+  runId: z.string().min(1).optional(),
+  ...WorkingMemoryTextShape,
+  decisions: WorkingMemoryListShape.decisions.default([]),
+  importantFiles: WorkingMemoryListShape.importantFiles.default([]),
+  toolsUsed: WorkingMemoryListShape.toolsUsed.default([]),
+  toolSummaries: WorkingMemoryListShape.toolSummaries.default([]),
+  blockers: WorkingMemoryListShape.blockers.default([]),
+  pendingApprovalIds: WorkingMemoryListShape.pendingApprovalIds.default([]),
   summary: z.string().max(1200).default(''),
   createdAtMs: z.number().int().nonnegative(),
   updatedAtMs: z.number().int().nonnegative(),
@@ -195,16 +207,13 @@ export const WorkingMemoryArtifactSchema = z.object({
 export const WorkingMemoryUpdateBodySchema = z.object({
   sessionId: z.string().min(1),
   runId: z.string().min(1).optional(),
-  currentGoal: z.string().max(500).optional(),
-  activeProject: z.string().max(200).optional(),
-  activeTask: z.string().max(200).optional(),
-  decisions: z.array(z.string().max(500)).optional(),
-  importantFiles: z.array(z.string().max(500)).optional(),
-  toolsUsed: z.array(z.string().min(1)).optional(),
-  toolSummaries: z.array(WorkingMemoryToolSummarySchema).optional(),
-  blockers: z.array(z.string().max(500)).optional(),
-  pendingApprovalIds: z.array(z.string().min(1)).optional(),
-  nextAction: z.string().max(500).optional(),
+  ...WorkingMemoryTextShape,
+  decisions: WorkingMemoryListShape.decisions.optional(),
+  importantFiles: WorkingMemoryListShape.importantFiles.optional(),
+  toolsUsed: WorkingMemoryListShape.toolsUsed.optional(),
+  toolSummaries: WorkingMemoryListShape.toolSummaries.optional(),
+  blockers: WorkingMemoryListShape.blockers.optional(),
+  pendingApprovalIds: WorkingMemoryListShape.pendingApprovalIds.optional(),
   summary: z.string().max(1200).optional(),
 });
 
@@ -217,8 +226,7 @@ export const MemoryCandidateEvidenceSchema = z.object({
 
 export const ExtractedMemoryCandidateSchema = z
   .object({
-    scope: MemoryScopeSchema,
-    scopeId: z.string().min(1).optional(),
+    ...ScopeShape,
     kind: MemoryKindSchema,
     content: z.string().min(1).max(2000),
     confidence: z.number().min(0).max(1),

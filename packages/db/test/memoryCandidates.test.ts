@@ -12,6 +12,19 @@ import {
 } from '../src/repositories/memoryCandidates.js';
 import { queryMemories } from '../src/repositories/memories.js';
 
+function userMessage(content: string, extra: Record<string, unknown> = {}) {
+  return { role: 'user' as const, content, ...extra };
+}
+
+function toolFailure(id: string) {
+  return {
+    id,
+    role: 'tool' as const,
+    toolName: 'sys_file_info',
+    content: JSON.stringify({ error: 'STAT_FAILED', message: 'ENOENT: missing file' }),
+  };
+}
+
 describe('memory candidate extraction', () => {
   let db: DrizzleDb;
   let sqlite: ReturnType<typeof openDatabase>['sqlite'];
@@ -36,12 +49,10 @@ describe('memory candidate extraction', () => {
         sessionId: 'session-1',
         agentId: 'agent-1',
         messages: [
-          {
+          userMessage('Remember that agent-platform should keep memory retrieval auditable.', {
             id: 'message-1',
-            role: 'user',
-            content: 'Remember that agent-platform should keep memory retrieval auditable.',
             createdAtMs: 1000,
-          },
+          }),
         ],
       },
       { nowMs: 2000 },
@@ -70,10 +81,7 @@ describe('memory candidate extraction', () => {
     const memories = createMemoryCandidates(db, {
       sessionId: 'session-1',
       messages: [
-        {
-          role: 'user',
-          content: 'Actually, do not use a graph database for memory v1; use relational tables.',
-        },
+        userMessage('Actually, do not use a graph database for memory v1; use relational tables.'),
       ],
     });
 
@@ -93,18 +101,8 @@ describe('memory candidate extraction', () => {
       sessionId: 'session-1',
       projectId: 'agent-platform',
       messages: [
-        {
-          id: 'tool-1',
-          role: 'tool',
-          toolName: 'sys_file_info',
-          content: JSON.stringify({ error: 'STAT_FAILED', message: 'ENOENT: missing file' }),
-        },
-        {
-          id: 'tool-2',
-          role: 'tool',
-          toolName: 'sys_file_info',
-          content: JSON.stringify({ error: 'STAT_FAILED', message: 'ENOENT: missing file' }),
-        },
+        toolFailure('tool-1'),
+        toolFailure('tool-2'),
         {
           id: 'assistant-1',
           role: 'assistant',
@@ -125,10 +123,7 @@ describe('memory candidate extraction', () => {
     const memories = createMemoryCandidates(db, {
       sessionId: 'session-1',
       messages: [
-        {
-          role: 'user',
-          content: 'Remember that the API key is sk-proj-abcdefghijklmnopqrstuvwxyz1234567890',
-        },
+        userMessage('Remember that the API key is sk-proj-abcdefghijklmnopqrstuvwxyz1234567890'),
       ],
     });
 
@@ -146,7 +141,7 @@ describe('memory candidate extraction', () => {
     expect(
       extractMemoryCandidates({
         sessionId: 'session-1',
-        messages: [{ role: 'user', content: 'Can you explain what this function does?' }],
+        messages: [userMessage('Can you explain what this function does?')],
       }),
     ).toEqual([]);
   });

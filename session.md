@@ -155,6 +155,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Implemented `agent-platform-memory.3` pending memory candidate extraction from explicit remember instructions, corrections, repeated failures, and remediations on `task/agent-platform-memory.3`.
 - **Date:** 2026-05-01
 - **Session:** Addressed review feedback for `agent-platform-memory.3`: shared text compaction, safer credential regex flags, escaped source-metadata JSON paths, non-hardcoded candidate scoping, explicit working-memory list clearing, and docs/session typo fixes.
+- **Date:** 2026-05-01
+- **Session:** Reduced SonarCloud new-code duplication for `agent-platform-memory.3` by extracting shared memory contract shapes, working-memory persistence mapping, and DB test fixtures.
 
 ### Session-close guardrail (required)
 

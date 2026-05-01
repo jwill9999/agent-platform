@@ -17,6 +17,7 @@ const MAX_LIST_ITEMS = 20;
 const MAX_TOOL_SUMMARIES = 12;
 
 type WorkingMemoryRow = typeof schema.workingMemoryArtifacts.$inferSelect;
+type WorkingMemoryPersistenceValues = typeof schema.workingMemoryArtifacts.$inferInsert;
 
 function parseJsonArray<T>(value: string | null, guard: (entry: unknown) => entry is T): T[] {
   if (!value) return [];
@@ -104,6 +105,47 @@ function buildSummary(artifact: WorkingMemoryArtifact): string {
   return parts.join('\n').slice(0, 1200);
 }
 
+function toPersistenceValues(
+  artifact: WorkingMemoryArtifact,
+  summary: string,
+): WorkingMemoryPersistenceValues {
+  return {
+    sessionId: artifact.sessionId,
+    runId: artifact.runId ?? null,
+    currentGoal: artifact.currentGoal ?? null,
+    activeProject: artifact.activeProject ?? null,
+    activeTask: artifact.activeTask ?? null,
+    decisionsJson: JSON.stringify(artifact.decisions),
+    importantFilesJson: JSON.stringify(artifact.importantFiles),
+    toolsUsedJson: JSON.stringify(artifact.toolsUsed),
+    toolSummariesJson: JSON.stringify(artifact.toolSummaries),
+    blockersJson: JSON.stringify(artifact.blockers),
+    pendingApprovalIdsJson: JSON.stringify(artifact.pendingApprovalIds),
+    nextAction: artifact.nextAction ?? null,
+    summary,
+    createdAtMs: artifact.createdAtMs,
+    updatedAtMs: artifact.updatedAtMs,
+  };
+}
+
+function toUpdateValues(values: WorkingMemoryPersistenceValues) {
+  return {
+    runId: values.runId,
+    currentGoal: values.currentGoal,
+    activeProject: values.activeProject,
+    activeTask: values.activeTask,
+    decisionsJson: values.decisionsJson,
+    importantFilesJson: values.importantFilesJson,
+    toolsUsedJson: values.toolsUsedJson,
+    toolSummariesJson: values.toolSummariesJson,
+    blockersJson: values.blockersJson,
+    pendingApprovalIdsJson: values.pendingApprovalIdsJson,
+    nextAction: values.nextAction,
+    summary: values.summary,
+    updatedAtMs: values.updatedAtMs,
+  };
+}
+
 export function getWorkingMemoryArtifact(
   db: DrizzleDb,
   sessionId: string,
@@ -147,42 +189,13 @@ export function upsertWorkingMemoryArtifact(
     updatedAtMs: nowMs,
   });
   const summary = (parsed.summary ?? buildSummary(next)).slice(0, 1200);
+  const persistenceValues = toPersistenceValues(next, summary);
 
   db.insert(schema.workingMemoryArtifacts)
-    .values({
-      sessionId: next.sessionId,
-      runId: next.runId ?? null,
-      currentGoal: next.currentGoal ?? null,
-      activeProject: next.activeProject ?? null,
-      activeTask: next.activeTask ?? null,
-      decisionsJson: JSON.stringify(next.decisions),
-      importantFilesJson: JSON.stringify(next.importantFiles),
-      toolsUsedJson: JSON.stringify(next.toolsUsed),
-      toolSummariesJson: JSON.stringify(next.toolSummaries),
-      blockersJson: JSON.stringify(next.blockers),
-      pendingApprovalIdsJson: JSON.stringify(next.pendingApprovalIds),
-      nextAction: next.nextAction ?? null,
-      summary,
-      createdAtMs: next.createdAtMs,
-      updatedAtMs: next.updatedAtMs,
-    })
+    .values(persistenceValues)
     .onConflictDoUpdate({
       target: schema.workingMemoryArtifacts.sessionId,
-      set: {
-        runId: next.runId ?? null,
-        currentGoal: next.currentGoal ?? null,
-        activeProject: next.activeProject ?? null,
-        activeTask: next.activeTask ?? null,
-        decisionsJson: JSON.stringify(next.decisions),
-        importantFilesJson: JSON.stringify(next.importantFiles),
-        toolsUsedJson: JSON.stringify(next.toolsUsed),
-        toolSummariesJson: JSON.stringify(next.toolSummaries),
-        blockersJson: JSON.stringify(next.blockers),
-        pendingApprovalIdsJson: JSON.stringify(next.pendingApprovalIds),
-        nextAction: next.nextAction ?? null,
-        summary,
-        updatedAtMs: next.updatedAtMs,
-      },
+      set: toUpdateValues(persistenceValues),
     })
     .run();
 
