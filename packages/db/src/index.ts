@@ -15,5 +15,6 @@ export * from './repositories/settings.js';
 export * from './repositories/toolExecutions.js';
 export * from './repositories/approvalRequests.js';
 export * from './repositories/memories.js';
+export * from './repositories/memoryCandidates.js';
 export * from './repositories/workingMemory.js';
 export * from './slug.js';

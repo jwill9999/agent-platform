@@ -22,7 +22,9 @@ import {
   CodingToolEnvelopeSchema,
   CriticVerdictSchema,
   ExecutionLimitsSchema,
+  ExtractedMemoryCandidateSchema,
   HealthResponseSchema,
+  MemoryCandidateExtractionInputSchema,
   MemoryCreateBodySchema,
   MemoryLinkSchema,
   MemoryQuerySchema,
@@ -269,6 +271,49 @@ describe('contracts round-trip', () => {
       currentGoal: 'Continue the task.',
       toolsUsed: ['sys_list_files'],
     });
+  });
+
+  it('Memory candidate schemas round-trip and enforce scoped policy', () => {
+    const input = MemoryCandidateExtractionInputSchema.parse({
+      sessionId: 'session-1',
+      agentId: 'agent-1',
+      messages: [
+        {
+          id: 'message-1',
+          role: 'user',
+          content: 'Remember that we prefer project-scoped memory for repo decisions.',
+          createdAtMs: 1000,
+        },
+      ],
+    });
+    expect(MemoryCandidateExtractionInputSchema.parse(structuredClone(input))).toEqual(input);
+
+    const candidate = ExtractedMemoryCandidateSchema.parse({
+      scope: 'project',
+      scopeId: 'agent-platform',
+      kind: 'preference',
+      content: 'Prefer project-scoped memory for repo decisions.',
+      confidence: 0.84,
+      rationale: 'The user explicitly asked the agent to remember this information.',
+      evidence: [
+        {
+          kind: 'user_message',
+          id: 'message-1',
+          excerpt: 'Remember that we prefer project-scoped memory for repo decisions.',
+          atMs: 1000,
+        },
+      ],
+      tags: ['candidate', 'explicit'],
+      safetyState: 'safe',
+    });
+    expect(ExtractedMemoryCandidateSchema.parse(structuredClone(candidate))).toEqual(candidate);
+    expect(() =>
+      ExtractedMemoryCandidateSchema.parse({
+        ...candidate,
+        scope: 'session',
+        scopeId: undefined,
+      }),
+    ).toThrow();
   });
 
   it('Coding apply patch schemas round-trip', () => {

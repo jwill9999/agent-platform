@@ -167,6 +167,10 @@ export {
   WorkingMemoryToolSummarySchema,
   WorkingMemoryArtifactSchema,
   WorkingMemoryUpdateBodySchema,
+  MemoryCandidateEvidenceSchema,
+  ExtractedMemoryCandidateSchema,
+  MemoryCandidateMessageSchema,
+  MemoryCandidateExtractionInputSchema,
   type MemoryScope,
   type MemoryKind,
   type MemoryStatus,
@@ -185,6 +189,10 @@ export {
   type WorkingMemoryToolSummary,
   type WorkingMemoryArtifact,
   type WorkingMemoryUpdateBody,
+  type MemoryCandidateEvidence,
+  type ExtractedMemoryCandidate,
+  type MemoryCandidateMessage,
+  type MemoryCandidateExtractionInput,
 } from './memory.js';
 export {
   ToolExecutionSchema,

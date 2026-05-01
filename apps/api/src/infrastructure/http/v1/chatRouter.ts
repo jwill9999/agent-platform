@@ -21,6 +21,7 @@ import {
   resolveModelConfigKey,
   parseMasterKeyFromBase64,
   upsertWorkingMemoryArtifact,
+  createMemoryCandidates,
 } from '@agent-platform/db';
 import type {
   ApprovalRequest,
@@ -523,6 +524,17 @@ function deriveToolSummaries(messages: ChatMessage[]): WorkingMemoryToolSummary[
     .slice(0, 12);
 }
 
+function toMemoryCandidateMessage(message: ChatMessage) {
+  if (message.role === 'tool') {
+    return {
+      role: 'tool' as const,
+      content: message.content,
+      toolName: message.toolName || undefined,
+    };
+  }
+  return { role: message.role, content: message.content };
+}
+
 function buildWorkingMemoryPrompt(summary: string): string {
   return [
     'Short-term working memory for this session follows.',
@@ -539,12 +551,14 @@ function withWorkingMemoryPrompt(systemPrompt: string, summary?: string): string
 function refreshWorkingMemory({
   db,
   sessionId,
+  agentId,
   runId,
   userMessage,
   newMessages,
 }: {
   db: DrizzleDb;
   sessionId: string;
+  agentId: string;
   runId: string;
   userMessage: string;
   newMessages: ChatMessage[];
@@ -578,6 +592,15 @@ function refreshWorkingMemory({
     blockers,
     pendingApprovalIds: pendingApprovals.map((approval) => approval.id),
     nextAction: assistantText ? truncate(assistantText, 500) : 'Continue the session.',
+  });
+
+  createMemoryCandidates(db, {
+    sessionId,
+    agentId,
+    messages: [
+      { role: 'user', content: userMessage },
+      ...newMessages.map((message) => toMemoryCandidateMessage(message)),
+    ],
   });
 }
 
@@ -869,6 +892,7 @@ export async function handleSessionResume(
     refreshWorkingMemory({
       db,
       sessionId,
+      agentId: session.agentId,
       runId,
       userMessage: 'Resume reviewed tool call.',
       newMessages: finalState?.messages?.slice(initialCount) ?? [],
@@ -964,6 +988,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         refreshWorkingMemory({
           db,
           sessionId,
+          agentId: session.agentId,
           runId,
           userMessage: message,
           newMessages: finalState?.messages?.slice(messages.length) ?? [],

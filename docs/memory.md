@@ -4,6 +4,7 @@ The memory system now has two separate layers:
 
 - Durable long-term memories in `memories` and `memory_links`.
 - Short-term working memory in `working_memory_artifacts`.
+- Pending candidate memories extracted from corrections, failures, remediations, and explicit remember instructions.
 
 Long-term memories are not automatically retrieved into prompts yet. Working memory is session-scoped and can be injected into the current session prompt to preserve task continuity across long conversations and resume flows.
 
@@ -43,6 +44,26 @@ Working memory is inspectable through `GET /v1/sessions/:id/working-memory`. It 
 
 Tool outputs are summarized before persistence. Raw tool payloads are not copied wholesale into working memory.
 
+## Candidate Extraction
+
+The chat runtime runs conservative candidate extraction after a successful chat or resume turn. Candidates are stored in `memories` as:
+
+- `status: pending`
+- `reviewStatus: unreviewed`
+- `source.kind: observability`
+- `metadata.candidate: true`
+
+Candidates are never active memory before review. They are only raw proposals for later review/UI tasks.
+
+The v1 extractor looks for:
+
+- Explicit user instructions such as "remember", "make a note", or "note that".
+- User corrections and replacement instructions.
+- Repeated tool/runtime failures with the same signature.
+- Tool/runtime failures followed by assistant remediation language.
+
+Candidate metadata includes rationale, evidence excerpts, and the suggested scope. Candidate content is credential-scanned before storage. Credential-like strings are redacted and the memory is marked `safetyState: redacted`.
+
 ## Retrieval Boundary
 
-Durable long-term memory still has no automatic retrieval in this increment. Later tasks should make long-term retrieval explicit, auditable, and policy-gated before any durable memory content is inserted into model context.
+Durable long-term memory still has no automatic retrieval in this increment. Pending candidates are not retrieved. Later tasks should make long-term retrieval explicit, auditable, and policy-gated before any durable memory content is inserted into model context.

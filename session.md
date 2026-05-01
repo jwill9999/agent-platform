@@ -151,6 +151,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Implemented `agent-platform-memory.1` memory contracts, SQLite schema/migration, repository CRUD/query APIs, metadata redaction, relationship links, tests, and docs on `task/agent-platform-memory.1`.
 - **Date:** 2026-05-01
 - **Session:** Implemented `agent-platform-memory.2` short-term session working memory artifacts, prompt continuity hook, inspectable API endpoint, tests, and docs on `task/agent-platform-memory.2`.
+- **Date:** 2026-05-01
+- **Session:** Implemented `agent-platform-memory.3` pending memory candidate extraction from explicit remember instructions, corrections, repeated failures, and remediations on `task/agent-platform-memory.3`.
 
 ### Session-close guardrail (required)
 
@@ -162,6 +164,30 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Memory candidate extraction implemented
+
+Branch state: `task/agent-platform-memory.3` contains the third memory epic task.
+
+- Added shared contracts for extracted memory candidates, candidate evidence, and extraction input messages.
+- Added a DB repository helper that extracts conservative pending candidates from explicit remember instructions, user corrections, repeated tool/runtime failures, and remediation language.
+- Candidate memories are persisted through the long-term memory repository as `status: pending` and `reviewStatus: unreviewed`; they are not active/retrieved before review.
+- Candidate metadata records rationale, scope suggestion, and bounded evidence excerpts.
+- Candidate content and evidence excerpts are credential-scanned before storage; redacted candidates are marked `safetyState: redacted`.
+- Wired candidate extraction into successful chat and approval-resume working-memory refresh paths.
+- Updated `docs/memory.md` to document the candidate extraction layer and retrieval boundary.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+- `pnpm --filter @agent-platform/db run test -- test/memoryCandidates.test.ts test/memories.test.ts`
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm docs:lint`
+- `pnpm test`
+- `pnpm build`
 
 ### Short-term working memory implemented
 

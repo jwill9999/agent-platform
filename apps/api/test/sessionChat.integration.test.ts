@@ -8,6 +8,7 @@ import {
   DEFAULT_AGENT_ID,
   openDatabase,
   parseMasterKeyFromBase64,
+  queryMemories,
   runSeed,
 } from '@agent-platform/db';
 import request from 'supertest';
@@ -602,6 +603,41 @@ describe('POST /v1/chat (session-aware)', () => {
       });
       expect(memoryRes.body.data.toolSummaries[0].summary.length).toBeLessThanOrEqual(500);
       expect(JSON.stringify(memoryRes.body.data)).not.toContain(rawPayload);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('stores explicit remember instructions as pending memory candidates', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+      mockToolCalls.mockReturnValueOnce('Noted for review.');
+
+      await request(app)
+        .post('/v1/chat')
+        .send({
+          sessionId,
+          message: 'Remember that agent-platform should keep memory retrieval auditable.',
+        })
+        .expect(200);
+
+      const candidates = queryMemories(db, {
+        status: 'pending',
+        reviewStatus: 'unreviewed',
+        tag: 'explicit',
+      });
+      expect(candidates).toHaveLength(1);
+      expect(candidates[0]).toMatchObject({
+        scope: 'project',
+        scopeId: 'agent-platform',
+        status: 'pending',
+        reviewStatus: 'unreviewed',
+        content: 'that agent-platform should keep memory retrieval auditable.',
+      });
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

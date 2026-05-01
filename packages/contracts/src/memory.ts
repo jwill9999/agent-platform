@@ -208,6 +208,50 @@ export const WorkingMemoryUpdateBodySchema = z.object({
   summary: z.string().max(1200).optional(),
 });
 
+export const MemoryCandidateEvidenceSchema = z.object({
+  kind: z.enum(['user_message', 'assistant_message', 'tool_result', 'observability']),
+  id: z.string().min(1).optional(),
+  excerpt: z.string().min(1).max(1000),
+  atMs: z.number().int().nonnegative().optional(),
+});
+
+export const ExtractedMemoryCandidateSchema = z
+  .object({
+    scope: MemoryScopeSchema,
+    scopeId: z.string().min(1).optional(),
+    kind: MemoryKindSchema,
+    content: z.string().min(1).max(2000),
+    confidence: z.number().min(0).max(1),
+    rationale: z.string().min(1).max(1000),
+    evidence: z.array(MemoryCandidateEvidenceSchema).min(1).max(10),
+    tags: z.array(z.string().min(1)).default([]),
+    safetyState: MemorySafetyStateSchema.default('safe'),
+  })
+  .superRefine((value, ctx) => {
+    if (!validateScopedMemory(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: scopedMemoryMessage(value.scope),
+        path: ['scopeId'],
+      });
+    }
+  });
+
+export const MemoryCandidateMessageSchema = z.object({
+  id: z.string().min(1).optional(),
+  role: z.enum(['user', 'assistant', 'tool', 'system']),
+  content: z.string(),
+  toolName: z.string().min(1).optional(),
+  createdAtMs: z.number().int().nonnegative().optional(),
+});
+
+export const MemoryCandidateExtractionInputSchema = z.object({
+  sessionId: z.string().min(1),
+  agentId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
+  messages: z.array(MemoryCandidateMessageSchema).default([]),
+});
+
 export type MemoryScope = z.infer<typeof MemoryScopeSchema>;
 export type MemoryKind = z.infer<typeof MemoryKindSchema>;
 export type MemoryStatus = z.infer<typeof MemoryStatusSchema>;
@@ -226,3 +270,7 @@ export type MemoryLink = z.infer<typeof MemoryLinkSchema>;
 export type WorkingMemoryToolSummary = z.infer<typeof WorkingMemoryToolSummarySchema>;
 export type WorkingMemoryArtifact = z.infer<typeof WorkingMemoryArtifactSchema>;
 export type WorkingMemoryUpdateBody = z.infer<typeof WorkingMemoryUpdateBodySchema>;
+export type MemoryCandidateEvidence = z.infer<typeof MemoryCandidateEvidenceSchema>;
+export type ExtractedMemoryCandidate = z.infer<typeof ExtractedMemoryCandidateSchema>;
+export type MemoryCandidateMessage = z.infer<typeof MemoryCandidateMessageSchema>;
+export type MemoryCandidateExtractionInput = z.infer<typeof MemoryCandidateExtractionInputSchema>;
