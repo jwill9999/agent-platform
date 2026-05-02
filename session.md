@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Closed out `agent-platform-memory.6` and claimed the final memory epic task, `agent-platform-memory.7`, on new branch `task/agent-platform-memory.7`. Beads/Dolt claim sync succeeded.
+- **Date:** 2026-05-02
 - **Session:** Addressed SonarCloud reliability findings on `task/agent-platform-memory.6`: removed loop-index reassignment in chat history sanitisation, replaced `charCodeAt()` with `codePointAt()` in workspace path checks, and reduced overlapping maintainability findings in the touched chat/bash workspace policy code.
 - **Date:** 2026-05-02
 - **Session:** Addressed review feedback on `task/agent-platform-memory.6`: working-memory JSON array reads now tolerate malformed persisted data, memory export URL construction no longer relies on string replacement, retrieval omitted counts now exercise cross-scope memories, and memory secret redaction utilities are centralized.
@@ -447,11 +449,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-memory.6`
+- **Current branch:** `task/agent-platform-memory.7`
 - **Current base:** chained from prior memory task branches toward `feature/agent-platform-memory`.
 - **Latest completed task:** `agent-platform-memory.6` review-gated self-learning workflow.
-- **Current work:** Review feedback for `agent-platform-memory.6` has been addressed; next task is `agent-platform-memory.7`.
-- **Remote sync:** Branch and Beads/Dolt should be pushed after the review-fix commit.
+- **Current work:** `agent-platform-memory.7` retention, expiry, cleanup, and cross-scope safety tests is claimed but implementation has not started.
+- **Remote sync:** Beads/Dolt is synced after claiming `.7`; branch should be pushed after this session update commit.
 
 ### Beads
 
