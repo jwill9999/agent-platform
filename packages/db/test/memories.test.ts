@@ -16,6 +16,7 @@ import {
   queryMemories,
   updateMemory,
 } from '../src/repositories/memories.js';
+import * as schema from '../src/schema.js';
 
 type MemoryInput = Parameters<typeof createMemory>[1];
 
@@ -188,6 +189,39 @@ describe('memory repository', () => {
 
     expect(literalMarker.safetyState).toBe('unchecked');
     expect(literalMarker.source.metadata).toEqual({ note: '[REDACTED]' });
+  });
+
+  it('falls back for malformed stored JSON metadata and tags', () => {
+    db.insert(schema.memories)
+      .values({
+        id: 'malformed-json',
+        scope: 'session',
+        scopeId: 'session-1',
+        kind: 'working_note',
+        status: 'approved',
+        reviewStatus: 'approved',
+        content: 'Legacy row with malformed JSON fields.',
+        confidence: 0.8,
+        sourceKind: 'manual',
+        sourceId: null,
+        sourceLabel: null,
+        sourceMetadataJson: '{broken',
+        tagsJson: 'not-json',
+        metadataJson: '[',
+        safetyState: 'safe',
+        createdAtMs: 1000,
+        updatedAtMs: 1000,
+        expiresAtMs: null,
+        reviewedAtMs: null,
+        reviewedBy: null,
+      })
+      .run();
+
+    const memory = getMemory(db, 'malformed-json');
+
+    expect(memory.source.metadata).toEqual({});
+    expect(memory.metadata).toEqual({});
+    expect(memory.tags).toEqual([]);
   });
 
   it('stores links between memories and cascades them on delete', () => {

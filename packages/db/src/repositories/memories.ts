@@ -91,17 +91,24 @@ function stringifyJson(value: unknown): string {
   return JSON.stringify(redactJsonValue(value).value);
 }
 
+function parseJsonValue(value: string | null): unknown {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
 function parseJsonObject(value: string | null): JsonObject {
-  if (!value) return {};
-  const parsed = JSON.parse(value) as unknown;
+  const parsed = parseJsonValue(value);
   return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
     ? (parsed as JsonObject)
     : {};
 }
 
 function parseJsonArray(value: string | null): string[] {
-  if (!value) return [];
-  const parsed = JSON.parse(value) as unknown;
+  const parsed = parseJsonValue(value);
   return Array.isArray(parsed)
     ? parsed.filter((entry): entry is string => typeof entry === 'string')
     : [];
