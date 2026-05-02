@@ -31,10 +31,12 @@ function failedMessage(output: Awaited<ReturnType<typeof executeRepoDiscoveryToo
 describe('repo discovery tools', () => {
   let root: string;
   let repo: string;
+  let explicitRepo: string;
 
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'repo-discovery-test-'));
     repo = join(root, 'repo');
+    explicitRepo = join(root, 'explicit-repo');
     await mkdir(join(repo, 'apps', 'web', 'src'), { recursive: true });
     await mkdir(join(repo, 'apps', 'web', 'test'), { recursive: true });
     await mkdir(join(repo, 'packages', 'harness', 'src'), { recursive: true });
@@ -73,6 +75,14 @@ describe('repo discovery tools', () => {
     );
     await writeFile(join(repo, 'node_modules', 'hidden', 'bad.ts'), 'Needle\n', 'utf-8');
     await symlink(join(root, 'outside'), join(repo, 'outside-link'));
+
+    await mkdir(explicitRepo, { recursive: true });
+    await writeFile(
+      join(explicitRepo, 'package.json'),
+      JSON.stringify({ name: 'explicit-repo' }),
+      'utf-8',
+    );
+    await writeFile(join(explicitRepo, 'explicit-only.ts'), 'export const explicit = true;\n');
   });
 
   afterEach(async () => {
@@ -131,6 +141,32 @@ describe('repo discovery tools', () => {
     expect(
       (result.files as Array<{ path: string }>).some((file) => file.path === 'package.json'),
     ).toBe(true);
+  });
+
+  it('prefers explicit repository discovery paths over the active project default', async () => {
+    const result = data(
+      await executeRepoDiscoveryTool(
+        REPO_DISCOVERY_TOOL_IDS.repoMap,
+        { repoPath: 'explicit-repo', maxDepth: 2 },
+        { workspaceRoot: root, defaultRepoPath: 'repo' },
+      ),
+    );
+
+    expect(
+      (result.files as Array<{ path: string }>).some((file) => file.path === 'explicit-only.ts'),
+    ).toBe(true);
+  });
+
+  it('returns a tool error when explicit and default repository paths are unreadable', async () => {
+    const message = failedMessage(
+      await executeRepoDiscoveryTool(
+        REPO_DISCOVERY_TOOL_IDS.repoMap,
+        { repoPath: 'missing-repo', maxDepth: 1 },
+        { workspaceRoot: root, defaultRepoPath: 'also-missing-repo' },
+      ),
+    );
+
+    expect(message).toContain('is not readable');
   });
 
   it('searches text files with bounded results and skips ignored directories', async () => {

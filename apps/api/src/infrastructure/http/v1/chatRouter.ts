@@ -654,10 +654,12 @@ function createAuditLog(db: DrizzleDb): ReturnType<typeof createToolAuditLogger>
 function resolveSessionProjectPath(db: DrizzleDb, sessionId: string): string | undefined {
   const session = getSession(db, sessionId);
   const workingMemory = getWorkingMemoryArtifact(db, sessionId);
-  const projectId = session?.projectId ?? workingMemory?.projectId ?? workingMemory?.activeProject;
-  if (!projectId) return undefined;
-  const project = findProject(db, projectId);
-  return project?.workspacePath;
+  const projectId = session?.projectId ?? workingMemory?.projectId;
+  if (projectId) {
+    const project = findProject(db, projectId);
+    if (project) return project.workspacePath;
+  }
+  return workingMemory?.activeProject;
 }
 
 function createRuntimeToolDispatchNode({

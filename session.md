@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Addressed active-project PR review feedback: project workspace paths now normalize under `projects/` without duplicate prefixes, duplicate project slugs return structured conflicts, session project binding validates the project before updating, legacy working-memory `activeProject` remains a direct path fallback, and repo/git/migration/workspace tests cover precedence and project associations.
+- **Date:** 2026-05-02
 - **Session:** Completed `agent-platform-active-project` on `task/agent-platform-active-project`: added first-class project records, non-breaking nullable project associations for sessions, memories, and working memory, project CRUD API routes, workspace `projects/` area support, and active-project default paths for repo discovery, git, and quality-gate tools. Terminal quality gates passed; Beads close succeeded but Dolt auto-push failed because the sandbox could not resolve GitHub.
 - **Date:** 2026-05-02
 - **Session:** Added explicit non-breaking migration and test strategy to the project/work context and scheduler specs. `agent-platform-active-project` is now the prerequisite foundation for shared project associations; scheduler `.1` should remain additive and should not start implementing project-owned jobs until that model exists.
@@ -505,6 +507,9 @@ Quality gates passed:
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
 - Active project foundation checks passed:
+  - Review feedback rerun: `pnpm --filter @agent-platform/db exec vitest run test/projects.test.ts test/migrate.test.ts`
+  - Review feedback rerun: `pnpm --filter @agent-platform/harness exec vitest run test/repoDiscoveryTools.test.ts test/gitTools.test.ts`
+  - Review feedback rerun: `pnpm --filter @agent-platform/api exec vitest run test/projectsRouter.test.ts test/workspaceRouter.test.ts` (run with escalation because API Supertest binds local ports)
   - `pnpm --filter @agent-platform/contracts run build`
   - `pnpm --filter @agent-platform/db run build`
   - `pnpm --filter @agent-platform/harness run build`

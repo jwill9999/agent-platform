@@ -11,6 +11,8 @@ import {
   createProject,
   getProject,
   listProjects,
+  ProjectSlugConflictError,
+  ProjectWorkspacePathError,
   updateProject,
 } from '../src/repositories/projects.js';
 import {
@@ -84,6 +86,44 @@ describe('projects repository and associations', () => {
     expect(listProjects(db, { includeArchived: true }).map((entry) => entry.archivedAtMs)).toEqual([
       3000,
     ]);
+  });
+
+  it('normalizes project workspace paths under projects without duplicate prefixes', () => {
+    const explicit = createProject(
+      db,
+      { name: 'Explicit Project', workspacePath: '/workspace/projects/explicit-project' },
+      { id: 'project-1', nowMs: 1000 },
+    );
+    expect(explicit.workspacePath).toBe('projects/explicit-project');
+
+    const legacy = createProject(
+      db,
+      { name: 'Legacy Project', workspacePath: 'scratch/legacy-project' },
+      { id: 'project-2', nowMs: 1000 },
+    );
+    expect(legacy.workspacePath).toBe('projects/scratch/legacy-project');
+
+    const bare = updateProject(db, 'project-2', { workspacePath: '/workspace' }, 2000);
+    expect(bare.workspacePath).toBe('projects/legacy-project');
+  });
+
+  it('rejects invalid project workspace paths and maps duplicate slugs', () => {
+    createProject(db, { name: 'Duplicate Project' }, { id: 'project-1', nowMs: 1000 });
+
+    expect(() =>
+      createProject(
+        db,
+        { name: 'Duplicate Project Copy', slug: 'duplicate-project' },
+        { id: 'project-2', nowMs: 1000 },
+      ),
+    ).toThrow(ProjectSlugConflictError);
+    expect(() =>
+      createProject(
+        db,
+        { name: 'Invalid Path Project', workspacePath: '../outside' },
+        { id: 'project-3', nowMs: 1000 },
+      ),
+    ).toThrow(ProjectWorkspacePathError);
   });
 
   it('keeps sessions valid without projects and supports nullable project binding', () => {

@@ -9,6 +9,8 @@ import {
   findProject,
   listProjects,
   ProjectNotFoundError,
+  ProjectSlugConflictError,
+  ProjectWorkspacePathError,
   updateProject,
 } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
@@ -21,6 +23,12 @@ import { parseBody, requireParam } from './routerUtils.js';
 function mapProjectError(error: unknown): never {
   if (error instanceof ProjectNotFoundError) {
     throw new HttpError(404, 'NOT_FOUND', error.message);
+  }
+  if (error instanceof ProjectSlugConflictError) {
+    throw new HttpError(409, 'PROJECT_SLUG_CONFLICT', error.message);
+  }
+  if (error instanceof ProjectWorkspacePathError) {
+    throw new HttpError(400, 'VALIDATION_ERROR', error.message);
   }
   throw error;
 }
@@ -48,8 +56,12 @@ export function createProjectsRouter(db: DrizzleDb): Router {
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const project = createProject(db, parseBody(ProjectCreateBodySchema, req.body));
-      res.status(201).json({ data: project });
+      try {
+        const project = createProject(db, parseBody(ProjectCreateBodySchema, req.body));
+        res.status(201).json({ data: project });
+      } catch (error) {
+        mapProjectError(error);
+      }
     }),
   );
 

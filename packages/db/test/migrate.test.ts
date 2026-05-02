@@ -43,6 +43,34 @@ describe('migrations', () => {
     expect(names).toContain('memory_links');
     expect(names).toContain('working_memory_artifacts');
     expect(names).toContain('projects');
+    const columnsFor = (table: string) =>
+      (
+        sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+          name: string;
+        }>
+      ).map((column) => column.name);
+    const indexesFor = (table: string) =>
+      (
+        sqlite.prepare(`PRAGMA index_list(${table})`).all() as Array<{
+          name: string;
+        }>
+      ).map((index) => index.name);
+    const foreignTablesFor = (table: string) =>
+      (
+        sqlite.prepare(`PRAGMA foreign_key_list(${table})`).all() as Array<{
+          table: string;
+        }>
+      ).map((foreignKey) => foreignKey.table);
+
+    expect(columnsFor('sessions')).toContain('project_id');
+    expect(columnsFor('memories')).toContain('project_id');
+    expect(columnsFor('working_memory_artifacts')).toContain('project_id');
+    expect(indexesFor('sessions')).toContain('sessions_project_idx');
+    expect(indexesFor('memories')).toContain('memories_project_idx');
+    expect(indexesFor('working_memory_artifacts')).toContain('working_memory_project_idx');
+    expect(foreignTablesFor('sessions')).toContain('projects');
+    expect(foreignTablesFor('memories')).toContain('projects');
+    expect(foreignTablesFor('working_memory_artifacts')).toContain('projects');
     closeDatabase(sqlite);
   });
 });

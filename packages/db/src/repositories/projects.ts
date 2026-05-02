@@ -27,6 +27,20 @@ export class ProjectNotFoundError extends Error {
   }
 }
 
+export class ProjectSlugConflictError extends Error {
+  constructor(slug: string) {
+    super(`Project slug already exists: ${slug}`);
+    this.name = 'ProjectSlugConflictError';
+  }
+}
+
+export class ProjectWorkspacePathError extends Error {
+  constructor(workspacePath: string) {
+    super(`Project workspace path must stay under projects/: ${workspacePath}`);
+    this.name = 'ProjectWorkspacePathError';
+  }
+}
+
 function parseMetadata(value: string | null): Record<string, unknown> {
   if (!value) return {};
   try {
@@ -56,12 +70,53 @@ function rowToProject(row: ProjectRow): ProjectRecord {
 
 function normalizeWorkspacePath(slug: string, workspacePath?: string): string {
   const trimmed = workspacePath?.trim();
-  if (trimmed) return trimmed.replaceAll('\\', '/').replace(/^\/workspace\/?/, 'projects/');
-  return `projects/${slug}`;
+  if (!trimmed) return `projects/${slug}`;
+
+  let normalized = trimmed.replaceAll('\\', '/');
+  if (normalized.startsWith('./')) normalized = normalized.slice(2);
+
+  if (normalized === '/workspace' || normalized === '/workspace/') {
+    return `projects/${slug}`;
+  }
+  if (normalized.startsWith('/workspace/projects/')) {
+    return normalized.replace(/^\/workspace\//, '');
+  }
+  if (normalized.startsWith('/workspace/')) {
+    normalized = `projects/${normalized.slice('/workspace/'.length)}`;
+  } else if (!normalized.startsWith('projects/')) {
+    normalized = `projects/${normalized.replace(/^\/+/, '')}`;
+  }
+
+  if (
+    normalized === 'projects' ||
+    normalized.startsWith('/') ||
+    normalized.split('/').includes('..')
+  ) {
+    throw new ProjectWorkspacePathError(trimmed);
+  }
+
+  return normalized;
 }
 
 function conditionForIdOrSlug(idOrSlug: string) {
   return or(eq(schema.projects.id, idOrSlug), eq(schema.projects.slug, idOrSlug));
+}
+
+function isProjectSlugConstraintError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const code = 'code' in error ? String(error.code) : '';
+  const message = 'message' in error ? String(error.message) : '';
+  return (
+    code.startsWith('SQLITE_CONSTRAINT') &&
+    (message.includes('projects.slug') || message.includes('projects_slug_idx'))
+  );
+}
+
+function mapProjectWriteError(error: unknown, slug: string): never {
+  if (isProjectSlugConstraintError(error)) {
+    throw new ProjectSlugConflictError(slug);
+  }
+  throw error;
 }
 
 export function createProject(
@@ -75,20 +130,24 @@ export function createProject(
   const slug = input.slug ?? slugify(input.name);
   const workspacePath = normalizeWorkspacePath(slug, input.workspacePath);
 
-  db.insert(schema.projects)
-    .values({
-      id,
-      slug,
-      name: input.name,
-      description: input.description ?? null,
-      workspacePath,
-      workspaceKey: input.workspaceKey ?? workspacePath,
-      metadataJson: JSON.stringify(input.metadata),
-      archivedAtMs: null,
-      createdAtMs: nowMs,
-      updatedAtMs: nowMs,
-    })
-    .run();
+  try {
+    db.insert(schema.projects)
+      .values({
+        id,
+        slug,
+        name: input.name,
+        description: input.description ?? null,
+        workspacePath,
+        workspaceKey: input.workspaceKey ?? workspacePath,
+        metadataJson: JSON.stringify(input.metadata),
+        archivedAtMs: null,
+        createdAtMs: nowMs,
+        updatedAtMs: nowMs,
+      })
+      .run();
+  } catch (error) {
+    mapProjectWriteError(error, slug);
+  }
 
   return getProject(db, id);
 }
@@ -126,27 +185,31 @@ export function updateProject(
   const patch = ProjectUpdateBodySchema.parse(rawPatch);
   const slug = patch.slug ?? existing.slug;
 
-  db.update(schema.projects)
-    .set({
-      slug,
-      name: patch.name ?? existing.name,
-      description:
-        patch.description === undefined ? (existing.description ?? null) : patch.description,
-      workspacePath: patch.workspacePath
-        ? normalizeWorkspacePath(slug, patch.workspacePath)
-        : existing.workspacePath,
-      workspaceKey:
-        patch.workspaceKey === undefined ? (existing.workspaceKey ?? null) : patch.workspaceKey,
-      metadataJson:
-        patch.metadata === undefined
-          ? JSON.stringify(existing.metadata)
-          : JSON.stringify(patch.metadata),
-      archivedAtMs:
-        patch.archivedAtMs === undefined ? (existing.archivedAtMs ?? null) : patch.archivedAtMs,
-      updatedAtMs: nowMs,
-    })
-    .where(eq(schema.projects.id, existing.id))
-    .run();
+  try {
+    db.update(schema.projects)
+      .set({
+        slug,
+        name: patch.name ?? existing.name,
+        description:
+          patch.description === undefined ? (existing.description ?? null) : patch.description,
+        workspacePath: patch.workspacePath
+          ? normalizeWorkspacePath(slug, patch.workspacePath)
+          : existing.workspacePath,
+        workspaceKey:
+          patch.workspaceKey === undefined ? (existing.workspaceKey ?? null) : patch.workspaceKey,
+        metadataJson:
+          patch.metadata === undefined
+            ? JSON.stringify(existing.metadata)
+            : JSON.stringify(patch.metadata),
+        archivedAtMs:
+          patch.archivedAtMs === undefined ? (existing.archivedAtMs ?? null) : patch.archivedAtMs,
+        updatedAtMs: nowMs,
+      })
+      .where(eq(schema.projects.id, existing.id))
+      .run();
+  } catch (error) {
+    mapProjectWriteError(error, slug);
+  }
 
   return getProject(db, existing.id);
 }
