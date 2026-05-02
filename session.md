@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Implemented `agent-platform-scheduler.2` on `task/agent-platform-scheduler.2`: added the API-owned scheduler service, due-job claiming with leases, no-op built-in target execution, persisted run/log transitions, retry backoff, timeout handling, cancellation requests, expired-run recovery, and API lifecycle start/stop wiring.
+- **Date:** 2026-05-02
 - **Session:** Addressed scheduler `.1` review feedback: scheduled job run logs now enforce a unique `(runId, sequence)` index and allocate the next sequence with a single insert-select statement instead of a separate max-then-insert step.
 - **Date:** 2026-05-02
 - **Session:** Implemented `agent-platform-scheduler.1` on `task/agent-platform-scheduler.1`: added shared scheduler contracts, SQLite/Drizzle scheduler tables and migration, repository CRUD/list/update/run/log APIs, and tested ownership plus run state transitions. No job runner/execution loop was added in this task.
@@ -479,11 +481,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-scheduler.1`
-- **Current base:** branched from `task/agent-platform-active-project` after the active-project foundation was completed.
+- **Current branch:** `task/agent-platform-scheduler.2`
+- **Current base:** branched from `task/agent-platform-scheduler.1` after the scheduler foundation task was completed.
 - **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** `agent-platform-scheduler.1` scheduler contracts, schema, repository, and run state machine are implemented, closed in Beads, committed, and pushed. Next work is `agent-platform-scheduler.2`.
-- **Remote sync:** `task/agent-platform-scheduler.1` is up to date with origin at commit `dcb19c9`; Beads/Dolt push succeeded.
+- **Current work:** `agent-platform-scheduler.2` scheduler runner, queue/lease, retry, timeout, and cancellation basics are implemented and closed in Beads. Next work is `agent-platform-scheduler.3`.
+- **Remote sync:** Beads/Dolt push succeeded after closing `.2`; `task/agent-platform-scheduler.2` code changes are pending commit and git push.
 
 ### Beads
 
@@ -499,7 +501,8 @@ Quality gates passed:
 - `agent-platform-scheduler` epic is open.
 - `agent-platform-active-project` is closed locally as the required P1 project/work context foundation task.
 - `agent-platform-scheduler.1` is closed.
-- `agent-platform-scheduler.2` through `.5` are open and dependency-chained.
+- `agent-platform-scheduler.2` is closed.
+- `agent-platform-scheduler.3` through `.5` are open and dependency-chained.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
 - New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
@@ -510,6 +513,20 @@ Quality gates passed:
 ### Quality
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
+- Scheduler `.2` runner checks passed:
+  - `pnpm --filter @agent-platform/db run build`
+  - `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts`
+  - `pnpm --filter @agent-platform/api exec vitest run test/schedulerService.test.ts`
+  - `pnpm --filter @agent-platform/api run typecheck`
+  - `pnpm --filter @agent-platform/db run typecheck`
+  - `pnpm --filter @agent-platform/api run lint`
+  - `pnpm --filter @agent-platform/db run lint`
+  - `pnpm --filter @agent-platform/api run test` (run with escalation because API Supertest binds local ports)
+  - `pnpm --filter @agent-platform/db run test`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test` (run with escalation because API Supertest binds local ports)
 - Scheduler `.1` foundation checks passed:
   - Review feedback rerun: `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts test/migrate.test.ts`
   - Review feedback rerun: `pnpm --filter @agent-platform/db run typecheck`

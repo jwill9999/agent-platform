@@ -24,7 +24,7 @@ import {
   ScheduledJobRunRecordSchema,
   ScheduledJobUpdateBodySchema,
 } from '@agent-platform/contracts';
-import { and, asc, desc, eq, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 
 import type { DrizzleDb } from '../database.js';
 import * as schema from '../schema.js';
@@ -311,6 +311,73 @@ export function setScheduledJobStatus(
   return getScheduledJob(db, id);
 }
 
+export function claimDueScheduledJobs(
+  db: DrizzleDb,
+  options: { workerId: string; nowMs?: number; leaseMs: number; limit?: number },
+): ScheduledJobRecord[] {
+  const nowMs = options.nowMs ?? Date.now();
+  const limit = Math.max(1, Math.min(options.limit ?? 10, 100));
+  const leaseExpiresAtMs = nowMs + options.leaseMs;
+  const leaseIsAvailable = or(
+    isNull(schema.scheduledJobs.leaseOwner),
+    lte(schema.scheduledJobs.leaseExpiresAtMs, nowMs),
+  );
+  const dueConditions = and(
+    eq(schema.scheduledJobs.status, 'enabled'),
+    lte(schema.scheduledJobs.nextRunAtMs, nowMs),
+    leaseIsAvailable,
+  );
+  const candidates = db
+    .select({ id: schema.scheduledJobs.id })
+    .from(schema.scheduledJobs)
+    .where(dueConditions)
+    .orderBy(asc(schema.scheduledJobs.nextRunAtMs), asc(schema.scheduledJobs.createdAtMs))
+    .limit(limit)
+    .all();
+
+  const claimed: ScheduledJobRecord[] = [];
+  for (const candidate of candidates) {
+    const result = db
+      .update(schema.scheduledJobs)
+      .set({
+        leaseOwner: options.workerId,
+        leaseExpiresAtMs,
+        updatedAtMs: nowMs,
+      })
+      .where(and(eq(schema.scheduledJobs.id, candidate.id), dueConditions))
+      .run() as { changes?: number };
+    if ((result.changes ?? 0) > 0) {
+      claimed.push(getScheduledJob(db, candidate.id));
+    }
+  }
+
+  return claimed;
+}
+
+export function updateScheduledJobScheduleState(
+  db: DrizzleDb,
+  id: string,
+  options: {
+    status?: ScheduledJobStatus;
+    nextRunAtMs?: number | null;
+    clearLease?: boolean;
+    nowMs?: number;
+  },
+): ScheduledJobRecord {
+  getScheduledJob(db, id);
+  const nowMs = options.nowMs ?? Date.now();
+  db.update(schema.scheduledJobs)
+    .set({
+      ...(options.status ? { status: options.status } : {}),
+      ...(options.nextRunAtMs !== undefined ? { nextRunAtMs: options.nextRunAtMs } : {}),
+      ...(options.clearLease ? { leaseOwner: null, leaseExpiresAtMs: null } : {}),
+      updatedAtMs: nowMs,
+    })
+    .where(eq(schema.scheduledJobs.id, id))
+    .run();
+  return getScheduledJob(db, id);
+}
+
 export function createScheduledJobRun(
   db: DrizzleDb,
   rawInput: ScheduledJobRunCreateBody,
@@ -368,6 +435,40 @@ export function listScheduledJobRuns(
     .offset(query.offset)
     .all()
     .map(rowToRun);
+}
+
+export function listExpiredRunningScheduledJobRuns(
+  db: DrizzleDb,
+  options: { nowMs?: number; limit?: number } = {},
+): ScheduledJobRunRecord[] {
+  const nowMs = options.nowMs ?? Date.now();
+  const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
+  return db
+    .select()
+    .from(schema.scheduledJobRuns)
+    .where(
+      and(
+        eq(schema.scheduledJobRuns.status, 'running'),
+        lte(schema.scheduledJobRuns.leaseExpiresAtMs, nowMs),
+      ),
+    )
+    .orderBy(asc(schema.scheduledJobRuns.leaseExpiresAtMs))
+    .limit(limit)
+    .all()
+    .map(rowToRun);
+}
+
+export function requestScheduledJobRunCancellation(
+  db: DrizzleDb,
+  id: string,
+  nowMs = Date.now(),
+): ScheduledJobRunRecord {
+  getScheduledJobRun(db, id);
+  db.update(schema.scheduledJobRuns)
+    .set({ cancelRequestedAtMs: nowMs, updatedAtMs: nowMs })
+    .where(eq(schema.scheduledJobRuns.id, id))
+    .run();
+  return getScheduledJobRun(db, id);
 }
 
 export function transitionScheduledJobRun(
