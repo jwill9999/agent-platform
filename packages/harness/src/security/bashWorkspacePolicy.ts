@@ -39,36 +39,32 @@ function tokenize(segment: string): string[] {
   let current = '';
   let quote: '"' | "'" | null = null;
 
-  for (let idx = 0; idx < segment.length; idx++) {
-    const char = segment[idx]!;
-
-    if (quote) {
-      if (char === quote) {
-        quote = null;
-      } else {
-        current += char;
-      }
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-
-    if (isWhitespace(char)) {
-      if (current) {
-        tokens.push(current);
-        current = '';
-      }
-      continue;
-    }
-
-    current += char;
+  for (const char of segment) {
+    const tokenized = tokenizeChar({ char, current, quote, tokens });
+    current = tokenized.current;
+    quote = tokenized.quote;
   }
 
   if (current) tokens.push(current);
   return tokens;
+}
+
+function tokenizeChar(state: {
+  char: string;
+  current: string;
+  quote: '"' | "'" | null;
+  tokens: string[];
+}): { current: string; quote: '"' | "'" | null } {
+  const { char, tokens } = state;
+  if (state.quote) {
+    return char === state.quote
+      ? { current: state.current, quote: null }
+      : { current: state.current + char, quote: state.quote };
+  }
+  if (char === '"' || char === "'") return { current: state.current, quote: char };
+  if (!isWhitespace(char)) return { current: state.current + char, quote: null };
+  if (state.current) tokens.push(state.current);
+  return { current: '', quote: null };
 }
 
 function splitShellSegments(command: string): string[] {
@@ -79,29 +75,18 @@ function splitShellSegments(command: string): string[] {
   for (let idx = 0; idx < command.length; idx++) {
     const char = command[idx]!;
 
-    if (quote) {
-      current += char;
-      if (char === quote) quote = null;
+    const quoteState = appendQuotedChar({ char, current, quote });
+    if (quoteState) {
+      current = quoteState.current;
+      quote = quoteState.quote;
       continue;
     }
 
-    if (char === '"' || char === "'") {
-      quote = char;
-      current += char;
-      continue;
-    }
-
-    if (char === ';' || char === '|') {
+    const operator = shellOperatorLength(command, idx);
+    if (operator > 0) {
       if (current.trim()) segments.push(current);
       current = '';
-      if (command[idx + 1] === '|' || command[idx + 1] === '&') idx++;
-      continue;
-    }
-
-    if (char === '&' && command[idx + 1] === '&') {
-      if (current.trim()) segments.push(current);
-      current = '';
-      idx++;
+      idx += operator - 1;
       continue;
     }
 
@@ -110,6 +95,29 @@ function splitShellSegments(command: string): string[] {
 
   if (current.trim()) segments.push(current);
   return segments;
+}
+
+function appendQuotedChar(state: {
+  char: string;
+  current: string;
+  quote: '"' | "'" | null;
+}): { current: string; quote: '"' | "'" | null } | null {
+  if (state.quote) {
+    return {
+      current: state.current + state.char,
+      quote: state.char === state.quote ? null : state.quote,
+    };
+  }
+  if (state.char !== '"' && state.char !== "'") return null;
+  return { current: state.current + state.char, quote: state.char };
+}
+
+function shellOperatorLength(command: string, index: number): number {
+  const char = command[index];
+  const next = command[index + 1];
+  if (char === '&') return next === '&' ? 2 : 0;
+  if (char !== ';' && char !== '|') return 0;
+  return next === '|' || next === '&' ? 2 : 1;
 }
 
 function commandName(raw: string): string {
@@ -124,11 +132,11 @@ function isAssignment(token: string): boolean {
   const equalsIdx = token.indexOf('=');
   if (equalsIdx <= 0) return false;
 
-  const first = token.charCodeAt(0);
+  const first = token.codePointAt(0);
   if (!isAsciiLetter(first) && first !== 95) return false;
 
   for (let idx = 1; idx < equalsIdx; idx++) {
-    const code = token.charCodeAt(idx);
+    const code = token.codePointAt(idx);
     if (!isAsciiLetter(code) && !isAsciiDigit(code) && code !== 95) return false;
   }
 
@@ -142,11 +150,13 @@ function isPathOperand(token: string): boolean {
   return token.includes('/');
 }
 
-function isAsciiLetter(code: number): boolean {
+function isAsciiLetter(code: number | undefined): boolean {
+  if (code === undefined) return false;
   return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
 }
 
-function isAsciiDigit(code: number): boolean {
+function isAsciiDigit(code: number | undefined): boolean {
+  if (code === undefined) return false;
   return code >= 48 && code <= 57;
 }
 
@@ -163,7 +173,7 @@ function redirectTargetFromToken(token: string): string | null {
   const redirectIdx = token.indexOf('>');
   if (redirectIdx <= 0) return null;
   for (let idx = 0; idx < redirectIdx; idx++) {
-    if (!isAsciiDigit(token.charCodeAt(idx))) return null;
+    if (!isAsciiDigit(token.codePointAt(idx))) return null;
   }
   return token.slice(redirectIdx + 1);
 }
@@ -231,12 +241,10 @@ function collectSegmentAccesses(segment: string): BashPathAccess[] {
 }
 
 export function extractBashPathAccesses(command: string): BashPathAccess[] {
-  const accesses: BashPathAccess[] = [];
-  for (const segment of splitShellSegments(command)) {
-    accesses.push(...collectRedirectWrites(tokenize(segment)));
-    accesses.push(...collectSegmentAccesses(segment));
-  }
-  return accesses;
+  return splitShellSegments(command).flatMap((segment) => [
+    ...collectRedirectWrites(tokenize(segment)),
+    ...collectSegmentAccesses(segment),
+  ]);
 }
 
 export async function validateBashWorkspacePolicy(

@@ -38,6 +38,7 @@ import {
   SessionResumeBodySchema,
 } from '@agent-platform/contracts';
 import {
+  type AgentContext,
   buildAgentContext,
   destroyAgentContext,
   AgentNotFoundError,
@@ -53,14 +54,11 @@ import {
   DEFAULT_MOUNTS,
   createToolAuditLogger,
   redactCredentials,
+  type ChatMessage,
   type HarnessStateType,
-} from '@agent-platform/harness';
-import type {
-  AgentContext,
-  ChatMessage,
-  OutputEmitter,
-  ToolAuditStore,
-  ToolCallIntent,
+  type OutputEmitter,
+  type ToolAuditStore,
+  type ToolCallIntent,
 } from '@agent-platform/harness';
 import {
   resolveModelConfig,
@@ -250,42 +248,61 @@ export function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
  */
 function sanitiseToolCallHistory(history: ChatMessage[]): ChatMessage[] {
   const cleaned: ChatMessage[] = [];
-  for (let i = 0; i < history.length; i += 1) {
-    const msg = history[i]!;
-    if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
-      const toolCalls = msg.toolCalls;
-      const toolResults: ChatMessage[] = [];
-      let cursor = i + 1;
-      for (const toolCall of toolCalls) {
-        const candidate = history[cursor];
-        if (candidate?.role !== 'tool' || candidate.toolCallId !== toolCall.id) {
-          toolResults.length = 0;
-          break;
-        }
-        toolResults.push({
-          ...candidate,
-          toolName: candidate.toolName || toolCall.name,
-        });
-        cursor += 1;
-      }
-      if (toolResults.length === toolCalls.length) {
-        cleaned.push(msg, ...toolResults);
-        i = cursor - 1;
-      }
+  let index = 0;
+  while (index < history.length) {
+    const msg = history[index]!;
+    const paired = pairedAssistantToolMessages(history, index);
+    if (paired) {
+      cleaned.push(...paired.messages);
+      index = paired.nextIndex;
+      continue;
+    }
+    if (msg.role === 'assistant' && msg.toolCalls?.length) {
+      index += 1;
       continue;
     }
 
-    if (msg.role === 'tool') {
-      const prev = cleaned.at(-1);
-      const hasMatchingCall =
-        prev?.role === 'assistant' &&
-        Array.isArray(prev.toolCalls) &&
-        prev.toolCalls.some((c) => c.id === msg.toolCallId);
-      if (!hasMatchingCall) continue;
+    if (msg.role === 'tool' && !hasMatchingPreviousToolCall(cleaned, msg)) {
+      index += 1;
+      continue;
     }
+
     cleaned.push(msg);
+    index += 1;
   }
   return cleaned;
+}
+
+function pairedAssistantToolMessages(
+  history: ChatMessage[],
+  assistantIndex: number,
+): { messages: ChatMessage[]; nextIndex: number } | undefined {
+  const assistant = history[assistantIndex];
+  if (assistant?.role !== 'assistant' || !assistant.toolCalls?.length) return undefined;
+
+  const toolResults = assistant.toolCalls.map((toolCall, offset): ChatMessage | undefined => {
+    const candidate = history[assistantIndex + offset + 1];
+    if (candidate?.role !== 'tool' || candidate.toolCallId !== toolCall.id) return undefined;
+    return { ...candidate, toolName: candidate.toolName || toolCall.name };
+  });
+
+  if (toolResults.some((result) => result === undefined)) return undefined;
+  return {
+    messages: [assistant, ...(toolResults as ChatMessage[])],
+    nextIndex: assistantIndex + toolResults.length + 1,
+  };
+}
+
+function hasMatchingPreviousToolCall(
+  cleaned: ChatMessage[],
+  msg: Extract<ChatMessage, { role: 'tool' }>,
+): boolean {
+  const prev = cleaned.at(-1);
+  return (
+    prev?.role === 'assistant' &&
+    Array.isArray(prev.toolCalls) &&
+    prev.toolCalls.some((call) => call.id === msg.toolCallId)
+  );
 }
 
 /** Persist only the new assistant/tool messages the graph appended. */
