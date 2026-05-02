@@ -33,6 +33,7 @@ export type ScheduledJobTargetContext = {
     level: 'debug' | 'info' | 'warn' | 'error',
     message: string,
     data?: Record<string, unknown>,
+    options?: { truncated?: boolean },
   ) => void;
 };
 
@@ -158,6 +159,20 @@ export function createSchedulerService(
   let intervalId: ReturnType<typeof setInterval> | undefined;
   let running = false;
 
+  function appendRunLog(
+    runId: string,
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    data: Record<string, unknown> = {},
+    logOptions: { truncated?: boolean } = {},
+  ) {
+    appendScheduledJobRunLog(
+      db,
+      { runId, level, message, data, truncated: logOptions.truncated ?? false },
+      { nowMs: nowMs() },
+    );
+  }
+
   async function recoverExpiredRuns(): Promise<void> {
     for (const run of listExpiredRunningScheduledJobRuns(db, {
       nowMs: nowMs(),
@@ -169,13 +184,26 @@ export function createSchedulerService(
         errorCode: 'SCHEDULER_LEASE_EXPIRED',
         errorMessage: 'Scheduled job run lease expired before completion.',
       });
+      appendRunLog(run.id, 'error', 'Scheduled job run lease expired.', {
+        runId: run.id,
+        leaseOwner: run.leaseOwner,
+        leaseExpiresAtMs: run.leaseExpiresAtMs,
+      });
       const job = getScheduledJob(db, run.jobId);
+      const retry = shouldRetry(job, failed);
+      const nextRunAtMs = retry ? nextRunAfterFailure(job, currentNowMs) : null;
       updateScheduledJobScheduleState(db, job.id, {
-        status: shouldRetry(job, failed) ? 'enabled' : 'paused',
-        nextRunAtMs: shouldRetry(job, failed) ? nextRunAfterFailure(job, currentNowMs) : null,
+        status: retry ? 'enabled' : 'paused',
+        nextRunAtMs,
         clearLease: true,
         nowMs: currentNowMs,
       });
+      appendRunLog(
+        run.id,
+        retry ? 'warn' : 'error',
+        retry ? 'Scheduled job retry scheduled.' : 'Scheduled job retries exhausted.',
+        { nextRunAtMs, attempt: failed.attempt, maxAttempts: job.retryPolicy.maxAttempts },
+      );
     }
   }
 
@@ -193,6 +221,12 @@ export function createSchedulerService(
       },
       { nowMs: nowMs() },
     );
+    appendRunLog(run.id, 'info', 'Scheduled job run claimed.', {
+      jobId: job.id,
+      workerId,
+      attempt,
+      leaseExpiresAtMs: run.leaseExpiresAtMs,
+    });
     run = transitionScheduledJobRun(db, run.id, 'running', {
       nowMs: nowMs(),
       leaseOwner: workerId,
@@ -215,12 +249,8 @@ export function createSchedulerService(
       level: 'debug' | 'info' | 'warn' | 'error',
       message: string,
       data: Record<string, unknown> = {},
-    ) =>
-      appendScheduledJobRunLog(
-        db,
-        { runId: run.id, level, message, data, truncated: false },
-        { nowMs: nowMs() },
-      );
+      logOptions: { truncated?: boolean } = {},
+    ) => appendRunLog(run.id, level, message, data, logOptions);
 
     try {
       appendLog('info', 'Scheduled job run started.', { jobId: job.id, attempt });
@@ -236,7 +266,10 @@ export function createSchedulerService(
         nowMs: nowMs(),
         resultSummary: result.summary ?? 'Scheduled job completed.',
       });
-      appendLog('info', 'Scheduled job run succeeded.', { runId: run.id });
+      appendLog('info', 'Scheduled job run succeeded.', {
+        runId: run.id,
+        resultSummary: run.resultSummary,
+      });
       const nextRunAtMs = nextRunAfterSuccess(job, nowMs());
       updateScheduledJobScheduleState(db, job.id, {
         status: nextRunAtMs === null ? 'archived' : 'enabled',
@@ -275,11 +308,18 @@ export function createSchedulerService(
         error: errorMessage(error),
       });
       if (shouldRetry(job, run)) {
+        const nextRunAtMs = nextRunAfterFailure(job, nowMs());
         updateScheduledJobScheduleState(db, job.id, {
           status: 'enabled',
-          nextRunAtMs: nextRunAfterFailure(job, nowMs()),
+          nextRunAtMs,
           clearLease: true,
           nowMs: nowMs(),
+        });
+        appendLog('warn', 'Scheduled job retry scheduled.', {
+          runId: run.id,
+          nextRunAtMs,
+          attempt: run.attempt,
+          maxAttempts: job.retryPolicy.maxAttempts,
         });
       } else {
         updateScheduledJobScheduleState(db, job.id, {
@@ -287,6 +327,11 @@ export function createSchedulerService(
           nextRunAtMs: null,
           clearLease: true,
           nowMs: nowMs(),
+        });
+        appendLog('error', 'Scheduled job retries exhausted.', {
+          runId: run.id,
+          attempt: run.attempt,
+          maxAttempts: job.retryPolicy.maxAttempts,
         });
       }
     }

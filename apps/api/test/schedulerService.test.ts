@@ -73,6 +73,7 @@ describe('scheduler service', () => {
       leaseOwner: undefined,
     });
     expect(listScheduledJobRunLogs(opened.db, run!.id).map((log) => log.message)).toEqual([
+      'Scheduled job run claimed.',
       'Scheduled job run started.',
       'Built-in scheduler no-op task completed.',
       'Scheduled job run succeeded.',
@@ -119,6 +120,12 @@ describe('scheduler service', () => {
       status: 'enabled',
       nextRunAtMs: 1_500,
     });
+    expect(
+      listScheduledJobRunLogs(
+        opened.db,
+        listScheduledJobRuns(opened.db, { jobId: 'job-1' })[0]!.id,
+      ).map((log) => log.message),
+    ).toContain('Scheduled job retry scheduled.');
 
     nowMs = 1_499;
     await service.runOnce();
@@ -231,5 +238,50 @@ describe('scheduler service', () => {
       nextRunAtMs: 1_250,
       leaseOwner: undefined,
     });
+    expect(listScheduledJobRunLogs(opened.db, 'run-1').map((log) => log.message)).toEqual([
+      'Scheduled job run lease expired.',
+      'Scheduled job retry scheduled.',
+    ]);
+  });
+
+  it('redacts and truncates target output logs and failure details', async () => {
+    const secret = 'sk-proj-123456789012345678901234567890';
+    createScheduledJob(opened.db, dueJob({ retryPolicy: { maxAttempts: 1, backoffMs: 0 } }), {
+      id: 'job-1',
+      nowMs: 500,
+    });
+    const executor: ScheduledJobTargetExecutor = ({ log }) => {
+      log('info', `Target output ${secret} ${'x'.repeat(4_200)}`, {
+        authorization: `Bearer ${'a'.repeat(32)}`,
+      });
+      throw new Error(`failed with ${secret}`);
+    };
+    const service = createSchedulerService(opened.db, {
+      workerId: 'worker-1',
+      nowMs: () => nowMs,
+      targetExecutor: executor,
+    });
+
+    await service.runOnce();
+
+    const [run] = listScheduledJobRuns(opened.db, { jobId: 'job-1' });
+    expect(run).toMatchObject({
+      status: 'failed',
+      errorCode: 'SCHEDULER_RUN_FAILED',
+      errorMessage: 'failed with [REDACTED:OpenAI API Key]',
+    });
+    const logs = listScheduledJobRunLogs(opened.db, run!.id);
+    const output = logs.find((log) => log.message.startsWith('Target output'));
+    expect(output).toMatchObject({ truncated: true });
+    expect(output!.message).toContain('[REDACTED:OpenAI API Key]');
+    expect(output!.message).not.toContain(secret);
+    expect(output!.data).toEqual({ authorization: '[REDACTED]' });
+    expect(logs.map((log) => log.message)).toEqual([
+      'Scheduled job run claimed.',
+      'Scheduled job run started.',
+      output!.message,
+      'Scheduled job run failed.',
+      'Scheduled job retries exhausted.',
+    ]);
   });
 });

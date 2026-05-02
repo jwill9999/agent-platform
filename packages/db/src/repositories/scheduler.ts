@@ -28,12 +28,15 @@ import { and, asc, desc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 
 import type { DrizzleDb } from '../database.js';
 import * as schema from '../schema.js';
+import { redactCredentialText, redactObject } from './memoryRedaction.js';
 
 type ScheduledJobRow = typeof schema.scheduledJobs.$inferSelect;
 type ScheduledJobRunRow = typeof schema.scheduledJobRuns.$inferSelect;
 type ScheduledJobRunLogRow = typeof schema.scheduledJobRunLogs.$inferSelect;
 
 const TERMINAL_RUN_STATUSES = new Set<ScheduledJobRunStatus>(['succeeded', 'failed', 'cancelled']);
+const MAX_RUN_TEXT_CHARS = 4_000;
+const MAX_LOG_DATA_JSON_CHARS = 8_000;
 
 const RUN_TRANSITIONS: Record<ScheduledJobRunStatus, readonly ScheduledJobRunStatus[]> = {
   queued: ['running', 'cancelled'],
@@ -74,6 +77,53 @@ function parseJsonObject(value: string | null): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+function truncateText(value: string, maxChars: number): { value: string; truncated: boolean } {
+  if (value.length <= maxChars) return { value, truncated: false };
+  const marker = `\n... (truncated, ${value.length} chars total)`;
+  return {
+    value: `${value.slice(0, Math.max(0, maxChars - marker.length))}${marker}`,
+    truncated: true,
+  };
+}
+
+function redactAndTruncateText(value: string | null | undefined): {
+  value: string | null;
+  truncated: boolean;
+} {
+  if (value === undefined || value === null) return { value: value ?? null, truncated: false };
+  const redacted = redactCredentialText(value);
+  const truncated = truncateText(redacted.value, MAX_RUN_TEXT_CHARS);
+  return { value: truncated.value, truncated: truncated.truncated };
+}
+
+function prepareLogPayload(input: ScheduledJobRunLogCreateBody): {
+  message: string;
+  dataJson: string;
+  truncated: boolean;
+} {
+  const message = redactAndTruncateText(input.message);
+  const redactedData = redactObject(input.data ?? {});
+  const dataJson = JSON.stringify(redactedData.value);
+  if (dataJson.length <= MAX_LOG_DATA_JSON_CHARS) {
+    return {
+      message: message.value ?? '',
+      dataJson,
+      truncated: input.truncated || message.truncated,
+    };
+  }
+
+  const preview = truncateText(dataJson, MAX_LOG_DATA_JSON_CHARS);
+  return {
+    message: message.value ?? '',
+    dataJson: JSON.stringify({
+      truncated: true,
+      originalChars: dataJson.length,
+      preview: preview.value,
+    }),
+    truncated: true,
+  };
 }
 
 function rowToJob(row: ScheduledJobRow): ScheduledJobRecord {
@@ -491,6 +541,8 @@ export function transitionScheduledJobRun(
     throw new ScheduledJobTransitionError(existing.status, status);
   }
   const nowMs = options.nowMs ?? Date.now();
+  const resultSummary = redactAndTruncateText(options.resultSummary);
+  const errorMessage = redactAndTruncateText(options.errorMessage);
 
   db.update(schema.scheduledJobRuns)
     .set({
@@ -516,10 +568,10 @@ export function transitionScheduledJobRun(
       resultSummary:
         options.resultSummary === undefined
           ? (existing.resultSummary ?? null)
-          : options.resultSummary,
+          : resultSummary.value,
       errorCode: options.errorCode === undefined ? (existing.errorCode ?? null) : options.errorCode,
       errorMessage:
-        options.errorMessage === undefined ? (existing.errorMessage ?? null) : options.errorMessage,
+        options.errorMessage === undefined ? (existing.errorMessage ?? null) : errorMessage.value,
       updatedAtMs: nowMs,
     })
     .where(eq(schema.scheduledJobRuns.id, id))
@@ -540,11 +592,17 @@ export function appendScheduledJobRunLog(
   rawInput: ScheduledJobRunLogCreateBody,
   options: { id?: string; nowMs?: number } = {},
 ): ScheduledJobRunLogRecord {
-  const input = ScheduledJobRunLogCreateBodySchema.parse(rawInput);
+  const preTruncated =
+    typeof rawInput.message === 'string' ? redactAndTruncateText(rawInput.message) : undefined;
+  const input = ScheduledJobRunLogCreateBodySchema.parse({
+    ...rawInput,
+    message: preTruncated ? (preTruncated.value ?? '') : rawInput.message,
+    truncated: Boolean(rawInput.truncated || preTruncated?.truncated),
+  });
   const run = getScheduledJobRun(db, input.runId);
   const id = options.id ?? randomUUID();
   const nowMs = options.nowMs ?? Date.now();
-  const truncated = input.truncated ? 1 : 0;
+  const payload = prepareLogPayload(input);
 
   db.run(sql`
     insert into scheduled_job_run_logs (
@@ -564,9 +622,9 @@ export function appendScheduledJobRunLog(
       ${run.jobId},
       coalesce(max(sequence) + 1, 0),
       ${input.level},
-      ${input.message},
-      ${JSON.stringify(input.data)},
-      ${truncated},
+      ${payload.message},
+      ${payload.dataJson},
+      ${payload.truncated ? 1 : 0},
       ${nowMs}
     from scheduled_job_run_logs
     where run_id = ${input.runId}

@@ -256,6 +256,46 @@ describe('scheduler repository', () => {
     );
   });
 
+  it('redacts and bounds persisted run logs and terminal summaries', () => {
+    createScheduledJob(db, baseJob(), { id: 'job-1', nowMs: 1_000 });
+    createScheduledJobRun(db, { jobId: 'job-1' }, { id: 'run-1', nowMs: 1_000 });
+    transitionScheduledJobRun(db, 'run-1', 'running', { nowMs: 2_000 });
+
+    const secret = 'sk-proj-123456789012345678901234567890';
+    const longMessage = `Output ${secret} ${'x'.repeat(4_200)}`;
+    const log = appendScheduledJobRunLog(
+      db,
+      {
+        runId: 'run-1',
+        level: 'info',
+        message: longMessage,
+        data: {
+          token: secret,
+          nested: { value: `Bearer ${'a'.repeat(32)}` },
+          large: 'y'.repeat(9_000),
+        },
+      },
+      { id: 'log-1', nowMs: 2_100 },
+    );
+
+    expect(log.truncated).toBe(true);
+    expect(log.message.length).toBeLessThanOrEqual(4_000);
+    expect(log.message).toContain('[REDACTED:OpenAI API Key]');
+    expect(JSON.stringify(log.data)).not.toContain(secret);
+    expect(JSON.stringify(log.data)).toContain('[REDACTED]');
+    expect(JSON.stringify(log.data)).toContain('truncated');
+
+    const failed = transitionScheduledJobRun(db, 'run-1', 'failed', {
+      nowMs: 3_000,
+      errorCode: 'SECRET_FAILURE',
+      errorMessage: `Failed with ${secret} ${'z'.repeat(4_200)}`,
+    });
+
+    expect(failed.errorMessage).toContain('[REDACTED:OpenAI API Key]');
+    expect(failed.errorMessage).not.toContain(secret);
+    expect(failed.errorMessage!.length).toBeLessThanOrEqual(4_000);
+  });
+
   it('allows retrying failed runs by transitioning failed back to queued', () => {
     createScheduledJob(db, baseJob(), { id: 'job-1', nowMs: 1_000 });
     createScheduledJobRun(db, { jobId: 'job-1' }, { id: 'run-1', nowMs: 1_000 });

@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Implemented `agent-platform-scheduler.3` on `task/agent-platform-scheduler.3`: scheduler run logs now redact credential text, bound messages/data with truncation metadata, redact terminal result/error summaries, and capture claimed/started/output/retry/cancel/fail/success/expired-lease lifecycle evidence. Full unit suite passed after the expected sandboxed API listener failure was rerun with escalation.
+- **Date:** 2026-05-02
 - **Session:** Implemented `agent-platform-scheduler.2` on `task/agent-platform-scheduler.2`: added the API-owned scheduler service, due-job claiming with leases, no-op built-in target execution, persisted run/log transitions, retry backoff, timeout handling, cancellation requests, expired-run recovery, and API lifecycle start/stop wiring.
 - **Date:** 2026-05-02
 - **Session:** Addressed scheduler `.1` review feedback: scheduled job run logs now enforce a unique `(runId, sequence)` index and allocate the next sequence with a single insert-select statement instead of a separate max-then-insert step.
@@ -481,11 +483,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-scheduler.2`
-- **Current base:** branched from `task/agent-platform-scheduler.1` after the scheduler foundation task was completed.
+- **Current branch:** `task/agent-platform-scheduler.3`
+- **Current base:** branched from `task/agent-platform-scheduler.2` after the scheduler runner task was completed.
 - **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** `agent-platform-scheduler.2` scheduler runner, queue/lease, retry, timeout, and cancellation basics are implemented and closed in Beads. Next work is `agent-platform-scheduler.3`.
-- **Remote sync:** Beads/Dolt push succeeded after closing `.2`; `task/agent-platform-scheduler.2` code changes are pending commit and git push.
+- **Current work:** `agent-platform-scheduler.3` background process tracking and bounded log capture are implemented and closed in Beads. Next work is `agent-platform-scheduler.4`.
+- **Remote sync:** Beads/Dolt push succeeded after closing `.3`; `.3` code changes are pending commit and git push.
 
 ### Beads
 
@@ -502,7 +504,8 @@ Quality gates passed:
 - `agent-platform-active-project` is closed locally as the required P1 project/work context foundation task.
 - `agent-platform-scheduler.1` is closed.
 - `agent-platform-scheduler.2` is closed.
-- `agent-platform-scheduler.3` through `.5` are open and dependency-chained.
+- `agent-platform-scheduler.3` is closed.
+- `agent-platform-scheduler.4` and `.5` are open and dependency-chained.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
 - New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
@@ -513,6 +516,18 @@ Quality gates passed:
 ### Quality
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
+- Scheduler `.3` tracking/log-capture checks passed:
+  - `pnpm --filter @agent-platform/db run build`
+  - `pnpm --filter @agent-platform/api run typecheck`
+  - `pnpm --filter @agent-platform/db run typecheck`
+  - `pnpm --filter @agent-platform/api run lint`
+  - `pnpm --filter @agent-platform/db run lint`
+  - `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts`
+  - `pnpm --filter @agent-platform/api exec vitest run test/schedulerService.test.ts`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
 - Scheduler `.2` runner checks passed:
   - `pnpm --filter @agent-platform/db run build`
   - `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts`
