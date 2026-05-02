@@ -480,8 +480,8 @@ Quality gates passed:
 - **Current branch:** `task/agent-platform-scheduler.1`
 - **Current base:** branched from `task/agent-platform-active-project` after the active-project foundation was completed.
 - **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** `agent-platform-scheduler.1` scheduler contracts, schema, repository, and run state machine are implemented. Next work is `agent-platform-scheduler.2` once `.1` is closed and pushed.
-- **Remote sync:** Push `task/agent-platform-scheduler.1` after closing `.1` in Beads and committing this session update.
+- **Current work:** `agent-platform-scheduler.1` scheduler contracts, schema, repository, and run state machine are implemented, closed in Beads, committed, and pushed. Next work is `agent-platform-scheduler.2`.
+- **Remote sync:** `task/agent-platform-scheduler.1` is up to date with origin at commit `dcb19c9`; Beads/Dolt push succeeded.
 
 ### Beads
 
@@ -496,7 +496,7 @@ Quality gates passed:
 - `agent-platform-memory.1` through `.7` are complete and closed.
 - `agent-platform-scheduler` epic is open.
 - `agent-platform-active-project` is closed locally as the required P1 project/work context foundation task.
-- `agent-platform-scheduler.1` is implemented and ready to close after final sync.
+- `agent-platform-scheduler.1` is closed.
 - `agent-platform-scheduler.2` through `.5` are open and dependency-chained.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
@@ -656,8 +656,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Close and push `agent-platform-scheduler.1`.
-2. Branch `task/agent-platform-scheduler.2` from `task/agent-platform-scheduler.1`.
+1. Open/monitor the task PR for `task/agent-platform-scheduler.1` into `feature/agent-platform-scheduler`.
+2. After `.1` is accepted, branch `task/agent-platform-scheduler.2` from `task/agent-platform-scheduler.1`.
 3. Implement `agent-platform-scheduler.2`: runner, queue polling, retries, cancellation basics, and lease handling.
 
 ---
