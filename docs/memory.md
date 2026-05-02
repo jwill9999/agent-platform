@@ -75,3 +75,13 @@ The chat runtime retrieves approved long-term memories into a bounded prompt bun
 - Prompt entries include source kind/id/label, confidence, memory kind, and scope.
 
 Pending candidate memories are not retrieved. The runtime records a `memory_retrieval` trace event with included and omitted counts so retrieval decisions are auditable without logging full prompt content.
+
+## Management
+
+Long-term memory is manageable without direct database access:
+
+- `/settings/memory` lists durable memories and pending candidates with scope, status, confidence, source, safety, tags, and expiry.
+- `/v1/memories` supports list/detail/update/review/delete/export/clear-by-scope operations.
+- Built-in memory tools (`sys_memory_list`, `sys_memory_get`, `sys_memory_review`, `sys_memory_delete`, and `sys_memory_export`) are bound to the current session and agent scope. They can see global memories plus the active session/agent memories; cross-session access is denied.
+
+Deletion and clear-by-scope are explicit actions. API management actions emit structured audit logs without memory content, and `sys_memory_delete` is registered as a high-risk tool requiring approval.

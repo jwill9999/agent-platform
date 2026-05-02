@@ -72,6 +72,13 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `GET /v1/sessions/:id/working-memory`    |    —     |       ✅        | Inspect session-scoped working memory        |
 | `PUT /v1/sessions/:id`                   |    —     |       ✅        | Update session (no UI)                       |
 | `DELETE /v1/sessions/:id`                |    —     |       ✅        | Delete session (no UI)                       |
+| `GET /v1/memories`                       |    ✅    |       ✅        | Memory dashboard list/filter                 |
+| `GET /v1/memories/export`                |    ✅    |       ✅        | Export filtered memory records               |
+| `GET /v1/memories/:id`                   |    ✅    |       ✅        | Memory dashboard detail                      |
+| `PUT /v1/memories/:id`                   |    ✅    |       ✅        | Memory dashboard edit                        |
+| `POST /v1/memories/:id/review`           |    ✅    |       ✅        | Approve or reject a memory record            |
+| `DELETE /v1/memories/:id`                |    ✅    |       ✅        | Delete a memory record                       |
+| `POST /v1/memories/clear`                |    ✅    |       ✅        | Explicit clear-by-scope memory action        |
 | `GET /v1/model-configs`                  |    ✅    |       ✅        | Model configs dashboard                      |
 | `POST /v1/model-configs`                 |    ✅    |       ✅        | Model configs dashboard — create             |
 | `PUT /v1/model-configs/:id`              |    ✅    |       ✅        | Model configs dashboard — edit               |
@@ -285,6 +292,22 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 Body schema: `SessionCreateBodySchema` — requires `agentId`. Agent must exist (FK constraint → 404 on missing).
 
 `GET /v1/sessions/:id/working-memory` returns `{ "data": null }` until the session has completed at least one chat or resume turn that produced working-memory state. When present, the artifact is scoped to the session and contains the current goal, active project/task, key decisions, important files, bounded tool summaries, blockers, pending approval IDs, next action, and a compact summary used for session continuity.
+
+### Memories
+
+| Method   | Path                      | Description                                      |
+| -------- | ------------------------- | ------------------------------------------------ |
+| `GET`    | `/v1/memories`            | List memory records with scope/status filters    |
+| `GET`    | `/v1/memories/export`     | Export filtered records as JSON-safe data        |
+| `GET`    | `/v1/memories/:id`        | Get one memory record                            |
+| `PUT`    | `/v1/memories/:id`        | Edit memory content, tags, metadata, or workflow |
+| `POST`   | `/v1/memories/:id/review` | Approve or reject a memory record                |
+| `DELETE` | `/v1/memories/:id`        | Delete one memory record                         |
+| `POST`   | `/v1/memories/clear`      | Delete records matching an explicit scope        |
+
+`GET /v1/memories` accepts `scope`, `scopeId`, `kind`, `status`, `reviewStatus`, `safetyState`, `minConfidence`, `sourceKind`, `sourceId`, `tag`, `includeExpired`, `limit`, and `offset`. It returns `{ "data": { "items": [...], "total": 1, "limit": 100, "offset": 0 } }`.
+
+Review requests use `{ "decision": "approved" | "rejected", "reason"?: "..." }`. Clear requests require `{ "scope": "...", "scopeId"?: "...", "confirm": true }` and may include status/review/safety filters. Destructive memory operations are logged without memory content.
 
 ### Chat
 

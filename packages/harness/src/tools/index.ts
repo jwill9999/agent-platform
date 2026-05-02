@@ -33,6 +33,13 @@ export {
   executeRepoDiscoveryTool,
 } from './repoDiscoveryTools.js';
 export {
+  MEMORY_TOOLS,
+  MEMORY_TOOL_IDS,
+  MEMORY_TOOL_MAP,
+  executeMemoryTool,
+  type MemoryToolContext,
+} from './memoryTools.js';
+export {
   OBSERVABILITY_TOOLS,
   OBSERVABILITY_IDS,
   OBSERVABILITY_MAP,

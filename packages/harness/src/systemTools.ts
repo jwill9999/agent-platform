@@ -33,6 +33,10 @@ import {
   REPO_DISCOVERY_TOOLS,
   REPO_DISCOVERY_TOOL_MAP,
   executeRepoDiscoveryTool,
+  MEMORY_TOOLS,
+  MEMORY_TOOL_MAP,
+  executeMemoryTool,
+  type MemoryToolContext,
 } from './tools/index.js';
 import {
   SYSTEM_TOOL_PREFIX,
@@ -72,6 +76,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   ...GIT_TOOL_MAP,
   ...QUALITY_GATE_MAP,
   ...REPO_DISCOVERY_TOOL_MAP,
+  ...MEMORY_TOOL_MAP,
 } as const;
 
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
@@ -175,6 +180,8 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...QUALITY_GATE_TOOLS,
   // Repository discovery and bounded code search
   ...REPO_DISCOVERY_TOOLS,
+  // Memory management, scoped to the current session/agent
+  ...MEMORY_TOOLS,
   // Lazy skill loading — fetch full skill instructions on demand
   {
     id: ids.getSkillDetail,
@@ -322,6 +329,7 @@ async function handleListFiles(toolId: string, args: Record<string, unknown>): P
  */
 export function createSystemToolExecutor(options?: {
   observability?: ObservabilityToolContext;
+  memory?: MemoryToolContext;
   workspaceRoot?: string;
 }): NativeToolExecutor {
   const configuredWorkspaceRoot = options?.workspaceRoot ?? WORKSPACE_ROOT;
@@ -368,6 +376,9 @@ export function createSystemToolExecutor(options?: {
 
     const repoDiscoveryResult = await executeRepoDiscoveryTool(toolId, args, { workspaceRoot });
     if (repoDiscoveryResult) return repoDiscoveryResult;
+
+    const memoryResult = await executeMemoryTool(toolId, args, options?.memory);
+    if (memoryResult) return memoryResult;
 
     return {
       type: 'error',

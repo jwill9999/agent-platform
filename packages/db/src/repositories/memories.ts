@@ -324,6 +324,18 @@ export function deleteMemory(db: DrizzleDb, id: string): boolean {
   return result.changes > 0;
 }
 
+export function deleteMemoriesByQuery(
+  db: DrizzleDb,
+  rawQuery: MemoryQueryInput,
+  options: QueryMemoriesOptions = {},
+): number {
+  const query = MemoryQuerySchema.parse(rawQuery);
+  const conditions = buildMemoryConditions(query, options.nowMs ?? Date.now());
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const result = db.delete(schema.memories).where(where).run();
+  return result.changes;
+}
+
 export interface CreateMemoryLinkInput {
   sourceMemoryId: string;
   targetMemoryId: string;

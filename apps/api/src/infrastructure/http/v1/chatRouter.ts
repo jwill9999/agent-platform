@@ -644,8 +644,9 @@ function createRuntimeToolDispatchNode({
             sessionId,
             traceId: runId,
           },
+          memory: { db, sessionId, agentId: agentCtx.agent.id },
         }
-      : undefined,
+      : { memory: { db, sessionId, agentId: agentCtx.agent.id } },
   );
 
   return createToolDispatchNode({

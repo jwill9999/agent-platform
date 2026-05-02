@@ -159,6 +159,32 @@ export const MemoryQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const MemoryReviewBodySchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  reviewedBy: z.string().min(1).default('local-user'),
+  reason: z.string().min(1).max(1000).optional(),
+});
+
+export const MemoryClearBodySchema = z
+  .object({
+    scope: MemoryScopeSchema,
+    scopeId: z.string().min(1).optional(),
+    status: MemoryStatusSchema.optional(),
+    reviewStatus: MemoryReviewStatusSchema.optional(),
+    safetyState: MemorySafetyStateSchema.optional(),
+    includeExpired: z.boolean().default(false),
+    confirm: z.literal(true),
+  })
+  .superRefine((value, ctx) => {
+    if (!validateScopedMemory(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: scopedMemoryMessage(value.scope),
+        path: ['scopeId'],
+      });
+    }
+  });
+
 export const MemoryLinkSchema = z.object({
   sourceMemoryId: z.string().min(1),
   targetMemoryId: z.string().min(1),
@@ -305,6 +331,8 @@ export type MemoryCreateBodyInput = z.input<typeof MemoryCreateBodySchema>;
 export type MemoryUpdateBody = z.infer<typeof MemoryUpdateBodySchema>;
 export type MemoryQuery = z.infer<typeof MemoryQuerySchema>;
 export type MemoryQueryInput = z.input<typeof MemoryQuerySchema>;
+export type MemoryReviewBody = z.infer<typeof MemoryReviewBodySchema>;
+export type MemoryClearBody = z.infer<typeof MemoryClearBodySchema>;
 export type MemoryLink = z.infer<typeof MemoryLinkSchema>;
 export type PromptMemorySource = z.infer<typeof PromptMemorySourceSchema>;
 export type PromptMemoryItem = z.infer<typeof PromptMemoryItemSchema>;
