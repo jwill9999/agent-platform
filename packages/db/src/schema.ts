@@ -298,7 +298,7 @@ export const scheduledJobRunLogs = sqliteTable(
     createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
   },
   (t) => ({
-    runIdx: index('scheduled_job_run_logs_run_idx').on(t.runId, t.sequence),
+    runSequenceIdx: uniqueIndex('scheduled_job_run_logs_run_sequence_idx').on(t.runId, t.sequence),
     jobIdx: index('scheduled_job_run_logs_job_idx').on(t.jobId),
   }),
 );

@@ -119,6 +119,9 @@ describe('migrations', () => {
         'scheduled_job_runs_lease_idx',
       ]),
     );
+    expect(indexesFor('scheduled_job_run_logs')).toEqual(
+      expect.arrayContaining(['scheduled_job_run_logs_run_sequence_idx']),
+    );
     expect(foreignTablesFor('scheduled_jobs')).toEqual(
       expect.arrayContaining(['projects', 'agents', 'sessions']),
     );

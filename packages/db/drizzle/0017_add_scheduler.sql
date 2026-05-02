@@ -80,6 +80,6 @@ CREATE TABLE `scheduled_job_run_logs` (
   `created_at_ms` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `scheduled_job_run_logs_run_idx` ON `scheduled_job_run_logs` (`run_id`, `sequence`);
+CREATE UNIQUE INDEX `scheduled_job_run_logs_run_sequence_idx` ON `scheduled_job_run_logs` (`run_id`, `sequence`);
 --> statement-breakpoint
 CREATE INDEX `scheduled_job_run_logs_job_idx` ON `scheduled_job_run_logs` (`job_id`);

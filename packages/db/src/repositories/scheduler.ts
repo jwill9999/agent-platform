@@ -441,27 +441,35 @@ export function appendScheduledJobRunLog(
 ): ScheduledJobRunLogRecord {
   const input = ScheduledJobRunLogCreateBodySchema.parse(rawInput);
   const run = getScheduledJobRun(db, input.runId);
-  const sequenceResult = db
-    .select({ maxSequence: sql<number | null>`max(${schema.scheduledJobRunLogs.sequence})` })
-    .from(schema.scheduledJobRunLogs)
-    .where(eq(schema.scheduledJobRunLogs.runId, input.runId))
-    .get();
-  const sequence = (sequenceResult?.maxSequence ?? -1) + 1;
   const id = options.id ?? randomUUID();
+  const nowMs = options.nowMs ?? Date.now();
+  const truncated = input.truncated ? 1 : 0;
 
-  db.insert(schema.scheduledJobRunLogs)
-    .values({
+  db.run(sql`
+    insert into scheduled_job_run_logs (
       id,
-      runId: input.runId,
-      jobId: run.jobId,
+      run_id,
+      job_id,
       sequence,
-      level: input.level,
-      message: input.message,
-      dataJson: JSON.stringify(input.data),
-      truncated: input.truncated,
-      createdAtMs: options.nowMs ?? Date.now(),
-    })
-    .run();
+      level,
+      message,
+      data_json,
+      truncated,
+      created_at_ms
+    )
+    select
+      ${id},
+      ${input.runId},
+      ${run.jobId},
+      coalesce(max(sequence) + 1, 0),
+      ${input.level},
+      ${input.message},
+      ${JSON.stringify(input.data)},
+      ${truncated},
+      ${nowMs}
+    from scheduled_job_run_logs
+    where run_id = ${input.runId}
+  `);
 
   const row = db
     .select()

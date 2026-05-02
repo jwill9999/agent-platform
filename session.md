@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Addressed scheduler `.1` review feedback: scheduled job run logs now enforce a unique `(runId, sequence)` index and allocate the next sequence with a single insert-select statement instead of a separate max-then-insert step.
+- **Date:** 2026-05-02
 - **Session:** Implemented `agent-platform-scheduler.1` on `task/agent-platform-scheduler.1`: added shared scheduler contracts, SQLite/Drizzle scheduler tables and migration, repository CRUD/list/update/run/log APIs, and tested ownership plus run state transitions. No job runner/execution loop was added in this task.
 - **Date:** 2026-05-02
 - **Session:** Addressed active-project PR review feedback: project workspace paths now normalize under `projects/` without duplicate prefixes, duplicate project slugs return structured conflicts, session project binding validates the project before updating, legacy working-memory `activeProject` remains a direct path fallback, and repo/git/migration/workspace tests cover precedence and project associations.
@@ -509,6 +511,11 @@ Quality gates passed:
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
 - Scheduler `.1` foundation checks passed:
+  - Review feedback rerun: `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts test/migrate.test.ts`
+  - Review feedback rerun: `pnpm --filter @agent-platform/db run typecheck`
+  - Review feedback rerun: `pnpm --filter @agent-platform/db run lint`
+  - Review feedback rerun: `pnpm exec prettier --check packages/db/src/repositories/scheduler.ts packages/db/src/schema.ts packages/db/test/migrate.test.ts`
+  - Review feedback rerun: `git diff --check`
   - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
   - `pnpm --filter @agent-platform/contracts run typecheck`
   - `pnpm --filter @agent-platform/contracts run build`
