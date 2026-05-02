@@ -5,6 +5,8 @@ import type { MemoryRecord, MemoryUpdateBody } from '@agent-platform/contracts';
 import { Check, Download, Loader2, RefreshCw, Save, Search, Trash2, X } from 'lucide-react';
 
 import { apiDelete, apiGet, apiPath, apiPost, apiPut, ApiRequestError } from '@/lib/apiClient';
+import { cn } from '@/lib/cn';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,8 +22,40 @@ type MemoryListResponse = {
 const statusOptions = ['', 'pending', 'approved', 'rejected', 'archived'] as const;
 const scopeOptions = ['', 'global', 'project', 'agent', 'session'] as const;
 
+function titleCase(value: string): string {
+  return value
+    .split('_')
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function displayScope(memory: MemoryRecord): string {
   return memory.scopeId ? `${memory.scope}:${memory.scopeId}` : memory.scope;
+}
+
+function statusBadgeClass(status: MemoryRecord['status']): string {
+  switch (status) {
+    case 'approved':
+      return 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
+    case 'pending':
+      return 'border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300';
+    case 'rejected':
+      return 'border-rose-500/40 bg-rose-500/15 text-rose-700 dark:text-rose-300';
+    case 'archived':
+      return 'border-slate-500/40 bg-slate-500/15 text-slate-700 dark:text-slate-300';
+  }
+}
+
+function reviewBadgeClass(reviewStatus: MemoryRecord['reviewStatus']): string {
+  switch (reviewStatus) {
+    case 'approved':
+      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
+    case 'unreviewed':
+    case 'needs_review':
+      return 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
+    case 'rejected':
+      return 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300';
+  }
 }
 
 function memoryQueryPath(
@@ -58,6 +92,7 @@ export function MemoryDashboard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busyMemoryId, setBusyMemoryId] = useState<string | null>(null);
 
   const path = useMemo(() => memoryQueryPath(filters), [filters]);
 
@@ -93,11 +128,14 @@ export function MemoryDashboard() {
 
   const reviewMemory = useCallback(
     async (memory: MemoryRecord, decision: 'approved' | 'rejected') => {
+      setBusyMemoryId(memory.id);
       try {
         await apiPost(apiPath('memories', memory.id, 'review'), { decision });
         await load();
       } catch (e) {
         setError(e instanceof ApiRequestError ? e.message : String(e));
+      } finally {
+        setBusyMemoryId(null);
       }
     },
     [load],
@@ -106,11 +144,14 @@ export function MemoryDashboard() {
   const deleteOne = useCallback(
     async (memory: MemoryRecord) => {
       if (!confirm(`Delete memory ${memory.id}?`)) return;
+      setBusyMemoryId(memory.id);
       try {
         await apiDelete(apiPath('memories', memory.id));
         await load();
       } catch (e) {
         setError(e instanceof ApiRequestError ? e.message : String(e));
+      } finally {
+        setBusyMemoryId(null);
       }
     },
     [load],
@@ -330,93 +371,165 @@ export function MemoryDashboard() {
 
       {!loading && memories.length > 0 && (
         <div className="space-y-3">
-          {memories.map((memory) => (
-            <article key={memory.id} className="rounded-lg border border-border bg-card p-4">
-              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>{displayScope(memory)}</span>
-                    <span>{memory.kind}</span>
-                    <span>{memory.status}</span>
-                    <span>{memory.reviewStatus}</span>
-                    <span>{Math.round(memory.confidence * 100)}%</span>
+          {memories.map((memory) => {
+            const isBusy = busyMemoryId === memory.id;
+            const isApproved = memory.status === 'approved' && memory.reviewStatus === 'approved';
+            const isRejected = memory.status === 'rejected' || memory.reviewStatus === 'rejected';
+
+            return (
+              <article
+                key={memory.id}
+                className={cn(
+                  'rounded-lg border bg-card p-4 shadow-sm transition-colors',
+                  isBusy ? 'border-primary/50 bg-primary/5' : 'border-border',
+                )}
+              >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'px-3 py-1 text-sm font-semibold',
+                          statusBadgeClass(memory.status),
+                        )}
+                      >
+                        {titleCase(memory.status)}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'px-2.5 py-1 text-xs font-semibold',
+                          reviewBadgeClass(memory.reviewStatus),
+                        )}
+                      >
+                        {titleCase(memory.reviewStatus)}
+                      </Badge>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {Math.round(memory.confidence * 100)}% confidence
+                      </span>
+                    </div>
+
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-foreground">
+                      {memory.content}
+                    </p>
                   </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
-                    {memory.content}
-                  </p>
+
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => beginEdit(memory)}
+                      disabled={isBusy}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={isApproved ? 'secondary' : 'outline'}
+                      className={cn(
+                        'border-emerald-500/40 hover:border-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700 active:bg-emerald-500/25 dark:hover:text-emerald-300',
+                        isApproved && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+                      )}
+                      disabled={isBusy || isApproved}
+                      onClick={() => {
+                        reviewMemory(memory, 'approved').catch((e: unknown) => {
+                          setError(e instanceof ApiRequestError ? e.message : String(e));
+                        });
+                      }}
+                    >
+                      {isBusy ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="mr-2 h-4 w-4" />
+                      )}
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={isRejected ? 'secondary' : 'outline'}
+                      className={cn(
+                        'border-rose-500/40 hover:border-rose-600 hover:bg-rose-500/15 hover:text-rose-700 active:bg-rose-500/25 dark:hover:text-rose-300',
+                        isRejected && 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+                      )}
+                      disabled={isBusy || isRejected}
+                      onClick={() => {
+                        reviewMemory(memory, 'rejected').catch((e: unknown) => {
+                          setError(e instanceof ApiRequestError ? e.message : String(e));
+                        });
+                      }}
+                    >
+                      {isBusy ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="mr-2 h-4 w-4" />
+                      )}
+                      Reject
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={isBusy}
+                      className="active:bg-destructive/80"
+                      onClick={() => {
+                        deleteOne(memory).catch((e: unknown) => {
+                          setError(e instanceof ApiRequestError ? e.message : String(e));
+                        });
+                      }}
+                    >
+                      {isBusy ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => beginEdit(memory)}>
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      reviewMemory(memory, 'approved').catch((e: unknown) => {
-                        setError(e instanceof ApiRequestError ? e.message : String(e));
-                      });
-                    }}
-                  >
-                    <Check className="mr-2 h-4 w-4" />
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      reviewMemory(memory, 'rejected').catch((e: unknown) => {
-                        setError(e instanceof ApiRequestError ? e.message : String(e));
-                      });
-                    }}
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => {
-                      deleteOne(memory).catch((e: unknown) => {
-                        setError(e instanceof ApiRequestError ? e.message : String(e));
-                      });
-                    }}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
-                </div>
-              </div>
-              <dl className="grid gap-2 text-xs text-muted-foreground md:grid-cols-4">
-                <div>
-                  <dt className="font-medium">Source</dt>
-                  <dd>{memory.source.label ?? memory.source.kind}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium">Safety</dt>
-                  <dd>{memory.safetyState}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium">Expires</dt>
-                  <dd>
+
+                <dl className="mt-4 grid gap-3 rounded-md bg-muted/35 p-3 text-xs text-muted-foreground md:grid-cols-4">
+                  <div>
+                    <dt className="font-medium text-foreground">Scope</dt>
+                    <dd className="mt-1 break-all">{displayScope(memory)}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-foreground">Kind</dt>
+                    <dd className="mt-1">{titleCase(memory.kind)}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-foreground">Source</dt>
+                    <dd className="mt-1">{memory.source.label ?? memory.source.kind}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-foreground">Safety</dt>
+                    <dd className="mt-1">{titleCase(memory.safetyState)}</dd>
+                  </div>
+                </dl>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>
+                    Expires:{' '}
                     {memory.expiresAtMs ? new Date(memory.expiresAtMs).toLocaleString() : 'Never'}
-                  </dd>
+                  </span>
+                  {memory.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                  {memory.tags.length === 0 && <span>No tags</span>}
                 </div>
-                <div>
-                  <dt className="font-medium">Tags</dt>
-                  <dd>{memory.tags.length ? memory.tags.join(', ') : 'None'}</dd>
-                </div>
-              </dl>
-              {Object.keys(memory.source.metadata).length > 0 && (
-                <details className="mt-3 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer font-medium">Source metadata</summary>
-                  <pre className="mt-2 overflow-auto rounded-md bg-muted p-2">
-                    {JSON.stringify(memory.source.metadata, null, 2)}
-                  </pre>
-                </details>
-              )}
-            </article>
-          ))}
+
+                {Object.keys(memory.source.metadata).length > 0 && (
+                  <details className="mt-3 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer font-medium">Source metadata</summary>
+                    <pre className="mt-2 overflow-auto rounded-md bg-muted p-2">
+                      {JSON.stringify(memory.source.metadata, null, 2)}
+                    </pre>
+                  </details>
+                )}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

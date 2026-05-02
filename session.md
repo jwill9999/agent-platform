@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Polished the Settings Memory dashboard after manual review: promoted pending/approved/rejected states into larger colored badges, added clearer action hover/active/busy feedback, and reduced visual noise in each memory record card.
+- **Date:** 2026-05-02
 - **Session:** Implemented and verified `agent-platform-memory.7` on `task/agent-platform-memory.7`: added dry-run-first expired memory cleanup, cleanup API contracts/routes, scoped export/clear safety coverage, retention docs, and focused/broader package quality gates.
 - **Date:** 2026-05-02
 - **Session:** Added the missing Memory entry to the main Settings sidebar dropdown after manual epic testing confirmed the page worked but was not discoverable from the sidebar.
@@ -488,6 +490,9 @@ Quality gates passed:
   - `pnpm --filter @agent-platform/db build`
   - `pnpm --filter @agent-platform/contracts typecheck`
   - `pnpm --filter @agent-platform/db typecheck`
+  - `pnpm --filter @agent-platform/web typecheck`
+  - `pnpm --filter @agent-platform/web lint`
+  - `pnpm --filter @agent-platform/web test`
   - `pnpm --filter @agent-platform/api typecheck`
   - `pnpm --filter @agent-platform/contracts lint`
   - `pnpm --filter @agent-platform/db lint`
