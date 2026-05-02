@@ -10,6 +10,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Date:** 2026-05-02
 - **Session:** Implemented and verified `agent-platform-memory.7` on `task/agent-platform-memory.7`: added dry-run-first expired memory cleanup, cleanup API contracts/routes, scoped export/clear safety coverage, retention docs, and focused/broader package quality gates.
 - **Date:** 2026-05-02
+- **Session:** Added the missing Memory entry to the main Settings sidebar dropdown after manual epic testing confirmed the page worked but was not discoverable from the sidebar.
+- **Date:** 2026-05-02
 - **Session:** Closed out `agent-platform-memory.6` and claimed the final memory epic task, `agent-platform-memory.7`, on new branch `task/agent-platform-memory.7`. Beads/Dolt claim sync succeeded.
 - **Date:** 2026-05-02
 - **Session:** Addressed SonarCloud reliability findings on `task/agent-platform-memory.6`: removed loop-index reassignment in chat history sanitisation, replaced `charCodeAt()` with `codePointAt()` in workspace path checks, and reduced overlapping maintainability findings in the touched chat/bash workspace policy code.
@@ -491,6 +493,9 @@ Quality gates passed:
   - `pnpm --filter @agent-platform/contracts test`
   - `pnpm --filter @agent-platform/db test`
   - `pnpm --filter @agent-platform/api test` (escalated for Supertest local listener)
+- Memory sidebar discoverability checks passed:
+  - `pnpm --filter @agent-platform/web typecheck`
+  - `pnpm --filter @agent-platform/web lint`
 - Structured edit checks passed:
   - `pnpm --filter @agent-platform/contracts build`
   - `pnpm --filter @agent-platform/agent-validation build`
