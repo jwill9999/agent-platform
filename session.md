@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Memory epic closeout complete. The epic was manually tested, merged to `main`, local `main` was updated, old task/feature branches were pruned, and `agent-platform-memory` plus child tasks `.1` through `.7` are closed in Beads. Pause here; next session should start planning/refinement for the next epic from updated `main`.
+- **Date:** 2026-05-02
 - **Session:** Addressed follow-up memory review feedback on `task/agent-platform-memory.7`: prompt memory retrieval now queries only visible, approved, safe/redacted, unexpired, minimum-confidence scopes; tool error parsing is shared; memory tools return structured scope errors; working-memory overwrite semantics are documented; important-file extraction avoids obvious URLs; and the memory.2 spec typo is fixed.
 - **Date:** 2026-05-02
 - **Session:** Polished the Settings Memory dashboard after manual review: promoted pending/approved/rejected states into larger colored badges, added clearer action hover/active/busy feedback, and reduced visual noise in each memory record card.
@@ -459,11 +461,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-memory.7`
-- **Current base:** chained from prior memory task branches toward `feature/agent-platform-memory`.
-- **Latest completed task:** `agent-platform-memory.7` retention, expiry, cleanup, and cross-scope safety tests.
-- **Current work:** Memory epic implementation chain is complete; final task branch is ready for PR/pipeline review into `feature/agent-platform-memory`.
-- **Remote sync:** Branch and Beads/Dolt should be pushed after this session update commit.
+- **Current branch:** `main`
+- **Current base:** updated `origin/main` after the memory epic merge.
+- **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
+- **Current work:** Paused. No task is currently claimed; next session should plan/refine the next epic before implementation.
+- **Remote sync:** Memory epic code has been merged to `main`; Beads/Dolt is synced after closeout.
 
 ### Beads
 
@@ -474,8 +476,8 @@ Quality gates passed:
 - `agent-platform-code-tools.6` is closed.
 - `agent-platform-code-tools.7` is closed.
 - `agent-platform-code-tools` epic is closed.
-- `agent-platform-memory` epic is closed in Beads; final branch is pending PR/merge review.
-- `agent-platform-memory.1` through `.7` are complete in the chained task branches.
+- `agent-platform-memory` epic is closed in Beads and merged to `main`.
+- `agent-platform-memory.1` through `.7` are complete and closed.
 - New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
