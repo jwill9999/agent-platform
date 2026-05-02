@@ -4,7 +4,7 @@
 
 Implements the core of the memory epic: adds durable long‑term memory records and links, short‑term session working memory artifacts, conservative prompt retrieval and self‑learning evaluation, plus API routes, system tools, UI, and tests to manage and safely expose memory; also refactors some shell/workspace parsing utilities for reliability and wires memory into the chat/runtime graph traces.
 
-#### Sequence diagram for chat request with memory retrieval and working memory refresh
+### Sequence diagram for chat request with memory retrieval and working memory refresh
 
 ```mermaid
 sequenceDiagram
@@ -37,7 +37,7 @@ sequenceDiagram
   WebApp-->>User: Render assistant reply
 ```
 
-#### ER diagram for new memory-related database tables
+### ER diagram for new memory-related database tables
 
 ```mermaid
 erDiagram
@@ -99,7 +99,7 @@ erDiagram
   sessions ||--o| working_memory_artifacts : has_working_memory
 ```
 
-#### Class diagram for memory contracts and repositories
+### Class diagram for memory contracts and repositories
 
 ```mermaid
 classDiagram
@@ -382,7 +382,7 @@ classDiagram
 <details>
 <summary>Tips and commands</summary>
 
-#### Interacting with Sourcery
+### Interacting with Sourcery
 
 - **Trigger a new review:** Comment `@sourcery-ai review` on the pull request.
 - **Continue discussions:** Reply directly to Sourcery's review comments.
@@ -406,7 +406,7 @@ classDiagram
   want to start fresh with a new review - don't forget to comment
   `@sourcery-ai review` to trigger a new review!
 
-#### Customizing Your Experience
+### Customizing Your Experience
 
 Access your [dashboard](https://app.sourcery.ai) to:
 
@@ -416,7 +416,7 @@ Access your [dashboard](https://app.sourcery.ai) to:
 - Add, remove or edit custom review instructions.
 - Adjust other review settings.
 
-#### Getting Help
+### Getting Help
 
 - [Contact our support team](mailto:support@sourcery.ai) for questions or feedback.
 - Visit our [documentation](https://docs.sourcery.ai) for detailed guides and information.
