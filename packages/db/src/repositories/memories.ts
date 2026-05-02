@@ -20,30 +20,10 @@ import { and, desc, eq, gte, isNull, or, sql } from 'drizzle-orm';
 
 import type { DrizzleDb } from '../database.js';
 import * as schema from '../schema.js';
-
-const REDACT_KEYS = new Set([
-  'key',
-  'token',
-  'password',
-  'secret',
-  'apikey',
-  'api_key',
-  'authorization',
-  'auth',
-  'credential',
-  'credentials',
-  'access_token',
-  'refresh_token',
-  'private_key',
-]);
+import { type JsonObject, redactObject, stringifyRedactedJson } from './memoryRedaction.js';
 
 type MemoryRow = typeof schema.memories.$inferSelect;
 type MemoryLinkRow = typeof schema.memoryLinks.$inferSelect;
-type JsonObject = Record<string, unknown>;
-interface RedactionResult<T> {
-  value: T;
-  wasRedacted: boolean;
-}
 
 export class MemoryNotFoundError extends Error {
   constructor(id: string) {
@@ -52,43 +32,8 @@ export class MemoryNotFoundError extends Error {
   }
 }
 
-function redactJsonValue(value: unknown): RedactionResult<unknown> {
-  if (Array.isArray(value)) {
-    let wasRedacted = false;
-    const redacted = value.map((entry) => {
-      const result = redactJsonValue(entry);
-      wasRedacted ||= result.wasRedacted;
-      return result.value;
-    });
-    return { value: redacted, wasRedacted };
-  }
-  if (typeof value !== 'object' || value === null) {
-    return { value, wasRedacted: false };
-  }
-
-  const redacted: JsonObject = {};
-  let wasRedacted = false;
-  for (const [key, child] of Object.entries(value)) {
-    if (REDACT_KEYS.has(key.toLowerCase())) {
-      redacted[key] = '[REDACTED]';
-      wasRedacted = true;
-      continue;
-    }
-
-    const result = redactJsonValue(child);
-    redacted[key] = result.value;
-    wasRedacted ||= result.wasRedacted;
-  }
-  return { value: redacted, wasRedacted };
-}
-
-function redactObject(value: JsonObject): RedactionResult<JsonObject> {
-  const result = redactJsonValue(value);
-  return { value: result.value as JsonObject, wasRedacted: result.wasRedacted };
-}
-
 function stringifyJson(value: unknown): string {
-  return JSON.stringify(redactJsonValue(value).value);
+  return stringifyRedactedJson(value);
 }
 
 function parseJsonValue(value: string | null): unknown {

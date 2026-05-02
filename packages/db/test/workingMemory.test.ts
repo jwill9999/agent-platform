@@ -12,6 +12,7 @@ import {
   getWorkingMemoryArtifact,
   upsertWorkingMemoryArtifact,
 } from '../src/repositories/workingMemory.js';
+import * as schema from '../src/schema.js';
 
 describe('working memory repository', () => {
   let db: DrizzleDb;
@@ -130,6 +131,40 @@ describe('working memory repository', () => {
     expect(cleared.importantFiles).toEqual([]);
     expect(cleared.toolsUsed).toEqual([]);
     expect(cleared.toolSummaries).toEqual([]);
+  });
+
+  it('falls back to empty lists for malformed persisted JSON arrays', () => {
+    db.insert(schema.workingMemoryArtifacts)
+      .values({
+        sessionId,
+        runId: null,
+        currentGoal: 'Recover malformed state',
+        activeProject: null,
+        activeTask: null,
+        decisionsJson: '{broken',
+        importantFilesJson: 'not-json',
+        toolsUsedJson: '[',
+        toolSummariesJson: '{"not":"array"}',
+        blockersJson: 'null',
+        pendingApprovalIdsJson: '["approval-1", 7]',
+        nextAction: null,
+        summary: 'Malformed persisted working memory.',
+        createdAtMs: 1000,
+        updatedAtMs: 1000,
+      })
+      .run();
+
+    const artifact = getWorkingMemoryArtifact(db, sessionId);
+
+    expect(artifact).toMatchObject({
+      currentGoal: 'Recover malformed state',
+      decisions: [],
+      importantFiles: [],
+      toolsUsed: [],
+      toolSummaries: [],
+      blockers: [],
+      pendingApprovalIds: ['approval-1'],
+    });
   });
 
   it('is deleted when the owning session is deleted', () => {

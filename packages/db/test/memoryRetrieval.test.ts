@@ -108,7 +108,7 @@ describe('memory retrieval', () => {
       lowConfidence: 1,
       unsafe: 1,
       notRelevant: 1,
-      crossScope: 0,
+      crossScope: 1,
     });
   });
 

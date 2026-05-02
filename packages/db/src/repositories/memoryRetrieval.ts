@@ -128,32 +128,17 @@ function relevanceScore(memory: MemoryRecord, queryTerms: Set<string>, nowMs: nu
   );
 }
 
-function collectApprovedCandidates(
-  db: DrizzleDb,
-  scope: MemoryRetrievalScope,
-  nowMs: number,
-): MemoryRecord[] {
-  const common = {
-    status: 'approved' as const,
-    reviewStatus: 'approved' as const,
-    includeExpired: true,
-    limit: 500,
-  };
-  const queries = [
-    { ...common, scope: 'global' as const },
-    { ...common, scope: 'session' as const, scopeId: scope.sessionId },
-    ...(scope.agentId ? [{ ...common, scope: 'agent' as const, scopeId: scope.agentId }] : []),
-    ...(scope.projectId
-      ? [{ ...common, scope: 'project' as const, scopeId: scope.projectId }]
-      : []),
-  ];
-  const byId = new Map<string, MemoryRecord>();
-  for (const query of queries) {
-    for (const memory of queryMemories(db, query, { nowMs })) {
-      byId.set(memory.id, memory);
-    }
-  }
-  return [...byId.values()];
+function collectApprovedCandidates(db: DrizzleDb, nowMs: number): MemoryRecord[] {
+  return queryMemories(
+    db,
+    {
+      status: 'approved',
+      reviewStatus: 'approved',
+      includeExpired: true,
+      limit: 500,
+    },
+    { nowMs },
+  );
 }
 
 function sortCandidates(a: RetrievalCandidate, b: RetrievalCandidate): number {
@@ -182,7 +167,7 @@ export function retrievePromptMemories(
     crossScope: 0,
   };
 
-  const candidates = collectApprovedCandidates(db, input.scope, nowMs)
+  const candidates = collectApprovedCandidates(db, nowMs)
     .filter((memory) => {
       if (!allowedScopes.has(scopeKey(memory))) {
         omitted.crossScope += 1;

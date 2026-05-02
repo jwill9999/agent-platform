@@ -24,19 +24,22 @@ function displayScope(memory: MemoryRecord): string {
   return memory.scopeId ? `${memory.scope}:${memory.scopeId}` : memory.scope;
 }
 
-function memoryQueryPath(filters: {
-  scope: string;
-  scopeId: string;
-  status: string;
-  reviewStatus: string;
-  tag: string;
-}) {
+function memoryQueryPath(
+  filters: {
+    scope: string;
+    scopeId: string;
+    status: string;
+    reviewStatus: string;
+    tag: string;
+  },
+  basePath = apiPath('memories'),
+) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value.trim()) params.set(key, value.trim());
   }
   params.set('includeExpired', 'true');
-  return `${apiPath('memories')}?${params.toString()}`;
+  return `${basePath}?${params.toString()}`;
 }
 
 export function MemoryDashboard() {
@@ -135,8 +138,9 @@ export function MemoryDashboard() {
 
   const exportJson = useCallback(async () => {
     try {
+      const exportPath = memoryQueryPath(filters, apiPath('memories', 'export'));
       const data = await apiGet<{ exportedAtMs: number; count: number; memories: MemoryRecord[] }>(
-        path.replace('/memories?', '/memories/export?'),
+        exportPath,
       );
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -148,7 +152,7 @@ export function MemoryDashboard() {
     } catch (e) {
       setError(e instanceof ApiRequestError ? e.message : String(e));
     }
-  }, [path]);
+  }, [filters]);
 
   const clearCurrentScope = useCallback(async () => {
     if (!filters.scope) {

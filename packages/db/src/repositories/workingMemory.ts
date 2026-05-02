@@ -21,7 +21,12 @@ type WorkingMemoryPersistenceValues = typeof schema.workingMemoryArtifacts.$infe
 
 function parseJsonArray<T>(value: string | null, guard: (entry: unknown) => entry is T): T[] {
   if (!value) return [];
-  const parsed = JSON.parse(value) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    return [];
+  }
   return Array.isArray(parsed) ? parsed.filter(guard) : [];
 }
 

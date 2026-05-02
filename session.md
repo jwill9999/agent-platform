@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Addressed review feedback on `task/agent-platform-memory.6`: working-memory JSON array reads now tolerate malformed persisted data, memory export URL construction no longer relies on string replacement, retrieval omitted counts now exercise cross-scope memories, and memory secret redaction utilities are centralized.
+- **Date:** 2026-05-02
 - **Session:** Started `agent-platform-memory.5` on `task/agent-platform-memory.5`; added memory management APIs, scoped native memory tools, Settings Memory UI, and focused tests. Remaining before close: full quality gate, Beads close, commit, and push.
 - **Date:** 2026-05-02
 - **Session:** Addressed review feedback on `task/agent-platform-memory.5`: malformed persisted memory JSON now falls back safely during reads, with DB regression coverage.
@@ -443,11 +445,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-memory.1`
-- **Current base:** `main` / `feature/agent-platform-memory` after code-tools merge and planning follow-ups.
-- **Latest completed task:** `agent-platform-code-tools.7` coding tool visibility and E2E validation
-- **Current work:** `agent-platform-memory.1` memory contracts, schema, repository, and policy model has been claimed.
-- **Remote sync:** Beads/Dolt is synced after creating memory child tasks, claiming `.1`, and recording the long-term memory store decision.
+- **Current branch:** `task/agent-platform-memory.6`
+- **Current base:** chained from prior memory task branches toward `feature/agent-platform-memory`.
+- **Latest completed task:** `agent-platform-memory.6` review-gated self-learning workflow.
+- **Current work:** Review feedback for `agent-platform-memory.6` has been addressed; next task is `agent-platform-memory.7`.
+- **Remote sync:** Branch and Beads/Dolt should be pushed after the review-fix commit.
 
 ### Beads
 

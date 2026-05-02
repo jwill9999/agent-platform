@@ -14,21 +14,7 @@ import {
 
 import type { DrizzleDb } from '../database.js';
 import { createMemory } from './memories.js';
-
-const CREDENTIAL_PATTERNS: readonly { name: string; pattern: RegExp }[] = [
-  { name: 'AWS Access Key', pattern: /AKIA[0-9A-Z]{16}/ },
-  { name: 'JWT', pattern: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
-  { name: 'Private Key', pattern: /-----BEGIN (RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/ },
-  { name: 'GitHub Token', pattern: /(ghp|gho|ghu|ghs|ghr)_\w{36,}/ },
-  { name: 'OpenAI API Key', pattern: /sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/ },
-  { name: 'Generic API Key', pattern: /(?:api[_-]?key|apikey)\s*[:=]\s*["']?[\w-]{20,}/i },
-  { name: 'Generic Secret', pattern: /(?:secret|password)\s*[:=]\s*["']?[^\s"']{8,}/i },
-  { name: 'Bearer Token', pattern: /Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/ },
-  {
-    name: 'Base64 Encoded Key',
-    pattern: /(?:key|secret|token)\s*[:=]\s*["']?[a-z0-9+/]{40,}={0,2}/i,
-  },
-];
+import { redactCredentialText } from './memoryRedaction.js';
 
 const EXPLICIT_REMEMBER_RE =
   /\b(?:remember|please remember|make a note|note that|save this)\b[:\s-]*(?<content>.+)/i;
@@ -58,20 +44,9 @@ function stripUndefined(value: unknown): unknown {
   return clean;
 }
 
-function globalPattern(pattern: RegExp): RegExp {
-  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
-  return new RegExp(pattern.source, flags);
-}
-
 function redactCandidateText(content: string): RedactedText {
-  let result = content;
-  let wasRedacted = false;
-  for (const { name, pattern } of CREDENTIAL_PATTERNS) {
-    const next = result.replace(globalPattern(pattern), `[REDACTED:${name}]`);
-    wasRedacted ||= next !== result;
-    result = next;
-  }
-  return { content: result, safetyState: wasRedacted ? 'redacted' : 'safe' };
+  const result = redactCredentialText(content);
+  return { content: result.value, safetyState: result.wasRedacted ? 'redacted' : 'safe' };
 }
 
 function inferKind(content: string): MemoryKind {
