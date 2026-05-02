@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Implemented `agent-platform-scheduler.1` on `task/agent-platform-scheduler.1`: added shared scheduler contracts, SQLite/Drizzle scheduler tables and migration, repository CRUD/list/update/run/log APIs, and tested ownership plus run state transitions. No job runner/execution loop was added in this task.
+- **Date:** 2026-05-02
 - **Session:** Addressed active-project PR review feedback: project workspace paths now normalize under `projects/` without duplicate prefixes, duplicate project slugs return structured conflicts, session project binding validates the project before updating, legacy working-memory `activeProject` remains a direct path fallback, and repo/git/migration/workspace tests cover precedence and project associations.
 - **Date:** 2026-05-02
 - **Session:** Completed `agent-platform-active-project` on `task/agent-platform-active-project`: added first-class project records, non-breaking nullable project associations for sessions, memories, and working memory, project CRUD API routes, workspace `projects/` area support, and active-project default paths for repo discovery, git, and quality-gate tools. Terminal quality gates passed; Beads close succeeded but Dolt auto-push failed because the sandbox could not resolve GitHub.
@@ -475,11 +477,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-active-project`
-- **Current base:** branched from scheduler planning work as the prerequisite foundation for `agent-platform-scheduler.1`.
+- **Current branch:** `task/agent-platform-scheduler.1`
+- **Current base:** branched from `task/agent-platform-active-project` after the active-project foundation was completed.
 - **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** `agent-platform-active-project` is implemented and closed in Beads. Next implementation work is `agent-platform-scheduler.1`, after the active-project branch is reviewed/merged into the scheduler chain.
-- **Remote sync:** Current task branch should be pushed after this session update commit. Beads/Dolt close succeeded locally; `bd dolt push` still needs network/auth outside the sandbox.
+- **Current work:** `agent-platform-scheduler.1` scheduler contracts, schema, repository, and run state machine are implemented. Next work is `agent-platform-scheduler.2` once `.1` is closed and pushed.
+- **Remote sync:** Push `task/agent-platform-scheduler.1` after closing `.1` in Beads and committing this session update.
 
 ### Beads
 
@@ -494,7 +496,7 @@ Quality gates passed:
 - `agent-platform-memory.1` through `.7` are complete and closed.
 - `agent-platform-scheduler` epic is open.
 - `agent-platform-active-project` is closed locally as the required P1 project/work context foundation task.
-- `agent-platform-scheduler.1` is claimed but depends on the project model from `agent-platform-active-project`.
+- `agent-platform-scheduler.1` is implemented and ready to close after final sync.
 - `agent-platform-scheduler.2` through `.5` are open and dependency-chained.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
@@ -506,6 +508,17 @@ Quality gates passed:
 ### Quality
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
+- Scheduler `.1` foundation checks passed:
+  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+  - `pnpm --filter @agent-platform/contracts run typecheck`
+  - `pnpm --filter @agent-platform/contracts run build`
+  - `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts test/migrate.test.ts`
+  - `pnpm --filter @agent-platform/db run typecheck`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `git diff --check`
+  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
 - Active project foundation checks passed:
   - Review feedback rerun: `pnpm --filter @agent-platform/db exec vitest run test/projects.test.ts test/migrate.test.ts`
   - Review feedback rerun: `pnpm --filter @agent-platform/harness exec vitest run test/repoDiscoveryTools.test.ts test/gitTools.test.ts`
@@ -643,9 +656,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Resume on `task/agent-platform-memory.1`.
-2. Refine `agent-platform-memory.1` with the owner before implementation if needed.
-3. Implement `agent-platform-memory.1`: shared contracts, relational DB schema/repository, policy model, and optional memory link model.
+1. Close and push `agent-platform-scheduler.1`.
+2. Branch `task/agent-platform-scheduler.2` from `task/agent-platform-scheduler.1`.
+3. Implement `agent-platform-scheduler.2`: runner, queue polling, retries, cancellation basics, and lease handling.
 
 ---
 

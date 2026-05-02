@@ -199,6 +199,110 @@ export const sessions = sqliteTable('sessions', {
   updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
 });
 
+/** Durable scheduled/background work definitions. Execution is added by later tasks. */
+export const scheduledJobs = sqliteTable(
+  'scheduled_jobs',
+  {
+    id: text('id').primaryKey(),
+    scope: text('scope').notNull(),
+    scopeId: text('scope_id'),
+    projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
+    ownerAgentId: text('owner_agent_id').references(() => agents.id, { onDelete: 'set null' }),
+    ownerSessionId: text('owner_session_id').references(() => sessions.id, {
+      onDelete: 'set null',
+    }),
+    executionAgentId: text('execution_agent_id').references(() => agents.id, {
+      onDelete: 'set null',
+    }),
+    createdFromSessionId: text('created_from_session_id').references(() => sessions.id, {
+      onDelete: 'set null',
+    }),
+    name: text('name').notNull(),
+    description: text('description'),
+    instructions: text('instructions').notNull(),
+    targetKind: text('target_kind').notNull(),
+    targetPayloadJson: text('target_payload_json').notNull().default('{}'),
+    scheduleType: text('schedule_type').notNull(),
+    runAtMs: integer('run_at_ms', { mode: 'number' }),
+    intervalMs: integer('interval_ms', { mode: 'number' }),
+    cronExpression: text('cron_expression'),
+    timezone: text('timezone').notNull().default('UTC'),
+    nextRunAtMs: integer('next_run_at_ms', { mode: 'number' }),
+    status: text('status').notNull().default('paused'),
+    retryPolicyJson: text('retry_policy_json').notNull().default('{}'),
+    timeoutMs: integer('timeout_ms', { mode: 'number' }).notNull(),
+    lastRunAtMs: integer('last_run_at_ms', { mode: 'number' }),
+    leaseOwner: text('lease_owner'),
+    leaseExpiresAtMs: integer('lease_expires_at_ms', { mode: 'number' }),
+    metadataJson: text('metadata_json').notNull().default('{}'),
+    createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+    updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+  },
+  (t) => ({
+    scopeIdx: index('scheduled_jobs_scope_idx').on(t.scope, t.scopeId),
+    projectIdx: index('scheduled_jobs_project_idx').on(t.projectId),
+    ownerAgentIdx: index('scheduled_jobs_owner_agent_idx').on(t.ownerAgentId),
+    ownerSessionIdx: index('scheduled_jobs_owner_session_idx').on(t.ownerSessionId),
+    executionAgentIdx: index('scheduled_jobs_execution_agent_idx').on(t.executionAgentId),
+    statusIdx: index('scheduled_jobs_status_idx').on(t.status),
+    nextRunIdx: index('scheduled_jobs_next_run_idx').on(t.status, t.nextRunAtMs),
+  }),
+);
+
+/** One persisted execution attempt for a scheduled job. */
+export const scheduledJobRuns = sqliteTable(
+  'scheduled_job_runs',
+  {
+    id: text('id').primaryKey(),
+    jobId: text('job_id')
+      .notNull()
+      .references(() => scheduledJobs.id, { onDelete: 'cascade' }),
+    status: text('status').notNull(),
+    attempt: integer('attempt', { mode: 'number' }).notNull().default(1),
+    queuedAtMs: integer('queued_at_ms', { mode: 'number' }).notNull(),
+    startedAtMs: integer('started_at_ms', { mode: 'number' }),
+    completedAtMs: integer('completed_at_ms', { mode: 'number' }),
+    leaseOwner: text('lease_owner'),
+    leaseExpiresAtMs: integer('lease_expires_at_ms', { mode: 'number' }),
+    cancelRequestedAtMs: integer('cancel_requested_at_ms', { mode: 'number' }),
+    resultSummary: text('result_summary'),
+    errorCode: text('error_code'),
+    errorMessage: text('error_message'),
+    metadataJson: text('metadata_json').notNull().default('{}'),
+    createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+    updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+  },
+  (t) => ({
+    jobIdx: index('scheduled_job_runs_job_idx').on(t.jobId),
+    statusIdx: index('scheduled_job_runs_status_idx').on(t.status),
+    leaseIdx: index('scheduled_job_runs_lease_idx').on(t.status, t.leaseExpiresAtMs),
+  }),
+);
+
+/** Bounded append-only log/event rows for scheduled job runs. */
+export const scheduledJobRunLogs = sqliteTable(
+  'scheduled_job_run_logs',
+  {
+    id: text('id').primaryKey(),
+    runId: text('run_id')
+      .notNull()
+      .references(() => scheduledJobRuns.id, { onDelete: 'cascade' }),
+    jobId: text('job_id')
+      .notNull()
+      .references(() => scheduledJobs.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence', { mode: 'number' }).notNull(),
+    level: text('level').notNull(),
+    message: text('message').notNull(),
+    dataJson: text('data_json').notNull().default('{}'),
+    truncated: integer('truncated', { mode: 'boolean' }).notNull().default(false),
+    createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+  },
+  (t) => ({
+    runIdx: index('scheduled_job_run_logs_run_idx').on(t.runId, t.sequence),
+    jobIdx: index('scheduled_job_run_logs_job_idx').on(t.jobId),
+  }),
+);
+
 /** Chat / session UI metadata (title, extra JSON). */
 export const chatMetadata = sqliteTable('chat_metadata', {
   id: text('id').primaryKey(),

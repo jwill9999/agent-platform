@@ -120,6 +120,13 @@
       "when": 1777500000000,
       "tag": "0016_add_projects",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1777600000000,
+      "tag": "0017_add_scheduler",
+      "breakpoints": true
     }
   ]
 }
