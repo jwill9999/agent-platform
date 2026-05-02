@@ -8,6 +8,14 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Added explicit non-breaking migration and test strategy to the project/work context and scheduler specs. `agent-platform-active-project` is now the prerequisite foundation for shared project associations; scheduler `.1` should remain additive and should not start implementing project-owned jobs until that model exists.
+- **Date:** 2026-05-02
+- **Session:** Moved the global project/work context association design into `agent-platform-active-project`: that task now owns the `projects` table plus sessions, memories, working-memory, and future scheduler associations. Scheduler `.1` should depend on and reuse that model rather than inventing a second project abstraction.
+- **Date:** 2026-05-02
+- **Session:** Refined scheduler DB association requirements: scheduled jobs need first-class ownership columns (`scope`, `scopeId`, `projectId`, `ownerAgentId`, `ownerSessionId`, `executionAgentId`, `createdFromSessionId`) with contract/repository invariants, not loose metadata-only associations.
+- **Date:** 2026-05-02
+- **Session:** Claimed `agent-platform-scheduler.1`, created `task/agent-platform-scheduler.1` from `feature/agent-platform-scheduler`, and clarified scheduler terminology: a project is the durable work context, a scheduled job is the editable automation definition, a job run is one execution attempt, and a Beads task is only repo planning metadata.
+- **Date:** 2026-05-02
 - **Session:** Started scheduler epic refinement from updated `main`: created `feature/agent-platform-scheduler`, expanded the scheduler parent spec, created child specs `agent-platform-scheduler.1` through `.5`, created matching Beads child tasks, and chained dependencies from `.1` through `.5`. Next step is to claim `.1` and implement the durable scheduler contracts/schema foundation.
 - **Date:** 2026-05-02
 - **Session:** Memory epic closeout complete. The epic was manually tested, merged to `main`, local `main` was updated, old task/feature branches were pruned, and `agent-platform-memory` plus child tasks `.1` through `.7` are closed in Beads. Pause here; next session should start planning/refinement for the next epic from updated `main`.
@@ -463,11 +471,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `feature/agent-platform-scheduler`
-- **Current base:** branched from updated `main` after the memory epic merge.
+- **Current branch:** `task/agent-platform-scheduler.1`
+- **Current base:** branched from `feature/agent-platform-scheduler`.
 - **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** Scheduler epic refinement is underway; child tasks/specs are created and chained. No implementation changes yet.
-- **Remote sync:** Scheduler planning branch and Beads/Dolt should be pushed after this session update commit.
+- **Current work:** `agent-platform-scheduler.1` is claimed but now explicitly depends on `agent-platform-active-project`; implementation should start with the project/work context foundation before scheduler-owned project jobs.
+- **Remote sync:** Scheduler planning branch is pushed; current task branch and Beads/Dolt should be pushed after this session update commit.
 
 ### Beads
 
@@ -481,8 +489,10 @@ Quality gates passed:
 - `agent-platform-memory` epic is closed in Beads and merged to `main`.
 - `agent-platform-memory.1` through `.7` are complete and closed.
 - `agent-platform-scheduler` epic is open.
-- `agent-platform-scheduler.1` through `.5` are open and dependency-chained; `.1` is the first ready implementation task.
-- New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
+- `agent-platform-active-project` is the required P1 project/work context foundation task.
+- `agent-platform-scheduler.1` is claimed but depends on the project model from `agent-platform-active-project`.
+- `agent-platform-scheduler.2` through `.5` are open and dependency-chained.
+- Follow-up task `agent-platform-active-project` is open as a P1 prerequisite for project/work context, active project workspace defaults, and shared project associations.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
 - New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
