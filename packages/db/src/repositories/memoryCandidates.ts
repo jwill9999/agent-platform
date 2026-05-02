@@ -16,6 +16,7 @@ import {
 import type { DrizzleDb } from '../database.js';
 import { createMemory } from './memories.js';
 import { redactCredentialText } from './memoryRedaction.js';
+import { findProject } from './projects.js';
 
 const EXPLICIT_REMEMBER_RE =
   /\b(?:remember|please remember|make a note|note that|save this)\b[:\s-]*(?<content>.+)/i;
@@ -57,7 +58,9 @@ function inferKind(content: string): MemoryKind {
 }
 
 function inferScope(input: MemoryCandidateExtractionInput) {
-  if (input.projectId) return { scope: 'project' as const, scopeId: input.projectId };
+  if (input.projectId) {
+    return { scope: 'project' as const, scopeId: input.projectId, projectId: input.projectId };
+  }
   if (input.agentId) return { scope: 'agent' as const, scopeId: input.agentId };
   return { scope: 'session' as const, scopeId: input.sessionId };
 }
@@ -274,12 +277,15 @@ export function createMemoryCandidates(
   options: CreateMemoryCandidatesOptions = {},
 ) {
   const input = MemoryCandidateExtractionInputSchema.parse(rawInput);
-  return extractMemoryCandidates(input).map((candidate) =>
-    createMemory(
+  return extractMemoryCandidates(input).map((candidate) => {
+    const projectId =
+      candidate.projectId && findProject(db, candidate.projectId) ? candidate.projectId : undefined;
+    return createMemory(
       db,
       {
         scope: candidate.scope,
         scopeId: candidate.scopeId,
+        projectId,
         kind: candidate.kind,
         status: 'pending',
         reviewStatus: 'unreviewed',
@@ -307,6 +313,6 @@ export function createMemoryCandidates(
         safetyState: candidate.safetyState,
       },
       { nowMs: options.nowMs },
-    ),
-  );
+    );
+  });
 }

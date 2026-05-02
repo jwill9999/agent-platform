@@ -95,6 +95,28 @@ export const modelConfigs = sqliteTable('model_configs', {
   updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
 });
 
+/** Durable project/work context for workspace-bound application work. */
+export const projects = sqliteTable(
+  'projects',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    workspacePath: text('workspace_path').notNull(),
+    workspaceKey: text('workspace_key'),
+    metadataJson: text('metadata_json').notNull().default('{}'),
+    archivedAtMs: integer('archived_at_ms', { mode: 'number' }),
+    createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
+    updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
+  },
+  (t) => ({
+    slugIdx: uniqueIndex('projects_slug_idx').on(t.slug),
+    workspaceKeyIdx: index('projects_workspace_key_idx').on(t.workspaceKey),
+    archivedIdx: index('projects_archived_at_idx').on(t.archivedAtMs),
+  }),
+);
+
 /** Persisted agent profile (matches Agent contract shape via JSON + join tables). */
 export const agents = sqliteTable(
   'agents',
@@ -171,6 +193,7 @@ export const sessions = sqliteTable('sessions', {
   agentId: text('agent_id')
     .notNull()
     .references(() => agents.id, { onDelete: 'cascade' }),
+  projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
   title: text('title'),
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),
   updatedAtMs: integer('updated_at_ms', { mode: 'number' }).notNull(),
@@ -263,6 +286,7 @@ export const memories = sqliteTable(
     id: text('id').primaryKey(),
     scope: text('scope').notNull(),
     scopeId: text('scope_id'),
+    projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
     kind: text('kind').notNull(),
     status: text('status').notNull().default('pending'),
     reviewStatus: text('review_status').notNull().default('unreviewed'),
@@ -288,6 +312,7 @@ export const memories = sqliteTable(
     reviewStatusIdx: index('memories_review_status_idx').on(t.reviewStatus),
     expiresAtIdx: index('memories_expires_at_idx').on(t.expiresAtMs),
     sourceIdx: index('memories_source_idx').on(t.sourceKind, t.sourceId),
+    projectIdx: index('memories_project_idx').on(t.projectId),
   }),
 );
 
@@ -319,6 +344,7 @@ export const workingMemoryArtifacts = sqliteTable('working_memory_artifacts', {
   runId: text('run_id'),
   currentGoal: text('current_goal'),
   activeProject: text('active_project'),
+  projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
   activeTask: text('active_task'),
   decisionsJson: text('decisions_json').notNull().default('[]'),
   importantFilesJson: text('important_files_json').notNull().default('[]'),

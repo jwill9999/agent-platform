@@ -119,6 +119,20 @@ describe('repo discovery tools', () => {
     );
   });
 
+  it('defaults repository discovery to the active project path when repoPath is omitted', async () => {
+    const result = data(
+      await executeRepoDiscoveryTool(
+        REPO_DISCOVERY_TOOL_IDS.repoMap,
+        { maxDepth: 2 },
+        { workspaceRoot: root, defaultRepoPath: 'repo' },
+      ),
+    );
+
+    expect(
+      (result.files as Array<{ path: string }>).some((file) => file.path === 'package.json'),
+    ).toBe(true);
+  });
+
   it('searches text files with bounded results and skips ignored directories', async () => {
     const result = data(
       await executeRepoDiscoveryTool(

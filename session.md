@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Completed `agent-platform-active-project` on `task/agent-platform-active-project`: added first-class project records, non-breaking nullable project associations for sessions, memories, and working memory, project CRUD API routes, workspace `projects/` area support, and active-project default paths for repo discovery, git, and quality-gate tools. Terminal quality gates passed; Beads close succeeded but Dolt auto-push failed because the sandbox could not resolve GitHub.
+- **Date:** 2026-05-02
 - **Session:** Added explicit non-breaking migration and test strategy to the project/work context and scheduler specs. `agent-platform-active-project` is now the prerequisite foundation for shared project associations; scheduler `.1` should remain additive and should not start implementing project-owned jobs until that model exists.
 - **Date:** 2026-05-02
 - **Session:** Moved the global project/work context association design into `agent-platform-active-project`: that task now owns the `projects` table plus sessions, memories, working-memory, and future scheduler associations. Scheduler `.1` should depend on and reuse that model rather than inventing a second project abstraction.
@@ -471,11 +473,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-scheduler.1`
-- **Current base:** branched from `feature/agent-platform-scheduler`.
+- **Current branch:** `task/agent-platform-active-project`
+- **Current base:** branched from scheduler planning work as the prerequisite foundation for `agent-platform-scheduler.1`.
 - **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** `agent-platform-scheduler.1` is claimed but now explicitly depends on `agent-platform-active-project`; implementation should start with the project/work context foundation before scheduler-owned project jobs.
-- **Remote sync:** Scheduler planning branch is pushed; current task branch and Beads/Dolt should be pushed after this session update commit.
+- **Current work:** `agent-platform-active-project` is implemented and closed in Beads. Next implementation work is `agent-platform-scheduler.1`, after the active-project branch is reviewed/merged into the scheduler chain.
+- **Remote sync:** Current task branch should be pushed after this session update commit. Beads/Dolt close succeeded locally; `bd dolt push` still needs network/auth outside the sandbox.
 
 ### Beads
 
@@ -489,10 +491,9 @@ Quality gates passed:
 - `agent-platform-memory` epic is closed in Beads and merged to `main`.
 - `agent-platform-memory.1` through `.7` are complete and closed.
 - `agent-platform-scheduler` epic is open.
-- `agent-platform-active-project` is the required P1 project/work context foundation task.
+- `agent-platform-active-project` is closed locally as the required P1 project/work context foundation task.
 - `agent-platform-scheduler.1` is claimed but depends on the project model from `agent-platform-active-project`.
 - `agent-platform-scheduler.2` through `.5` are open and dependency-chained.
-- Follow-up task `agent-platform-active-project` is open as a P1 prerequisite for project/work context, active project workspace defaults, and shared project associations.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
 - New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
@@ -503,6 +504,15 @@ Quality gates passed:
 ### Quality
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
+- Active project foundation checks passed:
+  - `pnpm --filter @agent-platform/contracts run build`
+  - `pnpm --filter @agent-platform/db run build`
+  - `pnpm --filter @agent-platform/harness run build`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test` (run with escalation because API Supertest binds local ports)
+  - `git diff --check`
 - Memory `.7` retention/cleanup checks passed:
   - `pnpm --filter @agent-platform/contracts build`
   - `pnpm --filter @agent-platform/db build`

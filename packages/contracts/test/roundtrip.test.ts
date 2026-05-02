@@ -37,6 +37,8 @@ import {
   WorkingMemoryUpdateBodySchema,
   OutputSchema,
   PlanSchema,
+  ProjectCreateBodySchema,
+  ProjectRecordSchema,
   SecretRefSchema,
   SkillSchema,
 } from '../src/index.js';
@@ -104,6 +106,26 @@ describe('contracts round-trip', () => {
     });
     expect(SecretRefSchema.parse(structuredClone(ref))).toEqual(ref);
     expect(PlanSchema.parse(structuredClone(plan))).toEqual(plan);
+  });
+
+  it('Project schemas round-trip', () => {
+    const project = ProjectRecordSchema.parse({
+      id: 'project-1',
+      slug: 'agent-platform',
+      name: 'Agent Platform',
+      description: 'Main repository',
+      workspacePath: 'projects/agent-platform',
+      workspaceKey: 'projects/agent-platform',
+      metadata: { language: 'typescript' },
+      createdAtMs: 1000,
+      updatedAtMs: 1000,
+    });
+    expect(ProjectRecordSchema.parse(structuredClone(project))).toEqual(project);
+
+    expect(ProjectCreateBodySchema.parse({ name: 'Agent Platform' })).toMatchObject({
+      name: 'Agent Platform',
+      metadata: {},
+    });
   });
 
   it('CriticVerdictSchema', () => {
@@ -179,6 +201,7 @@ describe('contracts round-trip', () => {
       id: 'memory-1',
       scope: 'project',
       scopeId: 'project-1',
+      projectId: 'project-1',
       kind: 'decision',
       status: 'approved',
       reviewStatus: 'approved',
@@ -277,6 +300,7 @@ describe('contracts round-trip', () => {
       runId: 'run-1',
       currentGoal: 'Implement working memory.',
       activeProject: 'agent-platform',
+      projectId: 'project-1',
       activeTask: 'agent-platform-memory.2',
       decisions: ['Keep short-term state session scoped.'],
       importantFiles: ['packages/db/src/repositories/workingMemory.ts'],

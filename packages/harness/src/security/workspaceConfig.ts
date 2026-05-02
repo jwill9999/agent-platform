@@ -4,7 +4,13 @@ import { resolve, join } from 'node:path';
 export const DEFAULT_WORKSPACE_CONTAINER_PATH = '/workspace';
 
 export const WORKSPACE_SUBDIRECTORIES = ['config', 'logs'] as const;
-export const WORKSPACE_CHILD_DIRECTORIES = ['uploads', 'generated', 'scratch', 'exports'] as const;
+export const WORKSPACE_CHILD_DIRECTORIES = [
+  'uploads',
+  'generated',
+  'scratch',
+  'exports',
+  'projects',
+] as const;
 
 export type HostPlatform = 'linux' | 'darwin' | 'win32';
 

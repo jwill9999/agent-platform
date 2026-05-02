@@ -46,6 +46,7 @@ describe('workspaceRouter', () => {
       'generated',
       'scratch',
       'exports',
+      'projects',
     ]);
     expect(
       res.body.data.areas

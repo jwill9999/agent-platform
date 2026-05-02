@@ -41,6 +41,16 @@ export {
   type SessionRecord,
   type SessionResumeBody,
 } from './session.js';
+export {
+  ProjectRecordSchema,
+  ProjectCreateBodySchema,
+  ProjectUpdateBodySchema,
+  ProjectQuerySchema,
+  type ProjectRecord,
+  type ProjectCreateBody,
+  type ProjectUpdateBody,
+  type ProjectQuery,
+} from './project.js';
 export { SkillSchema, SkillCreateBodySchema, type Skill, type SkillCreateBody } from './skill.js';
 export { SecretRefSchema, type SecretRef } from './secrets.js';
 export {

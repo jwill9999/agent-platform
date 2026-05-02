@@ -67,6 +67,7 @@ function rowToMemory(row: MemoryRow): MemoryRecord {
     id: row.id,
     scope: row.scope,
     scopeId: row.scopeId ?? undefined,
+    projectId: row.projectId ?? undefined,
     kind: row.kind,
     status: row.status,
     reviewStatus: row.reviewStatus,
@@ -124,6 +125,7 @@ export function createMemory(
       id,
       scope: parsed.scope,
       scopeId: parsed.scopeId ?? null,
+      projectId: parsed.projectId ?? null,
       kind: parsed.kind,
       status: parsed.status,
       reviewStatus: parsed.reviewStatus,
@@ -206,6 +208,7 @@ function buildMemoryConditions(query: MemoryQuery, nowMs: number) {
   const conditions = [];
   if (query.scope) conditions.push(eq(schema.memories.scope, query.scope));
   if (query.scopeId) conditions.push(eq(schema.memories.scopeId, query.scopeId));
+  if (query.projectId) conditions.push(eq(schema.memories.projectId, query.projectId));
   if (query.kind) conditions.push(eq(schema.memories.kind, query.kind));
   if (query.status) conditions.push(eq(schema.memories.status, query.status));
   if (query.reviewStatus) conditions.push(eq(schema.memories.reviewStatus, query.reviewStatus));
@@ -262,6 +265,7 @@ export function updateMemory(
       sourceKind: nextSource.kind,
       sourceId: nextSource.id ?? null,
       sourceLabel: nextSource.label ?? null,
+      projectId: parsed.projectId === undefined ? (existing.projectId ?? null) : parsed.projectId,
       sourceMetadataJson: JSON.stringify(sourceMetadata.value),
       tagsJson:
         parsed.tags === undefined ? JSON.stringify(existing.tags) : stringifyJson(parsed.tags),

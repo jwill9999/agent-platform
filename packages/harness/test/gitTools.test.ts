@@ -80,6 +80,18 @@ describe('git tools', () => {
     expect(result.changedFiles).toEqual([]);
   });
 
+  it('defaults git tools to the active project path when repoPath is omitted', async () => {
+    const result = resultData(
+      await executeGitTool(
+        GIT_TOOL_IDS.status,
+        {},
+        { workspaceRoot: root, defaultRepoPath: 'repo' },
+      ),
+    );
+
+    expect(result.clean).toBe(true);
+  });
+
   it('summarizes staged, unstaged, and untracked files', async () => {
     await writeFile(join(repo, 'README.md'), 'hello\nupdated\n', 'utf-8');
     await writeFile(join(repo, 'staged.txt'), 'staged\n', 'utf-8');

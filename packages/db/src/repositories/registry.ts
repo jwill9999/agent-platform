@@ -321,7 +321,10 @@ export function getSession(db: DrizzleDb, id: string): SessionRecord | undefined
   return row ? sessionRowToContract(row) : undefined;
 }
 
-export function createSession(db: DrizzleDb, input: { agentId: string }): SessionRecord {
+export function createSession(
+  db: DrizzleDb,
+  input: { agentId: string; projectId?: string },
+): SessionRecord {
   const now = Date.now();
   const id = randomUUID();
   wrapConstraintError(
@@ -331,6 +334,7 @@ export function createSession(db: DrizzleDb, input: { agentId: string }): Sessio
         .values({
           id,
           agentId: input.agentId,
+          projectId: input.projectId ?? null,
           createdAtMs: now,
           updatedAtMs: now,
         })
@@ -355,6 +359,7 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
           .values({
             id: record.id,
             agentId: record.agentId,
+            projectId: record.projectId ?? null,
             title: record.title ?? null,
             createdAtMs: existing?.createdAtMs ?? record.createdAtMs,
             updatedAtMs: record.updatedAtMs,
@@ -363,6 +368,7 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
             target: schema.sessions.id,
             set: {
               agentId: record.agentId,
+              projectId: record.projectId ?? null,
               title: record.title ?? null,
               updatedAtMs: record.updatedAtMs,
             },
@@ -371,6 +377,15 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
       }),
     `session ${record.id}`,
   );
+}
+
+export function updateSessionProject(db: DrizzleDb, id: string, projectId: string | null): boolean {
+  const r = db
+    .update(schema.sessions)
+    .set({ projectId, updatedAtMs: Date.now() })
+    .where(eq(schema.sessions.id, id))
+    .run();
+  return r.changes > 0;
 }
 
 export function deleteSession(db: DrizzleDb, id: string): boolean {
