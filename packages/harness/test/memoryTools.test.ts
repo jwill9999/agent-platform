@@ -89,4 +89,19 @@ describe('memory tools', () => {
     );
     expect(result).toMatchObject({ type: 'error', code: 'MEMORY_SCOPE_DENIED' });
   });
+
+  it('returns specific scope errors for invalid list scopes', async () => {
+    const context = { db: ctx.db, sessionId: 'session-1', agentId: 'agent-1' };
+
+    await expect(
+      executeMemoryTool(MEMORY_TOOL_IDS.list, { scope: 'project' }, context),
+    ).resolves.toMatchObject({ type: 'error', code: 'MEMORY_SCOPE_INVALID' });
+    await expect(
+      executeMemoryTool(
+        MEMORY_TOOL_IDS.list,
+        { scope: 'session', scopeId: 'other-session' },
+        context,
+      ),
+    ).resolves.toMatchObject({ type: 'error', code: 'MEMORY_SCOPE_DENIED' });
+  });
 });

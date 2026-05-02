@@ -180,6 +180,8 @@ export function upsertWorkingMemoryArtifact(
     importantFiles: mergeStrings(existing?.importantFiles ?? [], parsed.importantFiles),
     toolsUsed: mergeStrings(existing?.toolsUsed ?? [], parsed.toolsUsed),
     toolSummaries: mergeToolSummaries(existing?.toolSummaries ?? [], parsed.toolSummaries),
+    // Blockers and pending approvals reflect current state, so a provided list replaces
+    // previous values; undefined preserves the existing state, and [] clears it.
     blockers:
       parsed.blockers === undefined
         ? (existing?.blockers ?? [])

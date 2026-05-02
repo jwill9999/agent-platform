@@ -35,6 +35,7 @@ import type {
 import {
   compactText,
   DEFAULT_CONTEXT_WINDOW,
+  parseStructuredToolError,
   SessionResumeBodySchema,
 } from '@agent-platform/contracts';
 import {
@@ -498,7 +499,18 @@ function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalReq
 
 function extractImportantFiles(text: string): string[] {
   const matches = text.matchAll(/\b(?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]+\b/g);
-  return [...matches].map((match) => match[0]).slice(0, 10);
+  const urlLikePattern =
+    /^(?:[a-zA-Z][a-zA-Z\d+.-]*:\/\/|(?:www\.)?[\w-]+\.[A-Za-z]{2,})(?:[/?#]|$)/;
+  const results: string[] = [];
+
+  for (const match of matches) {
+    const candidate = match[0];
+    if (urlLikePattern.test(candidate)) continue;
+    results.push(candidate);
+    if (results.length >= 10) break;
+  }
+
+  return results;
 }
 
 function extractActiveTask(text: string): string | undefined {
@@ -515,23 +527,19 @@ function extractDecisions(text: string): string[] {
 }
 
 function summarizeToolContent(content: string): { ok: boolean; summary: string } {
-  let ok = true;
+  const toolError = parseStructuredToolError(content);
+  if (toolError) return { ok: false, summary: compactText(toolError, 500) };
+
   let summary = content;
   try {
     const parsed = JSON.parse(content) as unknown;
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-      const obj = parsed as { error?: unknown; message?: unknown };
-      if (typeof obj.error === 'string') {
-        ok = false;
-        summary = typeof obj.message === 'string' ? `${obj.error}: ${obj.message}` : obj.error;
-      } else {
-        summary = 'Tool returned structured data.';
-      }
+      summary = 'Tool returned structured data.';
     }
   } catch {
     summary = content.replaceAll(/<tool_result[^>]*>|<\/tool_result>/g, '');
   }
-  return { ok, summary: compactText(summary, 500) };
+  return { ok: true, summary: compactText(summary, 500) };
 }
 
 function deriveToolSummaries(messages: ChatMessage[]): WorkingMemoryToolSummary[] {

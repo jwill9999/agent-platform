@@ -38,4 +38,4 @@ Add short-term session/run memory artifacts that preserve task continuity withou
 
 - Current task state survives long sessions and resumes.
 - Short-term memory remains session-scoped and inspectable.
-- No durable learning happens without later review workflow.
+- No durable learning happens without a later review workflow.

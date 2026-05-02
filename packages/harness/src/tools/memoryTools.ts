@@ -47,6 +47,15 @@ export interface MemoryToolContext {
 const MEMORY_STATUSES = new Set(['pending', 'approved', 'rejected', 'archived']);
 const MEMORY_REVIEW_STATUSES = new Set(['unreviewed', 'approved', 'rejected', 'needs_review']);
 
+class MemoryScopeError extends Error {
+  constructor(
+    readonly code: 'MEMORY_SCOPE_DENIED' | 'MEMORY_SCOPE_INVALID',
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 export const MEMORY_TOOLS: readonly ContractTool[] = [
   {
     id: MEMORY_TOOL_IDS.list,
@@ -159,18 +168,27 @@ function scopedQuery(args: Record<string, unknown>, context: MemoryToolContext):
   if (scope === 'agent') {
     const scopeId = requestedScopeId || context.agentId;
     if (!scopeId || scopeId !== context.agentId) {
-      throw new Error('Agent memory scope is not visible to this session');
+      throw new MemoryScopeError(
+        'MEMORY_SCOPE_DENIED',
+        'Agent memory scope is not visible to this session',
+      );
     }
     return { ...filterQuery(args), scope: 'agent', scopeId };
   }
   if (scope === 'session') {
     const scopeId = requestedScopeId || context.sessionId;
     if (scopeId !== context.sessionId) {
-      throw new Error('Session memory scope is not visible to this session');
+      throw new MemoryScopeError(
+        'MEMORY_SCOPE_DENIED',
+        'Session memory scope is not visible to this session',
+      );
     }
     return { ...filterQuery(args), scope: 'session', scopeId };
   }
-  throw new Error('Only global, agent, and session memory scopes are available to tools');
+  throw new MemoryScopeError(
+    'MEMORY_SCOPE_INVALID',
+    'Only global, agent, and session memory scopes are available to tools',
+  );
 }
 
 function filterQuery(args: Record<string, unknown>): MemoryQueryInput {
@@ -250,6 +268,7 @@ export async function executeMemoryTool(
     }
   } catch (error) {
     if (error instanceof MemoryNotFoundError) return toolError('MEMORY_NOT_FOUND', error.message);
+    if (error instanceof MemoryScopeError) return toolError(error.code, error.message);
     return toolError('MEMORY_TOOL_FAILED', errorMessage(error));
   }
 }

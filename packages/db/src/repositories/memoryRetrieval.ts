@@ -1,6 +1,8 @@
 import type {
   MemoryKind,
+  MemoryQueryInput,
   MemoryRecord,
+  MemorySafetyState,
   PromptMemoryBundle,
   PromptMemoryItem,
 } from '@agent-platform/contracts';
@@ -12,6 +14,8 @@ import { queryMemories } from './memories.js';
 const DEFAULT_LIMIT = 8;
 const MIN_CONFIDENCE = 0.65;
 const MAX_CONTENT_LENGTH = 600;
+const MAX_CANDIDATES_PER_QUERY = 50;
+const RETRIEVABLE_SAFETY_STATES: readonly MemorySafetyState[] = ['safe', 'redacted'];
 const KIND_WEIGHT: Record<MemoryKind, number> = {
   fact: 1.05,
   preference: 1.2,
@@ -82,6 +86,14 @@ function allowedScopeKeys(scope: MemoryRetrievalScope): Set<string> {
   ]);
 }
 
+function allowedScopeQueries(scope: MemoryRetrievalScope): MemoryQueryInput[] {
+  const queries: MemoryQueryInput[] = [{ scope: 'global' }];
+  if (scope.sessionId) queries.push({ scope: 'session', scopeId: scope.sessionId });
+  if (scope.agentId) queries.push({ scope: 'agent', scopeId: scope.agentId });
+  if (scope.projectId) queries.push({ scope: 'project', scopeId: scope.projectId });
+  return queries;
+}
+
 function scopeKey(memory: MemoryRecord): string {
   return `${memory.scope}:${memory.scopeId ?? ''}`;
 }
@@ -128,17 +140,32 @@ function relevanceScore(memory: MemoryRecord, queryTerms: Set<string>, nowMs: nu
   );
 }
 
-function collectApprovedCandidates(db: DrizzleDb, nowMs: number): MemoryRecord[] {
-  return queryMemories(
-    db,
-    {
-      status: 'approved',
-      reviewStatus: 'approved',
-      includeExpired: true,
-      limit: 500,
-    },
-    { nowMs },
-  );
+function collectApprovedCandidates(
+  db: DrizzleDb,
+  scope: MemoryRetrievalScope,
+  minConfidence: number,
+  nowMs: number,
+): MemoryRecord[] {
+  const byId = new Map<string, MemoryRecord>();
+  for (const scopeQuery of allowedScopeQueries(scope)) {
+    for (const safetyState of RETRIEVABLE_SAFETY_STATES) {
+      const memories = queryMemories(
+        db,
+        {
+          ...scopeQuery,
+          status: 'approved',
+          reviewStatus: 'approved',
+          safetyState,
+          minConfidence,
+          includeExpired: false,
+          limit: MAX_CANDIDATES_PER_QUERY,
+        },
+        { nowMs },
+      );
+      for (const memory of memories) byId.set(memory.id, memory);
+    }
+  }
+  return [...byId.values()];
 }
 
 function sortCandidates(a: RetrievalCandidate, b: RetrievalCandidate): number {
@@ -167,7 +194,7 @@ export function retrievePromptMemories(
     crossScope: 0,
   };
 
-  const candidates = collectApprovedCandidates(db, nowMs)
+  const candidates = collectApprovedCandidates(db, input.scope, minConfidence, nowMs)
     .filter((memory) => {
       if (!allowedScopes.has(scopeKey(memory))) {
         omitted.crossScope += 1;

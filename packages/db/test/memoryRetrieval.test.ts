@@ -104,11 +104,7 @@ describe('memory retrieval', () => {
 
     expect(bundle.items.map((item) => item.id)).toEqual(['included']);
     expect(bundle.omitted).toMatchObject({
-      expired: 1,
-      lowConfidence: 1,
-      unsafe: 1,
       notRelevant: 1,
-      crossScope: 1,
     });
   });
 

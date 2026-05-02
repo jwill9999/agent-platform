@@ -10,6 +10,7 @@ import {
   compactText,
   ExtractedMemoryCandidateSchema,
   MemoryCandidateExtractionInputSchema,
+  parseStructuredToolError,
 } from '@agent-platform/contracts';
 
 import type { DrizzleDb } from '../database.js';
@@ -165,17 +166,8 @@ function correctionCandidate(
 
 function parseToolError(message: MemoryCandidateMessage): string | undefined {
   if (message.role !== 'tool') return undefined;
-  try {
-    const parsed = JSON.parse(message.content) as unknown;
-    if (typeof parsed === 'object' && parsed !== null) {
-      const obj = parsed as { error?: unknown; message?: unknown };
-      if (typeof obj.error === 'string') {
-        return typeof obj.message === 'string' ? `${obj.error}: ${obj.message}` : obj.error;
-      }
-    }
-  } catch {
-    // Fall through to text heuristics.
-  }
+  const structuredError = parseStructuredToolError(message.content);
+  if (structuredError) return structuredError;
   return /\b(error|failed|enoent|exception|timeout)\b/i.test(message.content)
     ? message.content
     : undefined;

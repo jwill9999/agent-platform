@@ -217,7 +217,7 @@ export {
   type SelfLearningMetrics,
   type SelfLearningEvaluationResult,
 } from './memory.js';
-export { compactText } from './text.js';
+export { compactText, parseStructuredToolError } from './text.js';
 export {
   ToolExecutionSchema,
   ToolExecutionStatusSchema,
