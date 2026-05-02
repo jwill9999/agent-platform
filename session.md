@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Started scheduler epic refinement from updated `main`: created `feature/agent-platform-scheduler`, expanded the scheduler parent spec, created child specs `agent-platform-scheduler.1` through `.5`, created matching Beads child tasks, and chained dependencies from `.1` through `.5`. Next step is to claim `.1` and implement the durable scheduler contracts/schema foundation.
+- **Date:** 2026-05-02
 - **Session:** Memory epic closeout complete. The epic was manually tested, merged to `main`, local `main` was updated, old task/feature branches were pruned, and `agent-platform-memory` plus child tasks `.1` through `.7` are closed in Beads. Pause here; next session should start planning/refinement for the next epic from updated `main`.
 - **Date:** 2026-05-02
 - **Session:** Addressed follow-up memory review feedback on `task/agent-platform-memory.7`: prompt memory retrieval now queries only visible, approved, safe/redacted, unexpired, minimum-confidence scopes; tool error parsing is shared; memory tools return structured scope errors; working-memory overwrite semantics are documented; important-file extraction avoids obvious URLs; and the memory.2 spec typo is fixed.
@@ -461,11 +463,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `main`
-- **Current base:** updated `origin/main` after the memory epic merge.
+- **Current branch:** `feature/agent-platform-scheduler`
+- **Current base:** branched from updated `main` after the memory epic merge.
 - **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** Paused. No task is currently claimed; next session should plan/refine the next epic before implementation.
-- **Remote sync:** Memory epic code has been merged to `main`; Beads/Dolt is synced after closeout.
+- **Current work:** Scheduler epic refinement is underway; child tasks/specs are created and chained. No implementation changes yet.
+- **Remote sync:** Scheduler planning branch and Beads/Dolt should be pushed after this session update commit.
 
 ### Beads
 
@@ -478,6 +480,8 @@ Quality gates passed:
 - `agent-platform-code-tools` epic is closed.
 - `agent-platform-memory` epic is closed in Beads and merged to `main`.
 - `agent-platform-memory.1` through `.7` are complete and closed.
+- `agent-platform-scheduler` epic is open.
+- `agent-platform-scheduler.1` through `.5` are open and dependency-chained; `.1` is the first ready implementation task.
 - New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
