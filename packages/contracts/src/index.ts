@@ -176,6 +176,11 @@ export {
   ExtractedMemoryCandidateSchema,
   MemoryCandidateMessageSchema,
   MemoryCandidateExtractionInputSchema,
+  SelfLearningObjectiveSchema,
+  SelfLearningObservedOutcomeSchema,
+  SelfLearningEvaluateBodySchema,
+  SelfLearningMetricsSchema,
+  SelfLearningEvaluationResultSchema,
   type MemoryScope,
   type MemoryKind,
   type MemoryStatus,
@@ -203,6 +208,11 @@ export {
   type ExtractedMemoryCandidate,
   type MemoryCandidateMessage,
   type MemoryCandidateExtractionInput,
+  type SelfLearningObjective,
+  type SelfLearningObservedOutcome,
+  type SelfLearningEvaluateBody,
+  type SelfLearningMetrics,
+  type SelfLearningEvaluationResult,
 } from './memory.js';
 export { compactText } from './text.js';
 export {

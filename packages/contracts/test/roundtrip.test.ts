@@ -30,6 +30,8 @@ import {
   PromptMemoryBundleSchema,
   MemoryQuerySchema,
   MemoryRecordSchema,
+  SelfLearningEvaluateBodySchema,
+  SelfLearningEvaluationResultSchema,
   WorkingMemoryArtifactSchema,
   WorkingMemoryUpdateBodySchema,
   OutputSchema,
@@ -335,6 +337,36 @@ describe('contracts round-trip', () => {
         scopeId: undefined,
       }),
     ).toThrow();
+  });
+
+  it('Self-learning schemas round-trip with review-gated result metadata', () => {
+    const input = SelfLearningEvaluateBodySchema.parse({
+      sessionId: 'session-1',
+      agentId: 'agent-1',
+      observedOutcomes: [
+        {
+          kind: 'observability_error',
+          id: 'event-1',
+          message: "ENOENT: no such file or directory, open '/workspace/app/src/index.ts'",
+          atMs: 1000,
+        },
+      ],
+    });
+    expect(input).toMatchObject({
+      objective: 'recoverable_workspace_path_errors',
+      minOccurrences: 2,
+    });
+
+    const result = SelfLearningEvaluationResultSchema.parse({
+      objective: 'recoverable_workspace_path_errors',
+      proposed: false,
+      reason: 'Not enough matching signals.',
+      metrics: {
+        before: { observedSignals: 1, matchingSignals: 1, candidateSignals: 0 },
+        after: { approvedLearningMemories: 0, existingPendingProposals: 0 },
+      },
+    });
+    expect(SelfLearningEvaluationResultSchema.parse(structuredClone(result))).toEqual(result);
   });
 
   it('Coding apply patch schemas round-trip', () => {

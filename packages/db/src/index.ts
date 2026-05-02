@@ -17,5 +17,6 @@ export * from './repositories/approvalRequests.js';
 export * from './repositories/memories.js';
 export * from './repositories/memoryCandidates.js';
 export * from './repositories/memoryRetrieval.js';
+export * from './repositories/selfLearning.js';
 export * from './repositories/workingMemory.js';
 export * from './slug.js';

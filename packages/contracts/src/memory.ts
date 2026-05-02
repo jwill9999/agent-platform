@@ -317,6 +317,44 @@ export const MemoryCandidateExtractionInputSchema = z.object({
   messages: z.array(MemoryCandidateMessageSchema).default([]),
 });
 
+export const SelfLearningObjectiveSchema = z.enum(['recoverable_workspace_path_errors']);
+
+export const SelfLearningObservedOutcomeSchema = z.object({
+  kind: z.enum(['observability_error', 'memory_candidate']),
+  id: z.string().min(1).optional(),
+  message: z.string().min(1).max(2000),
+  atMs: z.number().int().nonnegative().optional(),
+});
+
+export const SelfLearningEvaluateBodySchema = z.object({
+  sessionId: z.string().min(1),
+  agentId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
+  objective: SelfLearningObjectiveSchema.default('recoverable_workspace_path_errors'),
+  minOccurrences: z.number().int().min(2).max(20).default(2),
+  observedOutcomes: z.array(SelfLearningObservedOutcomeSchema).default([]),
+});
+
+export const SelfLearningMetricsSchema = z.object({
+  before: z.object({
+    observedSignals: z.number().int().nonnegative(),
+    matchingSignals: z.number().int().nonnegative(),
+    candidateSignals: z.number().int().nonnegative(),
+  }),
+  after: z.object({
+    approvedLearningMemories: z.number().int().nonnegative(),
+    existingPendingProposals: z.number().int().nonnegative(),
+  }),
+});
+
+export const SelfLearningEvaluationResultSchema = z.object({
+  objective: SelfLearningObjectiveSchema,
+  proposed: z.boolean(),
+  reason: z.string().min(1),
+  metrics: SelfLearningMetricsSchema,
+  memory: MemoryRecordSchema.optional(),
+});
+
 export type MemoryScope = z.infer<typeof MemoryScopeSchema>;
 export type MemoryKind = z.infer<typeof MemoryKindSchema>;
 export type MemoryStatus = z.infer<typeof MemoryStatusSchema>;
@@ -344,3 +382,8 @@ export type MemoryCandidateEvidence = z.infer<typeof MemoryCandidateEvidenceSche
 export type ExtractedMemoryCandidate = z.infer<typeof ExtractedMemoryCandidateSchema>;
 export type MemoryCandidateMessage = z.infer<typeof MemoryCandidateMessageSchema>;
 export type MemoryCandidateExtractionInput = z.infer<typeof MemoryCandidateExtractionInputSchema>;
+export type SelfLearningObjective = z.infer<typeof SelfLearningObjectiveSchema>;
+export type SelfLearningObservedOutcome = z.infer<typeof SelfLearningObservedOutcomeSchema>;
+export type SelfLearningEvaluateBody = z.infer<typeof SelfLearningEvaluateBodySchema>;
+export type SelfLearningMetrics = z.infer<typeof SelfLearningMetricsSchema>;
+export type SelfLearningEvaluationResult = z.infer<typeof SelfLearningEvaluationResultSchema>;

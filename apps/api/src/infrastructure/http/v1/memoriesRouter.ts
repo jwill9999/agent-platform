@@ -2,6 +2,7 @@ import {
   MemoryClearBodySchema,
   MemoryQuerySchema,
   MemoryReviewBodySchema,
+  SelfLearningEvaluateBodySchema,
   MemoryUpdateBodySchema,
 } from '@agent-platform/contracts';
 import type { DrizzleDb } from '@agent-platform/db';
@@ -9,12 +10,14 @@ import {
   countMemories,
   deleteMemoriesByQuery,
   deleteMemory,
+  evaluateSelfLearning,
   getMemory,
   MemoryNotFoundError,
   queryMemories,
   updateMemory,
 } from '@agent-platform/db';
 import { createLogger } from '@agent-platform/logger';
+import type { ObservabilityStore } from '@agent-platform/plugin-observability';
 import { Router } from 'express';
 
 import { asyncHandler } from '../asyncHandler.js';
@@ -22,6 +25,10 @@ import { HttpError } from '../httpError.js';
 import { parseBody, requireParam } from './routerUtils.js';
 
 const log = createLogger('api:memories');
+
+export interface MemoriesRouterOptions {
+  observabilityStore?: ObservabilityStore;
+}
 
 function notFound(error: unknown): never {
   if (error instanceof MemoryNotFoundError) {
@@ -58,7 +65,21 @@ function parseMemoryQuery(query: Record<string, unknown>) {
   return result.data;
 }
 
-export function createMemoriesRouter(db: DrizzleDb): Router {
+function observedOutcomesFromStore(store: ObservabilityStore | undefined, sessionId: string) {
+  return (
+    store?.getErrors({ sessionId, limit: 100 }).map((record) => ({
+      kind: 'observability_error' as const,
+      id: record.id,
+      message:
+        record.event.kind === 'error'
+          ? record.event.message
+          : `${record.event.kind}: ${JSON.stringify(record.event)}`,
+      atMs: record.timestampMs,
+    })) ?? []
+  );
+}
+
+export function createMemoriesRouter(db: DrizzleDb, options: MemoriesRouterOptions = {}): Router {
   const router = Router();
 
   router.get(
@@ -100,6 +121,27 @@ export function createMemoriesRouter(db: DrizzleDb): Router {
         deleted,
       });
       res.json({ data: { deleted } });
+    }),
+  );
+
+  router.post(
+    '/self-learning/evaluate',
+    asyncHandler(async (req, res) => {
+      const body = parseBody(SelfLearningEvaluateBodySchema, req.body);
+      const result = evaluateSelfLearning(db, {
+        ...body,
+        observedOutcomes: [
+          ...body.observedOutcomes,
+          ...observedOutcomesFromStore(options.observabilityStore, body.sessionId),
+        ],
+      });
+      log.info('memory.self_learning_evaluated', {
+        sessionId: body.sessionId,
+        objective: result.objective,
+        proposed: result.proposed,
+        matchingSignals: result.metrics.before.matchingSignals,
+      });
+      res.status(result.proposed ? 201 : 200).json({ data: result });
     }),
   );
 

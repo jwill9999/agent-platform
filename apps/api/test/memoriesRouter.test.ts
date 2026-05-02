@@ -96,4 +96,44 @@ describe('memoriesRouter', () => {
     const missing = await request(ctx.app).get('/v1/memories/memory-1');
     expect(missing.status).toBe(404);
   });
+
+  it('evaluates self-learning candidates and keeps them review gated', async () => {
+    const evaluated = await request(ctx.app)
+      .post('/v1/memories/self-learning/evaluate')
+      .send({
+        sessionId: 'session-1',
+        observedOutcomes: [
+          {
+            kind: 'observability_error',
+            id: 'event-1',
+            message: "ENOENT: no such file or directory, open '/workspace/app.ts'",
+          },
+          {
+            kind: 'observability_error',
+            id: 'event-2',
+            message: "STAT_FAILED: no such file or directory, stat '/workspace/app.ts'",
+          },
+        ],
+      });
+
+    expect(evaluated.status).toBe(201);
+    expect(evaluated.body.data).toMatchObject({
+      proposed: true,
+      objective: 'recoverable_workspace_path_errors',
+      memory: {
+        status: 'pending',
+        reviewStatus: 'unreviewed',
+        tags: ['candidate', 'self-learning', 'workspace-path', 'failure'],
+      },
+    });
+
+    const memoryId = evaluated.body.data.memory.id as string;
+    const active = await request(ctx.app).get('/v1/memories?status=approved&tag=self-learning');
+    expect(active.body.data.items).toEqual([]);
+
+    const reviewed = await request(ctx.app)
+      .post(`/v1/memories/${memoryId}/review`)
+      .send({ decision: 'approved' });
+    expect(reviewed.body.data.status).toBe('approved');
+  });
 });

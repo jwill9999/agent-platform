@@ -11,6 +11,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Started `agent-platform-memory.5` on `task/agent-platform-memory.5`; added memory management APIs, scoped native memory tools, Settings Memory UI, and focused tests. Remaining before close: full quality gate, Beads close, commit, and push.
 - **Date:** 2026-05-02
 - **Session:** Addressed review feedback on `task/agent-platform-memory.5`: malformed persisted memory JSON now falls back safely during reads, with DB regression coverage.
+- **Date:** 2026-05-02
+- **Session:** Started `agent-platform-memory.6` on `task/agent-platform-memory.6`; added the first review-gated self-learning evaluator for repeated recoverable workspace/path errors with API and DB tests.
 - **Date:** 2026-04-26
 - **Session:** `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux` and closed in Beads. Next chain task started: `task/agent-platform-de4` claimed (`in_progress`).
 - **Date:** 2026-04-27

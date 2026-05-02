@@ -86,7 +86,7 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   router.use('/tool-executions', createToolExecutionsRouter(db));
   router.use('/approval-requests', createApprovalRequestsRouter(db));
   router.use('/model-configs', createModelConfigsRouter(db));
-  router.use('/memories', createMemoriesRouter(db));
+  router.use('/memories', createMemoriesRouter(db, { observabilityStore }));
   router.use('/workspace', createWorkspaceRouter());
 
   return router;

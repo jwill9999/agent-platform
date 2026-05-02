@@ -85,3 +85,15 @@ Long-term memory is manageable without direct database access:
 - Built-in memory tools (`sys_memory_list`, `sys_memory_get`, `sys_memory_review`, `sys_memory_delete`, and `sys_memory_export`) are bound to the current session and agent scope. They can see global memories plus the active session/agent memories; cross-session access is denied.
 
 Deletion and clear-by-scope are explicit actions. API management actions emit structured audit logs without memory content, and `sys_memory_delete` is registered as a high-risk tool requiring approval.
+
+## Self-Learning
+
+The first self-learning loop is deliberately narrow and review-gated. `POST /v1/memories/self-learning/evaluate` evaluates the `recoverable_workspace_path_errors` objective by combining:
+
+- Recent observability errors for the current session.
+- Supplied observed outcomes from callers/tests.
+- Existing pending failure candidates in memory.
+
+When repeated recoverable workspace/path errors cross the configured threshold, the evaluator creates a pending `failure_learning` memory tagged `self-learning`. The memory includes evidence excerpts, before/after metrics, and a `selfLearning` metadata block that explicitly records blocked autonomous actions (`code_change`, `policy_change`, `prompt_change`, and `beads_task`).
+
+The evaluator never changes code, policy, prompts, or Beads tasks. A user must approve the proposed memory through the normal memory review flow before it becomes durable prompt-retrievable memory.
