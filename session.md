@@ -8,6 +8,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Implemented `agent-platform-scheduler.4` on `task/agent-platform-scheduler.4`: added scheduler REST management routes, Settings Scheduler navigation/page, job creation plus pause/resume/run-now controls, run/log inspection, cancellation handling, scheduler display helpers, and focused API/web tests. Verified API/web lint and typecheck, focused scheduler tests, API/web test suites, and the web production build.
+- **Date:** 2026-05-02
+- **Session:** Closed `agent-platform-scheduler.4` and claimed `agent-platform-scheduler.5` for notification hooks, E2E coverage, docs, and final scheduler epic polish. Beads/Dolt close and claim sync both succeeded.
+- **Date:** 2026-05-02
 - **Session:** Addressed scheduler `.3` review feedback: `appendScheduledJobRunLog` now redacts/truncates messages once before validation and only prepares structured data afterward; scheduler DB tests now cover redaction/truncation for both terminal `errorMessage` and `resultSummary`.
 - **Date:** 2026-05-02
 - **Session:** Implemented `agent-platform-scheduler.3` on `task/agent-platform-scheduler.3`: scheduler run logs now redact credential text, bound messages/data with truncation metadata, redact terminal result/error summaries, and capture claimed/started/output/retry/cancel/fail/success/expired-lease lifecycle evidence. Full unit suite passed after the expected sandboxed API listener failure was rerun with escalation.
