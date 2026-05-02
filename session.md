@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Implemented and verified `agent-platform-memory.7` on `task/agent-platform-memory.7`: added dry-run-first expired memory cleanup, cleanup API contracts/routes, scoped export/clear safety coverage, retention docs, and focused/broader package quality gates.
+- **Date:** 2026-05-02
 - **Session:** Closed out `agent-platform-memory.6` and claimed the final memory epic task, `agent-platform-memory.7`, on new branch `task/agent-platform-memory.7`. Beads/Dolt claim sync succeeded.
 - **Date:** 2026-05-02
 - **Session:** Addressed SonarCloud reliability findings on `task/agent-platform-memory.6`: removed loop-index reassignment in chat history sanitisation, replaced `charCodeAt()` with `codePointAt()` in workspace path checks, and reduced overlapping maintainability findings in the touched chat/bash workspace policy code.
@@ -451,9 +453,9 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-memory.7`
 - **Current base:** chained from prior memory task branches toward `feature/agent-platform-memory`.
-- **Latest completed task:** `agent-platform-memory.6` review-gated self-learning workflow.
-- **Current work:** `agent-platform-memory.7` retention, expiry, cleanup, and cross-scope safety tests is claimed but implementation has not started.
-- **Remote sync:** Beads/Dolt is synced after claiming `.7`; branch should be pushed after this session update commit.
+- **Latest completed task:** `agent-platform-memory.7` retention, expiry, cleanup, and cross-scope safety tests.
+- **Current work:** Memory epic implementation chain is complete; final task branch is ready for PR/pipeline review into `feature/agent-platform-memory`.
+- **Remote sync:** Branch and Beads/Dolt should be pushed after this session update commit.
 
 ### Beads
 
@@ -464,9 +466,8 @@ Quality gates passed:
 - `agent-platform-code-tools.6` is closed.
 - `agent-platform-code-tools.7` is closed.
 - `agent-platform-code-tools` epic is closed.
-- `agent-platform-memory` epic is open.
-- `agent-platform-memory.1` is claimed and in progress.
-- `agent-platform-memory.2` through `.7` are open and chained behind `.1`.
+- `agent-platform-memory` epic is closed in Beads; final branch is pending PR/merge review.
+- `agent-platform-memory.1` through `.7` are complete in the chained task branches.
 - New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
@@ -478,6 +479,18 @@ Quality gates passed:
 ### Quality
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
+- Memory `.7` retention/cleanup checks passed:
+  - `pnpm --filter @agent-platform/contracts build`
+  - `pnpm --filter @agent-platform/db build`
+  - `pnpm --filter @agent-platform/contracts typecheck`
+  - `pnpm --filter @agent-platform/db typecheck`
+  - `pnpm --filter @agent-platform/api typecheck`
+  - `pnpm --filter @agent-platform/contracts lint`
+  - `pnpm --filter @agent-platform/db lint`
+  - `pnpm --filter @agent-platform/api lint`
+  - `pnpm --filter @agent-platform/contracts test`
+  - `pnpm --filter @agent-platform/db test`
+  - `pnpm --filter @agent-platform/api test` (escalated for Supertest local listener)
 - Structured edit checks passed:
   - `pnpm --filter @agent-platform/contracts build`
   - `pnpm --filter @agent-platform/agent-validation build`

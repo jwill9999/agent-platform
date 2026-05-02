@@ -305,11 +305,12 @@ Body schema: `SessionCreateBodySchema` — requires `agentId`. Agent must exist 
 | `POST`   | `/v1/memories/:id/review`             | Approve or reject a memory record                |
 | `DELETE` | `/v1/memories/:id`                    | Delete one memory record                         |
 | `POST`   | `/v1/memories/clear`                  | Delete records matching an explicit scope        |
+| `POST`   | `/v1/memories/cleanup`                | Dry-run or delete expired records                |
 | `POST`   | `/v1/memories/self-learning/evaluate` | Evaluate a narrow self-learning objective        |
 
 `GET /v1/memories` accepts `scope`, `scopeId`, `kind`, `status`, `reviewStatus`, `safetyState`, `minConfidence`, `sourceKind`, `sourceId`, `tag`, `includeExpired`, `limit`, and `offset`. It returns `{ "data": { "items": [...], "total": 1, "limit": 100, "offset": 0 } }`.
 
-Review requests use `{ "decision": "approved" | "rejected", "reason"?: "..." }`. Clear requests require `{ "scope": "...", "scopeId"?: "...", "confirm": true }` and may include status/review/safety filters. Destructive memory operations are logged without memory content.
+Review requests use `{ "decision": "approved" | "rejected", "reason"?: "..." }`. Clear requests require `{ "scope": "...", "scopeId"?: "...", "confirm": true }` and may include status/review/safety filters. Cleanup requests target expired memories only; they default to dry-run and require `{ "dryRun": false, "confirm": true }` before deletion. Destructive memory operations are logged without memory content.
 
 `POST /v1/memories/self-learning/evaluate` currently supports the narrow `recoverable_workspace_path_errors` objective. It combines supplied observed outcomes, recent observability errors for the session, and pending failure candidates. If the configured threshold is reached, it creates a `pending` / `unreviewed` `failure_learning` memory tagged `self-learning`; it does not create Beads tasks, code changes, policy changes, or prompt changes. Approval still happens through the normal memory review endpoint/UI.
 

@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  MemoryCleanupBody,
+  MemoryCleanupBodyInput,
   MemoryCreateBodyInput,
   MemoryLink,
   MemoryLinkRelation,
@@ -10,13 +12,14 @@ import type {
   MemoryUpdateBody,
 } from '@agent-platform/contracts';
 import {
+  MemoryCleanupBodySchema,
   MemoryCreateBodySchema,
   MemoryLinkSchema,
   MemoryQuerySchema,
   MemoryRecordSchema,
   MemoryUpdateBodySchema,
 } from '@agent-platform/contracts';
-import { and, desc, eq, gte, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 
 import type { DrizzleDb } from '../database.js';
 import * as schema from '../schema.js';
@@ -154,6 +157,13 @@ export interface QueryMemoriesOptions {
   nowMs?: number;
 }
 
+export interface CleanupExpiredMemoriesResult {
+  dryRun: boolean;
+  beforeMs: number;
+  matched: number;
+  deleted: number;
+}
+
 export function queryMemories(
   db: DrizzleDb,
   rawQuery: MemoryQueryInput,
@@ -286,6 +296,37 @@ export function deleteMemoriesByQuery(
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const result = db.delete(schema.memories).where(where).run();
   return result.changes;
+}
+
+function buildExpiredCleanupConditions(cleanup: MemoryCleanupBody, beforeMs: number) {
+  const conditions = [lte(schema.memories.expiresAtMs, beforeMs)];
+  if (cleanup.scope) conditions.push(eq(schema.memories.scope, cleanup.scope));
+  if (cleanup.scopeId) conditions.push(eq(schema.memories.scopeId, cleanup.scopeId));
+  return conditions;
+}
+
+export function cleanupExpiredMemories(
+  db: DrizzleDb,
+  rawCleanup: MemoryCleanupBodyInput,
+  options: QueryMemoriesOptions = {},
+): CleanupExpiredMemoriesResult {
+  const cleanup = MemoryCleanupBodySchema.parse(rawCleanup);
+  const beforeMs = cleanup.beforeMs ?? options.nowMs ?? Date.now();
+  const conditions = buildExpiredCleanupConditions(cleanup, beforeMs);
+  const where = and(...conditions);
+  const count =
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.memories)
+      .where(where)
+      .get()?.count ?? 0;
+
+  if (cleanup.dryRun) {
+    return { dryRun: true, beforeMs, matched: count, deleted: 0 };
+  }
+
+  const result = db.delete(schema.memories).where(where).run();
+  return { dryRun: false, beforeMs, matched: count, deleted: result.changes };
 }
 
 export interface CreateMemoryLinkInput {

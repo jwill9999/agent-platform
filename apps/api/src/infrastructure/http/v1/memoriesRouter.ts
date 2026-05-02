@@ -1,5 +1,6 @@
 import {
   MemoryClearBodySchema,
+  MemoryCleanupBodySchema,
   MemoryQuerySchema,
   MemoryReviewBodySchema,
   SelfLearningEvaluateBodySchema,
@@ -7,6 +8,7 @@ import {
 } from '@agent-platform/contracts';
 import type { DrizzleDb } from '@agent-platform/db';
 import {
+  cleanupExpiredMemories,
   countMemories,
   deleteMemoriesByQuery,
   deleteMemory,
@@ -121,6 +123,23 @@ export function createMemoriesRouter(db: DrizzleDb, options: MemoriesRouterOptio
         deleted,
       });
       res.json({ data: { deleted } });
+    }),
+  );
+
+  router.post(
+    '/cleanup',
+    asyncHandler(async (req, res) => {
+      const body = parseBody(MemoryCleanupBodySchema, req.body);
+      const result = cleanupExpiredMemories(db, body);
+      log.warn('memory.cleanup_expired', {
+        scope: body.scope,
+        scopeId: body.scopeId,
+        beforeMs: result.beforeMs,
+        dryRun: result.dryRun,
+        matched: result.matched,
+        deleted: result.deleted,
+      });
+      res.json({ data: result });
     }),
   );
 

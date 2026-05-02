@@ -185,6 +185,41 @@ export const MemoryClearBodySchema = z
     }
   });
 
+export const MemoryCleanupBodySchema = z
+  .object({
+    scope: MemoryScopeSchema.optional(),
+    scopeId: z.string().min(1).optional(),
+    beforeMs: z.number().int().positive().optional(),
+    dryRun: z.boolean().default(true),
+    confirm: z.boolean().default(false),
+  })
+  .superRefine((value, ctx) => {
+    if (value.scope === undefined && value.scopeId !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'scopeId requires scope',
+        path: ['scopeId'],
+      });
+    }
+    if (
+      value.scope !== undefined &&
+      !validateScopedMemory({ scope: value.scope, scopeId: value.scopeId })
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: scopedMemoryMessage(value.scope),
+        path: ['scopeId'],
+      });
+    }
+    if (!value.dryRun && !value.confirm) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'destructive cleanup requires confirm: true',
+        path: ['confirm'],
+      });
+    }
+  });
+
 export const MemoryLinkSchema = z.object({
   sourceMemoryId: z.string().min(1),
   targetMemoryId: z.string().min(1),
@@ -371,6 +406,8 @@ export type MemoryQuery = z.infer<typeof MemoryQuerySchema>;
 export type MemoryQueryInput = z.input<typeof MemoryQuerySchema>;
 export type MemoryReviewBody = z.infer<typeof MemoryReviewBodySchema>;
 export type MemoryClearBody = z.infer<typeof MemoryClearBodySchema>;
+export type MemoryCleanupBody = z.infer<typeof MemoryCleanupBodySchema>;
+export type MemoryCleanupBodyInput = z.input<typeof MemoryCleanupBodySchema>;
 export type MemoryLink = z.infer<typeof MemoryLinkSchema>;
 export type PromptMemorySource = z.infer<typeof PromptMemorySourceSchema>;
 export type PromptMemoryItem = z.infer<typeof PromptMemoryItemSchema>;

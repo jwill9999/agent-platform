@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeDatabase, openDatabase } from '../src/database.js';
 import type { DrizzleDb } from '../src/database.js';
 import {
+  cleanupExpiredMemories,
   countMemories,
   createMemory,
   createMemoryLink,
@@ -140,6 +141,74 @@ describe('memory repository', () => {
         (m) => m.id,
       ),
     ).toEqual(['current', 'expired']);
+  });
+
+  it('cleans up expired memories with dry-run and scope limits', () => {
+    createMemory(
+      db,
+      memoryInput({
+        scope: 'project',
+        scopeId: 'project-1',
+        kind: 'fact',
+        content: 'Expired project note.',
+        confidence: 0.8,
+        source: { kind: 'manual' },
+        expiresAtMs: 1500,
+      }),
+      { id: 'expired-project', nowMs: 1000 },
+    );
+    createMemory(
+      db,
+      memoryInput({
+        scope: 'session',
+        scopeId: 'session-1',
+        kind: 'fact',
+        content: 'Expired session note.',
+        confidence: 0.8,
+        source: { kind: 'manual' },
+        expiresAtMs: 1500,
+      }),
+      { id: 'expired-session', nowMs: 1000 },
+    );
+    createMemory(
+      db,
+      memoryInput({
+        scope: 'project',
+        scopeId: 'project-1',
+        kind: 'fact',
+        content: 'Current project note.',
+        confidence: 0.8,
+        source: { kind: 'manual' },
+        expiresAtMs: 2500,
+      }),
+      { id: 'current-project', nowMs: 1000 },
+    );
+
+    expect(cleanupExpiredMemories(db, { dryRun: true }, { nowMs: 2000 })).toEqual({
+      dryRun: true,
+      beforeMs: 2000,
+      matched: 2,
+      deleted: 0,
+    });
+    expect(queryMemories(db, { includeExpired: true }, { nowMs: 2000 })).toHaveLength(3);
+
+    expect(
+      cleanupExpiredMemories(
+        db,
+        { scope: 'project', scopeId: 'project-1', dryRun: false, confirm: true },
+        { nowMs: 2000 },
+      ),
+    ).toEqual({
+      dryRun: false,
+      beforeMs: 2000,
+      matched: 1,
+      deleted: 1,
+    });
+    expect(
+      queryMemories(db, { includeExpired: true }, { nowMs: 2000 })
+        .map((m) => m.id)
+        .sort(),
+    ).toEqual(['current-project', 'expired-session']);
   });
 
   it('redacts sensitive source metadata and memory metadata before persistence', () => {

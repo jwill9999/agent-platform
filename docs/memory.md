@@ -29,6 +29,8 @@ Memory records are stored in `memories`. Optional relationships are stored in `m
 
 Repository queries support scope, kind, status, review status, confidence floor, source kind/id, source metadata filters, tags, and expiry filtering. Expired memories are excluded unless `includeExpired` is set.
 
+Expiry is enforced at read time and cleanup time. Normal queries and prompt retrieval exclude records whose `expiresAtMs` is earlier than the current time. Operators can still inspect expired records with `includeExpired` for review, export, or cleanup decisions.
+
 ## Working Memory
 
 Working memory artifacts are stored in `working_memory_artifacts` and keyed by `sessionId`. They capture transient task state:
@@ -81,10 +83,12 @@ Pending candidate memories are not retrieved. The runtime records a `memory_retr
 Long-term memory is manageable without direct database access:
 
 - `/settings/memory` lists durable memories and pending candidates with scope, status, confidence, source, safety, tags, and expiry.
-- `/v1/memories` supports list/detail/update/review/delete/export/clear-by-scope operations.
+- `/v1/memories` supports list/detail/update/review/delete/export/clear-by-scope/expired-cleanup operations.
 - Built-in memory tools (`sys_memory_list`, `sys_memory_get`, `sys_memory_review`, `sys_memory_delete`, and `sys_memory_export`) are bound to the current session and agent scope. They can see global memories plus the active session/agent memories; cross-session access is denied.
 
-Deletion and clear-by-scope are explicit actions. API management actions emit structured audit logs without memory content, and `sys_memory_delete` is registered as a high-risk tool requiring approval.
+Deletion and clear-by-scope are explicit actions. Clear requests must name a valid scope, and project/agent/session scopes require a matching `scopeId`; this prevents accidental cross-scope deletion. Expired cleanup is available through `POST /v1/memories/cleanup`, defaults to dry-run, and only deletes records with `expiresAtMs` at or before the cleanup cutoff after callers send `dryRun: false` and `confirm: true`.
+
+API management actions emit structured audit logs without memory content, and `sys_memory_delete` is registered as a high-risk tool requiring approval. Exports use the same query filters as listing, so scoped exports do not include unrelated project, agent, or session memories.
 
 ## Self-Learning
 

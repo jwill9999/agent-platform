@@ -30,6 +30,7 @@ import {
   PromptMemoryBundleSchema,
   MemoryQuerySchema,
   MemoryRecordSchema,
+  MemoryCleanupBodySchema,
   SelfLearningEvaluateBodySchema,
   SelfLearningEvaluationResultSchema,
   WorkingMemoryArtifactSchema,
@@ -216,6 +217,19 @@ describe('contracts round-trip', () => {
         kind: 'fact',
         content: 'Missing scope id.',
         source: { kind: 'manual' },
+      }),
+    ).toThrow();
+
+    expect(MemoryCleanupBodySchema.parse({ scope: 'global' })).toEqual({
+      scope: 'global',
+      dryRun: true,
+      confirm: false,
+    });
+    expect(() =>
+      MemoryCleanupBodySchema.parse({
+        scope: 'session',
+        scopeId: 'session-1',
+        dryRun: false,
       }),
     ).toThrow();
 
