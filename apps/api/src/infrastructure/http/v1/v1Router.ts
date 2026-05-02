@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { createAgentsRouter } from './agentsRouter.js';
 import { createApprovalRequestsRouter } from './approvalRequestsRouter.js';
 import { createChatRouter, type ChatRouterOptions } from './chatRouter.js';
+import { createMemoriesRouter } from './memoriesRouter.js';
 import { createMcpServersRouter } from './mcpServersRouter.js';
 import { createModelConfigsRouter } from './modelConfigsRouter.js';
 import { createSessionsRouter } from './sessionsRouter.js';
@@ -85,6 +86,7 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   router.use('/tool-executions', createToolExecutionsRouter(db));
   router.use('/approval-requests', createApprovalRequestsRouter(db));
   router.use('/model-configs', createModelConfigsRouter(db));
+  router.use('/memories', createMemoriesRouter(db, { observabilityStore }));
   router.use('/workspace', createWorkspaceRouter());
 
   return router;

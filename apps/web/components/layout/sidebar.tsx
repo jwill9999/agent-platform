@@ -19,6 +19,7 @@ import {
   Puzzle,
   History,
   FolderOpen,
+  Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './sidebar-context';
@@ -76,6 +77,12 @@ const settingsNavigation = [
     href: '/settings/workspace',
     icon: FolderOpen,
     description: 'Inspect files',
+  },
+  {
+    name: 'Memory',
+    href: '/settings/memory',
+    icon: Brain,
+    description: 'Review memories',
   },
   {
     name: 'MCP Servers',

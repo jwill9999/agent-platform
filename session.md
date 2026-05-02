@@ -7,6 +7,28 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-02
+- **Session:** Addressed follow-up memory review feedback on `task/agent-platform-memory.7`: prompt memory retrieval now queries only visible, approved, safe/redacted, unexpired, minimum-confidence scopes; tool error parsing is shared; memory tools return structured scope errors; working-memory overwrite semantics are documented; important-file extraction avoids obvious URLs; and the memory.2 spec typo is fixed.
+- **Date:** 2026-05-02
+- **Session:** Polished the Settings Memory dashboard after manual review: promoted pending/approved/rejected states into larger colored badges, added clearer action hover/active/busy feedback, and reduced visual noise in each memory record card.
+- **Date:** 2026-05-02
+- **Session:** Implemented and verified `agent-platform-memory.7` on `task/agent-platform-memory.7`: added dry-run-first expired memory cleanup, cleanup API contracts/routes, scoped export/clear safety coverage, retention docs, and focused/broader package quality gates.
+- **Date:** 2026-05-02
+- **Session:** Added the missing Memory entry to the main Settings sidebar dropdown after manual epic testing confirmed the page worked but was not discoverable from the sidebar.
+- **Date:** 2026-05-02
+- **Session:** Addressed SonarCloud maintainability/reliability feedback on the final memory branch: simplified self-learning evidence mapping, added explicit string sort comparators, reduced chat history sanitiser complexity, and removed voided promise handlers from the Memory dashboard.
+- **Date:** 2026-05-02
+- **Session:** Closed out `agent-platform-memory.6` and claimed the final memory epic task, `agent-platform-memory.7`, on new branch `task/agent-platform-memory.7`. Beads/Dolt claim sync succeeded.
+- **Date:** 2026-05-02
+- **Session:** Addressed SonarCloud reliability findings on `task/agent-platform-memory.6`: removed loop-index reassignment in chat history sanitisation, replaced `charCodeAt()` with `codePointAt()` in workspace path checks, and reduced overlapping maintainability findings in the touched chat/bash workspace policy code.
+- **Date:** 2026-05-02
+- **Session:** Addressed review feedback on `task/agent-platform-memory.6`: working-memory JSON array reads now tolerate malformed persisted data, memory export URL construction no longer relies on string replacement, retrieval omitted counts now exercise cross-scope memories, and memory secret redaction utilities are centralized.
+- **Date:** 2026-05-02
+- **Session:** Started `agent-platform-memory.5` on `task/agent-platform-memory.5`; added memory management APIs, scoped native memory tools, Settings Memory UI, and focused tests. Remaining before close: full quality gate, Beads close, commit, and push.
+- **Date:** 2026-05-02
+- **Session:** Addressed review feedback on `task/agent-platform-memory.5`: malformed persisted memory JSON now falls back safely during reads, with DB regression coverage.
+- **Date:** 2026-05-02
+- **Session:** Started `agent-platform-memory.6` on `task/agent-platform-memory.6`; added the first review-gated self-learning evaluator for repeated recoverable workspace/path errors with API and DB tests.
 - **Date:** 2026-04-26
 - **Session:** `task/agent-platform-7d1` merged into `feature/agent-platform-ui-ux` and closed in Beads. Next chain task started: `task/agent-platform-de4` claimed (`in_progress`).
 - **Date:** 2026-04-27
@@ -143,6 +165,24 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added backlog task `agent-platform-improvement-goals` for a limited observability-driven self-improvement loop with reviewed candidates.
 - **Date:** 2026-04-30
 - **Session:** Remembered future epic refinement workflow: review specs/tickets with owner before moving epics from refinement/planning to ready.
+- **Date:** 2026-04-30
+- **Session:** Started memory epic setup: created `feature/agent-platform-memory`, created `task/agent-platform-memory.1`, created seven memory child tasks/specs, and claimed `.1`.
+- **Date:** 2026-04-30
+- **Session:** Paused before implementing `agent-platform-memory.1`; remembered long-term memory v1 should use a relational store with optional links, not a graph database.
+- **Date:** 2026-05-01
+- **Session:** Implemented `agent-platform-memory.1` memory contracts, SQLite schema/migration, repository CRUD/query APIs, metadata redaction, relationship links, tests, and docs on `task/agent-platform-memory.1`.
+- **Date:** 2026-05-01
+- **Session:** Implemented `agent-platform-memory.2` short-term session working memory artifacts, prompt continuity hook, inspectable API endpoint, tests, and docs on `task/agent-platform-memory.2`.
+- **Date:** 2026-05-01
+- **Session:** Implemented `agent-platform-memory.3` pending memory candidate extraction from explicit remember instructions, corrections, repeated failures, and remediations on `task/agent-platform-memory.3`.
+- **Date:** 2026-05-01
+- **Session:** Addressed review feedback for `agent-platform-memory.3`: shared text compaction, safer credential regex flags, escaped source-metadata JSON paths, non-hardcoded candidate scoping, explicit working-memory list clearing, and docs/session typo fixes.
+- **Date:** 2026-05-01
+- **Session:** Reduced SonarCloud new-code duplication for `agent-platform-memory.3` by extracting shared memory contract shapes, working-memory persistence mapping, and DB test fixtures.
+- **Date:** 2026-05-01
+- **Session:** Closed out `agent-platform-memory.3` after green pipelines, claimed `agent-platform-memory.4`, and created `task/agent-platform-memory.4`. Implementation has not started.
+- **Date:** 2026-05-02
+- **Session:** Implemented `agent-platform-memory.4` approved long-term memory retrieval with conservative ranking, prompt bundle formatting, chat prompt integration, trace metadata, tests, and docs.
 
 ### Session-close guardrail (required)
 
@@ -154,6 +194,76 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Memory candidate extraction implemented
+
+Branch state: `task/agent-platform-memory.3` contains the third memory epic task.
+
+- Added shared contracts for extracted memory candidates, candidate evidence, and extraction input messages.
+- Added a DB repository helper that extracts conservative pending candidates from explicit remember instructions, user corrections, repeated tool/runtime failures, and remediation language.
+- Candidate memories are persisted through the long-term memory repository as `status: pending` and `reviewStatus: unreviewed`; they are not active/retrieved before review.
+- Candidate metadata records rationale, scope suggestion, and bounded evidence excerpts.
+- Candidate content and evidence excerpts are credential-scanned before storage; redacted candidates are marked `safetyState: redacted`.
+- Wired candidate extraction into successful chat and approval-resume working-memory refresh paths.
+- Updated `docs/memory.md` to document the candidate extraction layer and retrieval boundary.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+- `pnpm --filter @agent-platform/db run test -- test/memoryCandidates.test.ts test/memories.test.ts`
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm docs:lint`
+- `pnpm test`
+- `pnpm build`
+
+### Short-term working memory implemented
+
+Branch state: `task/agent-platform-memory.2` contains the second memory epic task.
+
+- Added shared working-memory contracts for session-scoped artifacts and bounded tool summaries.
+- Added `working_memory_artifacts` SQLite table plus repository APIs for get/upsert/delete with merge/de-dupe behavior.
+- Chat and resume flows now refresh session working memory after successful graph runs.
+- Prompt building now appends a compact short-term working-memory summary to the system prompt when a session artifact exists.
+- Added `GET /v1/sessions/:id/working-memory` so the artifact is inspectable through the API.
+- Working memory captures current goal, active project/task, decisions, important files, tool names, bounded tool summaries, blockers, pending approval IDs, next action, and a compact summary.
+- Tool payloads are summarized before persistence; raw tool output is not copied wholesale.
+- Updated `docs/memory.md` and `docs/api-reference.md` for the working-memory layer and endpoint.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+- `pnpm --filter @agent-platform/db run test -- test/workingMemory.test.ts test/migrate.test.ts`
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm docs:lint`
+- `pnpm test`
+- `pnpm build`
+
+### Memory foundation implemented
+
+Branch state: `task/agent-platform-memory.1` contains the first memory epic task.
+
+- Added shared memory contracts for scopes, kinds, status, review status, source metadata, confidence, expiry, and safety state.
+- Added `memories` and `memory_links` SQLite tables plus repository APIs for create/read/update/delete/query/count and memory links.
+- Repository queries support scope, kind, status, review status, confidence floor, source kind/id, source metadata, tags, and expiry filtering.
+- Metadata redaction happens before persistence for common secret-bearing keys, including nested objects and arrays.
+- Added `docs/memory.md` describing the v1 relational model, storage boundary, and explicit no-automatic-prompt-retrieval decision.
+- Added focused contract and DB tests for round-trip validation, CRUD/query, expiry filtering, metadata redaction, migration, and link cascade behavior.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
+- `pnpm --filter @agent-platform/db run test -- test/memories.test.ts test/migrate.test.ts`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm test` (run with escalation because Supertest API tests bind local HTTP listeners)
+- `pnpm docs:lint`
 
 ### Chat UI model-config and stream error handling fixed
 
@@ -328,15 +438,32 @@ Quality gates passed:
 - Captured `agent-platform-improvement-goals` as a follow-up for monitored goals and reviewed self-improvement candidates. First pass should start with one narrow objective and no autonomous changes.
 - Added Beads memory `when-creating-new-epics-schedule-or-explicitly-run`: new epics should have a refinement session with the owner before implementation, including ticket/spec review, requirement changes, tradeoff discussion, and moving from refinement/planning to ready only after that review.
 
+### Memory epic started
+
+- Confirmed `agent-platform-code-tools` is closed with all seven child tasks complete.
+- Created and pushed `feature/agent-platform-memory` from the updated `main`.
+- Created `task/agent-platform-memory.1` from the memory feature branch.
+- Created memory child specs:
+  - `docs/tasks/agent-platform-memory.1.md`
+  - `docs/tasks/agent-platform-memory.2.md`
+  - `docs/tasks/agent-platform-memory.3.md`
+  - `docs/tasks/agent-platform-memory.4.md`
+  - `docs/tasks/agent-platform-memory.5.md`
+  - `docs/tasks/agent-platform-memory.6.md`
+  - `docs/tasks/agent-platform-memory.7.md`
+- Created matching Beads child tasks, linked them under `agent-platform-memory`, chained dependencies from `.1` through `.7`, claimed `agent-platform-memory.1`, and synced Beads/Dolt.
+- Long-term memory planning decision: v1 should use a relational SQLite/Postgres-compatible memory table with scope, kind, review status, confidence/source metadata, tags/metadata, expiry, and optional `memory_links` for graph-like relationships. Do not introduce a graph database initially; consider vector search or graph traversal later if retrieval needs prove it.
+- Added Beads memory `memory-epic-planning-decision-start-long-term-memory` with this direction.
+
 ## Current state
 
 ### Git
 
-- **Current branch:** `task/agent-platform-code-tools.7`
-- **Current base:** `7249457 Collapse chat tool activity`
-- **Latest completed task:** `agent-platform-code-tools.7` coding tool visibility and E2E validation
-- **Current work:** Code-tools epic is complete. No further child task exists on this epic.
-- **Remote sync:** Beads/Dolt is synced after closing `.7`; branch should be pushed after this session update commit.
+- **Current branch:** `task/agent-platform-memory.7`
+- **Current base:** chained from prior memory task branches toward `feature/agent-platform-memory`.
+- **Latest completed task:** `agent-platform-memory.7` retention, expiry, cleanup, and cross-scope safety tests.
+- **Current work:** Memory epic implementation chain is complete; final task branch is ready for PR/pipeline review into `feature/agent-platform-memory`.
+- **Remote sync:** Branch and Beads/Dolt should be pushed after this session update commit.
 
 ### Beads
 
@@ -347,6 +474,8 @@ Quality gates passed:
 - `agent-platform-code-tools.6` is closed.
 - `agent-platform-code-tools.7` is closed.
 - `agent-platform-code-tools` epic is closed.
+- `agent-platform-memory` epic is closed in Beads; final branch is pending PR/merge review.
+- `agent-platform-memory.1` through `.7` are complete in the chained task branches.
 - New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
@@ -358,6 +487,34 @@ Quality gates passed:
 ### Quality
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
+- Memory `.7` retention/cleanup checks passed:
+  - `pnpm --filter @agent-platform/contracts build`
+  - `pnpm --filter @agent-platform/db build`
+  - `pnpm --filter @agent-platform/contracts typecheck`
+  - `pnpm --filter @agent-platform/db typecheck`
+  - `pnpm --filter @agent-platform/web typecheck`
+  - `pnpm --filter @agent-platform/web lint`
+  - `pnpm --filter @agent-platform/web test`
+  - `pnpm --filter @agent-platform/api typecheck`
+  - `pnpm --filter @agent-platform/contracts lint`
+  - `pnpm --filter @agent-platform/db lint`
+  - `pnpm --filter @agent-platform/api lint`
+  - `pnpm --filter @agent-platform/contracts test`
+  - `pnpm --filter @agent-platform/db test`
+  - `pnpm --filter @agent-platform/api test` (escalated for Supertest local listener)
+- Memory sidebar discoverability checks passed:
+  - `pnpm --filter @agent-platform/web typecheck`
+  - `pnpm --filter @agent-platform/web lint`
+- Sonar feedback cleanup checks passed:
+  - `pnpm --filter @agent-platform/db typecheck`
+  - `pnpm --filter @agent-platform/api typecheck`
+  - `pnpm --filter @agent-platform/web typecheck`
+  - `pnpm --filter @agent-platform/db lint`
+  - `pnpm --filter @agent-platform/api lint`
+  - `pnpm --filter @agent-platform/web lint`
+  - `pnpm --filter @agent-platform/db test -- --run test/memories.test.ts test/selfLearning.test.ts`
+  - `pnpm --filter @agent-platform/api test -- --run test/sessionChat.integration.test.ts`
+  - `pnpm --filter @agent-platform/web test`
 - Structured edit checks passed:
   - `pnpm --filter @agent-platform/contracts build`
   - `pnpm --filter @agent-platform/agent-validation build`
@@ -455,9 +612,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the `.7` closeout/session update on `task/agent-platform-code-tools.7`.
-2. Decide next epic/task to start. Ready candidates include `agent-platform-active-project`, `agent-platform-research-tools`, `agent-platform-browser-tools`, and `agent-platform-memory`.
-3. Keep the IDE/file-tree integration as a separate follow-up under `agent-platform-ide-rethink`.
+1. Resume on `task/agent-platform-memory.1`.
+2. Refine `agent-platform-memory.1` with the owner before implementation if needed.
+3. Implement `agent-platform-memory.1`: shared contracts, relational DB schema/repository, policy model, and optional memory link model.
 
 ---
 

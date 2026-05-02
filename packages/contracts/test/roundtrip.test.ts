@@ -22,7 +22,19 @@ import {
   CodingToolEnvelopeSchema,
   CriticVerdictSchema,
   ExecutionLimitsSchema,
+  ExtractedMemoryCandidateSchema,
   HealthResponseSchema,
+  MemoryCandidateExtractionInputSchema,
+  MemoryCreateBodySchema,
+  MemoryLinkSchema,
+  PromptMemoryBundleSchema,
+  MemoryQuerySchema,
+  MemoryRecordSchema,
+  MemoryCleanupBodySchema,
+  SelfLearningEvaluateBodySchema,
+  SelfLearningEvaluationResultSchema,
+  WorkingMemoryArtifactSchema,
+  WorkingMemoryUpdateBodySchema,
   OutputSchema,
   PlanSchema,
   SecretRefSchema,
@@ -160,6 +172,215 @@ describe('contracts round-trip', () => {
       reason: 'approved by user',
     });
     expect(() => ApprovalRequestSchema.parse({ ...request, status: 'done' })).toThrow();
+  });
+
+  it('Memory schemas round-trip and enforce scoped policy', () => {
+    const record = MemoryRecordSchema.parse({
+      id: 'memory-1',
+      scope: 'project',
+      scopeId: 'project-1',
+      kind: 'decision',
+      status: 'approved',
+      reviewStatus: 'approved',
+      content: 'Use relational memory storage for v1.',
+      confidence: 0.9,
+      source: {
+        kind: 'user',
+        id: 'message-1',
+        metadata: { channel: 'chat' },
+      },
+      tags: ['architecture'],
+      metadata: { ticket: 'agent-platform-memory.1' },
+      safetyState: 'safe',
+      createdAtMs: 1000,
+      updatedAtMs: 1000,
+    });
+    expect(MemoryRecordSchema.parse(structuredClone(record))).toEqual(record);
+
+    const createBody = MemoryCreateBodySchema.parse({
+      scope: 'global',
+      kind: 'preference',
+      content: 'Prefer concise answers.',
+      source: { kind: 'manual' },
+    });
+    expect(createBody).toMatchObject({
+      scope: 'global',
+      kind: 'preference',
+      status: 'pending',
+      reviewStatus: 'unreviewed',
+      confidence: 0.5,
+    });
+
+    expect(() =>
+      MemoryCreateBodySchema.parse({
+        scope: 'session',
+        kind: 'fact',
+        content: 'Missing scope id.',
+        source: { kind: 'manual' },
+      }),
+    ).toThrow();
+
+    expect(MemoryCleanupBodySchema.parse({ scope: 'global' })).toEqual({
+      scope: 'global',
+      dryRun: true,
+      confirm: false,
+    });
+    expect(() =>
+      MemoryCleanupBodySchema.parse({
+        scope: 'session',
+        scopeId: 'session-1',
+        dryRun: false,
+      }),
+    ).toThrow();
+
+    expect(
+      MemoryQuerySchema.parse({ minConfidence: '0.75', includeExpired: 'true' }),
+    ).toMatchObject({
+      minConfidence: 0.75,
+      includeExpired: true,
+      limit: 100,
+      offset: 0,
+    });
+
+    const link = MemoryLinkSchema.parse({
+      sourceMemoryId: 'memory-1',
+      targetMemoryId: 'memory-2',
+      relation: 'supports',
+      createdAtMs: 1000,
+    });
+    expect(MemoryLinkSchema.parse(structuredClone(link))).toEqual(link);
+
+    const promptBundle = PromptMemoryBundleSchema.parse({
+      items: [
+        {
+          id: 'memory-1',
+          scope: 'project',
+          scopeId: 'project-1',
+          kind: 'decision',
+          content: 'Use relational memory storage for v1.',
+          confidence: 0.9,
+          source: { kind: 'user', id: 'message-1', label: 'reviewed user message' },
+          tags: ['architecture'],
+          updatedAtMs: 1000,
+          score: 0.81,
+        },
+      ],
+      includedCount: 1,
+      omitted: { expired: 0, lowConfidence: 0, unsafe: 0, notRelevant: 2, crossScope: 0 },
+    });
+    expect(PromptMemoryBundleSchema.parse(structuredClone(promptBundle))).toEqual(promptBundle);
+  });
+
+  it('Working memory schemas round-trip and bound summaries', () => {
+    const artifact = WorkingMemoryArtifactSchema.parse({
+      sessionId: 'session-1',
+      runId: 'run-1',
+      currentGoal: 'Implement working memory.',
+      activeProject: 'agent-platform',
+      activeTask: 'agent-platform-memory.2',
+      decisions: ['Keep short-term state session scoped.'],
+      importantFiles: ['packages/db/src/repositories/workingMemory.ts'],
+      toolsUsed: ['sys_read_file'],
+      toolSummaries: [
+        {
+          toolName: 'sys_read_file',
+          ok: true,
+          summary: 'Read a repository file.',
+          atMs: 1000,
+        },
+      ],
+      blockers: ['Waiting for review'],
+      pendingApprovalIds: ['approval-1'],
+      nextAction: 'Run focused tests.',
+      summary: 'Goal: Implement working memory. Next: Run focused tests.',
+      createdAtMs: 1000,
+      updatedAtMs: 2000,
+    });
+    expect(WorkingMemoryArtifactSchema.parse(structuredClone(artifact))).toEqual(artifact);
+
+    const update = WorkingMemoryUpdateBodySchema.parse({
+      sessionId: 'session-1',
+      currentGoal: 'Continue the task.',
+      toolsUsed: ['sys_list_files'],
+    });
+    expect(update).toEqual({
+      sessionId: 'session-1',
+      currentGoal: 'Continue the task.',
+      toolsUsed: ['sys_list_files'],
+    });
+  });
+
+  it('Memory candidate schemas round-trip and enforce scoped policy', () => {
+    const input = MemoryCandidateExtractionInputSchema.parse({
+      sessionId: 'session-1',
+      agentId: 'agent-1',
+      messages: [
+        {
+          id: 'message-1',
+          role: 'user',
+          content: 'Remember that we prefer project-scoped memory for repo decisions.',
+          createdAtMs: 1000,
+        },
+      ],
+    });
+    expect(MemoryCandidateExtractionInputSchema.parse(structuredClone(input))).toEqual(input);
+
+    const candidate = ExtractedMemoryCandidateSchema.parse({
+      scope: 'project',
+      scopeId: 'agent-platform',
+      kind: 'preference',
+      content: 'Prefer project-scoped memory for repo decisions.',
+      confidence: 0.84,
+      rationale: 'The user explicitly asked the agent to remember this information.',
+      evidence: [
+        {
+          kind: 'user_message',
+          id: 'message-1',
+          excerpt: 'Remember that we prefer project-scoped memory for repo decisions.',
+          atMs: 1000,
+        },
+      ],
+      tags: ['candidate', 'explicit'],
+      safetyState: 'safe',
+    });
+    expect(ExtractedMemoryCandidateSchema.parse(structuredClone(candidate))).toEqual(candidate);
+    expect(() =>
+      ExtractedMemoryCandidateSchema.parse({
+        ...candidate,
+        scope: 'session',
+        scopeId: undefined,
+      }),
+    ).toThrow();
+  });
+
+  it('Self-learning schemas round-trip with review-gated result metadata', () => {
+    const input = SelfLearningEvaluateBodySchema.parse({
+      sessionId: 'session-1',
+      agentId: 'agent-1',
+      observedOutcomes: [
+        {
+          kind: 'observability_error',
+          id: 'event-1',
+          message: "ENOENT: no such file or directory, open '/workspace/app/src/index.ts'",
+          atMs: 1000,
+        },
+      ],
+    });
+    expect(input).toMatchObject({
+      objective: 'recoverable_workspace_path_errors',
+      minOccurrences: 2,
+    });
+
+    const result = SelfLearningEvaluationResultSchema.parse({
+      objective: 'recoverable_workspace_path_errors',
+      proposed: false,
+      reason: 'Not enough matching signals.',
+      metrics: {
+        before: { observedSignals: 1, matchingSignals: 1, candidateSignals: 0 },
+        after: { approvedLearningMemories: 0, existingPendingProposals: 0 },
+      },
+    });
+    expect(SelfLearningEvaluationResultSchema.parse(structuredClone(result))).toEqual(result);
   });
 
   it('Coding apply patch schemas round-trip', () => {

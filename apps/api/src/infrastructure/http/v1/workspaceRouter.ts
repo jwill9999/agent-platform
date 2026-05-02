@@ -24,14 +24,15 @@ export type WorkspaceRouterOptions = {
   workspaceRoot?: string;
 };
 
-function isAsciiLetter(code: number): boolean {
+function isAsciiLetter(code: number | undefined): boolean {
+  if (code === undefined) return false;
   return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
 }
 
 function isWindowsAbsolutePath(value: string): boolean {
   return (
     value.length >= 3 &&
-    isAsciiLetter(value.charCodeAt(0)) &&
+    isAsciiLetter(value.codePointAt(0)) &&
     value[1] === ':' &&
     (value[2] === '\\' || value[2] === '/')
   );

@@ -43,6 +43,17 @@ export type TraceEvent =
       messagesIncluded: number;
       strategy: string;
     }
+  | {
+      type: 'memory_retrieval';
+      included: number;
+      omitted: {
+        expired: number;
+        lowConfidence: number;
+        unsafe: number;
+        notRelevant: number;
+        crossScope: number;
+      };
+    }
   | { type: 'skill_loaded'; skillId: string; loadCount: number }
   | { type: 'skill_load_loop'; skillId: string; loadCount: number }
   | {

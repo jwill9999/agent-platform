@@ -4,10 +4,12 @@ import path from 'node:path';
 
 import {
   closeDatabase,
+  createMemory,
   createModelConfig,
   DEFAULT_AGENT_ID,
   openDatabase,
   parseMasterKeyFromBase64,
+  queryMemories,
   runSeed,
 } from '@agent-platform/db';
 import request from 'supertest';
@@ -515,6 +517,191 @@ describe('POST /v1/chat (session-aware)', () => {
       restoreChatEnv(envSnap);
       if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
       else process.env.SECRETS_MASTER_KEY = previousMasterKey;
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('persists inspectable working memory and includes it on later turns', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+
+      mockToolCalls.mockReturnValueOnce(
+        'Decision: keep the working memory session scoped. Next update packages/db/src/repositories/workingMemory.ts.',
+      );
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Implement agent-platform-memory.2 for agent-platform' })
+        .expect(200);
+
+      const memoryRes = await request(app)
+        .get(`/v1/sessions/${sessionId}/working-memory`)
+        .expect(200);
+      expect(memoryRes.body.data).toMatchObject({
+        sessionId,
+        currentGoal: 'Implement agent-platform-memory.2 for agent-platform',
+        activeTask: 'agent-platform-memory.2',
+        nextAction:
+          'Decision: keep the working memory session scoped. Next update packages/db/src/repositories/workingMemory.ts.',
+      });
+      expect(memoryRes.body.data.decisions).toContain(
+        'Decision: keep the working memory session scoped',
+      );
+      expect(memoryRes.body.data.importantFiles).toContain(
+        'packages/db/src/repositories/workingMemory.ts',
+      );
+
+      mockToolCalls.mockReturnValueOnce('Continuing with the remembered task');
+      await request(app).post('/v1/chat').send({ sessionId, message: 'Continue' }).expect(200);
+
+      const followUpState = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; content: string }>;
+      };
+      expect(followUpState.messages?.[0]?.content).toContain('Short-term working memory');
+      expect(followUpState.messages?.[0]?.content).toContain(
+        'Goal: Implement agent-platform-memory.2 for agent-platform',
+      );
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('includes approved prompt memories with retrieval trace metadata', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+      createMemory(
+        db,
+        {
+          scope: 'agent',
+          scopeId: DEFAULT_AGENT_ID,
+          kind: 'decision',
+          status: 'approved',
+          reviewStatus: 'approved',
+          content: 'Memory retrieval must include source metadata in prompt bundles.',
+          confidence: 0.91,
+          source: { kind: 'manual', id: 'review-1', label: 'approved review' },
+          tags: ['retrieval'],
+          safetyState: 'safe',
+        },
+        { id: 'approved-memory', nowMs: 1000 },
+      );
+      createMemory(
+        db,
+        {
+          scope: 'agent',
+          scopeId: DEFAULT_AGENT_ID,
+          kind: 'decision',
+          status: 'pending',
+          reviewStatus: 'unreviewed',
+          content: 'Pending memory retrieval should not appear in prompts.',
+          source: { kind: 'manual' },
+          tags: ['retrieval'],
+          safetyState: 'safe',
+        },
+        { id: 'pending-memory', nowMs: 1000 },
+      );
+
+      mockToolCalls.mockReturnValueOnce('Using approved memory.');
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'How should memory retrieval prompt bundles work?' })
+        .expect(200);
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; content: string }>;
+        trace?: Array<{ type: string; included?: number }>;
+      };
+      const systemPrompt = state.messages?.[0]?.content ?? '';
+      expect(systemPrompt).toContain('Long-term approved memories');
+      expect(systemPrompt).toContain('Memory retrieval must include source metadata');
+      expect(systemPrompt).toContain('sourceId=review-1');
+      expect(systemPrompt).not.toContain('Pending memory retrieval should not appear');
+      expect(state.trace).toContainEqual(
+        expect.objectContaining({ type: 'memory_retrieval', included: 1 }),
+      );
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('stores bounded tool summaries instead of raw tool output in working memory', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+      const rawPayload = 'x'.repeat(2_000);
+
+      mockToolCalls
+        .mockReturnValueOnce([
+          {
+            id: 'tc-json',
+            name: 'sys_json_stringify',
+            args: { data: { rawPayload } },
+          },
+        ])
+        .mockReturnValueOnce('Tool run complete');
+
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Run a tool and summarize it' })
+        .expect(200);
+
+      const memoryRes = await request(app)
+        .get(`/v1/sessions/${sessionId}/working-memory`)
+        .expect(200);
+      expect(memoryRes.body.data.toolsUsed).toContain('sys_json_stringify');
+      expect(memoryRes.body.data.toolSummaries[0]).toMatchObject({
+        toolName: 'sys_json_stringify',
+        ok: true,
+        summary: expect.any(String),
+      });
+      expect(memoryRes.body.data.toolSummaries[0].summary.length).toBeLessThanOrEqual(500);
+      expect(JSON.stringify(memoryRes.body.data)).not.toContain(rawPayload);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('stores explicit remember instructions as pending memory candidates', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+      mockToolCalls.mockReturnValueOnce('Noted for review.');
+
+      await request(app)
+        .post('/v1/chat')
+        .send({
+          sessionId,
+          message: 'Remember that agent-platform should keep memory retrieval auditable.',
+        })
+        .expect(200);
+
+      const candidates = queryMemories(db, {
+        status: 'pending',
+        reviewStatus: 'unreviewed',
+        tag: 'explicit',
+      });
+      expect(candidates).toHaveLength(1);
+      expect(candidates[0]).toMatchObject({
+        scope: 'agent',
+        scopeId: DEFAULT_AGENT_ID,
+        status: 'pending',
+        reviewStatus: 'unreviewed',
+        content: 'that agent-platform should keep memory retrieval auditable.',
+      });
+    } finally {
+      restoreChatEnv(envSnap);
       closeDatabase(sqlite);
     }
   });

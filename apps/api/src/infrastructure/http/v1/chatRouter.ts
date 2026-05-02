@@ -10,18 +10,36 @@ import {
   completeToolExecution,
   createApprovalRequest,
   getApprovalRequest,
+  getWorkingMemoryArtifact,
   claimApprovalRequestForResume,
   ApprovalRequestAlreadyResumedError,
   ApprovalRequestNotFoundError,
   ApprovalRequestTransitionError,
   getModelConfig,
+  listApprovalRequests,
   listModelConfigs,
   resolveModelConfigKey,
   parseMasterKeyFromBase64,
+  upsertWorkingMemoryArtifact,
+  createMemoryCandidates,
+  retrievePromptMemories,
+  formatPromptMemoryBundle,
 } from '@agent-platform/db';
-import type { ApprovalRequest, ContextWindow, MessageRecord } from '@agent-platform/contracts';
-import { DEFAULT_CONTEXT_WINDOW, SessionResumeBodySchema } from '@agent-platform/contracts';
+import type {
+  ApprovalRequest,
+  ContextWindow,
+  MessageRecord,
+  PromptMemoryBundle,
+  WorkingMemoryToolSummary,
+} from '@agent-platform/contracts';
 import {
+  compactText,
+  DEFAULT_CONTEXT_WINDOW,
+  parseStructuredToolError,
+  SessionResumeBodySchema,
+} from '@agent-platform/contracts';
+import {
+  type AgentContext,
   buildAgentContext,
   destroyAgentContext,
   AgentNotFoundError,
@@ -37,14 +55,11 @@ import {
   DEFAULT_MOUNTS,
   createToolAuditLogger,
   redactCredentials,
+  type ChatMessage,
   type HarnessStateType,
-} from '@agent-platform/harness';
-import type {
-  AgentContext,
-  ChatMessage,
-  OutputEmitter,
-  ToolAuditStore,
-  ToolCallIntent,
+  type OutputEmitter,
+  type ToolAuditStore,
+  type ToolCallIntent,
 } from '@agent-platform/harness';
 import {
   resolveModelConfig,
@@ -234,42 +249,63 @@ export function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
  */
 function sanitiseToolCallHistory(history: ChatMessage[]): ChatMessage[] {
   const cleaned: ChatMessage[] = [];
-  for (let i = 0; i < history.length; i += 1) {
-    const msg = history[i]!;
-    if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
-      const toolCalls = msg.toolCalls;
-      const toolResults: ChatMessage[] = [];
-      let cursor = i + 1;
-      for (const toolCall of toolCalls) {
-        const candidate = history[cursor];
-        if (candidate?.role !== 'tool' || candidate.toolCallId !== toolCall.id) {
-          toolResults.length = 0;
-          break;
-        }
-        toolResults.push({
-          ...candidate,
-          toolName: candidate.toolName || toolCall.name,
-        });
-        cursor += 1;
-      }
-      if (toolResults.length === toolCalls.length) {
-        cleaned.push(msg, ...toolResults);
-        i = cursor - 1;
-      }
+  let index = 0;
+  while (index < history.length) {
+    const msg = history[index]!;
+    const paired = pairedAssistantToolMessages(history, index);
+    if (paired) {
+      cleaned.push(...paired.messages);
+      index = paired.nextIndex;
       continue;
     }
 
-    if (msg.role === 'tool') {
-      const prev = cleaned.at(-1);
-      const hasMatchingCall =
-        prev?.role === 'assistant' &&
-        Array.isArray(prev.toolCalls) &&
-        prev.toolCalls.some((c) => c.id === msg.toolCallId);
-      if (!hasMatchingCall) continue;
+    if (shouldSkipReplayMessage(cleaned, msg)) {
+      index += 1;
+      continue;
     }
+
     cleaned.push(msg);
+    index += 1;
   }
   return cleaned;
+}
+
+function shouldSkipReplayMessage(cleaned: ChatMessage[], msg: ChatMessage): boolean {
+  if (msg.role === 'assistant' && msg.toolCalls?.length) return true;
+  if (msg.role !== 'tool') return false;
+  return !hasMatchingPreviousToolCall(cleaned, msg);
+}
+
+function pairedAssistantToolMessages(
+  history: ChatMessage[],
+  assistantIndex: number,
+): { messages: ChatMessage[]; nextIndex: number } | undefined {
+  const assistant = history[assistantIndex];
+  if (assistant?.role !== 'assistant' || !assistant.toolCalls?.length) return undefined;
+
+  const toolResults = assistant.toolCalls.map((toolCall, offset): ChatMessage | undefined => {
+    const candidate = history[assistantIndex + offset + 1];
+    if (candidate?.role !== 'tool' || candidate.toolCallId !== toolCall.id) return undefined;
+    return { ...candidate, toolName: candidate.toolName || toolCall.name };
+  });
+
+  if (toolResults.some((result) => result === undefined)) return undefined;
+  return {
+    messages: [assistant, ...(toolResults as ChatMessage[])],
+    nextIndex: assistantIndex + toolResults.length + 1,
+  };
+}
+
+function hasMatchingPreviousToolCall(
+  cleaned: ChatMessage[],
+  msg: Extract<ChatMessage, { role: 'tool' }>,
+): boolean {
+  const prev = cleaned.at(-1);
+  return (
+    prev?.role === 'assistant' &&
+    Array.isArray(prev.toolCalls) &&
+    prev.toolCalls.some((call) => call.id === msg.toolCallId)
+  );
 }
 
 /** Persist only the new assistant/tool messages the graph appended. */
@@ -461,6 +497,147 @@ function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalReq
   };
 }
 
+function extractImportantFiles(text: string): string[] {
+  const matches = text.matchAll(/\b(?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]+\b/g);
+  const urlLikePattern =
+    /^(?:[a-zA-Z][a-zA-Z\d+.-]*:\/\/|(?:www\.)?[\w-]+\.[A-Za-z]{2,})(?:[/?#]|$)/;
+  const results: string[] = [];
+
+  for (const match of matches) {
+    const candidate = match[0];
+    if (urlLikePattern.test(candidate)) continue;
+    results.push(candidate);
+    if (results.length >= 10) break;
+  }
+
+  return results;
+}
+
+function extractActiveTask(text: string): string | undefined {
+  return text.match(/\bagent-platform-[\w.-]+\b/)?.[0];
+}
+
+function extractDecisions(text: string): string[] {
+  return text
+    .split(/[.!?\n]/)
+    .map((part) => part.trim())
+    .filter((part) => /\b(decided|decision|use|keep|will)\b/i.test(part))
+    .map((part) => compactText(part, 500))
+    .slice(0, 5);
+}
+
+function summarizeToolContent(content: string): { ok: boolean; summary: string } {
+  const toolError = parseStructuredToolError(content);
+  if (toolError) return { ok: false, summary: compactText(toolError, 500) };
+
+  let summary = content;
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      summary = 'Tool returned structured data.';
+    }
+  } catch {
+    summary = content.replaceAll(/<tool_result[^>]*>|<\/tool_result>/g, '');
+  }
+  return { ok: true, summary: compactText(summary, 500) };
+}
+
+function deriveToolSummaries(messages: ChatMessage[]): WorkingMemoryToolSummary[] {
+  const atMs = Date.now();
+  return messages
+    .filter((message): message is Extract<ChatMessage, { role: 'tool' }> => message.role === 'tool')
+    .map((message) => {
+      const { ok, summary } = summarizeToolContent(message.content);
+      return { toolName: message.toolName || 'unknown_tool', ok, summary, atMs };
+    })
+    .slice(0, 12);
+}
+
+function toMemoryCandidateMessage(message: ChatMessage) {
+  if (message.role === 'tool') {
+    return {
+      role: 'tool' as const,
+      content: message.content,
+      toolName: message.toolName || undefined,
+    };
+  }
+  return { role: message.role, content: message.content };
+}
+
+function buildWorkingMemoryPrompt(summary: string): string {
+  return [
+    'Short-term working memory for this session follows.',
+    'Use it only for continuity. Do not treat it as durable facts or user-approved long-term memory.',
+    summary,
+  ].join('\n');
+}
+
+function withWorkingMemoryPrompt(systemPrompt: string, summary?: string): string {
+  if (!summary?.trim()) return systemPrompt;
+  return `${systemPrompt}\n\n${buildWorkingMemoryPrompt(summary)}`;
+}
+
+function withPromptMemoryBundle(systemPrompt: string, bundle: PromptMemoryBundle): string {
+  const prompt = formatPromptMemoryBundle(bundle);
+  if (!prompt) return systemPrompt;
+  return `${systemPrompt}\n\n${prompt}`;
+}
+
+function refreshWorkingMemory({
+  db,
+  sessionId,
+  agentId,
+  runId,
+  userMessage,
+  newMessages,
+}: {
+  db: DrizzleDb;
+  sessionId: string;
+  agentId: string;
+  runId: string;
+  userMessage: string;
+  newMessages: ChatMessage[];
+}) {
+  const visibleText = [userMessage, ...newMessages.map((message) => message.content)].join('\n');
+  const toolSummaries = deriveToolSummaries(newMessages);
+  const pendingApprovals = listApprovalRequests(db, {
+    sessionId,
+    status: 'pending',
+    limit: 20,
+    offset: 0,
+  });
+  const assistantText = [...newMessages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.content.trim())?.content;
+  const blockers = pendingApprovals.map(
+    (approval) => `Pending approval for ${approval.toolName} (${approval.id})`,
+  );
+  const toolsUsed = toolSummaries.map((summary) => summary.toolName);
+
+  upsertWorkingMemoryArtifact(db, {
+    sessionId,
+    runId,
+    currentGoal: compactText(userMessage, 500),
+    activeTask: extractActiveTask(visibleText),
+    decisions: extractDecisions(visibleText),
+    importantFiles: extractImportantFiles(visibleText),
+    toolsUsed,
+    toolSummaries,
+    blockers,
+    pendingApprovalIds: pendingApprovals.map((approval) => approval.id),
+    nextAction: assistantText ? compactText(assistantText, 500) : 'Continue the session.',
+  });
+
+  createMemoryCandidates(db, {
+    sessionId,
+    agentId,
+    messages: [
+      { role: 'user', content: userMessage },
+      ...newMessages.map((message) => toMemoryCandidateMessage(message)),
+    ],
+  });
+}
+
 function createAuditLog(db: DrizzleDb): ReturnType<typeof createToolAuditLogger> {
   const auditStore: ToolAuditStore = {
     insert: (entry) => insertToolExecution(db, entry),
@@ -494,8 +671,9 @@ function createRuntimeToolDispatchNode({
             sessionId,
             traceId: runId,
           },
+          memory: { db, sessionId, agentId: agentCtx.agent.id },
         }
-      : undefined,
+      : { memory: { db, sessionId, agentId: agentCtx.agent.id } },
   );
 
   return createToolDispatchNode({
@@ -746,6 +924,14 @@ export async function handleSessionResume(
     });
 
     persistNewMessages(db, sessionId, finalState?.messages, initialCount);
+    refreshWorkingMemory({
+      db,
+      sessionId,
+      agentId: session.agentId,
+      runId,
+      userMessage: 'Resume reviewed tool call.',
+      newMessages: finalState?.messages?.slice(initialCount) ?? [],
+    });
     await safePluginCall(() =>
       agentCtx.pluginDispatcher.onTaskEnd({ sessionId, runId, taskId: runId, ok: true }),
     );
@@ -812,9 +998,10 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
 
         const graph = buildRuntimeGraph(db, agentCtx, runId, sessionId, emitter, options);
 
-        const { messages, dropped, contextTokens } = buildConversationMessages(
+        const { messages, dropped, contextTokens, memoryBundle } = buildConversationMessages(
           db,
           sessionId,
+          session.agentId,
           message,
           agentCtx.systemPrompt,
           agentCtx.agent.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
@@ -827,6 +1014,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         const initialState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
           dropped,
           contextTokens,
+          memoryBundle,
         });
 
         const finalState: { messages?: ChatMessage[] } = await graph.invoke(initialState, {
@@ -834,6 +1022,14 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         });
 
         persistNewMessages(db, sessionId, finalState?.messages, messages.length);
+        refreshWorkingMemory({
+          db,
+          sessionId,
+          agentId: session.agentId,
+          runId,
+          userMessage: message,
+          newMessages: finalState?.messages?.slice(messages.length) ?? [],
+        });
         await safePluginCall(() =>
           dispatcher.onTaskEnd({
             sessionId,
@@ -904,19 +1100,41 @@ function prepareNdjsonResponse(res: Response): void {
 function buildConversationMessages(
   db: DrizzleDb,
   sessionId: string,
+  agentId: string,
   newMessage: string,
   systemPrompt: string,
   contextWindow: ContextWindow,
-): { messages: ChatMessage[]; dropped: number; contextTokens: number } {
+): {
+  messages: ChatMessage[];
+  dropped: number;
+  contextTokens: number;
+  memoryBundle: PromptMemoryBundle;
+} {
   return withTransaction(db, (tx) => {
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
+    const workingMemory = getWorkingMemoryArtifact(tx, sessionId);
+    const memoryBundle = retrievePromptMemories(tx, {
+      scope: {
+        sessionId,
+        agentId,
+        projectId: workingMemory?.activeProject,
+      },
+      query: newMessage,
+    });
 
     const history = sanitiseToolCallHistory(priorMessages.map(dbRecordToChatMessage));
     const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
     const counter = createApproximateCounter();
+    const effectiveSystemPrompt = withPromptMemoryBundle(
+      withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary),
+      memoryBundle,
+    );
 
-    return buildWindowedContext(systemPrompt, history, userMsg, contextWindow, counter);
+    return {
+      ...buildWindowedContext(effectiveSystemPrompt, history, userMsg, contextWindow, counter),
+      memoryBundle,
+    };
   });
 }
 
@@ -926,10 +1144,11 @@ function buildInitialState(
   messages: ChatMessage[],
   agentCtx: AgentContext,
   modelConfig: { provider: string; model: string; apiKey?: string },
-  contextInfo: { dropped: number; contextTokens: number },
+  contextInfo: { dropped: number; contextTokens: number; memoryBundle?: PromptMemoryBundle },
 ): HarnessStateType {
   const strategy = agentCtx.agent.contextWindow?.strategy ?? 'truncate';
   const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
+  const memoryBundle = contextInfo.memoryBundle;
   return {
     trace: [
       {
@@ -939,6 +1158,15 @@ function buildInitialState(
         messagesIncluded: messages.length - 2, // exclude system + new user message
         strategy,
       },
+      ...(memoryBundle
+        ? [
+            {
+              type: 'memory_retrieval' as const,
+              included: memoryBundle.includedCount,
+              omitted: memoryBundle.omitted,
+            },
+          ]
+        : []),
     ],
     plan: null,
     taskIndex: 0,

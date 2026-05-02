@@ -42,54 +42,63 @@ The Next.js BFF exposes two proxy layers to the browser:
 - **`/api/chat`** — dedicated BFF route with its own Zod validation, timeout, and error handling; proxies to `POST /v1/chat`.
 - **`/api/v1/[...path]`** — catch-all proxy that forwards any `/v1` request to the API verbatim.
 
-| Endpoint                                 | Frontend | curl / API-only | Notes                                        |
-| ---------------------------------------- | :------: | :-------------: | -------------------------------------------- |
-| `POST /v1/chat`                          |    ✅    |       ✅        | Primary chat — via dedicated `/api/chat` BFF |
-| `GET /v1/agents`                         |    ✅    |       ✅        | Agent dashboard, agent editor, home page     |
-| `POST /v1/agents`                        |    ✅    |       ✅        | Agent editor, duplicate                      |
-| `PUT /v1/agents/:id`                     |    ✅    |       ✅        | Agent editor                                 |
-| `DELETE /v1/agents/:id`                  |    ✅    |       ✅        | Agent dashboard                              |
-| `GET /v1/sessions`                       |    ✅    |       ✅        | Sessions page                                |
-| `POST /v1/sessions`                      |    ✅    |       ✅        | Home page, IDE chat                          |
-| `GET /v1/skills`                         |    ✅    |       ✅        | Skills dashboard, agent editor               |
-| `POST /v1/skills`                        |    ✅    |       ✅        | Skills dashboard                             |
-| `PUT /v1/skills/:id`                     |    ✅    |       ✅        | Skills dashboard                             |
-| `DELETE /v1/skills/:id`                  |    ✅    |       ✅        | Skills dashboard                             |
-| `GET /v1/tools`                          |    ✅    |       ✅        | Tools dashboard                              |
-| `POST /v1/tools`                         |    ✅    |       ✅        | Tools dashboard                              |
-| `PUT /v1/tools/:id`                      |    ✅    |       ✅        | Tools dashboard                              |
-| `DELETE /v1/tools/:id`                   |    ✅    |       ✅        | Tools dashboard                              |
-| `GET /v1/mcp-servers`                    |    ✅    |       ✅        | MCP dashboard, agent editor                  |
-| `POST /v1/mcp-servers`                   |    ✅    |       ✅        | MCP dashboard                                |
-| `PUT /v1/mcp-servers/:id`                |    ✅    |       ✅        | MCP dashboard                                |
-| `DELETE /v1/mcp-servers/:id`             |    ✅    |       ✅        | MCP dashboard                                |
-| `POST /v1/mcp-servers/:id/test`          |    ✅    |       ✅        | MCP dashboard — connection test              |
-| `GET /v1/agents/:id`                     |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/skills/:id`                     |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/tools/:id`                      |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/mcp-servers/:id`                |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/sessions/:id`                   |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `PUT /v1/sessions/:id`                   |    —     |       ✅        | Update session (no UI)                       |
-| `DELETE /v1/sessions/:id`                |    —     |       ✅        | Delete session (no UI)                       |
-| `GET /v1/model-configs`                  |    ✅    |       ✅        | Model configs dashboard                      |
-| `POST /v1/model-configs`                 |    ✅    |       ✅        | Model configs dashboard — create             |
-| `PUT /v1/model-configs/:id`              |    ✅    |       ✅        | Model configs dashboard — edit               |
-| `DELETE /v1/model-configs/:id`           |    ✅    |       ✅        | Model configs dashboard — delete             |
-| `POST /v1/model-configs/:id/test`        |    ✅    |       ✅        | Model configs dashboard — test connection    |
-| `GET /v1/model-configs/:id`              |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
-| `GET /v1/settings`                       |    —     |       ✅        | Platform settings — API / automation only    |
-| `PUT /v1/settings/:key`                  |    —     |       ✅        | Set a setting — API / automation only        |
-| `DELETE /v1/settings/:key`               |    —     |       ✅        | Delete a setting — API / automation only     |
-| `GET /v1/tool-executions`                |    —     |       ✅        | Audit log query — API / automation only      |
-| `GET /v1/approval-requests`              |    —     |       ✅        | HITL approval request query                  |
-| `GET /v1/approval-requests/:id`          |    —     |       ✅        | HITL approval request detail                 |
-| `POST /v1/approval-requests/:id/approve` |    —     |       ✅        | Approve pending HITL request                 |
-| `POST /v1/approval-requests/:id/reject`  |    —     |       ✅        | Reject pending HITL request                  |
-| `POST /v1/approval-requests/:id/expire`  |    —     |       ✅        | Expire pending HITL request                  |
-| `GET /v1/workspace/files`                |    ✅    |       ✅        | List workspace files by managed area         |
-| `GET /v1/workspace/files/download`       |    ✅    |       ✅        | Download a safe workspace-relative file      |
-| `POST /v1/chat/stream`                   |    —     |       ✅        | ⚠️ Deprecated legacy pass-through            |
-| `GET /health`                            |    —     |       ✅        | Health check (outside `/v1`)                 |
+| Endpoint                                   | Frontend | curl / API-only | Notes                                        |
+| ------------------------------------------ | :------: | :-------------: | -------------------------------------------- |
+| `POST /v1/chat`                            |    ✅    |       ✅        | Primary chat — via dedicated `/api/chat` BFF |
+| `GET /v1/agents`                           |    ✅    |       ✅        | Agent dashboard, agent editor, home page     |
+| `POST /v1/agents`                          |    ✅    |       ✅        | Agent editor, duplicate                      |
+| `PUT /v1/agents/:id`                       |    ✅    |       ✅        | Agent editor                                 |
+| `DELETE /v1/agents/:id`                    |    ✅    |       ✅        | Agent dashboard                              |
+| `GET /v1/sessions`                         |    ✅    |       ✅        | Sessions page                                |
+| `POST /v1/sessions`                        |    ✅    |       ✅        | Home page, IDE chat                          |
+| `GET /v1/skills`                           |    ✅    |       ✅        | Skills dashboard, agent editor               |
+| `POST /v1/skills`                          |    ✅    |       ✅        | Skills dashboard                             |
+| `PUT /v1/skills/:id`                       |    ✅    |       ✅        | Skills dashboard                             |
+| `DELETE /v1/skills/:id`                    |    ✅    |       ✅        | Skills dashboard                             |
+| `GET /v1/tools`                            |    ✅    |       ✅        | Tools dashboard                              |
+| `POST /v1/tools`                           |    ✅    |       ✅        | Tools dashboard                              |
+| `PUT /v1/tools/:id`                        |    ✅    |       ✅        | Tools dashboard                              |
+| `DELETE /v1/tools/:id`                     |    ✅    |       ✅        | Tools dashboard                              |
+| `GET /v1/mcp-servers`                      |    ✅    |       ✅        | MCP dashboard, agent editor                  |
+| `POST /v1/mcp-servers`                     |    ✅    |       ✅        | MCP dashboard                                |
+| `PUT /v1/mcp-servers/:id`                  |    ✅    |       ✅        | MCP dashboard                                |
+| `DELETE /v1/mcp-servers/:id`               |    ✅    |       ✅        | MCP dashboard                                |
+| `POST /v1/mcp-servers/:id/test`            |    ✅    |       ✅        | MCP dashboard — connection test              |
+| `GET /v1/agents/:id`                       |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/skills/:id`                       |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/tools/:id`                        |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/mcp-servers/:id`                  |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/sessions/:id`                     |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/sessions/:id/working-memory`      |    —     |       ✅        | Inspect session-scoped working memory        |
+| `PUT /v1/sessions/:id`                     |    —     |       ✅        | Update session (no UI)                       |
+| `DELETE /v1/sessions/:id`                  |    —     |       ✅        | Delete session (no UI)                       |
+| `GET /v1/memories`                         |    ✅    |       ✅        | Memory dashboard list/filter                 |
+| `GET /v1/memories/export`                  |    ✅    |       ✅        | Export filtered memory records               |
+| `GET /v1/memories/:id`                     |    ✅    |       ✅        | Memory dashboard detail                      |
+| `PUT /v1/memories/:id`                     |    ✅    |       ✅        | Memory dashboard edit                        |
+| `POST /v1/memories/:id/review`             |    ✅    |       ✅        | Approve or reject a memory record            |
+| `DELETE /v1/memories/:id`                  |    ✅    |       ✅        | Delete a memory record                       |
+| `POST /v1/memories/clear`                  |    ✅    |       ✅        | Explicit clear-by-scope memory action        |
+| `POST /v1/memories/self-learning/evaluate` |    —     |       ✅        | Generate review-gated self-learning proposal |
+| `GET /v1/model-configs`                    |    ✅    |       ✅        | Model configs dashboard                      |
+| `POST /v1/model-configs`                   |    ✅    |       ✅        | Model configs dashboard — create             |
+| `PUT /v1/model-configs/:id`                |    ✅    |       ✅        | Model configs dashboard — edit               |
+| `DELETE /v1/model-configs/:id`             |    ✅    |       ✅        | Model configs dashboard — delete             |
+| `POST /v1/model-configs/:id/test`          |    ✅    |       ✅        | Model configs dashboard — test connection    |
+| `GET /v1/model-configs/:id`                |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/settings`                         |    —     |       ✅        | Platform settings — API / automation only    |
+| `PUT /v1/settings/:key`                    |    —     |       ✅        | Set a setting — API / automation only        |
+| `DELETE /v1/settings/:key`                 |    —     |       ✅        | Delete a setting — API / automation only     |
+| `GET /v1/tool-executions`                  |    —     |       ✅        | Audit log query — API / automation only      |
+| `GET /v1/approval-requests`                |    —     |       ✅        | HITL approval request query                  |
+| `GET /v1/approval-requests/:id`            |    —     |       ✅        | HITL approval request detail                 |
+| `POST /v1/approval-requests/:id/approve`   |    —     |       ✅        | Approve pending HITL request                 |
+| `POST /v1/approval-requests/:id/reject`    |    —     |       ✅        | Reject pending HITL request                  |
+| `POST /v1/approval-requests/:id/expire`    |    —     |       ✅        | Expire pending HITL request                  |
+| `GET /v1/workspace/files`                  |    ✅    |       ✅        | List workspace files by managed area         |
+| `GET /v1/workspace/files/download`         |    ✅    |       ✅        | Download a safe workspace-relative file      |
+| `POST /v1/chat/stream`                     |    —     |       ✅        | ⚠️ Deprecated legacy pass-through            |
+| `GET /health`                              |    —     |       ✅        | Health check (outside `/v1`)                 |
 
 > **Note:** The catch-all BFF proxy makes all `/v1` endpoints technically reachable from the browser. The "—" entries above simply have no UI that calls them today.
 
@@ -272,15 +281,38 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 
 ### Sessions
 
-| Method   | Path               | Description                         |
-| -------- | ------------------ | ----------------------------------- |
-| `GET`    | `/v1/sessions`     | List sessions (filter: `?agentId=`) |
-| `GET`    | `/v1/sessions/:id` | Get session by ID                   |
-| `POST`   | `/v1/sessions`     | Create a session                    |
-| `PUT`    | `/v1/sessions/:id` | Update a session                    |
-| `DELETE` | `/v1/sessions/:id` | Delete a session                    |
+| Method   | Path                              | Description                         |
+| -------- | --------------------------------- | ----------------------------------- |
+| `GET`    | `/v1/sessions`                    | List sessions (filter: `?agentId=`) |
+| `GET`    | `/v1/sessions/:id`                | Get session by ID                   |
+| `GET`    | `/v1/sessions/:id/working-memory` | Get session working memory artifact |
+| `POST`   | `/v1/sessions`                    | Create a session                    |
+| `PUT`    | `/v1/sessions/:id`                | Update a session                    |
+| `DELETE` | `/v1/sessions/:id`                | Delete a session                    |
 
 Body schema: `SessionCreateBodySchema` — requires `agentId`. Agent must exist (FK constraint → 404 on missing).
+
+`GET /v1/sessions/:id/working-memory` returns `{ "data": null }` until the session has completed at least one chat or resume turn that produced working-memory state. When present, the artifact is scoped to the session and contains the current goal, active project/task, key decisions, important files, bounded tool summaries, blockers, pending approval IDs, next action, and a compact summary used for session continuity.
+
+### Memories
+
+| Method   | Path                                  | Description                                      |
+| -------- | ------------------------------------- | ------------------------------------------------ |
+| `GET`    | `/v1/memories`                        | List memory records with scope/status filters    |
+| `GET`    | `/v1/memories/export`                 | Export filtered records as JSON-safe data        |
+| `GET`    | `/v1/memories/:id`                    | Get one memory record                            |
+| `PUT`    | `/v1/memories/:id`                    | Edit memory content, tags, metadata, or workflow |
+| `POST`   | `/v1/memories/:id/review`             | Approve or reject a memory record                |
+| `DELETE` | `/v1/memories/:id`                    | Delete one memory record                         |
+| `POST`   | `/v1/memories/clear`                  | Delete records matching an explicit scope        |
+| `POST`   | `/v1/memories/cleanup`                | Dry-run or delete expired records                |
+| `POST`   | `/v1/memories/self-learning/evaluate` | Evaluate a narrow self-learning objective        |
+
+`GET /v1/memories` accepts `scope`, `scopeId`, `kind`, `status`, `reviewStatus`, `safetyState`, `minConfidence`, `sourceKind`, `sourceId`, `tag`, `includeExpired`, `limit`, and `offset`. It returns `{ "data": { "items": [...], "total": 1, "limit": 100, "offset": 0 } }`.
+
+Review requests use `{ "decision": "approved" | "rejected", "reason"?: "..." }`. Clear requests require `{ "scope": "...", "scopeId"?: "...", "confirm": true }` and may include status/review/safety filters. Cleanup requests target expired memories only; they default to dry-run and require `{ "dryRun": false, "confirm": true }` before deletion. Destructive memory operations are logged without memory content.
+
+`POST /v1/memories/self-learning/evaluate` currently supports the narrow `recoverable_workspace_path_errors` objective. It combines supplied observed outcomes, recent observability errors for the session, and pending failure candidates. If the configured threshold is reached, it creates a `pending` / `unreviewed` `failure_learning` memory tagged `self-learning`; it does not create Beads tasks, code changes, policy changes, or prompt changes. Approval still happens through the normal memory review endpoint/UI.
 
 ### Chat
 

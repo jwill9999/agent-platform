@@ -6,7 +6,7 @@ export default function SettingsLayout({ children }: Readonly<{ children: ReactN
       <div className="max-w-4xl mx-auto">
         <h1 className="text-xl font-semibold text-foreground mb-1">Configuration</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Manage agents, models, skills, tools, and MCP servers.
+          Manage agents, models, skills, tools, memory, and MCP servers.
         </p>
         {children}
       </div>
