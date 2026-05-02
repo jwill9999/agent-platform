@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-02
+- **Session:** Addressed scheduler `.3` review feedback: `appendScheduledJobRunLog` now redacts/truncates messages once before validation and only prepares structured data afterward; scheduler DB tests now cover redaction/truncation for both terminal `errorMessage` and `resultSummary`.
+- **Date:** 2026-05-02
 - **Session:** Implemented `agent-platform-scheduler.3` on `task/agent-platform-scheduler.3`: scheduler run logs now redact credential text, bound messages/data with truncation metadata, redact terminal result/error summaries, and capture claimed/started/output/retry/cancel/fail/success/expired-lease lifecycle evidence. Full unit suite passed after the expected sandboxed API listener failure was rerun with escalation.
 - **Date:** 2026-05-02
 - **Session:** Implemented `agent-platform-scheduler.2` on `task/agent-platform-scheduler.2`: added the API-owned scheduler service, due-job claiming with leases, no-op built-in target execution, persisted run/log transitions, retry backoff, timeout handling, cancellation requests, expired-run recovery, and API lifecycle start/stop wiring.

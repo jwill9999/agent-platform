@@ -294,6 +294,17 @@ describe('scheduler repository', () => {
     expect(failed.errorMessage).toContain('[REDACTED:OpenAI API Key]');
     expect(failed.errorMessage).not.toContain(secret);
     expect(failed.errorMessage!.length).toBeLessThanOrEqual(4_000);
+
+    createScheduledJobRun(db, { jobId: 'job-1', attempt: 2 }, { id: 'run-2', nowMs: 4_000 });
+    transitionScheduledJobRun(db, 'run-2', 'running', { nowMs: 4_100 });
+    const succeeded = transitionScheduledJobRun(db, 'run-2', 'succeeded', {
+      nowMs: 5_000,
+      resultSummary: `Succeeded with ${secret} ${'y'.repeat(4_200)}`,
+    });
+
+    expect(succeeded.resultSummary).toContain('[REDACTED:OpenAI API Key]');
+    expect(succeeded.resultSummary).not.toContain(secret);
+    expect(succeeded.resultSummary!.length).toBeLessThanOrEqual(4_000);
   });
 
   it('allows retrying failed runs by transitioning failed back to queued', () => {

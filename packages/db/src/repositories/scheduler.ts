@@ -103,20 +103,19 @@ function prepareLogPayload(input: ScheduledJobRunLogCreateBody): {
   dataJson: string;
   truncated: boolean;
 } {
-  const message = redactAndTruncateText(input.message);
   const redactedData = redactObject(input.data ?? {});
   const dataJson = JSON.stringify(redactedData.value);
   if (dataJson.length <= MAX_LOG_DATA_JSON_CHARS) {
     return {
-      message: message.value ?? '',
+      message: input.message,
       dataJson,
-      truncated: input.truncated || message.truncated,
+      truncated: input.truncated,
     };
   }
 
   const preview = truncateText(dataJson, MAX_LOG_DATA_JSON_CHARS);
   return {
-    message: message.value ?? '',
+    message: input.message,
     dataJson: JSON.stringify({
       truncated: true,
       originalChars: dataJson.length,
@@ -592,12 +591,12 @@ export function appendScheduledJobRunLog(
   rawInput: ScheduledJobRunLogCreateBody,
   options: { id?: string; nowMs?: number } = {},
 ): ScheduledJobRunLogRecord {
-  const preTruncated =
+  const preparedMessage =
     typeof rawInput.message === 'string' ? redactAndTruncateText(rawInput.message) : undefined;
   const input = ScheduledJobRunLogCreateBodySchema.parse({
     ...rawInput,
-    message: preTruncated ? (preTruncated.value ?? '') : rawInput.message,
-    truncated: Boolean(rawInput.truncated || preTruncated?.truncated),
+    message: preparedMessage ? (preparedMessage.value ?? '') : rawInput.message,
+    truncated: Boolean(rawInput.truncated || preparedMessage?.truncated),
   });
   const run = getScheduledJobRun(db, input.runId);
   const id = options.id ?? randomUUID();
