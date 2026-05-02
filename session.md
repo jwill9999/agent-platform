@@ -12,6 +12,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Date:** 2026-05-02
 - **Session:** Added the missing Memory entry to the main Settings sidebar dropdown after manual epic testing confirmed the page worked but was not discoverable from the sidebar.
 - **Date:** 2026-05-02
+- **Session:** Addressed SonarCloud maintainability/reliability feedback on the final memory branch: simplified self-learning evidence mapping, added explicit string sort comparators, reduced chat history sanitiser complexity, and removed voided promise handlers from the Memory dashboard.
+- **Date:** 2026-05-02
 - **Session:** Closed out `agent-platform-memory.6` and claimed the final memory epic task, `agent-platform-memory.7`, on new branch `task/agent-platform-memory.7`. Beads/Dolt claim sync succeeded.
 - **Date:** 2026-05-02
 - **Session:** Addressed SonarCloud reliability findings on `task/agent-platform-memory.6`: removed loop-index reassignment in chat history sanitisation, replaced `charCodeAt()` with `codePointAt()` in workspace path checks, and reduced overlapping maintainability findings in the touched chat/bash workspace policy code.
@@ -496,6 +498,16 @@ Quality gates passed:
 - Memory sidebar discoverability checks passed:
   - `pnpm --filter @agent-platform/web typecheck`
   - `pnpm --filter @agent-platform/web lint`
+- Sonar feedback cleanup checks passed:
+  - `pnpm --filter @agent-platform/db typecheck`
+  - `pnpm --filter @agent-platform/api typecheck`
+  - `pnpm --filter @agent-platform/web typecheck`
+  - `pnpm --filter @agent-platform/db lint`
+  - `pnpm --filter @agent-platform/api lint`
+  - `pnpm --filter @agent-platform/web lint`
+  - `pnpm --filter @agent-platform/db test -- --run test/memories.test.ts test/selfLearning.test.ts`
+  - `pnpm --filter @agent-platform/api test -- --run test/sessionChat.integration.test.ts`
+  - `pnpm --filter @agent-platform/web test`
 - Structured edit checks passed:
   - `pnpm --filter @agent-platform/contracts build`
   - `pnpm --filter @agent-platform/agent-validation build`

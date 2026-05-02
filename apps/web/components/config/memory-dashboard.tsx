@@ -76,7 +76,9 @@ export function MemoryDashboard() {
   }, [path]);
 
   useEffect(() => {
-    void load();
+    load().catch((e: unknown) => {
+      setError(e instanceof Error ? e.message : String(e));
+    });
   }, [load]);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
@@ -189,15 +191,15 @@ export function MemoryDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => void load()} disabled={loading}>
+          <Button variant="outline" onClick={load} disabled={loading}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Button variant="outline" onClick={() => void exportJson()}>
+          <Button variant="outline" onClick={exportJson}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button variant="destructive" onClick={() => void clearCurrentScope()}>
+          <Button variant="destructive" onClick={clearCurrentScope}>
             <Trash2 className="mr-2 h-4 w-4" />
             Clear Scope
           </Button>
@@ -302,7 +304,7 @@ export function MemoryDashboard() {
               onChange={(e) => setEditTags(e.target.value)}
               placeholder="tag-one, tag-two"
             />
-            <Button onClick={() => void saveEdit()} disabled={saving || !editContent.trim()}>
+            <Button onClick={saveEdit} disabled={saving || !editContent.trim()}>
               {saving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -350,7 +352,11 @@ export function MemoryDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => void reviewMemory(memory, 'approved')}
+                    onClick={() => {
+                      reviewMemory(memory, 'approved').catch((e: unknown) => {
+                        setError(e instanceof ApiRequestError ? e.message : String(e));
+                      });
+                    }}
                   >
                     <Check className="mr-2 h-4 w-4" />
                     Approve
@@ -358,12 +364,24 @@ export function MemoryDashboard() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => void reviewMemory(memory, 'rejected')}
+                    onClick={() => {
+                      reviewMemory(memory, 'rejected').catch((e: unknown) => {
+                        setError(e instanceof ApiRequestError ? e.message : String(e));
+                      });
+                    }}
                   >
                     <X className="mr-2 h-4 w-4" />
                     Reject
                   </Button>
-                  <Button size="sm" variant="destructive" onClick={() => void deleteOne(memory)}>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      deleteOne(memory).catch((e: unknown) => {
+                        setError(e instanceof ApiRequestError ? e.message : String(e));
+                      });
+                    }}
+                  >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete
                   </Button>

@@ -257,12 +257,8 @@ function sanitiseToolCallHistory(history: ChatMessage[]): ChatMessage[] {
       index = paired.nextIndex;
       continue;
     }
-    if (msg.role === 'assistant' && msg.toolCalls?.length) {
-      index += 1;
-      continue;
-    }
 
-    if (msg.role === 'tool' && !hasMatchingPreviousToolCall(cleaned, msg)) {
+    if (shouldSkipReplayMessage(cleaned, msg)) {
       index += 1;
       continue;
     }
@@ -271,6 +267,12 @@ function sanitiseToolCallHistory(history: ChatMessage[]): ChatMessage[] {
     index += 1;
   }
   return cleaned;
+}
+
+function shouldSkipReplayMessage(cleaned: ChatMessage[], msg: ChatMessage): boolean {
+  if (msg.role === 'assistant' && msg.toolCalls?.length) return true;
+  if (msg.role !== 'tool') return false;
+  return !hasMatchingPreviousToolCall(cleaned, msg);
 }
 
 function pairedAssistantToolMessages(

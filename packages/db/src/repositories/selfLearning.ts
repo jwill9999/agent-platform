@@ -85,7 +85,7 @@ function selfLearningObjective(memory: MemoryRecord): string | undefined {
 
 function evidenceFor(signal: LearningSignal): MemoryCandidateEvidence {
   return {
-    kind: signal.kind === 'memory_candidate' ? 'observability' : 'observability',
+    kind: 'observability',
     id: signal.id,
     excerpt: compactText(signal.message, 1000),
     atMs: signal.atMs,

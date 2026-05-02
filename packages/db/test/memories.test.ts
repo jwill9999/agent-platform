@@ -21,6 +21,10 @@ import * as schema from '../src/schema.js';
 
 type MemoryInput = Parameters<typeof createMemory>[1];
 
+function byString(left: string, right: string): number {
+  return left.localeCompare(right);
+}
+
 function memoryInput(overrides: Partial<MemoryInput>): MemoryInput {
   return {
     scope: 'project',
@@ -207,7 +211,7 @@ describe('memory repository', () => {
     expect(
       queryMemories(db, { includeExpired: true }, { nowMs: 2000 })
         .map((m) => m.id)
-        .sort(),
+        .sort(byString),
     ).toEqual(['current-project', 'expired-session']);
   });
 
