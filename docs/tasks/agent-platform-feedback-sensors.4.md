@@ -21,6 +21,7 @@ Required outcomes:
   - test quality concerns
   - unresolved security/code-quality findings
   - readiness to commit, push, or request review
+- Evaluate readiness against the active agent profile. Coding agents should be checked against repository/task DoD; personal-assistant agents should be checked against task satisfaction, safety, and external-action risk.
 - Allow orchestrated agents to expose their available self-assessment tools and selected sensor profile without autonomously weakening required gates.
 - Keep inferential sensors bounded by model config, timeout, cost, and max-iteration limits.
 - Make failed criteria feed back as concise revise instructions.
@@ -61,6 +62,7 @@ Required outcomes:
   - accepted inferential sensor result
   - failed result with revise criteria
   - unresolved security/code-quality finding blocks readiness when required
+  - profile-specific readiness checks differ for coding and personal-assistant agents
   - self-assessment tool/profile exposure cannot disable required gates
   - malformed model output fails closed
   - plugin override behavior if new hooks are added
@@ -71,6 +73,7 @@ Required outcomes:
 - [ ] Inferential sensors are represented by the shared sensor model.
 - [ ] Existing critic/DoD behavior remains compatible.
 - [ ] Open required findings can influence semantic readiness checks.
+- [ ] Readiness criteria can vary by active agent profile without weakening required gates.
 - [ ] Semantic failures produce actionable feedback for the next model turn.
 - [ ] Tests cover pass, fail, malformed, and cap-reached paths.
 - [ ] `bd close agent-platform-feedback-sensors.4 --reason "Inferential sensor checkpoints added"`

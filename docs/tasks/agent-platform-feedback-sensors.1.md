@@ -14,6 +14,8 @@ Required outcomes:
 
 - Add contract types for sensor definitions, trigger policies, sensor run records, sensor results, repair instructions, and evidence links.
 - Support at least two execution types: `computational` and `inferential`.
+- Add agent scope and capability-profile metadata so sensors can declare whether they apply to coding, personal-assistant, research, automation, or custom agents.
+- Represent when a sensor is `required`, `optional`, `manual_only`, or `disabled` for a given agent profile and task context.
 - Support feedback sources such as local commands, IDE problems, IDE/plugin terminal output, IDE plugin findings, SonarQube local/remote, CodeQL local/remote, GitHub checks, PR reviews, PR annotations, agent code comments, and user feedback.
 - Support trigger/cadence types for `on_meaningful_change`, `before_commit`, `before_push`, `after_push`, `before_completion`, `external_feedback`, `scheduled`, and `manual`.
 - Represent provider capability and availability states including `available`, `unavailable`, `auth_required`, `not_configured`, and `permission_denied`.
@@ -64,6 +66,8 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
   - provider unavailable/auth-required result with repair action
   - Docker/container or sandbox runtime limitation with repair action
   - host/container path mapping metadata
+  - sensor disabled for personal-assistant profile but required for coding profile
+  - manual-only sensor can be selected explicitly without being globally enabled
   - bounded/redacted terminal evidence payload
   - trigger policy serialization
   - invalid definitions rejected by Zod
@@ -71,6 +75,7 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
 ## Definition of done
 
 - [ ] Sensor schemas and types are exported from contracts.
+- [ ] Agent scope/profile metadata can represent profile-specific required/optional/manual/disabled sensor selection.
 - [ ] Normalized finding and provider availability schemas are exported.
 - [ ] Runtime environment and limitation schemas are exported.
 - [ ] IDE/plugin terminal evidence schemas are bounded and redactable.

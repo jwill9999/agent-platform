@@ -13,9 +13,10 @@ Expose sensor configuration, provider availability, findings, and outcomes to us
 Required outcomes:
 
 - API surfaces expose configured sensors and recent sensor outcomes for a session/run.
-- API surfaces expose discovered capabilities, provider availability, normalized findings, and retry/connect actions.
+- API surfaces expose discovered capabilities, active agent profile, selected sensor profile, provider availability, normalized findings, and retry/connect actions.
 - UI surfaces show sensor pass/fail status without flooding the chat transcript.
 - Users can distinguish:
+  - active agent profile and selected sensor profile
   - deterministic checks
   - inferential checks
   - local/IDE findings
@@ -27,6 +28,7 @@ Required outcomes:
   - reviewed improvement candidates
 - UI can prompt for provider connection/authentication when a required remote or IDE/plugin source is unavailable, then retry discovery/import.
 - UI should encourage users to install or enable supported IDE plugins/adapters when that would expose useful diagnostics, terminal output, SonarQube/CodeQL feedback, or review-agent comments to the harness.
+- UI should make clear when coding sensors are disabled because the active agent/profile does not require them, with an explicit manual run option when appropriate.
 - Integration tests prove failed sensors trigger another agent pass.
 - E2E tests prove visible sensor status and successful completion after correction.
 - Documentation explains how to configure and trust sensors.
@@ -48,7 +50,7 @@ Required outcomes:
 ## Implementation plan
 
 1. Read `apps/api/src/infrastructure/http/v1/toolsRouter.ts`, `apps/api/src/infrastructure/http/v1/chatRouter.ts`, and relevant web chat/output components.
-2. Add API response fields or routes for sensor definitions/results using contracts from task `.1`.
+2. Add API response fields or routes for sensor definitions/results using contracts from task `.1`, including agent profile and selected sensor profile.
 3. Add UI rendering for compact sensor status:
    - passed
    - failed and repaired
@@ -76,6 +78,9 @@ Required outcomes:
 - Add tests for:
   - API exposes sensor result metadata
   - API exposes discovered capability and provider availability metadata
+  - API exposes active agent profile and selected sensor profile
+  - personal-assistant profile does not show coding gates as required
+  - coding profile shows repository gates as required before push
   - auth-required provider can be surfaced and retried
   - IDE/plugin provider not configured can be surfaced with setup guidance
   - Docker/sandbox limitation can be surfaced with repair guidance
@@ -87,6 +92,7 @@ Required outcomes:
 ## Definition of done
 
 - [ ] Sensor controls/results are visible through API and UI surfaces.
+- [ ] Active agent profile and selected sensor profile are visible enough for users to understand why sensors did or did not run.
 - [ ] Provider auth/connect/retry flows are visible and test-covered where implemented.
 - [ ] IDE/plugin setup guidance is available when local feedback providers are not configured.
 - [ ] Docker/container/sandbox limitations are visible and test-covered where implemented.

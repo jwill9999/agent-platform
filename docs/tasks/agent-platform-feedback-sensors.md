@@ -16,6 +16,7 @@ Add first-class feedback sensors to the coding harness so deterministic and infe
     "capability_discovery",
     "finding_ingestion",
     "runtime_environment_discovery",
+    "agent_scope_policy",
     "computational_sensor_runner",
     "react_sensor_check_node",
     "pre_push_validation",
@@ -63,11 +64,26 @@ Add first-class feedback sensors to the coding harness so deterministic and infe
     "fast_sensors": "run_targeted_checks_only_when_useful",
     "slow_sensors": "run_at_pre_push_or_explicit_checkpoints",
     "remote_sensors": "import_after_push_or_when_requested",
+    "agent_scope": "enabled_by_agent_profile_and_task_context",
     "repeated_failures": "propose_feedforward_improvements_for_human_review",
     "autonomous_instruction_changes": "disallowed"
   }
 }
 ```
+
+## Agent Scope And Profiles
+
+Feedback sensors are not globally enabled for every agent. Each sensor definition should declare the agent scopes, task contexts, and capability profile it applies to. The default coding profile should use the richest local/IDE/remote quality feedback because it changes repositories and needs pre-push confidence. A general personal-assistant profile should not run coding quality gates unless the task enters a coding workspace or the user explicitly asks for repository validation.
+
+Initial profiles:
+
+- **personal_assistant:** lightweight task-satisfaction and safety checks; no coding gates, GitHub checks, SonarQube, CodeQL, IDE terminal ingestion, or Docker validation unless explicitly requested and authorized.
+- **coding:** full coding sensor profile, including local gates, IDE/plugin feedback, SonarQube, CodeQL, GitHub checks, pre-push validation, post-push import, and runtime limitation reporting.
+- **research:** source/citation and browsing-related sensors; coding gates only if research produces repository changes.
+- **automation:** action-risk, external-system, and completion-state sensors; coding gates only when filesystem/repository changes are in scope.
+- **custom:** user/admin-selected capability bundle, with explicit risk and provider requirements.
+
+The future capability registry and policy-profile work should own reusable bundles, but feedback sensors must be designed so a sensor can answer: "which agent profiles may use me, when am I required, and what provider/runtime permissions do I need?"
 
 ## Execution Cadence
 
@@ -80,6 +96,8 @@ Sensors should improve the coding flow without turning every edit into a full CI
 - **Scheduled:** later orchestration can poll long-running remote checks and repeated failure patterns.
 
 Capability discovery comes before user confirmation. The platform should inspect local scripts, repository instructions, SonarQube/CodeQL configuration, IDE/problem surfaces, IDE/plugin terminal-output providers, GitHub remotes, branch protection, and check runs where authenticated access is available. Missing auth or missing IDE/plugin access should be represented as an `auth_required`, `not_configured`, or `unavailable` sensor result with a clear repair action, not as absence of a gate.
+
+Capability discovery is filtered by agent scope. For example, discovering GitHub and SonarQube should make them available to a coding agent's profile, but should not cause a personal-assistant agent to start running repository gates during ordinary non-coding work.
 
 ## Runtime Environment Constraints
 
@@ -150,6 +168,7 @@ flowchart TD
 - Prefer pre-push local validation and post-push remote feedback import over frequent full checks after every edit.
 - Missing provider auth is a structured availability state with repair actions such as connect, authenticate, skip optional sensor, or retry.
 - Runtime boundaries are first-class sensor context. A failed Docker/sandbox precondition is reported as an environment limitation with a repair action, not as a passing or absent quality gate.
+- Sensor enablement is agent-profile and task-context aware. Coding sensors must not be forced onto general-purpose agents unless their task context requires them or the user explicitly opts in.
 - Feed the model repair-shaped messages, not raw logs. Raw stdout/stderr remain evidence artifacts.
 - Reuse the existing critic and DoD loop model for inferential sensors instead of creating a second semantic-review system.
 - Keep automatic harness improvement review-gated. Repeated failures may propose Beads tasks, memories, skills, or instruction changes, but must not apply them directly.
@@ -161,6 +180,7 @@ flowchart TD
 - Remote feedback from GitHub Actions, CodeQL, SonarQube, PR annotations, and code review comments can be imported after push or on request.
 - IDE/problem diagnostics, IDE/plugin terminal output, and agent-generated code comments can be ingested before push and deduplicated with local/remote findings.
 - Docker/container/runtime limitations are visible in sensor results and do not mask required checks.
+- Sensor selection respects agent scope and capability profile so personal-assistant, research, automation, and coding agents get appropriate feedback without unnecessary tools.
 - Inferential sensors can run at task checkpoints with cost/iteration limits.
 - Sensor outcomes are observable and queryable.
 - Repeated sensor failures can become reviewed improvement candidates.

@@ -13,6 +13,7 @@ Persist and expose sensor outcomes and normalized findings so repeated failures 
 Required outcomes:
 
 - Record sensor runs/results in the observability store with redaction and truncation.
+- Record the active agent profile, task context, and selected sensor profile for each sensor run/result.
 - Record normalized findings from local commands, IDE problems, IDE/plugin terminal output, SonarQube, CodeQL, GitHub checks, PR annotations, agent code comments, and user feedback.
 - Record runtime environment metadata and limitations for sensor runs, including Docker service/container identity, sandbox profile, missing tools, missing mounts, and path mappings where available.
 - Expose sensor outcomes through existing observability tools where appropriate.
@@ -46,7 +47,7 @@ Required outcomes:
 3. Store compact sensor summaries and evidence references, not full unbounded logs.
 4. Store provider availability/auth state so missing GitHub/SonarQube/CodeQL/IDE-plugin access can be explained and retried.
 5. Store runtime limitation state so Docker/sandbox access problems can be explained, retried, and distinguished from code failures.
-6. Add query support for recent sensor failures, open findings, provider availability, runtime limitations, and repeated failure patterns.
+6. Add query support for recent sensor failures, open findings, provider availability, runtime limitations, selected sensor profile, and repeated failure patterns.
 7. Integrate with the existing improvement-goals plan if it has landed; otherwise define a pending candidate shape that can be adopted by that work.
 8. Add tests for redaction, truncation, ordering, session scoping, and deduplication.
 9. Document the feedback flywheel rules: repeated failures propose reviewed feedforward changes, never direct autonomous updates.
@@ -62,6 +63,7 @@ Required outcomes:
   - session-scoped sensor queries
   - provider auth/unavailable state storage
   - runtime limitation state storage
+  - agent profile and selected sensor profile storage
   - finding deduplication across local and remote sources
   - repeated failure pattern aggregation
   - redaction of command output and paths where required
@@ -72,6 +74,7 @@ Required outcomes:
 - [ ] Sensor outcomes are recorded in observability.
 - [ ] Normalized findings and provider availability states are queryable.
 - [ ] Runtime environment limitations are queryable and distinct from code failures.
+- [ ] Sensor outcomes can be filtered by agent profile and selected sensor profile.
 - [ ] Agents/users can query recent sensor failures.
 - [ ] Repeated failures can produce reviewed improvement candidates.
 - [ ] Automatic feedforward mutation is explicitly prevented.

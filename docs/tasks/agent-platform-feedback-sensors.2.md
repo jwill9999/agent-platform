@@ -14,6 +14,7 @@ Required outcomes:
 
 - Add a harness module that can run computational sensors using the existing `sys_run_quality_gate` backend.
 - Collect locally available findings from configured feedback surfaces where possible, including IDE/problem diagnostics, bounded IDE/plugin terminal output, SonarQube plugins or CLI output, CodeQL output, and agent-generated code comments.
+- Select sensors using agent profile, task context, changed files, and trigger/cadence context. Coding agents should receive repository quality gates; personal-assistant agents should not unless the task explicitly involves repository work.
 - Select a minimal sensor set from trigger/cadence context:
   - TypeScript/package changes: package `typecheck`
   - source/test changes: package or root `test`
@@ -46,7 +47,7 @@ Required outcomes:
 
 1. Read `packages/harness/src/tools/qualityGateTool.ts`, `packages/harness/src/tools/gitTools.ts`, and `packages/harness/src/tools/repoDiscoveryTools.ts`.
 2. Create `packages/harness/src/sensors/computationalSensorRunner.ts`.
-3. Define a runner API that accepts changed files, repo path, available sensor definitions, and execution limits.
+3. Define a runner API that accepts agent profile, task context, changed files, repo path, available sensor definitions, and execution limits.
 4. Reuse `executeQualityGateTool` instead of invoking shell commands directly.
 5. Add provider/finding collector interfaces that can return `available`, `auth_required`, `not_configured`, `permission_denied`, runtime limitation states, or normalized findings without failing the whole run.
 6. Add deterministic failure normalization helpers:
@@ -67,6 +68,9 @@ Required outcomes:
 - `pnpm typecheck`
 - Add tests for:
   - selecting typecheck/lint/test from changed files
+  - coding profile selects repository quality sensors
+  - personal-assistant profile skips coding sensors for non-coding tasks
+  - manual request can select an otherwise manual-only sensor
   - output truncation metadata
   - failing quality gate converted to repair instruction
   - imported IDE/SonarQube/CodeQL/review finding converted to repair instruction
@@ -80,6 +84,7 @@ Required outcomes:
 ## Definition of done
 
 - [ ] Computational sensor runner exists and uses approved quality gate execution.
+- [ ] Sensor selection respects agent profile and task context.
 - [ ] Local/problem/provider findings can be normalized and deduplicated.
 - [ ] IDE/plugin terminal output is ingested only through approved bounded providers.
 - [ ] Runtime environment limitations are reported distinctly from quality failures.
