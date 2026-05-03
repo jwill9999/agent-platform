@@ -92,7 +92,7 @@ function updateAttempts(
   state: HarnessStateType,
   results: readonly SensorResult[],
 ): Record<string, number> {
-  const attempts = { ...(state.sensorAttempts ?? {}) };
+  const attempts: Record<string, number> = state.sensorAttempts ? { ...state.sensorAttempts } : {};
   for (const result of results) {
     const key = primaryFailureKey(result);
     if (!key) continue;
@@ -151,9 +151,11 @@ function buildRepairFeedback(results: readonly SensorResult[], maxChars: number)
       lines.push(`Repair: ${instruction.summary}`);
     }
     for (const finding of result.findings.slice(0, 5)) {
-      const location = finding.file
-        ? ` (${finding.file}${finding.line ? `:${finding.line}` : ''})`
-        : '';
+      let location = '';
+      if (finding.file) {
+        const lineSuffix = finding.line ? `:${finding.line}` : '';
+        location = ` (${finding.file}${lineSuffix})`;
+      }
       lines.push(`Finding: ${finding.message}${location}`);
     }
   }

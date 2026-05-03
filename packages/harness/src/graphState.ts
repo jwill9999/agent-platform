@@ -126,8 +126,8 @@ export const HarnessState = Annotation.Root({
   }),
   sensorAttempts: Annotation<Record<string, number>>({
     reducer: (left: Record<string, number>, right: Record<string, number>) => ({
-      ...(left ?? {}),
-      ...(right ?? {}),
+      ...left,
+      ...right,
     }),
     default: () => ({}),
   }),

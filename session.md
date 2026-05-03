@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Addressed SonarCloud PR #131 feedback on `task/agent-platform-feedback-sensors.3`: refactored duplicated ReAct graph construction, reduced reported complexity/style findings, verified focused gates, and prepared the branch for re-analysis.
+- **Date:** 2026-05-03
 - **Session:** Implemented `agent-platform-feedback-sensors.3` on `task/agent-platform-feedback-sensors.3`: wired sensor checks into ReAct routing, added bounded repair feedback/escalation behavior, enabled API graph support, and closed the bead after green gates.
 - **Date:** 2026-05-03
 - **Session:** Implemented `agent-platform-feedback-sensors.2` on `task/agent-platform-feedback-sensors.2`: added deterministic computational sensor runner, imported finding normalization, bounded terminal evidence handling, runtime limitation reporting, and focused/broad quality gates.
@@ -216,6 +218,27 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### SonarCloud feedback addressed for PR #131
+
+Branch state: `task/agent-platform-feedback-sensors.3` contains the pushed task implementation plus a follow-up cleanup commit.
+
+- Reviewed GitHub-exposed SonarCloud check metadata for PR `#131`.
+- SonarCloud quality gate failed on new-code duplication: `5.6% Duplication on New Code`, required `<= 3%`.
+- Sonar annotations also reported repeated graph-routing implementations, `buildHarnessGraph` cognitive complexity, empty-object spreads, nested ternary/template formatting, and one inline union return type.
+- Refactored `packages/harness/src/buildGraph.ts` to build optional ReAct graph variants through one shared route assembly instead of repeated near-identical branches.
+- Added shared route aliases/helpers for sensor/critic routing.
+- Cleaned smaller findings in:
+  - `packages/harness/src/graphState.ts`
+  - `packages/harness/src/nodes/sensorCheck.ts`
+  - `packages/harness/src/sensors/computationalSensorRunner.ts`
+- Local verification passed:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm format:check`
+  - `pnpm typecheck`
+- SonarQube MCP duplication tools are not available in this session. GitHub check annotations were used as the authenticated feedback source.
 
 ### Sensor checks wired into ReAct loop
 
@@ -560,9 +583,9 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-feedback-sensors.3`
 - **Current base:** `feature/feedback-sensors-harness`
-- **Latest task commit:** pending commit for `agent-platform-feedback-sensors.3`
-- **Current work:** `.3` implemented and closed locally; commit/push pending if this note is read before closeout completes.
-- **Remote sync:** Git push and `bd dolt push` are still required at closeout. Beads auto-push failed because GitHub SSH/DNS was unavailable from the sandbox.
+- **Latest task commit:** `de397f6 Address Sonar duplication feedback`
+- **Current work:** `.3` is implemented, closed, and has a SonarCloud cleanup commit ready to push.
+- **Remote sync:** Git push is required so SonarCloud can re-analyze PR `#131`; `bd dolt push` was already synced for the closed bead before the Sonar cleanup.
 
 ### Beads
 
@@ -579,6 +602,12 @@ Quality gates passed:
 
 ### Quality
 
+- SonarCloud PR `#131` follow-up gates passed locally:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm format:check`
+  - `pnpm typecheck`
 - Sensor ReAct-loop gates passed:
   - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
   - `pnpm --filter @agent-platform/harness run test`
@@ -592,16 +621,17 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Complete closeout for `task/agent-platform-feedback-sensors.3`: commit, `git pull --rebase`, `bd dolt push`, `git push`, and verify upstream status.
-2. Start `agent-platform-feedback-sensors.4` from the `.3` chain tip after `.3` is pushed.
-3. Keep `.4` focused on inferential sensor checkpoints; GitHub/SonarQube/CodeQL remote polling remains separate from the computational routing already added.
+1. Push `task/agent-platform-feedback-sensors.3` so SonarCloud can re-run PR `#131`.
+2. Re-check PR `#131` after pipelines finish, especially the SonarCloud quality gate and `e2e`.
+3. Start `agent-platform-feedback-sensors.4` from the `.3` chain tip after the PR checks are acceptable.
+4. Keep `.4` focused on inferential sensor checkpoints; GitHub/SonarQube/CodeQL remote polling remains separate from the computational routing already added.
 
 ---
 
 ## Blockers / questions for owner
 
 - SonarQube scans were not used as the completion gate because escalated touched-file scans were rejected by policy risk review. Fallback terminal gates passed.
-- Beads Dolt auto-push reported GitHub DNS/auth failure earlier in the sandbox; retry `bd dolt push` during closeout.
+- SonarQube MCP duplication tools are not currently exposed in this session; GitHub check annotations are available through `gh api`.
 
 ---
 

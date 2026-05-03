@@ -405,13 +405,15 @@ function normalizeCollectorResult(
   collector: ComputationalFindingCollectorResult,
 ): { record: SensorRunRecord; result: SensorResult } {
   const findings = dedupeFindings(collector.findings ?? []);
+  const findingPlural = findings.length === 1 ? '' : 's';
+  const summary = findings.length
+    ? `Imported ${findings.length} finding${findingPlural} from ${collector.id}.`
+    : `No findings imported from ${collector.id}.`;
   const result = SensorResultSchema.parse({
     sensorId: `collector:${collector.id}`,
     status: statusForCollectorResult(collector),
     severity: findings[0]?.severity,
-    summary: findings.length
-      ? `Imported ${findings.length} finding${findings.length === 1 ? '' : 's'} from ${collector.id}.`
-      : `No findings imported from ${collector.id}.`,
+    summary,
     findings,
     repairInstructions: repairInstructionsForFindings(findings),
     terminalEvidence: collector.terminalEvidence ?? [],
