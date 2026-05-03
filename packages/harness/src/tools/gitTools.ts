@@ -124,6 +124,7 @@ export const GIT_TOOLS: readonly ContractTool[] = [
 
 type GitOptions = {
   workspaceRoot?: string;
+  defaultRepoPath?: string;
 };
 
 type GitCommandResult = {
@@ -174,7 +175,10 @@ async function resolveRepoPath(
   options?: GitOptions,
 ): Promise<string> {
   const workspaceRoot = await realpath(options?.workspaceRoot ?? process.cwd());
-  const requested = stringArg(args, 'repoPath', '.');
+  const requested =
+    typeof args.repoPath === 'string'
+      ? stringArg(args, 'repoPath', '.')
+      : (options?.defaultRepoPath ?? '.');
   const candidate = isAbsolute(requested) ? requested : resolve(workspaceRoot, requested);
 
   try {

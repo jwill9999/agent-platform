@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const SessionRecordSchema = z.object({
   id: z.string().min(1),
   agentId: z.string().min(1),
+  projectId: z.string().min(1).nullish(),
   title: z.string().nullish(),
   createdAtMs: z.number().int().nonnegative(),
   updatedAtMs: z.number().int().nonnegative(),
@@ -14,6 +15,7 @@ export type SessionRecord = z.infer<typeof SessionRecordSchema>;
 /** POST /v1/sessions body — id is always system-generated. */
 export const SessionCreateBodySchema = z.object({
   agentId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
 });
 
 export type SessionCreateBody = z.infer<typeof SessionCreateBodySchema>;

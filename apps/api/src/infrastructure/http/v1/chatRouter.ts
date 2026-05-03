@@ -24,6 +24,7 @@ import {
   createMemoryCandidates,
   retrievePromptMemories,
   formatPromptMemoryBundle,
+  findProject,
 } from '@agent-platform/db';
 import type {
   ApprovalRequest,
@@ -613,11 +614,14 @@ function refreshWorkingMemory({
     (approval) => `Pending approval for ${approval.toolName} (${approval.id})`,
   );
   const toolsUsed = toolSummaries.map((summary) => summary.toolName);
+  const session = getSession(db, sessionId);
+  const projectId = session?.projectId;
 
   upsertWorkingMemoryArtifact(db, {
     sessionId,
     runId,
     currentGoal: compactText(userMessage, 500),
+    projectId: projectId ?? undefined,
     activeTask: extractActiveTask(visibleText),
     decisions: extractDecisions(visibleText),
     importantFiles: extractImportantFiles(visibleText),
@@ -631,6 +635,7 @@ function refreshWorkingMemory({
   createMemoryCandidates(db, {
     sessionId,
     agentId,
+    projectId: projectId ?? undefined,
     messages: [
       { role: 'user', content: userMessage },
       ...newMessages.map((message) => toMemoryCandidateMessage(message)),
@@ -644,6 +649,17 @@ function createAuditLog(db: DrizzleDb): ReturnType<typeof createToolAuditLogger>
     complete: (id, data) => completeToolExecution(db, id, data),
   };
   return createToolAuditLogger(auditStore);
+}
+
+function resolveSessionProjectPath(db: DrizzleDb, sessionId: string): string | undefined {
+  const session = getSession(db, sessionId);
+  const workingMemory = getWorkingMemoryArtifact(db, sessionId);
+  const projectId = session?.projectId ?? workingMemory?.projectId;
+  if (projectId) {
+    const project = findProject(db, projectId);
+    if (project) return project.workspacePath;
+  }
+  return workingMemory?.activeProject;
 }
 
 function createRuntimeToolDispatchNode({
@@ -663,6 +679,7 @@ function createRuntimeToolDispatchNode({
   options: ChatRouterOptions;
   approvedToolCallIds?: ReadonlySet<string>;
 }) {
+  const defaultRepoPath = resolveSessionProjectPath(db, sessionId);
   const nativeToolExecutor = createSystemToolExecutor(
     options.observabilityStore
       ? {
@@ -672,8 +689,9 @@ function createRuntimeToolDispatchNode({
             traceId: runId,
           },
           memory: { db, sessionId, agentId: agentCtx.agent.id },
+          defaultRepoPath,
         }
-      : { memory: { db, sessionId, agentId: agentCtx.agent.id } },
+      : { memory: { db, sessionId, agentId: agentCtx.agent.id }, defaultRepoPath },
   );
 
   return createToolDispatchNode({
@@ -1114,11 +1132,12 @@ function buildConversationMessages(
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
     const workingMemory = getWorkingMemoryArtifact(tx, sessionId);
+    const session = getSession(tx, sessionId);
     const memoryBundle = retrievePromptMemories(tx, {
       scope: {
         sessionId,
         agentId,
-        projectId: workingMemory?.activeProject,
+        projectId: session?.projectId ?? workingMemory?.projectId ?? workingMemory?.activeProject,
       },
       query: newMessage,
     });

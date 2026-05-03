@@ -46,7 +46,15 @@ describe('workspaceRouter', () => {
       'generated',
       'scratch',
       'exports',
+      'projects',
     ]);
+    expect(
+      res.body.data.areas.find((area: { area: string }) => area.area === 'projects'),
+    ).toMatchObject({
+      area: 'projects',
+      label: 'Projects',
+      path: 'projects',
+    });
     expect(
       res.body.data.areas
         .find((area: { area: string }) => area.area === 'generated')

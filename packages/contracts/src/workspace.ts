@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-export const WorkspaceAreaSchema = z.enum(['uploads', 'generated', 'scratch', 'exports']);
+export const WorkspaceAreaSchema = z.enum([
+  'uploads',
+  'generated',
+  'scratch',
+  'exports',
+  'projects',
+]);
 export type WorkspaceArea = z.infer<typeof WorkspaceAreaSchema>;
 
 export const WorkspaceFileKindSchema = z.enum(['file', 'directory']);

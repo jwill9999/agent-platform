@@ -56,6 +56,7 @@ export const MemorySourceSchema = z.object({
 const ScopeShape = {
   scope: MemoryScopeSchema,
   scopeId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
 };
 const MemoryBaseShape = {
   kind: MemoryKindSchema,
@@ -74,15 +75,24 @@ const ReviewMetadataShape = {
 function validateScopedMemory(value: {
   scope: z.infer<typeof MemoryScopeSchema>;
   scopeId?: string;
+  projectId?: string;
 }) {
-  if (value.scope === 'global') return value.scopeId === undefined;
+  if (value.scope === 'global') {
+    return value.scopeId === undefined && value.projectId === undefined;
+  }
+  if (value.scope === 'project') {
+    return (
+      value.scopeId !== undefined &&
+      (value.projectId === undefined || value.projectId === value.scopeId)
+    );
+  }
   return value.scopeId !== undefined;
 }
 
 function scopedMemoryMessage(scope: z.infer<typeof MemoryScopeSchema>): string {
-  return scope === 'global'
-    ? 'global memories must not include scopeId'
-    : 'non-global memories require scopeId';
+  if (scope === 'global') return 'global memories must not include scopeId or projectId';
+  if (scope === 'project') return 'project memories require scopeId and projectId to match';
+  return 'non-global memories require scopeId';
 }
 
 export const MemoryRecordSchema = z
@@ -137,6 +147,7 @@ export const MemoryUpdateBodySchema = z.object({
   tags: z.array(z.string().min(1)).optional(),
   metadata: z.record(JsonValueSchema).optional(),
   safetyState: MemorySafetyStateSchema.optional(),
+  projectId: z.string().min(1).nullable().optional(),
   expiresAtMs: z.number().int().positive().nullable().optional(),
   reviewedAtMs: z.number().int().nonnegative().nullable().optional(),
   reviewedBy: z.string().min(1).nullable().optional(),
@@ -149,6 +160,7 @@ export const MemoryQuerySchema = z.object({
   status: MemoryStatusSchema.optional(),
   reviewStatus: MemoryReviewStatusSchema.optional(),
   safetyState: MemorySafetyStateSchema.optional(),
+  projectId: z.string().min(1).optional(),
   minConfidence: z.coerce.number().min(0).max(1).optional(),
   sourceKind: MemorySourceKindSchema.optional(),
   sourceId: z.string().min(1).optional(),
@@ -269,6 +281,7 @@ export const WorkingMemoryToolSummarySchema = z.object({
 const WorkingMemoryTextShape = {
   currentGoal: z.string().max(500).optional(),
   activeProject: z.string().max(200).optional(),
+  projectId: z.string().max(200).optional(),
   activeTask: z.string().max(200).optional(),
   nextAction: z.string().max(500).optional(),
 };
