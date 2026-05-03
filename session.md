@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Feedback-sensors planning branch was merged to `main`; local `main` is updated and old feature/task branches were pruned. No implementation task is active. Pause here until the owner is ready to refine and claim the first feedback-sensors task.
+- **Date:** 2026-05-03
 - **Session:** Added follow-up Beads task `agent-platform-session-handoff-hygiene` with a spec for capping/rotating `session.md`; linked it as a dependency of `agent-platform-context-optimisation`.
 - **Date:** 2026-05-03
 - **Session:** Planned the feedback sensors harness epic from the Böckeler/Thoughtworks harness-engineering discussion. Created Beads epic `agent-platform-feedback-sensors`, six chained child tasks, linked spec files under `docs/tasks/`, and committed the planning docs on `feature/feedback-sensors-harness`.
@@ -201,9 +203,16 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
+### Main branch refreshed after planning merge
+
+- Scheduler epic functionality was manually checked by the owner and merged to `main` before this handoff update.
+- Feedback-sensors harness planning was also merged to `main` through PR #127.
+- Local `main` is current with `origin/main`; old feature/task branches were pruned by the owner.
+- No scheduler or feedback-sensors implementation task is currently active in this workspace.
+
 ### Feedback sensors harness planned
 
-Branch state: `feature/feedback-sensors-harness` contains planning/spec documentation only.
+Branch state: planning/spec documentation was merged to `main`; no implementation work has started.
 
 - Used the SonarQube plugin flow earlier in the session; `sonarqube-cli` was installed, but auth requires the owner to run `sonar auth login -o jwill9999` locally before issue listing can continue.
 - Reviewed the Böckeler/Fowler article and Thoughtworks Radar framing: computational sensors run fast deterministic checks, inferential sensors run semantic review at bounded checkpoints, and both should produce LLM-optimized self-correction signals.
@@ -467,11 +476,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `feature/feedback-sensors-harness`
+- **Current branch:** `main`
 - **Current base:** `origin/main`
-- **Latest commit:** `1d1e690 docs: plan feedback sensors harness`
-- **Current work:** Planning only. Implementation has not started and no feedback-sensors child task is claimed.
-- **Remote sync:** Git branch pushed to `origin/feature/feedback-sensors-harness`. Beads local records exist, but Dolt push failed because GitHub SSH/DNS was unavailable to `bd dolt push` in the sandbox.
+- **Latest commit:** `4560039 Merge pull request #127 from jwill9999/feature/feedback-sensors-harness`
+- **Current work:** No active implementation task. Feedback-sensors planning exists on `main`; refinement should happen before claiming `.1`.
+- **Remote sync:** `main` is updated after the merge. Old feature/task branches were pruned by the owner.
 
 ### Beads
 
@@ -492,17 +501,17 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Ask the owner to run `bd dolt push` if Beads remote sync is still blocked by GitHub auth/DNS.
+1. Run a refinement session with the owner for `agent-platform-feedback-sensors` before claiming `.1`.
 2. Decide whether to implement `agent-platform-session-handoff-hygiene` before starting the feedback-sensors epic.
-3. Run a refinement session with the owner for `agent-platform-feedback-sensors` before claiming `.1`.
-4. After refinement, start `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`.
+3. After refinement, claim `agent-platform-feedback-sensors.1` and branch from updated `main` using the repo task-branch workflow.
+4. If scheduler live updates or further Scheduler UI side panels become priority, create a separate follow-up Beads task rather than reopening the completed scheduler epic.
 
 ---
 
 ## Blockers / questions for owner
 
 - SonarQube issue listing is blocked until CLI authentication is completed locally with `sonar auth login -o jwill9999`.
-- Beads Dolt auto-push reported GitHub DNS/auth failure in the sandbox; owner may need to run `bd dolt push`.
+- No active code blocker. Beads remote sync should be checked when the next task is claimed.
 
 ---
 
