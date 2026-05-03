@@ -10,8 +10,10 @@ import {
   closeDatabase,
   createScheduledJob,
   createScheduledJobRun,
+  getScheduledJob,
   listScheduledJobRunLogs,
   openDatabase,
+  ScheduledJobNotFoundError,
   transitionScheduledJobRun,
 } from '@agent-platform/db';
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
@@ -81,6 +83,9 @@ describe('schedulerRouter', () => {
     const runNow = await request(app).post(`/v1/scheduler/${id}/run`).send({}).expect(200);
     expect(runNow.body.data.status).toBe('enabled');
     expect(runNow.body.data.nextRunAtMs).toBeLessThanOrEqual(Date.now());
+
+    await request(app).delete(`/v1/scheduler/${id}`).expect(204);
+    expect(() => getScheduledJob(opened.db, id)).toThrow(ScheduledJobNotFoundError);
   });
 
   it('lists runs and logs, and requests cancellation for running runs', async () => {
@@ -145,6 +150,7 @@ describe('schedulerRouter', () => {
       .expect(400);
 
     await request(app).get('/v1/scheduler/missing').expect(404);
+    await request(app).delete('/v1/scheduler/missing').expect(404);
     await request(app).post('/v1/scheduler/runs/missing/cancel').send({}).expect(404);
   });
 });

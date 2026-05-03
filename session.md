@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Added post-close scheduler UI polish on `task/agent-platform-scheduler.5`: widened the settings shell, redesigned Settings Scheduler so create/edit plus scheduled jobs use the main workspace while a tabbed side panel exposes details/runs/logs, added edit/update/delete support, local timezone-aware create/update payloads, and field-level form validation/status copy.
+- **Date:** 2026-05-03
 - **Session:** Implemented `agent-platform-scheduler.5` on `task/agent-platform-scheduler.5`: added structured scheduler notification events persisted as run logs, a notification hook for future channels, safe `memory.cleanup_expired.dry_run` maintenance target, API-to-runner integration coverage, safety regression coverage for unsupported `agent_turn` jobs, and scheduler/API documentation with manual verification steps.
 - **Date:** 2026-05-03
 - **Session:** Closed `agent-platform-scheduler.5`; Beads auto-closed the parent `agent-platform-scheduler` epic and Dolt sync succeeded. Scheduler epic is ready for PR/pipeline/manual UI verification from `task/agent-platform-scheduler.5`.
@@ -228,6 +230,34 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Scheduler UI polish and form clarity
+
+Branch state: `task/agent-platform-scheduler.5` has a post-close UI polish commit for manual review feedback.
+
+- Widened the Settings shell from `max-w-4xl` to a full-width `max-w-[1600px]` container.
+- Reworked Settings Scheduler from a stacked/busy layout into a management layout where create/edit and scheduled jobs occupy the main workspace, while selected-job details, actions, runs, and logs sit in a right-side operational panel.
+- Changed the operational side panel to use switchable `Details`, `Runs`, and `Logs` views so future contextual panels such as Git, pipelines, and project state can follow the same pattern without crowding the main workflow.
+- Added edit mode using the existing scheduler `PUT /v1/scheduler/:id` API.
+- Added `DELETE /v1/scheduler/:id` plus UI delete actions for the selected job and multi-selected scheduled jobs.
+- Create and edit now send `Intl.DateTimeFormat().resolvedOptions().timeZone` instead of hardcoded `UTC`.
+- The run-at field label displays the detected local timezone so users know what timezone the date picker uses.
+- Added client-side form validation with field-specific messages for missing name, missing instructions, missing run date/time, and invalid recurring interval.
+- Changed the ambiguous `Initial status` label to `Start job`, with options `Paused - review first` and `Enabled - run automatically`; edit mode shows the current status instead of a misleading create-only status selector.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run build`
+- `pnpm --filter @agent-platform/api run typecheck`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/api exec vitest run test/schedulerRouter.test.ts`
+- `pnpm --filter @agent-platform/db run build`
+- `pnpm --filter @agent-platform/db run typecheck`
+- `pnpm --filter @agent-platform/db run lint`
+- `pnpm format:check`
+- `git diff --check`
 
 ### Memory candidate extraction implemented
 
@@ -493,11 +523,11 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-scheduler.3`
-- **Current base:** branched from `task/agent-platform-scheduler.2` after the scheduler runner task was completed.
-- **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** `agent-platform-scheduler.3` background process tracking and bounded log capture are implemented and closed in Beads. Next work is `agent-platform-scheduler.4`.
-- **Remote sync:** Beads/Dolt push succeeded after closing `.3`; `.3` code changes are pending commit and git push.
+- **Current branch:** `task/agent-platform-scheduler.5`
+- **Current base:** chained from `task/agent-platform-scheduler.4`; this is the final scheduler task branch.
+- **Latest completed epic:** `agent-platform-scheduler` scheduler and background work.
+- **Current work:** Scheduler epic is closed in Beads. A post-close UI polish commit was added on `.5` for manual review feedback before the branch is merged forward.
+- **Remote sync:** Beads/Dolt was synced when `.5` closed. Git push is required after committing this session update.
 
 ### Beads
 
@@ -510,12 +540,12 @@ Quality gates passed:
 - `agent-platform-code-tools` epic is closed.
 - `agent-platform-memory` epic is closed in Beads and merged to `main`.
 - `agent-platform-memory.1` through `.7` are complete and closed.
-- `agent-platform-scheduler` epic is open.
+- `agent-platform-scheduler` epic is closed.
 - `agent-platform-active-project` is closed locally as the required P1 project/work context foundation task.
 - `agent-platform-scheduler.1` is closed.
 - `agent-platform-scheduler.2` is closed.
 - `agent-platform-scheduler.3` is closed.
-- `agent-platform-scheduler.4` and `.5` are open and dependency-chained.
+- `agent-platform-scheduler.4` and `.5` are closed.
 - New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
 - New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
 - New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
@@ -526,6 +556,12 @@ Quality gates passed:
 ### Quality
 
 - SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
+- Scheduler UI polish checks passed:
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run build`
+  - `pnpm format:check`
+  - `git diff --check`
 - Scheduler `.3` tracking/log-capture checks passed:
   - `pnpm --filter @agent-platform/db run build`
   - `pnpm --filter @agent-platform/api run typecheck`
@@ -705,9 +741,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Open/monitor the task PR for `task/agent-platform-scheduler.1` into `feature/agent-platform-scheduler`.
-2. After `.1` is accepted, branch `task/agent-platform-scheduler.2` from `task/agent-platform-scheduler.1`.
-3. Implement `agent-platform-scheduler.2`: runner, queue polling, retries, cancellation basics, and lease handling.
+1. Push the scheduler UI polish/session update on `task/agent-platform-scheduler.5`.
+2. Owner should rebuild/restart and manually verify `/settings/scheduler`: create validation errors, local timezone label, create paused/enabled wording, edit/save, run now, pause/resume, and runs/logs.
+3. After green pipelines and manual approval, merge the final scheduler task branch forward into `feature/agent-platform-scheduler`, then feature into `main` through the normal PR flow.
 
 ---
 

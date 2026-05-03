@@ -346,6 +346,14 @@ export function updateScheduledJob(
   return getScheduledJob(db, id);
 }
 
+export function deleteScheduledJob(db: DrizzleDb, id: string): boolean {
+  getScheduledJob(db, id);
+  const result = db.delete(schema.scheduledJobs).where(eq(schema.scheduledJobs.id, id)).run() as {
+    changes?: number;
+  };
+  return (result.changes ?? 0) > 0;
+}
+
 export function setScheduledJobStatus(
   db: DrizzleDb,
   id: string,

@@ -7,6 +7,7 @@ import {
 import type { DrizzleDb } from '@agent-platform/db';
 import {
   createScheduledJob,
+  deleteScheduledJob,
   getScheduledJob,
   getScheduledJobRun,
   listScheduledJobRunLogs,
@@ -173,6 +174,20 @@ export function createSchedulerRouter(db: DrizzleDb): Router {
         const job = updateScheduledJob(db, id, body);
         log.info('scheduler.job_updated', { id, status: job.status });
         res.json({ data: job });
+      } catch (error) {
+        notFound(error);
+      }
+    }),
+  );
+
+  router.delete(
+    '/:id',
+    asyncHandler(async (req, res) => {
+      const id = requireParam(req.params, 'id');
+      try {
+        deleteScheduledJob(db, id);
+        log.warn('scheduler.job_deleted', { id });
+        res.status(204).send();
       } catch (error) {
         notFound(error);
       }
