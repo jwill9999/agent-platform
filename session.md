@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Implemented `agent-platform-feedback-sensors.2` on `task/agent-platform-feedback-sensors.2`: added deterministic computational sensor runner, imported finding normalization, bounded terminal evidence handling, runtime limitation reporting, and focused/broad quality gates.
+- **Date:** 2026-05-03
 - **Session:** Implemented `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`: added shared sensor contracts, public exports, trace lifecycle event types, and contract/trace tests.
 - **Date:** 2026-05-03
 - **Session:** Created Beads epic `agent-platform-ui-quality-sensors` and spec for future UI/UX grading sensors that use browser evidence, deterministic UI checks, and rubric-based design review.
@@ -212,6 +214,35 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Computational sensor runner implemented
+
+Branch state: `task/agent-platform-feedback-sensors.2` contains the second implementation task.
+
+- Implemented `agent-platform-feedback-sensors.2`.
+- Added `packages/harness/src/sensors/computationalSensorRunner.ts`.
+- Runner selects deterministic quality-gate sensors by agent profile, task context, trigger, changed files, available sensor definitions, and execution limits.
+- Coding before-push repository work selects required local quality gates; personal-assistant work skips repository gates unless repo context/manual requests apply.
+- Runner reuses `sys_run_quality_gate` through `executeQualityGateTool`; it does not construct arbitrary shell commands.
+- Quality-gate failures are normalized into compact `SensorFinding` records and `SensorRepairInstruction` actions with bounded stdout/stderr evidence.
+- Imported provider findings from SonarQube, CodeQL, PR review/annotation style sources, IDE/plugin terminal evidence, provider availability, runtime metadata, path mappings, and runtime limitations normalize into shared sensor results and dedupe by finding key.
+- Sandbox/workspace denial is reported as an environment/policy error with runtime limitation metadata, not as a code failure.
+- Added `packages/harness/test/computationalSensorRunner.test.ts` covering selection, profile policy, manual sensors, execution limits, success, failure repair instructions, truncation evidence, imported findings, bounded terminal evidence, provider auth, runtime/path mapping, missing mounts, and workspace denial.
+- Closed Beads task `agent-platform-feedback-sensors.2`.
+- Committed the implementation as `bb47228 Implement computational sensor runner`; session handoff update is pending commit if this note is read before final push.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/harness exec vitest run test/computationalSensorRunner.test.ts`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm test` with escalation for API Supertest local listener binding
+
+Completion gate:
+
+- SonarQube CLI was attempted for touched files. Sandboxed runs failed on keychain/state access; escalated scans were rejected by policy because they could send source/auth material externally. Fallback gate passed with typecheck, lint, format, focused tests, harness tests, and full tests.
 
 ### Feedback sensors harness refined
 
@@ -497,17 +528,18 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-feedback-sensors.1`
+- **Current branch:** `task/agent-platform-feedback-sensors.2`
 - **Current base:** `feature/feedback-sensors-harness`
-- **Latest commit:** `a0178df Track UI quality sensor epic` plus pending `agent-platform-feedback-sensors.1` implementation if not yet committed.
-- **Current work:** First feedback-sensors child task implemented locally; commit/push pending if this note is seen before closeout.
-- **Remote sync:** Git upstream currently reports `origin/feature/feedback-sensors-harness` as gone/unavailable in this sandbox. Beads local records exist, but Dolt auto-push failed because GitHub SSH/DNS was unavailable.
+- **Latest task commit:** `bb47228 Implement computational sensor runner`
+- **Current work:** `agent-platform-feedback-sensors.2` implemented and closed locally; handoff update is being committed before push.
+- **Remote sync:** Git push and `bd dolt push` are still required at closeout. Earlier Beads auto-push failed because GitHub SSH/DNS was unavailable from the sandbox.
 
 ### Beads
 
 - `agent-platform-feedback-sensors` is in progress as a P2 epic.
-- `agent-platform-feedback-sensors.1` is implemented and ready to close after commit/push.
-- `agent-platform-feedback-sensors.2` through `.6` are open P2 child tasks.
+- `agent-platform-feedback-sensors.1` is closed.
+- `agent-platform-feedback-sensors.2` is closed.
+- `agent-platform-feedback-sensors.3` through `.6` are open P2 child tasks.
 - Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
 - Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, agent-scope/profile policy, normalized findings, IDE/problem and IDE/plugin terminal feedback, SonarQube/CodeQL/GitHub feedback, Docker/container/sandbox limitations, provider auth states, pre-push validation, and post-push feedback import.
 - `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
@@ -516,36 +548,29 @@ Quality gates passed:
 
 ### Quality
 
-- `pnpm docs:lint` passed for the planning/documentation change.
-- `git diff --check` passed.
-- Sensor contract implementation gates passed:
-  - `pnpm --filter @agent-platform/contracts exec vitest run test/sensor.test.ts`
-  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorTrace.test.ts`
-  - `pnpm --filter @agent-platform/contracts run test`
+- Computational runner gates passed:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/computationalSensorRunner.test.ts`
   - `pnpm --filter @agent-platform/harness run test`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm format:check`
   - `pnpm typecheck`
   - `pnpm lint`
+  - `pnpm format:check`
   - `pnpm test` with escalation for API Supertest local listener binding
-- SonarQube CLI was attempted for touched files but could not be used as the completion gate: sandboxed runs could not access keychain/state, escalated scan of `sensor.ts` was rejected by policy risk review, and other touched-file scans reported no project configured. Fallback gate passed.
-- SonarQube CLI was installed but not authenticated; issue listing remains blocked until the owner completes `sonar auth login -o jwill9999`.
+- SonarQube CLI was attempted for touched files but could not be used as the completion gate: sandboxed runs could not access keychain/state, and escalated scans were rejected by policy risk review because they may send source/auth material externally. Fallback gate passed.
 
 ---
 
 ## Next (priority order)
 
-1. Close and push `agent-platform-feedback-sensors.1` if this session is resumed before closeout completes.
-2. Start `agent-platform-feedback-sensors.2` from `task/agent-platform-feedback-sensors.1` after `.1` is pushed.
-3. Keep `.2` limited to deterministic runner/finding collection; runtime graph behavior belongs in `.3`.
+1. Complete closeout for `task/agent-platform-feedback-sensors.2`: commit this handoff update, `git pull --rebase`, `bd dolt push`, `git push`, and verify upstream status.
+2. Start `agent-platform-feedback-sensors.3` from the `.2` chain tip after `.2` is pushed.
+3. Keep `.3` focused on wiring sensor results into the ReAct loop; remote GitHub/SonarQube/CodeQL polling remains in `.4`.
 
 ---
 
 ## Blockers / questions for owner
 
-- SonarQube issue listing is blocked until CLI authentication is completed locally with `sonar auth login -o jwill9999`.
-- Beads Dolt auto-push reported GitHub DNS/auth failure in the sandbox; owner may need to run `bd dolt push`.
+- SonarQube scans were not used as the completion gate because escalated touched-file scans were rejected by policy risk review. Fallback terminal gates passed.
+- Beads Dolt auto-push reported GitHub DNS/auth failure earlier in the sandbox; retry `bd dolt push` during closeout.
 
 ---
 

@@ -83,23 +83,23 @@ Required outcomes:
 
 ## Definition of done
 
-- [ ] Computational sensor runner exists and uses approved quality gate execution.
-- [ ] Sensor selection respects agent profile and task context.
-- [ ] Local/problem/provider findings can be normalized and deduplicated.
-- [ ] IDE/plugin terminal output is ingested only through approved bounded providers.
-- [ ] Runtime environment limitations are reported distinctly from quality failures.
-- [ ] Results are compact and suitable to feed into an LLM turn.
-- [ ] Raw logs remain evidence, not primary feedback.
-- [ ] Tests cover selection, success, failure, truncation, and denial paths.
-- [ ] `bd close agent-platform-feedback-sensors.2 --reason "Computational sensor runner implemented"`
+- [x] Computational sensor runner exists and uses approved quality gate execution.
+- [x] Sensor selection respects agent profile and task context.
+- [x] Local/problem/provider findings can be normalized and deduplicated.
+- [x] IDE/plugin terminal output is ingested only through approved bounded providers.
+- [x] Runtime environment limitations are reported distinctly from quality failures.
+- [x] Results are compact and suitable to feed into an LLM turn.
+- [x] Raw logs remain evidence, not primary feedback.
+- [x] Tests cover selection, success, failure, truncation, and denial paths.
+- [x] `bd close agent-platform-feedback-sensors.2 --reason "Computational sensor runner implemented"`
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-feedback-sensors.1`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: N/A - merge at segment end
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] Task branch created from `task/agent-platform-feedback-sensors.1`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] If segment tip: N/A - merge at segment end
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-03
