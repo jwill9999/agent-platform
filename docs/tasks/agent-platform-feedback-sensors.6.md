@@ -8,17 +8,22 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Task requirements
 
-Expose sensor configuration and outcomes to users, then validate the full self-correction loop.
+Expose sensor configuration, provider availability, findings, and outcomes to users, then validate the full self-correction loop.
 
 Required outcomes:
 
 - API surfaces expose configured sensors and recent sensor outcomes for a session/run.
+- API surfaces expose discovered capabilities, provider availability, normalized findings, and retry/connect actions.
 - UI surfaces show sensor pass/fail status without flooding the chat transcript.
 - Users can distinguish:
   - deterministic checks
   - inferential checks
+  - local/IDE findings
+  - remote GitHub/SonarQube/CodeQL/review feedback
+  - unavailable/auth-required providers
   - repeated-failure escalation
   - reviewed improvement candidates
+- UI can prompt for provider connection/authentication when a required remote source is unavailable, then retry discovery/import.
 - Integration tests prove failed sensors trigger another agent pass.
 - E2E tests prove visible sensor status and successful completion after correction.
 - Documentation explains how to configure and trust sensors.
@@ -46,10 +51,13 @@ Required outcomes:
    - failed and repaired
    - failed and escalated
    - skipped with reason
-4. Keep raw logs behind expandable evidence/details.
-5. Add integration tests for chat runs where a mocked sensor fails once, feeds repair guidance, and then passes.
-6. Add Playwright coverage if UI surfaces are touched.
-7. Update `docs/api-reference.md`, `docs/architecture.md`, and `docs/development.md` as needed.
+   - unavailable/auth required with connect/retry action
+4. Add UI/API affordances to inspect open findings grouped by source, severity, file, and repair state.
+5. Keep raw logs behind expandable evidence/details.
+6. Add integration tests for chat runs where a mocked sensor fails once, feeds repair guidance, and then passes.
+7. Add tests for provider auth-required and retry flows.
+8. Add Playwright coverage if UI surfaces are touched.
+9. Update `docs/api-reference.md`, `docs/architecture.md`, and `docs/development.md` as needed.
 
 ## Tests (required before sign-off)
 
@@ -61,6 +69,8 @@ Required outcomes:
 - `pnpm test:e2e` when the UI flow is implemented and Docker compose stack is available
 - Add tests for:
   - API exposes sensor result metadata
+  - API exposes discovered capability and provider availability metadata
+  - auth-required provider can be surfaced and retried
   - failed sensor loops back into model context
   - passing sensor permits completion
   - UI renders pass/fail/escalated states
@@ -69,6 +79,7 @@ Required outcomes:
 ## Definition of done
 
 - [ ] Sensor controls/results are visible through API and UI surfaces.
+- [ ] Provider auth/connect/retry flows are visible and test-covered where implemented.
 - [ ] Full failure-to-correction loop is covered by tests.
 - [ ] Documentation explains sensor execution types, trigger timing, and review-gated flywheel behavior.
 - [ ] Quality gates pass for touched packages.

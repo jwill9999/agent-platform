@@ -8,15 +8,16 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Task requirements
 
-Add a sensor-check phase to the ReAct graph so failed computational sensors feed repair signals into the next model turn.
+Add sensor-check phases to the ReAct graph so targeted checks can run during work, required local gates run before commit/push, and remote/imported findings feed repair signals into the next model turn.
 
 Required outcomes:
 
 - Add optional `sensorCheckNode` support to `buildHarnessGraph`.
-- Route relevant tool dispatches through the sensor node after code-changing tools.
+- Route relevant tool dispatches through the sensor node only when trigger policy marks the event as a meaningful checkpoint.
+- Add explicit support for `before_commit`, `before_push`, `after_push`, `external_feedback`, `manual`, and `scheduled` trigger contexts.
 - Feed failed sensor repair instructions into `state.messages` as bounded system feedback.
 - Continue when sensors pass.
-- Stop or escalate when the same sensor failure repeats without progress.
+- Stop or escalate when a required sensor is unavailable, provider auth is required, or the same sensor failure repeats without progress.
 - Record sensor trace events and emit user-visible `thinking`/`error` events when appropriate.
 
 ## Dependency order
@@ -38,14 +39,16 @@ Required outcomes:
 1. Read `packages/harness/src/buildGraph.ts`, `packages/harness/src/graphState.ts`, and `packages/harness/src/nodes/dodCheck.ts`.
 2. Add `sensorResults`, `sensorAttempts`, and minimal loop-detection state to `HarnessState`.
 3. Create `packages/harness/src/nodes/sensorCheck.ts`.
-4. Detect code-changing tool calls using system tool IDs and coding edit tool IDs.
-5. Add graph variants for:
+4. Detect code-changing tool calls using system tool IDs and coding edit tool IDs, but default to targeted checks rather than full validation.
+5. Add a pre-completion/pre-push route that runs required local sensors before the agent declares work ready.
+6. Add an external feedback route for imported GitHub/SonarQube/CodeQL/review results after push or manual refresh.
+7. Add graph variants for:
    - ReAct only + sensors
    - ReAct + critic + sensors
    - ReAct + DoD + sensors
    - ReAct + critic + DoD + sensors
-6. Reuse existing deadline, `maxSteps`, and critic iteration cap patterns.
-7. Add focused tests in `packages/harness/test/sensorCheck.test.ts` and route tests in `packages/harness/test/reactLoop.test.ts`.
+8. Reuse existing deadline, `maxSteps`, and critic iteration cap patterns.
+9. Add focused tests in `packages/harness/test/sensorCheck.test.ts` and route tests in `packages/harness/test/reactLoop.test.ts`.
 
 ## Tests (required before sign-off)
 
@@ -55,14 +58,19 @@ Required outcomes:
 - `pnpm typecheck`
 - Add tests for:
   - no sensor run after read-only tools
-  - sensor run after code edit tool
+  - targeted sensor run after meaningful code edit checkpoint
+  - no full gate after every edit
+  - required local sensor run before completion/push
+  - external feedback import after push/manual refresh
   - failed sensor adds repair feedback and loops to `react_llm_reason`
   - passed sensor permits normal routing
+  - required auth/unavailable provider escalates clearly
   - repeated identical failure halts with a clear error
 
 ## Definition of done
 
 - [ ] Sensor node participates in the ReAct loop.
+- [ ] Full validation runs at pre-completion/pre-push checkpoints, not after every edit.
 - [ ] Failed sensor output is LLM-facing and bounded.
 - [ ] Passing sensors do not add noisy context.
 - [ ] Routing is covered for graph variants used by the API.

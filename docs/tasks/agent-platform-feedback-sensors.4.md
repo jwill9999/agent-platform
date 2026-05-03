@@ -8,7 +8,7 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Task requirements
 
-Extend checkpoint evaluation so semantic sensors can review the agent's result when deterministic checks are insufficient.
+Extend checkpoint evaluation so semantic sensors can review the agent's result when deterministic checks are insufficient, including future orchestrated agents that need to self-assess before asking for human review.
 
 Required outcomes:
 
@@ -19,6 +19,9 @@ Required outcomes:
   - diff intent versus user request
   - architecture boundary risk
   - test quality concerns
+  - unresolved security/code-quality findings
+  - readiness to commit, push, or request review
+- Allow orchestrated agents to expose their available self-assessment tools and selected sensor profile without autonomously weakening required gates.
 - Keep inferential sensors bounded by model config, timeout, cost, and max-iteration limits.
 - Make failed criteria feed back as concise revise instructions.
 
@@ -42,9 +45,10 @@ Required outcomes:
 2. Define inferential sensor evaluator interfaces in the harness.
 3. Add plugin extension points if existing `onDodCheck` cannot represent the needed categories cleanly.
 4. Implement a default evaluator that returns structured sensor results from model output.
-5. Add prompt text that asks for JSON only and requires evidence-backed failed criteria.
-6. Ensure malformed model output fails closed with a useful sensor failure.
-7. Add tests with mocked model/evaluator output.
+5. Include normalized open findings from computational sensors as evidence for inferential review.
+6. Add prompt text that asks for JSON only and requires evidence-backed failed criteria.
+7. Ensure malformed model output fails closed with a useful sensor failure.
+8. Add tests with mocked model/evaluator output.
 
 ## Tests (required before sign-off)
 
@@ -56,6 +60,8 @@ Required outcomes:
 - Add tests for:
   - accepted inferential sensor result
   - failed result with revise criteria
+  - unresolved security/code-quality finding blocks readiness when required
+  - self-assessment tool/profile exposure cannot disable required gates
   - malformed model output fails closed
   - plugin override behavior if new hooks are added
   - cap reached behavior
@@ -64,6 +70,7 @@ Required outcomes:
 
 - [ ] Inferential sensors are represented by the shared sensor model.
 - [ ] Existing critic/DoD behavior remains compatible.
+- [ ] Open required findings can influence semantic readiness checks.
 - [ ] Semantic failures produce actionable feedback for the next model turn.
 - [ ] Tests cover pass, fail, malformed, and cap-reached paths.
 - [ ] `bd close agent-platform-feedback-sensors.4 --reason "Inferential sensor checkpoints added"`
