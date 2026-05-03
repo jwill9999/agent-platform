@@ -8,39 +8,9 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
-- **Session:** Added post-close scheduler UI polish on `task/agent-platform-scheduler.5`: widened the settings shell, redesigned Settings Scheduler so create/edit plus scheduled jobs use the main workspace while a tabbed side panel exposes details/runs/logs, added edit/update/delete support, local timezone-aware create/update payloads, and field-level form validation/status copy.
+- **Session:** Added follow-up Beads task `agent-platform-session-handoff-hygiene` with a spec for capping/rotating `session.md`; linked it as a dependency of `agent-platform-context-optimisation`.
 - **Date:** 2026-05-03
-- **Session:** Implemented `agent-platform-scheduler.5` on `task/agent-platform-scheduler.5`: added structured scheduler notification events persisted as run logs, a notification hook for future channels, safe `memory.cleanup_expired.dry_run` maintenance target, API-to-runner integration coverage, safety regression coverage for unsupported `agent_turn` jobs, and scheduler/API documentation with manual verification steps.
-- **Date:** 2026-05-03
-- **Session:** Closed `agent-platform-scheduler.5`; Beads auto-closed the parent `agent-platform-scheduler` epic and Dolt sync succeeded. Scheduler epic is ready for PR/pipeline/manual UI verification from `task/agent-platform-scheduler.5`.
-- **Date:** 2026-05-02
-- **Session:** Implemented `agent-platform-scheduler.4` on `task/agent-platform-scheduler.4`: added scheduler REST management routes, Settings Scheduler navigation/page, job creation plus pause/resume/run-now controls, run/log inspection, cancellation handling, scheduler display helpers, and focused API/web tests. Verified API/web lint and typecheck, focused scheduler tests, API/web test suites, and the web production build.
-- **Date:** 2026-05-02
-- **Session:** Closed `agent-platform-scheduler.4` and claimed `agent-platform-scheduler.5` for notification hooks, E2E coverage, docs, and final scheduler epic polish. Beads/Dolt close and claim sync both succeeded.
-- **Date:** 2026-05-02
-- **Session:** Addressed scheduler `.3` review feedback: `appendScheduledJobRunLog` now redacts/truncates messages once before validation and only prepares structured data afterward; scheduler DB tests now cover redaction/truncation for both terminal `errorMessage` and `resultSummary`.
-- **Date:** 2026-05-02
-- **Session:** Implemented `agent-platform-scheduler.3` on `task/agent-platform-scheduler.3`: scheduler run logs now redact credential text, bound messages/data with truncation metadata, redact terminal result/error summaries, and capture claimed/started/output/retry/cancel/fail/success/expired-lease lifecycle evidence. Full unit suite passed after the expected sandboxed API listener failure was rerun with escalation.
-- **Date:** 2026-05-02
-- **Session:** Implemented `agent-platform-scheduler.2` on `task/agent-platform-scheduler.2`: added the API-owned scheduler service, due-job claiming with leases, no-op built-in target execution, persisted run/log transitions, retry backoff, timeout handling, cancellation requests, expired-run recovery, and API lifecycle start/stop wiring.
-- **Date:** 2026-05-02
-- **Session:** Addressed scheduler `.1` review feedback: scheduled job run logs now enforce a unique `(runId, sequence)` index and allocate the next sequence with a single insert-select statement instead of a separate max-then-insert step.
-- **Date:** 2026-05-02
-- **Session:** Implemented `agent-platform-scheduler.1` on `task/agent-platform-scheduler.1`: added shared scheduler contracts, SQLite/Drizzle scheduler tables and migration, repository CRUD/list/update/run/log APIs, and tested ownership plus run state transitions. No job runner/execution loop was added in this task.
-- **Date:** 2026-05-02
-- **Session:** Addressed active-project PR review feedback: project workspace paths now normalize under `projects/` without duplicate prefixes, duplicate project slugs return structured conflicts, session project binding validates the project before updating, legacy working-memory `activeProject` remains a direct path fallback, and repo/git/migration/workspace tests cover precedence and project associations.
-- **Date:** 2026-05-02
-- **Session:** Completed `agent-platform-active-project` on `task/agent-platform-active-project`: added first-class project records, non-breaking nullable project associations for sessions, memories, and working memory, project CRUD API routes, workspace `projects/` area support, and active-project default paths for repo discovery, git, and quality-gate tools. Terminal quality gates passed; Beads close succeeded but Dolt auto-push failed because the sandbox could not resolve GitHub.
-- **Date:** 2026-05-02
-- **Session:** Added explicit non-breaking migration and test strategy to the project/work context and scheduler specs. `agent-platform-active-project` is now the prerequisite foundation for shared project associations; scheduler `.1` should remain additive and should not start implementing project-owned jobs until that model exists.
-- **Date:** 2026-05-02
-- **Session:** Moved the global project/work context association design into `agent-platform-active-project`: that task now owns the `projects` table plus sessions, memories, working-memory, and future scheduler associations. Scheduler `.1` should depend on and reuse that model rather than inventing a second project abstraction.
-- **Date:** 2026-05-02
-- **Session:** Refined scheduler DB association requirements: scheduled jobs need first-class ownership columns (`scope`, `scopeId`, `projectId`, `ownerAgentId`, `ownerSessionId`, `executionAgentId`, `createdFromSessionId`) with contract/repository invariants, not loose metadata-only associations.
-- **Date:** 2026-05-02
-- **Session:** Claimed `agent-platform-scheduler.1`, created `task/agent-platform-scheduler.1` from `feature/agent-platform-scheduler`, and clarified scheduler terminology: a project is the durable work context, a scheduled job is the editable automation definition, a job run is one execution attempt, and a Beads task is only repo planning metadata.
-- **Date:** 2026-05-02
-- **Session:** Started scheduler epic refinement from updated `main`: created `feature/agent-platform-scheduler`, expanded the scheduler parent spec, created child specs `agent-platform-scheduler.1` through `.5`, created matching Beads child tasks, and chained dependencies from `.1` through `.5`. Next step is to claim `.1` and implement the durable scheduler contracts/schema foundation.
+- **Session:** Planned the feedback sensors harness epic from the Böckeler/Thoughtworks harness-engineering discussion. Created Beads epic `agent-platform-feedback-sensors`, six chained child tasks, linked spec files under `docs/tasks/`, and committed the planning docs on `feature/feedback-sensors-harness`.
 - **Date:** 2026-05-02
 - **Session:** Memory epic closeout complete. The epic was manually tested, merged to `main`, local `main` was updated, old task/feature branches were pruned, and `agent-platform-memory` plus child tasks `.1` through `.7` are closed in Beads. Pause here; next session should start planning/refinement for the next epic from updated `main`.
 - **Date:** 2026-05-02
@@ -231,57 +201,31 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Scheduler UI polish and form clarity
+### Feedback sensors harness planned
 
-Branch state: `task/agent-platform-scheduler.5` has a post-close UI polish commit for manual review feedback.
+Branch state: `feature/feedback-sensors-harness` contains planning/spec documentation only.
 
-- Widened the Settings shell from `max-w-4xl` to a full-width `max-w-[1600px]` container.
-- Reworked Settings Scheduler from a stacked/busy layout into a management layout where create/edit and scheduled jobs occupy the main workspace, while selected-job details, actions, runs, and logs sit in a right-side operational panel.
-- Changed the operational side panel to use switchable `Details`, `Runs`, and `Logs` views so future contextual panels such as Git, pipelines, and project state can follow the same pattern without crowding the main workflow.
-- Added edit mode using the existing scheduler `PUT /v1/scheduler/:id` API.
-- Added `DELETE /v1/scheduler/:id` plus UI delete actions for the selected job and multi-selected scheduled jobs.
-- Create and edit now send `Intl.DateTimeFormat().resolvedOptions().timeZone` instead of hardcoded `UTC`.
-- The run-at field label displays the detected local timezone so users know what timezone the date picker uses.
-- Added client-side form validation with field-specific messages for missing name, missing instructions, missing run date/time, and invalid recurring interval.
-- Changed the ambiguous `Initial status` label to `Start job`, with options `Paused - review first` and `Enabled - run automatically`; edit mode shows the current status instead of a misleading create-only status selector.
-
-Quality gates passed:
-
-- `pnpm --filter @agent-platform/web run typecheck`
-- `pnpm --filter @agent-platform/web run lint`
-- `pnpm --filter @agent-platform/web run build`
-- `pnpm --filter @agent-platform/api run typecheck`
-- `pnpm --filter @agent-platform/api run lint`
-- `pnpm --filter @agent-platform/api exec vitest run test/schedulerRouter.test.ts`
-- `pnpm --filter @agent-platform/db run build`
-- `pnpm --filter @agent-platform/db run typecheck`
-- `pnpm --filter @agent-platform/db run lint`
-- `pnpm format:check`
-- `git diff --check`
-
-### Memory candidate extraction implemented
-
-Branch state: `task/agent-platform-memory.3` contains the third memory epic task.
-
-- Added shared contracts for extracted memory candidates, candidate evidence, and extraction input messages.
-- Added a DB repository helper that extracts conservative pending candidates from explicit remember instructions, user corrections, repeated tool/runtime failures, and remediation language.
-- Candidate memories are persisted through the long-term memory repository as `status: pending` and `reviewStatus: unreviewed`; they are not active/retrieved before review.
-- Candidate metadata records rationale, scope suggestion, and bounded evidence excerpts.
-- Candidate content and evidence excerpts are credential-scanned before storage; redacted candidates are marked `safetyState: redacted`.
-- Wired candidate extraction into successful chat and approval-resume working-memory refresh paths.
-- Updated `docs/memory.md` to document the candidate extraction layer and retrieval boundary.
+- Used the SonarQube plugin flow earlier in the session; `sonarqube-cli` was installed, but auth requires the owner to run `sonar auth login -o jwill9999` locally before issue listing can continue.
+- Reviewed the Böckeler/Fowler article and Thoughtworks Radar framing: computational sensors run fast deterministic checks, inferential sensors run semantic review at bounded checkpoints, and both should produce LLM-optimized self-correction signals.
+- Created Beads epic `agent-platform-feedback-sensors`.
+- Created child tasks `agent-platform-feedback-sensors.1` through `.6`, linked under the epic, with Beads dependencies chained linearly.
+- Added matching specs:
+  - `docs/tasks/agent-platform-feedback-sensors.md`
+  - `docs/tasks/agent-platform-feedback-sensors.1.md`
+  - `docs/tasks/agent-platform-feedback-sensors.2.md`
+  - `docs/tasks/agent-platform-feedback-sensors.3.md`
+  - `docs/tasks/agent-platform-feedback-sensors.4.md`
+  - `docs/tasks/agent-platform-feedback-sensors.5.md`
+  - `docs/tasks/agent-platform-feedback-sensors.6.md`
+- Updated `docs/tasks/README.md` epic index.
+- Created branch `feature/feedback-sensors-harness` from `origin/main` to keep the planning docs out of the prior scheduler task branch.
+- Committed planning docs as `1d1e690 docs: plan feedback sensors harness`.
+- Added follow-up task `agent-platform-session-handoff-hygiene` with spec `docs/tasks/agent-platform-session-handoff-hygiene.md`.
+- Linked `agent-platform-context-optimisation` to depend on `agent-platform-session-handoff-hygiene` so handoff-file hygiene is handled before broader context-window optimisation.
 
 Quality gates passed:
 
-- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-- `pnpm --filter @agent-platform/db run test -- test/memoryCandidates.test.ts test/memories.test.ts`
-- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
-- `pnpm typecheck`
-- `pnpm lint`
-- `pnpm format:check`
 - `pnpm docs:lint`
-- `pnpm test`
-- `pnpm build`
 
 ### Short-term working memory implemented
 
@@ -523,233 +467,42 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-scheduler.5`
-- **Current base:** chained from `task/agent-platform-scheduler.4`; this is the final scheduler task branch.
-- **Latest completed epic:** `agent-platform-scheduler` scheduler and background work.
-- **Current work:** Scheduler epic is closed in Beads. A post-close UI polish commit was added on `.5` for manual review feedback before the branch is merged forward.
-- **Remote sync:** Beads/Dolt was synced when `.5` closed. Git push is required after committing this session update.
+- **Current branch:** `feature/feedback-sensors-harness`
+- **Current base:** `origin/main`
+- **Latest commit:** `1d1e690 docs: plan feedback sensors harness`
+- **Current work:** Planning only. Implementation has not started and no feedback-sensors child task is claimed.
+- **Remote sync:** Git branch pushed to `origin/feature/feedback-sensors-harness`. Beads local records exist, but Dolt push failed because GitHub SSH/DNS was unavailable to `bd dolt push` in the sandbox.
 
 ### Beads
 
-- `agent-platform-code-tools.2` is closed.
-- `agent-platform-code-tools.3` is closed.
-- `agent-platform-code-tools.4` is closed.
-- `agent-platform-code-tools.5` is closed.
-- `agent-platform-code-tools.6` is closed.
-- `agent-platform-code-tools.7` is closed.
-- `agent-platform-code-tools` epic is closed.
-- `agent-platform-memory` epic is closed in Beads and merged to `main`.
-- `agent-platform-memory.1` through `.7` are complete and closed.
-- `agent-platform-scheduler` epic is closed.
-- `agent-platform-active-project` is closed locally as the required P1 project/work context foundation task.
-- `agent-platform-scheduler.1` is closed.
-- `agent-platform-scheduler.2` is closed.
-- `agent-platform-scheduler.3` is closed.
-- `agent-platform-scheduler.4` and `.5` are closed.
-- New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
-- New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
-- New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
-- New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
-- New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
-- Process note: before starting future epics, run a refinement session with the owner to review and adjust tickets/specs before marking the epic ready.
+- `agent-platform-feedback-sensors` is open as a P2 epic.
+- `agent-platform-feedback-sensors.1` through `.6` are open P2 child tasks.
+- Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
+- Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md`.
+- `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
+- Per stored memory, schedule or explicitly run owner refinement before moving this epic from planning/refinement to implementation-ready.
 
 ### Quality
 
-- SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
-- Scheduler UI polish checks passed:
-  - `pnpm --filter @agent-platform/web run typecheck`
-  - `pnpm --filter @agent-platform/web run lint`
-  - `pnpm --filter @agent-platform/web run build`
-  - `pnpm format:check`
-  - `git diff --check`
-- Scheduler `.3` tracking/log-capture checks passed:
-  - `pnpm --filter @agent-platform/db run build`
-  - `pnpm --filter @agent-platform/api run typecheck`
-  - `pnpm --filter @agent-platform/db run typecheck`
-  - `pnpm --filter @agent-platform/api run lint`
-  - `pnpm --filter @agent-platform/db run lint`
-  - `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts`
-  - `pnpm --filter @agent-platform/api exec vitest run test/schedulerService.test.ts`
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
-- Scheduler `.2` runner checks passed:
-  - `pnpm --filter @agent-platform/db run build`
-  - `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts`
-  - `pnpm --filter @agent-platform/api exec vitest run test/schedulerService.test.ts`
-  - `pnpm --filter @agent-platform/api run typecheck`
-  - `pnpm --filter @agent-platform/db run typecheck`
-  - `pnpm --filter @agent-platform/api run lint`
-  - `pnpm --filter @agent-platform/db run lint`
-  - `pnpm --filter @agent-platform/api run test` (run with escalation because API Supertest binds local ports)
-  - `pnpm --filter @agent-platform/db run test`
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (run with escalation because API Supertest binds local ports)
-- Scheduler `.1` foundation checks passed:
-  - Review feedback rerun: `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts test/migrate.test.ts`
-  - Review feedback rerun: `pnpm --filter @agent-platform/db run typecheck`
-  - Review feedback rerun: `pnpm --filter @agent-platform/db run lint`
-  - Review feedback rerun: `pnpm exec prettier --check packages/db/src/repositories/scheduler.ts packages/db/src/schema.ts packages/db/test/migrate.test.ts`
-  - Review feedback rerun: `git diff --check`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/contracts run build`
-  - `pnpm --filter @agent-platform/db exec vitest run test/scheduler.test.ts test/migrate.test.ts`
-  - `pnpm --filter @agent-platform/db run typecheck`
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `git diff --check`
-  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
-- Active project foundation checks passed:
-  - Review feedback rerun: `pnpm --filter @agent-platform/db exec vitest run test/projects.test.ts test/migrate.test.ts`
-  - Review feedback rerun: `pnpm --filter @agent-platform/harness exec vitest run test/repoDiscoveryTools.test.ts test/gitTools.test.ts`
-  - Review feedback rerun: `pnpm --filter @agent-platform/api exec vitest run test/projectsRouter.test.ts test/workspaceRouter.test.ts` (run with escalation because API Supertest binds local ports)
-  - `pnpm --filter @agent-platform/contracts run build`
-  - `pnpm --filter @agent-platform/db run build`
-  - `pnpm --filter @agent-platform/harness run build`
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (run with escalation because API Supertest binds local ports)
-  - `git diff --check`
-- Memory `.7` retention/cleanup checks passed:
-  - `pnpm --filter @agent-platform/contracts build`
-  - `pnpm --filter @agent-platform/db build`
-  - `pnpm --filter @agent-platform/contracts typecheck`
-  - `pnpm --filter @agent-platform/db typecheck`
-  - `pnpm --filter @agent-platform/web typecheck`
-  - `pnpm --filter @agent-platform/web lint`
-  - `pnpm --filter @agent-platform/web test`
-  - `pnpm --filter @agent-platform/api typecheck`
-  - `pnpm --filter @agent-platform/contracts lint`
-  - `pnpm --filter @agent-platform/db lint`
-  - `pnpm --filter @agent-platform/api lint`
-  - `pnpm --filter @agent-platform/contracts test`
-  - `pnpm --filter @agent-platform/db test`
-  - `pnpm --filter @agent-platform/api test` (escalated for Supertest local listener)
-- Memory sidebar discoverability checks passed:
-  - `pnpm --filter @agent-platform/web typecheck`
-  - `pnpm --filter @agent-platform/web lint`
-- Sonar feedback cleanup checks passed:
-  - `pnpm --filter @agent-platform/db typecheck`
-  - `pnpm --filter @agent-platform/api typecheck`
-  - `pnpm --filter @agent-platform/web typecheck`
-  - `pnpm --filter @agent-platform/db lint`
-  - `pnpm --filter @agent-platform/api lint`
-  - `pnpm --filter @agent-platform/web lint`
-  - `pnpm --filter @agent-platform/db test -- --run test/memories.test.ts test/selfLearning.test.ts`
-  - `pnpm --filter @agent-platform/api test -- --run test/sessionChat.integration.test.ts`
-  - `pnpm --filter @agent-platform/web test`
-- Structured edit checks passed:
-  - `pnpm --filter @agent-platform/contracts build`
-  - `pnpm --filter @agent-platform/agent-validation build`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/agent-validation run test -- test/allowlists.test.ts`
-  - `pnpm --filter @agent-platform/harness run test -- test/codingEditTool.test.ts test/toolAuditLog.test.ts test/mediumRiskTools.test.ts test/toolDispatch.test.ts`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/agent-validation run typecheck`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/contracts run lint`
-  - `pnpm --filter @agent-platform/agent-validation run lint`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
-- Sonar duplicate-code follow-up checks passed:
-  - `pnpm --filter @agent-platform/harness run test -- test/toolAuditLog.test.ts`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm exec prettier --check packages/harness/test/toolAuditLog.test.ts`
-  - `git diff --check`
-- Read-only git tool focused checks passed:
-  - `pnpm --filter @agent-platform/contracts build`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/harness run build`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run test -- test/gitTools.test.ts test/lowRiskTools.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts`
-  - `pnpm --filter @agent-platform/contracts run lint`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm exec prettier --check packages/harness/src/tools/gitTools.ts packages/harness/test/gitTools.test.ts`
-- Broad `.4` completion checks passed:
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
-  - `pnpm docs:lint`
-  - `pnpm exec prettier --check session.md`
-  - `git diff --check`
-- `.4` GitHub pipelines passed green after push.
-- Governed test runner focused checks passed:
-  - `pnpm --filter @agent-platform/contracts build`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/contracts run lint`
-  - `pnpm --filter @agent-platform/harness run build`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run test -- test/qualityGateTool.test.ts test/mediumRiskTools.test.ts test/toolAuditLog.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm exec prettier --check packages/contracts/src/codingTool.ts packages/harness/src/tools/qualityGateTool.ts packages/harness/test/qualityGateTool.test.ts`
-- Broad `.5` completion checks passed:
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
-  - `pnpm docs:lint`
-  - `pnpm exec prettier --check session.md`
-  - `git diff --check`
-- Chat runtime evaluator fix checks passed:
-  - `pnpm --filter @agent-platform/api run typecheck`
-  - `pnpm --filter @agent-platform/api run lint`
-  - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
-- Quality-gate package-path and CI follow-up checks passed:
-  - `pnpm --filter @agent-platform/harness exec vitest run test/qualityGateTool.test.ts`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm test` (run with escalation because API Supertest binds local ports)
-  - pre-push harness build/typecheck/test
-- Repository discovery focused checks passed:
-  - `pnpm --filter @agent-platform/contracts run build`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run build`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm --filter @agent-platform/harness exec vitest run test/repoDiscoveryTools.test.ts test/mcpTrustGuard.test.ts`
-  - `pnpm --filter @agent-platform/harness run test -- test/repoDiscoveryTools.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts test/lowRiskTools.test.ts`
-  - `pnpm docs:lint`
-  - `pnpm exec prettier --check docs/coding-tool-contracts.md packages/contracts/src/codingTool.ts packages/harness/src/tools/repoDiscoveryTools.ts packages/harness/test/repoDiscoveryTools.test.ts packages/contracts/test/roundtrip.test.ts`
-  - `git diff --check`
-- Broad `.6` completion checks passed:
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (run with escalation because API Supertest binds local ports)
-- `.7` tool-activity UI focused checks passed:
-  - `pnpm --filter @agent-platform/web run typecheck`
-  - `pnpm --filter @agent-platform/web run lint`
-  - `pnpm --filter @agent-platform/web run test -- test/use-harness-chat.test.ts`
-  - `pnpm docs:lint`
-  - `pnpm exec prettier --check apps/web/hooks/use-harness-chat.ts apps/web/components/chat/chat.tsx apps/web/components/chat/message.tsx apps/web/components/chat/tool-trace-block.tsx apps/web/app/page.tsx apps/web/test/use-harness-chat.test.ts docs/tasks/agent-platform-code-tools.7.md`
-  - `pnpm exec prettier --check session.md docs/tasks/agent-platform-code-tools.7.md`
-  - `git diff --check`
+- `pnpm docs:lint` passed for the planning/documentation change.
+- No runtime code changed.
+- SonarQube CLI was installed but not authenticated; issue listing remains blocked until the owner completes `sonar auth login -o jwill9999`.
 
 ---
 
 ## Next (priority order)
 
-1. Push the scheduler UI polish/session update on `task/agent-platform-scheduler.5`.
-2. Owner should rebuild/restart and manually verify `/settings/scheduler`: create validation errors, local timezone label, create paused/enabled wording, edit/save, run now, pause/resume, and runs/logs.
-3. After green pipelines and manual approval, merge the final scheduler task branch forward into `feature/agent-platform-scheduler`, then feature into `main` through the normal PR flow.
+1. Ask the owner to run `bd dolt push` if Beads remote sync is still blocked by GitHub auth/DNS.
+2. Decide whether to implement `agent-platform-session-handoff-hygiene` before starting the feedback-sensors epic.
+3. Run a refinement session with the owner for `agent-platform-feedback-sensors` before claiming `.1`.
+4. After refinement, start `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`.
 
 ---
 
 ## Blockers / questions for owner
 
-- No code blockers.
+- SonarQube issue listing is blocked until CLI authentication is completed locally with `sonar auth login -o jwill9999`.
+- Beads Dolt auto-push reported GitHub DNS/auth failure in the sandbox; owner may need to run `bd dolt push`.
 
 ---
 
