@@ -55,6 +55,16 @@ export {
   type SensorCheckNodeOptions,
   type SensorRunner,
 } from './nodes/sensorCheck.js';
+export {
+  runInferentialSensors,
+  runFeedbackSensors,
+  type InferentialSensorCheck,
+  type InferentialSensorEvaluation,
+  type InferentialSensorEvaluator,
+  type InferentialSensorEvaluatorInput,
+  type InferentialSensorRunnerInput,
+  type FeedbackSensorRunnerInput,
+} from './sensors/inferentialSensorRunner.js';
 export { EVALUATOR_SYSTEM_PROMPT } from './personas/evaluator.js';
 export { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from './toolTimeout.js';
 export {

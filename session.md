@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Implemented and closed `agent-platform-feedback-sensors.4`: added inferential feedback sensors, wired them into the default sensor runner, verified gates, and prepared `task/agent-platform-feedback-sensors.4` for push.
+- **Date:** 2026-05-03
 - **Session:** Completed `.3` closeout after SonarCloud passed on PR #131, claimed `agent-platform-feedback-sensors.4`, synced Beads/Dolt, and pushed `task/agent-platform-feedback-sensors.4` from the `.3` chain tip.
 - **Date:** 2026-05-03
 - **Session:** Addressed the remaining SonarCloud PR #131 duplication source in `packages/harness/test/reactLoop.test.ts` by extracting shared ReAct test fixtures; local gates are green and the branch is ready for the final Sonar rerun before claiming `.4`.
@@ -225,148 +227,40 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### SonarCloud feedback addressed for PR #131
+### Inferential sensor checkpoints implemented
 
-Branch state: `task/agent-platform-feedback-sensors.3` contains the pushed task implementation plus a follow-up cleanup commit.
+Branch state: `task/agent-platform-feedback-sensors.4` contains the fourth feedback-sensors task.
 
-- Final cleanup commit `8c81015 Reduce react loop test duplication` pushed; SonarCloud passed on PR `#131` with `0 New issues` and `0.0% Duplication on New Code`.
-- Latest PR `#131` status before claiming `.4`: SonarCloud, Docker, lychee, markdownlint, and GitGuardian passed; Sourcery skipped due rate limit; `verify` and `e2e` were still pending.
-- Claimed `agent-platform-feedback-sensors.4` in Beads and synced Beads/Dolt.
-- Created and pushed `task/agent-platform-feedback-sensors.4` from the `.3` chain tip. Pre-push affected-package gate passed for `apps/api`, `packages/contracts`, and `packages/harness`: build, typecheck, and tests.
-- Second SonarCloud run after commit `9d2a163` still failed the quality gate at `3.6% Duplication on New Code`, required `<= 3%`.
-- The remaining annotation was `packages/harness/src/buildGraph.ts`, where `buildHarnessGraph` cognitive complexity was `19` versus the allowed `15`.
-- Extracted `createReactGraph` and `createPlanOnlyGraph` so `buildHarnessGraph` is now the high-level selector and optional ReAct graph assembly lives in smaller helpers.
-- Verified this second cleanup with:
-  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm format:check`
-  - `pnpm typecheck`
-- Reviewed GitHub-exposed SonarCloud check metadata for PR `#131`.
-- SonarCloud quality gate failed on new-code duplication: `5.6% Duplication on New Code`, required `<= 3%`.
-- After the graph cleanup, SonarCloud still reported `3.6% Duplication on New Code` with no annotations. Queried SonarCloud measures/duplication APIs and found all remaining duplication in `packages/harness/test/reactLoop.test.ts`: 92 new duplicated lines across 3 duplicated blocks.
-- Refactored `reactLoop.test.ts` to share assistant text/tool-call responses, tool-result responses, and failed sensor run fixtures.
-- Verified the test-fixture cleanup with:
-  - `pnpm --filter @agent-platform/harness exec vitest run test/reactLoop.test.ts test/sensorCheck.test.ts`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm format:check`
-  - `pnpm typecheck`
-- Sonar annotations also reported repeated graph-routing implementations, `buildHarnessGraph` cognitive complexity, empty-object spreads, nested ternary/template formatting, and one inline union return type.
-- Refactored `packages/harness/src/buildGraph.ts` to build optional ReAct graph variants through one shared route assembly instead of repeated near-identical branches.
-- Added shared route aliases/helpers for sensor/critic routing.
-- Cleaned smaller findings in:
-  - `packages/harness/src/graphState.ts`
-  - `packages/harness/src/nodes/sensorCheck.ts`
-  - `packages/harness/src/sensors/computationalSensorRunner.ts`
-- Local verification passed:
-  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm format:check`
-  - `pnpm typecheck`
-- SonarQube MCP duplication tools are not available in this session. GitHub check annotations were used as the authenticated feedback source.
-
-### Sensor checks wired into ReAct loop
-
-Branch state: `task/agent-platform-feedback-sensors.3` contains the third implementation task.
-
-- Implemented `agent-platform-feedback-sensors.3`.
-- Added `packages/harness/src/nodes/sensorCheck.ts` with optional sensor execution, explicit trigger support, bounded LLM-facing repair feedback, required-provider/runtime escalation, optional runtime-limitation continuation, and repeated-failure loop detection.
-- Extended `HarnessState` with sensor results, attempts, requested/last trigger, last tool IDs, active sensor profile/context, changed files, repo path, and imported collector results.
-- Wired `sensorCheckNode` into all ReAct graph variants: ReAct only, ReAct + critic, ReAct + DoD, and ReAct + critic + DoD.
-- Route behavior now runs targeted sensors after meaningful code-changing tools, full required sensors before completion/pre-push, and explicit manual/external/after-push style refreshes before the next LLM turn.
-- Passing sensors stay quiet; failed sensors append compact `<sensor-feedback>` system messages and route back to `react_llm_reason`.
-- Required unavailable/auth/runtime limitations halt with clear streamed errors; repeated identical failures halt with `sensor_loop_limit` trace events.
-- Enabled the optional sensor node in the API runtime graph while suppressing thinking output when no sensors are selected.
-- Added focused tests in `packages/harness/test/sensorCheck.test.ts` and route coverage in `packages/harness/test/reactLoop.test.ts`.
-- Closed Beads task `agent-platform-feedback-sensors.3`.
+- Added `packages/harness/src/sensors/inferentialSensorRunner.ts`.
+- Inferential checks now emit normal `SensorResult`/`SensorRunRecord` records with `inferential:*` IDs, shared sensor categories, evidence, severity, and repair instructions.
+- Coding profiles run six bounded semantic checks at final/manual/external checkpoints: task satisfaction, diff intent, architecture boundary risk, test quality, unresolved findings, and readiness to commit/push/review.
+- Personal-assistant profiles only run task satisfaction and readiness checks by default.
+- The default `createSensorCheckNode` runner now calls `runFeedbackSensors`, which runs computational sensors first and then inferential sensors. This preserves required local gates; self-assessment cannot disable or replace typecheck/test/lint findings.
+- Open findings from computational collectors and quality gates are passed into the inferential evaluator as evidence.
+- Model-backed evaluator prompt requires JSON-only output with evidence-backed failed criteria. Malformed output fails closed as `inferential:self_assessment`.
+- Missing model config is reported as an unavailable inferential self-assessment sensor.
+- Added `packages/harness/test/inferentialSensorRunner.test.ts` covering pass, fail, unresolved findings, coding vs personal-assistant profile selection, malformed output, max-sensor cap behavior, and combined computational + inferential gate preservation.
+- Updated `docs/tasks/agent-platform-feedback-sensors.4.md` checklist and closed Beads task `agent-platform-feedback-sensors.4`.
 
 Quality gates passed:
 
-- `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
+- `pnpm --filter @agent-platform/harness run test -- test/inferentialSensorRunner.test.ts`
+- `pnpm --filter @agent-platform/harness run test -- test/critic.test.ts`
+- `pnpm --filter @agent-platform/harness run test -- test/dodCheck.test.ts`
+- `pnpm --filter @agent-platform/harness run test -- test/sensorCheck.test.ts`
 - `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/plugin-sdk run test`
+- `pnpm --filter @agent-platform/harness run typecheck`
 - `pnpm typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
 - `pnpm lint`
-- `pnpm format:check`
-- `pnpm test` with escalation for API Supertest local listener binding
 
 Completion gate:
 
-- SonarQube CLI was attempted for touched source files. Sandboxed runs failed on keychain/state access; escalated scan was rejected by policy because it may send source/auth material externally. Fallback gate passed with typecheck, lint, format, focused tests, harness tests, and full tests.
-
-### Computational sensor runner implemented
-
-Branch state: `task/agent-platform-feedback-sensors.2` contains the second implementation task.
-
-- Implemented `agent-platform-feedback-sensors.2`.
-- Added `packages/harness/src/sensors/computationalSensorRunner.ts`.
-- Runner selects deterministic quality-gate sensors by agent profile, task context, trigger, changed files, available sensor definitions, and execution limits.
-- Coding before-push repository work selects required local quality gates; personal-assistant work skips repository gates unless repo context/manual requests apply.
-- Runner reuses `sys_run_quality_gate` through `executeQualityGateTool`; it does not construct arbitrary shell commands.
-- Quality-gate failures are normalized into compact `SensorFinding` records and `SensorRepairInstruction` actions with bounded stdout/stderr evidence.
-- Imported provider findings from SonarQube, CodeQL, PR review/annotation style sources, IDE/plugin terminal evidence, provider availability, runtime metadata, path mappings, and runtime limitations normalize into shared sensor results and dedupe by finding key.
-- Sandbox/workspace denial is reported as an environment/policy error with runtime limitation metadata, not as a code failure.
-- Added `packages/harness/test/computationalSensorRunner.test.ts` covering selection, profile policy, manual sensors, execution limits, success, failure repair instructions, truncation evidence, imported findings, bounded terminal evidence, provider auth, runtime/path mapping, missing mounts, and workspace denial.
-- Closed Beads task `agent-platform-feedback-sensors.2`.
-- Committed the implementation as `bb47228 Implement computational sensor runner`; session handoff update is pending commit if this note is read before final push.
-
-Quality gates passed:
-
-- `pnpm --filter @agent-platform/harness exec vitest run test/computationalSensorRunner.test.ts`
-- `pnpm --filter @agent-platform/harness run test`
-- `pnpm typecheck`
-- `pnpm lint`
-- `pnpm format:check`
-- `pnpm test` with escalation for API Supertest local listener binding
-
-Completion gate:
-
-- SonarQube CLI was attempted for touched files. Sandboxed runs failed on keychain/state access; escalated scans were rejected by policy because they could send source/auth material externally. Fallback gate passed with typecheck, lint, format, focused tests, harness tests, and full tests.
-
-### Feedback sensors harness refined
-
-Branch state: `task/agent-platform-feedback-sensors.1` contains the first implementation task.
-
-- Implemented `agent-platform-feedback-sensors.1`.
-- Added `packages/contracts/src/sensor.ts` with Zod schemas and TypeScript types for sensor definitions, trigger/cadence policy, agent profile policy, findings, evidence, repair instructions, provider availability, runtime metadata, runtime limitations, terminal evidence, results, and run records.
-- Exported all sensor schemas/types from `packages/contracts/src/index.ts`.
-- Extended `packages/harness/src/trace.ts` with `sensor_run`, `sensor_result`, and `sensor_loop_limit` trace events.
-- Added contract coverage in `packages/contracts/test/sensor.test.ts` and trace typing coverage in `packages/harness/test/sensorTrace.test.ts`.
-- No runtime sensor behavior was added in this task.
-- Refined `agent-platform-feedback-sensors` and child specs `.1` through `.6` after owner discussion.
-- Added source-aware finding ingestion to the epic scope: local commands, IDE/problems, SonarQube local/remote, CodeQL local/remote, GitHub checks, PR reviews/annotations, agent code comments, and user feedback.
-- Clarified execution cadence: cheap targeted checks during work, required local validation before commit/push, remote feedback import after push or on request, plus manual/scheduled hooks for orchestration.
-- Added provider availability/auth states to the planned contracts, including `auth_required`, `unavailable`, connect/authenticate/retry actions, and graceful degradation when GitHub/SonarQube/CodeQL access is missing.
-- Added normalized finding/deduplication requirements so security quality, duplication, hotspots, lint/test/build findings, and review comments can be treated as one feedback model.
-- Added IDE/plugin feedback-provider requirements so agents can ingest bounded terminal output, diagnostics/problems, SonarQube/CodeQL plugin feedback, and review-agent comments exposed by the user's IDE without broad sandbox/process access.
-- Added API/UI guidance to encourage users to install or enable supported IDE plugins/adapters when those providers would expose useful local feedback to the harness.
-- Added Docker/container and future command-sandbox constraints so sensors distinguish code failures from environment limitations such as stopped services, missing mounts, unavailable tools, blocked network/auth, sandbox-denied access, and host/container path mapping gaps.
-- Added agent-scope/profile policy so sensor definitions declare where they apply: `personal_assistant`, `coding`, `research`, `automation`, or `custom`. Coding agents get repository quality gates; personal-assistant agents skip coding gates unless the task explicitly enters repository work or the user manually requests validation.
-- Created follow-on Beads epic `agent-platform-ui-quality-sensors` with spec `docs/tasks/agent-platform-ui-quality-sensors.md` for browser-evidence-driven UI/UX grading, deterministic UI checks, inferential design review, and feedback-loop repair instructions.
-- Updated Beads descriptions and acceptance criteria for the epic and all six child tasks to match the refined specs. Beads/Dolt auto-push attempted to sync but failed due GitHub DNS/auth being unavailable in the sandbox.
-- Committed the refinement as `62eee69 Refine feedback sensor specs`.
-- Used the SonarQube plugin flow earlier in the session; `sonarqube-cli` was installed, but auth requires the owner to run `sonar auth login -o jwill9999` locally before issue listing can continue.
-- Reviewed the Böckeler/Fowler article and Thoughtworks Radar framing: computational sensors run fast deterministic checks, inferential sensors run semantic review at bounded checkpoints, and both should produce LLM-optimized self-correction signals.
-- Created Beads epic `agent-platform-feedback-sensors`.
-- Created child tasks `agent-platform-feedback-sensors.1` through `.6`, linked under the epic, with Beads dependencies chained linearly.
-- Added matching specs:
-  - `docs/tasks/agent-platform-feedback-sensors.md`
-  - `docs/tasks/agent-platform-feedback-sensors.1.md`
-  - `docs/tasks/agent-platform-feedback-sensors.2.md`
-  - `docs/tasks/agent-platform-feedback-sensors.3.md`
-  - `docs/tasks/agent-platform-feedback-sensors.4.md`
-  - `docs/tasks/agent-platform-feedback-sensors.5.md`
-  - `docs/tasks/agent-platform-feedback-sensors.6.md`
-- Updated `docs/tasks/README.md` epic index.
-- Created branch `feature/feedback-sensors-harness` from `origin/main` to keep the planning docs out of the prior scheduler task branch.
-- Committed planning docs as `1d1e690 docs: plan feedback sensors harness`.
-- Added follow-up task `agent-platform-session-handoff-hygiene` with spec `docs/tasks/agent-platform-session-handoff-hygiene.md`.
-- Linked `agent-platform-context-optimisation` to depend on `agent-platform-session-handoff-hygiene` so handoff-file hygiene is handled before broader context-window optimisation.
-
-Quality gates passed:
-
-- `pnpm docs:lint`
+- SonarQube MCP tools were not exposed through the currently callable MCP tool list.
+- Authenticated SonarCloud CLI/API access works. `sonar auth status` is connected to `https://sonarcloud.io`, org `jwill9999`.
+- Current PR `#131` quality gate read via SonarCloud API is `OK`, with `new_duplicated_lines_density` at `0.0` and security hotspot review at `100.0`.
+- `bd close` succeeded locally; its Dolt auto-push failed because GitHub DNS/auth was unavailable from the sandbox. The normal git push still needs to be completed for the branch.
 
 ### Short-term working memory implemented
 
@@ -610,9 +504,9 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-feedback-sensors.4`
 - **Current base:** `feature/feedback-sensors-harness`
-- **Latest task commit:** `8c81015 Reduce react loop test duplication`
-- **Current work:** `.3` is implemented, closed, and SonarCloud-passing; `.4` is claimed and ready to start.
-- **Remote sync:** `task/agent-platform-feedback-sensors.4` is pushed and tracking origin; Beads/Dolt push for the `.4` claim succeeded.
+- **Latest task commit:** `9c0fe1c Add inferential feedback sensors` before the required `session.md` amend.
+- **Current work:** `.4` implementation is complete and Beads is closed locally. `session.md` still needs to be amended into the latest commit, then the branch must be pushed.
+- **Remote sync:** branch tracks `origin/task/agent-platform-feedback-sensors.4`; latest `.4` implementation commit has not been pushed yet at the time this handoff update was written.
 
 ### Beads
 
@@ -620,7 +514,7 @@ Quality gates passed:
 - `agent-platform-feedback-sensors.1` is closed.
 - `agent-platform-feedback-sensors.2` is closed.
 - `agent-platform-feedback-sensors.3` is closed.
-- `agent-platform-feedback-sensors.4` is in progress and assigned.
+- `agent-platform-feedback-sensors.4` is closed locally.
 - `agent-platform-feedback-sensors.5` through `.6` are open P2 child tasks.
 - Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
 - Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, agent-scope/profile policy, normalized findings, IDE/problem and IDE/plugin terminal feedback, SonarQube/CodeQL/GitHub feedback, Docker/container/sandbox limitations, provider auth states, pre-push validation, and post-push feedback import.
@@ -630,40 +524,33 @@ Quality gates passed:
 
 ### Quality
 
-- SonarCloud PR `#131` follow-up gates passed locally:
-  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
-  - `pnpm --filter @agent-platform/harness exec vitest run test/reactLoop.test.ts test/sensorCheck.test.ts`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm format:check`
-  - `pnpm typecheck`
-- Final `.4` branch push pre-flight passed for affected packages:
-  - `packages/contracts`: build, typecheck, tests
-  - `packages/harness`: build, typecheck, tests
-  - `apps/api`: build, typecheck, tests
-- Sensor ReAct-loop gates passed:
-  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
+- `.4` gates passed:
+  - `pnpm --filter @agent-platform/harness run test -- test/inferentialSensorRunner.test.ts`
+  - `pnpm --filter @agent-platform/harness run test -- test/critic.test.ts`
+  - `pnpm --filter @agent-platform/harness run test -- test/dodCheck.test.ts`
+  - `pnpm --filter @agent-platform/harness run test -- test/sensorCheck.test.ts`
   - `pnpm --filter @agent-platform/harness run test`
+  - `pnpm --filter @agent-platform/plugin-sdk run test`
+  - `pnpm --filter @agent-platform/harness run typecheck`
   - `pnpm typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
   - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` with escalation for API Supertest local listener binding
-- SonarQube CLI was attempted for touched files but could not be used as the completion gate: sandboxed runs could not access keychain/state, and escalated scans were rejected by policy risk review because they may send source/auth material externally. Fallback gate passed.
+- SonarCloud PR `#131` API quality gate is currently `OK`, including `0.0%` duplication on new code.
 
 ---
 
 ## Next (priority order)
 
-1. Start implementation for `agent-platform-feedback-sensors.4` on `task/agent-platform-feedback-sensors.4`.
-2. Re-check PR `#131` after pipelines finish, especially `verify` and `e2e`.
-3. Keep `.4` focused on inferential sensor checkpoints; GitHub/SonarQube/CodeQL remote polling remains separate from the computational routing already added.
+1. Amend `session.md` into the `.4` commit and push `task/agent-platform-feedback-sensors.4`.
+2. Re-check PR `#131` after remote pipelines/SonarCloud analyze the pushed `.4` commit.
+3. Claim `agent-platform-feedback-sensors.5` next: add sensor observability and feedback flywheel.
 
 ---
 
 ## Blockers / questions for owner
 
-- SonarQube scans were not used as the completion gate because escalated touched-file scans were rejected by policy risk review. Fallback terminal gates passed.
-- SonarQube MCP duplication tools are not currently exposed in this session; GitHub check annotations are available through `gh api`.
+- SonarQube MCP tools are still not exposed in this session, but authenticated SonarCloud CLI/API reads work.
+- `bd close` Dolt auto-push failed due GitHub DNS/auth from the sandbox; push the git branch normally and sync Beads/Dolt when network/auth is available.
 
 ---
 

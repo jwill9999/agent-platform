@@ -10,14 +10,16 @@ import type { HarnessStateType } from '../graphState.js';
 import type { TraceEvent } from '../trace.js';
 import type { ChatMessage, OutputEmitter } from '../types.js';
 import {
-  runComputationalSensors,
   type ComputationalSensorRun,
-  type ComputationalSensorRunnerInput,
   type ComputationalSensorRunnerOptions,
 } from '../sensors/computationalSensorRunner.js';
+import {
+  runFeedbackSensors,
+  type FeedbackSensorRunnerInput,
+} from '../sensors/inferentialSensorRunner.js';
 
 export type SensorRunner = (
-  input: ComputationalSensorRunnerInput,
+  input: FeedbackSensorRunnerInput,
   options?: ComputationalSensorRunnerOptions,
 ) => Promise<ComputationalSensorRun>;
 
@@ -183,7 +185,7 @@ function hasRequiredEscalation(
 function buildSensorInput(
   state: HarnessStateType,
   trigger: SensorTrigger,
-): ComputationalSensorRunnerInput {
+): FeedbackSensorRunnerInput {
   return {
     agentProfile: resolveAgentProfile(state),
     taskContexts: state.sensorTaskContexts ?? [],
@@ -191,6 +193,11 @@ function buildSensorInput(
     repoPath: state.sensorRepoPath ?? '.',
     changedFiles: state.sensorChangedFiles ?? [],
     findingCollectorResults: state.sensorFindingCollectorResults ?? [],
+    messages: state.messages ?? [],
+    llmOutput: state.llmOutput,
+    dodContract: state.dodContract,
+    previousSensorResults: state.sensorResults ?? [],
+    modelConfig: state.modelConfig,
     executionLimits:
       trigger === 'on_meaningful_change'
         ? {
@@ -214,7 +221,7 @@ export function routeAfterSensorCheck(state: HarnessStateType): 'react_llm_reaso
 }
 
 export function createSensorCheckNode(options: SensorCheckNodeOptions = {}) {
-  const runSensors = options.runSensors ?? runComputationalSensors;
+  const runSensors = options.runSensors ?? runFeedbackSensors;
   const maxFeedbackChars = options.maxFeedbackChars ?? DEFAULT_MAX_FEEDBACK_CHARS;
   const repeatedFailureLimit = options.repeatedFailureLimit ?? DEFAULT_REPEATED_FAILURE_LIMIT;
 

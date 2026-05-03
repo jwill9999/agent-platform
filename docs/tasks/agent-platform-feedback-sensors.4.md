@@ -70,21 +70,21 @@ Required outcomes:
 
 ## Definition of done
 
-- [ ] Inferential sensors are represented by the shared sensor model.
-- [ ] Existing critic/DoD behavior remains compatible.
-- [ ] Open required findings can influence semantic readiness checks.
-- [ ] Readiness criteria can vary by active agent profile without weakening required gates.
-- [ ] Semantic failures produce actionable feedback for the next model turn.
-- [ ] Tests cover pass, fail, malformed, and cap-reached paths.
-- [ ] `bd close agent-platform-feedback-sensors.4 --reason "Inferential sensor checkpoints added"`
+- [x] Inferential sensors are represented by the shared sensor model.
+- [x] Existing critic/DoD behavior remains compatible.
+- [x] Open required findings can influence semantic readiness checks.
+- [x] Readiness criteria can vary by active agent profile without weakening required gates.
+- [x] Semantic failures produce actionable feedback for the next model turn.
+- [x] Tests cover pass, fail, malformed, and cap-reached paths.
+- [x] `bd close agent-platform-feedback-sensors.4 --reason "Inferential sensor checkpoints added"`
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-feedback-sensors.3`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: N/A - merge at segment end
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] Task branch created from `task/agent-platform-feedback-sensors.3`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] If segment tip: N/A - merge at segment end
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-03
