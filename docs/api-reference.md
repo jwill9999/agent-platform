@@ -84,6 +84,7 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `POST /v1/scheduler`                       |    ✅    |       ✅        | Create a scheduled job                       |
 | `GET /v1/scheduler/:id`                    |    ✅    |       ✅        | Scheduler dashboard detail                   |
 | `PUT /v1/scheduler/:id`                    |    ✅    |       ✅        | Update a scheduled job                       |
+| `DELETE /v1/scheduler/:id`                 |    ✅    |       ✅        | Delete a scheduled job and run history       |
 | `POST /v1/scheduler/:id/pause`             |    ✅    |       ✅        | Pause a scheduled job                        |
 | `POST /v1/scheduler/:id/resume`            |    ✅    |       ✅        | Resume a scheduled job                       |
 | `POST /v1/scheduler/:id/run`               |    ✅    |       ✅        | Request an immediate run                     |
@@ -327,21 +328,24 @@ Review requests use `{ "decision": "approved" | "rejected", "reason"?: "..." }`.
 
 ### Scheduler
 
-| Method | Path                               | Description                                      |
-| ------ | ---------------------------------- | ------------------------------------------------ |
-| `GET`  | `/v1/scheduler`                    | List scheduled jobs with scope/status filters    |
-| `POST` | `/v1/scheduler`                    | Create a scheduled job                           |
-| `GET`  | `/v1/scheduler/:id`                | Get one scheduled job                            |
-| `PUT`  | `/v1/scheduler/:id`                | Update name, instructions, schedule, or metadata |
-| `POST` | `/v1/scheduler/:id/pause`          | Pause a scheduled job                            |
-| `POST` | `/v1/scheduler/:id/resume`         | Resume a scheduled job                           |
-| `POST` | `/v1/scheduler/:id/run`            | Mark a job due for immediate execution           |
-| `GET`  | `/v1/scheduler/:id/runs`           | List run attempts for a job                      |
-| `GET`  | `/v1/scheduler/runs/:runId`        | Get one run attempt                              |
-| `POST` | `/v1/scheduler/runs/:runId/cancel` | Request best-effort cancellation                 |
-| `GET`  | `/v1/scheduler/runs/:runId/logs`   | Inspect bounded logs and notification entries    |
+| Method   | Path                               | Description                                      |
+| -------- | ---------------------------------- | ------------------------------------------------ |
+| `GET`    | `/v1/scheduler`                    | List scheduled jobs with scope/status filters    |
+| `POST`   | `/v1/scheduler`                    | Create a scheduled job                           |
+| `GET`    | `/v1/scheduler/:id`                | Get one scheduled job                            |
+| `PUT`    | `/v1/scheduler/:id`                | Update name, instructions, schedule, or metadata |
+| `DELETE` | `/v1/scheduler/:id`                | Delete a job and its runs/logs                   |
+| `POST`   | `/v1/scheduler/:id/pause`          | Pause a scheduled job                            |
+| `POST`   | `/v1/scheduler/:id/resume`         | Resume a scheduled job                           |
+| `POST`   | `/v1/scheduler/:id/run`            | Mark a job due for immediate execution           |
+| `GET`    | `/v1/scheduler/:id/runs`           | List run attempts for a job                      |
+| `GET`    | `/v1/scheduler/runs/:runId`        | Get one run attempt                              |
+| `POST`   | `/v1/scheduler/runs/:runId/cancel` | Request best-effort cancellation                 |
+| `GET`    | `/v1/scheduler/runs/:runId/logs`   | Inspect bounded logs and notification entries    |
 
 Jobs support `one_off`, `delayed`, and interval-based `recurring` schedules. The local API-owned scheduler is enabled by default and can be disabled with `SCHEDULER_ENABLED=false`. Poll and lease timing can be tuned with `SCHEDULER_POLL_INTERVAL_MS` and `SCHEDULER_LEASE_MS`.
+
+Create and update requests accept user-facing job fields such as `name`, `description`, `instructions`, `scheduleType`, `runAtMs`, `intervalMs`, `timezone`, `status`, retry policy, timeout, and metadata. The Settings Scheduler UI uses the browser/system timezone when creating and editing jobs. `DELETE /v1/scheduler/:id` removes the scheduled job and cascades its persisted run/log history.
 
 Built-in scheduled targets are deliberately narrow. `scheduler.noop` is the default smoke-test target, and `memory.cleanup_expired.dry_run` reports expired-memory cleanup matches without deleting records. Destructive memory cleanup still requires the explicit `/v1/memories/cleanup` confirmation path. Unsupported `agent_turn` scheduler targets fail closed until routed through the normal agent/HITL policy path.
 

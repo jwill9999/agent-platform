@@ -64,12 +64,14 @@ Source of truth: `packages/db/src/schema.ts`
 
 #### `sessions` — Chat sessions
 
-| Column          | Type    | Notes                         |
-| --------------- | ------- | ----------------------------- |
-| `id`            | text PK | UUID                          |
-| `agent_id`      | text FK | → `agents.id`, cascade delete |
-| `created_at_ms` | integer | Unix epoch ms                 |
-| `updated_at_ms` | integer | Unix epoch ms                 |
+| Column          | Type    | Notes                               |
+| --------------- | ------- | ----------------------------------- |
+| `id`            | text PK | UUID                                |
+| `agent_id`      | text FK | → `agents.id`, cascade delete       |
+| `project_id`    | text FK | → `projects.id`, SET NULL on delete |
+| `title`         | text    | Optional session title              |
+| `created_at_ms` | integer | Unix epoch ms                       |
+| `updated_at_ms` | integer | Unix epoch ms                       |
 
 #### `messages` — Conversation messages
 
@@ -131,6 +133,23 @@ Source of truth: `packages/db/src/schema.ts`
 
 > **API key** is never stored in plaintext. When `apiKey` is provided on create/update, it is encrypted with AES-256-GCM and stored in `secret_refs`. The `hasApiKey` flag in API responses indicates whether a key is stored.
 
+#### `projects` — Durable workspace/project contexts
+
+| Column           | Type    | Notes                                                     |
+| ---------------- | ------- | --------------------------------------------------------- |
+| `id`             | text PK | UUID                                                      |
+| `slug`           | text    | Unique index, human-readable                              |
+| `name`           | text    | Required                                                  |
+| `description`    | text    | Optional                                                  |
+| `workspace_path` | text    | Workspace-relative path, normally under `projects/<slug>` |
+| `workspace_key`  | text    | Optional stable workspace identity                        |
+| `metadata_json`  | text    | Non-secret project metadata JSON                          |
+| `archived_at_ms` | integer | Archive marker; `NULL` means active                       |
+| `created_at_ms`  | integer | Unix epoch ms                                             |
+| `updated_at_ms`  | integer | Unix epoch ms                                             |
+
+Projects are the first-class long-lived work context for application/repository work. Sessions, working memory, long-term memories, and scheduled jobs can reference a project without requiring every chat to have one.
+
 #### `secret_refs` — Encrypted secret references
 
 | Column           | Type    | Notes                          |
@@ -169,20 +188,168 @@ Source of truth: `packages/db/src/schema.ts`
 | `completed_at_ms` | integer | Execution end time (optional)                          |
 | `duration_ms`     | integer | Computed duration (optional)                           |
 
+#### `approval_requests` — Durable human approval requests
+
+| Column                   | Type    | Notes                                         |
+| ------------------------ | ------- | --------------------------------------------- |
+| `id`                     | text PK | Approval request id                           |
+| `session_id`             | text    | Session context                               |
+| `run_id`                 | text    | Harness run id                                |
+| `agent_id`               | text    | Agent requesting approval                     |
+| `tool_name`              | text    | Tool awaiting approval                        |
+| `args_json`              | text    | Redacted tool arguments                       |
+| `execution_payload_json` | text    | Resume payload for approved execution         |
+| `risk_tier`              | text    | Risk tier at request time                     |
+| `status`                 | text    | `pending` / `approved` / `denied` / `expired` |
+| `created_at_ms`          | integer | Created timestamp                             |
+| `decided_at_ms`          | integer | Decision timestamp                            |
+| `resumed_at_ms`          | integer | Resume timestamp                              |
+| `expires_at_ms`          | integer | Optional expiry                               |
+| `decision_reason`        | text    | Optional human decision reason                |
+
+#### `memories` — Review-gated long-term memories
+
+| Column                 | Type    | Notes                                                     |
+| ---------------------- | ------- | --------------------------------------------------------- |
+| `id`                   | text PK | Memory id                                                 |
+| `scope`                | text    | `global` / `project` / `agent` / `session`                |
+| `scope_id`             | text    | Scope owner id where required                             |
+| `project_id`           | text FK | → `projects.id`, SET NULL on delete                       |
+| `kind`                 | text    | Memory kind such as fact, preference, or failure learning |
+| `status`               | text    | `pending` / `active` / `archived`                         |
+| `review_status`        | text    | `unreviewed` / `approved` / `rejected`                    |
+| `content`              | text    | Redacted memory text                                      |
+| `confidence`           | real    | Confidence score                                          |
+| `source_kind`          | text    | Source category                                           |
+| `source_id`            | text    | Optional source id                                        |
+| `source_label`         | text    | Optional source label                                     |
+| `source_metadata_json` | text    | Redacted source metadata JSON                             |
+| `tags_json`            | text    | JSON array of tags                                        |
+| `metadata_json`        | text    | Redacted metadata JSON                                    |
+| `safety_state`         | text    | Safety/redaction state                                    |
+| `created_at_ms`        | integer | Unix epoch ms                                             |
+| `updated_at_ms`        | integer | Unix epoch ms                                             |
+| `expires_at_ms`        | integer | Optional expiry                                           |
+| `reviewed_at_ms`       | integer | Optional review timestamp                                 |
+| `reviewed_by`          | text    | Optional reviewer id/name                                 |
+
+#### `memory_links` — Optional memory relationships
+
+| Column             | Type    | Notes                                   |
+| ------------------ | ------- | --------------------------------------- |
+| `source_memory_id` | text FK | → `memories.id`, cascade delete         |
+| `target_memory_id` | text FK | → `memories.id`, cascade delete         |
+| `relation`         | text    | Relationship kind; part of composite PK |
+| `metadata_json`    | text    | Redacted relationship metadata JSON     |
+| `created_at_ms`    | integer | Unix epoch ms                           |
+
+#### `working_memory_artifacts` — Short-term session memory
+
+| Column                      | Type    | Notes                                   |
+| --------------------------- | ------- | --------------------------------------- |
+| `session_id`                | text PK | → `sessions.id`, cascade delete         |
+| `run_id`                    | text    | Latest run contributing to the artifact |
+| `current_goal`              | text    | Current session goal                    |
+| `active_project`            | text    | Human-readable active project label     |
+| `project_id`                | text FK | → `projects.id`, SET NULL on delete     |
+| `active_task`               | text    | Current task label                      |
+| `decisions_json`            | text    | Bounded JSON array                      |
+| `important_files_json`      | text    | Bounded JSON array                      |
+| `tools_used_json`           | text    | Bounded JSON array                      |
+| `tool_summaries_json`       | text    | Bounded JSON array                      |
+| `blockers_json`             | text    | Bounded JSON array                      |
+| `pending_approval_ids_json` | text    | Bounded JSON array                      |
+| `next_action`               | text    | Suggested next action                   |
+| `summary`                   | text    | Compact continuity summary              |
+| `created_at_ms`             | integer | Unix epoch ms                           |
+| `updated_at_ms`             | integer | Unix epoch ms                           |
+
+#### `scheduled_jobs` — Durable scheduled job definitions
+
+| Column                    | Type    | Notes                                              |
+| ------------------------- | ------- | -------------------------------------------------- |
+| `id`                      | text PK | Job id                                             |
+| `scope`                   | text    | `global` / `project` / `agent` / `session`         |
+| `scope_id`                | text    | Scope owner id where required                      |
+| `project_id`              | text FK | → `projects.id`, SET NULL on delete                |
+| `owner_agent_id`          | text FK | → `agents.id`, SET NULL on delete                  |
+| `owner_session_id`        | text FK | → `sessions.id`, SET NULL on delete                |
+| `execution_agent_id`      | text FK | → `agents.id`, SET NULL on delete                  |
+| `created_from_session_id` | text FK | → `sessions.id`, SET NULL on delete                |
+| `name`                    | text    | User-facing job name                               |
+| `description`             | text    | Optional description                               |
+| `instructions`            | text    | User-facing instructions                           |
+| `target_kind`             | text    | `built_in` now; agent turn targets are fail-closed |
+| `target_payload_json`     | text    | Target-specific payload JSON                       |
+| `schedule_type`           | text    | `one_off` / `delayed` / `recurring`                |
+| `run_at_ms`               | integer | One-off/delayed run time                           |
+| `interval_ms`             | integer | Recurring interval                                 |
+| `cron_expression`         | text    | Reserved; not executed by the local runner yet     |
+| `timezone`                | text    | IANA timezone captured from UI/API                 |
+| `next_run_at_ms`          | integer | Next due time                                      |
+| `status`                  | text    | `enabled` / `paused` / `archived`                  |
+| `retry_policy_json`       | text    | Retry policy JSON                                  |
+| `timeout_ms`              | integer | Run timeout                                        |
+| `last_run_at_ms`          | integer | Last execution timestamp                           |
+| `lease_owner`             | text    | Scheduler worker lease owner                       |
+| `lease_expires_at_ms`     | integer | Lease expiry                                       |
+| `metadata_json`           | text    | Non-secret metadata JSON                           |
+| `created_at_ms`           | integer | Unix epoch ms                                      |
+| `updated_at_ms`           | integer | Unix epoch ms                                      |
+
+#### `scheduled_job_runs` — Scheduled job run attempts
+
+| Column                   | Type    | Notes                                 |
+| ------------------------ | ------- | ------------------------------------- |
+| `id`                     | text PK | Run id                                |
+| `job_id`                 | text FK | → `scheduled_jobs.id`, cascade delete |
+| `status`                 | text    | Queued/running/terminal run status    |
+| `attempt`                | integer | Retry attempt number                  |
+| `queued_at_ms`           | integer | Queue timestamp                       |
+| `started_at_ms`          | integer | Start timestamp                       |
+| `completed_at_ms`        | integer | Completion timestamp                  |
+| `lease_owner`            | text    | Scheduler worker lease owner          |
+| `lease_expires_at_ms`    | integer | Lease expiry                          |
+| `cancel_requested_at_ms` | integer | Best-effort cancellation marker       |
+| `result_summary`         | text    | Redacted/truncated terminal summary   |
+| `error_code`             | text    | Optional error code                   |
+| `error_message`          | text    | Redacted/truncated error message      |
+| `metadata_json`          | text    | Non-secret metadata JSON              |
+| `created_at_ms`          | integer | Unix epoch ms                         |
+| `updated_at_ms`          | integer | Unix epoch ms                         |
+
+#### `scheduled_job_run_logs` — Bounded scheduled run logs
+
+| Column          | Type    | Notes                                     |
+| --------------- | ------- | ----------------------------------------- |
+| `id`            | text PK | Log row id                                |
+| `run_id`        | text FK | → `scheduled_job_runs.id`, cascade delete |
+| `job_id`        | text FK | → `scheduled_jobs.id`, cascade delete     |
+| `sequence`      | integer | Per-run sequence; unique with `run_id`    |
+| `level`         | text    | `debug` / `info` / `warn` / `error`       |
+| `message`       | text    | Redacted/truncated log message            |
+| `data_json`     | text    | Redacted/truncated structured data JSON   |
+| `truncated`     | integer | Boolean truncation marker                 |
+| `created_at_ms` | integer | Unix epoch ms                             |
+
 ## Entity Relationships
 
 ```
 agents ──< agent_skills >── skills
 agents ──< agent_tools >── tools
 agents ──< agent_mcp_servers >── mcp_servers
-agents ──< sessions ──< messages
+projects ──< sessions ──< messages
+agents ──< sessions
 sessions ──< plans
 sessions ── chat_metadata (1:1)
+sessions ── working_memory_artifacts (1:1)
+projects ──< memories ──< memory_links >── memories
+projects ──< scheduled_jobs ──< scheduled_job_runs ──< scheduled_job_run_logs
 agents >── model_configs ──< secret_refs (model_config_id FK; SET NULL on delete)
 tool_executions (references agent_id, session_id — no FK constraints)
 ```
 
-All foreign keys use **cascade delete** — deleting an agent removes its sessions, junction entries, etc. The `tool_executions` table is a standalone audit log without FK constraints for performance.
+Most ownership foreign keys cascade only where deleting the owner should remove dependent runtime state, such as sessions/messages, memory links, and scheduled job runs/logs. Optional project/agent/session associations on jobs, memories, and working memory use `SET NULL` so historical records can survive owner removal where appropriate. The `tool_executions` table is a standalone audit log without FK constraints for performance.
 
 ## IDs and Slugs
 
@@ -206,9 +373,15 @@ Migrations live in `packages/db/drizzle/` and are numbered sequentially:
 | `0006_add_context_window.sql`    | context_window_json on agents                                     |
 | `0007_add_risk_tier.sql`         | risk_tier and requires_approval on tools                          |
 | `0008_add_tool_executions.sql`   | tool_executions audit log table                                   |
-| `0009_add_chat_metadata.sql`     | chat_metadata table for session titles                            |
-| `0010_extend_session_schema.sql` | messages table, updated sessions columns                          |
+| `0009_add_skill_lazy_fields.sql` | Lazy-loading metadata on skills                                   |
+| `0010_add_session_title.sql`     | Session title field                                               |
 | `0011_add_model_configs.sql`     | model_configs table + model_config_id FK on agents                |
+| `0012_add_approval_requests.sql` | HITL approval request persistence                                 |
+| `0013_hitl_resume.sql`           | Approval resume payload/timestamps                                |
+| `0014_add_memories.sql`          | Long-term memories and memory_links tables                        |
+| `0015_add_working_memory.sql`    | Short-term working_memory_artifacts table                         |
+| `0016_add_projects.sql`          | Projects table and project associations                           |
+| `0017_add_scheduler.sql`         | Scheduled jobs, runs, and run logs                                |
 
 ### Adding a New Migration
 

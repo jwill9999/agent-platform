@@ -64,6 +64,7 @@ See [Development Guide](docs/development.md) for prerequisites, env vars, tests,
 | [Configuration](docs/configuration.md)                                   | Env vars, model routing, limits, MCP, security                        |
 | [Workspace Storage](docs/workspace-storage.md)                           | Host workspace setup, security, cleanup, and validation               |
 | [Coding Runtime](docs/coding-runtime.md)                                 | Container CLI baseline and coding-agent policy                        |
+| [Scheduler](docs/scheduler.md)                                           | Durable scheduled jobs, background runs, logs, and notifications      |
 | [Harness Gap Analysis](docs/planning/harness-gap-analysis-2026-04-29.md) | Capability gaps and recommended roadmap for coding/general automation |
 | [Memory Management](docs/planning/memory-management.md)                  | Short-term, long-term, and self-learning memory architecture          |
 | [Plugin Guide](docs/plugin-guide.md)                                     | Plugin hooks and authoring                                            |

@@ -26,6 +26,18 @@ Supported built-in targets:
 - `scheduler.noop`: safe smoke-test target used by the UI.
 - `memory.cleanup_expired.dry_run`: reports how many expired memories would be cleaned up without deleting records.
 
+## Settings UI
+
+Open **Settings > Scheduler** to create and manage jobs. The page supports:
+
+- Creating one-off and recurring smoke-test jobs.
+- Editing selected jobs without recreating them.
+- Pausing, resuming, and requesting an immediate run.
+- Deleting one selected job or multiple selected jobs. Deleting a job cascades its persisted runs and logs.
+- Inspecting the selected job, recent runs, and bounded run logs in the right-side panel.
+
+The **Run at** field is interpreted in the user's browser/system timezone and the saved job stores that timezone explicitly. The dashboard currently refreshes after page load, manual **Refresh**, and user actions such as create, update, pause, resume, run now, cancel, or delete. It does not yet stream scheduler updates live while a run is progressing.
+
 ## Notifications
 
 The runner emits structured notification events for:
@@ -55,3 +67,5 @@ Scheduler jobs do not bypass tool policy. Destructive maintenance remains confir
 8. Create another job and use pause/resume to confirm the status badges and action buttons update.
 
 For API-only verification, create a job with `POST /v1/scheduler`, request `POST /v1/scheduler/:id/run`, then inspect `/v1/scheduler/:id/runs` and `/v1/scheduler/runs/:runId/logs`.
+
+To verify edit/delete behaviour, create a paused one-off job, select it, choose **Edit**, update the name or instructions, and save. Then select one or more jobs and delete them; the job list, detail panel, runs, and logs should clear without requiring a restart.
