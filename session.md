@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Addressed the remaining SonarCloud PR #131 duplication source in `packages/harness/test/reactLoop.test.ts` by extracting shared ReAct test fixtures; local gates are green and the branch is ready for the final Sonar rerun before claiming `.4`.
+- **Date:** 2026-05-03
 - **Session:** Addressed the second SonarCloud PR #131 pass after duplication dropped to 3.6% but remained above the 3% gate: extracted ReAct graph assembly helpers from `buildHarnessGraph`, verified local gates, and prepared the branch for another analysis run.
 - **Date:** 2026-05-03
 - **Session:** Addressed SonarCloud PR #131 feedback on `task/agent-platform-feedback-sensors.3`: refactored duplicated ReAct graph construction, reduced reported complexity/style findings, verified focused gates, and prepared the branch for re-analysis.
@@ -236,6 +238,14 @@ Branch state: `task/agent-platform-feedback-sensors.3` contains the pushed task 
   - `pnpm typecheck`
 - Reviewed GitHub-exposed SonarCloud check metadata for PR `#131`.
 - SonarCloud quality gate failed on new-code duplication: `5.6% Duplication on New Code`, required `<= 3%`.
+- After the graph cleanup, SonarCloud still reported `3.6% Duplication on New Code` with no annotations. Queried SonarCloud measures/duplication APIs and found all remaining duplication in `packages/harness/test/reactLoop.test.ts`: 92 new duplicated lines across 3 duplicated blocks.
+- Refactored `reactLoop.test.ts` to share assistant text/tool-call responses, tool-result responses, and failed sensor run fixtures.
+- Verified the test-fixture cleanup with:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/reactLoop.test.ts test/sensorCheck.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm format:check`
+  - `pnpm typecheck`
 - Sonar annotations also reported repeated graph-routing implementations, `buildHarnessGraph` cognitive complexity, empty-object spreads, nested ternary/template formatting, and one inline union return type.
 - Refactored `packages/harness/src/buildGraph.ts` to build optional ReAct graph variants through one shared route assembly instead of repeated near-identical branches.
 - Added shared route aliases/helpers for sensor/critic routing.
@@ -594,9 +604,9 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-feedback-sensors.3`
 - **Current base:** `feature/feedback-sensors-harness`
-- **Latest task commit:** pending second Sonar cleanup commit after `9d2a163 Address Sonar duplication feedback`.
-- **Current work:** `.3` is implemented and closed; a second `buildGraph.ts` helper extraction is ready to commit/push for another SonarCloud re-analysis.
-- **Remote sync:** Git push is required after committing the second Sonar cleanup; `bd dolt push` was already synced for the closed bead before Sonar follow-up work.
+- **Latest task commit:** `b8c1941 Reduce graph builder complexity`; pending final `reactLoop.test.ts` duplication cleanup commit.
+- **Current work:** `.3` is implemented and closed; final SonarCloud duplication cleanup is ready to commit/push before claiming `.4`.
+- **Remote sync:** Git push is required after committing the final Sonar cleanup; `bd dolt push` was already synced for the closed bead before Sonar follow-up work.
 
 ### Beads
 
@@ -615,6 +625,7 @@ Quality gates passed:
 
 - SonarCloud PR `#131` follow-up gates passed locally:
   - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
+  - `pnpm --filter @agent-platform/harness exec vitest run test/reactLoop.test.ts test/sensorCheck.test.ts`
   - `pnpm --filter @agent-platform/harness run typecheck`
   - `pnpm --filter @agent-platform/harness run lint`
   - `pnpm format:check`
@@ -632,7 +643,7 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the second `buildGraph.ts` Sonar cleanup on `task/agent-platform-feedback-sensors.3`.
+1. Commit and push the final `reactLoop.test.ts` Sonar duplication cleanup on `task/agent-platform-feedback-sensors.3`.
 2. Re-check PR `#131` after pipelines finish, especially the SonarCloud quality gate, `verify`, `docker`, and `e2e`.
 3. Start `agent-platform-feedback-sensors.4` from the `.3` chain tip after the PR checks are acceptable.
 4. Keep `.4` focused on inferential sensor checkpoints; GitHub/SonarQube/CodeQL remote polling remains separate from the computational routing already added.

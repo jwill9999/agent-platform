@@ -86,12 +86,94 @@ function passingSensorRunner(calls: Array<Record<string, unknown>>): SensorRunne
   };
 }
 
+function assistantText(content: string): Partial<HarnessStateType> {
+  return {
+    llmOutput: { kind: 'text', content } as LlmOutput,
+    messages: [{ role: 'assistant', content }] as ChatMessage[],
+  };
+}
+
+function assistantToolCall(
+  id: string,
+  name: string,
+  args: Record<string, unknown>,
+): Partial<HarnessStateType> {
+  return {
+    llmOutput: {
+      kind: 'tool_calls',
+      calls: [{ id, name, args }],
+    } as LlmOutput,
+    messages: [
+      { role: 'assistant', content: '', toolCalls: [{ id, name, args }] },
+    ] as ChatMessage[],
+  };
+}
+
+function toolResult(
+  toolCallId: string,
+  toolName: string,
+  content: string,
+): Partial<HarnessStateType> {
+  return {
+    llmOutput: null,
+    messages: [{ role: 'tool', toolCallId, toolName, content }] as ChatMessage[],
+  };
+}
+
+function failedSensorRun(options: {
+  sensorId: string;
+  trigger: 'before_push' | 'external_feedback';
+  selectionState: 'required' | 'optional';
+  summary: string;
+  source: 'local_command' | 'github_pr_review';
+  severity: 'high' | 'medium';
+  category: 'quality_gate' | 'code_quality';
+  message: string;
+  repairSummary: string;
+}) {
+  return {
+    results: [
+      {
+        sensorId: options.sensorId,
+        status: 'failed',
+        summary: options.summary,
+        findings: [
+          {
+            source: options.source,
+            severity: options.severity,
+            status: 'open',
+            category: options.category,
+            message: options.message,
+            evidence: [],
+            metadata: {},
+          },
+        ],
+        repairInstructions: [{ summary: options.repairSummary, actions: [] }],
+        evidence: [],
+        terminalEvidence: [],
+        runtimeLimitations: [],
+        metadata: {},
+      },
+    ],
+    records: [
+      {
+        id: `${options.sensorId}:${options.trigger}`,
+        sensorId: options.sensorId,
+        trigger: options.trigger,
+        selectedForProfile: 'coding',
+        selectionState: options.selectionState,
+        status: 'completed',
+        startedAtMs: 0,
+        completedAtMs: 1,
+        metadata: {},
+      },
+    ],
+  };
+}
+
 describe('ReAct loop', () => {
   it('completes when LLM returns text (no tool calls)', async () => {
-    const llmNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: { kind: 'text', content: 'Done!' } as LlmOutput,
-      messages: [{ role: 'assistant', content: 'Done!' }] as ChatMessage[],
-    }));
+    const llmNode: GraphNodeFn = vi.fn(async () => assistantText('Done!'));
     const toolNode: GraphNodeFn = vi.fn(async () => ({}));
 
     const graph = buildHarnessGraph({
@@ -115,31 +197,13 @@ describe('ReAct loop', () => {
     const llmNode: GraphNodeFn = vi.fn(async () => {
       llmCallCount++;
       if (llmCallCount === 1) {
-        return {
-          llmOutput: {
-            kind: 'tool_calls',
-            calls: [{ id: 'tc1', name: 'echo', args: { text: 'hi' } }],
-          } as LlmOutput,
-          messages: [
-            {
-              role: 'assistant',
-              content: '',
-              toolCalls: [{ id: 'tc1', name: 'echo', args: { text: 'hi' } }],
-            },
-          ] as ChatMessage[],
-        };
+        return assistantToolCall('tc1', 'echo', { text: 'hi' });
       }
-      return {
-        llmOutput: { kind: 'text', content: 'All done' } as LlmOutput,
-        messages: [{ role: 'assistant', content: 'All done' }] as ChatMessage[],
-      };
+      return assistantText('All done');
     });
 
     const toolNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: null,
-      messages: [
-        { role: 'tool', toolCallId: 'tc1', toolName: 'echo', content: '"hi"' },
-      ] as ChatMessage[],
+      ...toolResult('tc1', 'echo', '"hi"'),
       trace: [{ type: 'tool_dispatch' as const, toolId: 'echo', step: 0, ok: true }],
     }));
 
@@ -159,22 +223,9 @@ describe('ReAct loop', () => {
   });
 
   it('halts at maxSteps', async () => {
-    const llmNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: {
-        kind: 'tool_calls',
-        calls: [{ id: 'tc', name: 'tool-a', args: {} }],
-      } as LlmOutput,
-      messages: [
-        { role: 'assistant', content: '', toolCalls: [{ id: 'tc', name: 'tool-a', args: {} }] },
-      ] as ChatMessage[],
-    }));
+    const llmNode: GraphNodeFn = vi.fn(async () => assistantToolCall('tc', 'tool-a', {}));
 
-    const toolNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: null,
-      messages: [
-        { role: 'tool', toolCallId: 'tc', toolName: 'tool-a', content: '{}' },
-      ] as ChatMessage[],
-    }));
+    const toolNode: GraphNodeFn = vi.fn(async () => toolResult('tc', 'tool-a', '{}'));
 
     const graph = buildHarnessGraph({
       executeTool: vi.fn(),
@@ -192,26 +243,9 @@ describe('ReAct loop', () => {
   });
 
   it('detects loop when same tool+args called 3 times consecutively', async () => {
-    const llmNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: {
-        kind: 'tool_calls',
-        calls: [{ id: 'tc', name: 'stuck-tool', args: { x: 1 } }],
-      } as LlmOutput,
-      messages: [
-        {
-          role: 'assistant',
-          content: '',
-          toolCalls: [{ id: 'tc', name: 'stuck-tool', args: { x: 1 } }],
-        },
-      ] as ChatMessage[],
-    }));
+    const llmNode: GraphNodeFn = vi.fn(async () => assistantToolCall('tc', 'stuck-tool', { x: 1 }));
 
-    const toolNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: null,
-      messages: [
-        { role: 'tool', toolCallId: 'tc', toolName: 'stuck-tool', content: '"same"' },
-      ] as ChatMessage[],
-    }));
+    const toolNode: GraphNodeFn = vi.fn(async () => toolResult('tc', 'stuck-tool', '"same"'));
 
     const graph = buildHarnessGraph({
       executeTool: vi.fn(),
@@ -234,32 +268,12 @@ describe('ReAct loop', () => {
     const llmNode: GraphNodeFn = vi.fn(async () => {
       callIdx++;
       if (callIdx <= 3) {
-        return {
-          llmOutput: {
-            kind: 'tool_calls',
-            calls: [{ id: `tc${callIdx}`, name: 'tool', args: { i: callIdx } }],
-          } as LlmOutput,
-          messages: [
-            {
-              role: 'assistant',
-              content: '',
-              toolCalls: [{ id: `tc${callIdx}`, name: 'tool', args: { i: callIdx } }],
-            },
-          ] as ChatMessage[],
-        };
+        return assistantToolCall(`tc${callIdx}`, 'tool', { i: callIdx });
       }
-      return {
-        llmOutput: { kind: 'text', content: 'done' } as LlmOutput,
-        messages: [{ role: 'assistant', content: 'done' }] as ChatMessage[],
-      };
+      return assistantText('done');
     });
 
-    const toolNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: null,
-      messages: [
-        { role: 'tool', toolCallId: 'tc', toolName: 'tool', content: '"ok"' },
-      ] as ChatMessage[],
-    }));
+    const toolNode: GraphNodeFn = vi.fn(async () => toolResult('tc', 'tool', '"ok"'));
 
     const graph = buildHarnessGraph({
       executeTool: vi.fn(),
@@ -307,31 +321,13 @@ describe('ReAct loop', () => {
     const llmNode: GraphNodeFn = vi.fn(async () => {
       llmCallCount++;
       if (llmCallCount === 1) {
-        return {
-          llmOutput: {
-            kind: 'tool_calls',
-            calls: [{ id: 'edit-1', name: 'coding_apply_patch', args: { operations: [] } }],
-          } as LlmOutput,
-          messages: [
-            {
-              role: 'assistant',
-              content: '',
-              toolCalls: [{ id: 'edit-1', name: 'coding_apply_patch', args: { operations: [] } }],
-            },
-          ] as ChatMessage[],
-        };
+        return assistantToolCall('edit-1', 'coding_apply_patch', { operations: [] });
       }
-      return {
-        llmOutput: { kind: 'text', content: 'Done' } as LlmOutput,
-        messages: [{ role: 'assistant', content: 'Done' }] as ChatMessage[],
-      };
+      return assistantText('Done');
     });
-    const toolNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: null,
-      messages: [
-        { role: 'tool', toolCallId: 'edit-1', toolName: 'coding_apply_patch', content: '{}' },
-      ] as ChatMessage[],
-    }));
+    const toolNode: GraphNodeFn = vi.fn(async () =>
+      toolResult('edit-1', 'coding_apply_patch', '{}'),
+    );
 
     const graph = buildHarnessGraph({
       executeTool: vi.fn(),
@@ -359,59 +355,28 @@ describe('ReAct loop', () => {
     const llmNode: GraphNodeFn = vi.fn(async (state) => {
       llmCallCount++;
       if (llmCallCount === 1) {
-        return {
-          llmOutput: { kind: 'text', content: 'Done' } as LlmOutput,
-          messages: [{ role: 'assistant', content: 'Done' }] as ChatMessage[],
-        };
+        return assistantText('Done');
       }
       expect(state.messages.some((message) => message.content.includes('<sensor-feedback'))).toBe(
         true,
       );
-      return {
-        llmOutput: { kind: 'text', content: 'Fixed' } as LlmOutput,
-        messages: [{ role: 'assistant', content: 'Fixed' }] as ChatMessage[],
-      };
+      return assistantText('Fixed');
     });
     const sensorRunner: SensorRunner = vi
       .fn()
-      .mockResolvedValueOnce({
-        results: [
-          {
-            sensorId: 'quality_gate:typecheck',
-            status: 'failed',
-            summary: 'typecheck failed',
-            findings: [
-              {
-                source: 'local_command',
-                severity: 'high',
-                status: 'open',
-                category: 'quality_gate',
-                message: 'TS2322 Type mismatch',
-                evidence: [],
-                metadata: {},
-              },
-            ],
-            repairInstructions: [{ summary: 'Fix TypeScript typecheck failures.', actions: [] }],
-            evidence: [],
-            terminalEvidence: [],
-            runtimeLimitations: [],
-            metadata: {},
-          },
-        ],
-        records: [
-          {
-            id: 'quality_gate:typecheck:before_push',
-            sensorId: 'quality_gate:typecheck',
-            trigger: 'before_push',
-            selectedForProfile: 'coding',
-            selectionState: 'required',
-            status: 'completed',
-            startedAtMs: 0,
-            completedAtMs: 1,
-            metadata: {},
-          },
-        ],
-      })
+      .mockResolvedValueOnce(
+        failedSensorRun({
+          sensorId: 'quality_gate:typecheck',
+          trigger: 'before_push',
+          selectionState: 'required',
+          summary: 'typecheck failed',
+          source: 'local_command',
+          severity: 'high',
+          category: 'quality_gate',
+          message: 'TS2322 Type mismatch',
+          repairSummary: 'Fix TypeScript typecheck failures.',
+        }),
+      )
       .mockImplementation(passingSensorRunner([]));
 
     const graph = buildHarnessGraph({
@@ -435,53 +400,21 @@ describe('ReAct loop', () => {
       expect(state.messages.some((message) => message.content.includes('<sensor-feedback'))).toBe(
         true,
       );
-      return {
-        llmOutput: { kind: 'text', content: 'I will fix the review comment.' } as LlmOutput,
-        messages: [
-          { role: 'assistant', content: 'I will fix the review comment.' },
-        ] as ChatMessage[],
-      };
+      return assistantText('I will fix the review comment.');
     });
     const sensorRunner: SensorRunner = async (input) => {
       sensorCalls.push(input as unknown as Record<string, unknown>);
-      return {
-        results: [
-          {
-            sensorId: 'collector:github-review',
-            status: 'failed',
-            summary: 'Imported 1 finding from github-review.',
-            findings: [
-              {
-                source: 'github_pr_review',
-                severity: 'medium',
-                status: 'open',
-                category: 'code_quality',
-                message: 'Handle the review comment.',
-                evidence: [],
-                metadata: {},
-              },
-            ],
-            repairInstructions: [{ summary: 'Address 1 imported sensor finding.', actions: [] }],
-            evidence: [],
-            terminalEvidence: [],
-            runtimeLimitations: [],
-            metadata: {},
-          },
-        ],
-        records: [
-          {
-            id: 'collector:github-review:external_feedback',
-            sensorId: 'collector:github-review',
-            trigger: 'external_feedback',
-            selectedForProfile: 'coding',
-            selectionState: 'optional',
-            status: 'completed',
-            startedAtMs: 0,
-            completedAtMs: 1,
-            metadata: {},
-          },
-        ],
-      };
+      return failedSensorRun({
+        sensorId: 'collector:github-review',
+        trigger: 'external_feedback',
+        selectionState: 'optional',
+        summary: 'Imported 1 finding from github-review.',
+        source: 'github_pr_review',
+        severity: 'medium',
+        category: 'code_quality',
+        message: 'Handle the review comment.',
+        repairSummary: 'Address 1 imported sensor finding.',
+      });
     };
 
     const graph = buildHarnessGraph({
@@ -551,10 +484,7 @@ describe('ReAct loop', () => {
 
   it('ends with DOD_FAILED when the DoD check still fails at the iteration cap', async () => {
     const { emitter, events } = captureEmitter();
-    const llmNode: GraphNodeFn = vi.fn(async () => ({
-      llmOutput: { kind: 'text', content: 'draft' } as LlmOutput,
-      messages: [{ role: 'assistant', content: 'draft' }] as ChatMessage[],
-    }));
+    const llmNode: GraphNodeFn = vi.fn(async () => assistantText('draft'));
     const toolNode: GraphNodeFn = vi.fn(async () => ({}));
 
     const graph = buildHarnessGraph({
