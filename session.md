@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Added follow-up Beads task `agent-platform-session-handoff-hygiene` with a spec for capping/rotating `session.md`; linked it as a dependency of `agent-platform-context-optimisation`.
+- **Date:** 2026-05-03
 - **Session:** Planned the feedback sensors harness epic from the Böckeler/Thoughtworks harness-engineering discussion. Created Beads epic `agent-platform-feedback-sensors`, six chained child tasks, linked spec files under `docs/tasks/`, and committed the planning docs on `feature/feedback-sensors-harness`.
 - **Date:** 2026-05-02
 - **Session:** Memory epic closeout complete. The epic was manually tested, merged to `main`, local `main` was updated, old task/feature branches were pruned, and `agent-platform-memory` plus child tasks `.1` through `.7` are closed in Beads. Pause here; next session should start planning/refinement for the next epic from updated `main`.
@@ -218,6 +220,8 @@ Branch state: `feature/feedback-sensors-harness` contains planning/spec document
 - Updated `docs/tasks/README.md` epic index.
 - Created branch `feature/feedback-sensors-harness` from `origin/main` to keep the planning docs out of the prior scheduler task branch.
 - Committed planning docs as `1d1e690 docs: plan feedback sensors harness`.
+- Added follow-up task `agent-platform-session-handoff-hygiene` with spec `docs/tasks/agent-platform-session-handoff-hygiene.md`.
+- Linked `agent-platform-context-optimisation` to depend on `agent-platform-session-handoff-hygiene` so handoff-file hygiene is handled before broader context-window optimisation.
 
 Quality gates passed:
 
@@ -475,6 +479,7 @@ Quality gates passed:
 - `agent-platform-feedback-sensors.1` through `.6` are open P2 child tasks.
 - Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
 - Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md`.
+- `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
 - Per stored memory, schedule or explicitly run owner refinement before moving this epic from planning/refinement to implementation-ready.
 
 ### Quality
@@ -488,8 +493,9 @@ Quality gates passed:
 ## Next (priority order)
 
 1. Ask the owner to run `bd dolt push` if Beads remote sync is still blocked by GitHub auth/DNS.
-2. Run a refinement session with the owner for `agent-platform-feedback-sensors` before claiming `.1`.
-3. After refinement, start `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`.
+2. Decide whether to implement `agent-platform-session-handoff-hygiene` before starting the feedback-sensors epic.
+3. Run a refinement session with the owner for `agent-platform-feedback-sensors` before claiming `.1`.
+4. After refinement, start `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`.
 
 ---
 
