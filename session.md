@@ -7,6 +7,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-03
+- **Session:** Implemented `agent-platform-scheduler.5` on `task/agent-platform-scheduler.5`: added structured scheduler notification events persisted as run logs, a notification hook for future channels, safe `memory.cleanup_expired.dry_run` maintenance target, API-to-runner integration coverage, safety regression coverage for unsupported `agent_turn` jobs, and scheduler/API documentation with manual verification steps.
+- **Date:** 2026-05-03
+- **Session:** Closed `agent-platform-scheduler.5`; Beads auto-closed the parent `agent-platform-scheduler` epic and Dolt sync succeeded. Scheduler epic is ready for PR/pipeline/manual UI verification from `task/agent-platform-scheduler.5`.
 - **Date:** 2026-05-02
 - **Session:** Implemented `agent-platform-scheduler.4` on `task/agent-platform-scheduler.4`: added scheduler REST management routes, Settings Scheduler navigation/page, job creation plus pause/resume/run-now controls, run/log inspection, cancellation handling, scheduler display helpers, and focused API/web tests. Verified API/web lint and typecheck, focused scheduler tests, API/web test suites, and the web production build.
 - **Date:** 2026-05-02

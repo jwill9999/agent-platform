@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import {
   closeDatabase,
+  createMemory,
   createScheduledJob,
   createScheduledJobRun,
   getScheduledJob,
@@ -35,6 +36,19 @@ function dueJob(overrides: Partial<ScheduledJobCreateBody> = {}): ScheduledJobCr
     nextRunAtMs: 1_000,
     status: 'enabled',
     timeoutMs: 1_000,
+    ...overrides,
+  };
+}
+
+type MemoryInput = Parameters<typeof createMemory>[1];
+
+function memoryInput(overrides: Partial<MemoryInput> = {}): MemoryInput {
+  return {
+    scope: 'global',
+    kind: 'fact',
+    content: 'Temporary memory.',
+    source: { kind: 'manual' },
+    expiresAtMs: 900,
     ...overrides,
   };
 }
@@ -77,7 +91,62 @@ describe('scheduler service', () => {
       'Scheduled job run started.',
       'Built-in scheduler no-op task completed.',
       'Scheduled job run succeeded.',
+      'Notification: Scheduled job completed successfully.',
     ]);
+  });
+
+  it('emits notification events for successful runs', async () => {
+    createScheduledJob(opened.db, dueJob(), { id: 'job-1', nowMs: 500 });
+    const notifications: unknown[] = [];
+    const service = createSchedulerService(opened.db, {
+      workerId: 'worker-1',
+      nowMs: () => nowMs,
+      onNotification: (event) => {
+        notifications.push(event);
+      },
+    });
+
+    await service.runOnce();
+
+    expect(notifications).toEqual([
+      expect.objectContaining({
+        kind: 'scheduler.job_succeeded',
+        level: 'info',
+        jobId: 'job-1',
+        runStatus: 'succeeded',
+        message: 'Scheduled job completed successfully.',
+      }),
+    ]);
+  });
+
+  it('runs expired-memory cleanup as a safe dry-run maintenance task', async () => {
+    createMemory(opened.db, memoryInput(), { id: 'expired-memory', nowMs: 500 });
+    createScheduledJob(
+      opened.db,
+      dueJob({
+        targetPayload: { task: 'memory.cleanup_expired.dry_run', beforeMs: 1_000 },
+      }),
+      { id: 'job-1', nowMs: 500 },
+    );
+    const service = createSchedulerService(opened.db, {
+      workerId: 'worker-1',
+      nowMs: () => nowMs,
+    });
+
+    await service.runOnce();
+
+    const [run] = listScheduledJobRuns(opened.db, { jobId: 'job-1' });
+    expect(run).toMatchObject({
+      status: 'succeeded',
+      resultSummary: 'Expired memory cleanup dry-run matched 1 records.',
+    });
+    const logs = listScheduledJobRunLogs(opened.db, run!.id);
+    expect(logs.map((log) => log.message)).toContain('Expired memory cleanup dry-run completed.');
+    expect(
+      logs.find((log) => log.message === 'Expired memory cleanup dry-run completed.'),
+    ).toMatchObject({
+      data: expect.objectContaining({ dryRun: true, matched: 1, deleted: 0 }),
+    });
   });
 
   it('does not run due jobs while another worker holds a valid lease', async () => {
@@ -244,6 +313,86 @@ describe('scheduler service', () => {
     ]);
   });
 
+  it('emits retry-exhausted notifications when expired leases cannot retry', async () => {
+    createScheduledJob(opened.db, dueJob({ retryPolicy: { maxAttempts: 1, backoffMs: 250 } }), {
+      id: 'job-1',
+      nowMs: 500,
+    });
+    const run = createScheduledJobRun(
+      opened.db,
+      {
+        jobId: 'job-1',
+        status: 'queued',
+        attempt: 1,
+        leaseOwner: 'dead-worker',
+        leaseExpiresAtMs: 900,
+        metadata: {},
+      },
+      { id: 'run-1', nowMs: 700 },
+    );
+    transitionScheduledJobRun(opened.db, run.id, 'running', {
+      nowMs: 800,
+      leaseOwner: 'dead-worker',
+      leaseExpiresAtMs: 900,
+    });
+    const notifications: unknown[] = [];
+    const service = createSchedulerService(opened.db, {
+      workerId: 'worker-1',
+      nowMs: () => nowMs,
+      onNotification: (event) => {
+        notifications.push(event);
+      },
+    });
+
+    await service.runOnce();
+
+    expect(notifications).toEqual([
+      expect.objectContaining({
+        kind: 'scheduler.job_retry_exhausted',
+        level: 'error',
+        jobId: 'job-1',
+        runId: 'run-1',
+        runStatus: 'failed',
+      }),
+    ]);
+    expect(listScheduledJobRunLogs(opened.db, 'run-1').map((log) => log.message)).toContain(
+      'Notification: Scheduled job retries exhausted after lease recovery.',
+    );
+  });
+
+  it('keeps unsupported agent-turn work blocked instead of bypassing policy', async () => {
+    createScheduledJob(
+      opened.db,
+      dueJob({
+        targetKind: 'agent_turn',
+        targetPayload: { prompt: 'Run a high-risk shell command.' },
+        retryPolicy: { maxAttempts: 1, backoffMs: 0 },
+      }),
+      { id: 'job-1', nowMs: 500 },
+    );
+    const notifications: unknown[] = [];
+    const service = createSchedulerService(opened.db, {
+      workerId: 'worker-1',
+      nowMs: () => nowMs,
+      onNotification: (event) => {
+        notifications.push(event);
+      },
+    });
+
+    await service.runOnce();
+
+    const [run] = listScheduledJobRuns(opened.db, { jobId: 'job-1' });
+    expect(run).toMatchObject({
+      status: 'failed',
+      errorCode: 'SCHEDULER_RUN_FAILED',
+      errorMessage: 'Unsupported scheduled job target kind: agent_turn',
+    });
+    expect(notifications).toEqual([
+      expect.objectContaining({ kind: 'scheduler.job_failed', runStatus: 'failed' }),
+      expect.objectContaining({ kind: 'scheduler.job_retry_exhausted', runStatus: 'failed' }),
+    ]);
+  });
+
   it('redacts and truncates target output logs and failure details', async () => {
     const secret = 'sk-proj-123456789012345678901234567890';
     createScheduledJob(opened.db, dueJob({ retryPolicy: { maxAttempts: 1, backoffMs: 0 } }), {
@@ -281,7 +430,9 @@ describe('scheduler service', () => {
       'Scheduled job run started.',
       output!.message,
       'Scheduled job run failed.',
+      'Notification: Scheduled job run failed.',
       'Scheduled job retries exhausted.',
+      'Notification: Scheduled job retries exhausted.',
     ]);
   });
 });

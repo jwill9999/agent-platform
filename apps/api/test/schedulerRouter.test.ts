@@ -15,6 +15,7 @@ import {
   transitionScheduledJobRun,
 } from '@agent-platform/db';
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
+import { createSchedulerService } from '../src/application/scheduler/schedulerService.js';
 import { createSchedulerRouter } from '../src/infrastructure/http/v1/schedulerRouter.js';
 
 function buildTestApp(db: ReturnType<typeof openDatabase>['db']) {
@@ -108,6 +109,33 @@ describe('schedulerRouter', () => {
       .send({})
       .expect(200);
     expect(cancelled.body.data.cancelRequestedAtMs).toEqual(expect.any(Number));
+  });
+
+  it('creates, executes, and inspects a scheduled job through API plus runner integration', async () => {
+    const created = await request(app)
+      .post('/v1/scheduler')
+      .send(jobBody({ status: 'enabled', runAtMs: 1_000, nextRunAtMs: 1_000 }))
+      .expect(201);
+    const jobId = created.body.data.id as string;
+    const service = createSchedulerService(opened.db, {
+      workerId: 'worker-1',
+      nowMs: () => 1_000,
+    });
+
+    await service.runOnce();
+
+    const runs = await request(app).get(`/v1/scheduler/${jobId}/runs`).expect(200);
+    expect(runs.body.data.items).toHaveLength(1);
+    const run = runs.body.data.items[0] as { id: string; status: string; resultSummary?: string };
+    expect(run).toMatchObject({
+      status: 'succeeded',
+      resultSummary: 'Built-in scheduler no-op task completed.',
+    });
+
+    const logs = await request(app).get(`/v1/scheduler/runs/${run.id}/logs`).expect(200);
+    expect(logs.body.data.items.map((log: { message: string }) => log.message)).toContain(
+      'Notification: Scheduled job completed successfully.',
+    );
   });
 
   it('returns validation and not-found errors clearly', async () => {

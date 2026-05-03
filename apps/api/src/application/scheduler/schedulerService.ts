@@ -1,6 +1,7 @@
 import {
   appendScheduledJobRunLog,
   claimDueScheduledJobs,
+  cleanupExpiredMemories,
   createScheduledJobRun,
   getScheduledJob,
   getScheduledJobRun,
@@ -24,11 +25,34 @@ export type ScheduledJobTargetResult = {
   summary?: string;
 };
 
+export type ScheduledJobNotificationKind =
+  | 'scheduler.job_succeeded'
+  | 'scheduler.job_failed'
+  | 'scheduler.job_cancelled'
+  | 'scheduler.job_retry_exhausted';
+
+export type ScheduledJobNotificationEvent = {
+  kind: ScheduledJobNotificationKind;
+  level: 'info' | 'warn' | 'error';
+  jobId: string;
+  jobName: string;
+  runId: string;
+  runStatus: ScheduledJobRunRecord['status'];
+  attempt: number;
+  maxAttempts: number;
+  message: string;
+  atMs: number;
+  summary?: string;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
 export type ScheduledJobTargetContext = {
   db: DrizzleDb;
   job: ScheduledJobRecord;
   run: ScheduledJobRunRecord;
   signal: AbortSignal;
+  nowMs: () => number;
   log: (
     level: 'debug' | 'info' | 'warn' | 'error',
     message: string,
@@ -53,6 +77,7 @@ export type SchedulerServiceOptions = {
   setTimeoutFn?: typeof setTimeout;
   clearTimeoutFn?: typeof clearTimeout;
   targetExecutor?: ScheduledJobTargetExecutor;
+  onNotification?: (event: ScheduledJobNotificationEvent) => void | Promise<void>;
 };
 
 export type SchedulerService = {
@@ -69,6 +94,22 @@ function intervalFromEnv(name: string, fallback: number): number {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function stringPayload(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function numberPayload(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : undefined;
+}
+
+function memoryCleanupScope(
+  value: unknown,
+): 'global' | 'project' | 'agent' | 'session' | undefined {
+  return value === 'global' || value === 'project' || value === 'agent' || value === 'session'
+    ? value
+    : undefined;
 }
 
 function shouldRetry(job: ScheduledJobRecord, run: ScheduledJobRunRecord): boolean {
@@ -110,8 +151,10 @@ async function runWithAbortSignal<T>(signal: AbortSignal, task: Promise<T>): Pro
 }
 
 async function defaultTargetExecutor({
+  db,
   job,
   log: appendLog,
+  nowMs,
 }: ScheduledJobTargetContext): Promise<ScheduledJobTargetResult> {
   if (job.targetKind !== 'built_in_task') {
     throw new Error(`Unsupported scheduled job target kind: ${job.targetKind}`);
@@ -119,12 +162,42 @@ async function defaultTargetExecutor({
 
   const task =
     typeof job.targetPayload['task'] === 'string' ? job.targetPayload['task'] : 'scheduler.noop';
-  if (task !== 'scheduler.noop' && task !== 'noop') {
-    throw new Error(`Unsupported built-in scheduled task: ${task}`);
+  if (task === 'scheduler.noop' || task === 'noop') {
+    appendLog('info', 'Built-in scheduler no-op task completed.', { task });
+    return { summary: 'Built-in scheduler no-op task completed.' };
   }
 
-  appendLog('info', 'Built-in scheduler no-op task completed.', { task });
-  return { summary: 'Built-in scheduler no-op task completed.' };
+  if (task === 'memory.cleanup_expired.dry_run') {
+    const scope = memoryCleanupScope(job.targetPayload['scope']);
+    const scopeId = stringPayload(job.targetPayload['scopeId']);
+    const result = cleanupExpiredMemories(
+      db,
+      {
+        scope,
+        scopeId,
+        beforeMs: numberPayload(job.targetPayload['beforeMs']),
+        dryRun: true,
+      },
+      { nowMs: nowMs() },
+    );
+    const data: Record<string, unknown> = {
+      task,
+      scope: scope ?? 'all',
+      beforeMs: result.beforeMs,
+      matched: result.matched,
+      deleted: result.deleted,
+      dryRun: result.dryRun,
+    };
+    if (scopeId) data.scopeId = scopeId;
+    appendLog('info', 'Expired memory cleanup dry-run completed.', {
+      ...data,
+    });
+    return {
+      summary: `Expired memory cleanup dry-run matched ${result.matched} records.`,
+    };
+  }
+
+  throw new Error(`Unsupported built-in scheduled task: ${task}`);
 }
 
 function createAbortController(
@@ -156,6 +229,7 @@ export function createSchedulerService(
   const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
   const clearTimeoutFn = options.clearTimeoutFn ?? clearTimeout;
   const targetExecutor = options.targetExecutor ?? defaultTargetExecutor;
+  const onNotification = options.onNotification;
   let intervalId: ReturnType<typeof setInterval> | undefined;
   let running = false;
 
@@ -171,6 +245,53 @@ export function createSchedulerService(
       { runId, level, message, data, truncated: logOptions.truncated ?? false },
       { nowMs: nowMs() },
     );
+  }
+
+  async function emitNotification(event: ScheduledJobNotificationEvent): Promise<void> {
+    appendRunLog(event.runId, event.level, `Notification: ${event.message}`, {
+      notification: event,
+    });
+    if (!onNotification) return;
+    try {
+      await onNotification(event);
+    } catch (error) {
+      const message = errorMessage(error);
+      log.warn('scheduler.notification_failed', {
+        jobId: event.jobId,
+        runId: event.runId,
+        kind: event.kind,
+        error: message,
+      });
+      appendRunLog(event.runId, 'warn', 'Scheduler notification hook failed.', {
+        notificationKind: event.kind,
+        error: message,
+      });
+    }
+  }
+
+  async function notifyRun(
+    kind: ScheduledJobNotificationKind,
+    level: ScheduledJobNotificationEvent['level'],
+    job: ScheduledJobRecord,
+    run: ScheduledJobRunRecord,
+    message: string,
+  ): Promise<void> {
+    const event: ScheduledJobNotificationEvent = {
+      kind,
+      level,
+      jobId: job.id,
+      jobName: job.name,
+      runId: run.id,
+      runStatus: run.status,
+      attempt: run.attempt,
+      maxAttempts: job.retryPolicy.maxAttempts,
+      message,
+      atMs: nowMs(),
+    };
+    if (run.resultSummary) event.summary = run.resultSummary;
+    if (run.errorCode) event.errorCode = run.errorCode;
+    if (run.errorMessage) event.errorMessage = run.errorMessage;
+    await emitNotification(event);
   }
 
   async function recoverExpiredRuns(): Promise<void> {
@@ -204,6 +325,15 @@ export function createSchedulerService(
         retry ? 'Scheduled job retry scheduled.' : 'Scheduled job retries exhausted.',
         { nextRunAtMs, attempt: failed.attempt, maxAttempts: job.retryPolicy.maxAttempts },
       );
+      if (!retry) {
+        await notifyRun(
+          'scheduler.job_retry_exhausted',
+          'error',
+          job,
+          failed,
+          'Scheduled job retries exhausted after lease recovery.',
+        );
+      }
     }
   }
 
@@ -257,7 +387,7 @@ export function createSchedulerService(
       const result = await runWithAbortSignal(
         controller.signal,
         Promise.resolve(
-          targetExecutor({ db, job, run, signal: controller.signal, log: appendLog }),
+          targetExecutor({ db, job, run, signal: controller.signal, nowMs, log: appendLog }),
         ),
       );
       clearTimeoutFn(timeoutId);
@@ -270,6 +400,13 @@ export function createSchedulerService(
         runId: run.id,
         resultSummary: run.resultSummary,
       });
+      await notifyRun(
+        'scheduler.job_succeeded',
+        'info',
+        job,
+        run,
+        'Scheduled job completed successfully.',
+      );
       const nextRunAtMs = nextRunAfterSuccess(job, nowMs());
       updateScheduledJobScheduleState(db, job.id, {
         status: nextRunAtMs === null ? 'archived' : 'enabled',
@@ -282,12 +419,19 @@ export function createSchedulerService(
       clearIntervalFn(cancelIntervalId);
       const latest = getScheduledJobRun(db, run.id);
       if (latest.cancelRequestedAtMs) {
-        transitionScheduledJobRun(db, run.id, 'cancelled', {
+        const cancelled = transitionScheduledJobRun(db, run.id, 'cancelled', {
           nowMs: nowMs(),
           errorCode: 'SCHEDULER_RUN_CANCELLED',
           errorMessage: 'Scheduled job run was cancelled.',
         });
         appendLog('warn', 'Scheduled job run cancelled.', { runId: run.id });
+        await notifyRun(
+          'scheduler.job_cancelled',
+          'warn',
+          job,
+          cancelled,
+          'Scheduled job run was cancelled.',
+        );
         updateScheduledJobScheduleState(db, job.id, {
           status: 'paused',
           nextRunAtMs: null,
@@ -307,6 +451,7 @@ export function createSchedulerService(
         runId: run.id,
         error: errorMessage(error),
       });
+      await notifyRun('scheduler.job_failed', 'error', job, run, 'Scheduled job run failed.');
       if (shouldRetry(job, run)) {
         const nextRunAtMs = nextRunAfterFailure(job, nowMs());
         updateScheduledJobScheduleState(db, job.id, {
@@ -333,6 +478,13 @@ export function createSchedulerService(
           attempt: run.attempt,
           maxAttempts: job.retryPolicy.maxAttempts,
         });
+        await notifyRun(
+          'scheduler.job_retry_exhausted',
+          'error',
+          job,
+          run,
+          'Scheduled job retries exhausted.',
+        );
       }
     }
   }
