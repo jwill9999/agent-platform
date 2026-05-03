@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Implemented `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`: added shared sensor contracts, public exports, trace lifecycle event types, and contract/trace tests.
+- **Date:** 2026-05-03
 - **Session:** Created Beads epic `agent-platform-ui-quality-sensors` and spec for future UI/UX grading sensors that use browser evidence, deterministic UI checks, and rubric-based design review.
 - **Date:** 2026-05-03
 - **Session:** Added agent-scope/profile policy to feedback-sensors specs so coding sensors apply to coding agents by default, while personal-assistant/research/automation agents only use relevant sensors or explicit/manual selections.
@@ -213,8 +215,14 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ### Feedback sensors harness refined
 
-Branch state: `feature/feedback-sensors-harness` contains planning/spec documentation only.
+Branch state: `task/agent-platform-feedback-sensors.1` contains the first implementation task.
 
+- Implemented `agent-platform-feedback-sensors.1`.
+- Added `packages/contracts/src/sensor.ts` with Zod schemas and TypeScript types for sensor definitions, trigger/cadence policy, agent profile policy, findings, evidence, repair instructions, provider availability, runtime metadata, runtime limitations, terminal evidence, results, and run records.
+- Exported all sensor schemas/types from `packages/contracts/src/index.ts`.
+- Extended `packages/harness/src/trace.ts` with `sensor_run`, `sensor_result`, and `sensor_loop_limit` trace events.
+- Added contract coverage in `packages/contracts/test/sensor.test.ts` and trace typing coverage in `packages/harness/test/sensorTrace.test.ts`.
+- No runtime sensor behavior was added in this task.
 - Refined `agent-platform-feedback-sensors` and child specs `.1` through `.6` after owner discussion.
 - Added source-aware finding ingestion to the epic scope: local commands, IDE/problems, SonarQube local/remote, CodeQL local/remote, GitHub checks, PR reviews/annotations, agent code comments, and user feedback.
 - Clarified execution cadence: cheap targeted checks during work, required local validation before commit/push, remote feedback import after push or on request, plus manual/scheduled hooks for orchestration.
@@ -489,16 +497,17 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `feature/feedback-sensors-harness`
-- **Current base:** `origin/main`
-- **Latest commit:** `248a23b Add agent-scoped sensor profiles` plus pending UI quality sensors epic/spec if not yet committed.
-- **Current work:** Planning/refinement only. Implementation has not started and no feedback-sensors child task is claimed.
+- **Current branch:** `task/agent-platform-feedback-sensors.1`
+- **Current base:** `feature/feedback-sensors-harness`
+- **Latest commit:** `a0178df Track UI quality sensor epic` plus pending `agent-platform-feedback-sensors.1` implementation if not yet committed.
+- **Current work:** First feedback-sensors child task implemented locally; commit/push pending if this note is seen before closeout.
 - **Remote sync:** Git upstream currently reports `origin/feature/feedback-sensors-harness` as gone/unavailable in this sandbox. Beads local records exist, but Dolt auto-push failed because GitHub SSH/DNS was unavailable.
 
 ### Beads
 
 - `agent-platform-feedback-sensors` is in progress as a P2 epic.
-- `agent-platform-feedback-sensors.1` through `.6` are open P2 child tasks.
+- `agent-platform-feedback-sensors.1` is implemented and ready to close after commit/push.
+- `agent-platform-feedback-sensors.2` through `.6` are open P2 child tasks.
 - Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
 - Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, agent-scope/profile policy, normalized findings, IDE/problem and IDE/plugin terminal feedback, SonarQube/CodeQL/GitHub feedback, Docker/container/sandbox limitations, provider auth states, pre-push validation, and post-push feedback import.
 - `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
@@ -509,17 +518,27 @@ Quality gates passed:
 
 - `pnpm docs:lint` passed for the planning/documentation change.
 - `git diff --check` passed.
-- No runtime code changed.
+- Sensor contract implementation gates passed:
+  - `pnpm --filter @agent-platform/contracts exec vitest run test/sensor.test.ts`
+  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorTrace.test.ts`
+  - `pnpm --filter @agent-platform/contracts run test`
+  - `pnpm --filter @agent-platform/harness run test`
+  - `pnpm --filter @agent-platform/contracts run typecheck`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm format:check`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm test` with escalation for API Supertest local listener binding
+- SonarQube CLI was attempted for touched files but could not be used as the completion gate: sandboxed runs could not access keychain/state, escalated scan of `sensor.ts` was rejected by policy risk review, and other touched-file scans reported no project configured. Fallback gate passed.
 - SonarQube CLI was installed but not authenticated; issue listing remains blocked until the owner completes `sonar auth login -o jwill9999`.
 
 ---
 
 ## Next (priority order)
 
-1. Push `feature/feedback-sensors-harness` and run `bd dolt push` once GitHub network/auth is available.
-2. Decide whether to implement `agent-platform-session-handoff-hygiene` before starting the feedback-sensors epic.
-3. Claim `agent-platform-feedback-sensors.1` and create `task/agent-platform-feedback-sensors.1` from `feature/feedback-sensors-harness`.
-4. Implement `.1` contracts first; do not add runtime behavior until the contract/finding/provider availability model is in place.
+1. Close and push `agent-platform-feedback-sensors.1` if this session is resumed before closeout completes.
+2. Start `agent-platform-feedback-sensors.2` from `task/agent-platform-feedback-sensors.1` after `.1` is pushed.
+3. Keep `.2` limited to deterministic runner/finding collection; runtime graph behavior belongs in `.3`.
 
 ---
 

@@ -74,24 +74,24 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
 
 ## Definition of done
 
-- [ ] Sensor schemas and types are exported from contracts.
-- [ ] Agent scope/profile metadata can represent profile-specific required/optional/manual/disabled sensor selection.
-- [ ] Normalized finding and provider availability schemas are exported.
-- [ ] Runtime environment and limitation schemas are exported.
-- [ ] IDE/plugin terminal evidence schemas are bounded and redactable.
-- [ ] Trace event types can represent sensor lifecycle outcomes.
-- [ ] Tests cover successful and invalid contract shapes.
-- [ ] No harness behavior changes are introduced yet except trace typing support.
-- [ ] Beads acceptance criteria are satisfied.
-- [ ] `bd close agent-platform-feedback-sensors.1 --reason "Sensor contracts and policy model defined"`
+- [x] Sensor schemas and types are exported from contracts.
+- [x] Agent scope/profile metadata can represent profile-specific required/optional/manual/disabled sensor selection.
+- [x] Normalized finding and provider availability schemas are exported.
+- [x] Runtime environment and limitation schemas are exported.
+- [x] IDE/plugin terminal evidence schemas are bounded and redactable.
+- [x] Trace event types can represent sensor lifecycle outcomes.
+- [x] Tests cover successful and invalid contract shapes.
+- [x] No harness behavior changes are introduced yet except trace typing support.
+- [x] Beads acceptance criteria are satisfied.
+- [x] `bd close agent-platform-feedback-sensors.1 --reason "Sensor contracts and policy model defined"`
 
 ## Sign-off
 
-- [ ] Task branch created from `feature/feedback-sensors-harness`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: N/A - merge at segment end
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] Task branch created from `feature/feedback-sensors-harness`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] If segment tip: N/A - merge at segment end
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-03

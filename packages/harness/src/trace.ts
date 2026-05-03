@@ -1,4 +1,9 @@
-import type { RiskTier } from '@agent-platform/contracts';
+import type {
+  RiskTier,
+  SensorAgentProfile,
+  SensorResultStatus,
+  SensorTrigger,
+} from '@agent-platform/contracts';
 
 /** Observability events emitted by the harness graph (append-only in state). */
 export type TraceEvent =
@@ -68,5 +73,25 @@ export type TraceEvent =
       passed: boolean;
       criteriaCount: number;
       failedCriteria: string[];
+    }
+  | {
+      type: 'sensor_run';
+      sensorId: string;
+      trigger: SensorTrigger;
+      profile?: SensorAgentProfile;
+      required: boolean;
+    }
+  | {
+      type: 'sensor_result';
+      sensorId: string;
+      status: SensorResultStatus;
+      findingCount: number;
+      repairInstructionCount: number;
+    }
+  | {
+      type: 'sensor_loop_limit';
+      sensorId: string;
+      repeats: number;
+      reason: string;
     }
   | { type: 'graph_end' };
