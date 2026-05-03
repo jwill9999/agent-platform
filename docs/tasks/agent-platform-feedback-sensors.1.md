@@ -14,11 +14,12 @@ Required outcomes:
 
 - Add contract types for sensor definitions, trigger policies, sensor run records, sensor results, repair instructions, and evidence links.
 - Support at least two execution types: `computational` and `inferential`.
-- Support feedback sources such as local commands, IDE problems, SonarQube local/remote, CodeQL local/remote, GitHub checks, PR reviews, PR annotations, agent code comments, and user feedback.
+- Support feedback sources such as local commands, IDE problems, IDE/plugin terminal output, IDE plugin findings, SonarQube local/remote, CodeQL local/remote, GitHub checks, PR reviews, PR annotations, agent code comments, and user feedback.
 - Support trigger/cadence types for `on_meaningful_change`, `before_commit`, `before_push`, `after_push`, `before_completion`, `external_feedback`, `scheduled`, and `manual`.
 - Represent provider capability and availability states including `available`, `unavailable`, `auth_required`, `not_configured`, and `permission_denied`.
 - Represent sensor result states including `passed`, `failed`, `skipped`, `unavailable`, and `error`.
 - Add normalized finding contracts with source, severity, status, file/line, rule ID, message, evidence, and dedupe keys.
+- Add bounded terminal evidence contracts with source command/task name, producer, timestamp, redaction state, output caps, and optional problem extraction metadata.
 - Add repair actions suitable for UI/agent flows, including `fix_code`, `run_command`, `connect_provider`, `authenticate_cli`, `retry`, `open_external`, `ask_user`, and `defer_with_reason`.
 - Extend trace/event contracts with sensor run lifecycle events.
 - Keep contracts generic enough for quality gates, SonarQube, browser checks, critic/DoD, observability drift checks, and future custom linters.
@@ -57,8 +58,9 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
 - Add tests for:
   - valid computational and inferential sensor definitions
   - failed sensor result with repair instruction and evidence artifact
-  - imported finding from SonarQube, CodeQL, GitHub annotation, IDE problem, or agent code comment
+  - imported finding from SonarQube, CodeQL, GitHub annotation, IDE problem, IDE/plugin terminal output, or agent code comment
   - provider unavailable/auth-required result with repair action
+  - bounded/redacted terminal evidence payload
   - trigger policy serialization
   - invalid definitions rejected by Zod
 
@@ -66,6 +68,7 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
 
 - [ ] Sensor schemas and types are exported from contracts.
 - [ ] Normalized finding and provider availability schemas are exported.
+- [ ] IDE/plugin terminal evidence schemas are bounded and redactable.
 - [ ] Trace event types can represent sensor lifecycle outcomes.
 - [ ] Tests cover successful and invalid contract shapes.
 - [ ] No harness behavior changes are introduced yet except trace typing support.

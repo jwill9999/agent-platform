@@ -13,10 +13,10 @@ Persist and expose sensor outcomes and normalized findings so repeated failures 
 Required outcomes:
 
 - Record sensor runs/results in the observability store with redaction and truncation.
-- Record normalized findings from local commands, IDE problems, SonarQube, CodeQL, GitHub checks, PR annotations, agent code comments, and user feedback.
+- Record normalized findings from local commands, IDE problems, IDE/plugin terminal output, SonarQube, CodeQL, GitHub checks, PR annotations, agent code comments, and user feedback.
 - Expose sensor outcomes through existing observability tools where appropriate.
 - Detect repeated failure patterns by sensor ID, rule, file area, or repair category.
-- Deduplicate the same issue when it appears across local diagnostics, IDE problems, CI annotations, and remote code scanning.
+- Deduplicate the same issue when it appears across local diagnostics, IDE problems, IDE/plugin terminal output, CI annotations, and remote code scanning.
 - Generate reviewed improvement candidates:
   - Beads issue proposal
   - memory candidate
@@ -43,7 +43,7 @@ Required outcomes:
 1. Read `packages/plugin-observability/src/events.ts`, `packages/plugin-observability/src/store.ts`, and `packages/harness/src/tools/observabilityTools.ts`.
 2. Add sensor event kinds to observability events.
 3. Store compact sensor summaries and evidence references, not full unbounded logs.
-4. Store provider availability/auth state so missing GitHub/SonarQube/CodeQL access can be explained and retried.
+4. Store provider availability/auth state so missing GitHub/SonarQube/CodeQL/IDE-plugin access can be explained and retried.
 5. Add query support for recent sensor failures, open findings, provider availability, and repeated failure patterns.
 6. Integrate with the existing improvement-goals plan if it has landed; otherwise define a pending candidate shape that can be adopted by that work.
 7. Add tests for redaction, truncation, ordering, session scoping, and deduplication.

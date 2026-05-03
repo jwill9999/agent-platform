@@ -36,6 +36,7 @@ Add first-class feedback sensors to the coding harness so deterministic and infe
       "codeql",
       "github_checks",
       "ide_problems",
+      "ide_terminal_output",
       "agent_code_comments"
     ],
     "inferential": ["critic", "definition_of_done", "diff_intent_review", "architecture_fit_review"]
@@ -43,6 +44,8 @@ Add first-class feedback sensors to the coding harness so deterministic and infe
   "feedback_sources": [
     "local_command",
     "ide_problems",
+    "ide_terminal_output",
+    "ide_plugin_finding",
     "sonarqube_local",
     "sonarqube_remote",
     "codeql_local",
@@ -67,13 +70,24 @@ Add first-class feedback sensors to the coding harness so deterministic and infe
 
 Sensors should improve the coding flow without turning every edit into a full CI run.
 
-- **During work:** run only cheap, targeted checks when they are likely to produce useful feedback, such as a package-level test after a focused source change or a path/security check after a risky action.
+- **During work:** run only cheap, targeted checks when they are likely to produce useful feedback, such as a package-level test after a focused source change, a path/security check after a risky action, or ingestion of already-produced IDE/plugin feedback.
 - **Before commit/push:** run the required local completion gate. This is the primary computational checkpoint and should approximate the repository's CI expectations before code reaches GitHub Actions.
 - **After push:** import remote feedback instead of rerunning everything locally. This includes GitHub check runs, CodeQL/code scanning alerts, SonarQube quality gates, PR annotations, and review comments.
 - **Manual:** allow the user or agent to request sensor discovery, local validation, remote feedback import, or a specific provider check.
 - **Scheduled:** later orchestration can poll long-running remote checks and repeated failure patterns.
 
-Capability discovery comes before user confirmation. The platform should inspect local scripts, repository instructions, SonarQube/CodeQL configuration, IDE/problem surfaces, GitHub remotes, branch protection, and check runs where authenticated access is available. Missing auth should be represented as an `auth_required` or `unavailable` sensor result with a clear repair action, not as absence of a gate.
+Capability discovery comes before user confirmation. The platform should inspect local scripts, repository instructions, SonarQube/CodeQL configuration, IDE/problem surfaces, IDE/plugin terminal-output providers, GitHub remotes, branch protection, and check runs where authenticated access is available. Missing auth or missing IDE/plugin access should be represented as an `auth_required`, `not_configured`, or `unavailable` sensor result with a clear repair action, not as absence of a gate.
+
+## IDE Feedback Integration
+
+The sandbox should support approved, bounded reads from IDE-exposed feedback surfaces so agents can see problems already identified by the user's development tools. This should not require broad filesystem or process access. Preferred integrations are IDE plugins or local adapters that expose:
+
+- diagnostics/problems from the editor
+- terminal output from user-run tasks, test watchers, linters, SonarQube plugins, CodeQL tools, and review agents
+- code comments or annotations produced by IDE extensions
+- provider status such as connected, unavailable, permission denied, or plugin not installed
+
+The application should encourage users to connect supported IDE plugins when available. If a repo or workflow would benefit from IDE feedback but no provider is configured, the sensor should return a structured setup action rather than silently ignoring that source.
 
 ## Proposed Task Chain
 
@@ -114,7 +128,7 @@ flowchart TD
 
 - Start with sensor metadata and structured results in contracts, not ad hoc tool output parsing in graph nodes.
 - Treat existing `sys_run_quality_gate` as the first computational sensor execution backend.
-- Treat IDE problems, SonarQube issues, CodeQL alerts, GitHub checks, PR annotations, agent code comments, and user feedback as normalized findings with source metadata.
+- Treat IDE problems, IDE/plugin terminal output, SonarQube issues, CodeQL alerts, GitHub checks, PR annotations, agent code comments, and user feedback as normalized findings with source metadata.
 - Prefer pre-push local validation and post-push remote feedback import over frequent full checks after every edit.
 - Missing provider auth is a structured availability state with repair actions such as connect, authenticate, skip optional sensor, or retry.
 - Feed the model repair-shaped messages, not raw logs. Raw stdout/stderr remain evidence artifacts.
@@ -126,7 +140,7 @@ flowchart TD
 - Sensors have typed definitions, trigger policies, bounded result envelopes, and trace events.
 - Fast deterministic sensors can run selectively during work, with required local validation before commit/push.
 - Remote feedback from GitHub Actions, CodeQL, SonarQube, PR annotations, and code review comments can be imported after push or on request.
-- IDE/problem diagnostics and agent-generated code comments can be ingested before push and deduplicated with local/remote findings.
+- IDE/problem diagnostics, IDE/plugin terminal output, and agent-generated code comments can be ingested before push and deduplicated with local/remote findings.
 - Inferential sensors can run at task checkpoints with cost/iteration limits.
 - Sensor outcomes are observable and queryable.
 - Repeated sensor failures can become reviewed improvement candidates.

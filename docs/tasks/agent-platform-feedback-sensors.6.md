@@ -19,11 +19,13 @@ Required outcomes:
   - deterministic checks
   - inferential checks
   - local/IDE findings
+  - IDE/plugin terminal-output findings
   - remote GitHub/SonarQube/CodeQL/review feedback
   - unavailable/auth-required providers
   - repeated-failure escalation
   - reviewed improvement candidates
-- UI can prompt for provider connection/authentication when a required remote source is unavailable, then retry discovery/import.
+- UI can prompt for provider connection/authentication when a required remote or IDE/plugin source is unavailable, then retry discovery/import.
+- UI should encourage users to install or enable supported IDE plugins/adapters when that would expose useful diagnostics, terminal output, SonarQube/CodeQL feedback, or review-agent comments to the harness.
 - Integration tests prove failed sensors trigger another agent pass.
 - E2E tests prove visible sensor status and successful completion after correction.
 - Documentation explains how to configure and trust sensors.
@@ -56,8 +58,9 @@ Required outcomes:
 5. Keep raw logs behind expandable evidence/details.
 6. Add integration tests for chat runs where a mocked sensor fails once, feeds repair guidance, and then passes.
 7. Add tests for provider auth-required and retry flows.
-8. Add Playwright coverage if UI surfaces are touched.
-9. Update `docs/api-reference.md`, `docs/architecture.md`, and `docs/development.md` as needed.
+8. Add setup guidance for IDE/plugin feedback providers, including what data is exposed and how output is bounded/redacted.
+9. Add Playwright coverage if UI surfaces are touched.
+10. Update `docs/api-reference.md`, `docs/architecture.md`, and `docs/development.md` as needed.
 
 ## Tests (required before sign-off)
 
@@ -71,6 +74,7 @@ Required outcomes:
   - API exposes sensor result metadata
   - API exposes discovered capability and provider availability metadata
   - auth-required provider can be surfaced and retried
+  - IDE/plugin provider not configured can be surfaced with setup guidance
   - failed sensor loops back into model context
   - passing sensor permits completion
   - UI renders pass/fail/escalated states
@@ -80,6 +84,7 @@ Required outcomes:
 
 - [ ] Sensor controls/results are visible through API and UI surfaces.
 - [ ] Provider auth/connect/retry flows are visible and test-covered where implemented.
+- [ ] IDE/plugin setup guidance is available when local feedback providers are not configured.
 - [ ] Full failure-to-correction loop is covered by tests.
 - [ ] Documentation explains sensor execution types, trigger timing, and review-gated flywheel behavior.
 - [ ] Quality gates pass for touched packages.
