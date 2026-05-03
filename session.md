@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Audited and updated feature documentation after the scheduler/feedback-sensors merge: README now links the Scheduler guide; API docs include scheduler delete/update details and local timezone behaviour; database docs cover projects, memory, working memory, HITL approvals, and scheduler tables/migrations; scheduler docs cover edit/delete/manual refresh behaviour.
+- **Date:** 2026-05-03
 - **Session:** Feedback-sensors planning branch was merged to `main`; local `main` is updated and old feature/task branches were pruned. No implementation task is active. Pause here until the owner is ready to refine and claim the first feedback-sensors task.
 - **Date:** 2026-05-03
 - **Session:** Added follow-up Beads task `agent-platform-session-handoff-hygiene` with a spec for capping/rotating `session.md`; linked it as a dependency of `agent-platform-context-optimisation`.
@@ -209,6 +211,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - Feedback-sensors harness planning was also merged to `main` through PR #127.
 - Local `main` is current with `origin/main`; old feature/task branches were pruned by the owner.
 - No scheduler or feedback-sensors implementation task is currently active in this workspace.
+- Documentation was brought up to date for the scheduler management UI/API, local timezone handling, scheduler delete cascade behaviour, and the current database schema/migration list.
 
 ### Feedback sensors harness planned
 
@@ -478,9 +481,9 @@ Quality gates passed:
 
 - **Current branch:** `main`
 - **Current base:** `origin/main`
-- **Latest commit:** `4560039 Merge pull request #127 from jwill9999/feature/feedback-sensors-harness`
+- **Latest commit:** `9d0467a Update docs for scheduler and database features`
 - **Current work:** No active implementation task. Feedback-sensors planning exists on `main`; refinement should happen before claiming `.1`.
-- **Remote sync:** `main` is updated after the merge. Old feature/task branches were pruned by the owner.
+- **Remote sync:** Local `main` has documentation/session commits ahead of `origin/main`; pushing directly to `origin/main` requires explicit owner confirmation.
 
 ### Beads
 
@@ -494,6 +497,7 @@ Quality gates passed:
 ### Quality
 
 - `pnpm docs:lint` passed for the planning/documentation change.
+- `pnpm docs:lint` also passed after the scheduler/database documentation update.
 - No runtime code changed.
 - SonarQube CLI was installed but not authenticated; issue listing remains blocked until the owner completes `sonar auth login -o jwill9999`.
 
