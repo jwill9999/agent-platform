@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Refined `agent-platform-feedback-sensors` specs after owner review to make sensors source-aware, cadence-aware, provider-auth-aware, and focused on pre-push local validation plus post-push GitHub/SonarQube/CodeQL/review feedback import.
+- **Date:** 2026-05-03
 - **Session:** Added follow-up Beads task `agent-platform-session-handoff-hygiene` with a spec for capping/rotating `session.md`; linked it as a dependency of `agent-platform-context-optimisation`.
 - **Date:** 2026-05-03
 - **Session:** Planned the feedback sensors harness epic from the Böckeler/Thoughtworks harness-engineering discussion. Created Beads epic `agent-platform-feedback-sensors`, six chained child tasks, linked spec files under `docs/tasks/`, and committed the planning docs on `feature/feedback-sensors-harness`.
@@ -201,10 +203,17 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Feedback sensors harness planned
+### Feedback sensors harness refined
 
 Branch state: `feature/feedback-sensors-harness` contains planning/spec documentation only.
 
+- Refined `agent-platform-feedback-sensors` and child specs `.1` through `.6` after owner discussion.
+- Added source-aware finding ingestion to the epic scope: local commands, IDE/problems, SonarQube local/remote, CodeQL local/remote, GitHub checks, PR reviews/annotations, agent code comments, and user feedback.
+- Clarified execution cadence: cheap targeted checks during work, required local validation before commit/push, remote feedback import after push or on request, plus manual/scheduled hooks for orchestration.
+- Added provider availability/auth states to the planned contracts, including `auth_required`, `unavailable`, connect/authenticate/retry actions, and graceful degradation when GitHub/SonarQube/CodeQL access is missing.
+- Added normalized finding/deduplication requirements so security quality, duplication, hotspots, lint/test/build findings, and review comments can be treated as one feedback model.
+- Updated Beads descriptions and acceptance criteria for the epic and all six child tasks to match the refined specs. Beads/Dolt auto-push attempted to sync but failed due GitHub DNS/auth being unavailable in the sandbox.
+- Committed the refinement as `62eee69 Refine feedback sensor specs`.
 - Used the SonarQube plugin flow earlier in the session; `sonarqube-cli` was installed, but auth requires the owner to run `sonar auth login -o jwill9999` locally before issue listing can continue.
 - Reviewed the Böckeler/Fowler article and Thoughtworks Radar framing: computational sensors run fast deterministic checks, inferential sensors run semantic review at bounded checkpoints, and both should produce LLM-optimized self-correction signals.
 - Created Beads epic `agent-platform-feedback-sensors`.
@@ -469,22 +478,23 @@ Quality gates passed:
 
 - **Current branch:** `feature/feedback-sensors-harness`
 - **Current base:** `origin/main`
-- **Latest commit:** `1d1e690 docs: plan feedback sensors harness`
-- **Current work:** Planning only. Implementation has not started and no feedback-sensors child task is claimed.
-- **Remote sync:** Git branch pushed to `origin/feature/feedback-sensors-harness`. Beads local records exist, but Dolt push failed because GitHub SSH/DNS was unavailable to `bd dolt push` in the sandbox.
+- **Latest commit:** `62eee69 Refine feedback sensor specs`
+- **Current work:** Planning/refinement only. Implementation has not started and no feedback-sensors child task is claimed.
+- **Remote sync:** Git upstream currently reports `origin/feature/feedback-sensors-harness` as gone/unavailable in this sandbox. Beads local records exist, but Dolt auto-push failed because GitHub SSH/DNS was unavailable.
 
 ### Beads
 
-- `agent-platform-feedback-sensors` is open as a P2 epic.
+- `agent-platform-feedback-sensors` is in progress as a P2 epic.
 - `agent-platform-feedback-sensors.1` through `.6` are open P2 child tasks.
 - Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
-- Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md`.
+- Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, normalized findings, IDE/problem feedback, SonarQube/CodeQL/GitHub feedback, provider auth states, pre-push validation, and post-push feedback import.
 - `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
 - Per stored memory, schedule or explicitly run owner refinement before moving this epic from planning/refinement to implementation-ready.
 
 ### Quality
 
 - `pnpm docs:lint` passed for the planning/documentation change.
+- `git diff --check` passed.
 - No runtime code changed.
 - SonarQube CLI was installed but not authenticated; issue listing remains blocked until the owner completes `sonar auth login -o jwill9999`.
 
@@ -492,10 +502,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Ask the owner to run `bd dolt push` if Beads remote sync is still blocked by GitHub auth/DNS.
+1. Push `feature/feedback-sensors-harness` and run `bd dolt push` once GitHub network/auth is available.
 2. Decide whether to implement `agent-platform-session-handoff-hygiene` before starting the feedback-sensors epic.
-3. Run a refinement session with the owner for `agent-platform-feedback-sensors` before claiming `.1`.
-4. After refinement, start `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`.
+3. Claim `agent-platform-feedback-sensors.1` and create `task/agent-platform-feedback-sensors.1` from `feature/feedback-sensors-harness`.
+4. Implement `.1` contracts first; do not add runtime behavior until the contract/finding/provider availability model is in place.
 
 ---
 
