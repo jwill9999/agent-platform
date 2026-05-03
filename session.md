@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** README was checked after the docs audit and updated with a concise current-capabilities section plus a link to the implemented Memory Model guide.
+- **Date:** 2026-05-03
 - **Session:** Audited and updated feature documentation after the scheduler/feedback-sensors merge: README now links the Scheduler guide; API docs include scheduler delete/update details and local timezone behaviour; database docs cover projects, memory, working memory, HITL approvals, and scheduler tables/migrations; scheduler docs cover edit/delete/manual refresh behaviour.
 - **Date:** 2026-05-03
 - **Session:** Feedback-sensors planning branch was merged to `main`; local `main` is updated and old feature/task branches were pruned. No implementation task is active. Pause here until the owner is ready to refine and claim the first feedback-sensors task.
@@ -212,6 +214,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - Local `main` is current with `origin/main`; old feature/task branches were pruned by the owner.
 - No scheduler or feedback-sensors implementation task is currently active in this workspace.
 - Documentation was brought up to date for the scheduler management UI/API, local timezone handling, scheduler delete cascade behaviour, and the current database schema/migration list.
+- README was refreshed to summarize current platform capabilities and link the implemented Memory Model guide.
 
 ### Feedback sensors harness planned
 
@@ -481,7 +484,7 @@ Quality gates passed:
 
 - **Current branch:** `main`
 - **Current base:** `origin/main`
-- **Latest commit:** `9d0467a Update docs for scheduler and database features`
+- **Latest commit:** pending README/session documentation commit
 - **Current work:** No active implementation task. Feedback-sensors planning exists on `main`; refinement should happen before claiming `.1`.
 - **Remote sync:** Local `main` has documentation/session commits ahead of `origin/main`; pushing directly to `origin/main` requires explicit owner confirmation.
 

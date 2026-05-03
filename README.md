@@ -22,6 +22,15 @@ When complete:
 - **Web:** `http://localhost:3001`
 - **Workspace:** host-backed under `.agent-platform/workspaces/default` for local development and mounted into the API container at `/workspace`
 
+## Current Capabilities
+
+- **Chat and agent runtime:** configurable agents, model configs, encrypted provider API keys, MCP server assignments, and NDJSON streaming through the API/web BFF.
+- **Settings UI:** management pages for agents, models, skills, tools, workspace files, memory, scheduler jobs, sessions, plugins, and MCP servers.
+- **Human-in-the-loop approvals:** risky or explicitly approval-required tools pause for user approval before execution and can resume safely after a decision.
+- **Workspace-aware coding tools:** repository discovery, git inspection, structured edits, quality gates, and guarded filesystem access inside the managed `/workspace`.
+- **Memory:** short-term working memory, review-gated long-term memories, memory candidates, approved prompt retrieval, Settings Memory review/export/cleanup, and a narrow self-learning evaluator.
+- **Scheduler:** durable local scheduled jobs with one-off and recurring schedules, pause/resume/run-now/edit/delete controls, persisted runs/logs, notifications, and safe built-in tasks.
+
 ### Restart without wiping the database
 
 Stops whatever is listening on the dev ports, then starts the stack again (rebuild, seed, run). Your **`SQLITE_PATH`** file (default `data/dev.sqlite`) is **not** deleted.
@@ -65,6 +74,7 @@ See [Development Guide](docs/development.md) for prerequisites, env vars, tests,
 | [Workspace Storage](docs/workspace-storage.md)                           | Host workspace setup, security, cleanup, and validation               |
 | [Coding Runtime](docs/coding-runtime.md)                                 | Container CLI baseline and coding-agent policy                        |
 | [Scheduler](docs/scheduler.md)                                           | Durable scheduled jobs, background runs, logs, and notifications      |
+| [Memory Model](docs/memory.md)                                           | Implemented memory layers, review flow, retrieval, and retention      |
 | [Harness Gap Analysis](docs/planning/harness-gap-analysis-2026-04-29.md) | Capability gaps and recommended roadmap for coding/general automation |
 | [Memory Management](docs/planning/memory-management.md)                  | Short-term, long-term, and self-learning memory architecture          |
 | [Plugin Guide](docs/plugin-guide.md)                                     | Plugin hooks and authoring                                            |
