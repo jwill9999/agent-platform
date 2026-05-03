@@ -424,6 +424,10 @@ export async function runFeedbackSensors(
   options: ComputationalSensorRunnerOptions = {},
 ): Promise<ComputationalSensorRun> {
   const computational = await runComputationalSensors(input, options);
+  if (!input.evaluateInferentialSensors) {
+    return computational;
+  }
+
   const inferential = await runInferentialSensors({
     agentProfile: input.agentProfile,
     trigger: input.trigger,

@@ -257,4 +257,34 @@ describe('inferential sensor runner', () => {
       expect.arrayContaining(['quality_gate:typecheck', 'inferential:readiness']),
     );
   });
+
+  it('does not spend an implicit evaluator call in the combined run without an evaluator', async () => {
+    const calls: string[] = [];
+    const run = await runFeedbackSensors(
+      {
+        agentProfile: 'coding',
+        taskContexts: ['repo_change'],
+        trigger: 'before_push',
+        repoPath: '.',
+        changedFiles: ['packages/harness/src/foo.ts'],
+        modelConfig: {
+          provider: 'openai',
+          model: 'gpt-test',
+          apiKey: 'sk-test-key',
+        },
+      },
+      {
+        qualityGateExecutor: async (_toolId, args) => {
+          calls.push(String(args['profile']));
+          return qualityGateOutput(true);
+        },
+      },
+    );
+
+    expect(calls).toEqual(['typecheck', 'test', 'lint']);
+    expect(run.results.map((result) => result.sensorId)).not.toContain(
+      'inferential:self_assessment',
+    );
+    expect(run.results.some((result) => result.sensorId.startsWith('inferential:'))).toBe(false);
+  });
 });

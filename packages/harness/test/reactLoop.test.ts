@@ -350,6 +350,25 @@ describe('ReAct loop', () => {
     );
   });
 
+  it('ends after a text answer when no sensors are selected', async () => {
+    const llmNode: GraphNodeFn = vi.fn(async () => assistantText('Done'));
+    const sensorRunner: SensorRunner = vi.fn(async () => ({ records: [], results: [] }));
+    const graph = buildHarnessGraph({
+      executeTool: vi.fn(),
+      llmReasonNode: llmNode,
+      toolDispatchNode: vi.fn(async () => ({})),
+      sensorCheckNode: createSensorCheckNode({ runSensors: sensorRunner }),
+    });
+
+    const out = await graph.invoke(makeInitialState(), {
+      configurable: { thread_id: 'react-sensors-none-selected' },
+    });
+
+    expect(llmNode).toHaveBeenCalledTimes(1);
+    expect(sensorRunner).toHaveBeenCalledTimes(1);
+    expect(out.messages.at(-1)).toMatchObject({ role: 'assistant', content: 'Done' });
+  });
+
   it('feeds failed sensor repair feedback into the next LLM turn', async () => {
     let llmCallCount = 0;
     const llmNode: GraphNodeFn = vi.fn(async (state) => {
