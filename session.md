@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Implemented `agent-platform-feedback-sensors.3` on `task/agent-platform-feedback-sensors.3`: wired sensor checks into ReAct routing, added bounded repair feedback/escalation behavior, enabled API graph support, and closed the bead after green gates.
+- **Date:** 2026-05-03
 - **Session:** Implemented `agent-platform-feedback-sensors.2` on `task/agent-platform-feedback-sensors.2`: added deterministic computational sensor runner, imported finding normalization, bounded terminal evidence handling, runtime limitation reporting, and focused/broad quality gates.
 - **Date:** 2026-05-03
 - **Session:** Implemented `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`: added shared sensor contracts, public exports, trace lifecycle event types, and contract/trace tests.
@@ -214,6 +216,34 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Sensor checks wired into ReAct loop
+
+Branch state: `task/agent-platform-feedback-sensors.3` contains the third implementation task.
+
+- Implemented `agent-platform-feedback-sensors.3`.
+- Added `packages/harness/src/nodes/sensorCheck.ts` with optional sensor execution, explicit trigger support, bounded LLM-facing repair feedback, required-provider/runtime escalation, optional runtime-limitation continuation, and repeated-failure loop detection.
+- Extended `HarnessState` with sensor results, attempts, requested/last trigger, last tool IDs, active sensor profile/context, changed files, repo path, and imported collector results.
+- Wired `sensorCheckNode` into all ReAct graph variants: ReAct only, ReAct + critic, ReAct + DoD, and ReAct + critic + DoD.
+- Route behavior now runs targeted sensors after meaningful code-changing tools, full required sensors before completion/pre-push, and explicit manual/external/after-push style refreshes before the next LLM turn.
+- Passing sensors stay quiet; failed sensors append compact `<sensor-feedback>` system messages and route back to `react_llm_reason`.
+- Required unavailable/auth/runtime limitations halt with clear streamed errors; repeated identical failures halt with `sensor_loop_limit` trace events.
+- Enabled the optional sensor node in the API runtime graph while suppressing thinking output when no sensors are selected.
+- Added focused tests in `packages/harness/test/sensorCheck.test.ts` and route coverage in `packages/harness/test/reactLoop.test.ts`.
+- Closed Beads task `agent-platform-feedback-sensors.3`.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm test` with escalation for API Supertest local listener binding
+
+Completion gate:
+
+- SonarQube CLI was attempted for touched source files. Sandboxed runs failed on keychain/state access; escalated scan was rejected by policy because it may send source/auth material externally. Fallback gate passed with typecheck, lint, format, focused tests, harness tests, and full tests.
 
 ### Computational sensor runner implemented
 
@@ -528,18 +558,19 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-feedback-sensors.2`
+- **Current branch:** `task/agent-platform-feedback-sensors.3`
 - **Current base:** `feature/feedback-sensors-harness`
-- **Latest task commit:** `bb47228 Implement computational sensor runner`
-- **Current work:** `agent-platform-feedback-sensors.2` implemented and closed locally; handoff update is being committed before push.
-- **Remote sync:** Git push and `bd dolt push` are still required at closeout. Earlier Beads auto-push failed because GitHub SSH/DNS was unavailable from the sandbox.
+- **Latest task commit:** pending commit for `agent-platform-feedback-sensors.3`
+- **Current work:** `.3` implemented and closed locally; commit/push pending if this note is read before closeout completes.
+- **Remote sync:** Git push and `bd dolt push` are still required at closeout. Beads auto-push failed because GitHub SSH/DNS was unavailable from the sandbox.
 
 ### Beads
 
 - `agent-platform-feedback-sensors` is in progress as a P2 epic.
 - `agent-platform-feedback-sensors.1` is closed.
 - `agent-platform-feedback-sensors.2` is closed.
-- `agent-platform-feedback-sensors.3` through `.6` are open P2 child tasks.
+- `agent-platform-feedback-sensors.3` is closed.
+- `agent-platform-feedback-sensors.4` through `.6` are open P2 child tasks.
 - Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
 - Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, agent-scope/profile policy, normalized findings, IDE/problem and IDE/plugin terminal feedback, SonarQube/CodeQL/GitHub feedback, Docker/container/sandbox limitations, provider auth states, pre-push validation, and post-push feedback import.
 - `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
@@ -548,8 +579,8 @@ Quality gates passed:
 
 ### Quality
 
-- Computational runner gates passed:
-  - `pnpm --filter @agent-platform/harness exec vitest run test/computationalSensorRunner.test.ts`
+- Sensor ReAct-loop gates passed:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
   - `pnpm --filter @agent-platform/harness run test`
   - `pnpm typecheck`
   - `pnpm lint`
@@ -561,9 +592,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Complete closeout for `task/agent-platform-feedback-sensors.2`: commit this handoff update, `git pull --rebase`, `bd dolt push`, `git push`, and verify upstream status.
-2. Start `agent-platform-feedback-sensors.3` from the `.2` chain tip after `.2` is pushed.
-3. Keep `.3` focused on wiring sensor results into the ReAct loop; remote GitHub/SonarQube/CodeQL polling remains in `.4`.
+1. Complete closeout for `task/agent-platform-feedback-sensors.3`: commit, `git pull --rebase`, `bd dolt push`, `git push`, and verify upstream status.
+2. Start `agent-platform-feedback-sensors.4` from the `.3` chain tip after `.3` is pushed.
+3. Keep `.4` focused on inferential sensor checkpoints; GitHub/SonarQube/CodeQL remote polling remains separate from the computational routing already added.
 
 ---
 

@@ -27,6 +27,8 @@ export type BuildHarnessGraphOptions = {
   dodProposeNode?: GraphNodeFn;
   /** Optional DoD check node, run after a tool-free draft answer before END. */
   dodCheckNode?: GraphNodeFn;
+  /** Optional sensor check node, run after code-change checkpoints and before final completion. */
+  sensorCheckNode?: GraphNodeFn;
   /** LLM reasoning node (ReAct path). Required for mode='react'. */
   llmReasonNode?: GraphNodeFn;
   /** Tool dispatch node (ReAct path). Required for mode='react'. */
@@ -210,9 +212,11 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
 
     // Build tool call signatures from the current llmOutput
     const newSignatures: string[] = [];
+    const sensorLastToolIds: string[] = [];
     if (state.llmOutput?.kind === 'tool_calls') {
       for (const call of state.llmOutput.calls) {
         newSignatures.push(hashToolCall(call.name, call.args));
+        sensorLastToolIds.push(call.name);
       }
     }
 
@@ -231,6 +235,7 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
         return {
           ...result,
           recentToolCalls: window,
+          sensorLastToolIds,
         };
       }
 
@@ -253,12 +258,14 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
         recentToolCalls: window,
         halted: true,
         trace,
+        sensorLastToolIds,
       };
     }
 
     return {
       ...result,
       recentToolCalls: window,
+      sensorLastToolIds,
     };
   };
 }
@@ -267,6 +274,14 @@ function routeAfterLlm(state: HarnessStateType): 'react_tool_dispatch' | typeof 
   if (state.halted) return END;
   if (state.llmOutput?.kind === 'tool_calls') return 'react_tool_dispatch';
   return END;
+}
+
+function routeAfterLlmWithSensors(
+  state: HarnessStateType,
+): 'react_tool_dispatch' | 'react_sensor_check' | typeof END {
+  if (state.halted) return END;
+  if (state.llmOutput?.kind === 'tool_calls') return 'react_tool_dispatch';
+  return 'react_sensor_check';
 }
 
 function routeAfterLlmWithCritic(
@@ -297,6 +312,19 @@ function routeAfterCritic(state: HarnessStateType): 'react_llm_reason' | typeof 
   return 'react_llm_reason';
 }
 
+function routeAfterCriticWithSensors(
+  state: HarnessStateType,
+): 'react_llm_reason' | 'react_sensor_check' | typeof END {
+  if (state.halted) return END;
+  if (checkDeadline(state).expired) return END;
+  const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
+  const iterations = state.iterations ?? 0;
+  const accepted = !state.critique;
+  if (!accepted && iterations >= cap) return END;
+  if (!accepted) return 'react_llm_reason';
+  return 'react_sensor_check';
+}
+
 function routeAfterCriticWithDod(
   state: HarnessStateType,
 ): 'react_llm_reason' | 'react_dod_check' | typeof END {
@@ -319,6 +347,27 @@ function routeAfterDodCheck(state: HarnessStateType): 'react_llm_reason' | typeo
   return 'react_llm_reason';
 }
 
+function routeAfterDodCheckWithSensors(
+  state: HarnessStateType,
+): 'react_llm_reason' | 'react_sensor_check' | typeof END {
+  const base = routeAfterDodCheck(state);
+  if (base === END && state.dodContract?.passed && !state.halted) return 'react_sensor_check';
+  return base;
+}
+
+function hasMeaningfulSensorToolCheckpoint(state: HarnessStateType): boolean {
+  const codeChangingTools = new Set([
+    'coding_apply_patch',
+    'sys_write_file',
+    'sys_append_file',
+    'sys_copy_file',
+    'sys_create_directory',
+    'sys_download_file',
+    'sys_bash',
+  ]);
+  return (state.sensorLastToolIds ?? []).some((toolId) => codeChangingTools.has(toolId));
+}
+
 function routeAfterReactDispatch(state: HarnessStateType): 'react_llm_reason' | typeof END {
   if (state.halted) return END;
   if (checkDeadline(state).expired) return END;
@@ -327,6 +376,22 @@ function routeAfterReactDispatch(state: HarnessStateType): 'react_llm_reason' | 
     return END;
   }
   return 'react_llm_reason';
+}
+
+function routeAfterReactDispatchWithSensors(
+  state: HarnessStateType,
+): 'react_llm_reason' | 'react_sensor_check' | typeof END {
+  const base = routeAfterReactDispatch(state);
+  if (base === END) return END;
+  return hasMeaningfulSensorToolCheckpoint(state) ? 'react_sensor_check' : 'react_llm_reason';
+}
+
+function routeAfterSensorCheck(state: HarnessStateType): 'react_llm_reason' | typeof END {
+  if (state.halted) return END;
+  if (state.sensorLastTrigger === 'on_meaningful_change') return 'react_llm_reason';
+  const lastResult = state.sensorResults?.at(-1);
+  if (lastResult?.status === 'failed') return 'react_llm_reason';
+  return END;
 }
 
 // ---------------------------------------------------------------------------
@@ -362,6 +427,124 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
 
   if (options.llmReasonNode && options.toolDispatchNode) {
     // Full graph with mode router → (react | plan) paths
+    if (
+      options.sensorCheckNode &&
+      options.dodProposeNode &&
+      options.dodCheckNode &&
+      options.criticNode
+    ) {
+      const routeByMode = (
+        state: HarnessStateType,
+      ): 'react_sensor_check' | 'react_dod_propose' | 'plan_generate' => {
+        if (state.mode === 'plan') return 'plan_generate';
+        if (state.sensorRequestedTrigger) return 'react_sensor_check';
+        return 'react_dod_propose';
+      };
+      const graph = new StateGraph(HarnessState)
+        .addNode('plan_generate', planGenNode)
+        .addNode('resolve_plan', createResolvePlanNode(options))
+        .addNode('execute', createExecuteNode(options))
+        .addNode('react_dod_propose', options.dodProposeNode)
+        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
+        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+        .addNode('react_critic', options.criticNode)
+        .addNode('react_dod_check', options.dodCheckNode)
+        .addNode('react_sensor_check', options.sensorCheckNode)
+        .addConditionalEdges(START, routeByMode)
+        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+        .addEdge('resolve_plan', 'execute')
+        .addConditionalEdges('execute', routeAfterExecute)
+        .addEdge('react_dod_propose', 'react_llm_reason')
+        .addConditionalEdges('react_llm_reason', routeAfterLlmWithCritic)
+        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatchWithSensors)
+        .addConditionalEdges('react_critic', routeAfterCriticWithDod)
+        .addConditionalEdges('react_dod_check', routeAfterDodCheckWithSensors)
+        .addConditionalEdges('react_sensor_check', routeAfterSensorCheck);
+      return graph.compile({ checkpointer });
+    }
+
+    if (options.sensorCheckNode && options.dodProposeNode && options.dodCheckNode) {
+      const routeByMode = (
+        state: HarnessStateType,
+      ): 'react_sensor_check' | 'react_dod_propose' | 'plan_generate' => {
+        if (state.mode === 'plan') return 'plan_generate';
+        if (state.sensorRequestedTrigger) return 'react_sensor_check';
+        return 'react_dod_propose';
+      };
+      const graph = new StateGraph(HarnessState)
+        .addNode('plan_generate', planGenNode)
+        .addNode('resolve_plan', createResolvePlanNode(options))
+        .addNode('execute', createExecuteNode(options))
+        .addNode('react_dod_propose', options.dodProposeNode)
+        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
+        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+        .addNode('react_dod_check', options.dodCheckNode)
+        .addNode('react_sensor_check', options.sensorCheckNode)
+        .addConditionalEdges(START, routeByMode)
+        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+        .addEdge('resolve_plan', 'execute')
+        .addConditionalEdges('execute', routeAfterExecute)
+        .addEdge('react_dod_propose', 'react_llm_reason')
+        .addConditionalEdges('react_llm_reason', routeAfterLlmWithDod)
+        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatchWithSensors)
+        .addConditionalEdges('react_dod_check', routeAfterDodCheckWithSensors)
+        .addConditionalEdges('react_sensor_check', routeAfterSensorCheck);
+      return graph.compile({ checkpointer });
+    }
+
+    if (options.sensorCheckNode && options.criticNode) {
+      const routeByMode = (
+        state: HarnessStateType,
+      ): 'react_sensor_check' | 'react_llm_reason' | 'plan_generate' => {
+        if (state.mode === 'plan') return 'plan_generate';
+        if (state.sensorRequestedTrigger) return 'react_sensor_check';
+        return 'react_llm_reason';
+      };
+      const graph = new StateGraph(HarnessState)
+        .addNode('plan_generate', planGenNode)
+        .addNode('resolve_plan', createResolvePlanNode(options))
+        .addNode('execute', createExecuteNode(options))
+        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
+        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+        .addNode('react_critic', options.criticNode)
+        .addNode('react_sensor_check', options.sensorCheckNode)
+        .addConditionalEdges(START, routeByMode)
+        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+        .addEdge('resolve_plan', 'execute')
+        .addConditionalEdges('execute', routeAfterExecute)
+        .addConditionalEdges('react_llm_reason', routeAfterLlmWithCritic)
+        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatchWithSensors)
+        .addConditionalEdges('react_critic', routeAfterCriticWithSensors)
+        .addConditionalEdges('react_sensor_check', routeAfterSensorCheck);
+      return graph.compile({ checkpointer });
+    }
+
+    if (options.sensorCheckNode) {
+      const routeByMode = (
+        state: HarnessStateType,
+      ): 'react_sensor_check' | 'react_llm_reason' | 'plan_generate' => {
+        if (state.mode === 'plan') return 'plan_generate';
+        if (state.sensorRequestedTrigger) return 'react_sensor_check';
+        return 'react_llm_reason';
+      };
+      const graph = new StateGraph(HarnessState)
+        .addNode('plan_generate', planGenNode)
+        .addNode('resolve_plan', createResolvePlanNode(options))
+        .addNode('execute', createExecuteNode(options))
+        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
+        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
+        .addNode('react_sensor_check', options.sensorCheckNode)
+        .addConditionalEdges(START, routeByMode)
+        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+        .addEdge('resolve_plan', 'execute')
+        .addConditionalEdges('execute', routeAfterExecute)
+        .addConditionalEdges('react_llm_reason', routeAfterLlmWithSensors)
+        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatchWithSensors)
+        .addConditionalEdges('react_sensor_check', routeAfterSensorCheck);
+
+      return graph.compile({ checkpointer });
+    }
+
     if (options.dodProposeNode && options.dodCheckNode && options.criticNode) {
       const routeByMode = (state: HarnessStateType): 'react_dod_propose' | 'plan_generate' => {
         if (state.mode === 'plan') return 'plan_generate';

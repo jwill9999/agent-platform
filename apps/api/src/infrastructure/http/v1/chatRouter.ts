@@ -30,6 +30,7 @@ import type {
   ContextWindow,
   MessageRecord,
   PromptMemoryBundle,
+  SensorAgentProfile,
   WorkingMemoryToolSummary,
 } from '@agent-platform/contracts';
 import {
@@ -46,6 +47,7 @@ import {
   buildHarnessGraph,
   createLlmReasonNode,
   createToolDispatchNode,
+  createSensorCheckNode,
   createNdjsonEmitter,
   contractToolsToDefinitions,
   createApproximateCounter,
@@ -719,6 +721,7 @@ function buildRuntimeGraph(
       options,
       approvedToolCallIds,
     }),
+    sensorCheckNode: createSensorCheckNode({ emitter }),
     // Keep evaluator nodes out of the user-facing chat runtime for now. The
     // DoD proposer/checker use JSON-only internal prompts, and the critic makes
     // a second model call; both can surface internal evaluator output or errors
@@ -1149,6 +1152,7 @@ function buildInitialState(
   const strategy = agentCtx.agent.contextWindow?.strategy ?? 'truncate';
   const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
   const memoryBundle = contextInfo.memoryBundle;
+  const sensorProfile = inferSensorAgentProfile(agentCtx);
   return {
     trace: [
       {
@@ -1192,5 +1196,22 @@ function buildInitialState(
     critique: undefined,
     dodAttempts: 0,
     dodContract: undefined,
+    sensorResults: [],
+    sensorAttempts: {},
+    sensorLastToolIds: [],
+    sensorRequestedTrigger: undefined,
+    sensorLastTrigger: undefined,
+    sensorAgentProfile: sensorProfile,
+    sensorTaskContexts: sensorProfile === 'coding' ? ['repo_change'] : [],
+    sensorChangedFiles: [],
+    sensorRepoPath: '.',
+    sensorFindingCollectorResults: [],
   };
+}
+
+function inferSensorAgentProfile(agentCtx: AgentContext): SensorAgentProfile {
+  const agentText = `${agentCtx.agent.slug} ${agentCtx.agent.name} ${agentCtx.agent.description ?? ''}`;
+  return /\bcod(e|ing|er)\b|repository|typescript|application code/i.test(agentText)
+    ? 'coding'
+    : 'personal_assistant';
 }

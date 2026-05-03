@@ -79,21 +79,21 @@ Required outcomes:
 
 ## Definition of done
 
-- [ ] Sensor node participates in the ReAct loop.
-- [ ] Full validation runs at pre-completion/pre-push checkpoints, not after every edit.
-- [ ] Sensor routing respects active agent profile and task context.
-- [ ] Failed sensor output is LLM-facing and bounded.
-- [ ] Passing sensors do not add noisy context.
-- [ ] Routing is covered for graph variants used by the API.
-- [ ] `bd close agent-platform-feedback-sensors.3 --reason "Sensors wired into ReAct loop"`
+- [x] Sensor node participates in the ReAct loop.
+- [x] Full validation runs at pre-completion/pre-push checkpoints, not after every edit.
+- [x] Sensor routing respects active agent profile and task context.
+- [x] Failed sensor output is LLM-facing and bounded.
+- [x] Passing sensors do not add noisy context.
+- [x] Routing is covered for graph variants used by the API.
+- [x] `bd close agent-platform-feedback-sensors.3 --reason "Sensors wired into ReAct loop"`
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-feedback-sensors.2`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: N/A - merge at segment end
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] Task branch created from `task/agent-platform-feedback-sensors.2`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] If segment tip: N/A - merge at segment end
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-03
