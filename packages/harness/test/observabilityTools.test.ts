@@ -9,11 +9,17 @@ import {
 } from '../src/tools/observabilityTools.js';
 
 describe('observability tools', () => {
-  it('registers three zero-risk built-in tools without session parameters', () => {
+  it('registers zero-risk built-in tools without session parameters', () => {
     expect(OBSERVABILITY_TOOLS.map((tool) => tool.name)).toEqual([
       'query_logs',
       'query_recent_errors',
       'inspect_trace',
+      'query_sensor_findings',
+      'query_sensor_provider_availability',
+      'query_sensor_runtime_limitations',
+      'query_mcp_capability_availability',
+      'query_sensor_failure_patterns',
+      'query_feedback_candidates',
     ]);
 
     for (const tool of OBSERVABILITY_TOOLS) {
@@ -145,6 +151,121 @@ describe('observability tools', () => {
       type: 'error',
       code: 'TRACE_NOT_FOUND',
     });
+  });
+
+  it('queries sensor findings, MCP capabilities, failure patterns, and feedback candidates', async () => {
+    const store = createObservabilityStore();
+    for (const runId of ['trace-1', 'trace-2']) {
+      store.record({
+        kind: 'sensor_run',
+        sessionId: 'session-1',
+        runId,
+        trigger: 'before_push',
+        agentProfile: 'coding',
+        taskContexts: ['repo_change'],
+        records: [],
+        providerAvailability: [
+          {
+            provider: 'sonarqube',
+            capability: 'quality_findings',
+            state: 'available',
+            repairActions: [],
+          },
+        ],
+        runtimeLimitations: [
+          {
+            kind: 'sandbox_policy_denied',
+            message: 'Sandbox blocked scanner metadata access.',
+            repairActions: [],
+            metadata: {},
+          },
+        ],
+        mcpCapabilities: [
+          {
+            serverId: 'sonarqube',
+            capability: 'quality_findings',
+            state: 'available',
+            selectedForReflection: true,
+          },
+        ],
+        results: [
+          {
+            sensorId: 'collector:sonarqube',
+            status: 'failed',
+            severity: 'high',
+            summary: 'Imported SonarQube finding.',
+            findings: [
+              {
+                source: 'sonarqube_remote',
+                severity: 'high',
+                status: 'open',
+                category: 'code_quality',
+                message: 'Duplicated code block.',
+                file: 'src/foo.ts',
+                line: 9,
+                ruleId: 'typescript:S1192',
+                dedupeKey: 'typescript:S1192:src/foo.ts:9',
+                evidence: [],
+                metadata: {},
+              },
+            ],
+            repairInstructions: [],
+            evidence: [],
+            terminalEvidence: [],
+            runtimeLimitations: [],
+            metadata: {},
+          },
+        ],
+      });
+    }
+
+    const findings = await executeObservabilityTool(
+      OBSERVABILITY_IDS.querySensorFindings,
+      { limit: 10 },
+      { store, sessionId: 'session-1', traceId: 'trace-2' },
+    );
+    expect(findings.type).toBe('tool_result');
+    if (findings.type === 'tool_result') {
+      expect(findings.data.total).toBe(2);
+    }
+
+    const mcp = await executeObservabilityTool(
+      OBSERVABILITY_IDS.queryMcpCapabilityAvailability,
+      {},
+      { store, sessionId: 'session-1', traceId: 'trace-2' },
+    );
+    expect(mcp.type).toBe('tool_result');
+    if (mcp.type === 'tool_result') {
+      expect(mcp.data.records).toEqual([
+        expect.objectContaining({ serverId: 'sonarqube', selectedForReflection: true }),
+      ]);
+    }
+
+    const patterns = await executeObservabilityTool(
+      OBSERVABILITY_IDS.querySensorFailurePatterns,
+      {},
+      { store, sessionId: 'session-1', traceId: 'trace-2' },
+    );
+    expect(patterns.type).toBe('tool_result');
+    if (patterns.type === 'tool_result') {
+      expect(patterns.data.records).toEqual([
+        expect.objectContaining({ sensorId: 'collector:sonarqube', count: 2 }),
+      ]);
+    }
+
+    const candidates = await executeObservabilityTool(
+      OBSERVABILITY_IDS.queryFeedbackCandidates,
+      {},
+      { store, sessionId: 'session-1', traceId: 'trace-2' },
+    );
+    expect(candidates.type).toBe('tool_result');
+    if (candidates.type === 'tool_result') {
+      expect(candidates.data.records).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ reviewRequired: true, autoApply: false }),
+        ]),
+      );
+    }
   });
 });
 

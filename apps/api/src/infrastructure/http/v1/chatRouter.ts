@@ -721,7 +721,18 @@ function buildRuntimeGraph(
       options,
       approvedToolCallIds,
     }),
-    sensorCheckNode: createSensorCheckNode({ emitter }),
+    sensorCheckNode: createSensorCheckNode({
+      emitter,
+      ...(options.observabilityStore
+        ? {
+            observability: {
+              store: options.observabilityStore,
+              sessionId,
+              traceId: runId,
+            },
+          }
+        : {}),
+    }),
     // Keep evaluator nodes out of the user-facing chat runtime for now. The
     // DoD proposer/checker use JSON-only internal prompts, and the critic makes
     // a second model call; both can surface internal evaluator output or errors

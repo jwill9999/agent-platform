@@ -36,6 +36,32 @@ type ObservabilityStore = Readonly<{
     sessionId: string;
     traceId?: string;
   }) => { traceId: string; records: readonly ObservabilityRecord[] } | undefined;
+  getSensorFindings?: (filter: { sessionId: string; since?: string; limit?: number }) => unknown[];
+  getSensorProviderAvailability?: (filter: {
+    sessionId: string;
+    since?: string;
+    limit?: number;
+  }) => unknown[];
+  getSensorRuntimeLimitations?: (filter: {
+    sessionId: string;
+    since?: string;
+    limit?: number;
+  }) => unknown[];
+  getMcpCapabilityAvailability?: (filter: {
+    sessionId: string;
+    since?: string;
+    limit?: number;
+  }) => unknown[];
+  getSensorFailurePatterns?: (filter: {
+    sessionId: string;
+    since?: string;
+    limit?: number;
+  }) => unknown[];
+  getFeedbackCandidates?: (filter: {
+    sessionId: string;
+    since?: string;
+    limit?: number;
+  }) => unknown[];
 }>;
 
 export type ObservabilityToolContext = Readonly<{
@@ -48,9 +74,31 @@ export const OBSERVABILITY_IDS = {
   queryLogs: `${SYSTEM_TOOL_PREFIX}query_logs`,
   queryRecentErrors: `${SYSTEM_TOOL_PREFIX}query_recent_errors`,
   inspectTrace: `${SYSTEM_TOOL_PREFIX}inspect_trace`,
+  querySensorFindings: `${SYSTEM_TOOL_PREFIX}query_sensor_findings`,
+  querySensorProviderAvailability: `${SYSTEM_TOOL_PREFIX}query_sensor_provider_availability`,
+  querySensorRuntimeLimitations: `${SYSTEM_TOOL_PREFIX}query_sensor_runtime_limitations`,
+  queryMcpCapabilityAvailability: `${SYSTEM_TOOL_PREFIX}query_mcp_capability_availability`,
+  querySensorFailurePatterns: `${SYSTEM_TOOL_PREFIX}query_sensor_failure_patterns`,
+  queryFeedbackCandidates: `${SYSTEM_TOOL_PREFIX}query_feedback_candidates`,
 } as const;
 
 export const OBSERVABILITY_MAP = buildRiskMap(OBSERVABILITY_IDS, 'zero');
+
+function sensorQuerySchema(limitDescription: string) {
+  return {
+    type: 'object',
+    properties: {
+      since: {
+        type: 'string',
+        description: 'Optional ISO-8601 timestamp cursor.',
+      },
+      limit: {
+        type: 'number',
+        description: limitDescription,
+      },
+    },
+  };
+}
 
 export const OBSERVABILITY_TOOLS: readonly ContractTool[] = [
   {
@@ -116,6 +164,64 @@ export const OBSERVABILITY_TOOLS: readonly ContractTool[] = [
       },
     },
   },
+  {
+    id: OBSERVABILITY_IDS.querySensorFindings,
+    slug: 'sys-query-sensor-findings',
+    name: 'query_sensor_findings',
+    description: 'Query recent normalized sensor findings for the current session only.',
+    riskTier: 'zero',
+    config: { inputSchema: sensorQuerySchema('Maximum findings to return (1-50, default 20).') },
+  },
+  {
+    id: OBSERVABILITY_IDS.querySensorProviderAvailability,
+    slug: 'sys-query-sensor-provider-availability',
+    name: 'query_sensor_provider_availability',
+    description: 'Query feedback provider availability states for the current session only.',
+    riskTier: 'zero',
+    config: {
+      inputSchema: sensorQuerySchema('Maximum provider records to return (1-50, default 20).'),
+    },
+  },
+  {
+    id: OBSERVABILITY_IDS.querySensorRuntimeLimitations,
+    slug: 'sys-query-sensor-runtime-limitations',
+    name: 'query_sensor_runtime_limitations',
+    description: 'Query Docker, sandbox, and runtime limitations observed by sensors.',
+    riskTier: 'zero',
+    config: {
+      inputSchema: sensorQuerySchema('Maximum runtime limitations to return (1-50, default 20).'),
+    },
+  },
+  {
+    id: OBSERVABILITY_IDS.queryMcpCapabilityAvailability,
+    slug: 'sys-query-mcp-capability-availability',
+    name: 'query_mcp_capability_availability',
+    description: 'Query MCP feedback-provider capabilities available to sensor reflection.',
+    riskTier: 'zero',
+    config: {
+      inputSchema: sensorQuerySchema(
+        'Maximum MCP capability records to return (1-50, default 20).',
+      ),
+    },
+  },
+  {
+    id: OBSERVABILITY_IDS.querySensorFailurePatterns,
+    slug: 'sys-query-sensor-failure-patterns',
+    name: 'query_sensor_failure_patterns',
+    description: 'Query repeated sensor failure patterns for the current session only.',
+    riskTier: 'zero',
+    config: {
+      inputSchema: sensorQuerySchema('Maximum failure patterns to return (1-50, default 20).'),
+    },
+  },
+  {
+    id: OBSERVABILITY_IDS.queryFeedbackCandidates,
+    slug: 'sys-query-feedback-candidates',
+    name: 'query_feedback_candidates',
+    description: 'Query reviewed feedforward candidates derived from repeated sensor failures.',
+    riskTier: 'zero',
+    config: { inputSchema: sensorQuerySchema('Maximum candidates to return (1-50, default 20).') },
+  },
 ];
 
 const DEFAULT_LOG_LIMIT = 20;
@@ -151,7 +257,7 @@ function parseLevel(args: Record<string, unknown>): ObservabilityLevel | undefin
   return toolError('INVALID_ARGS', 'level must be one of: info, warn, error');
 }
 
-function truncateRecords(records: readonly ObservabilityRecord[], limit: number) {
+function truncateRecords<T>(records: readonly T[], limit: number) {
   const total = records.length;
   let selected = records.slice(0, limit);
   let truncated = selected.length < total;
@@ -255,6 +361,43 @@ function handleInspectTrace(
   });
 }
 
+type SensorStoreMethod =
+  | 'getSensorFindings'
+  | 'getSensorProviderAvailability'
+  | 'getSensorRuntimeLimitations'
+  | 'getMcpCapabilityAvailability'
+  | 'getSensorFailurePatterns'
+  | 'getFeedbackCandidates';
+
+function handleSensorQuery(
+  toolId: string,
+  args: Record<string, unknown>,
+  context: ObservabilityToolContext,
+  method: SensorStoreMethod,
+): Output {
+  const query = context.store[method];
+  if (!query) {
+    return toolError(
+      'SENSOR_OBSERVABILITY_UNAVAILABLE',
+      'Sensor observability queries are unavailable in this store',
+    );
+  }
+
+  const since = parseSince(args);
+  if (typeof since === 'object' && 'type' in since) return since;
+
+  const limit = parseLimit(args, DEFAULT_LOG_LIMIT);
+  if (typeof limit === 'object' && 'type' in limit) return limit;
+
+  const records = query({
+    sessionId: context.sessionId,
+    since,
+    limit: Number.MAX_SAFE_INTEGER,
+  });
+
+  return toolResult(toolId, truncateRecords(records, limit));
+}
+
 export async function executeObservabilityTool(
   toolId: string,
   args: Record<string, unknown>,
@@ -273,6 +416,30 @@ export async function executeObservabilityTool(
 
   if (toolId === OBSERVABILITY_IDS.inspectTrace) {
     return handleInspectTrace(toolId, args, resolvedContext);
+  }
+
+  if (toolId === OBSERVABILITY_IDS.querySensorFindings) {
+    return handleSensorQuery(toolId, args, resolvedContext, 'getSensorFindings');
+  }
+
+  if (toolId === OBSERVABILITY_IDS.querySensorProviderAvailability) {
+    return handleSensorQuery(toolId, args, resolvedContext, 'getSensorProviderAvailability');
+  }
+
+  if (toolId === OBSERVABILITY_IDS.querySensorRuntimeLimitations) {
+    return handleSensorQuery(toolId, args, resolvedContext, 'getSensorRuntimeLimitations');
+  }
+
+  if (toolId === OBSERVABILITY_IDS.queryMcpCapabilityAvailability) {
+    return handleSensorQuery(toolId, args, resolvedContext, 'getMcpCapabilityAvailability');
+  }
+
+  if (toolId === OBSERVABILITY_IDS.querySensorFailurePatterns) {
+    return handleSensorQuery(toolId, args, resolvedContext, 'getSensorFailurePatterns');
+  }
+
+  if (toolId === OBSERVABILITY_IDS.queryFeedbackCandidates) {
+    return handleSensorQuery(toolId, args, resolvedContext, 'getFeedbackCandidates');
   }
 
   return toolError('TOOL_NOT_FOUND', `Unknown observability tool '${toolId}'`);

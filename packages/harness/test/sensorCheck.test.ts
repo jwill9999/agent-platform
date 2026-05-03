@@ -181,6 +181,71 @@ describe('createSensorCheckNode', () => {
     expect(routeAfterSensorCheck({ ...makeState(), ...result })).toBe('react_llm_reason');
   });
 
+  it('records compact sensor observability with provider and MCP capability summaries', async () => {
+    const failing = makeSensorResult({
+      status: 'failed',
+      summary: 'SonarQube imported one finding.',
+      providerAvailability: {
+        provider: 'sonarqube',
+        capability: 'quality_findings',
+        state: 'available',
+        repairActions: [],
+      },
+      findings: [
+        {
+          source: 'sonarqube_remote',
+          severity: 'high',
+          status: 'open',
+          category: 'code_quality',
+          message: 'Duplicated code.',
+          file: 'packages/harness/src/foo.ts',
+          evidence: [],
+          metadata: {},
+        },
+      ],
+      runtimeLimitations: [
+        {
+          kind: 'sandbox_policy_denied',
+          message: 'Scanner metadata is outside the sandbox.',
+          repairActions: [],
+          metadata: {},
+        },
+      ],
+    });
+    const record = vi.fn();
+    const node = createSensorCheckNode({
+      runSensors: runnerWith(failing, 'optional'),
+      observability: {
+        store: { record },
+        sessionId: 'session-sensor',
+        traceId: 'run-sensor',
+      },
+    });
+
+    await node(makeState());
+
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'sensor_run',
+        sessionId: 'session-sensor',
+        runId: 'run-sensor',
+        agentProfile: 'coding',
+        taskContexts: ['repo_change'],
+        providerAvailability: [
+          expect.objectContaining({ provider: 'sonarqube', state: 'available' }),
+        ],
+        runtimeLimitations: [expect.objectContaining({ kind: 'sandbox_policy_denied' })],
+        mcpCapabilities: [
+          expect.objectContaining({
+            serverId: 'sonarqube',
+            capability: 'quality_findings',
+            selectedForReflection: true,
+          }),
+        ],
+      }),
+    );
+  });
+
   it('halts and emits an error when a required provider is unavailable', async () => {
     const { emitter, events } = captureEmitter();
     const unavailable = makeSensorResult({

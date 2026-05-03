@@ -1,7 +1,25 @@
+import type {
+  SensorAgentProfile,
+  SensorProviderAvailability,
+  SensorResult,
+  SensorRunRecord,
+  SensorRuntimeLimitation,
+  SensorTrigger,
+} from '@agent-platform/contracts';
+
 /**
  * Structured observability events — **no** raw prompt text or tool args unless explicitly enabled
  * in {@link ObservabilityPluginOptions}.
  */
+export type SensorMcpCapabilityAvailability = Readonly<{
+  serverId: string;
+  serverName?: string;
+  capability: string;
+  state: SensorProviderAvailability['state'];
+  selectedForReflection: boolean;
+  message?: string;
+}>;
+
 export type ObservabilityEvent = Readonly<
   | { kind: 'session_start'; sessionId: string; agentId: string }
   | {
@@ -42,6 +60,19 @@ export type ObservabilityEvent = Readonly<
       passed: boolean;
       criteriaCount: number;
       failedCriteriaCount: number;
+    }
+  | {
+      kind: 'sensor_run';
+      sessionId: string;
+      runId: string;
+      trigger: SensorTrigger;
+      agentProfile: SensorAgentProfile;
+      taskContexts: readonly string[];
+      records: readonly SensorRunRecord[];
+      results: readonly SensorResult[];
+      providerAvailability: readonly SensorProviderAvailability[];
+      runtimeLimitations: readonly SensorRuntimeLimitation[];
+      mcpCapabilities: readonly SensorMcpCapabilityAvailability[];
     }
   | {
       kind: 'error';

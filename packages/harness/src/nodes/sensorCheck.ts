@@ -1,8 +1,10 @@
 import { END } from '@langchain/langgraph';
 import type {
   SensorAgentProfile,
+  SensorProviderAvailability,
   SensorResult,
   SensorRunRecord,
+  SensorRuntimeLimitation,
   SensorTrigger,
 } from '@agent-platform/contracts';
 
@@ -23,10 +25,40 @@ export type SensorRunner = (
   options?: ComputationalSensorRunnerOptions,
 ) => Promise<ComputationalSensorRun>;
 
+type SensorMcpCapabilityAvailability = Readonly<{
+  serverId: string;
+  serverName?: string;
+  capability: string;
+  state: SensorProviderAvailability['state'];
+  selectedForReflection: boolean;
+  message?: string;
+}>;
+
+type SensorObservabilityStore = Readonly<{
+  record: (event: {
+    kind: 'sensor_run';
+    sessionId: string;
+    runId: string;
+    trigger: SensorTrigger;
+    agentProfile: SensorAgentProfile;
+    taskContexts: readonly string[];
+    records: readonly SensorRunRecord[];
+    results: readonly SensorResult[];
+    providerAvailability: readonly SensorProviderAvailability[];
+    runtimeLimitations: readonly SensorRuntimeLimitation[];
+    mcpCapabilities: readonly SensorMcpCapabilityAvailability[];
+  }) => unknown;
+}>;
+
 export type SensorCheckNodeOptions = {
   runSensors?: SensorRunner;
   runnerOptions?: ComputationalSensorRunnerOptions;
   emitter?: OutputEmitter;
+  observability?: Readonly<{
+    store: SensorObservabilityStore;
+    sessionId: string;
+    traceId: string;
+  }>;
   maxFeedbackChars?: number;
   repeatedFailureLimit?: number;
 };
@@ -144,6 +176,64 @@ function traceForRun(
   return traces;
 }
 
+function providerAvailabilityFrom(results: readonly SensorResult[]): SensorProviderAvailability[] {
+  return results
+    .map((result) => result.providerAvailability)
+    .filter((availability): availability is SensorProviderAvailability => availability != null);
+}
+
+function runtimeLimitationsFrom(results: readonly SensorResult[]): SensorRuntimeLimitation[] {
+  return results.flatMap((result) => result.runtimeLimitations);
+}
+
+function isKnownMcpFeedbackProvider(provider: string): boolean {
+  const normalized = provider.toLowerCase();
+  return (
+    normalized.startsWith('mcp:') ||
+    ['sonarqube', 'github', 'playwright', 'context7', 'notion'].some((name) =>
+      normalized.includes(name),
+    )
+  );
+}
+
+function mcpCapabilitiesFrom(
+  availability: readonly SensorProviderAvailability[],
+): SensorMcpCapabilityAvailability[] {
+  return availability
+    .filter((provider) => isKnownMcpFeedbackProvider(provider.provider))
+    .map((provider) => ({
+      serverId: provider.provider,
+      capability: provider.capability,
+      state: provider.state,
+      selectedForReflection: provider.state === 'available',
+      message: provider.message,
+    }));
+}
+
+function recordSensorObservability(
+  options: SensorCheckNodeOptions,
+  state: HarnessStateType,
+  trigger: SensorTrigger,
+  records: readonly SensorRunRecord[],
+  results: readonly SensorResult[],
+): void {
+  if (!options.observability) return;
+  const providerAvailability = providerAvailabilityFrom(results);
+  options.observability.store.record({
+    kind: 'sensor_run',
+    sessionId: options.observability.sessionId,
+    runId: options.observability.traceId,
+    trigger,
+    agentProfile: resolveAgentProfile(state),
+    taskContexts: state.sensorTaskContexts ?? [],
+    records,
+    results,
+    providerAvailability,
+    runtimeLimitations: runtimeLimitationsFrom(results),
+    mcpCapabilities: mcpCapabilitiesFrom(providerAvailability),
+  });
+}
+
 function buildRepairFeedback(results: readonly SensorResult[], maxChars: number): string {
   const lines = ['<sensor-feedback>'];
   for (const result of results) {
@@ -252,6 +342,7 @@ export function createSensorCheckNode(options: SensorCheckNodeOptions = {}) {
     });
 
     const trace = traceForRun(trigger, run.records, run.results);
+    recordSensorObservability(options, state, trigger, run.records, run.results);
     const attempts = updateAttempts(state, run.results);
     const repeated = repeatedFailure(attempts, run.results, repeatedFailureLimit);
 

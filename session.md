@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Completed and closed `agent-platform-feedback-sensors.5` on `task/agent-platform-feedback-sensors.5`: sensor runs now persist compact sanitized observability events, sensor findings/provider/runtime/MCP capability states are queryable through session-bound tools, repeated failures produce review-required feedforward candidates only, and local gates plus SonarQube Blocker/Critical query are green.
+- **Date:** 2026-05-04
 - **Session:** Fixed the GitHub Actions unit-test regression on `task/agent-platform-feedback-sensors.4`: the combined feedback sensor runner no longer spends an implicit inferential evaluator call unless an evaluator is explicitly supplied. Root typecheck, lint, and unit tests pass locally; SonarQube CLI found no open Blocker/Critical issues on the PR branch. A separate `.5` spec update for MCP feedback-provider discovery remains uncommitted.
 - **Date:** 2026-05-03
 - **Session:** Implemented and closed `agent-platform-feedback-sensors.4`: added inferential feedback sensors, wired them into the default sensor runner, verified gates, and prepared `task/agent-platform-feedback-sensors.4` for push.

@@ -425,13 +425,13 @@ importers:
 
   packages/plugin-observability:
     dependencies:
+      '@agent-platform/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@agent-platform/plugin-sdk':
         specifier: workspace:*
         version: link:../plugin-sdk
     devDependencies:
-      '@agent-platform/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.17
