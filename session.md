@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Addressed the second SonarCloud PR #131 pass after duplication dropped to 3.6% but remained above the 3% gate: extracted ReAct graph assembly helpers from `buildHarnessGraph`, verified local gates, and prepared the branch for another analysis run.
+- **Date:** 2026-05-03
 - **Session:** Addressed SonarCloud PR #131 feedback on `task/agent-platform-feedback-sensors.3`: refactored duplicated ReAct graph construction, reduced reported complexity/style findings, verified focused gates, and prepared the branch for re-analysis.
 - **Date:** 2026-05-03
 - **Session:** Implemented `agent-platform-feedback-sensors.3` on `task/agent-platform-feedback-sensors.3`: wired sensor checks into ReAct routing, added bounded repair feedback/escalation behavior, enabled API graph support, and closed the bead after green gates.
@@ -223,6 +225,15 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 Branch state: `task/agent-platform-feedback-sensors.3` contains the pushed task implementation plus a follow-up cleanup commit.
 
+- Second SonarCloud run after commit `9d2a163` still failed the quality gate at `3.6% Duplication on New Code`, required `<= 3%`.
+- The remaining annotation was `packages/harness/src/buildGraph.ts`, where `buildHarnessGraph` cognitive complexity was `19` versus the allowed `15`.
+- Extracted `createReactGraph` and `createPlanOnlyGraph` so `buildHarnessGraph` is now the high-level selector and optional ReAct graph assembly lives in smaller helpers.
+- Verified this second cleanup with:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/sensorCheck.test.ts test/reactLoop.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm format:check`
+  - `pnpm typecheck`
 - Reviewed GitHub-exposed SonarCloud check metadata for PR `#131`.
 - SonarCloud quality gate failed on new-code duplication: `5.6% Duplication on New Code`, required `<= 3%`.
 - Sonar annotations also reported repeated graph-routing implementations, `buildHarnessGraph` cognitive complexity, empty-object spreads, nested ternary/template formatting, and one inline union return type.
@@ -583,9 +594,9 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-feedback-sensors.3`
 - **Current base:** `feature/feedback-sensors-harness`
-- **Latest task commit:** `de397f6 Address Sonar duplication feedback`
-- **Current work:** `.3` is implemented, closed, and has a SonarCloud cleanup commit ready to push.
-- **Remote sync:** Git push is required so SonarCloud can re-analyze PR `#131`; `bd dolt push` was already synced for the closed bead before the Sonar cleanup.
+- **Latest task commit:** pending second Sonar cleanup commit after `9d2a163 Address Sonar duplication feedback`.
+- **Current work:** `.3` is implemented and closed; a second `buildGraph.ts` helper extraction is ready to commit/push for another SonarCloud re-analysis.
+- **Remote sync:** Git push is required after committing the second Sonar cleanup; `bd dolt push` was already synced for the closed bead before Sonar follow-up work.
 
 ### Beads
 
@@ -621,8 +632,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push `task/agent-platform-feedback-sensors.3` so SonarCloud can re-run PR `#131`.
-2. Re-check PR `#131` after pipelines finish, especially the SonarCloud quality gate and `e2e`.
+1. Commit and push the second `buildGraph.ts` Sonar cleanup on `task/agent-platform-feedback-sensors.3`.
+2. Re-check PR `#131` after pipelines finish, especially the SonarCloud quality gate, `verify`, `docker`, and `e2e`.
 3. Start `agent-platform-feedback-sensors.4` from the `.3` chain tip after the PR checks are acceptable.
 4. Keep `.4` focused on inferential sensor checkpoints; GitHub/SonarQube/CodeQL remote polling remains separate from the computational routing already added.
 

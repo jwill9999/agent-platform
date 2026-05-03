@@ -422,6 +422,62 @@ function routeAfterCriticForFeatures(hasDod: boolean, hasSensors: boolean) {
   return routeAfterCritic;
 }
 
+function createReactGraph(options: BuildHarnessGraphOptions, planGenNode: GraphNodeFn) {
+  const hasSensors = Boolean(options.sensorCheckNode);
+  const hasCritic = Boolean(options.criticNode);
+  const hasDod = Boolean(options.dodProposeNode && options.dodCheckNode);
+  const initialReactNode = hasDod ? 'react_dod_propose' : 'react_llm_reason';
+  const routeByMode = createReactStartRouter(initialReactNode, hasSensors);
+  const graph = new StateGraph(HarnessState)
+    .addNode('plan_generate', planGenNode)
+    .addNode('resolve_plan', createResolvePlanNode(options))
+    .addNode('execute', createExecuteNode(options))
+    .addNode('react_dod_propose', options.dodProposeNode ?? (async () => ({})))
+    .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode!))
+    .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode!))
+    .addNode('react_critic', options.criticNode ?? (async () => ({})))
+    .addNode('react_dod_check', options.dodCheckNode ?? (async () => ({})))
+    .addNode('react_sensor_check', options.sensorCheckNode ?? (async () => ({})));
+
+  graph
+    .addConditionalEdges(START, routeByMode)
+    .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+    .addEdge('resolve_plan', 'execute')
+    .addConditionalEdges('execute', routeAfterExecute)
+    .addConditionalEdges(
+      'react_tool_dispatch',
+      hasSensors ? routeAfterReactDispatchWithSensors : routeAfterReactDispatch,
+    );
+
+  if (hasDod) graph.addEdge('react_dod_propose', 'react_llm_reason');
+  if (hasSensors) graph.addConditionalEdges('react_sensor_check', routeAfterSensorCheck);
+  if (hasDod) {
+    graph.addConditionalEdges(
+      'react_dod_check',
+      hasSensors ? routeAfterDodCheckWithSensors : routeAfterDodCheck,
+    );
+  }
+
+  if (hasCritic) {
+    graph
+      .addConditionalEdges('react_llm_reason', routeAfterLlmWithCritic)
+      .addConditionalEdges('react_critic', routeAfterCriticForFeatures(hasDod, hasSensors));
+  } else {
+    graph.addConditionalEdges('react_llm_reason', routeAfterLlmForFeatures(hasDod, hasSensors));
+  }
+
+  return graph;
+}
+
+function createPlanOnlyGraph(options: BuildHarnessGraphOptions) {
+  return new StateGraph(HarnessState)
+    .addNode('resolve_plan', createResolvePlanNode(options))
+    .addNode('execute', createExecuteNode(options))
+    .addEdge(START, 'resolve_plan')
+    .addEdge('resolve_plan', 'execute')
+    .addConditionalEdges('execute', routeAfterExecute);
+}
+
 // ---------------------------------------------------------------------------
 // Mode router
 // ---------------------------------------------------------------------------
@@ -454,64 +510,8 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
   const planGenNode: GraphNodeFn = options.planGenerateNode ?? (async () => ({}));
 
   if (options.llmReasonNode && options.toolDispatchNode) {
-    const hasSensors = Boolean(options.sensorCheckNode);
-    const hasCritic = Boolean(options.criticNode);
-    const hasDod = Boolean(options.dodProposeNode && options.dodCheckNode);
-    const initialReactNode = hasDod ? 'react_dod_propose' : 'react_llm_reason';
-    const routeByMode = createReactStartRouter(initialReactNode, hasSensors);
-    const graph = new StateGraph(HarnessState)
-      .addNode('plan_generate', planGenNode)
-      .addNode('resolve_plan', createResolvePlanNode(options))
-      .addNode('execute', createExecuteNode(options))
-      .addNode('react_dod_propose', options.dodProposeNode ?? (async () => ({})))
-      .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
-      .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
-      .addNode('react_critic', options.criticNode ?? (async () => ({})))
-      .addNode('react_dod_check', options.dodCheckNode ?? (async () => ({})))
-      .addNode('react_sensor_check', options.sensorCheckNode ?? (async () => ({})));
-
-    graph
-      .addConditionalEdges(START, routeByMode)
-      .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
-      .addEdge('resolve_plan', 'execute')
-      .addConditionalEdges('execute', routeAfterExecute);
-
-    if (hasDod) {
-      graph.addEdge('react_dod_propose', 'react_llm_reason');
-    }
-
-    if (hasCritic) {
-      graph.addConditionalEdges('react_llm_reason', routeAfterLlmWithCritic);
-      graph.addConditionalEdges('react_critic', routeAfterCriticForFeatures(hasDod, hasSensors));
-    } else {
-      graph.addConditionalEdges('react_llm_reason', routeAfterLlmForFeatures(hasDod, hasSensors));
-    }
-
-    graph.addConditionalEdges(
-      'react_tool_dispatch',
-      hasSensors ? routeAfterReactDispatchWithSensors : routeAfterReactDispatch,
-    );
-
-    if (hasDod) {
-      graph.addConditionalEdges(
-        'react_dod_check',
-        hasSensors ? routeAfterDodCheckWithSensors : routeAfterDodCheck,
-      );
-    }
-    if (hasSensors) {
-      graph.addConditionalEdges('react_sensor_check', routeAfterSensorCheck);
-    }
-
-    return graph.compile({ checkpointer });
+    return createReactGraph(options, planGenNode).compile({ checkpointer });
   }
 
-  // No ReAct nodes → plan-only path (backwards compatible)
-  const graph = new StateGraph(HarnessState)
-    .addNode('resolve_plan', createResolvePlanNode(options))
-    .addNode('execute', createExecuteNode(options))
-    .addEdge(START, 'resolve_plan')
-    .addEdge('resolve_plan', 'execute')
-    .addConditionalEdges('execute', routeAfterExecute);
-
-  return graph.compile({ checkpointer });
+  return createPlanOnlyGraph(options).compile({ checkpointer });
 }
