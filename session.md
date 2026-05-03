@@ -7,6 +7,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-03
+- **Session:** Planned the feedback sensors harness epic from the Böckeler/Thoughtworks harness-engineering discussion. Created Beads epic `agent-platform-feedback-sensors`, six chained child tasks, linked spec files under `docs/tasks/`, and committed the planning docs on `feature/feedback-sensors-harness`.
 - **Date:** 2026-05-02
 - **Session:** Memory epic closeout complete. The epic was manually tested, merged to `main`, local `main` was updated, old task/feature branches were pruned, and `agent-platform-memory` plus child tasks `.1` through `.7` are closed in Beads. Pause here; next session should start planning/refinement for the next epic from updated `main`.
 - **Date:** 2026-05-02
@@ -197,29 +199,29 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Memory candidate extraction implemented
+### Feedback sensors harness planned
 
-Branch state: `task/agent-platform-memory.3` contains the third memory epic task.
+Branch state: `feature/feedback-sensors-harness` contains planning/spec documentation only.
 
-- Added shared contracts for extracted memory candidates, candidate evidence, and extraction input messages.
-- Added a DB repository helper that extracts conservative pending candidates from explicit remember instructions, user corrections, repeated tool/runtime failures, and remediation language.
-- Candidate memories are persisted through the long-term memory repository as `status: pending` and `reviewStatus: unreviewed`; they are not active/retrieved before review.
-- Candidate metadata records rationale, scope suggestion, and bounded evidence excerpts.
-- Candidate content and evidence excerpts are credential-scanned before storage; redacted candidates are marked `safetyState: redacted`.
-- Wired candidate extraction into successful chat and approval-resume working-memory refresh paths.
-- Updated `docs/memory.md` to document the candidate extraction layer and retrieval boundary.
+- Used the SonarQube plugin flow earlier in the session; `sonarqube-cli` was installed, but auth requires the owner to run `sonar auth login -o jwill9999` locally before issue listing can continue.
+- Reviewed the Böckeler/Fowler article and Thoughtworks Radar framing: computational sensors run fast deterministic checks, inferential sensors run semantic review at bounded checkpoints, and both should produce LLM-optimized self-correction signals.
+- Created Beads epic `agent-platform-feedback-sensors`.
+- Created child tasks `agent-platform-feedback-sensors.1` through `.6`, linked under the epic, with Beads dependencies chained linearly.
+- Added matching specs:
+  - `docs/tasks/agent-platform-feedback-sensors.md`
+  - `docs/tasks/agent-platform-feedback-sensors.1.md`
+  - `docs/tasks/agent-platform-feedback-sensors.2.md`
+  - `docs/tasks/agent-platform-feedback-sensors.3.md`
+  - `docs/tasks/agent-platform-feedback-sensors.4.md`
+  - `docs/tasks/agent-platform-feedback-sensors.5.md`
+  - `docs/tasks/agent-platform-feedback-sensors.6.md`
+- Updated `docs/tasks/README.md` epic index.
+- Created branch `feature/feedback-sensors-harness` from `origin/main` to keep the planning docs out of the prior scheduler task branch.
+- Committed planning docs as `1d1e690 docs: plan feedback sensors harness`.
 
 Quality gates passed:
 
-- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-- `pnpm --filter @agent-platform/db run test -- test/memoryCandidates.test.ts test/memories.test.ts`
-- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
-- `pnpm typecheck`
-- `pnpm lint`
-- `pnpm format:check`
 - `pnpm docs:lint`
-- `pnpm test`
-- `pnpm build`
 
 ### Short-term working memory implemented
 
@@ -461,168 +463,40 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `main`
-- **Current base:** updated `origin/main` after the memory epic merge.
-- **Latest completed epic:** `agent-platform-memory` memory management and self-learning.
-- **Current work:** Paused. No task is currently claimed; next session should plan/refine the next epic before implementation.
-- **Remote sync:** Memory epic code has been merged to `main`; Beads/Dolt is synced after closeout.
+- **Current branch:** `feature/feedback-sensors-harness`
+- **Current base:** `origin/main`
+- **Latest commit:** `1d1e690 docs: plan feedback sensors harness`
+- **Current work:** Planning only. Implementation has not started and no feedback-sensors child task is claimed.
+- **Remote sync:** Git branch pushed to `origin/feature/feedback-sensors-harness`. Beads local records exist, but Dolt push failed because GitHub SSH/DNS was unavailable to `bd dolt push` in the sandbox.
 
 ### Beads
 
-- `agent-platform-code-tools.2` is closed.
-- `agent-platform-code-tools.3` is closed.
-- `agent-platform-code-tools.4` is closed.
-- `agent-platform-code-tools.5` is closed.
-- `agent-platform-code-tools.6` is closed.
-- `agent-platform-code-tools.7` is closed.
-- `agent-platform-code-tools` epic is closed.
-- `agent-platform-memory` epic is closed in Beads and merged to `main`.
-- `agent-platform-memory.1` through `.7` are complete and closed.
-- New follow-up task `agent-platform-active-project` is open as a P2 task for active project workspace defaults.
-- New follow-up task `agent-platform-context-optimisation` is open as a P2 task for context window/token-budget optimisation after memory foundations.
-- New follow-up task `agent-platform-llm-observability-export` is open as a P2 task for LLM/context/memory observability export strategy.
-- New follow-up task `agent-platform-improvement-goals` is open as a P2 task for reviewed observability-driven self-improvement goals.
-- New follow-up task `agent-platform-runtime-backup-auto` is open as a P2 standalone platform task.
-- New follow-up task `agent-platform-ide-rethink` is open as a P2 product/architecture task.
-- Process note: before starting future epics, run a refinement session with the owner to review and adjust tickets/specs before marking the epic ready.
+- `agent-platform-feedback-sensors` is open as a P2 epic.
+- `agent-platform-feedback-sensors.1` through `.6` are open P2 child tasks.
+- Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
+- Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md`.
+- Per stored memory, schedule or explicitly run owner refinement before moving this epic from planning/refinement to implementation-ready.
 
 ### Quality
 
-- SonarQube MCP was unavailable in this session; terminal checks were used as the fallback gate.
-- Memory `.7` retention/cleanup checks passed:
-  - `pnpm --filter @agent-platform/contracts build`
-  - `pnpm --filter @agent-platform/db build`
-  - `pnpm --filter @agent-platform/contracts typecheck`
-  - `pnpm --filter @agent-platform/db typecheck`
-  - `pnpm --filter @agent-platform/web typecheck`
-  - `pnpm --filter @agent-platform/web lint`
-  - `pnpm --filter @agent-platform/web test`
-  - `pnpm --filter @agent-platform/api typecheck`
-  - `pnpm --filter @agent-platform/contracts lint`
-  - `pnpm --filter @agent-platform/db lint`
-  - `pnpm --filter @agent-platform/api lint`
-  - `pnpm --filter @agent-platform/contracts test`
-  - `pnpm --filter @agent-platform/db test`
-  - `pnpm --filter @agent-platform/api test` (escalated for Supertest local listener)
-- Memory sidebar discoverability checks passed:
-  - `pnpm --filter @agent-platform/web typecheck`
-  - `pnpm --filter @agent-platform/web lint`
-- Sonar feedback cleanup checks passed:
-  - `pnpm --filter @agent-platform/db typecheck`
-  - `pnpm --filter @agent-platform/api typecheck`
-  - `pnpm --filter @agent-platform/web typecheck`
-  - `pnpm --filter @agent-platform/db lint`
-  - `pnpm --filter @agent-platform/api lint`
-  - `pnpm --filter @agent-platform/web lint`
-  - `pnpm --filter @agent-platform/db test -- --run test/memories.test.ts test/selfLearning.test.ts`
-  - `pnpm --filter @agent-platform/api test -- --run test/sessionChat.integration.test.ts`
-  - `pnpm --filter @agent-platform/web test`
-- Structured edit checks passed:
-  - `pnpm --filter @agent-platform/contracts build`
-  - `pnpm --filter @agent-platform/agent-validation build`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/agent-validation run test -- test/allowlists.test.ts`
-  - `pnpm --filter @agent-platform/harness run test -- test/codingEditTool.test.ts test/toolAuditLog.test.ts test/mediumRiskTools.test.ts test/toolDispatch.test.ts`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/agent-validation run typecheck`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/contracts run lint`
-  - `pnpm --filter @agent-platform/agent-validation run lint`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
-- Sonar duplicate-code follow-up checks passed:
-  - `pnpm --filter @agent-platform/harness run test -- test/toolAuditLog.test.ts`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm exec prettier --check packages/harness/test/toolAuditLog.test.ts`
-  - `git diff --check`
-- Read-only git tool focused checks passed:
-  - `pnpm --filter @agent-platform/contracts build`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/harness run build`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run test -- test/gitTools.test.ts test/lowRiskTools.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts`
-  - `pnpm --filter @agent-platform/contracts run lint`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm exec prettier --check packages/harness/src/tools/gitTools.ts packages/harness/test/gitTools.test.ts`
-- Broad `.4` completion checks passed:
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
-  - `pnpm docs:lint`
-  - `pnpm exec prettier --check session.md`
-  - `git diff --check`
-- `.4` GitHub pipelines passed green after push.
-- Governed test runner focused checks passed:
-  - `pnpm --filter @agent-platform/contracts build`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/contracts run lint`
-  - `pnpm --filter @agent-platform/harness run build`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run test -- test/qualityGateTool.test.ts test/mediumRiskTools.test.ts test/toolAuditLog.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm exec prettier --check packages/contracts/src/codingTool.ts packages/harness/src/tools/qualityGateTool.ts packages/harness/test/qualityGateTool.test.ts`
-- Broad `.5` completion checks passed:
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (first sandboxed run failed at API Supertest local port binding only; escalated rerun passed)
-  - `pnpm docs:lint`
-  - `pnpm exec prettier --check session.md`
-  - `git diff --check`
-- Chat runtime evaluator fix checks passed:
-  - `pnpm --filter @agent-platform/api run typecheck`
-  - `pnpm --filter @agent-platform/api run lint`
-  - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` (run with escalation because Supertest binds local ports)
-- Quality-gate package-path and CI follow-up checks passed:
-  - `pnpm --filter @agent-platform/harness exec vitest run test/qualityGateTool.test.ts`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm test` (run with escalation because API Supertest binds local ports)
-  - pre-push harness build/typecheck/test
-- Repository discovery focused checks passed:
-  - `pnpm --filter @agent-platform/contracts run build`
-  - `pnpm --filter @agent-platform/contracts run typecheck`
-  - `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-  - `pnpm --filter @agent-platform/harness run typecheck`
-  - `pnpm --filter @agent-platform/harness run build`
-  - `pnpm --filter @agent-platform/harness run lint`
-  - `pnpm --filter @agent-platform/harness exec vitest run test/repoDiscoveryTools.test.ts test/mcpTrustGuard.test.ts`
-  - `pnpm --filter @agent-platform/harness run test -- test/repoDiscoveryTools.test.ts test/mcpTrustGuard.test.ts test/toolDispatch.test.ts test/lowRiskTools.test.ts`
-  - `pnpm docs:lint`
-  - `pnpm exec prettier --check docs/coding-tool-contracts.md packages/contracts/src/codingTool.ts packages/harness/src/tools/repoDiscoveryTools.ts packages/harness/test/repoDiscoveryTools.test.ts packages/contracts/test/roundtrip.test.ts`
-  - `git diff --check`
-- Broad `.6` completion checks passed:
-  - `pnpm typecheck`
-  - `pnpm lint`
-  - `pnpm format:check`
-  - `pnpm test` (run with escalation because API Supertest binds local ports)
-- `.7` tool-activity UI focused checks passed:
-  - `pnpm --filter @agent-platform/web run typecheck`
-  - `pnpm --filter @agent-platform/web run lint`
-  - `pnpm --filter @agent-platform/web run test -- test/use-harness-chat.test.ts`
-  - `pnpm docs:lint`
-  - `pnpm exec prettier --check apps/web/hooks/use-harness-chat.ts apps/web/components/chat/chat.tsx apps/web/components/chat/message.tsx apps/web/components/chat/tool-trace-block.tsx apps/web/app/page.tsx apps/web/test/use-harness-chat.test.ts docs/tasks/agent-platform-code-tools.7.md`
-  - `pnpm exec prettier --check session.md docs/tasks/agent-platform-code-tools.7.md`
-  - `git diff --check`
+- `pnpm docs:lint` passed for the planning/documentation change.
+- No runtime code changed.
+- SonarQube CLI was installed but not authenticated; issue listing remains blocked until the owner completes `sonar auth login -o jwill9999`.
 
 ---
 
 ## Next (priority order)
 
-1. Resume on `task/agent-platform-memory.1`.
-2. Refine `agent-platform-memory.1` with the owner before implementation if needed.
-3. Implement `agent-platform-memory.1`: shared contracts, relational DB schema/repository, policy model, and optional memory link model.
+1. Ask the owner to run `bd dolt push` if Beads remote sync is still blocked by GitHub auth/DNS.
+2. Run a refinement session with the owner for `agent-platform-feedback-sensors` before claiming `.1`.
+3. After refinement, start `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`.
 
 ---
 
 ## Blockers / questions for owner
 
-- No code blockers.
+- SonarQube issue listing is blocked until CLI authentication is completed locally with `sonar auth login -o jwill9999`.
+- Beads Dolt auto-push reported GitHub DNS/auth failure in the sandbox; owner may need to run `bd dolt push`.
 
 ---
 
