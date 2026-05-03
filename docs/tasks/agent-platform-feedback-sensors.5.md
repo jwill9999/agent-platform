@@ -14,6 +14,7 @@ Required outcomes:
 
 - Record sensor runs/results in the observability store with redaction and truncation.
 - Record normalized findings from local commands, IDE problems, IDE/plugin terminal output, SonarQube, CodeQL, GitHub checks, PR annotations, agent code comments, and user feedback.
+- Record runtime environment metadata and limitations for sensor runs, including Docker service/container identity, sandbox profile, missing tools, missing mounts, and path mappings where available.
 - Expose sensor outcomes through existing observability tools where appropriate.
 - Detect repeated failure patterns by sensor ID, rule, file area, or repair category.
 - Deduplicate the same issue when it appears across local diagnostics, IDE problems, IDE/plugin terminal output, CI annotations, and remote code scanning.
@@ -44,10 +45,11 @@ Required outcomes:
 2. Add sensor event kinds to observability events.
 3. Store compact sensor summaries and evidence references, not full unbounded logs.
 4. Store provider availability/auth state so missing GitHub/SonarQube/CodeQL/IDE-plugin access can be explained and retried.
-5. Add query support for recent sensor failures, open findings, provider availability, and repeated failure patterns.
-6. Integrate with the existing improvement-goals plan if it has landed; otherwise define a pending candidate shape that can be adopted by that work.
-7. Add tests for redaction, truncation, ordering, session scoping, and deduplication.
-8. Document the feedback flywheel rules: repeated failures propose reviewed feedforward changes, never direct autonomous updates.
+5. Store runtime limitation state so Docker/sandbox access problems can be explained, retried, and distinguished from code failures.
+6. Add query support for recent sensor failures, open findings, provider availability, runtime limitations, and repeated failure patterns.
+7. Integrate with the existing improvement-goals plan if it has landed; otherwise define a pending candidate shape that can be adopted by that work.
+8. Add tests for redaction, truncation, ordering, session scoping, and deduplication.
+9. Document the feedback flywheel rules: repeated failures propose reviewed feedforward changes, never direct autonomous updates.
 
 ## Tests (required before sign-off)
 
@@ -59,6 +61,7 @@ Required outcomes:
   - sensor event storage
   - session-scoped sensor queries
   - provider auth/unavailable state storage
+  - runtime limitation state storage
   - finding deduplication across local and remote sources
   - repeated failure pattern aggregation
   - redaction of command output and paths where required
@@ -68,6 +71,7 @@ Required outcomes:
 
 - [ ] Sensor outcomes are recorded in observability.
 - [ ] Normalized findings and provider availability states are queryable.
+- [ ] Runtime environment limitations are queryable and distinct from code failures.
 - [ ] Agents/users can query recent sensor failures.
 - [ ] Repeated failures can produce reviewed improvement candidates.
 - [ ] Automatic feedforward mutation is explicitly prevented.

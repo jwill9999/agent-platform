@@ -15,6 +15,7 @@ Add first-class feedback sensors to the coding harness so deterministic and infe
     "sensor_contracts",
     "capability_discovery",
     "finding_ingestion",
+    "runtime_environment_discovery",
     "computational_sensor_runner",
     "react_sensor_check_node",
     "pre_push_validation",
@@ -46,6 +47,8 @@ Add first-class feedback sensors to the coding harness so deterministic and infe
     "ide_problems",
     "ide_terminal_output",
     "ide_plugin_finding",
+    "container_runtime",
+    "sandbox_runtime",
     "sonarqube_local",
     "sonarqube_remote",
     "codeql_local",
@@ -77,6 +80,21 @@ Sensors should improve the coding flow without turning every edit into a full CI
 - **Scheduled:** later orchestration can poll long-running remote checks and repeated failure patterns.
 
 Capability discovery comes before user confirmation. The platform should inspect local scripts, repository instructions, SonarQube/CodeQL configuration, IDE/problem surfaces, IDE/plugin terminal-output providers, GitHub remotes, branch protection, and check runs where authenticated access is available. Missing auth or missing IDE/plugin access should be represented as an `auth_required`, `not_configured`, or `unavailable` sensor result with a clear repair action, not as absence of a gate.
+
+## Runtime Environment Constraints
+
+The platform currently runs the application stack in Docker, and future work may introduce more isolated sandboxes for specific commands. Sensors must discover and report the runtime they are operating in so failures are not misread as code problems.
+
+Edge cases to model early:
+
+- host paths and container paths may differ, so findings need path mapping metadata for files, evidence artifacts, and editor links
+- required tools may be installed on the host, in the app container, in an IDE plugin, or in a future command sandbox, but not in every runtime
+- Docker services may be stopped, unhealthy, missing mounts, or using stale volumes
+- a sensor may need network, GitHub auth, SonarQube auth, CodeQL databases, browser dependencies, or workspace mounts that are unavailable inside the current runtime
+- future command sandboxes may block process inspection, outbound network, Docker socket access, host IDE access, or writes outside an approved workspace
+- terminal output from IDEs/plugins may reflect host-side commands while local quality gates run inside containers, so results must preserve producer/runtime metadata
+
+Sensors should return structured environment limitations such as `runtime_unavailable`, `missing_mount`, `tool_unavailable`, `network_unavailable`, `permission_denied`, or `path_mapping_required` with repair actions. They should not silently downgrade required checks when a runtime boundary prevents execution.
 
 ## IDE Feedback Integration
 
@@ -131,6 +149,7 @@ flowchart TD
 - Treat IDE problems, IDE/plugin terminal output, SonarQube issues, CodeQL alerts, GitHub checks, PR annotations, agent code comments, and user feedback as normalized findings with source metadata.
 - Prefer pre-push local validation and post-push remote feedback import over frequent full checks after every edit.
 - Missing provider auth is a structured availability state with repair actions such as connect, authenticate, skip optional sensor, or retry.
+- Runtime boundaries are first-class sensor context. A failed Docker/sandbox precondition is reported as an environment limitation with a repair action, not as a passing or absent quality gate.
 - Feed the model repair-shaped messages, not raw logs. Raw stdout/stderr remain evidence artifacts.
 - Reuse the existing critic and DoD loop model for inferential sensors instead of creating a second semantic-review system.
 - Keep automatic harness improvement review-gated. Repeated failures may propose Beads tasks, memories, skills, or instruction changes, but must not apply them directly.
@@ -141,6 +160,7 @@ flowchart TD
 - Fast deterministic sensors can run selectively during work, with required local validation before commit/push.
 - Remote feedback from GitHub Actions, CodeQL, SonarQube, PR annotations, and code review comments can be imported after push or on request.
 - IDE/problem diagnostics, IDE/plugin terminal output, and agent-generated code comments can be ingested before push and deduplicated with local/remote findings.
+- Docker/container/runtime limitations are visible in sensor results and do not mask required checks.
 - Inferential sensors can run at task checkpoints with cost/iteration limits.
 - Sensor outcomes are observable and queryable.
 - Repeated sensor failures can become reviewed improvement candidates.

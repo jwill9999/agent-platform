@@ -17,7 +17,7 @@ Required outcomes:
 - Add explicit support for `before_commit`, `before_push`, `after_push`, `external_feedback`, `manual`, and `scheduled` trigger contexts.
 - Feed failed sensor repair instructions into `state.messages` as bounded system feedback.
 - Continue when sensors pass.
-- Stop or escalate when a required sensor is unavailable, provider auth is required, or the same sensor failure repeats without progress.
+- Stop or escalate when a required sensor is unavailable, provider auth is required, a runtime/sandbox limitation blocks a required check, or the same sensor failure repeats without progress.
 - Record sensor trace events and emit user-visible `thinking`/`error` events when appropriate.
 
 ## Dependency order
@@ -42,13 +42,17 @@ Required outcomes:
 4. Detect code-changing tool calls using system tool IDs and coding edit tool IDs, but default to targeted checks rather than full validation.
 5. Add a pre-completion/pre-push route that runs required local sensors before the agent declares work ready.
 6. Add an external feedback route for imported GitHub/SonarQube/CodeQL/review results after push or manual refresh.
-7. Add graph variants for:
+7. Add routing behavior for environment limitations:
+   - optional sensor blocked by runtime limitation records a skipped/unavailable result
+   - required sensor blocked by runtime limitation escalates with repair instructions
+   - transient runtime limitation can be retried manually or after environment repair
+8. Add graph variants for:
    - ReAct only + sensors
    - ReAct + critic + sensors
    - ReAct + DoD + sensors
    - ReAct + critic + DoD + sensors
-8. Reuse existing deadline, `maxSteps`, and critic iteration cap patterns.
-9. Add focused tests in `packages/harness/test/sensorCheck.test.ts` and route tests in `packages/harness/test/reactLoop.test.ts`.
+9. Reuse existing deadline, `maxSteps`, and critic iteration cap patterns.
+10. Add focused tests in `packages/harness/test/sensorCheck.test.ts` and route tests in `packages/harness/test/reactLoop.test.ts`.
 
 ## Tests (required before sign-off)
 
@@ -65,6 +69,8 @@ Required outcomes:
   - failed sensor adds repair feedback and loops to `react_llm_reason`
   - passed sensor permits normal routing
   - required auth/unavailable provider escalates clearly
+  - required runtime/sandbox limitation escalates clearly
+  - optional runtime/sandbox limitation records skipped/unavailable state
   - repeated identical failure halts with a clear error
 
 ## Definition of done

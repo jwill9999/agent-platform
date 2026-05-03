@@ -22,6 +22,8 @@ Required outcomes:
 - Treat pre-push validation as the primary required local checkpoint; during-work checks must be targeted and cheap by default.
 - Convert raw quality gate failures into LLM-optimized repair instructions with file, line, failing command, and next action.
 - Normalize imported findings into the shared finding model and deduplicate by source/rule/file/line/message where possible.
+- Discover whether the check is running on the host, in the Docker app container, through Docker compose, through an IDE plugin, or in a future isolated command sandbox.
+- Surface missing runtime prerequisites such as stopped containers, unhealthy services, missing workspace mounts, unavailable tool binaries, missing network/auth, or host/container path mapping gaps.
 - Read IDE/plugin terminal output only through approved providers or bounded transcript APIs; do not scrape arbitrary processes or bypass the workspace/sandbox policy.
 - Preserve raw stdout/stderr as bounded evidence artifacts.
 - Enforce workspace/path limits, timeout limits, output caps, and no arbitrary shell command construction.
@@ -46,13 +48,14 @@ Required outcomes:
 2. Create `packages/harness/src/sensors/computationalSensorRunner.ts`.
 3. Define a runner API that accepts changed files, repo path, available sensor definitions, and execution limits.
 4. Reuse `executeQualityGateTool` instead of invoking shell commands directly.
-5. Add provider/finding collector interfaces that can return `available`, `auth_required`, `not_configured`, `permission_denied`, or normalized findings without failing the whole run.
+5. Add provider/finding collector interfaces that can return `available`, `auth_required`, `not_configured`, `permission_denied`, runtime limitation states, or normalized findings without failing the whole run.
 6. Add deterministic failure normalization helpers:
    - TypeScript errors become "fix the type mismatch" repair instructions.
    - ESLint errors become "apply this lint rule" repair instructions.
    - test failures include expected/actual snippets when available.
    - SonarQube and CodeQL findings include severity, rule ID, hotspot/security metadata when present, and evidence links.
    - IDE problems, IDE/plugin terminal output, and agent code comments become findings with local source metadata.
+   - runtime failures distinguish code failure from environment failure.
    - unknown failures include the failing command and the smallest useful log tail.
 7. Add unit tests in `packages/harness/test/computationalSensorRunner.test.ts`.
 8. Ensure all result payloads satisfy the contracts from task `.1`.
@@ -69,6 +72,8 @@ Required outcomes:
   - imported IDE/SonarQube/CodeQL/review finding converted to repair instruction
   - IDE/plugin terminal output converted into bounded findings/evidence
   - auth-required provider returns unavailable result without blocking optional sensors
+  - stopped Docker service or missing mount returns environment limitation, not code failure
+  - host/container path mapping is included in finding evidence
   - passing quality gate converted to passed sensor result
   - denial when repo path is outside workspace
 
@@ -77,6 +82,7 @@ Required outcomes:
 - [ ] Computational sensor runner exists and uses approved quality gate execution.
 - [ ] Local/problem/provider findings can be normalized and deduplicated.
 - [ ] IDE/plugin terminal output is ingested only through approved bounded providers.
+- [ ] Runtime environment limitations are reported distinctly from quality failures.
 - [ ] Results are compact and suitable to feed into an LLM turn.
 - [ ] Raw logs remain evidence, not primary feedback.
 - [ ] Tests cover selection, success, failure, truncation, and denial paths.

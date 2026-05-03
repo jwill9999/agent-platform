@@ -18,6 +18,8 @@ Required outcomes:
 - Support trigger/cadence types for `on_meaningful_change`, `before_commit`, `before_push`, `after_push`, `before_completion`, `external_feedback`, `scheduled`, and `manual`.
 - Represent provider capability and availability states including `available`, `unavailable`, `auth_required`, `not_configured`, and `permission_denied`.
 - Represent sensor result states including `passed`, `failed`, `skipped`, `unavailable`, and `error`.
+- Add runtime environment metadata for host, Docker container, Docker compose service, IDE plugin, and future sandboxed command runtimes.
+- Represent environment limitation states including `runtime_unavailable`, `missing_mount`, `tool_unavailable`, `network_unavailable`, `path_mapping_required`, and `sandbox_policy_denied`.
 - Add normalized finding contracts with source, severity, status, file/line, rule ID, message, evidence, and dedupe keys.
 - Add bounded terminal evidence contracts with source command/task name, producer, timestamp, redaction state, output caps, and optional problem extraction metadata.
 - Add repair actions suitable for UI/agent flows, including `fix_code`, `run_command`, `connect_provider`, `authenticate_cli`, `retry`, `open_external`, `ask_user`, and `defer_with_reason`.
@@ -60,6 +62,8 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
   - failed sensor result with repair instruction and evidence artifact
   - imported finding from SonarQube, CodeQL, GitHub annotation, IDE problem, IDE/plugin terminal output, or agent code comment
   - provider unavailable/auth-required result with repair action
+  - Docker/container or sandbox runtime limitation with repair action
+  - host/container path mapping metadata
   - bounded/redacted terminal evidence payload
   - trigger policy serialization
   - invalid definitions rejected by Zod
@@ -68,6 +72,7 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
 
 - [ ] Sensor schemas and types are exported from contracts.
 - [ ] Normalized finding and provider availability schemas are exported.
+- [ ] Runtime environment and limitation schemas are exported.
 - [ ] IDE/plugin terminal evidence schemas are bounded and redactable.
 - [ ] Trace event types can represent sensor lifecycle outcomes.
 - [ ] Tests cover successful and invalid contract shapes.

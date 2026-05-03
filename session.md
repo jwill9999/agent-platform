@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-03
+- **Session:** Added Docker/container and future command-sandbox edge cases to feedback-sensors specs, including runtime discovery, missing mounts/tools/network, host/container path mapping, and distinct environment-limitation states.
+- **Date:** 2026-05-03
 - **Session:** Added IDE/plugin feedback-provider requirements to the feedback-sensors specs, including bounded terminal-output ingestion, diagnostics/problem providers, setup guidance, and provider availability states.
 - **Date:** 2026-05-03
 - **Session:** Refined `agent-platform-feedback-sensors` specs after owner review to make sensors source-aware, cadence-aware, provider-auth-aware, and focused on pre-push local validation plus post-push GitHub/SonarQube/CodeQL/review feedback import.
@@ -216,6 +218,7 @@ Branch state: `feature/feedback-sensors-harness` contains planning/spec document
 - Added normalized finding/deduplication requirements so security quality, duplication, hotspots, lint/test/build findings, and review comments can be treated as one feedback model.
 - Added IDE/plugin feedback-provider requirements so agents can ingest bounded terminal output, diagnostics/problems, SonarQube/CodeQL plugin feedback, and review-agent comments exposed by the user's IDE without broad sandbox/process access.
 - Added API/UI guidance to encourage users to install or enable supported IDE plugins/adapters when those providers would expose useful local feedback to the harness.
+- Added Docker/container and future command-sandbox constraints so sensors distinguish code failures from environment limitations such as stopped services, missing mounts, unavailable tools, blocked network/auth, sandbox-denied access, and host/container path mapping gaps.
 - Updated Beads descriptions and acceptance criteria for the epic and all six child tasks to match the refined specs. Beads/Dolt auto-push attempted to sync but failed due GitHub DNS/auth being unavailable in the sandbox.
 - Committed the refinement as `62eee69 Refine feedback sensor specs`.
 - Used the SonarQube plugin flow earlier in the session; `sonarqube-cli` was installed, but auth requires the owner to run `sonar auth login -o jwill9999` locally before issue listing can continue.
@@ -482,7 +485,7 @@ Quality gates passed:
 
 - **Current branch:** `feature/feedback-sensors-harness`
 - **Current base:** `origin/main`
-- **Latest commit:** `2d6c28b Update feedback sensors handoff` plus pending IDE/plugin feedback-provider spec refinement if not yet committed.
+- **Latest commit:** `b359498 Add IDE feedback providers to sensor specs` plus pending Docker/sandbox runtime limitation spec refinement if not yet committed.
 - **Current work:** Planning/refinement only. Implementation has not started and no feedback-sensors child task is claimed.
 - **Remote sync:** Git upstream currently reports `origin/feature/feedback-sensors-harness` as gone/unavailable in this sandbox. Beads local records exist, but Dolt auto-push failed because GitHub SSH/DNS was unavailable.
 
@@ -491,7 +494,7 @@ Quality gates passed:
 - `agent-platform-feedback-sensors` is in progress as a P2 epic.
 - `agent-platform-feedback-sensors.1` through `.6` are open P2 child tasks.
 - Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
-- Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, normalized findings, IDE/problem and IDE/plugin terminal feedback, SonarQube/CodeQL/GitHub feedback, provider auth states, pre-push validation, and post-push feedback import.
+- Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, normalized findings, IDE/problem and IDE/plugin terminal feedback, SonarQube/CodeQL/GitHub feedback, Docker/container/sandbox limitations, provider auth states, pre-push validation, and post-push feedback import.
 - `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
 - Per stored memory, schedule or explicitly run owner refinement before moving this epic from planning/refinement to implementation-ready.
 

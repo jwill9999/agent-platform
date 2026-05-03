@@ -22,6 +22,7 @@ Required outcomes:
   - IDE/plugin terminal-output findings
   - remote GitHub/SonarQube/CodeQL/review feedback
   - unavailable/auth-required providers
+  - Docker/container/sandbox limitations
   - repeated-failure escalation
   - reviewed improvement candidates
 - UI can prompt for provider connection/authentication when a required remote or IDE/plugin source is unavailable, then retry discovery/import.
@@ -55,12 +56,14 @@ Required outcomes:
    - skipped with reason
    - unavailable/auth required with connect/retry action
 4. Add UI/API affordances to inspect open findings grouped by source, severity, file, and repair state.
-5. Keep raw logs behind expandable evidence/details.
-6. Add integration tests for chat runs where a mocked sensor fails once, feeds repair guidance, and then passes.
-7. Add tests for provider auth-required and retry flows.
-8. Add setup guidance for IDE/plugin feedback providers, including what data is exposed and how output is bounded/redacted.
-9. Add Playwright coverage if UI surfaces are touched.
-10. Update `docs/api-reference.md`, `docs/architecture.md`, and `docs/development.md` as needed.
+5. Add UI/API affordances to inspect environment limitations such as stopped containers, missing mounts, sandbox-denied access, or host/container path mapping gaps.
+6. Keep raw logs behind expandable evidence/details.
+7. Add integration tests for chat runs where a mocked sensor fails once, feeds repair guidance, and then passes.
+8. Add tests for provider auth-required and retry flows.
+9. Add tests for required sensor blocked by Docker/sandbox limitation.
+10. Add setup guidance for IDE/plugin feedback providers, including what data is exposed and how output is bounded/redacted.
+11. Add Playwright coverage if UI surfaces are touched.
+12. Update `docs/api-reference.md`, `docs/architecture.md`, and `docs/development.md` as needed.
 
 ## Tests (required before sign-off)
 
@@ -75,6 +78,7 @@ Required outcomes:
   - API exposes discovered capability and provider availability metadata
   - auth-required provider can be surfaced and retried
   - IDE/plugin provider not configured can be surfaced with setup guidance
+  - Docker/sandbox limitation can be surfaced with repair guidance
   - failed sensor loops back into model context
   - passing sensor permits completion
   - UI renders pass/fail/escalated states
@@ -85,6 +89,7 @@ Required outcomes:
 - [ ] Sensor controls/results are visible through API and UI surfaces.
 - [ ] Provider auth/connect/retry flows are visible and test-covered where implemented.
 - [ ] IDE/plugin setup guidance is available when local feedback providers are not configured.
+- [ ] Docker/container/sandbox limitations are visible and test-covered where implemented.
 - [ ] Full failure-to-correction loop is covered by tests.
 - [ ] Documentation explains sensor execution types, trigger timing, and review-gated flywheel behavior.
 - [ ] Quality gates pass for touched packages.
