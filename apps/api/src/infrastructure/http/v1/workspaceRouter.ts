@@ -10,12 +10,13 @@ import { Router } from 'express';
 
 import { HttpError } from '../httpError.js';
 
-const WORKSPACE_AREAS = ['uploads', 'generated', 'scratch', 'exports'] as const;
+const WORKSPACE_AREAS = ['uploads', 'generated', 'scratch', 'exports', 'projects'] as const;
 const AREA_LABELS: Record<WorkspaceArea, string> = {
   uploads: 'Uploads',
   generated: 'Generated',
   scratch: 'Scratch',
   exports: 'Exports',
+  projects: 'Projects',
 };
 const MAX_DEPTH = 6;
 const MAX_FILES_PER_AREA = 500;

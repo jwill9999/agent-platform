@@ -15,6 +15,8 @@ import { createChatRouter, type ChatRouterOptions } from './chatRouter.js';
 import { createMemoriesRouter } from './memoriesRouter.js';
 import { createMcpServersRouter } from './mcpServersRouter.js';
 import { createModelConfigsRouter } from './modelConfigsRouter.js';
+import { createProjectsRouter } from './projectsRouter.js';
+import { createSchedulerRouter } from './schedulerRouter.js';
 import { createSessionsRouter } from './sessionsRouter.js';
 import { createSettingsRouter } from './settingsRouter.js';
 import { createSkillsRouter } from './skillsRouter.js';
@@ -86,6 +88,8 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   router.use('/tool-executions', createToolExecutionsRouter(db));
   router.use('/approval-requests', createApprovalRequestsRouter(db));
   router.use('/model-configs', createModelConfigsRouter(db));
+  router.use('/projects', createProjectsRouter(db));
+  router.use('/scheduler', createSchedulerRouter(db));
   router.use('/memories', createMemoriesRouter(db, { observabilityStore }));
   router.use('/workspace', createWorkspaceRouter());
 

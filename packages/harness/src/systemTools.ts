@@ -331,6 +331,7 @@ export function createSystemToolExecutor(options?: {
   observability?: ObservabilityToolContext;
   memory?: MemoryToolContext;
   workspaceRoot?: string;
+  defaultRepoPath?: string;
 }): NativeToolExecutor {
   const configuredWorkspaceRoot = options?.workspaceRoot ?? WORKSPACE_ROOT;
   const workspaceRoot = existsSync(configuredWorkspaceRoot)
@@ -368,13 +369,22 @@ export function createSystemToolExecutor(options?: {
     const codingEditResult = await executeCodingEditTool(toolId, args, { workspaceRoot });
     if (codingEditResult) return codingEditResult;
 
-    const gitResult = await executeGitTool(toolId, args, { workspaceRoot });
+    const gitResult = await executeGitTool(toolId, args, {
+      workspaceRoot,
+      defaultRepoPath: options?.defaultRepoPath,
+    });
     if (gitResult) return gitResult;
 
-    const qualityGateResult = await executeQualityGateTool(toolId, args, { workspaceRoot });
+    const qualityGateResult = await executeQualityGateTool(toolId, args, {
+      workspaceRoot,
+      defaultRepoPath: options?.defaultRepoPath,
+    });
     if (qualityGateResult) return qualityGateResult;
 
-    const repoDiscoveryResult = await executeRepoDiscoveryTool(toolId, args, { workspaceRoot });
+    const repoDiscoveryResult = await executeRepoDiscoveryTool(toolId, args, {
+      workspaceRoot,
+      defaultRepoPath: options?.defaultRepoPath,
+    });
     if (repoDiscoveryResult) return repoDiscoveryResult;
 
     const memoryResult = await executeMemoryTool(toolId, args, options?.memory);

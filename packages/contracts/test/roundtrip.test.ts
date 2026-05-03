@@ -37,7 +37,14 @@ import {
   WorkingMemoryUpdateBodySchema,
   OutputSchema,
   PlanSchema,
+  ProjectCreateBodySchema,
+  ProjectRecordSchema,
   SecretRefSchema,
+  ScheduledJobCreateBodySchema,
+  ScheduledJobRecordSchema,
+  ScheduledJobRunCreateBodySchema,
+  ScheduledJobRunLogRecordSchema,
+  ScheduledJobRunRecordSchema,
   SkillSchema,
 } from '../src/index.js';
 
@@ -104,6 +111,26 @@ describe('contracts round-trip', () => {
     });
     expect(SecretRefSchema.parse(structuredClone(ref))).toEqual(ref);
     expect(PlanSchema.parse(structuredClone(plan))).toEqual(plan);
+  });
+
+  it('Project schemas round-trip', () => {
+    const project = ProjectRecordSchema.parse({
+      id: 'project-1',
+      slug: 'agent-platform',
+      name: 'Agent Platform',
+      description: 'Main repository',
+      workspacePath: 'projects/agent-platform',
+      workspaceKey: 'projects/agent-platform',
+      metadata: { language: 'typescript' },
+      createdAtMs: 1000,
+      updatedAtMs: 1000,
+    });
+    expect(ProjectRecordSchema.parse(structuredClone(project))).toEqual(project);
+
+    expect(ProjectCreateBodySchema.parse({ name: 'Agent Platform' })).toMatchObject({
+      name: 'Agent Platform',
+      metadata: {},
+    });
   });
 
   it('CriticVerdictSchema', () => {
@@ -174,11 +201,97 @@ describe('contracts round-trip', () => {
     expect(() => ApprovalRequestSchema.parse({ ...request, status: 'done' })).toThrow();
   });
 
+  it('Scheduler schemas round-trip and enforce ownership/schedule policy', () => {
+    const job = ScheduledJobRecordSchema.parse({
+      id: 'job-1',
+      scope: 'project',
+      scopeId: 'project-1',
+      projectId: 'project-1',
+      executionAgentId: 'agent-1',
+      createdFromSessionId: 'session-1',
+      name: 'Nightly checks',
+      instructions: 'Run the project quality checks and summarize failures.',
+      targetKind: 'agent_turn',
+      targetPayload: { prompt: 'Run quality checks' },
+      scheduleType: 'recurring',
+      intervalMs: 86_400_000,
+      timezone: 'UTC',
+      nextRunAtMs: 2000,
+      status: 'paused',
+      retryPolicy: { maxAttempts: 2, backoffMs: 60_000 },
+      timeoutMs: 300_000,
+      metadata: { source: 'test' },
+      createdAtMs: 1000,
+      updatedAtMs: 1000,
+    });
+    expect(ScheduledJobRecordSchema.parse(structuredClone(job))).toEqual(job);
+    expect(
+      ScheduledJobCreateBodySchema.parse({
+        scope: 'global',
+        name: 'One off cleanup',
+        instructions: 'Inspect expired records.',
+        targetKind: 'built_in_task',
+        scheduleType: 'one_off',
+        runAtMs: 1000,
+      }),
+    ).toMatchObject({ status: 'paused', retryPolicy: { maxAttempts: 1 } });
+    expect(() =>
+      ScheduledJobCreateBodySchema.parse({
+        scope: 'project',
+        scopeId: 'project-1',
+        name: 'Bad project',
+        instructions: 'Bad owner',
+        targetKind: 'agent_turn',
+        scheduleType: 'delayed',
+        runAtMs: 1000,
+      }),
+    ).toThrow();
+    expect(() =>
+      ScheduledJobCreateBodySchema.parse({
+        scope: 'global',
+        name: 'Bad schedule',
+        instructions: 'Bad schedule',
+        targetKind: 'built_in_task',
+        scheduleType: 'recurring',
+      }),
+    ).toThrow();
+
+    const run = ScheduledJobRunRecordSchema.parse({
+      id: 'run-1',
+      jobId: 'job-1',
+      status: 'queued',
+      attempt: 1,
+      queuedAtMs: 1000,
+      metadata: {},
+      createdAtMs: 1000,
+      updatedAtMs: 1000,
+    });
+    expect(ScheduledJobRunRecordSchema.parse(structuredClone(run))).toEqual(run);
+    expect(ScheduledJobRunCreateBodySchema.parse({ jobId: 'job-1' })).toMatchObject({
+      status: 'queued',
+      attempt: 1,
+    });
+
+    const log = ScheduledJobRunLogRecordSchema.parse({
+      id: 'log-1',
+      runId: 'run-1',
+      jobId: 'job-1',
+      sequence: 0,
+      level: 'info',
+      message: 'Queued',
+      data: {},
+      truncated: false,
+      createdAtMs: 1000,
+    });
+    expect(ScheduledJobRunLogRecordSchema.parse(structuredClone(log))).toEqual(log);
+  });
+
   it('Memory schemas round-trip and enforce scoped policy', () => {
     const record = MemoryRecordSchema.parse({
       id: 'memory-1',
       scope: 'project',
       scopeId: 'project-1',
+      projectId: 'project-1',
       kind: 'decision',
       status: 'approved',
       reviewStatus: 'approved',
@@ -277,6 +390,7 @@ describe('contracts round-trip', () => {
       runId: 'run-1',
       currentGoal: 'Implement working memory.',
       activeProject: 'agent-platform',
+      projectId: 'project-1',
       activeTask: 'agent-platform-memory.2',
       decisions: ['Keep short-term state session scoped.'],
       importantFiles: ['packages/db/src/repositories/workingMemory.ts'],

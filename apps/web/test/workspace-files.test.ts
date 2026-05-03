@@ -40,6 +40,7 @@ describe('workspace file helpers', () => {
         },
         { area: 'scratch', label: 'Scratch', path: 'scratch', files: [] },
         { area: 'exports', label: 'Exports', path: 'exports', files: [] },
+        { area: 'projects', label: 'Projects', path: 'projects', files: [] },
       ],
     };
 

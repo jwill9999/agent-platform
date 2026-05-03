@@ -53,6 +53,9 @@ export function redactCredentialText(content: string): RedactionResult<string> {
 }
 
 export function redactJsonValue(value: unknown): RedactionResult<unknown> {
+  if (typeof value === 'string') {
+    return redactCredentialText(value);
+  }
   if (Array.isArray(value)) {
     let wasRedacted = false;
     const redacted = value.map((entry) => {

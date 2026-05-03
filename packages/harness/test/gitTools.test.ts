@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -41,10 +41,12 @@ function failedMessage(output: Awaited<ReturnType<typeof executeGitTool>>) {
 describe('git tools', () => {
   let root: string;
   let repo: string;
+  let explicitRepo: string;
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'git-tools-test-'));
     repo = join(root, 'repo');
+    explicitRepo = join(root, 'explicit-repo');
     await mkdir(repo);
     await git(repo, ['init']);
     await git(repo, ['config', 'user.name', 'Test User']);
@@ -52,6 +54,14 @@ describe('git tools', () => {
     await writeFile(join(repo, 'README.md'), 'hello\n', 'utf-8');
     await git(repo, ['add', 'README.md']);
     await git(repo, ['commit', '-m', 'Initial commit']);
+
+    await mkdir(explicitRepo);
+    await git(explicitRepo, ['init']);
+    await git(explicitRepo, ['config', 'user.name', 'Test User']);
+    await git(explicitRepo, ['config', 'user.email', 'test@example.com']);
+    await writeFile(join(explicitRepo, 'README.md'), 'explicit\n', 'utf-8');
+    await git(explicitRepo, ['add', 'README.md']);
+    await git(explicitRepo, ['commit', '-m', 'Explicit commit']);
   });
 
   afterEach(async () => {
@@ -78,6 +88,43 @@ describe('git tools', () => {
     expect(result.clean).toBe(true);
     expect(result.head).toEqual(expect.any(String));
     expect(result.changedFiles).toEqual([]);
+  });
+
+  it('defaults git tools to the active project path when repoPath is omitted', async () => {
+    const result = resultData(
+      await executeGitTool(
+        GIT_TOOL_IDS.status,
+        {},
+        { workspaceRoot: root, defaultRepoPath: 'repo' },
+      ),
+    );
+
+    expect(result.clean).toBe(true);
+  });
+
+  it('prefers an explicit repoPath over the active project default', async () => {
+    const result = resultData(
+      await executeGitTool(
+        GIT_TOOL_IDS.status,
+        { repoPath: 'explicit-repo' },
+        { workspaceRoot: root, defaultRepoPath: 'repo' },
+      ),
+    );
+
+    expect(result.clean).toBe(true);
+    expect(result.repoPath).toBe(await realpath(explicitRepo));
+  });
+
+  it('returns a tool error when explicit and default git repo paths are unreadable', async () => {
+    const message = failedMessage(
+      await executeGitTool(
+        GIT_TOOL_IDS.status,
+        { repoPath: 'missing-repo' },
+        { workspaceRoot: root, defaultRepoPath: 'also-missing-repo' },
+      ),
+    );
+
+    expect(message).toContain('is not readable');
   });
 
   it('summarizes staged, unstaged, and untracked files', async () => {
