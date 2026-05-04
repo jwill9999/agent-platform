@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Improved browser screenshot viewing on `task/agent-platform-browser-tools.5`: full-page screenshots now render as cropped readable thumbnails in chat and open into a width-filling, scrollable in-chat viewer with zoom controls.
+- **Date:** 2026-05-04
 - **Session:** Fixed the browser runtime `ENOSPC` launch failure path on `task/agent-platform-browser-tools.5`: Docker build cache had filled the container overlay, cache was pruned, and Playwright temp profiles now default to the host-backed workspace temp directory instead of container `/tmp`.
 - **Date:** 2026-05-04
 - **Session:** Fixed a browser-tools approval-resume regression on `task/agent-platform-browser-tools.5`: approved external browser starts now share the same runtime tool executor with the resumed graph, so immediate follow-up snapshot/screenshot calls keep access to the active browser session.
@@ -258,6 +260,33 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Browser screenshot viewer improved
+
+Branch state: `task/agent-platform-browser-tools.5` has an additional follow-up fix pending commit.
+
+- Reviewed manual screenshots showing full-page browser captures rendered as tiny images in the chat preview card and difficult-to-inspect images in the modal viewer.
+- Changed chat screenshot previews from whole-image fit to a fixed-height, top-aligned cropped thumbnail so a tall full-page capture fills the card instead of shrinking to a sliver.
+- Reworked the in-chat viewer into a width-filling, scrollable lightbox:
+  - default view fills the available modal width
+  - vertical scrolling exposes the rest of a full-page screenshot
+  - zoom controls allow 100% to 200% inspection without opening a new tab
+  - metadata remains visible in the viewer header
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/web run build`
+- `pnpm format:check`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP was not exposed in the current tool surface.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with web typecheck, lint, tests, build, formatting, and diff whitespace checks.
 
 ### Browser runtime ENOSPC hardening
 
@@ -751,8 +780,8 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-browser-tools.5`
 - **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4` -> `.5`
-- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up fixes cover approved-browser-session continuity and Playwright temp storage under Docker.
-- **Remote sync:** pending commit/push for the browser temp hardening and this session handoff update.
+- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up fixes cover approved-browser-session continuity, Playwright temp storage under Docker, and full-page screenshot viewing.
+- **Remote sync:** pending commit/push for the screenshot viewer fix and this session handoff update.
 
 ### Beads
 
@@ -777,6 +806,13 @@ Quality gates passed:
 
 ### Quality
 
+- Latest browser screenshot viewer gates passed:
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run test`
+  - `pnpm --filter @agent-platform/web run build`
+  - `pnpm format:check`
+  - `git diff --check`
 - Latest browser runtime ENOSPC hardening gates passed:
   - `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
   - `pnpm --filter @agent-platform/harness run typecheck`
@@ -820,11 +856,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the browser temp hardening plus `session.md` handoff update.
-2. Rebuild/restart the API container so Compose applies `AGENT_BROWSER_TMPDIR` and `TMPDIR`.
-3. Ask the owner to manually retest `http://web:3001`; browser start should no longer fail with `ENOSPC`.
-4. Ask the owner to manually retest external URL approval; snapshot/screenshot should no longer fail with `BROWSER_SESSION_UNAVAILABLE`.
-5. Watch PR #137 pipelines and address any feedback.
+1. Commit and push the screenshot viewer fix plus `session.md` handoff update.
+2. Ask the owner to manually retest a full-page external screenshot; the chat thumbnail should be readable and the modal should fill width with vertical scrolling.
+3. Rebuild/restart the API container when convenient so Compose applies `AGENT_BROWSER_TMPDIR` and `TMPDIR`.
+4. Watch PR #137 pipelines and address any feedback.
 
 ---
 
