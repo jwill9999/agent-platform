@@ -74,16 +74,16 @@ This is the segment tip. Open one PR from `task/agent-platform-browser-tools.5` 
 - [x] Risky actions are blocked or approval-gated in E2E/security coverage.
 - [x] Docker/runtime setup and limitations are documented.
 - [x] Browser artifacts are bounded and not dumped into chat by default.
-- [ ] Segment-tip PR is opened from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`.
+- [x] Segment-tip PR is opened from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`: https://github.com/jwill9999/agent-platform/pull/137
 - [x] Browser-tools epic checklist is complete.
 
 ## Sign-off
 
 - [x] Task branch created from `task/agent-platform-browser-tools.4`
 - [x] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: PR opened `task/agent-platform-browser-tools.5 -> feature/agent-platform-browser-tools`
-- [ ] `bd close agent-platform-browser-tools.5 --reason "Browser tools validated end to end"`
+- [x] Checklists in this document are complete
+- [x] If segment tip: PR opened `task/agent-platform-browser-tools.5 -> feature/agent-platform-browser-tools`: https://github.com/jwill9999/agent-platform/pull/137
+- [x] `bd close agent-platform-browser-tools.5 --reason "Browser tools validated end to end"`
 - [x] `decisions.md` updated only if architectural decision changed (not required)
 - [x] `session.md` updated if handoff needed
 

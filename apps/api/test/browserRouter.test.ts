@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -46,10 +46,7 @@ describe('browserRouter', () => {
   let app: ReturnType<typeof buildTestApp>;
 
   beforeEach(() => {
-    workspaceRoot = join(
-      tmpdir(),
-      `agent-platform-browser-api-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
+    workspaceRoot = mkdtempSync(join(tmpdir(), 'agent-platform-browser-api-'));
     app = buildTestApp(workspaceRoot);
   });
 

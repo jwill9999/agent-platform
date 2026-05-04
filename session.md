@@ -264,6 +264,9 @@ Branch state: `task/agent-platform-browser-tools.5` contains the browser-tools s
 - Negative coverage now includes external-domain navigation approval, redirect-to-external approval, sensitive input approval, ambiguous target failure, inactive-session failure after close, and bounded artifact/sidecar metadata.
 - Added browser runtime troubleshooting to `docs/development.md`.
 - Updated `docs/tasks/agent-platform-browser-tools.md` and `.5` with validation results and completed checklist items.
+- Addressed SonarCloud PR #137 hotspot `typescript:S2245` in
+  `apps/api/test/browserRouter.test.ts` by replacing `Math.random()` test path
+  generation with `mkdtempSync`.
 
 Quality gates passed:
 
@@ -278,12 +281,18 @@ Quality gates passed:
 - `pnpm test`
 - `docker compose --profile services exec -T api sh -lc 'E2E_SEED=1 SQLITE_PATH=/data/agent.sqlite node packages/db/dist/seed/run.js'`
 - `pnpm test:e2e`
+- `pnpm --filter @agent-platform/api exec vitest run test/browserRouter.test.ts`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/api run typecheck`
 
 Completion gate:
 
 - SonarQube MCP tools and IDE Problems were not available through the current tool surface.
 - Fallback typecheck/lint/test/E2E gates passed.
 - Earlier `pnpm test:e2e` failed before applying `E2E_SEED=1`; after applying the E2E seed to the running API container, all 16 E2E tests passed.
+- `sonar verify` could not confirm the hotspot fix because SonarCloud returned
+  `A3S analysis is not activated for this organization`; PR analysis should
+  verify after the fix is pushed.
 
 ### Browser tools tickets 1-4 implemented
 
@@ -671,17 +680,17 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-browser-tools.5`
 - **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4` -> `.5`
-- **Current work:** browser-tools ticket `.5` validation changes are ready to commit and push.
-- **Remote sync:** pending for the `.5` validation commit.
+- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`.
+- **Remote sync:** pending only for the final Beads/spec closeout commit.
 
 ### Beads
 
-- `agent-platform-browser-tools` is claimed/in progress locally.
+- `agent-platform-browser-tools` is closed locally.
 - `agent-platform-browser-tools.1` is closed locally.
 - `agent-platform-browser-tools.2` is closed locally.
 - `agent-platform-browser-tools.3` is closed locally.
 - `agent-platform-browser-tools.4` is closed locally.
-- `agent-platform-browser-tools.5` is in progress locally; validation implementation is complete and closeout/PR are next.
+- `agent-platform-browser-tools.5` is closed locally.
 - `agent-platform-feedback-sensors` is closed locally.
 - `agent-platform-feedback-sensors.1` is closed.
 - `agent-platform-feedback-sensors.2` is closed.
@@ -725,9 +734,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push `.5` validation changes.
-2. Open the segment-tip PR from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`.
-3. Close `agent-platform-browser-tools.5` in Beads and sync/push Beads state.
+1. Commit and push the final Beads/spec closeout update for `.5`.
+2. Ask the owner to run `bd dolt push` if Beads remote sync is still blocked through SSH/DNS.
+3. Watch PR #137 pipelines and address any feedback.
 
 ---
 
