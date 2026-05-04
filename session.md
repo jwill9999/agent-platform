@@ -7,6 +7,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-05
+- **Session:** Captured future operator-experience direction on `feature/agent-platform-operator-experience`: added Beads epic `agent-platform-operator-experience`, created `docs/tasks/agent-platform-operator-experience.md`, updated the task-spec index, and saved project memory for human-readable tool activity, HITL approvals, artifact/workbench UX, and Docker/host integration constraints.
 - **Date:** 2026-05-04
 - **Session:** Corrected full-page browser screenshot handling on `task/agent-platform-browser-tools.5`: the viewer now opens in fit-page mode with opt-in fit-width/zoom, chat previews are scrollable instead of cropped, and default screenshot artifacts now keep multi-megabyte PNGs intact instead of truncating at 2 MB.
 - **Date:** 2026-05-04
@@ -262,6 +264,30 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Operator experience epic captured
+
+Branch state: `feature/agent-platform-operator-experience` contains documentation-only planning work.
+
+- Added project memory for the product direction: user-facing tool activity and HITL approvals should be human-readable by default, with raw payloads/internal ids/policy decisions/trace ids kept in explicit debug or observability views.
+- Created Beads epic `agent-platform-operator-experience`.
+- Added `docs/tasks/agent-platform-operator-experience.md` covering:
+  - human-readable tool activity feed
+  - approval-card redesign
+  - structured toolchain observability
+  - artifact viewers for screenshots, snapshots, branch state, diffs, and code evidence
+  - IDE/workbench direction
+  - Docker/container constraints for host browser, IDE, plugins, and desktop-app access
+- Updated `docs/tasks/README.md` epic index.
+
+Verification:
+
+- `pnpm exec prettier --check docs/tasks/agent-platform-operator-experience.md docs/tasks/README.md`
+- `git diff --check`
+
+Notes:
+
+- Beads local state was updated, but Dolt auto-push failed because GitHub DNS/auth was unavailable from the sandbox. Run `bd dolt push` once network/auth is available.
 
 ### Browser screenshot full-page handling corrected
 
@@ -810,10 +836,10 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-browser-tools.5`
-- **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4` -> `.5`
-- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up fixes cover approved-browser-session continuity, Playwright temp storage under Docker, and full-page screenshot capture/viewing.
-- **Remote sync:** pending commit/push for the full-page screenshot handling fix and this session handoff update.
+- **Current branch:** `feature/agent-platform-operator-experience`
+- **Current base:** created from updated `main` after the browser-tools work was merged and old branches were pruned.
+- **Current work:** documentation-only planning branch for the future operator-experience epic.
+- **Remote sync:** pending push for `feature/agent-platform-operator-experience` after this session handoff update is amended/committed.
 
 ### Beads
 
@@ -831,6 +857,7 @@ Quality gates passed:
 - `agent-platform-feedback-sensors.5` is closed.
 - `agent-platform-feedback-sensors.6` is closed locally.
 - `agent-platform-branch-feedback-status` is open as a P2 follow-up epic with spec `docs/tasks/agent-platform-branch-feedback-status.md`.
+- `agent-platform-operator-experience` is open as a P2 follow-up epic with spec `docs/tasks/agent-platform-operator-experience.md`.
 - Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, agent-scope/profile policy, normalized findings, IDE/problem and IDE/plugin terminal feedback, SonarQube/CodeQL/GitHub feedback, Docker/container/sandbox limitations, provider auth states, pre-push validation, and post-push feedback import.
 - `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
 - `agent-platform-ui-quality-sensors` is open as a P2 epic with parent spec only; child specs are pending refinement.
@@ -899,11 +926,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the full-page screenshot handling fix plus `session.md` handoff update.
-2. Ask the owner to capture a new external full-page screenshot; existing truncated artifacts cannot be repaired retroactively.
-3. In the viewer, confirm the modal opens with the whole screenshot visible, then use fit-width/zoom only when inspecting details.
-4. Rebuild/restart the API container when convenient so Compose applies `AGENT_BROWSER_TMPDIR` and `TMPDIR`.
-5. Watch PR #137 pipelines and address any feedback.
+1. Finish this documentation closeout: amend/commit `session.md`, push `feature/agent-platform-operator-experience`, and run `bd dolt push` when network/auth is available.
+2. Discuss whether `agent-platform-operator-experience` should be broken into child tasks now or left as a parked follow-up epic.
+3. If task breakdown starts, begin with the human-readable tool event model, then HITL approval redesign, then artifact/workbench design patterns.
+4. Keep related existing epics linked: `agent-platform-branch-feedback-status`, `agent-platform-ide-rethink`, `agent-platform-ui-quality-sensors`, and `agent-platform-capability-registry`.
+5. Do not start the next implementation epic tonight unless the owner explicitly changes direction.
 
 ---
 
