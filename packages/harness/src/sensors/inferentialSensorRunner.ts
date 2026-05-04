@@ -279,11 +279,12 @@ function resultForVerdict(
   openFindingCount: number,
 ): SensorResult {
   const passed = verdict?.passed === true;
-  const failedCriteria = passed
-    ? []
-    : verdict?.failedCriteria.length
-      ? verdict.failedCriteria
-      : check.criteria;
+  let failedCriteria = check.criteria;
+  if (passed) {
+    failedCriteria = [];
+  } else if (verdict?.failedCriteria.length) {
+    failedCriteria = verdict.failedCriteria;
+  }
   return SensorResultSchema.parse({
     sensorId: check.id,
     status: passed ? 'passed' : 'failed',

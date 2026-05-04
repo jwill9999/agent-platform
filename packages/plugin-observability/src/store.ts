@@ -167,10 +167,10 @@ const MAX_TERMINAL_CONTENT_CHARS = 1_200;
 
 function redactText(value: string): string {
   return value
-    .replace(/sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g, '[REDACTED:OpenAI API Key]')
-    .replace(/(ghp|gho|ghu|ghs|ghr)_\w{36,}/g, '[REDACTED:GitHub Token]')
-    .replace(/Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g, '[REDACTED:Bearer Token]')
-    .replace(/\/Users\/[^/\s]+/g, '/Users/[REDACTED]');
+    .replaceAll(/sk-(?:proj-|svcacct-)?[A-Za-z0-9_*.-]{20,}/g, '[REDACTED:OpenAI API Key]')
+    .replaceAll(/(ghp|gho|ghu|ghs|ghr)_\w{36,}/g, '[REDACTED:GitHub Token]')
+    .replaceAll(/Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g, '[REDACTED:Bearer Token]')
+    .replaceAll(/\/Users\/[^/\s]+/g, '/Users/[REDACTED]');
 }
 
 function redactUnknown(value: unknown): unknown {
@@ -406,7 +406,7 @@ function failurePatternsFromFindings(
   }
   return [...patterns.values()].sort((left, right) => {
     const countDiff = right.count - left.count;
-    return countDiff !== 0 ? countDiff : right.lastSeenMs - left.lastSeenMs;
+    return countDiff === 0 ? right.lastSeenMs - left.lastSeenMs : countDiff;
   });
 }
 
