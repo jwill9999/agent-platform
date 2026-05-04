@@ -104,4 +104,20 @@ describe('browserRouter', () => {
       .query({ path: '../secret.txt' })
       .expect(403);
   });
+
+  it('serves image artifacts inline for chat previews', async () => {
+    writeArtifact(workspaceRoot, 'browser-session-1', 'artifact-1');
+
+    const res = await request(app)
+      .get('/v1/browser/artifacts/download')
+      .query({
+        path: '.agent-platform/browser/browser-session-1/artifact-1.png',
+        disposition: 'inline',
+      })
+      .expect(200);
+
+    expect(res.headers['content-type']).toContain('image/png');
+    expect(res.headers['content-disposition']).toContain('inline');
+    expect(Buffer.from(res.body as Buffer).toString('utf8')).toBe('png');
+  });
 });

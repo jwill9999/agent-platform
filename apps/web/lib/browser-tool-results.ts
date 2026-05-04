@@ -6,6 +6,7 @@ export type BrowserToolArtifactPreview = {
   label: string;
   mimeType: string;
   downloadHref?: string;
+  previewHref?: string;
   truncated: boolean;
   sizeBytes: number;
 };
@@ -40,6 +41,15 @@ function artifactDownloadHref(artifact: Record<string, unknown>): string | undef
     : undefined;
 }
 
+function artifactPreviewHref(
+  artifact: Record<string, unknown>,
+  mimeType: string,
+): string | undefined {
+  if (!mimeType.startsWith('image/')) return undefined;
+  const downloadHref = artifactDownloadHref(artifact);
+  return downloadHref ? `${downloadHref}&disposition=inline` : undefined;
+}
+
 function summarizeArtifact(value: unknown): BrowserToolArtifactPreview | null {
   if (!isRecord(value)) return null;
   const id = stringValue(value.id);
@@ -54,6 +64,7 @@ function summarizeArtifact(value: unknown): BrowserToolArtifactPreview | null {
     label,
     mimeType,
     downloadHref: artifactDownloadHref(value),
+    previewHref: artifactPreviewHref(value, mimeType),
     truncated: value.truncated === true,
     sizeBytes,
   };

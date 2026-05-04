@@ -35,6 +35,8 @@ describe('browser tool result helpers', () => {
           id: 'artifact-1',
           downloadHref:
             '/api/v1/browser/artifacts/download?path=.agent-platform%2Fbrowser%2Fsession%2Fartifact-1.png',
+          previewHref:
+            '/api/v1/browser/artifacts/download?path=.agent-platform%2Fbrowser%2Fsession%2Fartifact-1.png&disposition=inline',
         },
       ],
     });

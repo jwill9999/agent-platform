@@ -308,6 +308,8 @@ Branch state: `task/agent-platform-browser-tools.4` contains the cumulative brow
 - Updated the default browser URL policy to allow the Docker Compose `web`
   service hostname, so manual in-container browser-tool prompts can open
   `http://web:3001` without an external-domain approval interruption.
+- Added inline chat previews for stored browser screenshot artifacts while
+  keeping the original artifact download link.
 - Added API routes under `/v1/browser/artifacts` to list browser artifact sidecars and download bounded workspace-relative artifacts through `PathJail`.
 - Updated chat tool rendering to summarize browser tool results and link evidence artifacts without flooding the transcript with raw JSON.
 - Updated API/architecture/task docs and all `.1` through `.4` task specs.

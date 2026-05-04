@@ -74,17 +74,32 @@ function BrowserToolPreview({ data }: Readonly<{ data: unknown }>) {
       {summary.artifacts.length > 0 && (
         <div className="space-y-1">
           {summary.artifacts.map((artifact) => (
-            <div key={artifact.id} className="flex min-w-0 items-center gap-2 text-[11px]">
-              <span className="truncate text-foreground">{artifact.label}</span>
-              <span className="text-muted-foreground">{artifact.kind}</span>
-              <span className="text-muted-foreground">{formatFileSize(artifact.sizeBytes)}</span>
-              {artifact.truncated && <span className="text-amber-700">truncated</span>}
-              {artifact.downloadHref && (
+            <div key={artifact.id} className="space-y-1">
+              <div className="flex min-w-0 items-center gap-2 text-[11px]">
+                <span className="truncate text-foreground">{artifact.label}</span>
+                <span className="text-muted-foreground">{artifact.kind}</span>
+                <span className="text-muted-foreground">{formatFileSize(artifact.sizeBytes)}</span>
+                {artifact.truncated && <span className="text-amber-700">truncated</span>}
+                {artifact.downloadHref && (
+                  <a
+                    href={artifact.downloadHref}
+                    className="ml-auto text-primary underline-offset-2 hover:underline"
+                  >
+                    Open
+                  </a>
+                )}
+              </div>
+              {artifact.previewHref && (
                 <a
-                  href={artifact.downloadHref}
-                  className="ml-auto text-primary underline-offset-2 hover:underline"
+                  href={artifact.previewHref}
+                  className="block"
+                  aria-label={`Open ${artifact.label}`}
                 >
-                  Open
+                  <img
+                    src={artifact.previewHref}
+                    alt={artifact.label}
+                    className="max-h-80 w-full rounded border border-border object-contain"
+                  />
                 </a>
               )}
             </div>

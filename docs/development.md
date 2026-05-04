@@ -127,8 +127,9 @@ needed.
 
 Browser evidence is written under the workspace at
 `.agent-platform/browser/<session-id>/` with JSON sidecars for metadata. The
-chat UI renders compact browser activity summaries and links to artifacts
-instead of copying raw DOM, ARIA, or screenshot payloads into the transcript.
+chat UI renders compact browser activity summaries, previews screenshot
+artifacts inline, and links to stored artifacts instead of copying raw DOM,
+ARIA, or screenshot payloads into the transcript.
 
 When exercising the tools from inside the Docker Compose API container, target
 the web service at `http://web:3001`. The default browser URL policy allowlists

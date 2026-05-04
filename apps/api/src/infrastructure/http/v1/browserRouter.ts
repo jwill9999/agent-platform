@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { readdir, stat, readFile } from 'node:fs/promises';
-import { basename, join, posix, relative, resolve, sep } from 'node:path';
+import { basename, extname, join, posix, relative, resolve, sep } from 'node:path';
 
 import {
   BrowserArtifactSummarySchema,
@@ -73,6 +73,22 @@ function artifactPath(artifact: BrowserEvidenceArtifact, workspaceRoot: string):
   if (typeof fromMetadata === 'string' && fromMetadata.trim()) return fromMetadata;
   if (artifact.uri) return toWorkspaceRelative(workspaceRoot, artifact.uri);
   return join(BROWSER_ARTIFACT_ROOT, artifact.sessionId, artifact.id).split(sep).join('/');
+}
+
+function artifactContentType(path: string): string {
+  switch (extname(path).toLowerCase()) {
+    case '.png':
+      return 'image/png';
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.webp':
+      return 'image/webp';
+    case '.txt':
+      return 'text/plain; charset=utf-8';
+    default:
+      return 'application/octet-stream';
+  }
 }
 
 function toSummary(
@@ -174,6 +190,7 @@ export function createBrowserRouter(options: BrowserRouterOptions = {}): Router 
   router.get('/artifacts/download', async (req, res, next) => {
     try {
       const rawPath = typeof req.query.path === 'string' ? req.query.path : '';
+      const inline = req.query.disposition === 'inline';
       const relativePath = normalizeBrowserRelativePath(rawPath);
       const validation = await jail.validate(join(workspaceRoot, relativePath), 'read');
       if (!validation.allowed) {
@@ -190,11 +207,16 @@ export function createBrowserRouter(options: BrowserRouterOptions = {}): Router 
         throw new HttpError(400, 'BROWSER_ARTIFACT_INVALID', 'Only files can be downloaded');
       }
 
-      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader(
+        'Content-Type',
+        inline ? artifactContentType(validation.resolvedPath) : 'application/octet-stream',
+      );
       res.setHeader('Content-Length', String(fileStat.size));
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename="${encodeURIComponent(basename(validation.resolvedPath))}"`,
+        `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(
+          basename(validation.resolvedPath),
+        )}"`,
       );
       createReadStream(validation.resolvedPath).on('error', next).pipe(res);
     } catch (err) {
