@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { AddressInfo } from 'node:net';
@@ -74,7 +74,8 @@ describe('browser tools integration', () => {
   let manager: BrowserSessionManager | undefined;
 
   beforeEach(async () => {
-    workspaceRoot = await mkdtemp(join(tmpdir(), 'browser-tools-e2e-'));
+    workspaceRoot = join(process.cwd(), '.agent-platform/tmp/browser-tools-e2e', randomUUID());
+    await mkdir(workspaceRoot, { recursive: true });
     const fixture = await startFixtureServer();
     server = fixture.server;
     baseUrl = fixture.url;

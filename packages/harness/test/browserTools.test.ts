@@ -1,5 +1,5 @@
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -47,7 +47,8 @@ function makeDriver(page: BrowserPageDriver = makePage()): BrowserDriver {
 }
 
 async function withWorkspace<T>(fn: (workspaceRoot: string) => Promise<T>): Promise<T> {
-  const workspaceRoot = await mkdtemp(join(tmpdir(), 'browser-tools-test-'));
+  const workspaceRoot = join(process.cwd(), '.agent-platform/tmp/test-browser-tools', randomUUID());
+  await mkdir(workspaceRoot, { recursive: true });
   try {
     return await fn(workspaceRoot);
   } finally {
@@ -99,17 +100,12 @@ describe('browser tools', () => {
     await withWorkspace(async (workspaceRoot) => {
       const previous = {
         AGENT_BROWSER_TMPDIR: process.env.AGENT_BROWSER_TMPDIR,
-        TMPDIR: process.env.TMPDIR,
-        TMP: process.env.TMP,
-        TEMP: process.env.TEMP,
       };
       delete process.env.AGENT_BROWSER_TMPDIR;
       const expectedTempRoot = join(workspaceRoot, '.agent-platform/tmp/browser');
       const driver: BrowserDriver = {
-        launch: vi.fn(async () => {
-          expect(process.env.TMPDIR).toBe(expectedTempRoot);
-          expect(process.env.TMP).toBe(expectedTempRoot);
-          expect(process.env.TEMP).toBe(expectedTempRoot);
+        launch: vi.fn(async (options) => {
+          expect(options.browserTempRoot).toBe(expectedTempRoot);
           return { page: makePage(), close: vi.fn(async () => undefined) };
         }),
       };
@@ -119,14 +115,11 @@ describe('browser tools', () => {
         await manager.start({});
 
         expect((await stat(expectedTempRoot)).isDirectory()).toBe(true);
-        expect(process.env.TMPDIR).toBe(previous.TMPDIR);
-        expect(process.env.TMP).toBe(previous.TMP);
-        expect(process.env.TEMP).toBe(previous.TEMP);
+        expect(driver.launch).toHaveBeenCalledWith(
+          expect.objectContaining({ browserTempRoot: expectedTempRoot }),
+        );
       } finally {
         restoreTestEnvValue('AGENT_BROWSER_TMPDIR', previous.AGENT_BROWSER_TMPDIR);
-        restoreTestEnvValue('TMPDIR', previous.TMPDIR);
-        restoreTestEnvValue('TMP', previous.TMP);
-        restoreTestEnvValue('TEMP', previous.TEMP);
       }
     });
   });

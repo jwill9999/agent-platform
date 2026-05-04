@@ -106,7 +106,7 @@ describe('browser tool contracts', () => {
       matchedRule: 'localhost_allowed',
     });
 
-    expect(evaluateBrowserUrlPolicy('http://web:3001')).toMatchObject({
+    expect(evaluateBrowserUrlPolicy('https://web:3001')).toMatchObject({
       state: 'allowed',
       riskTier: 'medium',
       matchedRule: 'domain_allowed',

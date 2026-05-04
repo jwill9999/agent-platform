@@ -979,3 +979,15 @@ Tracked in Beads: `agent-platform-de4`
 ### 5. Refactor input bar controls into unified chat input
 
 Tracked in Beads: `agent-platform-lt6`
+
+---
+
+## 2026-05-04 Browser Tools SonarCloud Follow-Up
+
+- PR 137 SonarCloud reported 16 security hotspots and 6 maintainability issues on `task/agent-platform-browser-tools.5`.
+- Fixed the hotspot cluster by removing browser launch reliance on `TMPDIR`/`TMP`/`TEMP`; Playwright now receives explicit workspace-backed artifact, download, trace, and user-data directories.
+- Updated browser tests to use workspace-backed scratch directories instead of OS temp directories where this branch touches them.
+- Replaced the insecure `http://web:3001` policy test URL with `https://web:3001`.
+- Cleaned Sonar code-smell findings: nested ternary labels/actions, in-place sort in response construction, repeated `push`, redundant role assertion, and `filter().at(0)`.
+- Verification completed: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `git diff --check`, focused browser/contract tests, browser integration test with local-server escalation, and full `pnpm test` with local-server escalation all pass.
+- SonarQube CLI file-level `sonar verify` could not run because SonarCloud returned `403` for A3S analysis not being activated in the organization; final Sonar status requires the pushed PR analysis rerun.

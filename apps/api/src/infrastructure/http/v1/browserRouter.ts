@@ -159,7 +159,8 @@ async function listArtifacts(options: {
     totalArtifacts: artifacts.length,
     sessions: [...grouped.entries()]
       .map(([sessionId, sessionArtifacts]) => {
-        const sorted = sessionArtifacts.sort((a, b) => b.capturedAtMs - a.capturedAtMs);
+        const sorted = [...sessionArtifacts];
+        sorted.sort((a, b) => b.capturedAtMs - a.capturedAtMs);
         return {
           sessionId,
           artifactCount: sorted.length,

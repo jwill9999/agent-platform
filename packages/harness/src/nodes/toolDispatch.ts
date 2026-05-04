@@ -870,13 +870,15 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           : buildApprovalRequiredOutput(safeCall, browserUrlReason);
 
         await emitToolOutput(ctx, output);
-        traceEvents.push({
-          type: 'tool_approval_required',
-          toolId: safeCall.name,
-          step,
-          riskTier: 'medium',
-        });
-        traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok: false });
+        traceEvents.push(
+          {
+            type: 'tool_approval_required',
+            toolId: safeCall.name,
+            step,
+            riskTier: 'medium',
+          },
+          { type: 'tool_dispatch', toolId: safeCall.name, step, ok: false },
+        );
 
         if (!ctx.approvalRequests) {
           ctx.auditLog?.logDenied(

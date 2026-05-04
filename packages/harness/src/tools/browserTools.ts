@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { relative, sep, join } from 'node:path';
 
 import type { Locator, Page } from 'playwright';
@@ -270,7 +270,11 @@ export type BrowserRuntimeSession = {
 };
 
 export type BrowserDriver = {
-  launch(options: { viewport: BrowserViewport; timeoutMs: number }): Promise<BrowserRuntimeSession>;
+  launch(options: {
+    viewport: BrowserViewport;
+    timeoutMs: number;
+    browserTempRoot?: string;
+  }): Promise<BrowserRuntimeSession>;
 };
 
 type StoredSession = {
@@ -448,42 +452,58 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
   async launch(options: {
     viewport: BrowserViewport;
     timeoutMs: number;
+    browserTempRoot?: string;
   }): Promise<BrowserRuntimeSession> {
     const playwright = await import('playwright');
     const executablePath = resolveChromiumExecutablePath();
-    const browser = await playwright.chromium.launch({
-      headless: true,
-      timeout: options.timeoutMs,
-      executablePath,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
-    });
-    const context = await browser.newContext({ viewport: options.viewport });
-    const page = await context.newPage();
-    return {
-      page: {
-        url: () => page.url(),
-        title: () => page.title(),
-        viewportSize: () => page.viewportSize(),
-        goto: (url, gotoOptions) => page.goto(url, gotoOptions),
-        screenshot: (screenshotOptions) => page.screenshot(screenshotOptions),
-        content: () => page.content(),
-        ariaSnapshot: () => page.locator('body').ariaSnapshot({ timeout: 2_000 }),
-        locator: (target) => {
-          const locator = resolvePlaywrightLocator(page, target);
-          return {
-            count: () => locator.count(),
-            click: (clickOptions) => locator.click(clickOptions),
-            fill: (text, fillOptions) => locator.fill(text, fillOptions),
-            press: (key, pressOptions) => locator.press(key, pressOptions),
-          };
+    const launchTempRoot = await createBrowserLaunchTempRoot(options.browserTempRoot);
+    try {
+      const context = await playwright.chromium.launchPersistentContext(
+        join(launchTempRoot, 'user-data'),
+        {
+          headless: true,
+          timeout: options.timeoutMs,
+          executablePath,
+          args: ['--no-sandbox', '--disable-dev-shm-usage'],
+          viewport: options.viewport,
+          artifactsDir: join(launchTempRoot, 'artifacts'),
+          downloadsPath: join(launchTempRoot, 'downloads'),
+          tracesDir: join(launchTempRoot, 'traces'),
         },
-        close: () => page.close(),
-      },
-      close: async () => {
-        await context.close();
-        await browser.close();
-      },
-    };
+      );
+      const page = context.pages()[0] ?? (await context.newPage());
+      return {
+        page: {
+          url: () => page.url(),
+          title: () => page.title(),
+          viewportSize: () => page.viewportSize(),
+          goto: (url, gotoOptions) => page.goto(url, gotoOptions),
+          screenshot: (screenshotOptions) => page.screenshot(screenshotOptions),
+          content: () => page.content(),
+          ariaSnapshot: () => page.locator('body').ariaSnapshot({ timeout: 2_000 }),
+          locator: (target) => {
+            const locator = resolvePlaywrightLocator(page, target);
+            return {
+              count: () => locator.count(),
+              click: (clickOptions) => locator.click(clickOptions),
+              fill: (text, fillOptions) => locator.fill(text, fillOptions),
+              press: (key, pressOptions) => locator.press(key, pressOptions),
+            };
+          },
+          close: () => page.close(),
+        },
+        close: async () => {
+          try {
+            await context.close();
+          } finally {
+            await rm(launchTempRoot, { recursive: true, force: true });
+          }
+        },
+      };
+    } catch (error) {
+      await rm(launchTempRoot, { recursive: true, force: true });
+      throw error;
+    }
   }
 }
 
@@ -496,38 +516,20 @@ function resolveBrowserTempRoot(options: {
   return join(options.workspaceRoot, DEFAULT_BROWSER_TEMP_SUBDIR);
 }
 
-async function prepareBrowserTempEnvironment(tempRoot: string | undefined): Promise<() => void> {
-  if (!tempRoot) return () => undefined;
-
-  await mkdir(tempRoot, { recursive: true });
-  const previous = {
-    TMPDIR: process.env.TMPDIR,
-    TMP: process.env.TMP,
-    TEMP: process.env.TEMP,
-  };
-  process.env.TMPDIR = tempRoot;
-  process.env.TMP = tempRoot;
-  process.env.TEMP = tempRoot;
-
-  return () => {
-    restoreEnvValue('TMPDIR', previous.TMPDIR);
-    restoreEnvValue('TMP', previous.TMP);
-    restoreEnvValue('TEMP', previous.TEMP);
-  };
-}
-
-function restoreEnvValue(key: 'TMPDIR' | 'TMP' | 'TEMP', value: string | undefined): void {
-  if (value === undefined) {
-    delete process.env[key];
-    return;
-  }
-  process.env[key] = value;
+async function createBrowserLaunchTempRoot(tempRoot: string | undefined): Promise<string> {
+  const root = tempRoot ?? join(process.cwd(), DEFAULT_BROWSER_TEMP_SUBDIR);
+  await mkdir(root, { recursive: true });
+  return mkdtemp(join(root, 'playwright-'));
 }
 
 function resolvePlaywrightLocator(page: Page, target: BrowserActionTarget): Locator {
   if (target.role) {
     const name = target.label ?? target.text;
-    return page.getByRole(target.role as Parameters<typeof page.getByRole>[0], { name });
+    const getByRole = page.getByRole.bind(page) as (
+      role: string,
+      options: { name?: string | RegExp },
+    ) => Locator;
+    return getByRole(target.role, { name });
   }
   if (target.label) return page.getByLabel(target.label);
   if (target.text) return page.getByText(target.text);
@@ -546,9 +548,7 @@ function resolveChromiumExecutablePath(): string | undefined {
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  ]
-    .filter((candidate) => existsSync(candidate))
-    .at(0);
+  ].find((candidate) => existsSync(candidate));
 }
 
 export class BrowserSessionManager {
@@ -562,10 +562,11 @@ export class BrowserSessionManager {
 
   constructor(options: BrowserSessionManagerOptions = {}) {
     this.driver = options.driver ?? new PlaywrightBrowserDriver();
-    this.workspaceRoot = options.workspaceRoot ?? process.cwd();
+    const workspaceRoot = options.workspaceRoot ?? process.cwd();
+    this.workspaceRoot = workspaceRoot;
     this.browserTempRoot = resolveBrowserTempRoot({
       configuredTempRoot: options.browserTempRoot ?? process.env.AGENT_BROWSER_TMPDIR,
-      workspaceRoot: options.workspaceRoot,
+      workspaceRoot,
     });
     this.now = options.now ?? Date.now;
     this.sessionTimeoutMs =
@@ -582,16 +583,12 @@ export class BrowserSessionManager {
     }
 
     const viewport = options.viewport ?? DEFAULT_VIEWPORT;
-    const restoreBrowserTempEnv = await prepareBrowserTempEnvironment(this.browserTempRoot);
-    let runtime: BrowserRuntimeSession;
-    try {
-      runtime = await this.driver.launch({
-        viewport,
-        timeoutMs: options.timeoutMs ?? 30_000,
-      });
-    } finally {
-      restoreBrowserTempEnv();
-    }
+    if (this.browserTempRoot) await mkdir(this.browserTempRoot, { recursive: true });
+    const runtime = await this.driver.launch({
+      viewport,
+      timeoutMs: options.timeoutMs ?? 30_000,
+      browserTempRoot: this.browserTempRoot,
+    });
 
     const id = options.sessionId ?? `browser-session-${randomUUID()}`;
     if (options.url) {
@@ -1257,12 +1254,14 @@ async function handleInteraction(
         ? (args.target as BrowserActionTarget)
         : undefined;
     const timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined;
-    const result =
-      kind === 'click'
-        ? await manager.click({ sessionId, target, timeoutMs })
-        : kind === 'type'
-          ? await manager.type({ sessionId, target, timeoutMs, text: stringArg(args, 'text') })
-          : await manager.press({ sessionId, target, timeoutMs, key: stringArg(args, 'key') });
+    let result: Awaited<ReturnType<BrowserSessionManager['click']>>;
+    if (kind === 'click') {
+      result = await manager.click({ sessionId, target, timeoutMs });
+    } else if (kind === 'type') {
+      result = await manager.type({ sessionId, target, timeoutMs, text: stringArg(args, 'text') });
+    } else {
+      result = await manager.press({ sessionId, target, timeoutMs, key: stringArg(args, 'key') });
+    }
     if (!result) {
       return unavailableSessionResult(toolId, kind, sessionId, startedAtMs);
     }

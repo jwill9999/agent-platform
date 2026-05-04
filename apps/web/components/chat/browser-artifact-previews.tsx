@@ -47,6 +47,12 @@ function browserImageArtifacts(events: readonly ToolTraceEvent[]): PreviewArtifa
   return artifacts;
 }
 
+function getZoomLabel(viewMode: ViewMode, zoomPercent: number): string {
+  if (viewMode === 'page') return 'Fit';
+  if (viewMode === 'width') return 'Width';
+  return `${zoomPercent}%`;
+}
+
 export function BrowserArtifactPreviews({ events }: Props) {
   const artifacts = useMemo(() => browserImageArtifacts(events), [events]);
   const [selected, setSelected] = useState<PreviewArtifact | null>(null);
@@ -154,7 +160,7 @@ export function BrowserArtifactPreviews({ events }: Props) {
                   <ZoomOut className="h-4 w-4" />
                 </Button>
                 <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
-                  {viewMode === 'page' ? 'Fit' : viewMode === 'width' ? 'Width' : `${zoomPercent}%`}
+                  {getZoomLabel(viewMode, zoomPercent)}
                 </span>
                 <Button
                   type="button"
