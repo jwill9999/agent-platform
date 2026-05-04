@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Implemented `agent-platform-browser-tools.5` on `task/agent-platform-browser-tools.5`: added real Playwright browser-tool integration validation, documented browser runtime troubleshooting, completed the browser-tools epic checklist, and verified root typecheck/lint/test/format plus Playwright E2E after applying the E2E seed.
+- **Date:** 2026-05-04
 - **Session:** Updated the docs-policy hook on `task/agent-platform-browser-tools.5` so agents are explicitly instructed to scan/update docs or record TODOs at hook time, and fixed SonarCloud hotspot `javascript:S4036` in `scripts/coding-runtime-verify.mjs` by resolving commands from fixed absolute directories instead of ambient `PATH`.
 - **Date:** 2026-05-04
 - **Session:** Completed `agent-platform-browser-tools.1` through `.4` on `task/agent-platform-browser-tools.4`: added governed Playwright browser contracts/tools, evidence artifacts, API artifact listing/download routes, compact chat UI summaries, tests, docs, and closed `.4` locally. Commit `3581388` is ready to push; Beads Dolt auto-push is still blocked by GitHub DNS/auth from the sandbox.
@@ -252,6 +254,36 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Browser tools validation implemented
+
+Branch state: `task/agent-platform-browser-tools.5` contains the browser-tools segment tip.
+
+- Added `packages/harness/test/browserTools.integration.test.ts`, which drives a real Playwright browser against a local HTML fixture.
+- The integration test covers `browser_start`, `browser_navigate`, `browser_snapshot`, `browser_screenshot`, `browser_click`, `browser_type`, `browser_press`, and `browser_close`.
+- Negative coverage now includes external-domain navigation approval, redirect-to-external approval, sensitive input approval, ambiguous target failure, inactive-session failure after close, and bounded artifact/sidecar metadata.
+- Added browser runtime troubleshooting to `docs/development.md`.
+- Updated `docs/tasks/agent-platform-browser-tools.md` and `.5` with validation results and completed checklist items.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.integration.test.ts`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm exec markdownlint-cli2 docs/development.md docs/tasks/agent-platform-browser-tools.md docs/tasks/agent-platform-browser-tools.5.md`
+- `pnpm format:check`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm test`
+- `docker compose --profile services exec -T api sh -lc 'E2E_SEED=1 SQLITE_PATH=/data/agent.sqlite node packages/db/dist/seed/run.js'`
+- `pnpm test:e2e`
+
+Completion gate:
+
+- SonarQube MCP tools and IDE Problems were not available through the current tool surface.
+- Fallback typecheck/lint/test/E2E gates passed.
+- Earlier `pnpm test:e2e` failed before applying `E2E_SEED=1`; after applying the E2E seed to the running API container, all 16 E2E tests passed.
 
 ### Browser tools tickets 1-4 implemented
 
@@ -637,10 +669,10 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-browser-tools.4`
-- **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4`
-- **Current work:** browser-tools tickets `.1` through `.4` are implemented and committed in `3581388`.
-- **Remote sync:** `task/agent-platform-browser-tools.4` still needs to be pushed.
+- **Current branch:** `task/agent-platform-browser-tools.5`
+- **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4` -> `.5`
+- **Current work:** browser-tools ticket `.5` validation changes are ready to commit and push.
+- **Remote sync:** pending for the `.5` validation commit.
 
 ### Beads
 
@@ -649,7 +681,7 @@ Quality gates passed:
 - `agent-platform-browser-tools.2` is closed locally.
 - `agent-platform-browser-tools.3` is closed locally.
 - `agent-platform-browser-tools.4` is closed locally.
-- `agent-platform-browser-tools.5` is open and depends on `.4`; claim it after pushing `.4`.
+- `agent-platform-browser-tools.5` is in progress locally; validation implementation is complete and closeout/PR are next.
 - `agent-platform-feedback-sensors` is closed locally.
 - `agent-platform-feedback-sensors.1` is closed.
 - `agent-platform-feedback-sensors.2` is closed.
@@ -672,6 +704,13 @@ Quality gates passed:
   - harness/contracts/web/API tests listed in the latest session entry
   - touched-doc markdownlint
   - `git diff --check`
+- Browser-tools `.5` gates passed:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test`
+  - `pnpm test:e2e` after applying `E2E_SEED=1`
+  - focused harness browser integration test
 - Latest `.6` gates passed:
   - `pnpm typecheck`
   - `pnpm lint`
@@ -686,9 +725,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push `task/agent-platform-browser-tools.4`.
-2. Claim `agent-platform-browser-tools.5` and create `task/agent-platform-browser-tools.5` from the pushed `.4` branch tip.
-3. Ask the owner to run `bd dolt push` or rerun Beads sync when GitHub DNS/auth is available if Beads remote sync is still blocked.
+1. Commit and push `.5` validation changes.
+2. Open the segment-tip PR from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`.
+3. Close `agent-platform-browser-tools.5` in Beads and sync/push Beads state.
 
 ---
 

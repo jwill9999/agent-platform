@@ -96,11 +96,18 @@ by the browser session manager. The chat UI summarizes browser tool results as
 compact browser activity with artifact links rather than raw JSON, while the
 API keeps downloads bounded to `.agent-platform/browser/**`.
 
+Task `.5` adds real browser validation against a local web fixture using the
+Playwright-backed browser driver. The integration coverage exercises
+start/navigate/snapshot/screenshot/click/type/press/close, external-domain and
+redirect approval requirements, sensitive-input approval requirements,
+ambiguous-target failures, bounded artifact content, and workspace-relative
+sidecar metadata.
+
 ## Definition Of Done
 
-- Browser sessions are bounded by timeout and policy.
-- Read-only inspection can run without unnecessary approval.
-- Mutating actions are risk-scored and approval-gated when appropriate.
-- Screenshots/snapshots are stored as evidence artifacts.
-- Tests cover successful UI validation and blocked risky actions.
-- Child task specs exist for `.1` through `.5` and Beads dependencies match the proposed chain.
+- [x] Browser sessions are bounded by timeout and policy.
+- [x] Read-only inspection can run without unnecessary approval.
+- [x] Mutating actions are risk-scored and approval-gated when appropriate.
+- [x] Screenshots/snapshots are stored as evidence artifacts.
+- [x] Tests cover successful UI validation and blocked risky actions.
+- [x] Child task specs exist for `.1` through `.5` and Beads dependencies match the proposed chain.
