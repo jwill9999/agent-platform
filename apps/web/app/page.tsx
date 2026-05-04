@@ -1,6 +1,11 @@
 'use client';
 
-import type { Agent, ModelConfig, SessionRecord } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ModelConfig,
+  SensorDashboardResponse,
+  SessionRecord,
+} from '@agent-platform/contracts';
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '../components/chat/chat';
 import { AgentModelProvider } from '../components/chat/agent-model-context';
@@ -22,6 +27,9 @@ export default function HomePage() {
   const [isResuming, setIsResuming] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [sensorDashboard, setSensorDashboard] = useState<SensorDashboardResponse | null>(null);
+  const [sensorLoading, setSensorLoading] = useState(false);
+  const [sensorError, setSensorError] = useState<string | null>(null);
 
   const {
     messages,
@@ -76,24 +84,46 @@ export default function HomePage() {
     bootstrapAgents().catch(() => {});
   }, [bootstrapAgents]);
 
-  const createSessionForAgent = useCallback(async (agentId: string) => {
-    setSessionError(null);
-    setIsResuming(false);
+  const refreshSensors = useCallback(async (id: string, retry = false) => {
+    setSensorLoading(true);
+    setSensorError(null);
     try {
-      const session = await apiPost<SessionRecord>(apiPath('sessions'), {
-        agentId,
-      });
-      if (!session?.id) {
-        setSessionError('Failed to create session');
-        setSessionId(null);
-        return;
-      }
-      setSessionId(session.id);
+      const path = apiPath('sessions', id, 'sensors');
+      const data = retry
+        ? await apiPost<SensorDashboardResponse>(`${path}/retry`, {})
+        : await apiGet<SensorDashboardResponse>(path);
+      setSensorDashboard(data ?? null);
     } catch (e) {
-      setSessionError(e instanceof ApiRequestError ? e.message : String(e));
-      setSessionId(null);
+      setSensorError(e instanceof ApiRequestError ? e.message : String(e));
+    } finally {
+      setSensorLoading(false);
     }
   }, []);
+
+  const createSessionForAgent = useCallback(
+    async (agentId: string) => {
+      setSessionError(null);
+      setIsResuming(false);
+      try {
+        const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+          agentId,
+        });
+        if (!session?.id) {
+          setSessionError('Failed to create session');
+          setSessionId(null);
+          setSensorDashboard(null);
+          return;
+        }
+        setSessionId(session.id);
+        await refreshSensors(session.id);
+      } catch (e) {
+        setSessionError(e instanceof ApiRequestError ? e.message : String(e));
+        setSessionId(null);
+        setSensorDashboard(null);
+      }
+    },
+    [refreshSensors],
+  );
 
   useEffect(() => {
     if (!selectedAgentId) return;
@@ -119,8 +149,9 @@ export default function HomePage() {
       setSelectedAgentId(session.agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(session.agentId, agents, modelConfigs));
       setSessionId(session.id);
+      refreshSensors(session.id).catch(() => {});
     },
-    [agents, modelConfigs],
+    [agents, modelConfigs, refreshSensors],
   );
 
   const handleNewChatForAgent = useCallback(
@@ -144,11 +175,22 @@ export default function HomePage() {
       const messageForApi = formattedContext ? `${formattedContext}\n${text}` : text;
       const displayText = formattedContext ? text : undefined;
       sendMessage(messageForApi, displayText, selectedModelConfigId)
-        .then(() => refreshSessions())
+        .then(async () => {
+          await refreshSessions();
+          if (sessionId) await refreshSensors(sessionId);
+        })
         .catch(() => {});
       clearAttachments();
     },
-    [sendMessage, refreshSessions, formattedContext, clearAttachments, selectedModelConfigId],
+    [
+      sendMessage,
+      refreshSessions,
+      formattedContext,
+      clearAttachments,
+      selectedModelConfigId,
+      sessionId,
+      refreshSensors,
+    ],
   );
 
   const handleApprovalDecision = useCallback(
@@ -215,6 +257,12 @@ export default function HomePage() {
               toolEventsByMessage={toolEventsByMessage}
               approvalEventsByMessage={approvalEventsByMessage}
               onApprovalDecision={handleApprovalDecision}
+              sensorDashboard={sensorDashboard}
+              sensorLoading={sensorLoading}
+              sensorError={sensorError}
+              onRetrySensors={() => {
+                if (sessionId) refreshSensors(sessionId, true).catch(() => {});
+              }}
             />
           </AgentModelProvider>
         </div>

@@ -1,6 +1,6 @@
 # Task: Implement job runner, queue, retry, and cancellation basics
 
-**Beads id:** `agent-platform-scheduler.2`  
+**Beads id:** `agent-platform-scheduler.2`
 **Parent epic:** `agent-platform-scheduler` - Scheduler and background work
 
 ## Summary

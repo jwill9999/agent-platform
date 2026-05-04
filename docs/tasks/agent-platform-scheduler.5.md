@@ -1,6 +1,6 @@
 # Task: Add notification hooks, end-to-end tests, and epic polish
 
-**Beads id:** `agent-platform-scheduler.5`  
+**Beads id:** `agent-platform-scheduler.5`
 **Parent epic:** `agent-platform-scheduler` - Scheduler and background work
 
 ## Summary

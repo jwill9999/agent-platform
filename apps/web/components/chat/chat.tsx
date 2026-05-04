@@ -5,9 +5,11 @@ import type { UIMessage } from 'ai';
 import { Sparkles } from 'lucide-react';
 import { Message, getMessageText } from './message';
 import { ChatInput } from './chat-input';
+import { SensorStatusPanel } from './sensor-status-panel';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import type { CriticEvent } from '@/lib/critic-events';
 import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
+import type { SensorDashboardResponse } from '@agent-platform/contracts';
 
 export interface ChatProps {
   messages: UIMessage[];
@@ -37,6 +39,11 @@ export interface ChatProps {
   approvalEventsByMessage?: Record<string, readonly ApprovalCardState[]>;
   /** User decision handler for approval requests. */
   onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
+  /** Session-scoped sensor status, kept outside the chat transcript. */
+  sensorDashboard?: SensorDashboardResponse | null;
+  sensorLoading?: boolean;
+  sensorError?: string | null;
+  onRetrySensors?: () => void;
 }
 
 export function Chat({
@@ -55,6 +62,10 @@ export function Chat({
   toolEventsByMessage,
   approvalEventsByMessage,
   onApprovalDecision,
+  sensorDashboard,
+  sensorLoading,
+  sensorError,
+  onRetrySensors,
 }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -67,59 +78,70 @@ export function Chat({
   }, [messages, approvalEventsByMessage, scrollToBottom]);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-gradient-to-b from-background to-secondary/20">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4">
-          {messages.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <>
-              {messages.map((message, index) => (
-                <Message
-                  key={message.id}
-                  message={message}
-                  isStreaming={
-                    isLoading && message.role === 'assistant' && index === messages.length - 1
-                  }
-                  isAwaitingStreamContent={
-                    isLoading &&
-                    message.role === 'assistant' &&
-                    index === messages.length - 1 &&
-                    !getMessageText(message).trim()
-                  }
-                  criticEvents={
-                    message.role === 'assistant' ? criticEventsByMessage?.[message.id] : undefined
-                  }
-                  thinking={
-                    message.role === 'assistant' ? thinkingByMessage?.[message.id] : undefined
-                  }
-                  toolEvents={
-                    message.role === 'assistant' ? toolEventsByMessage?.[message.id] : undefined
-                  }
-                  approvals={
-                    message.role === 'assistant' ? approvalEventsByMessage?.[message.id] : undefined
-                  }
-                  onApprovalDecision={onApprovalDecision}
-                />
-              ))}
-              <div ref={messagesEndRef} className="h-4" />
-            </>
-          )}
+    <div className="flex flex-1 min-h-0 bg-gradient-to-b from-background to-secondary/20">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4">
+            {messages.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <>
+                {messages.map((message, index) => (
+                  <Message
+                    key={message.id}
+                    message={message}
+                    isStreaming={
+                      isLoading && message.role === 'assistant' && index === messages.length - 1
+                    }
+                    isAwaitingStreamContent={
+                      isLoading &&
+                      message.role === 'assistant' &&
+                      index === messages.length - 1 &&
+                      !getMessageText(message).trim()
+                    }
+                    criticEvents={
+                      message.role === 'assistant' ? criticEventsByMessage?.[message.id] : undefined
+                    }
+                    thinking={
+                      message.role === 'assistant' ? thinkingByMessage?.[message.id] : undefined
+                    }
+                    toolEvents={
+                      message.role === 'assistant' ? toolEventsByMessage?.[message.id] : undefined
+                    }
+                    approvals={
+                      message.role === 'assistant'
+                        ? approvalEventsByMessage?.[message.id]
+                        : undefined
+                    }
+                    onApprovalDecision={onApprovalDecision}
+                  />
+                ))}
+                <div ref={messagesEndRef} className="h-4" />
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Input */}
+        <ChatInput
+          onSend={onSend}
+          isLoading={isLoading}
+          canSend={canSend}
+          statusText={inputStatusText}
+          attachments={attachments}
+          onAddFiles={onAddFiles}
+          onRemoveAttachment={onRemoveAttachment}
+          onClearAttachments={onClearAttachments}
+          attachmentWarnings={attachmentWarnings}
+        />
       </div>
 
-      {/* Input */}
-      <ChatInput
-        onSend={onSend}
-        isLoading={isLoading}
-        canSend={canSend}
-        statusText={inputStatusText}
-        attachments={attachments}
-        onAddFiles={onAddFiles}
-        onRemoveAttachment={onRemoveAttachment}
-        onClearAttachments={onClearAttachments}
-        attachmentWarnings={attachmentWarnings}
+      <SensorStatusPanel
+        dashboard={sensorDashboard ?? null}
+        loading={sensorLoading}
+        error={sensorError}
+        onRetry={onRetrySensors}
       />
     </div>
   );

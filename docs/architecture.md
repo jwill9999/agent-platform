@@ -116,9 +116,17 @@ flowchart TD
 
 ## Observability
 
-The API owns a process-local observability store keyed by `sessionId` and `runId`. A global `plugin-observability` instance records lifecycle events into that store during each chat run, and the three zero-risk built-in observability tools read from the same store through a session-bound executor context.
+The API owns a process-local observability store keyed by `sessionId` and `runId`. A global `plugin-observability` instance records lifecycle events into that store during each chat run, and the zero-risk built-in observability tools read from the same store through a session-bound executor context.
 
 This keeps observability queryable by the agent at runtime without allowing cross-session reads. Tool access is jailed by closure-bound `sessionId`/`runId`, not by model-supplied parameters.
+
+## Feedback Sensors
+
+Feedback sensors run inside the harness after meaningful code checkpoints and before completion or push handoff. Computational sensors cover deterministic checks such as typecheck, test, lint, and imported findings from IDE plugins, terminal output, SonarQube, CodeQL, GitHub check runs, review comments, and MCP-backed providers. Inferential sensors review task satisfaction, architecture fit, test quality, open findings, and readiness to hand off.
+
+Sensor results are emitted as structured observability events, not chat transcript messages. `GET /v1/sessions/:id/sensors` exposes the bounded session dashboard used by the UI: active agent profile, selected sensor profile, deterministic and inferential definitions, provider availability, MCP capabilities selected for reflection, normalized findings, runtime limitations, repeated-failure patterns, and review-gated improvement candidates. The chat UI renders a compact expandable sensor panel so users can see pass/fail, repaired, auth-required, unavailable, Docker/sandbox-limited, and escalation states without flooding the conversation.
+
+Coding sensors are selected for coding-profile agents and repository task contexts. Personal-assistant profile sessions show coding gates as disabled or manual-only unless a repository task explicitly needs them. Provider connection remains explicit: unavailable or auth-required providers surface repair actions such as GitHub CLI authentication, SonarQube MCP or IDE plugin setup, CodeQL configuration, and retry discovery.
 
 ## API Clean Architecture
 

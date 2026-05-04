@@ -1,6 +1,6 @@
 # Task: Define scheduled job contracts, schema, and state machine
 
-**Beads id:** `agent-platform-scheduler.1`  
+**Beads id:** `agent-platform-scheduler.1`
 **Parent epic:** `agent-platform-scheduler` - Scheduler and background work
 
 ## Summary

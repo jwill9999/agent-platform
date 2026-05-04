@@ -1,7 +1,15 @@
 import { Annotation } from '@langchain/langgraph';
-import type { DodContract, ExecutionLimits, Plan } from '@agent-platform/contracts';
+import type {
+  DodContract,
+  ExecutionLimits,
+  Plan,
+  SensorAgentProfile,
+  SensorResult,
+  SensorTrigger,
+} from '@agent-platform/contracts';
 import type { TraceEvent } from './trace.js';
 import type { ChatMessage, LlmModelConfig, LlmOutput, ToolDefinition } from './types.js';
+import type { ComputationalFindingCollectorResult } from './sensors/computationalSensorRunner.js';
 
 function appendTrace(left: TraceEvent[], right: TraceEvent | TraceEvent[]): TraceEvent[] {
   const next = Array.isArray(right) ? right : [right];
@@ -107,6 +115,48 @@ export const HarnessState = Annotation.Root({
   // -- Definition-of-Done contract (task agent-platform-fc8) --
   /** Current DoD contract for the run; last-write-wins across propose/check phases. */
   dodContract: Annotation<DodContract | undefined>(),
+
+  // -- Feedback sensors (task agent-platform-feedback-sensors.3) --
+  sensorResults: Annotation<SensorResult[]>({
+    reducer: (left: SensorResult[], right: SensorResult | SensorResult[]) => {
+      const next = Array.isArray(right) ? right : [right];
+      return [...left, ...next];
+    },
+    default: () => [],
+  }),
+  sensorAttempts: Annotation<Record<string, number>>({
+    reducer: (left: Record<string, number>, right: Record<string, number>) => ({
+      ...left,
+      ...right,
+    }),
+    default: () => ({}),
+  }),
+  sensorLastToolIds: Annotation<string[]>({
+    reducer: (_left: string[], right: string | string[]) =>
+      Array.isArray(right) ? right : [right],
+    default: () => [],
+  }),
+  sensorRequestedTrigger: Annotation<SensorTrigger | undefined>(),
+  sensorLastTrigger: Annotation<SensorTrigger | undefined>(),
+  sensorAgentProfile: Annotation<SensorAgentProfile>(),
+  sensorTaskContexts: Annotation<string[]>({
+    reducer: (_left: string[], right: string | string[]) =>
+      Array.isArray(right) ? right : [right],
+    default: () => [],
+  }),
+  sensorChangedFiles: Annotation<string[]>({
+    reducer: (_left: string[], right: string | string[]) =>
+      Array.isArray(right) ? right : [right],
+    default: () => [],
+  }),
+  sensorRepoPath: Annotation<string>(),
+  sensorFindingCollectorResults: Annotation<ComputationalFindingCollectorResult[]>({
+    reducer: (
+      _left: ComputationalFindingCollectorResult[],
+      right: ComputationalFindingCollectorResult[],
+    ) => right,
+    default: () => [],
+  }),
 });
 
 export type HarnessStateType = typeof HarnessState.State;

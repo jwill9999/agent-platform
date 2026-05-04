@@ -8,17 +8,24 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Task requirements
 
-Build a deterministic sensor runner that selects approved fast checks after code-changing actions and turns failures into compact repair instructions.
+Build a deterministic sensor runner and finding collector that select approved checks at appropriate checkpoints and turn failures or imported findings into compact repair instructions.
 
 Required outcomes:
 
 - Add a harness module that can run computational sensors using the existing `sys_run_quality_gate` backend.
-- Select a minimal sensor set from trigger context:
+- Collect locally available findings from configured feedback surfaces where possible, including IDE/problem diagnostics, bounded IDE/plugin terminal output, SonarQube plugins or CLI output, CodeQL output, and agent-generated code comments.
+- Select sensors using agent profile, task context, changed files, and trigger/cadence context. Coding agents should receive repository quality gates; personal-assistant agents should not unless the task explicitly involves repository work.
+- Select a minimal sensor set from trigger/cadence context:
   - TypeScript/package changes: package `typecheck`
   - source/test changes: package or root `test`
   - code style changes: `lint`
   - docs changes: `docs` or `format`
+- Treat pre-push validation as the primary required local checkpoint; during-work checks must be targeted and cheap by default.
 - Convert raw quality gate failures into LLM-optimized repair instructions with file, line, failing command, and next action.
+- Normalize imported findings into the shared finding model and deduplicate by source/rule/file/line/message where possible.
+- Discover whether the check is running on the host, in the Docker app container, through Docker compose, through an IDE plugin, or in a future isolated command sandbox.
+- Surface missing runtime prerequisites such as stopped containers, unhealthy services, missing workspace mounts, unavailable tool binaries, missing network/auth, or host/container path mapping gaps.
+- Read IDE/plugin terminal output only through approved providers or bounded transcript APIs; do not scrape arbitrary processes or bypass the workspace/sandbox policy.
 - Preserve raw stdout/stderr as bounded evidence artifacts.
 - Enforce workspace/path limits, timeout limits, output caps, and no arbitrary shell command construction.
 
@@ -40,15 +47,19 @@ Required outcomes:
 
 1. Read `packages/harness/src/tools/qualityGateTool.ts`, `packages/harness/src/tools/gitTools.ts`, and `packages/harness/src/tools/repoDiscoveryTools.ts`.
 2. Create `packages/harness/src/sensors/computationalSensorRunner.ts`.
-3. Define a runner API that accepts changed files, repo path, available sensor definitions, and execution limits.
+3. Define a runner API that accepts agent profile, task context, changed files, repo path, available sensor definitions, and execution limits.
 4. Reuse `executeQualityGateTool` instead of invoking shell commands directly.
-5. Add deterministic failure normalization helpers:
+5. Add provider/finding collector interfaces that can return `available`, `auth_required`, `not_configured`, `permission_denied`, runtime limitation states, or normalized findings without failing the whole run.
+6. Add deterministic failure normalization helpers:
    - TypeScript errors become "fix the type mismatch" repair instructions.
    - ESLint errors become "apply this lint rule" repair instructions.
    - test failures include expected/actual snippets when available.
+   - SonarQube and CodeQL findings include severity, rule ID, hotspot/security metadata when present, and evidence links.
+   - IDE problems, IDE/plugin terminal output, and agent code comments become findings with local source metadata.
+   - runtime failures distinguish code failure from environment failure.
    - unknown failures include the failing command and the smallest useful log tail.
-6. Add unit tests in `packages/harness/test/computationalSensorRunner.test.ts`.
-7. Ensure all result payloads satisfy the contracts from task `.1`.
+7. Add unit tests in `packages/harness/test/computationalSensorRunner.test.ts`.
+8. Ensure all result payloads satisfy the contracts from task `.1`.
 
 ## Tests (required before sign-off)
 
@@ -57,26 +68,38 @@ Required outcomes:
 - `pnpm typecheck`
 - Add tests for:
   - selecting typecheck/lint/test from changed files
+  - coding profile selects repository quality sensors
+  - personal-assistant profile skips coding sensors for non-coding tasks
+  - manual request can select an otherwise manual-only sensor
   - output truncation metadata
   - failing quality gate converted to repair instruction
+  - imported IDE/SonarQube/CodeQL/review finding converted to repair instruction
+  - IDE/plugin terminal output converted into bounded findings/evidence
+  - auth-required provider returns unavailable result without blocking optional sensors
+  - stopped Docker service or missing mount returns environment limitation, not code failure
+  - host/container path mapping is included in finding evidence
   - passing quality gate converted to passed sensor result
   - denial when repo path is outside workspace
 
 ## Definition of done
 
-- [ ] Computational sensor runner exists and uses approved quality gate execution.
-- [ ] Results are compact and suitable to feed into an LLM turn.
-- [ ] Raw logs remain evidence, not primary feedback.
-- [ ] Tests cover selection, success, failure, truncation, and denial paths.
-- [ ] `bd close agent-platform-feedback-sensors.2 --reason "Computational sensor runner implemented"`
+- [x] Computational sensor runner exists and uses approved quality gate execution.
+- [x] Sensor selection respects agent profile and task context.
+- [x] Local/problem/provider findings can be normalized and deduplicated.
+- [x] IDE/plugin terminal output is ingested only through approved bounded providers.
+- [x] Runtime environment limitations are reported distinctly from quality failures.
+- [x] Results are compact and suitable to feed into an LLM turn.
+- [x] Raw logs remain evidence, not primary feedback.
+- [x] Tests cover selection, success, failure, truncation, and denial paths.
+- [x] `bd close agent-platform-feedback-sensors.2 --reason "Computational sensor runner implemented"`
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-feedback-sensors.1`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: N/A - merge at segment end
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] Task branch created from `task/agent-platform-feedback-sensors.1`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] If segment tip: N/A - merge at segment end
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-03

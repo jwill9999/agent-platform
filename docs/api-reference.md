@@ -70,6 +70,8 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `GET /v1/mcp-servers/:id`                  |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
 | `GET /v1/sessions/:id`                     |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
 | `GET /v1/sessions/:id/working-memory`      |    —     |       ✅        | Inspect session-scoped working memory        |
+| `GET /v1/sessions/:id/sensors`             |    ✅    |       ✅        | Session sensor dashboard                     |
+| `POST /v1/sessions/:id/sensors/retry`      |    ✅    |       ✅        | Refresh sensor provider discovery view       |
 | `PUT /v1/sessions/:id`                     |    —     |       ✅        | Update session (no UI)                       |
 | `DELETE /v1/sessions/:id`                  |    —     |       ✅        | Delete session (no UI)                       |
 | `GET /v1/memories`                         |    ✅    |       ✅        | Memory dashboard list/filter                 |
@@ -140,13 +142,19 @@ Body schema: `ToolSchema` — requires `name`, `handler` with `{ type: 'inline',
 
 Built-in observability tools exposed by `GET /v1/tools`:
 
-| Tool ID                   | Name                  | Parameters                   | Result envelope                         |
-| ------------------------- | --------------------- | ---------------------------- | --------------------------------------- |
-| `sys_query_logs`          | `query_logs`          | `level?`, `since?`, `limit?` | `{ total, truncated, records }`         |
-| `sys_query_recent_errors` | `query_recent_errors` | `limit?`                     | `{ total, truncated, records }`         |
-| `sys_inspect_trace`       | `inspect_trace`       | `traceId?`                   | `{ traceId, total, truncated, events }` |
+| Tool ID                                  | Name                                 | Parameters                   | Result envelope                         |
+| ---------------------------------------- | ------------------------------------ | ---------------------------- | --------------------------------------- |
+| `sys_query_logs`                         | `query_logs`                         | `level?`, `since?`, `limit?` | `{ total, truncated, records }`         |
+| `sys_query_recent_errors`                | `query_recent_errors`                | `limit?`                     | `{ total, truncated, records }`         |
+| `sys_inspect_trace`                      | `inspect_trace`                      | `traceId?`                   | `{ traceId, total, truncated, events }` |
+| `sys_query_sensor_findings`              | `query_sensor_findings`              | `since?`, `limit?`           | `{ total, truncated, findings }`        |
+| `sys_query_sensor_provider_availability` | `query_sensor_provider_availability` | `since?`, `limit?`           | `{ total, truncated, providers }`       |
+| `sys_query_sensor_runtime_limitations`   | `query_sensor_runtime_limitations`   | `since?`, `limit?`           | `{ total, truncated, limitations }`     |
+| `sys_query_mcp_capability_availability`  | `query_mcp_capability_availability`  | `since?`, `limit?`           | `{ total, truncated, capabilities }`    |
+| `sys_query_sensor_failure_patterns`      | `query_sensor_failure_patterns`      | `since?`, `limit?`           | `{ total, truncated, patterns }`        |
+| `sys_query_feedback_candidates`          | `query_feedback_candidates`          | `since?`, `limit?`           | `{ total, truncated, candidates }`      |
 
-All three observability tools are read-only, zero-risk system tools. They are jailed to the current API session, and `inspect_trace` defaults to the current run when `traceId` is omitted.
+All observability tools are read-only, zero-risk system tools. They are jailed to the current API session, and `inspect_trace` defaults to the current run when `traceId` is omitted.
 
 ### Approval Requests
 
@@ -298,6 +306,8 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 | `GET`    | `/v1/sessions`                    | List sessions (filter: `?agentId=`) |
 | `GET`    | `/v1/sessions/:id`                | Get session by ID                   |
 | `GET`    | `/v1/sessions/:id/working-memory` | Get session working memory artifact |
+| `GET`    | `/v1/sessions/:id/sensors`        | Get session sensor dashboard        |
+| `POST`   | `/v1/sessions/:id/sensors/retry`  | Refresh sensor discovery view       |
 | `POST`   | `/v1/sessions`                    | Create a session                    |
 | `PUT`    | `/v1/sessions/:id`                | Update a session                    |
 | `DELETE` | `/v1/sessions/:id`                | Delete a session                    |
@@ -305,6 +315,17 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 Body schema: `SessionCreateBodySchema` — requires `agentId`. Agent must exist (FK constraint → 404 on missing).
 
 `GET /v1/sessions/:id/working-memory` returns `{ "data": null }` until the session has completed at least one chat or resume turn that produced working-memory state. When present, the artifact is scoped to the session and contains the current goal, active project/task, key decisions, important files, bounded tool summaries, blockers, pending approval IDs, next action, and a compact summary used for session continuity.
+
+`GET /v1/sessions/:id/sensors` returns the session-scoped sensor dashboard used by the chat UI. It combines static sensor definitions with recent outcomes from the in-process observability store:
+
+- active agent profile and selected sensor profile
+- deterministic and inferential sensor definitions
+- recent sensor run records and results
+- provider availability for IDE, GitHub, SonarQube, CodeQL, and MCP-backed sources
+- normalized findings, runtime limitations, repeated-failure patterns, and review-gated feedback candidates
+- setup guidance and repair actions for unavailable, auth-required, or permission-denied providers
+
+`POST /v1/sessions/:id/sensors/retry` returns the same response shape after re-reading the current provider/outcome store. It is intentionally side-effect-light in this segment; provider-specific connection or authentication still happens through the surfaced repair actions, such as `gh auth login`, IDE adapter setup, or MCP server configuration.
 
 ### Memories
 

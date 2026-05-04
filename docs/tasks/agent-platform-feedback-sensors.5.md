@@ -8,13 +8,19 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Task requirements
 
-Persist and expose sensor outcomes so repeated failures can improve the harness over time.
+Persist and expose sensor outcomes and normalized findings so repeated failures can improve the harness over time.
 
 Required outcomes:
 
 - Record sensor runs/results in the observability store with redaction and truncation.
+- Record the active agent profile, task context, and selected sensor profile for each sensor run/result.
+- Record normalized findings from local commands, IDE problems, IDE/plugin terminal output, SonarQube, CodeQL, GitHub checks, PR annotations, agent code comments, and user feedback.
+- Discover configured/running MCP servers that can act as feedback providers, safely probe their exposed capabilities, and record whether they can contribute evidence to sensor reflection.
+- Map useful MCP capabilities into provider availability summaries, for example SonarQube quality findings, GitHub checks/review annotations, Playwright browser/UI evidence, or documentation/reference providers.
+- Record runtime environment metadata and limitations for sensor runs, including Docker service/container identity, sandbox profile, missing tools, missing mounts, and path mappings where available.
 - Expose sensor outcomes through existing observability tools where appropriate.
 - Detect repeated failure patterns by sensor ID, rule, file area, or repair category.
+- Deduplicate the same issue when it appears across local diagnostics, IDE problems, IDE/plugin terminal output, CI annotations, and remote code scanning.
 - Generate reviewed improvement candidates:
   - Beads issue proposal
   - memory candidate
@@ -41,10 +47,13 @@ Required outcomes:
 1. Read `packages/plugin-observability/src/events.ts`, `packages/plugin-observability/src/store.ts`, and `packages/harness/src/tools/observabilityTools.ts`.
 2. Add sensor event kinds to observability events.
 3. Store compact sensor summaries and evidence references, not full unbounded logs.
-4. Add query support for recent sensor failures and sensor failure patterns.
-5. Integrate with the existing improvement-goals plan if it has landed; otherwise define a pending candidate shape that can be adopted by that work.
-6. Add tests for redaction, truncation, ordering, and session scoping.
-7. Document the feedback flywheel rules: repeated failures propose reviewed feedforward changes, never direct autonomous updates.
+4. Store provider availability/auth state so missing GitHub/SonarQube/CodeQL/IDE-plugin access can be explained and retried.
+5. Add MCP provider discovery snapshots: configured/running server identity, exposed tool/resource capability summary, auth/runtime state, and whether the capability was selected for reflection.
+6. Store runtime limitation state so Docker/sandbox access problems can be explained, retried, and distinguished from code failures.
+7. Add query support for recent sensor failures, open findings, provider availability, MCP capability availability, runtime limitations, selected sensor profile, and repeated failure patterns.
+8. Integrate with the existing improvement-goals plan if it has landed; otherwise define a pending candidate shape that can be adopted by that work.
+9. Add tests for redaction, truncation, ordering, session scoping, and deduplication.
+10. Document the feedback flywheel rules: repeated failures propose reviewed feedforward changes, never direct autonomous updates.
 
 ## Tests (required before sign-off)
 
@@ -55,24 +64,34 @@ Required outcomes:
 - Add tests for:
   - sensor event storage
   - session-scoped sensor queries
+  - provider auth/unavailable state storage
+  - MCP provider discovery and capability availability storage
+  - MCP capability summaries can inform reflection but cannot disable required gates
+  - runtime limitation state storage
+  - agent profile and selected sensor profile storage
+  - finding deduplication across local and remote sources
   - repeated failure pattern aggregation
   - redaction of command output and paths where required
   - no autonomous mutation from candidate generation
 
 ## Definition of done
 
-- [ ] Sensor outcomes are recorded in observability.
-- [ ] Agents/users can query recent sensor failures.
-- [ ] Repeated failures can produce reviewed improvement candidates.
-- [ ] Automatic feedforward mutation is explicitly prevented.
+- [x] Sensor outcomes are recorded in observability.
+- [x] Normalized findings and provider availability states are queryable.
+- [x] MCP feedback-provider capability availability is discoverable and queryable.
+- [x] Runtime environment limitations are queryable and distinct from code failures.
+- [x] Sensor outcomes can be filtered by agent profile and selected sensor profile.
+- [x] Agents/users can query recent sensor failures.
+- [x] Repeated failures can produce reviewed improvement candidates.
+- [x] Automatic feedforward mutation is explicitly prevented.
 - [ ] `bd close agent-platform-feedback-sensors.5 --reason "Sensor observability and feedback flywheel added"`
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-feedback-sensors.4`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: N/A - merge at segment end
+- [x] Task branch created from `task/agent-platform-feedback-sensors.4`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] If segment tip: N/A - merge at segment end
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
 

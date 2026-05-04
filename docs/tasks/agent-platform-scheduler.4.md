@@ -1,6 +1,6 @@
 # Task: Add UI and API controls for scheduled and background work
 
-**Beads id:** `agent-platform-scheduler.4`  
+**Beads id:** `agent-platform-scheduler.4`
 **Parent epic:** `agent-platform-scheduler` - Scheduler and background work
 
 ## Summary

@@ -7,6 +7,44 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-04
+- **Session:** Merged `origin/main` into `task/agent-platform-feedback-sensors.6`, resolved conflicts in Beads interactions, `sessionsRouter`, and `session.md`, and verified the refreshed branch with focused API checks plus root typecheck/lint.
+- **Date:** 2026-05-04
+- **Session:** Completed and closed `agent-platform-feedback-sensors.6` on `task/agent-platform-feedback-sensors.6`: exposed session sensor dashboards through API/contracts, moved sensor status into a right-side feedback drawer, added API/E2E coverage, created follow-up epic `agent-platform-branch-feedback-status`, opened PR #134 to `feature/feedback-sensors-harness`, and pushed through the pre-push gate.
+- **Date:** 2026-05-04
+- **Session:** Claimed `agent-platform-feedback-sensors.6` and created `task/agent-platform-feedback-sensors.6` from the pushed `.5` branch tip. Next work: expose sensor configuration/results/provider/runtime states through API/UI and add end-to-end validation for self-correction and completion gates.
+- **Date:** 2026-05-04
+- **Session:** Investigated SonarCloud failure on PR #133 for `agent-platform-feedback-sensors.5`: quality gate failed because `new_security_rating=5` from one new vulnerability (`typescript:S6418`) in `packages/plugin-observability/test/store.test.ts`; patched the test placeholder and cleaned up the accompanying Sonar maintainability findings.
+- **Date:** 2026-05-04
+- **Session:** Completed and closed `agent-platform-feedback-sensors.5` on `task/agent-platform-feedback-sensors.5`: sensor runs now persist compact sanitized observability events, sensor findings/provider/runtime/MCP capability states are queryable through session-bound tools, repeated failures produce review-required feedforward candidates only, and local gates plus SonarQube Blocker/Critical query are green.
+- **Date:** 2026-05-04
+- **Session:** Fixed the GitHub Actions unit-test regression on `task/agent-platform-feedback-sensors.4`: the combined feedback sensor runner no longer spends an implicit inferential evaluator call unless an evaluator is explicitly supplied. Root typecheck, lint, and unit tests pass locally; SonarQube CLI found no open Blocker/Critical issues on the PR branch. A separate `.5` spec update for MCP feedback-provider discovery remains uncommitted.
+- **Date:** 2026-05-03
+- **Session:** Implemented and closed `agent-platform-feedback-sensors.4`: added inferential feedback sensors, wired them into the default sensor runner, verified gates, and prepared `task/agent-platform-feedback-sensors.4` for push.
+- **Date:** 2026-05-03
+- **Session:** Completed `.3` closeout after SonarCloud passed on PR #131, claimed `agent-platform-feedback-sensors.4`, synced Beads/Dolt, and pushed `task/agent-platform-feedback-sensors.4` from the `.3` chain tip.
+- **Date:** 2026-05-03
+- **Session:** Addressed the remaining SonarCloud PR #131 duplication source in `packages/harness/test/reactLoop.test.ts` by extracting shared ReAct test fixtures; local gates are green and the branch is ready for the final Sonar rerun before claiming `.4`.
+- **Date:** 2026-05-03
+- **Session:** Addressed the second SonarCloud PR #131 pass after duplication dropped to 3.6% but remained above the 3% gate: extracted ReAct graph assembly helpers from `buildHarnessGraph`, verified local gates, and prepared the branch for another analysis run.
+- **Date:** 2026-05-03
+- **Session:** Addressed SonarCloud PR #131 feedback on `task/agent-platform-feedback-sensors.3`: refactored duplicated ReAct graph construction, reduced reported complexity/style findings, verified focused gates, and prepared the branch for re-analysis.
+- **Date:** 2026-05-03
+- **Session:** Implemented `agent-platform-feedback-sensors.3` on `task/agent-platform-feedback-sensors.3`: wired sensor checks into ReAct routing, added bounded repair feedback/escalation behavior, enabled API graph support, and closed the bead after green gates.
+- **Date:** 2026-05-03
+- **Session:** Implemented `agent-platform-feedback-sensors.2` on `task/agent-platform-feedback-sensors.2`: added deterministic computational sensor runner, imported finding normalization, bounded terminal evidence handling, runtime limitation reporting, and focused/broad quality gates.
+- **Date:** 2026-05-03
+- **Session:** Implemented `agent-platform-feedback-sensors.1` on `task/agent-platform-feedback-sensors.1`: added shared sensor contracts, public exports, trace lifecycle event types, and contract/trace tests.
+- **Date:** 2026-05-03
+- **Session:** Created Beads epic `agent-platform-ui-quality-sensors` and spec for future UI/UX grading sensors that use browser evidence, deterministic UI checks, and rubric-based design review.
+- **Date:** 2026-05-03
+- **Session:** Added agent-scope/profile policy to feedback-sensors specs so coding sensors apply to coding agents by default, while personal-assistant/research/automation agents only use relevant sensors or explicit/manual selections.
+- **Date:** 2026-05-03
+- **Session:** Added Docker/container and future command-sandbox edge cases to feedback-sensors specs, including runtime discovery, missing mounts/tools/network, host/container path mapping, and distinct environment-limitation states.
+- **Date:** 2026-05-03
+- **Session:** Added IDE/plugin feedback-provider requirements to the feedback-sensors specs, including bounded terminal-output ingestion, diagnostics/problem providers, setup guidance, and provider availability states.
+- **Date:** 2026-05-03
+- **Session:** Refined `agent-platform-feedback-sensors` specs after owner review to make sensors source-aware, cadence-aware, provider-auth-aware, and focused on pre-push local validation plus post-push GitHub/SonarQube/CodeQL/review feedback import.
 - **Date:** 2026-05-03
 - **Session:** Confirmed `agent-platform-scheduler` is already closed in Beads, then claimed the next planned epic `agent-platform-feedback-sensors`. Child tasks `.1` through `.6` already exist with specs; implementation should wait for owner refinement before claiming `.1`.
 - **Date:** 2026-05-03
@@ -209,41 +247,83 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Main branch refreshed after planning merge
+### Sensor controls and right feedback drawer completed
 
-- Scheduler epic functionality was manually checked by the owner and merged to `main` before this handoff update.
-- Feedback-sensors harness planning was also merged to `main` through PR #127.
-- Local `main` is current with `origin/main`; old feature/task branches were pruned by the owner.
-- No scheduler or feedback-sensors implementation task is currently active in this workspace.
-- Documentation was brought up to date for the scheduler management UI/API, local timezone handling, scheduler delete cascade behaviour, and the current database schema/migration list.
-- README was refreshed to summarize current platform capabilities and link the implemented Memory Model guide.
-- Beads confirmed `agent-platform-scheduler` is already closed. `agent-platform-feedback-sensors` is now claimed/in progress as the next epic; no child task has been claimed yet.
+Branch state: `task/agent-platform-feedback-sensors.6` contains the final feedback-sensors task and has been refreshed with `origin/main`.
 
-### Feedback sensors harness planned
+- Preserved the scheduler/project work and documentation updates merged to `main`.
+- Preserved the feedback-sensors implementation branch work on top of the refreshed mainline.
 
-Branch state: planning/spec documentation was merged to `main`; no implementation work has started.
+- Added shared `SensorDashboardResponse` contracts for session-scoped sensor dashboards, MCP capability availability, repeated-failure patterns, feedback candidates, setup guidance, and status summaries.
+- Added `GET /v1/sessions/:id/sensors` and `POST /v1/sessions/:id/sensors/retry`.
+- The API dashboard combines configured sensor definitions, active agent profile, selected sensor profile, recent observability outcomes, provider availability, MCP capabilities, normalized findings, runtime limitations, repeated-failure patterns, and reviewed improvement candidates.
+- Added default provider guidance for IDE Problems, IDE terminal output, GitHub check runs, SonarQube issues, and CodeQL alerts when the coding profile is active but providers have not reported findings.
+- Moved the sensor UI out of the chat transcript and into a right-side feedback drawer collapsed by default.
+- The drawer shows pass/fail/open/unavailable counts, recent outcomes, provider auth/setup states, open findings, and Docker/sandbox/runtime limitations with manual retry.
+- Added an E2E fixture page at `/e2e/sensor-status` and Playwright coverage proving the drawer is hidden until opened and then renders providers, findings, corrected outcomes, and sandbox limitations.
+- Updated API, architecture, development, and task docs.
+- Closed `agent-platform-feedback-sensors.6`; Beads auto-closed the parent `agent-platform-feedback-sensors` epic locally.
 
-- Used the SonarQube plugin flow earlier in the session; `sonarqube-cli` was installed, but auth requires the owner to run `sonar auth login -o jwill9999` locally before issue listing can continue.
-- Reviewed the Böckeler/Fowler article and Thoughtworks Radar framing: computational sensors run fast deterministic checks, inferential sensors run semantic review at bounded checkpoints, and both should produce LLM-optimized self-correction signals.
-- Created Beads epic `agent-platform-feedback-sensors`.
-- Created child tasks `agent-platform-feedback-sensors.1` through `.6`, linked under the epic, with Beads dependencies chained linearly.
-- Added matching specs:
-  - `docs/tasks/agent-platform-feedback-sensors.md`
-  - `docs/tasks/agent-platform-feedback-sensors.1.md`
-  - `docs/tasks/agent-platform-feedback-sensors.2.md`
-  - `docs/tasks/agent-platform-feedback-sensors.3.md`
-  - `docs/tasks/agent-platform-feedback-sensors.4.md`
-  - `docs/tasks/agent-platform-feedback-sensors.5.md`
-  - `docs/tasks/agent-platform-feedback-sensors.6.md`
-- Updated `docs/tasks/README.md` epic index.
-- Created branch `feature/feedback-sensors-harness` from `origin/main` to keep the planning docs out of the prior scheduler task branch.
-- Committed planning docs as `1d1e690 docs: plan feedback sensors harness`.
-- Added follow-up task `agent-platform-session-handoff-hygiene` with spec `docs/tasks/agent-platform-session-handoff-hygiene.md`.
-- Linked `agent-platform-context-optimisation` to depend on `agent-platform-session-handoff-hygiene` so handoff-file hygiene is handled before broader context-window optimisation.
+### Branch-aware feedback follow-up epic created
+
+- Created Beads epic `agent-platform-branch-feedback-status`.
+- Added `docs/tasks/agent-platform-branch-feedback-status.md`.
+- The follow-up epic tracks branch/PR-aware feedback: current branch discovery, PR mapping, GitHub Actions/CodeQL/SonarQube/review import, MCP capability discovery, right-drawer integration, and sensor reflection.
 
 Quality gates passed:
 
-- `pnpm docs:lint`
+- `pnpm --filter @agent-platform/contracts run build`
+- `pnpm --filter @agent-platform/contracts exec vitest run test/sensor.test.ts`
+- `pnpm --filter @agent-platform/api exec vitest run test/sensorDashboard.integration.test.ts`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm test`
+- `pnpm exec playwright test -c e2e/playwright.config.ts e2e/mvp-e2e.spec.ts -g "sensor status panel"`
+- `pnpm test:e2e` passed before the drawer move; the focused sensor drawer E2E passed after the drawer move and Docker rebuild.
+
+Completion gate:
+
+- SonarQube MCP tools were not exposed through the currently callable MCP tool list in this session.
+- IDE Problems were not available in the local tool surface.
+- Fallback gates above passed. `pnpm docs:lint` failed only after Docker/E2E generated `.agent-platform/workspaces/default/scratch/demo-app/README.md`; tracked docs pass with `.agent-platform` excluded.
+
+### Inferential sensor checkpoints implemented
+
+Branch state: `task/agent-platform-feedback-sensors.4` contains the fourth feedback-sensors task.
+
+- Added `packages/harness/src/sensors/inferentialSensorRunner.ts`.
+- Inferential checks now emit normal `SensorResult`/`SensorRunRecord` records with `inferential:*` IDs, shared sensor categories, evidence, severity, and repair instructions.
+- Coding profiles run six bounded semantic checks at final/manual/external checkpoints: task satisfaction, diff intent, architecture boundary risk, test quality, unresolved findings, and readiness to commit/push/review.
+- Personal-assistant profiles only run task satisfaction and readiness checks by default.
+- The default `createSensorCheckNode` runner now calls `runFeedbackSensors`, which runs computational sensors first and then inferential sensors. This preserves required local gates; self-assessment cannot disable or replace typecheck/test/lint findings.
+- Open findings from computational collectors and quality gates are passed into the inferential evaluator as evidence.
+- Model-backed evaluator prompt requires JSON-only output with evidence-backed failed criteria. Malformed output fails closed as `inferential:self_assessment`.
+- Missing model config is reported as an unavailable inferential self-assessment sensor.
+- Added `packages/harness/test/inferentialSensorRunner.test.ts` covering pass, fail, unresolved findings, coding vs personal-assistant profile selection, malformed output, max-sensor cap behavior, and combined computational + inferential gate preservation.
+- Updated `docs/tasks/agent-platform-feedback-sensors.4.md` checklist and closed Beads task `agent-platform-feedback-sensors.4`.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/harness run test -- test/inferentialSensorRunner.test.ts`
+- `pnpm --filter @agent-platform/harness run test -- test/critic.test.ts`
+- `pnpm --filter @agent-platform/harness run test -- test/dodCheck.test.ts`
+- `pnpm --filter @agent-platform/harness run test -- test/sensorCheck.test.ts`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/plugin-sdk run test`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm lint`
+
+Completion gate:
+
+- SonarQube MCP tools were not exposed through the currently callable MCP tool list.
+- Authenticated SonarCloud CLI/API access works. `sonar auth status` is connected to `https://sonarcloud.io`, org `jwill9999`.
+- Current PR `#131` quality gate read via SonarCloud API is `OK`, with `new_duplicated_lines_density` at `0.0` and security hotspot review at `100.0`.
+- `bd close` succeeded locally; its Dolt auto-push failed because GitHub DNS/auth was unavailable from the sandbox. The normal git push still needs to be completed for the branch.
 
 ### Short-term working memory implemented
 
@@ -485,43 +565,54 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `main`
-- **Current base:** `origin/main`
-- **Latest commit:** `5e68d95 Refresh README for current capabilities`
-- **Current work:** `agent-platform-feedback-sensors` epic is claimed. No implementation task is active; refinement should happen before claiming `.1`.
-- **Remote sync:** Local `main` has documentation/session commits ahead of `origin/main`; pushing directly to `origin/main` requires explicit owner confirmation.
+- **Current branch:** `task/agent-platform-feedback-sensors.6`
+- **Current base:** refreshed with `origin/main`
+- **Current work:** `.6` implementation is complete, Beads is closed locally, and PR #134 is open to `feature/feedback-sensors-harness`.
+- **Remote sync:** branch tracks `origin/task/agent-platform-feedback-sensors.6`; merge-from-main resolution is ready to commit and push.
 
 ### Beads
 
-- `agent-platform-feedback-sensors` is open as a P2 epic.
-- `agent-platform-feedback-sensors.1` through `.6` are open P2 child tasks.
-- Dependencies are chained `.2 -> .1`, `.3 -> .2`, `.4 -> .3`, `.5 -> .4`, `.6 -> .5`.
-- Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md`.
+- `agent-platform-feedback-sensors` is closed locally.
+- `agent-platform-feedback-sensors.1` is closed.
+- `agent-platform-feedback-sensors.2` is closed.
+- `agent-platform-feedback-sensors.3` is closed.
+- `agent-platform-feedback-sensors.4` is closed.
+- `agent-platform-feedback-sensors.5` is closed.
+- `agent-platform-feedback-sensors.6` is closed locally.
+- `agent-platform-branch-feedback-status` is open as a P2 follow-up epic with spec `docs/tasks/agent-platform-branch-feedback-status.md`.
+- Specs exist under `docs/tasks/agent-platform-feedback-sensors*.md` and now cover capability discovery, agent-scope/profile policy, normalized findings, IDE/problem and IDE/plugin terminal feedback, SonarQube/CodeQL/GitHub feedback, Docker/container/sandbox limitations, provider auth states, pre-push validation, and post-push feedback import.
 - `agent-platform-session-handoff-hygiene` is open as a P2 task and blocks `agent-platform-context-optimisation`.
+- `agent-platform-ui-quality-sensors` is open as a P2 epic with parent spec only; child specs are pending refinement.
 - Per stored memory, schedule or explicitly run owner refinement before moving this epic from planning/refinement to implementation-ready.
 
 ### Quality
 
-- `pnpm docs:lint` passed for the planning/documentation change.
-- `pnpm docs:lint` also passed after the scheduler/database documentation update.
-- No runtime code changed.
-- SonarQube CLI was installed but not authenticated; issue listing remains blocked until the owner completes `sonar auth login -o jwill9999`.
+- Latest `.6` gates passed:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test`
+  - focused API sensor dashboard integration test
+  - focused Playwright sensor drawer test
+- `pnpm docs:lint` is blocked by ignored generated workspace content under `.agent-platform`; tracked docs pass with `.agent-platform` excluded.
+- After the `main` merge, focused API/contracts checks plus root typecheck/lint passed.
 
 ---
 
 ## Next (priority order)
 
-1. Run a refinement session with the owner for `agent-platform-feedback-sensors` before claiming `.1`.
-2. Decide whether to implement `agent-platform-session-handoff-hygiene` before starting the feedback-sensors epic.
-3. After refinement, claim `agent-platform-feedback-sensors.1` and branch from updated `main` using the repo task-branch workflow.
-4. If scheduler live updates or further Scheduler UI side panels become priority, create a separate follow-up Beads task rather than reopening the completed scheduler epic.
+1. Commit and push the `origin/main` merge into `task/agent-platform-feedback-sensors.6`.
+2. Confirm PR #134 updates cleanly after push and let CI run.
+3. Ask the owner to run `bd dolt push` or rerun Beads sync when GitHub DNS/auth is available.
+4. Schedule refinement for `agent-platform-branch-feedback-status` before breaking it into implementation tasks.
 
 ---
 
 ## Blockers / questions for owner
 
-- SonarQube issue listing is blocked until CLI authentication is completed locally with `sonar auth login -o jwill9999`.
-- No active code blocker. Beads remote sync should be checked when the next task is claimed.
+- SonarQube MCP tools and IDE Problems were not exposed in this session; fallback typecheck/lint/test/E2E gates passed.
+- Beads Dolt auto-push failed due GitHub DNS/auth from the sandbox; push the git branch normally and sync Beads/Dolt when network/auth is available.
+- SonarQube CLI issue listing is blocked until the owner completes `sonar auth login -o jwill9999`.
 
 ---
 

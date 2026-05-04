@@ -149,4 +149,171 @@ describe('createObservabilityStore', () => {
     expect(() => store.getErrors({ sessionId: '   ' })).toThrow('sessionId is required');
     expect(() => store.getTrace({ sessionId: '' })).toThrow('sessionId is required');
   });
+
+  it('stores sanitized sensor findings, provider state, MCP capabilities, and runtime limits', () => {
+    const store = createObservabilityStore();
+    const bearerSample = ['Bearer', 'abcdefghijklmnopqrstuvwxyz123456'].join(' ');
+    const openAiKeySample = ['sk', 'proj', 'abcdefghijklmnopqrstuvwxyz123456'].join('-');
+
+    vi.setSystemTime(new Date('2026-05-04T12:00:00.000Z'));
+    store.record({
+      kind: 'sensor_run',
+      sessionId: 'session-1',
+      runId: 'run-1',
+      trigger: 'external_feedback',
+      agentProfile: 'coding',
+      taskContexts: ['repo_change'],
+      records: [],
+      providerAvailability: [
+        {
+          provider: 'sonarqube',
+          capability: 'quality_findings',
+          state: 'available',
+          message: `Connected with ${bearerSample}`,
+          repairActions: [],
+        },
+      ],
+      runtimeLimitations: [
+        {
+          kind: 'sandbox_policy_denied',
+          message: 'Cannot read /Users/alice/project/.scannerwork',
+          repairActions: [],
+          metadata: { credentialLabel: 'sample GitHub token placeholder' },
+        },
+      ],
+      mcpCapabilities: [
+        {
+          serverId: 'sonarqube',
+          capability: 'quality_findings',
+          state: 'available',
+          selectedForReflection: true,
+        },
+      ],
+      results: [
+        {
+          sensorId: 'collector:sonarqube',
+          status: 'failed',
+          severity: 'high',
+          summary: 'Imported finding from /Users/alice/project',
+          findings: [
+            {
+              source: 'sonarqube_remote',
+              severity: 'high',
+              status: 'open',
+              category: 'code_quality',
+              message: `Fix duplicated code. ${openAiKeySample}`,
+              file: '/Users/alice/project/src/foo.ts',
+              line: 12,
+              ruleId: 'typescript:S1192',
+              dedupeKey: 'typescript:S1192:/Users/alice/project/src/foo.ts:12',
+              evidence: [],
+              metadata: {},
+            },
+          ],
+          repairInstructions: [],
+          evidence: [],
+          terminalEvidence: [
+            {
+              source: 'ide_terminal_output',
+              producer: 'sonarqube',
+              capturedAtMs: 0,
+              content: 'long terminal output '.repeat(200),
+              sizeBytes: 4_000,
+              maxBytes: 1_000,
+              truncated: false,
+              redacted: false,
+              extractedFindingCount: 1,
+            },
+          ],
+          runtimeLimitations: [],
+          metadata: {},
+        },
+      ],
+    });
+
+    const findings = store.getSensorFindings({ sessionId: 'session-1', limit: 10 });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.message).toContain('[REDACTED:OpenAI API Key]');
+    expect(findings[0]?.file).toBe('/Users/[REDACTED]/project/src/foo.ts');
+
+    expect(store.getSensorProviderAvailability({ sessionId: 'session-1' })[0]).toMatchObject({
+      provider: 'sonarqube',
+      state: 'available',
+    });
+    expect(store.getSensorRuntimeLimitations({ sessionId: 'session-1' })[0]).toMatchObject({
+      kind: 'sandbox_policy_denied',
+      message: 'Cannot read /Users/[REDACTED]/project/.scannerwork',
+    });
+    expect(store.getMcpCapabilityAvailability({ sessionId: 'session-1' })[0]).toMatchObject({
+      serverId: 'sonarqube',
+      selectedForReflection: true,
+    });
+  });
+
+  it('aggregates repeated sensor failure patterns into review-required candidates only', () => {
+    const store = createObservabilityStore();
+
+    for (const runId of ['run-1', 'run-2']) {
+      store.record({
+        kind: 'sensor_run',
+        sessionId: 'session-1',
+        runId,
+        trigger: 'before_push',
+        agentProfile: 'coding',
+        taskContexts: ['repo_change'],
+        records: [],
+        providerAvailability: [],
+        runtimeLimitations: [],
+        mcpCapabilities: [],
+        results: [
+          {
+            sensorId: 'quality_gate:typecheck',
+            status: 'failed',
+            severity: 'high',
+            summary: 'typecheck failed',
+            findings: [
+              {
+                source: 'local_command',
+                severity: 'high',
+                status: 'open',
+                category: 'quality_gate',
+                message: 'TS2322 type mismatch',
+                file: 'src/foo.ts',
+                line: 4,
+                ruleId: 'TS2322',
+                dedupeKey: 'TS2322:src/foo.ts:4',
+                evidence: [],
+                metadata: {},
+              },
+            ],
+            repairInstructions: [],
+            evidence: [],
+            terminalEvidence: [],
+            runtimeLimitations: [],
+            metadata: {},
+          },
+        ],
+      });
+    }
+
+    expect(store.getSensorFailurePatterns({ sessionId: 'session-1' })[0]).toMatchObject({
+      sensorId: 'quality_gate:typecheck',
+      count: 2,
+      ruleId: 'TS2322',
+    });
+    expect(store.getFeedbackCandidates({ sessionId: 'session-1' })).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'memory_candidate',
+          reviewRequired: true,
+          autoApply: false,
+        }),
+        expect.objectContaining({
+          kind: 'beads_issue_proposal',
+          reviewRequired: true,
+          autoApply: false,
+        }),
+      ]),
+    );
+  });
 });

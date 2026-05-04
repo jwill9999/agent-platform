@@ -1,6 +1,6 @@
 # Task: Add background process tracking and log capture
 
-**Beads id:** `agent-platform-scheduler.3`  
+**Beads id:** `agent-platform-scheduler.3`
 **Parent epic:** `agent-platform-scheduler` - Scheduler and background work
 
 ## Summary

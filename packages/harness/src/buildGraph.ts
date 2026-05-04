@@ -27,6 +27,8 @@ export type BuildHarnessGraphOptions = {
   dodProposeNode?: GraphNodeFn;
   /** Optional DoD check node, run after a tool-free draft answer before END. */
   dodCheckNode?: GraphNodeFn;
+  /** Optional sensor check node, run after code-change checkpoints and before final completion. */
+  sensorCheckNode?: GraphNodeFn;
   /** LLM reasoning node (ReAct path). Required for mode='react'. */
   llmReasonNode?: GraphNodeFn;
   /** Tool dispatch node (ReAct path). Required for mode='react'. */
@@ -50,6 +52,13 @@ const LOOP_DETECTION_THRESHOLD = 3;
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
+
+type CriticSensorRoute = 'react_llm_reason' | 'react_sensor_check' | typeof END;
+type ReactStartRoute =
+  | 'react_sensor_check'
+  | 'react_dod_propose'
+  | 'react_llm_reason'
+  | 'plan_generate';
 
 function hashToolCall(name: string, args: Record<string, unknown>): string {
   return `${name}:${JSON.stringify(
@@ -210,9 +219,11 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
 
     // Build tool call signatures from the current llmOutput
     const newSignatures: string[] = [];
+    const sensorLastToolIds: string[] = [];
     if (state.llmOutput?.kind === 'tool_calls') {
       for (const call of state.llmOutput.calls) {
         newSignatures.push(hashToolCall(call.name, call.args));
+        sensorLastToolIds.push(call.name);
       }
     }
 
@@ -231,6 +242,7 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
         return {
           ...result,
           recentToolCalls: window,
+          sensorLastToolIds,
         };
       }
 
@@ -253,12 +265,14 @@ function createReactToolWrapper(toolDispatchNode: GraphNodeFn) {
         recentToolCalls: window,
         halted: true,
         trace,
+        sensorLastToolIds,
       };
     }
 
     return {
       ...result,
       recentToolCalls: window,
+      sensorLastToolIds,
     };
   };
 }
@@ -267,6 +281,14 @@ function routeAfterLlm(state: HarnessStateType): 'react_tool_dispatch' | typeof 
   if (state.halted) return END;
   if (state.llmOutput?.kind === 'tool_calls') return 'react_tool_dispatch';
   return END;
+}
+
+function routeAfterLlmWithSensors(
+  state: HarnessStateType,
+): 'react_tool_dispatch' | 'react_sensor_check' | typeof END {
+  if (state.halted) return END;
+  if (state.llmOutput?.kind === 'tool_calls') return 'react_tool_dispatch';
+  return 'react_sensor_check';
 }
 
 function routeAfterLlmWithCritic(
@@ -297,6 +319,17 @@ function routeAfterCritic(state: HarnessStateType): 'react_llm_reason' | typeof 
   return 'react_llm_reason';
 }
 
+function routeAfterCriticWithSensors(state: HarnessStateType): CriticSensorRoute {
+  if (state.halted) return END;
+  if (checkDeadline(state).expired) return END;
+  const cap = state.limits?.maxCriticIterations ?? DEFAULT_MAX_CRITIC_ITERATIONS;
+  const iterations = state.iterations ?? 0;
+  const accepted = !state.critique;
+  if (!accepted && iterations >= cap) return END;
+  if (!accepted) return 'react_llm_reason';
+  return 'react_sensor_check';
+}
+
 function routeAfterCriticWithDod(
   state: HarnessStateType,
 ): 'react_llm_reason' | 'react_dod_check' | typeof END {
@@ -319,6 +352,27 @@ function routeAfterDodCheck(state: HarnessStateType): 'react_llm_reason' | typeo
   return 'react_llm_reason';
 }
 
+function routeAfterDodCheckWithSensors(
+  state: HarnessStateType,
+): 'react_llm_reason' | 'react_sensor_check' | typeof END {
+  const base = routeAfterDodCheck(state);
+  if (base === END && state.dodContract?.passed && !state.halted) return 'react_sensor_check';
+  return base;
+}
+
+function hasMeaningfulSensorToolCheckpoint(state: HarnessStateType): boolean {
+  const codeChangingTools = new Set([
+    'coding_apply_patch',
+    'sys_write_file',
+    'sys_append_file',
+    'sys_copy_file',
+    'sys_create_directory',
+    'sys_download_file',
+    'sys_bash',
+  ]);
+  return (state.sensorLastToolIds ?? []).some((toolId) => codeChangingTools.has(toolId));
+}
+
 function routeAfterReactDispatch(state: HarnessStateType): 'react_llm_reason' | typeof END {
   if (state.halted) return END;
   if (checkDeadline(state).expired) return END;
@@ -327,6 +381,101 @@ function routeAfterReactDispatch(state: HarnessStateType): 'react_llm_reason' | 
     return END;
   }
   return 'react_llm_reason';
+}
+
+function routeAfterReactDispatchWithSensors(
+  state: HarnessStateType,
+): 'react_llm_reason' | 'react_sensor_check' | typeof END {
+  const base = routeAfterReactDispatch(state);
+  if (base === END) return END;
+  return hasMeaningfulSensorToolCheckpoint(state) ? 'react_sensor_check' : 'react_llm_reason';
+}
+
+function routeAfterSensorCheck(state: HarnessStateType): 'react_llm_reason' | typeof END {
+  if (state.halted) return END;
+  if (state.sensorLastTrigger === 'on_meaningful_change') return 'react_llm_reason';
+  const lastResult = state.sensorResults?.at(-1);
+  if (lastResult?.status === 'failed') return 'react_llm_reason';
+  return END;
+}
+
+function createReactStartRouter(
+  defaultRoute: 'react_dod_propose' | 'react_llm_reason',
+  sensorsEnabled: boolean,
+) {
+  return (state: HarnessStateType): ReactStartRoute => {
+    if (state.mode === 'plan') return 'plan_generate';
+    if (sensorsEnabled && state.sensorRequestedTrigger) return 'react_sensor_check';
+    return defaultRoute;
+  };
+}
+
+function routeAfterLlmForFeatures(hasDod: boolean, hasSensors: boolean) {
+  if (hasDod) return routeAfterLlmWithDod;
+  if (hasSensors) return routeAfterLlmWithSensors;
+  return routeAfterLlm;
+}
+
+function routeAfterCriticForFeatures(hasDod: boolean, hasSensors: boolean) {
+  if (hasDod) return routeAfterCriticWithDod;
+  if (hasSensors) return routeAfterCriticWithSensors;
+  return routeAfterCritic;
+}
+
+function createReactGraph(options: BuildHarnessGraphOptions, planGenNode: GraphNodeFn) {
+  const hasSensors = Boolean(options.sensorCheckNode);
+  const hasCritic = Boolean(options.criticNode);
+  const hasDod = Boolean(options.dodProposeNode && options.dodCheckNode);
+  const initialReactNode = hasDod ? 'react_dod_propose' : 'react_llm_reason';
+  const routeByMode = createReactStartRouter(initialReactNode, hasSensors);
+  const graph = new StateGraph(HarnessState)
+    .addNode('plan_generate', planGenNode)
+    .addNode('resolve_plan', createResolvePlanNode(options))
+    .addNode('execute', createExecuteNode(options))
+    .addNode('react_dod_propose', options.dodProposeNode ?? (async () => ({})))
+    .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode!))
+    .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode!))
+    .addNode('react_critic', options.criticNode ?? (async () => ({})))
+    .addNode('react_dod_check', options.dodCheckNode ?? (async () => ({})))
+    .addNode('react_sensor_check', options.sensorCheckNode ?? (async () => ({})));
+
+  graph
+    .addConditionalEdges(START, routeByMode)
+    .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
+    .addEdge('resolve_plan', 'execute')
+    .addConditionalEdges('execute', routeAfterExecute)
+    .addConditionalEdges(
+      'react_tool_dispatch',
+      hasSensors ? routeAfterReactDispatchWithSensors : routeAfterReactDispatch,
+    );
+
+  if (hasDod) graph.addEdge('react_dod_propose', 'react_llm_reason');
+  if (hasSensors) graph.addConditionalEdges('react_sensor_check', routeAfterSensorCheck);
+  if (hasDod) {
+    graph.addConditionalEdges(
+      'react_dod_check',
+      hasSensors ? routeAfterDodCheckWithSensors : routeAfterDodCheck,
+    );
+  }
+
+  if (hasCritic) {
+    graph
+      .addConditionalEdges('react_llm_reason', routeAfterLlmWithCritic)
+      .addConditionalEdges('react_critic', routeAfterCriticForFeatures(hasDod, hasSensors));
+  } else {
+    graph.addConditionalEdges('react_llm_reason', routeAfterLlmForFeatures(hasDod, hasSensors));
+  }
+
+  return graph;
+}
+
+function createPlanOnlyGraph(options: BuildHarnessGraphOptions) {
+  return new StateGraph(HarnessState)
+    .addNode('resolve_plan', createResolvePlanNode(options))
+    .addNode('execute', createExecuteNode(options))
+    .addEdge(START, 'resolve_plan')
+    .addEdge('resolve_plan', 'execute')
+    .addConditionalEdges('execute', routeAfterExecute);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,107 +510,8 @@ export function buildHarnessGraph(options: BuildHarnessGraphOptions) {
   const planGenNode: GraphNodeFn = options.planGenerateNode ?? (async () => ({}));
 
   if (options.llmReasonNode && options.toolDispatchNode) {
-    // Full graph with mode router → (react | plan) paths
-    if (options.dodProposeNode && options.dodCheckNode && options.criticNode) {
-      const routeByMode = (state: HarnessStateType): 'react_dod_propose' | 'plan_generate' => {
-        if (state.mode === 'plan') return 'plan_generate';
-        return 'react_dod_propose';
-      };
-      const graph = new StateGraph(HarnessState)
-        .addNode('plan_generate', planGenNode)
-        .addNode('resolve_plan', createResolvePlanNode(options))
-        .addNode('execute', createExecuteNode(options))
-        .addNode('react_dod_propose', options.dodProposeNode)
-        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
-        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
-        .addNode('react_critic', options.criticNode)
-        .addNode('react_dod_check', options.dodCheckNode)
-        .addConditionalEdges(START, routeByMode)
-        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
-        .addEdge('resolve_plan', 'execute')
-        .addConditionalEdges('execute', routeAfterExecute)
-        .addEdge('react_dod_propose', 'react_llm_reason')
-        .addConditionalEdges('react_llm_reason', routeAfterLlmWithCritic)
-        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch)
-        .addConditionalEdges('react_critic', routeAfterCriticWithDod)
-        .addConditionalEdges('react_dod_check', routeAfterDodCheck);
-      return graph.compile({ checkpointer });
-    }
-
-    if (options.dodProposeNode && options.dodCheckNode) {
-      const routeByMode = (state: HarnessStateType): 'react_dod_propose' | 'plan_generate' => {
-        if (state.mode === 'plan') return 'plan_generate';
-        return 'react_dod_propose';
-      };
-      const graph = new StateGraph(HarnessState)
-        .addNode('plan_generate', planGenNode)
-        .addNode('resolve_plan', createResolvePlanNode(options))
-        .addNode('execute', createExecuteNode(options))
-        .addNode('react_dod_propose', options.dodProposeNode)
-        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
-        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
-        .addNode('react_dod_check', options.dodCheckNode)
-        .addConditionalEdges(START, routeByMode)
-        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
-        .addEdge('resolve_plan', 'execute')
-        .addConditionalEdges('execute', routeAfterExecute)
-        .addEdge('react_dod_propose', 'react_llm_reason')
-        .addConditionalEdges('react_llm_reason', routeAfterLlmWithDod)
-        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch)
-        .addConditionalEdges('react_dod_check', routeAfterDodCheck);
-      return graph.compile({ checkpointer });
-    }
-
-    if (options.criticNode) {
-      const routeByMode = (state: HarnessStateType): 'react_llm_reason' | 'plan_generate' => {
-        if (state.mode === 'plan') return 'plan_generate';
-        return 'react_llm_reason';
-      };
-      const llmRouter = routeAfterLlmWithCritic;
-      const graph = new StateGraph(HarnessState)
-        .addNode('plan_generate', planGenNode)
-        .addNode('resolve_plan', createResolvePlanNode(options))
-        .addNode('execute', createExecuteNode(options))
-        .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
-        .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
-        .addNode('react_critic', options.criticNode)
-        .addConditionalEdges(START, routeByMode)
-        .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
-        .addEdge('resolve_plan', 'execute')
-        .addConditionalEdges('execute', routeAfterExecute)
-        .addConditionalEdges('react_llm_reason', llmRouter)
-        .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch)
-        .addConditionalEdges('react_critic', routeAfterCritic);
-      return graph.compile({ checkpointer });
-    }
-
-    const routeByMode = (state: HarnessStateType): 'react_llm_reason' | 'plan_generate' => {
-      if (state.mode === 'plan') return 'plan_generate';
-      return 'react_llm_reason';
-    };
-    const graph = new StateGraph(HarnessState)
-      .addNode('plan_generate', planGenNode)
-      .addNode('resolve_plan', createResolvePlanNode(options))
-      .addNode('execute', createExecuteNode(options))
-      .addNode('react_llm_reason', createReactLlmWrapper(options.llmReasonNode))
-      .addNode('react_tool_dispatch', createReactToolWrapper(options.toolDispatchNode))
-      .addConditionalEdges(START, routeByMode)
-      .addConditionalEdges('plan_generate', routeAfterPlanGenerate)
-      .addEdge('resolve_plan', 'execute')
-      .addConditionalEdges('execute', routeAfterExecute)
-      .addConditionalEdges('react_llm_reason', routeAfterLlm)
-      .addConditionalEdges('react_tool_dispatch', routeAfterReactDispatch);
-
-    return graph.compile({ checkpointer });
+    return createReactGraph(options, planGenNode).compile({ checkpointer });
   }
 
-  // No ReAct nodes → plan-only path (backwards compatible)
-  const graph = new StateGraph(HarnessState)
-    .addNode('resolve_plan', createResolvePlanNode(options))
-    .addNode('execute', createExecuteNode(options))
-    .addEdge(START, 'resolve_plan')
-    .addEdge('resolve_plan', 'execute')
-    .addConditionalEdges('execute', routeAfterExecute);
-
-  return graph.compile({ checkpointer });
+  return createPlanOnlyGraph(options).compile({ checkpointer });
 }

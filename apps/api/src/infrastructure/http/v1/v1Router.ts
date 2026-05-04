@@ -5,6 +5,7 @@ import {
   createObservabilityPlugin,
   createObservabilityStore,
   type ObservabilityEvent,
+  type ObservabilityStore,
 } from '@agent-platform/plugin-observability';
 import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import { Router } from 'express';
@@ -30,11 +31,12 @@ const observabilityLog = createLogger('api:observability');
 
 export type V1RouterOptions = {
   chat?: Pick<ChatRouterOptions, 'llmReasonNode' | 'disableEvaluatorNodes'>;
+  observabilityStore?: ObservabilityStore;
 };
 
 export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Router {
   const router = Router();
-  const observabilityStore = createObservabilityStore();
+  const observabilityStore = options.observabilityStore ?? createObservabilityStore();
   const globalPlugins: readonly RegisteredPlugin[] = [
     {
       id: 'plugin-observability',

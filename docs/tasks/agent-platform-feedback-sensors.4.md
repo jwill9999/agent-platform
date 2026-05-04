@@ -8,7 +8,7 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Task requirements
 
-Extend checkpoint evaluation so semantic sensors can review the agent's result when deterministic checks are insufficient.
+Extend checkpoint evaluation so semantic sensors can review the agent's result when deterministic checks are insufficient, including future orchestrated agents that need to self-assess before asking for human review.
 
 Required outcomes:
 
@@ -19,6 +19,10 @@ Required outcomes:
   - diff intent versus user request
   - architecture boundary risk
   - test quality concerns
+  - unresolved security/code-quality findings
+  - readiness to commit, push, or request review
+- Evaluate readiness against the active agent profile. Coding agents should be checked against repository/task DoD; personal-assistant agents should be checked against task satisfaction, safety, and external-action risk.
+- Allow orchestrated agents to expose their available self-assessment tools and selected sensor profile without autonomously weakening required gates.
 - Keep inferential sensors bounded by model config, timeout, cost, and max-iteration limits.
 - Make failed criteria feed back as concise revise instructions.
 
@@ -42,9 +46,10 @@ Required outcomes:
 2. Define inferential sensor evaluator interfaces in the harness.
 3. Add plugin extension points if existing `onDodCheck` cannot represent the needed categories cleanly.
 4. Implement a default evaluator that returns structured sensor results from model output.
-5. Add prompt text that asks for JSON only and requires evidence-backed failed criteria.
-6. Ensure malformed model output fails closed with a useful sensor failure.
-7. Add tests with mocked model/evaluator output.
+5. Include normalized open findings from computational sensors as evidence for inferential review.
+6. Add prompt text that asks for JSON only and requires evidence-backed failed criteria.
+7. Ensure malformed model output fails closed with a useful sensor failure.
+8. Add tests with mocked model/evaluator output.
 
 ## Tests (required before sign-off)
 
@@ -56,25 +61,30 @@ Required outcomes:
 - Add tests for:
   - accepted inferential sensor result
   - failed result with revise criteria
+  - unresolved security/code-quality finding blocks readiness when required
+  - profile-specific readiness checks differ for coding and personal-assistant agents
+  - self-assessment tool/profile exposure cannot disable required gates
   - malformed model output fails closed
   - plugin override behavior if new hooks are added
   - cap reached behavior
 
 ## Definition of done
 
-- [ ] Inferential sensors are represented by the shared sensor model.
-- [ ] Existing critic/DoD behavior remains compatible.
-- [ ] Semantic failures produce actionable feedback for the next model turn.
-- [ ] Tests cover pass, fail, malformed, and cap-reached paths.
-- [ ] `bd close agent-platform-feedback-sensors.4 --reason "Inferential sensor checkpoints added"`
+- [x] Inferential sensors are represented by the shared sensor model.
+- [x] Existing critic/DoD behavior remains compatible.
+- [x] Open required findings can influence semantic readiness checks.
+- [x] Readiness criteria can vary by active agent profile without weakening required gates.
+- [x] Semantic failures produce actionable feedback for the next model turn.
+- [x] Tests cover pass, fail, malformed, and cap-reached paths.
+- [x] `bd close agent-platform-feedback-sensors.4 --reason "Inferential sensor checkpoints added"`
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-feedback-sensors.3`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: N/A - merge at segment end
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] Task branch created from `task/agent-platform-feedback-sensors.3`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] If segment tip: N/A - merge at segment end
+- [x] `decisions.md` updated only if architectural decision changed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-03

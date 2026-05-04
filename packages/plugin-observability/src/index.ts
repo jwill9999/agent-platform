@@ -11,4 +11,9 @@ export {
   type ObservabilityLogFilter,
   type ObservabilityErrorFilter,
   type ObservabilityTraceFilter,
+  type SensorObservationFilter,
+  type ObservedSensorFinding,
+  type SensorFailurePattern,
+  type SensorFeedbackCandidate,
 } from './store.js';
+export type { SensorMcpCapabilityAvailability } from './events.js';
