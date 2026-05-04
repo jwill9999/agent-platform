@@ -182,6 +182,12 @@ export {
   SensorDefinitionSchema,
   SensorRunStatusSchema,
   SensorRunRecordSchema,
+  SensorMcpCapabilityAvailabilitySchema,
+  SensorFailurePatternSchema,
+  SensorFeedbackCandidateSchema,
+  SensorSetupGuidanceSchema,
+  SensorDashboardStatusSummarySchema,
+  SensorDashboardResponseSchema,
   type SensorExecutionType,
   type SensorCategory,
   type SensorAgentProfile,
@@ -214,6 +220,12 @@ export {
   type SensorDefinition,
   type SensorRunStatus,
   type SensorRunRecord,
+  type SensorMcpCapabilityAvailability,
+  type SensorFailurePattern,
+  type SensorFeedbackCandidate,
+  type SensorSetupGuidance,
+  type SensorDashboardStatusSummary,
+  type SensorDashboardResponse,
 } from './sensor.js';
 export { redactArgs } from './redaction.js';
 export {

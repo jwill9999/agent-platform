@@ -364,3 +364,102 @@ export const SensorRunRecordSchema = z
   })
   .strict();
 export type SensorRunRecord = z.infer<typeof SensorRunRecordSchema>;
+
+export const SensorMcpCapabilityAvailabilitySchema = z
+  .object({
+    serverId: z.string().min(1),
+    serverName: z.string().min(1).optional(),
+    capability: z.string().min(1),
+    state: SensorProviderAvailabilityStateSchema,
+    selectedForReflection: z.boolean(),
+    message: z.string().min(1).optional(),
+  })
+  .strict();
+export type SensorMcpCapabilityAvailability = z.infer<typeof SensorMcpCapabilityAvailabilitySchema>;
+
+export const SensorFailurePatternSchema = z
+  .object({
+    key: z.string().min(1),
+    sensorId: z.string().min(1),
+    count: z.number().int().positive(),
+    severity: SensorFindingSeveritySchema.optional(),
+    ruleId: z.string().min(1).optional(),
+    files: z.array(z.string().min(1)).default([]),
+    firstSeenMs: z.number().int().nonnegative(),
+    lastSeenMs: z.number().int().nonnegative(),
+  })
+  .strict();
+export type SensorFailurePattern = z.infer<typeof SensorFailurePatternSchema>;
+
+export const SensorFeedbackCandidateSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum([
+      'beads_issue_proposal',
+      'memory_candidate',
+      'instruction_update_proposal',
+      'linter_test_proposal',
+    ]),
+    summary: z.string().min(1),
+    evidence: z.array(z.string()).default([]),
+    reviewRequired: z.literal(true),
+    autoApply: z.literal(false),
+  })
+  .strict();
+export type SensorFeedbackCandidate = z.infer<typeof SensorFeedbackCandidateSchema>;
+
+export const SensorSetupGuidanceSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    provider: z.string().min(1),
+    state: SensorProviderAvailabilityStateSchema,
+    summary: z.string().min(1),
+    actions: z.array(SensorRepairActionSchema).default([]),
+  })
+  .strict();
+export type SensorSetupGuidance = z.infer<typeof SensorSetupGuidanceSchema>;
+
+export const SensorDashboardStatusSummarySchema = z
+  .object({
+    passed: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    failedAndRepaired: z.number().int().nonnegative(),
+    escalated: z.number().int().nonnegative(),
+    skipped: z.number().int().nonnegative(),
+    unavailable: z.number().int().nonnegative(),
+    openFindings: z.number().int().nonnegative(),
+    lastTrigger: SensorTriggerSchema.optional(),
+    lastRunAtMs: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type SensorDashboardStatusSummary = z.infer<typeof SensorDashboardStatusSummarySchema>;
+
+export const SensorDashboardResponseSchema = z
+  .object({
+    sessionId: z.string().min(1),
+    activeAgentProfile: SensorAgentProfileSchema,
+    selectedSensorProfile: z.string().min(1),
+    codingSensorsRequired: z.boolean(),
+    definitions: z.array(SensorDefinitionSchema).default([]),
+    recentRuns: z.array(SensorRunRecordSchema).default([]),
+    recentResults: z.array(SensorResultSchema).default([]),
+    providerAvailability: z.array(SensorProviderAvailabilitySchema).default([]),
+    mcpCapabilities: z.array(SensorMcpCapabilityAvailabilitySchema).default([]),
+    findings: z
+      .array(
+        SensorFindingSchema.extend({
+          sensorId: z.string().min(1),
+          runId: z.string().min(1),
+          observedAtMs: z.number().int().nonnegative(),
+        }),
+      )
+      .default([]),
+    runtimeLimitations: z.array(SensorRuntimeLimitationSchema).default([]),
+    failurePatterns: z.array(SensorFailurePatternSchema).default([]),
+    feedbackCandidates: z.array(SensorFeedbackCandidateSchema).default([]),
+    setupGuidance: z.array(SensorSetupGuidanceSchema).default([]),
+    statusSummary: SensorDashboardStatusSummarySchema,
+  })
+  .strict();
+export type SensorDashboardResponse = z.infer<typeof SensorDashboardResponseSchema>;

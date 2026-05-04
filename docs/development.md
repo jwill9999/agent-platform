@@ -214,6 +214,23 @@ pnpm format:check     # Prettier
 pnpm test             # Vitest unit tests
 ```
 
+### Sensor Feedback Loop
+
+Coding-profile agents run feedback sensors at repository checkpoints rather than continuously. The harness selects targeted sensors after meaningful code-changing tools, then runs required repository sensors before completion or push handoff. Remote feedback such as GitHub Actions, CodeQL, SonarQube, review comments, and IDE/plugin diagnostics can also be imported after push or when an external provider reports findings.
+
+The chat UI shows sensor state in a right-side feedback drawer. Use it to inspect:
+
+- active agent profile and selected sensor profile
+- deterministic gates such as typecheck, tests, lint, docs, and format
+- inferential checks such as open-finding reflection and readiness
+- local command, IDE Problems, IDE terminal-output, SonarQube, CodeQL, GitHub, and review-agent findings
+- unavailable or auth-required providers and their retry/connect actions
+- Docker, container, sandbox, network, and path-mapping limitations
+
+To expose richer local feedback, enable supported IDE adapters or plugins that can provide bounded Problems data, terminal task output, SonarQube or CodeQL findings, and review-agent comments. Provider output must be bounded and redacted before it reaches the harness. If a required source is blocked by Docker mounts, sandbox policy, missing network, or host/container path mapping, the dashboard should surface the limitation and the repair action instead of silently skipping it.
+
+Personal-assistant profile sessions do not require coding gates by default. They can still use manual sensor imports when a task explicitly involves repository or UI work.
+
 ### Running a Single Test File
 
 ```bash

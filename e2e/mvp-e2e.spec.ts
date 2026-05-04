@@ -112,6 +112,31 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.getByTestId('critic-badge')).toHaveCount(0);
   });
 
+  test('sensor status panel renders providers, findings, and corrected outcomes', async ({
+    page,
+  }) => {
+    await page.goto('/e2e/sensor-status');
+
+    await expect(page.getByRole('heading', { name: 'E2E sensor status verify' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open sensors drawer' })).toBeVisible();
+    await expect(page.getByText('coding/repository-feedback')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Open sensors drawer' }).click();
+
+    await expect(page.getByText('coding/repository-feedback')).toBeVisible();
+    await expect(page.getByText('1 passed')).toBeVisible();
+    await expect(page.getByText('1 failed')).toBeVisible();
+    await expect(page.getByText('1 open')).toBeVisible();
+
+    await expect(page.getByText('Repaired')).toBeVisible();
+    await expect(page.getByText('typecheck')).toBeVisible();
+    await expect(page.getByText('sonarqube', { exact: true })).toBeVisible();
+    await expect(page.getByText('github/check_runs')).toBeVisible();
+    await expect(page.getByText('auth_required')).toBeVisible();
+    await expect(page.getByText('Review untrusted path handling.')).toBeVisible();
+    await expect(page.getByText('sandbox policy denied')).toBeVisible();
+  });
+
   test('approval card renders pending and terminal states (fixture page)', async ({ page }) => {
     await page.goto('/e2e/approval-card');
 

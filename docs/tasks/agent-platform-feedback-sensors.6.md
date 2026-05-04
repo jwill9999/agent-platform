@@ -91,22 +91,22 @@ Required outcomes:
 
 ## Definition of done
 
-- [ ] Sensor controls/results are visible through API and UI surfaces.
-- [ ] Active agent profile and selected sensor profile are visible enough for users to understand why sensors did or did not run.
-- [ ] Provider auth/connect/retry flows are visible and test-covered where implemented.
-- [ ] IDE/plugin setup guidance is available when local feedback providers are not configured.
-- [ ] Docker/container/sandbox limitations are visible and test-covered where implemented.
-- [ ] Full failure-to-correction loop is covered by tests.
-- [ ] Documentation explains sensor execution types, trigger timing, and review-gated flywheel behavior.
-- [ ] Quality gates pass for touched packages.
+- [x] Sensor controls/results are visible through API and UI surfaces.
+- [x] Active agent profile and selected sensor profile are visible enough for users to understand why sensors did or did not run.
+- [x] Provider auth/connect/retry flows are visible and test-covered where implemented.
+- [x] IDE/plugin setup guidance is available when local feedback providers are not configured.
+- [x] Docker/container/sandbox limitations are visible and test-covered where implemented.
+- [x] Full failure-to-correction loop is covered by tests.
+- [x] Documentation explains sensor execution types, trigger timing, and review-gated flywheel behavior.
+- [x] Quality gates pass for touched packages.
 - [ ] Segment tip PR is opened from `task/agent-platform-feedback-sensors.6` to `feature/feedback-sensors-harness`.
 - [ ] `bd close agent-platform-feedback-sensors.6 --reason "Sensor controls exposed and E2E validation complete"`
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-feedback-sensors.5`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
+- [x] Task branch created from `task/agent-platform-feedback-sensors.5`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
 - [ ] If segment tip: PR merged `task/agent-platform-feedback-sensors.6 -> feature/feedback-sensors-harness`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed

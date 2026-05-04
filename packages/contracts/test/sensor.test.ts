@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   SensorDefinitionSchema,
+  SensorDashboardResponseSchema,
   SensorFindingSchema,
   SensorRepairInstructionSchema,
   SensorResultSchema,
@@ -185,5 +186,86 @@ describe('sensor contracts', () => {
     });
 
     expect(SensorRunRecordSchema.parse(structuredClone(record))).toEqual(record);
+  });
+
+  it('represents a session sensor dashboard with provider and runtime guidance', () => {
+    const dashboard = SensorDashboardResponseSchema.parse({
+      sessionId: 'session-1',
+      activeAgentProfile: 'coding',
+      selectedSensorProfile: 'coding/repository-feedback',
+      codingSensorsRequired: true,
+      definitions: [
+        {
+          id: 'collector:sonarqube',
+          name: 'SonarQube findings',
+          executionType: 'computational',
+          category: 'security_hotspot',
+          feedbackSources: ['sonarqube_remote'],
+          agentProfilePolicy: { coding: 'optional', personal_assistant: 'manual_only' },
+          triggerPolicy: { triggers: ['after_push', 'manual'] },
+        },
+      ],
+      recentRuns: [],
+      recentResults: [],
+      providerAvailability: [
+        {
+          provider: 'github',
+          capability: 'check_runs',
+          state: 'auth_required',
+          repairActions: [{ kind: 'authenticate_cli', label: 'Authenticate GitHub CLI' }],
+        },
+      ],
+      mcpCapabilities: [
+        {
+          serverId: 'sonarqube',
+          capability: 'issues',
+          state: 'available',
+          selectedForReflection: true,
+        },
+      ],
+      findings: [
+        {
+          sensorId: 'collector:sonarqube',
+          runId: 'run-1',
+          observedAtMs: 1_000,
+          source: 'sonarqube_remote',
+          severity: 'high',
+          category: 'security',
+          message: 'Review generated credential handling.',
+        },
+      ],
+      runtimeLimitations: [
+        {
+          kind: 'sandbox_policy_denied',
+          message: 'The sandbox blocked access to the IDE terminal socket.',
+        },
+      ],
+      failurePatterns: [],
+      feedbackCandidates: [],
+      setupGuidance: [
+        {
+          id: 'github:check_runs',
+          title: 'github check_runs',
+          provider: 'github',
+          state: 'auth_required',
+          summary: 'GitHub CLI is not authenticated.',
+          actions: [{ kind: 'retry', label: 'Retry discovery' }],
+        },
+      ],
+      statusSummary: {
+        passed: 0,
+        failed: 1,
+        failedAndRepaired: 0,
+        escalated: 0,
+        skipped: 0,
+        unavailable: 1,
+        openFindings: 1,
+        lastTrigger: 'after_push',
+      },
+    });
+
+    expect(dashboard.providerAvailability[0]?.state).toBe('auth_required');
+    expect(dashboard.mcpCapabilities[0]?.selectedForReflection).toBe(true);
+    expect(dashboard.statusSummary.openFindings).toBe(1);
   });
 });

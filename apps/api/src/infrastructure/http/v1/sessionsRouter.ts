@@ -2,6 +2,7 @@ import { SessionCreateBodySchema, SessionRecordSchema } from '@agent-platform/co
 import {
   createSession,
   deleteSession,
+  getAgent,
   getWorkingMemoryArtifact,
   getSession,
   listMessagesBySession,
@@ -16,6 +17,7 @@ import { HttpError } from '../httpError.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { handleSessionResume, type ChatRouterOptions } from './chatRouter.js';
 import { parseBody, requireParam } from './routerUtils.js';
+import { buildSensorDashboardResponse, coerceSensorDashboardLimit } from './sensorDashboard.js';
 
 export function createSessionsRouter(
   db: DrizzleDb,
@@ -60,6 +62,46 @@ export function createSessionsRouter(
       const session = getSession(db, id);
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
       res.json({ data: getWorkingMemoryArtifact(db, id) ?? null });
+    }),
+  );
+
+  router.get(
+    '/:id/sensors',
+    asyncHandler(async (req, res) => {
+      const id = requireParam(req.params, 'id');
+      const session = getSession(db, id);
+      if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
+      const agent = getAgent(db, session.agentId);
+      if (!agent) throw new HttpError(404, 'NOT_FOUND', 'Session agent not found');
+
+      res.json({
+        data: buildSensorDashboardResponse({
+          sessionId: id,
+          agent,
+          observabilityStore: options.observabilityStore,
+          limit: coerceSensorDashboardLimit(req.query.limit),
+        }),
+      });
+    }),
+  );
+
+  router.post(
+    '/:id/sensors/retry',
+    asyncHandler(async (req, res) => {
+      const id = requireParam(req.params, 'id');
+      const session = getSession(db, id);
+      if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
+      const agent = getAgent(db, session.agentId);
+      if (!agent) throw new HttpError(404, 'NOT_FOUND', 'Session agent not found');
+
+      res.json({
+        data: buildSensorDashboardResponse({
+          sessionId: id,
+          agent,
+          observabilityStore: options.observabilityStore,
+          limit: coerceSensorDashboardLimit(req.query.limit),
+        }),
+      });
     }),
   );
 
