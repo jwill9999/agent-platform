@@ -38,6 +38,7 @@ const DEFAULT_VIEWPORT: BrowserViewport = {
 };
 const DEFAULT_TEXT_BYTES = 200_000;
 const DEFAULT_SCREENSHOT_BYTES = 2_000_000;
+const DEFAULT_BROWSER_TEMP_SUBDIR = '.agent-platform/tmp/browser';
 
 export const BROWSER_TOOL_IDS = {
   start: `${SYSTEM_TOOL_PREFIX}browser_start`,
@@ -281,6 +282,7 @@ type StoredSession = {
 type BrowserSessionManagerOptions = {
   driver?: BrowserDriver;
   workspaceRoot?: string;
+  browserTempRoot?: string;
   now?: () => number;
   sessionTimeoutMs?: number;
   policyProfile?: BrowserPolicyProfile;
@@ -485,6 +487,43 @@ export class PlaywrightBrowserDriver implements BrowserDriver {
   }
 }
 
+function resolveBrowserTempRoot(options: {
+  configuredTempRoot?: string;
+  workspaceRoot?: string;
+}): string | undefined {
+  if (options.configuredTempRoot) return options.configuredTempRoot;
+  if (!options.workspaceRoot || !existsSync(options.workspaceRoot)) return undefined;
+  return join(options.workspaceRoot, DEFAULT_BROWSER_TEMP_SUBDIR);
+}
+
+async function prepareBrowserTempEnvironment(tempRoot: string | undefined): Promise<() => void> {
+  if (!tempRoot) return () => undefined;
+
+  await mkdir(tempRoot, { recursive: true });
+  const previous = {
+    TMPDIR: process.env.TMPDIR,
+    TMP: process.env.TMP,
+    TEMP: process.env.TEMP,
+  };
+  process.env.TMPDIR = tempRoot;
+  process.env.TMP = tempRoot;
+  process.env.TEMP = tempRoot;
+
+  return () => {
+    restoreEnvValue('TMPDIR', previous.TMPDIR);
+    restoreEnvValue('TMP', previous.TMP);
+    restoreEnvValue('TEMP', previous.TEMP);
+  };
+}
+
+function restoreEnvValue(key: 'TMPDIR' | 'TMP' | 'TEMP', value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+}
+
 function resolvePlaywrightLocator(page: Page, target: BrowserActionTarget): Locator {
   if (target.role) {
     const name = target.label ?? target.text;
@@ -516,6 +555,7 @@ export class BrowserSessionManager {
   private readonly sessions = new Map<string, StoredSession>();
   private readonly driver: BrowserDriver;
   private readonly workspaceRoot: string;
+  private readonly browserTempRoot: string | undefined;
   private readonly now: () => number;
   private readonly sessionTimeoutMs: number;
   private readonly policyProfile: BrowserPolicyProfile;
@@ -523,6 +563,10 @@ export class BrowserSessionManager {
   constructor(options: BrowserSessionManagerOptions = {}) {
     this.driver = options.driver ?? new PlaywrightBrowserDriver();
     this.workspaceRoot = options.workspaceRoot ?? process.cwd();
+    this.browserTempRoot = resolveBrowserTempRoot({
+      configuredTempRoot: options.browserTempRoot ?? process.env.AGENT_BROWSER_TMPDIR,
+      workspaceRoot: options.workspaceRoot,
+    });
     this.now = options.now ?? Date.now;
     this.sessionTimeoutMs =
       options.sessionTimeoutMs ??
@@ -538,10 +582,16 @@ export class BrowserSessionManager {
     }
 
     const viewport = options.viewport ?? DEFAULT_VIEWPORT;
-    const runtime = await this.driver.launch({
-      viewport,
-      timeoutMs: options.timeoutMs ?? 30_000,
-    });
+    const restoreBrowserTempEnv = await prepareBrowserTempEnvironment(this.browserTempRoot);
+    let runtime: BrowserRuntimeSession;
+    try {
+      runtime = await this.driver.launch({
+        viewport,
+        timeoutMs: options.timeoutMs ?? 30_000,
+      });
+    } finally {
+      restoreBrowserTempEnv();
+    }
 
     const id = options.sessionId ?? `browser-session-${randomUUID()}`;
     if (options.url) {

@@ -131,6 +131,11 @@ chat UI renders compact browser activity summaries, keeps screenshot artifacts
 visible as persistent message previews, and links to stored artifacts instead
 of copying raw DOM, ARIA, or screenshot payloads into the transcript.
 
+Playwright temporary browser profiles and launch artifacts are routed to the
+host-backed workspace at `.agent-platform/tmp/browser` by default. Override
+`AGENT_BROWSER_TMPDIR` if the workspace mount is customized or if the browser
+runtime needs a different writable temp location.
+
 When exercising the tools from inside the Docker Compose API container, target
 the web service at `http://web:3001`. The default browser URL policy allowlists
 that Compose service hostname for local UI verification, while external domains
@@ -145,6 +150,10 @@ Troubleshooting:
 
 - If browser tools return `BROWSER_RUNTIME_UNAVAILABLE`, rebuild the API image
   and confirm Chromium is present in the container.
+- If the launch error mentions `ENOSPC` or `mkdtemp` under `/tmp`, Docker's
+  overlay filesystem is full. Reclaim Docker build cache or restart/rebuild the
+  API container so `AGENT_BROWSER_TMPDIR` points Playwright at the workspace
+  temp directory.
 - If screenshots fail or pages render blank in Docker, keep the API service
   `shm_size` at least `256mb`.
 - If local host-side integration tests bind a fixture HTTP server, run them

@@ -55,6 +55,14 @@ async function withWorkspace<T>(fn: (workspaceRoot: string) => Promise<T>): Prom
   }
 }
 
+function restoreTestEnvValue(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+}
+
 describe('browser tools', () => {
   it('registers browser tools with expected risk tiers', () => {
     expect(BROWSER_TOOLS.map((tool) => tool.id)).toEqual([
@@ -85,6 +93,42 @@ describe('browser tools', () => {
     expect(second.id).toBe(first.id);
     expect(driver.launch).toHaveBeenCalledTimes(1);
     expect(first.page?.url).toBe('http://localhost:3001/');
+  });
+
+  it('uses a workspace-backed temp directory while launching a browser', async () => {
+    await withWorkspace(async (workspaceRoot) => {
+      const previous = {
+        AGENT_BROWSER_TMPDIR: process.env.AGENT_BROWSER_TMPDIR,
+        TMPDIR: process.env.TMPDIR,
+        TMP: process.env.TMP,
+        TEMP: process.env.TEMP,
+      };
+      delete process.env.AGENT_BROWSER_TMPDIR;
+      const expectedTempRoot = join(workspaceRoot, '.agent-platform/tmp/browser');
+      const driver: BrowserDriver = {
+        launch: vi.fn(async () => {
+          expect(process.env.TMPDIR).toBe(expectedTempRoot);
+          expect(process.env.TMP).toBe(expectedTempRoot);
+          expect(process.env.TEMP).toBe(expectedTempRoot);
+          return { page: makePage(), close: vi.fn(async () => undefined) };
+        }),
+      };
+
+      try {
+        const manager = new BrowserSessionManager({ driver, workspaceRoot });
+        await manager.start({});
+
+        expect((await stat(expectedTempRoot)).isDirectory()).toBe(true);
+        expect(process.env.TMPDIR).toBe(previous.TMPDIR);
+        expect(process.env.TMP).toBe(previous.TMP);
+        expect(process.env.TEMP).toBe(previous.TEMP);
+      } finally {
+        restoreTestEnvValue('AGENT_BROWSER_TMPDIR', previous.AGENT_BROWSER_TMPDIR);
+        restoreTestEnvValue('TMPDIR', previous.TMPDIR);
+        restoreTestEnvValue('TMP', previous.TMP);
+        restoreTestEnvValue('TEMP', previous.TEMP);
+      }
+    });
   });
 
   it('expires inactive sessions and closes their runtime context', async () => {

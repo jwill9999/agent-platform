@@ -19,6 +19,11 @@ services:
       # Generate with: openssl rand -base64 32
       # The fallback below is a dev-only default — override in .env for production.
       SECRETS_MASTER_KEY: '${SECRETS_MASTER_KEY:-kDa9TbuIXhrZFMHkn3Y90FCTfvCwA7d1armHBgdNp/o=}'
+      # Keep Playwright temporary browser profiles/artifacts off the container
+      # overlay filesystem. Docker Desktop build cache can fill overlay `/tmp`,
+      # while the workspace mount remains host-backed and larger.
+      AGENT_BROWSER_TMPDIR: '${AGENT_BROWSER_TMPDIR:-/workspace/.agent-platform/tmp/browser}'
+      TMPDIR: '${AGENT_BROWSER_TMPDIR:-/workspace/.agent-platform/tmp/browser}'
     volumes:
       # App/runtime data is separate from user workspace files.
       - '${AGENT_DATA_HOST_PATH:-./.agent-platform/data}:/data'

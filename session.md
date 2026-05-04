@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Fixed the browser runtime `ENOSPC` launch failure path on `task/agent-platform-browser-tools.5`: Docker build cache had filled the container overlay, cache was pruned, and Playwright temp profiles now default to the host-backed workspace temp directory instead of container `/tmp`.
+- **Date:** 2026-05-04
 - **Session:** Fixed a browser-tools approval-resume regression on `task/agent-platform-browser-tools.5`: approved external browser starts now share the same runtime tool executor with the resumed graph, so immediate follow-up snapshot/screenshot calls keep access to the active browser session.
 - **Date:** 2026-05-04
 - **Session:** Implemented `agent-platform-browser-tools.5` on `task/agent-platform-browser-tools.5`: added real Playwright browser-tool integration validation, documented browser runtime troubleshooting, completed the browser-tools epic checklist, and verified root typecheck/lint/test/format plus Playwright E2E after applying the E2E seed.
@@ -256,6 +258,37 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Browser runtime ENOSPC hardening
+
+Branch state: `task/agent-platform-browser-tools.5` has an additional follow-up fix pending commit.
+
+- Investigated manual browser-tool failure:
+  - `sys_browser_start` failed before opening `http://web:3001`.
+  - Error was `ENOSPC: no space left on device, mkdtemp '/tmp/playwright-artifacts-XXXXXX'`.
+- Confirmed the API container overlay filesystem was full: `/` was `59G` used with `0` available, while `/workspace` still had free space.
+- Confirmed Docker build cache was the main local pressure source. Ran `docker builder prune -f`, reclaiming `41.51GB`; the API container now reports about `47G` free on `/`.
+- Added Compose defaults:
+  - `AGENT_BROWSER_TMPDIR=/workspace/.agent-platform/tmp/browser`
+  - `TMPDIR=/workspace/.agent-platform/tmp/browser`
+- Hardened `BrowserSessionManager` so it creates the browser temp directory under the workspace and temporarily applies `TMPDIR`/`TMP`/`TEMP` around browser launch.
+- Documented the workspace-backed temp path and `ENOSPC` troubleshooting in `docs/development.md`.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/harness run build`
+- `pnpm format:check`
+- `pnpm exec markdownlint-cli2 docs/development.md`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP was not exposed in the current tool surface.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with focused tests, typecheck, lint, build, formatting, docs lint, and diff whitespace checks.
 
 ### Browser approval resume session continuity fixed
 
@@ -718,8 +751,8 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-browser-tools.5`
 - **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4` -> `.5`
-- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up commit `82ddcb2` fixes approved-browser-session continuity.
-- **Remote sync:** pending push for `82ddcb2` plus this session handoff update.
+- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up fixes cover approved-browser-session continuity and Playwright temp storage under Docker.
+- **Remote sync:** pending commit/push for the browser temp hardening and this session handoff update.
 
 ### Beads
 
@@ -744,6 +777,14 @@ Quality gates passed:
 
 ### Quality
 
+- Latest browser runtime ENOSPC hardening gates passed:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm --filter @agent-platform/harness run build`
+  - `pnpm format:check`
+  - `pnpm exec markdownlint-cli2 docs/development.md`
+  - `git diff --check`
 - Latest browser approval resume fix gates passed:
   - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
   - `pnpm --filter @agent-platform/api run typecheck`
@@ -779,10 +820,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the `session.md` handoff update.
-2. Run `git pull --rebase`, `bd dolt push`, and `git push` for `task/agent-platform-browser-tools.5`.
-3. Ask the owner to manually retest: approve an external browser start, then confirm snapshot/screenshot run in the same resumed flow without `BROWSER_SESSION_UNAVAILABLE`.
-4. Watch PR #137 pipelines and address any feedback.
+1. Commit and push the browser temp hardening plus `session.md` handoff update.
+2. Rebuild/restart the API container so Compose applies `AGENT_BROWSER_TMPDIR` and `TMPDIR`.
+3. Ask the owner to manually retest `http://web:3001`; browser start should no longer fail with `ENOSPC`.
+4. Ask the owner to manually retest external URL approval; snapshot/screenshot should no longer fail with `BROWSER_SESSION_UNAVAILABLE`.
+5. Watch PR #137 pipelines and address any feedback.
 
 ---
 
