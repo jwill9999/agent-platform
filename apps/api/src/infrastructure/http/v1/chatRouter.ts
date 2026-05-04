@@ -60,6 +60,7 @@ import {
   redactCredentials,
   type ChatMessage,
   type HarnessStateType,
+  type NativeToolExecutor,
   type OutputEmitter,
   type ToolAuditStore,
   type ToolCallIntent,
@@ -113,6 +114,12 @@ export type ChatRouterOptions = {
   llmReasonNode?: ReturnType<typeof createLlmReasonNode>;
   disableEvaluatorNodes?: boolean;
   sessionLock?: SessionLock;
+  systemToolExecutorFactory?: (context: {
+    sessionId: string;
+    runId: string;
+    agentId: string;
+    defaultRepoPath?: string;
+  }) => NativeToolExecutor;
 };
 
 /** Derive a human-readable session title from the first user message. */
@@ -664,25 +671,29 @@ function resolveSessionProjectPath(db: DrizzleDb, sessionId: string): string | u
   return workingMemory?.activeProject;
 }
 
-function createRuntimeToolDispatchNode({
+function createRuntimeNativeToolExecutor({
   db,
   agentCtx,
   runId,
   sessionId,
-  emitter,
   options,
-  approvedToolCallIds,
 }: {
   db: DrizzleDb;
   agentCtx: AgentContext;
   runId: string;
   sessionId: string;
-  emitter: OutputEmitter;
   options: ChatRouterOptions;
-  approvedToolCallIds?: ReadonlySet<string>;
-}) {
+}): NativeToolExecutor {
   const defaultRepoPath = resolveSessionProjectPath(db, sessionId);
-  const nativeToolExecutor = createSystemToolExecutor(
+  const factoryExecutor = options.systemToolExecutorFactory?.({
+    sessionId,
+    runId,
+    agentId: agentCtx.agent.id,
+    defaultRepoPath,
+  });
+  if (factoryExecutor) return factoryExecutor;
+
+  return createSystemToolExecutor(
     options.observabilityStore
       ? {
           observability: {
@@ -695,12 +706,36 @@ function createRuntimeToolDispatchNode({
         }
       : { memory: { db, sessionId, agentId: agentCtx.agent.id }, defaultRepoPath },
   );
+}
+
+function createRuntimeToolDispatchNode({
+  db,
+  agentCtx,
+  runId,
+  sessionId,
+  emitter,
+  options,
+  approvedToolCallIds,
+  nativeToolExecutor,
+}: {
+  db: DrizzleDb;
+  agentCtx: AgentContext;
+  runId: string;
+  sessionId: string;
+  emitter: OutputEmitter;
+  options: ChatRouterOptions;
+  approvedToolCallIds?: ReadonlySet<string>;
+  nativeToolExecutor?: NativeToolExecutor;
+}) {
+  const resolvedNativeToolExecutor =
+    nativeToolExecutor ??
+    createRuntimeNativeToolExecutor({ db, agentCtx, runId, sessionId, options });
 
   return createToolDispatchNode({
     agent: agentCtx.agent,
     tools: agentCtx.tools,
     mcpManager: agentCtx.mcpManager,
-    nativeToolExecutor,
+    nativeToolExecutor: resolvedNativeToolExecutor,
     emitter,
     dispatcher: agentCtx.pluginDispatcher,
     pathJail: new PathJail(DEFAULT_MOUNTS),
@@ -725,6 +760,7 @@ function buildRuntimeGraph(
   emitter: OutputEmitter,
   options: ChatRouterOptions,
   approvedToolCallIds?: ReadonlySet<string>,
+  nativeToolExecutor?: NativeToolExecutor,
 ) {
   const dispatcher = agentCtx.pluginDispatcher;
   return buildHarnessGraph({
@@ -738,6 +774,7 @@ function buildRuntimeGraph(
       emitter,
       options,
       approvedToolCallIds,
+      nativeToolExecutor,
     }),
     sensorCheckNode: createSensorCheckNode({
       emitter,
@@ -905,6 +942,7 @@ export async function handleSessionResume(
     const initialCount = messages.length;
 
     let resumeMessages: ChatMessage[];
+    let nativeToolExecutor: NativeToolExecutor | undefined;
     if (approval.status === 'rejected') {
       resumeMessages = [buildRejectedToolMessage(toolCall, approval)];
       await emitter.emit({
@@ -913,6 +951,13 @@ export async function handleSessionResume(
         message: 'Human rejected tool execution.',
       });
     } else {
+      nativeToolExecutor = createRuntimeNativeToolExecutor({
+        db,
+        agentCtx,
+        runId,
+        sessionId,
+        options,
+      });
       const dispatchNode = createRuntimeToolDispatchNode({
         db,
         agentCtx,
@@ -921,6 +966,7 @@ export async function handleSessionResume(
         emitter,
         options,
         approvedToolCallIds: new Set([toolCall.id]),
+        nativeToolExecutor,
       });
       const dispatchState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
         dropped: 0,
@@ -941,6 +987,7 @@ export async function handleSessionResume(
       emitter,
       options,
       new Set([toolCall.id]),
+      nativeToolExecutor,
     );
     const resumeState = buildInitialState(
       runId,

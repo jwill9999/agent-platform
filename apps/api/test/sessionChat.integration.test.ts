@@ -12,6 +12,7 @@ import {
   queryMemories,
   runSeed,
 } from '@agent-platform/db';
+import type { NativeToolExecutor } from '@agent-platform/harness';
 import request from 'supertest';
 import type { Application } from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -48,7 +49,11 @@ vi.mock('@ai-sdk/openai-compatible', () => ({
 
 async function createSeededApp(
   dirs: string[],
-  options: { mockLlm?: boolean; disableEvaluatorNodes?: boolean } = {},
+  options: {
+    mockLlm?: boolean;
+    disableEvaluatorNodes?: boolean;
+    systemToolExecutorFactory?: () => NativeToolExecutor;
+  } = {},
 ): Promise<{
   app: Application;
   db: ReturnType<typeof openDatabase>['db'];
@@ -87,6 +92,7 @@ async function createSeededApp(
               chat: {
                 llmReasonNode,
                 disableEvaluatorNodes: options.disableEvaluatorNodes ?? true,
+                systemToolExecutorFactory: options.systemToolExecutorFactory,
               },
             },
           }
@@ -464,6 +470,99 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(200);
       expect(duplicateResume.body.data.resumedAtMs).toEqual(expect.any(Number));
       await expectToolExecutionCount(db, sessionId, 'success', 1);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('keeps browser sessions available to follow-up tools after URL approval', async () => {
+    const envSnap = snapshotChatEnv();
+    let executorFactoryCalls = 0;
+    const systemToolExecutorFactory = () => {
+      executorFactoryCalls++;
+      const activeBrowserSessions = new Set<string>();
+      const executor: NativeToolExecutor = async (toolId, args) => {
+        const sessionId =
+          typeof args.sessionId === 'string' ? args.sessionId : 'browser-session-test';
+        if (toolId === 'sys_browser_start') {
+          activeBrowserSessions.add(sessionId);
+          return {
+            type: 'tool_result',
+            toolId,
+            data: {
+              kind: 'start',
+              sessionId,
+              status: 'succeeded',
+              policyDecision: { state: 'allowed', matchedRule: 'browser_url_approved' },
+            },
+          };
+        }
+        if (toolId === 'sys_browser_snapshot') {
+          return {
+            type: 'tool_result',
+            toolId,
+            data: activeBrowserSessions.has(sessionId)
+              ? { kind: 'snapshot', sessionId, status: 'succeeded' }
+              : {
+                  kind: 'snapshot',
+                  sessionId,
+                  status: 'failed',
+                  error: {
+                    code: 'BROWSER_SESSION_UNAVAILABLE',
+                    message: 'Browser session is not active',
+                  },
+                },
+          };
+        }
+        return { type: 'error', code: 'TOOL_NOT_FOUND', message: `Unknown tool: ${toolId}` };
+      };
+      return executor;
+    };
+    const { app, sqlite } = await createSeededApp(dirs, {
+      mockLlm: true,
+      systemToolExecutorFactory,
+    });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionId = await createDefaultSession(app);
+      mockToolCallStream('sys_browser_start', {
+        sessionId: 'browser-session-test',
+        url: 'https://example.com',
+      });
+      const chatRes = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Open example.com and capture a snapshot' })
+        .expect(200);
+      const approvalRequestId = parseNdjsonEvents(chatRes.text).find(
+        (event) => event.type === 'approval_required',
+      )?.approvalRequestId;
+      expect(approvalRequestId).toEqual(expect.any(String));
+
+      await request(app)
+        .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+        .send({ reason: 'ok' })
+        .expect(200);
+
+      mockToolCalls
+        .mockReturnValueOnce([
+          {
+            id: 'tc-browser-snapshot',
+            name: 'sys_browser_snapshot',
+            args: { sessionId: 'browser-session-test' },
+          },
+        ])
+        .mockReturnValueOnce('Snapshot captured');
+      const resumeRes = await request(app)
+        .post(`/v1/sessions/${sessionId}/resume`)
+        .send({ approvalRequestId })
+        .expect(200);
+
+      expect(resumeRes.text).toContain('"kind":"snapshot"');
+      expect(resumeRes.text).toContain('"status":"succeeded"');
+      expect(resumeRes.text).not.toContain('BROWSER_SESSION_UNAVAILABLE');
+      expect(executorFactoryCalls).toBe(2);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

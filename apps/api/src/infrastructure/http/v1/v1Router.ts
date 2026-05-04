@@ -31,7 +31,10 @@ import { createInProcessSessionLock } from '../sessionLock.js';
 const observabilityLog = createLogger('api:observability');
 
 export type V1RouterOptions = {
-  chat?: Pick<ChatRouterOptions, 'llmReasonNode' | 'disableEvaluatorNodes'>;
+  chat?: Pick<
+    ChatRouterOptions,
+    'llmReasonNode' | 'disableEvaluatorNodes' | 'systemToolExecutorFactory'
+  >;
   observabilityStore?: ObservabilityStore;
 };
 
