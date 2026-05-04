@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Updated the docs-policy hook on `task/agent-platform-browser-tools.5` so agents are explicitly instructed to scan/update docs or record TODOs at hook time, and fixed SonarCloud hotspot `javascript:S4036` in `scripts/coding-runtime-verify.mjs` by resolving commands from fixed absolute directories instead of ambient `PATH`.
+- **Date:** 2026-05-04
 - **Session:** Completed `agent-platform-browser-tools.1` through `.4` on `task/agent-platform-browser-tools.4`: added governed Playwright browser contracts/tools, evidence artifacts, API artifact listing/download routes, compact chat UI summaries, tests, docs, and closed `.4` locally. Commit `3581388` is ready to push; Beads Dolt auto-push is still blocked by GitHub DNS/auth from the sandbox.
 - **Date:** 2026-05-04
 - **Session:** Planned next epic `agent-platform-browser-tools` on `feature/agent-platform-browser-tools`: claimed the epic, created child Beads tasks `.1` through `.5`, added chained dependencies, and wrote specs documenting Playwright as the core runtime with platform-owned policy/HITL/evidence handling.
@@ -398,17 +400,27 @@ Branch state: `task/agent-platform-memory.2` contains the second memory epic tas
 - Tool payloads are summarized before persistence; raw tool output is not copied wholesale.
 - Updated `docs/memory.md` and `docs/api-reference.md` for the working-memory layer and endpoint.
 
+---
+
+## Hook and Sonar hotspot update (2026-05-04)
+
+- **Summary:** Updated `.github/hooks/inject-docs-policy.sh` so the hook explicitly instructs agents to summarize implemented changes, scan relevant docs, update the right documentation, or append precise TODOs to `session.md` when the correct documentation change is unclear.
+- Fixed SonarCloud hotspot `javascript:S4036` in `scripts/coding-runtime-verify.mjs`; the runtime verifier now resolves required commands from a fixed set of absolute binary directories and executes the resolved absolute path instead of using `sh -lc "command -v ..."` or relying on ambient `PATH`.
+- Confirmed no `package.json` or `pnpm-lock.yaml` changes are present on `task/agent-platform-browser-tools.5`; no lockfile update is pending on this branch.
+
 Quality gates passed:
 
-- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-- `pnpm --filter @agent-platform/db run test -- test/workingMemory.test.ts test/migrate.test.ts`
-- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
-- `pnpm typecheck`
 - `pnpm lint`
-- `pnpm format:check`
-- `pnpm docs:lint`
-- `pnpm test`
-- `pnpm build`
+- `node --check scripts/coding-runtime-verify.mjs`
+- `node scripts/coding-runtime-verify.mjs`
+- `pnpm exec prettier --check scripts/coding-runtime-verify.mjs`
+- `pnpm exec markdownlint-cli2 session.md`
+- `git diff --check`
+
+Completion gate:
+
+- SonarCloud hotspot `AZ3mxfDpWfC-ETgZrxdI` was inspected through the Sonar API.
+- Local `sonar verify` could not confirm the fix because SonarCloud returned `A3S analysis is not activated for this organization`; the code path flagged by `javascript:S4036` has been removed.
 
 ### Memory foundation implemented
 
