@@ -99,8 +99,8 @@ Required outcomes:
 - [x] Full failure-to-correction loop is covered by tests.
 - [x] Documentation explains sensor execution types, trigger timing, and review-gated flywheel behavior.
 - [x] Quality gates pass for touched packages.
-- [ ] Segment tip PR is opened from `task/agent-platform-feedback-sensors.6` to `feature/feedback-sensors-harness`.
-- [ ] `bd close agent-platform-feedback-sensors.6 --reason "Sensor controls exposed and E2E validation complete"`
+- [x] Segment tip PR is opened from `task/agent-platform-feedback-sensors.6` to `feature/feedback-sensors-harness`: https://github.com/jwill9999/agent-platform/pull/134
+- [x] `bd close agent-platform-feedback-sensors.6 --reason "Sensor controls exposed in right drawer and E2E validation complete"`
 
 ## Sign-off
 
@@ -109,6 +109,6 @@ Required outcomes:
 - [x] Checklists in this document are complete
 - [ ] If segment tip: PR merged `task/agent-platform-feedback-sensors.6 -> feature/feedback-sensors-harness`
 - [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-03
