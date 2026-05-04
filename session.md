@@ -310,6 +310,9 @@ Branch state: `task/agent-platform-browser-tools.4` contains the cumulative brow
   `http://web:3001` without an external-domain approval interruption.
 - Added inline chat previews for stored browser screenshot artifacts while
   keeping the original artifact download link.
+- Moved browser screenshot previews out of the collapsible tool trace and into
+  persistent assistant message content, with an in-chat click-to-close image
+  viewer.
 - Routed external browser start/navigation approvals through the durable HITL
   approval-card flow; approved resumes now retry the browser action with an
   internal approval marker instead of relying on conversational approval text.

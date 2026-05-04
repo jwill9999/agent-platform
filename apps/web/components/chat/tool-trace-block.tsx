@@ -89,19 +89,6 @@ function BrowserToolPreview({ data }: Readonly<{ data: unknown }>) {
                   </a>
                 )}
               </div>
-              {artifact.previewHref && (
-                <a
-                  href={artifact.previewHref}
-                  className="block"
-                  aria-label={`Open ${artifact.label}`}
-                >
-                  <img
-                    src={artifact.previewHref}
-                    alt={artifact.label}
-                    className="max-h-80 w-full rounded border border-border object-contain"
-                  />
-                </a>
-              )}
             </div>
           ))}
         </div>
