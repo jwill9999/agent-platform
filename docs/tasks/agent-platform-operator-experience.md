@@ -66,6 +66,9 @@ The broader frontend is functional, but the design system needs a stronger produ
 - `agent-platform-ui-quality-sensors` — UI quality and visual UX sensors.
 - `agent-platform-capability-registry` — future capability/tool profiles.
 - `agent-platform-feedback-sensors` — feedback loop and sensor evidence.
+- `agent-platform-agent-profile-governance` — guided authoring for agent scopes, guardrails, and orchestration handoffs.
+
+Additional cross-epic planning context is captured in [Agent-Governed Authoring](../planning/agent-governed-authoring.md).
 
 ## Design Notes
 

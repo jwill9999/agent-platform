@@ -46,3 +46,7 @@ flowchart LR
 - Policy profiles make risk visible before runtime.
 - Compatibility checks prevent invalid capability bundles.
 - Tests cover install, disable, upgrade, and policy enforcement.
+
+## Refinement Notes
+
+Cross-epic planning for agent-governed skills, profile scopes, artifacts, observability, and orchestration guardrails is captured in [Agent-Governed Authoring](../planning/agent-governed-authoring.md).

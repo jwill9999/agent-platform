@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Captured agent-governed authoring refinement context on `feature/agent-platform-operator-experience`: added planning note `docs/planning/agent-governed-authoring.md`, created Beads epic `agent-platform-agent-profile-governance`, linked related epics, and saved project memory for collaborative skill/profile authoring, policy scopes, orchestration guardrails, artifacts, and phased observability.
+- **Date:** 2026-05-05
 - **Session:** Added and closed `agent-platform-browser-tools-guide` on `feature/agent-platform-operator-experience`: created the practical Browser Tools Guide, linked it from the browser-tools epic and task index, and pushed Beads state for the completed documentation task.
 - **Date:** 2026-05-05
 - **Session:** Captured future operator-experience direction on `feature/agent-platform-operator-experience`: added Beads epic `agent-platform-operator-experience`, created `docs/tasks/agent-platform-operator-experience.md`, updated the task-spec index, and saved project memory for human-readable tool activity, HITL approvals, artifact/workbench UX, and Docker/host integration constraints.

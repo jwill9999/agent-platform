@@ -156,3 +156,5 @@ When implementation tasks are created, they should include:
 ## Refinement notes
 
 Before implementation begins, run a refinement session with the owner to decide the v1 storage model, the minimum package elements, and the security posture for generated scripts.
+
+Additional cross-epic planning context is captured in [Agent-Governed Authoring](../planning/agent-governed-authoring.md).
