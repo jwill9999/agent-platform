@@ -70,20 +70,20 @@ Branch `task/agent-platform-browser-tools.4` from `task/agent-platform-browser-t
 
 ## Definition of done
 
-- [ ] Browser sessions and artifacts are inspectable through API/UI.
-- [ ] Evidence previews are bounded and explicit.
-- [ ] Policy and runtime failures are visible to users and agents.
-- [ ] Browser evidence can be consumed later by UI-quality sensors.
-- [ ] Quality gates pass for touched packages.
+- [x] Browser sessions and artifacts are inspectable through API/UI.
+- [x] Evidence previews are bounded and explicit.
+- [x] Policy and runtime failures are visible to users and agents.
+- [x] Browser evidence can be consumed later by UI-quality sensors.
+- [x] Quality gates pass for touched packages.
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-browser-tools.3`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] PR: N/A - merge at segment end
-- [ ] `bd close agent-platform-browser-tools.4 --reason "Browser observability and artifacts exposed"`
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] Task branch created from `task/agent-platform-browser-tools.3`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] PR: N/A - merge at segment end
+- [x] `bd close agent-platform-browser-tools.4 --reason "Browser observability and artifacts exposed"`
+- [x] `decisions.md` updated only if architectural decision changed (not required)
+- [x] `session.md` updated if handoff needed (not required)
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-04

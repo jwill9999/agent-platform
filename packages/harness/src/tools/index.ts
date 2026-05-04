@@ -47,6 +47,16 @@ export {
   type ObservabilityToolContext,
 } from './observabilityTools.js';
 export {
+  BROWSER_TOOLS,
+  BROWSER_TOOL_IDS,
+  BROWSER_TOOL_MAP,
+  BrowserSessionManager,
+  PlaywrightBrowserDriver,
+  executeBrowserTool,
+  type BrowserDriver,
+  type BrowserPageDriver,
+} from './browserTools.js';
+export {
   SYSTEM_TOOL_PREFIX,
   MAX_OUTPUT_BYTES,
   stringArg,

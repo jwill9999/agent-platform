@@ -67,19 +67,19 @@ Branch `task/agent-platform-browser-tools.2` from `task/agent-platform-browser-t
 
 ## Definition of done
 
-- [ ] Playwright-backed session lifecycle exists with cleanup and timeout.
-- [ ] Read-only browser tools are registered and policy-checked.
-- [ ] Screenshot/snapshot evidence is bounded and stored as artifacts.
-- [ ] Runtime limitation states are explicit and test-covered.
-- [ ] Quality gates pass for touched packages.
+- [x] Playwright-backed session lifecycle exists with cleanup and timeout.
+- [x] Read-only browser tools are registered and policy-checked.
+- [x] Screenshot/snapshot evidence is bounded and stored as artifacts.
+- [x] Runtime limitation states are explicit and test-covered.
+- [x] Quality gates pass for touched packages.
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-browser-tools.1`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
+- [x] Task branch created from `task/agent-platform-browser-tools.1`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
 - [ ] PR: N/A - merge at segment end
-- [ ] `bd close agent-platform-browser-tools.2 --reason "Browser lifecycle and read-only tools implemented"`
+- [x] `bd close agent-platform-browser-tools.2 --reason "Browser lifecycle and read-only tools implemented"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
 

@@ -65,19 +65,19 @@ This is the first task in the chained browser-tools segment.
 
 ## Definition of done
 
-- [ ] Browser session/action/policy/evidence contracts are defined and exported.
-- [ ] Risk tiers and policy decision states are test-covered.
-- [ ] Evidence artifact metadata supports future UI-quality sensor consumption.
-- [ ] Docs explain Playwright as the internal runtime and MCP/browser providers as optional adapters.
-- [ ] Quality gates pass for touched packages.
+- [x] Browser session/action/policy/evidence contracts are defined and exported.
+- [x] Risk tiers and policy decision states are test-covered.
+- [x] Evidence artifact metadata supports future UI-quality sensor consumption.
+- [x] Docs explain Playwright as the internal runtime and MCP/browser providers as optional adapters.
+- [x] Quality gates pass for touched packages.
 
 ## Sign-off
 
-- [ ] Task branch created from `feature/agent-platform-browser-tools`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
+- [x] Task branch created from `feature/agent-platform-browser-tools`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
 - [ ] PR: N/A - merge at segment end
-- [ ] `bd close agent-platform-browser-tools.1 --reason "Browser contracts and policy model defined"`
+- [x] `bd close agent-platform-browser-tools.1 --reason "Browser contracts and policy model defined"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
 

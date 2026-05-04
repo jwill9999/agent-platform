@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Completed `agent-platform-browser-tools.1` through `.4` on `task/agent-platform-browser-tools.4`: added governed Playwright browser contracts/tools, evidence artifacts, API artifact listing/download routes, compact chat UI summaries, tests, docs, and closed `.4` locally. Commit `3581388` is ready to push; Beads Dolt auto-push is still blocked by GitHub DNS/auth from the sandbox.
+- **Date:** 2026-05-04
 - **Session:** Planned next epic `agent-platform-browser-tools` on `feature/agent-platform-browser-tools`: claimed the epic, created child Beads tasks `.1` through `.5`, added chained dependencies, and wrote specs documenting Playwright as the core runtime with platform-owned policy/HITL/evidence handling.
 - **Date:** 2026-05-04
 - **Session:** Merged `origin/main` into `task/agent-platform-feedback-sensors.6`, resolved conflicts in Beads interactions, `sessionsRouter`, and `session.md`, and verified the refreshed branch with focused API checks plus root typecheck/lint.
@@ -248,6 +250,46 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Browser tools tickets 1-4 implemented
+
+Branch state: `task/agent-platform-browser-tools.4` contains the cumulative browser-tools implementation for `.1` through `.4`.
+
+- Completed and locally closed:
+  - `agent-platform-browser-tools.1` - shared browser contracts and policy schemas.
+  - `agent-platform-browser-tools.2` - read-only browser runtime/session/snapshot/screenshot tools.
+  - `agent-platform-browser-tools.3` - governed navigation, click, type, and keypress actions with URL/approval policy.
+  - `agent-platform-browser-tools.4` - browser evidence observability through API routes and compact chat UI summaries.
+- Added shared browser contracts in `packages/contracts/src/browserTool.ts`, exported through `packages/contracts/src/index.ts`.
+- Added Playwright-backed harness browser tools in `packages/harness/src/tools/browserTools.ts`, with Docker-friendly Chromium resolution, bounded artifacts, sidecar metadata, URL policy, approval-required states, and structured runtime limitations.
+- Added API routes under `/v1/browser/artifacts` to list browser artifact sidecars and download bounded workspace-relative artifacts through `PathJail`.
+- Updated chat tool rendering to summarize browser tool results and link evidence artifacts without flooding the transcript with raw JSON.
+- Updated API/architecture/task docs and all `.1` through `.4` task specs.
+- Commit created: `3581388 feat(browser-tools): add governed browser automation`.
+
+Quality gates passed:
+
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/contracts run test`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/api run test`
+- `pnpm --filter @agent-platform/api exec vitest run test/browserRouter.test.ts`
+- `pnpm --filter @agent-platform/api run typecheck`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm exec markdownlint-cli2 docs/api-reference.md docs/architecture.md docs/tasks/agent-platform-browser-tools.md docs/tasks/agent-platform-browser-tools.1.md docs/tasks/agent-platform-browser-tools.2.md docs/tasks/agent-platform-browser-tools.3.md docs/tasks/agent-platform-browser-tools.4.md`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP tools were not exposed through the currently callable tool list.
+- IDE Problems were not available in the local tool surface.
+- Fallback gates above passed. Full `pnpm docs:lint` is blocked by unrelated generated scratch content under `.agent-platform/workspaces/default/scratch/demo-app/README.md`; touched docs pass.
+- Beads close succeeded locally for `.4`; Beads Dolt auto-push failed because GitHub DNS/auth was unavailable from the sandbox.
 
 ### Browser tools epic planned
 
@@ -583,15 +625,19 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `feature/agent-platform-browser-tools`
-- **Current base:** `origin/main`
-- **Current work:** Browser-tools epic planning and child specs are ready to commit and push.
-- **Remote sync:** branch has not been pushed yet.
+- **Current branch:** `task/agent-platform-browser-tools.4`
+- **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4`
+- **Current work:** browser-tools tickets `.1` through `.4` are implemented and committed in `3581388`.
+- **Remote sync:** `task/agent-platform-browser-tools.4` still needs to be pushed.
 
 ### Beads
 
 - `agent-platform-browser-tools` is claimed/in progress locally.
-- `agent-platform-browser-tools.1` through `.5` are open and chained in Beads.
+- `agent-platform-browser-tools.1` is closed locally.
+- `agent-platform-browser-tools.2` is closed locally.
+- `agent-platform-browser-tools.3` is closed locally.
+- `agent-platform-browser-tools.4` is closed locally.
+- `agent-platform-browser-tools.5` is open and depends on `.4`; claim it after pushing `.4`.
 - `agent-platform-feedback-sensors` is closed locally.
 - `agent-platform-feedback-sensors.1` is closed.
 - `agent-platform-feedback-sensors.2` is closed.
@@ -607,8 +653,13 @@ Quality gates passed:
 
 ### Quality
 
-- Browser-tools planning docs:
-  - `git diff --check` passed.
+- Browser-tools `.1-.4` gates passed:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - harness/contracts/web/API tests listed in the latest session entry
+  - touched-doc markdownlint
+  - `git diff --check`
 - Latest `.6` gates passed:
   - `pnpm typecheck`
   - `pnpm lint`
@@ -623,10 +674,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push `feature/agent-platform-browser-tools`.
-2. After owner confirmation, claim `agent-platform-browser-tools.1` and create `task/agent-platform-browser-tools.1` from the feature branch.
-3. Ask the owner to run `bd dolt push` or rerun Beads sync when GitHub DNS/auth is available.
-4. Let PR #134 pipelines finish before merging feedback-sensors into its feature branch.
+1. Push `task/agent-platform-browser-tools.4`.
+2. Claim `agent-platform-browser-tools.5` and create `task/agent-platform-browser-tools.5` from the pushed `.4` branch tip.
+3. Ask the owner to run `bd dolt push` or rerun Beads sync when GitHub DNS/auth is available if Beads remote sync is still blocked.
 
 ---
 
