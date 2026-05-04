@@ -118,6 +118,47 @@ Docker mounts:
 | `AGENT_WORKSPACE_HOST_PATH` | `/workspace`   | User files: uploads, generated, export |
 | `AGENT_DATA_HOST_PATH`      | `/data`        | App/runtime data such as SQLite        |
 
+### Browser Tool Runtime
+
+The governed browser tools use Playwright from the API/harness runtime. The API
+Docker image installs Chromium through Alpine packages, and the harness also
+honors `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` when a custom browser binary is
+needed.
+
+Browser evidence is written under the workspace at
+`.agent-platform/browser/<session-id>/` with JSON sidecars for metadata. The
+chat UI renders compact browser activity summaries, keeps screenshot artifacts
+visible as persistent message previews, and links to stored artifacts instead
+of copying raw DOM, ARIA, or screenshot payloads into the transcript.
+
+Playwright temporary browser profiles and launch artifacts are routed to the
+host-backed workspace at `.agent-platform/tmp/browser` by default. Override
+`AGENT_BROWSER_TMPDIR` if the workspace mount is customized or if the browser
+runtime needs a different writable temp location.
+
+When exercising the tools from inside the Docker Compose API container, target
+the web service at `http://web:3001`. The default browser URL policy allowlists
+that Compose service hostname for local UI verification, while external domains
+still require approval.
+
+External browser start/navigation requests use the normal human-in-the-loop
+approval flow. The first attempt should render an approval card in chat; after
+approval, the session resume path reruns the browser action and captures the
+requested evidence.
+
+Troubleshooting:
+
+- If browser tools return `BROWSER_RUNTIME_UNAVAILABLE`, rebuild the API image
+  and confirm Chromium is present in the container.
+- If the launch error mentions `ENOSPC` or `mkdtemp` under `/tmp`, Docker's
+  overlay filesystem is full. Reclaim Docker build cache or restart/rebuild the
+  API container so `AGENT_BROWSER_TMPDIR` points Playwright at the workspace
+  temp directory.
+- If screenshots fail or pages render blank in Docker, keep the API service
+  `shm_size` at least `256mb`.
+- If local host-side integration tests bind a fixture HTTP server, run them
+  outside restricted sandboxes or with approval for local loopback binding.
+
 ### Host-Side Quality Gates
 
 These run on the host (not in Docker) for fast feedback:

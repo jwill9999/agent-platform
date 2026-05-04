@@ -74,7 +74,7 @@ Spec: docs/tasks/<issue-id>.md
 | HITL approvals          | `agent-platform-hitl`                    | `agent-platform-hitl.{1-5}.md`              |
 | Workspace storage       | `agent-platform-ws`                      | `agent-platform-ws.{1,1a,2-6}.md`           |
 | Coding tools            | `agent-platform-code-tools`              | `agent-platform-code-tools.{1-7}.md`        |
-| Browser tools           | `agent-platform-browser-tools`           | child specs pending                         |
+| Browser tools           | `agent-platform-browser-tools`           | `agent-platform-browser-tools.{1-5}.md`     |
 | Research tools          | `agent-platform-research-tools`          | child specs pending                         |
 | Memory management       | `agent-platform-memory`                  | child specs pending                         |
 | Scheduler               | `agent-platform-scheduler`               | child specs pending                         |

@@ -12,6 +12,7 @@ import { Router } from 'express';
 
 import { createAgentsRouter } from './agentsRouter.js';
 import { createApprovalRequestsRouter } from './approvalRequestsRouter.js';
+import { createBrowserRouter } from './browserRouter.js';
 import { createChatRouter, type ChatRouterOptions } from './chatRouter.js';
 import { createMemoriesRouter } from './memoriesRouter.js';
 import { createMcpServersRouter } from './mcpServersRouter.js';
@@ -30,7 +31,10 @@ import { createInProcessSessionLock } from '../sessionLock.js';
 const observabilityLog = createLogger('api:observability');
 
 export type V1RouterOptions = {
-  chat?: Pick<ChatRouterOptions, 'llmReasonNode' | 'disableEvaluatorNodes'>;
+  chat?: Pick<
+    ChatRouterOptions,
+    'llmReasonNode' | 'disableEvaluatorNodes' | 'systemToolExecutorFactory'
+  >;
   observabilityStore?: ObservabilityStore;
 };
 
@@ -93,6 +97,7 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   router.use('/projects', createProjectsRouter(db));
   router.use('/scheduler', createSchedulerRouter(db));
   router.use('/memories', createMemoriesRouter(db, { observabilityStore }));
+  router.use('/browser', createBrowserRouter());
   router.use('/workspace', createWorkspaceRouter());
 
   return router;

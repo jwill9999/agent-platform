@@ -8,6 +8,22 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Corrected full-page browser screenshot handling on `task/agent-platform-browser-tools.5`: the viewer now opens in fit-page mode with opt-in fit-width/zoom, chat previews are scrollable instead of cropped, and default screenshot artifacts now keep multi-megabyte PNGs intact instead of truncating at 2 MB.
+- **Date:** 2026-05-04
+- **Session:** Improved browser screenshot viewing on `task/agent-platform-browser-tools.5`: full-page screenshots now render as cropped readable thumbnails in chat and open into a width-filling, scrollable in-chat viewer with zoom controls.
+- **Date:** 2026-05-04
+- **Session:** Fixed the browser runtime `ENOSPC` launch failure path on `task/agent-platform-browser-tools.5`: Docker build cache had filled the container overlay, cache was pruned, and Playwright temp profiles now default to the host-backed workspace temp directory instead of container `/tmp`.
+- **Date:** 2026-05-04
+- **Session:** Fixed a browser-tools approval-resume regression on `task/agent-platform-browser-tools.5`: approved external browser starts now share the same runtime tool executor with the resumed graph, so immediate follow-up snapshot/screenshot calls keep access to the active browser session.
+- **Date:** 2026-05-04
+- **Session:** Implemented `agent-platform-browser-tools.5` on `task/agent-platform-browser-tools.5`: added real Playwright browser-tool integration validation, documented browser runtime troubleshooting, completed the browser-tools epic checklist, and verified root typecheck/lint/test/format plus Playwright E2E after applying the E2E seed.
+- **Date:** 2026-05-04
+- **Session:** Updated the docs-policy hook on `task/agent-platform-browser-tools.5` so agents are explicitly instructed to scan/update docs or record TODOs at hook time, and fixed SonarCloud hotspot `javascript:S4036` in `scripts/coding-runtime-verify.mjs` by resolving commands from fixed absolute directories instead of ambient `PATH`.
+- **Date:** 2026-05-04
+- **Session:** Completed `agent-platform-browser-tools.1` through `.4` on `task/agent-platform-browser-tools.4`: added governed Playwright browser contracts/tools, evidence artifacts, API artifact listing/download routes, compact chat UI summaries, tests, docs, and closed `.4` locally. Commit `3581388` is ready to push; Beads Dolt auto-push is still blocked by GitHub DNS/auth from the sandbox.
+- **Date:** 2026-05-04
+- **Session:** Planned next epic `agent-platform-browser-tools` on `feature/agent-platform-browser-tools`: claimed the epic, created child Beads tasks `.1` through `.5`, added chained dependencies, and wrote specs documenting Playwright as the core runtime with platform-owned policy/HITL/evidence handling.
+- **Date:** 2026-05-04
 - **Session:** Merged `origin/main` into `task/agent-platform-feedback-sensors.6`, resolved conflicts in Beads interactions, `sessionsRouter`, and `session.md`, and verified the refreshed branch with focused API checks plus root typecheck/lint.
 - **Date:** 2026-05-04
 - **Session:** Completed and closed `agent-platform-feedback-sensors.6` on `task/agent-platform-feedback-sensors.6`: exposed session sensor dashboards through API/contracts, moved sensor status into a right-side feedback drawer, added API/E2E coverage, created follow-up epic `agent-platform-branch-feedback-status`, opened PR #134 to `feature/feedback-sensors-harness`, and pushed through the pre-push gate.
@@ -247,6 +263,225 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
+### Browser screenshot full-page handling corrected
+
+Branch state: `task/agent-platform-browser-tools.5` has an additional follow-up fix pending commit.
+
+- Reviewed owner screenshots showing that the previous chat thumbnail still cropped full-page screenshots and the modal felt zoomed in because it defaulted to fit-width.
+- Identified a deeper capture-side issue: the screenshot artifact was marked `truncated`, so the PNG itself could be cut at the 2 MB default cap before the UI ever received it.
+- Changed chat previews to use a full-width, scrollable screenshot area instead of `object-cover` cropping.
+- Changed the modal to open in fit-page mode first, so the whole screenshot is visible before the user chooses fit-width or zoom.
+- Kept fit-width and 100-200% zoom controls for detailed inspection.
+- Raised the default screenshot artifact limit from 2 MB to 12 MB and added regression coverage proving a 2.2 MB screenshot is stored intact by default.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/web run build`
+- `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/harness run build`
+- `pnpm format:check`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP was not exposed in the current tool surface.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with affected web/harness typecheck, lint, tests, builds, formatting, and diff whitespace checks.
+
+### Browser screenshot viewer improved
+
+Branch state: `task/agent-platform-browser-tools.5` has an additional follow-up fix pending commit.
+
+- Reviewed manual screenshots showing full-page browser captures rendered as tiny images in the chat preview card and difficult-to-inspect images in the modal viewer.
+- Changed chat screenshot previews from whole-image fit to a fixed-height, top-aligned cropped thumbnail so a tall full-page capture fills the card instead of shrinking to a sliver.
+- Reworked the in-chat viewer into a width-filling, scrollable lightbox:
+  - default view fills the available modal width
+  - vertical scrolling exposes the rest of a full-page screenshot
+  - zoom controls allow 100% to 200% inspection without opening a new tab
+  - metadata remains visible in the viewer header
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/web run build`
+- `pnpm format:check`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP was not exposed in the current tool surface.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with web typecheck, lint, tests, build, formatting, and diff whitespace checks.
+
+### Browser runtime ENOSPC hardening
+
+Branch state: `task/agent-platform-browser-tools.5` has an additional follow-up fix pending commit.
+
+- Investigated manual browser-tool failure:
+  - `sys_browser_start` failed before opening `http://web:3001`.
+  - Error was `ENOSPC: no space left on device, mkdtemp '/tmp/playwright-artifacts-XXXXXX'`.
+- Confirmed the API container overlay filesystem was full: `/` was `59G` used with `0` available, while `/workspace` still had free space.
+- Confirmed Docker build cache was the main local pressure source. Ran `docker builder prune -f`, reclaiming `41.51GB`; the API container now reports about `47G` free on `/`.
+- Added Compose defaults:
+  - `AGENT_BROWSER_TMPDIR=/workspace/.agent-platform/tmp/browser`
+  - `TMPDIR=/workspace/.agent-platform/tmp/browser`
+- Hardened `BrowserSessionManager` so it creates the browser temp directory under the workspace and temporarily applies `TMPDIR`/`TMP`/`TEMP` around browser launch.
+- Documented the workspace-backed temp path and `ENOSPC` troubleshooting in `docs/development.md`.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/harness run build`
+- `pnpm format:check`
+- `pnpm exec markdownlint-cli2 docs/development.md`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP was not exposed in the current tool surface.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with focused tests, typecheck, lint, build, formatting, docs lint, and diff whitespace checks.
+
+### Browser approval resume session continuity fixed
+
+Branch state: `task/agent-platform-browser-tools.5` is ahead of origin with follow-up commit `82ddcb2`.
+
+- Investigated a manual browser-tool run where approving `https://bbc.co.uk` successfully opened the page, but the immediate `sys_browser_snapshot` and `sys_browser_screenshot` calls failed with `BROWSER_SESSION_UNAVAILABLE`.
+- Root cause: `handleSessionResume` executed the approved browser start with one native system-tool executor, then built a separate resumed runtime graph with a new executor. Browser sessions are stored in the executor-owned `BrowserSessionManager`, so the continuation graph could not see the approved start session.
+- Added a shared runtime native-tool executor path for approval resume. The approved tool dispatch and resumed graph now receive the same executor instance for that resume cycle.
+- Added a focused API regression test with a stateful fake browser executor. The test fails if `sys_browser_start` and the follow-up `sys_browser_snapshot` use different executor instances.
+- Exposed the test-only executor factory through the v1 chat router options so the regression can be validated without launching a real browser.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` (required sandbox escalation for Supertest listener binding)
+- `pnpm --filter @agent-platform/api run typecheck`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/api run build`
+- `pnpm format:check`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP did not become available through tool discovery in this session.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with focused tests, typecheck, lint, build, formatting, and diff whitespace checks.
+
+### Browser tools validation implemented
+
+Branch state: `task/agent-platform-browser-tools.5` contains the browser-tools segment tip.
+
+- Added `packages/harness/test/browserTools.integration.test.ts`, which drives a real Playwright browser against a local HTML fixture.
+- The integration test covers `browser_start`, `browser_navigate`, `browser_snapshot`, `browser_screenshot`, `browser_click`, `browser_type`, `browser_press`, and `browser_close`.
+- Negative coverage now includes external-domain navigation approval, redirect-to-external approval, sensitive input approval, ambiguous target failure, inactive-session failure after close, and bounded artifact/sidecar metadata.
+- Added browser runtime troubleshooting to `docs/development.md`.
+- Updated `docs/tasks/agent-platform-browser-tools.md` and `.5` with validation results and completed checklist items.
+- Addressed SonarCloud PR #137 hotspot `typescript:S2245` in
+  `apps/api/test/browserRouter.test.ts` by replacing `Math.random()` test path
+  generation with `mkdtempSync`.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.integration.test.ts`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm exec markdownlint-cli2 docs/development.md docs/tasks/agent-platform-browser-tools.md docs/tasks/agent-platform-browser-tools.5.md`
+- `pnpm format:check`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm test`
+- `docker compose --profile services exec -T api sh -lc 'E2E_SEED=1 SQLITE_PATH=/data/agent.sqlite node packages/db/dist/seed/run.js'`
+- `pnpm test:e2e`
+- `pnpm --filter @agent-platform/api exec vitest run test/browserRouter.test.ts`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/api run typecheck`
+
+Completion gate:
+
+- SonarQube MCP tools and IDE Problems were not available through the current tool surface.
+- Fallback typecheck/lint/test/E2E gates passed.
+- Earlier `pnpm test:e2e` failed before applying `E2E_SEED=1`; after applying the E2E seed to the running API container, all 16 E2E tests passed.
+- `sonar verify` could not confirm the hotspot fix because SonarCloud returned
+  `A3S analysis is not activated for this organization`; PR analysis should
+  verify after the fix is pushed.
+
+### Browser tools tickets 1-4 implemented
+
+Branch state: `task/agent-platform-browser-tools.4` contains the cumulative browser-tools implementation for `.1` through `.4`.
+
+- Completed and locally closed:
+  - `agent-platform-browser-tools.1` - shared browser contracts and policy schemas.
+  - `agent-platform-browser-tools.2` - read-only browser runtime/session/snapshot/screenshot tools.
+  - `agent-platform-browser-tools.3` - governed navigation, click, type, and keypress actions with URL/approval policy.
+  - `agent-platform-browser-tools.4` - browser evidence observability through API routes and compact chat UI summaries.
+- Added shared browser contracts in `packages/contracts/src/browserTool.ts`, exported through `packages/contracts/src/index.ts`.
+- Added Playwright-backed harness browser tools in `packages/harness/src/tools/browserTools.ts`, with Docker-friendly Chromium resolution, bounded artifacts, sidecar metadata, URL policy, approval-required states, and structured runtime limitations.
+- Updated the default browser URL policy to allow the Docker Compose `web`
+  service hostname, so manual in-container browser-tool prompts can open
+  `http://web:3001` without an external-domain approval interruption.
+- Added inline chat previews for stored browser screenshot artifacts while
+  keeping the original artifact download link.
+- Moved browser screenshot previews out of the collapsible tool trace and into
+  persistent assistant message content, with an in-chat click-to-close image
+  viewer.
+- Routed external browser start/navigation approvals through the durable HITL
+  approval-card flow; approved resumes now retry the browser action with an
+  internal approval marker instead of relying on conversational approval text.
+- Added API routes under `/v1/browser/artifacts` to list browser artifact sidecars and download bounded workspace-relative artifacts through `PathJail`.
+- Updated chat tool rendering to summarize browser tool results and link evidence artifacts without flooding the transcript with raw JSON.
+- Updated API/architecture/task docs and all `.1` through `.4` task specs.
+- Commit created: `3581388 feat(browser-tools): add governed browser automation`.
+
+Quality gates passed:
+
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm format:check`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/contracts run test`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/api run test`
+- `pnpm --filter @agent-platform/api exec vitest run test/browserRouter.test.ts`
+- `pnpm --filter @agent-platform/api run typecheck`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm exec markdownlint-cli2 docs/api-reference.md docs/architecture.md docs/tasks/agent-platform-browser-tools.md docs/tasks/agent-platform-browser-tools.1.md docs/tasks/agent-platform-browser-tools.2.md docs/tasks/agent-platform-browser-tools.3.md docs/tasks/agent-platform-browser-tools.4.md`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP tools were not exposed through the currently callable tool list.
+- IDE Problems were not available in the local tool surface.
+- Fallback gates above passed. Full `pnpm docs:lint` is blocked by unrelated generated scratch content under `.agent-platform/workspaces/default/scratch/demo-app/README.md`; touched docs pass.
+- Beads close succeeded locally for `.4`; Beads Dolt auto-push failed because GitHub DNS/auth was unavailable from the sandbox.
+
+### Browser tools epic planned
+
+Branch state: `feature/agent-platform-browser-tools` contains planning docs for the next P1 epic.
+
+- Claimed `agent-platform-browser-tools` in Beads.
+- Created child tasks `agent-platform-browser-tools.1` through `.5`.
+- Linked each child to `agent-platform-browser-tools` and chained dependencies `.1 -> .2 -> .3 -> .4 -> .5`.
+- Added specs:
+  - `docs/tasks/agent-platform-browser-tools.1.md`
+  - `docs/tasks/agent-platform-browser-tools.2.md`
+  - `docs/tasks/agent-platform-browser-tools.3.md`
+  - `docs/tasks/agent-platform-browser-tools.4.md`
+  - `docs/tasks/agent-platform-browser-tools.5.md`
+- Updated the epic spec to record the implementation direction: Playwright as the internal runtime, optional MCP/browser adapters, local/dev URLs first, platform-owned policy/HITL/evidence storage, and UI-quality grading deferred to `agent-platform-ui-quality-sensors`.
+- Updated `docs/tasks/README.md` so Browser tools points at the child spec files.
+
 ### Sensor controls and right feedback drawer completed
 
 Branch state: `task/agent-platform-feedback-sensors.6` contains the final feedback-sensors task and has been refreshed with `origin/main`.
@@ -338,17 +573,27 @@ Branch state: `task/agent-platform-memory.2` contains the second memory epic tas
 - Tool payloads are summarized before persistence; raw tool output is not copied wholesale.
 - Updated `docs/memory.md` and `docs/api-reference.md` for the working-memory layer and endpoint.
 
+---
+
+## Hook and Sonar hotspot update (2026-05-04)
+
+- **Summary:** Updated `.github/hooks/inject-docs-policy.sh` so the hook explicitly instructs agents to summarize implemented changes, scan relevant docs, update the right documentation, or append precise TODOs to `session.md` when the correct documentation change is unclear.
+- Fixed SonarCloud hotspot `javascript:S4036` in `scripts/coding-runtime-verify.mjs`; the runtime verifier now resolves required commands from a fixed set of absolute binary directories and executes the resolved absolute path instead of using `sh -lc "command -v ..."` or relying on ambient `PATH`.
+- Confirmed no `package.json` or `pnpm-lock.yaml` changes are present on `task/agent-platform-browser-tools.5`; no lockfile update is pending on this branch.
+
 Quality gates passed:
 
-- `pnpm --filter @agent-platform/contracts run test -- test/roundtrip.test.ts`
-- `pnpm --filter @agent-platform/db run test -- test/workingMemory.test.ts test/migrate.test.ts`
-- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
-- `pnpm typecheck`
 - `pnpm lint`
-- `pnpm format:check`
-- `pnpm docs:lint`
-- `pnpm test`
-- `pnpm build`
+- `node --check scripts/coding-runtime-verify.mjs`
+- `node scripts/coding-runtime-verify.mjs`
+- `pnpm exec prettier --check scripts/coding-runtime-verify.mjs`
+- `pnpm exec markdownlint-cli2 session.md`
+- `git diff --check`
+
+Completion gate:
+
+- SonarCloud hotspot `AZ3mxfDpWfC-ETgZrxdI` was inspected through the Sonar API.
+- Local `sonar verify` could not confirm the fix because SonarCloud returned `A3S analysis is not activated for this organization`; the code path flagged by `javascript:S4036` has been removed.
 
 ### Memory foundation implemented
 
@@ -565,13 +810,19 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-feedback-sensors.6`
-- **Current base:** refreshed with `origin/main`
-- **Current work:** `.6` implementation is complete, Beads is closed locally, and PR #134 is open to `feature/feedback-sensors-harness`.
-- **Remote sync:** branch tracks `origin/task/agent-platform-feedback-sensors.6`; merge-from-main resolution is ready to commit and push.
+- **Current branch:** `task/agent-platform-browser-tools.5`
+- **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4` -> `.5`
+- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up fixes cover approved-browser-session continuity, Playwright temp storage under Docker, and full-page screenshot capture/viewing.
+- **Remote sync:** pending commit/push for the full-page screenshot handling fix and this session handoff update.
 
 ### Beads
 
+- `agent-platform-browser-tools` is closed locally.
+- `agent-platform-browser-tools.1` is closed locally.
+- `agent-platform-browser-tools.2` is closed locally.
+- `agent-platform-browser-tools.3` is closed locally.
+- `agent-platform-browser-tools.4` is closed locally.
+- `agent-platform-browser-tools.5` is closed locally.
 - `agent-platform-feedback-sensors` is closed locally.
 - `agent-platform-feedback-sensors.1` is closed.
 - `agent-platform-feedback-sensors.2` is closed.
@@ -587,6 +838,53 @@ Quality gates passed:
 
 ### Quality
 
+- Latest full-page browser screenshot handling gates passed:
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run test`
+  - `pnpm --filter @agent-platform/web run build`
+  - `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm --filter @agent-platform/harness run build`
+  - `pnpm format:check`
+  - `git diff --check`
+- Latest browser screenshot viewer gates passed:
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run test`
+  - `pnpm --filter @agent-platform/web run build`
+  - `pnpm format:check`
+  - `git diff --check`
+- Latest browser runtime ENOSPC hardening gates passed:
+  - `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm --filter @agent-platform/harness run build`
+  - `pnpm format:check`
+  - `pnpm exec markdownlint-cli2 docs/development.md`
+  - `git diff --check`
+- Latest browser approval resume fix gates passed:
+  - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
+  - `pnpm --filter @agent-platform/api run typecheck`
+  - `pnpm --filter @agent-platform/api run lint`
+  - `pnpm --filter @agent-platform/api run build`
+  - `pnpm format:check`
+  - `git diff --check`
+- Browser-tools `.1-.4` gates passed:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - harness/contracts/web/API tests listed in the latest session entry
+  - touched-doc markdownlint
+  - `git diff --check`
+- Browser-tools `.5` gates passed:
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm format:check`
+  - `pnpm test`
+  - `pnpm test:e2e` after applying `E2E_SEED=1`
+  - focused harness browser integration test
 - Latest `.6` gates passed:
   - `pnpm typecheck`
   - `pnpm lint`
@@ -601,10 +899,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the `origin/main` merge into `task/agent-platform-feedback-sensors.6`.
-2. Confirm PR #134 updates cleanly after push and let CI run.
-3. Ask the owner to run `bd dolt push` or rerun Beads sync when GitHub DNS/auth is available.
-4. Schedule refinement for `agent-platform-branch-feedback-status` before breaking it into implementation tasks.
+1. Commit and push the full-page screenshot handling fix plus `session.md` handoff update.
+2. Ask the owner to capture a new external full-page screenshot; existing truncated artifacts cannot be repaired retroactively.
+3. In the viewer, confirm the modal opens with the whole screenshot visible, then use fit-width/zoom only when inspecting details.
+4. Rebuild/restart the API container when convenient so Compose applies `AGENT_BROWSER_TMPDIR` and `TMPDIR`.
+5. Watch PR #137 pipelines and address any feedback.
 
 ---
 
@@ -680,3 +979,15 @@ Tracked in Beads: `agent-platform-de4`
 ### 5. Refactor input bar controls into unified chat input
 
 Tracked in Beads: `agent-platform-lt6`
+
+---
+
+## 2026-05-04 Browser Tools SonarCloud Follow-Up
+
+- PR 137 SonarCloud reported 16 security hotspots and 6 maintainability issues on `task/agent-platform-browser-tools.5`.
+- Fixed the hotspot cluster by removing browser launch reliance on `TMPDIR`/`TMP`/`TEMP`; Playwright now receives explicit workspace-backed artifact, download, trace, and user-data directories.
+- Updated browser tests to use workspace-backed scratch directories instead of OS temp directories where this branch touches them.
+- Replaced the insecure `http://web:3001` policy test URL with `https://web:3001`.
+- Cleaned Sonar code-smell findings: nested ternary labels/actions, in-place sort in response construction, repeated `push`, redundant role assertion, and `filter().at(0)`.
+- Verification completed: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `git diff --check`, focused browser/contract tests, browser integration test with local-server escalation, and full `pnpm test` with local-server escalation all pass.
+- SonarQube CLI file-level `sonar verify` could not run because SonarCloud returned `403` for A3S analysis not being activated in the organization; final Sonar status requires the pushed PR analysis rerun.

@@ -100,6 +100,8 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `DELETE /v1/model-configs/:id`             |    ✅    |       ✅        | Model configs dashboard — delete             |
 | `POST /v1/model-configs/:id/test`          |    ✅    |       ✅        | Model configs dashboard — test connection    |
 | `GET /v1/model-configs/:id`                |    —     |       ✅        | Single resource fetch (no dedicated UI)      |
+| `GET /v1/browser/artifacts`                |    ✅    |       ✅        | Browser evidence browser                     |
+| `GET /v1/browser/artifacts/download`       |    ✅    |       ✅        | Browser evidence download                    |
 | `GET /v1/settings`                         |    —     |       ✅        | Platform settings — API / automation only    |
 | `PUT /v1/settings/:key`                    |    —     |       ✅        | Set a setting — API / automation only        |
 | `DELETE /v1/settings/:key`                 |    —     |       ✅        | Delete a setting — API / automation only     |
@@ -155,6 +157,41 @@ Built-in observability tools exposed by `GET /v1/tools`:
 | `sys_query_feedback_candidates`          | `query_feedback_candidates`          | `since?`, `limit?`           | `{ total, truncated, candidates }`      |
 
 All observability tools are read-only, zero-risk system tools. They are jailed to the current API session, and `inspect_trace` defaults to the current run when `traceId` is omitted.
+
+Browser automation tools use the shared browser contracts in `packages/contracts`. The contract surface covers governed browser sessions, page state, action requests/results, policy decisions, and bounded evidence artifacts. Action kinds are `start`, `navigate`, `snapshot`, `screenshot`, `click`, `type`, `press`, and `close`; snapshot/screenshot are read-only, start/navigate/close are medium risk, and input/mutation actions are high risk and approval-sensitive.
+
+The current harness registers these browser tools:
+
+| Tool ID                  | Name                 | Risk   | Description                                       |
+| ------------------------ | -------------------- | ------ | ------------------------------------------------- |
+| `sys_browser_start`      | `browser_start`      | medium | Start or reuse a governed Playwright session      |
+| `sys_browser_navigate`   | `browser_navigate`   | medium | Navigate with pre/post URL policy checks          |
+| `sys_browser_snapshot`   | `browser_snapshot`   | low    | Capture bounded DOM and ARIA snapshot artifacts   |
+| `sys_browser_screenshot` | `browser_screenshot` | low    | Capture a bounded PNG screenshot artifact         |
+| `sys_browser_click`      | `browser_click`      | high   | Click a governed target with approval safeguards  |
+| `sys_browser_type`       | `browser_type`       | high   | Fill a governed target with redaction safeguards  |
+| `sys_browser_press`      | `browser_press`      | high   | Press a key on a governed target                  |
+| `sys_browser_close`      | `browser_close`      | medium | Close the browser session and release the context |
+
+Evidence is stored as workspace files under `.agent-platform/browser/<session-id>/`
+and returned by reference with viewport, page URL, title, timestamp, truncation,
+redaction, and size metadata.
+
+Locator strategy prefers user-facing attributes in this order: role/name, label,
+visible text, placeholder, alt text, title, test id, then explicit CSS selector.
+Submit-like, destructive, and sensitive input actions return `approval_required`
+unless they have passed the approval path.
+
+Browser evidence artifacts are inspectable through:
+
+| Method | Path                             | Description                                       |
+| ------ | -------------------------------- | ------------------------------------------------- |
+| `GET`  | `/v1/browser/artifacts`          | List browser artifact metadata grouped by session |
+| `GET`  | `/v1/browser/artifacts/download` | Download a bounded browser artifact by path       |
+
+`GET /v1/browser/artifacts` accepts optional `sessionId`. Downloads are limited
+to `.agent-platform/browser/**` and do not expose `.json` metadata sidecars
+directly.
 
 ### Approval Requests
 

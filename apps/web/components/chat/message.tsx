@@ -9,6 +9,7 @@ import { Markdown } from './markdown';
 import type { CriticEvent } from '@/lib/critic-events';
 import { ApprovalCard } from './approval-card';
 import { ToolTraceBlock } from './tool-trace-block';
+import { BrowserArtifactPreviews } from './browser-artifact-previews';
 import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
 
 interface MessageProps {
@@ -89,6 +90,7 @@ export function Message({
             <ThinkingBlock content={thinking ?? ''} defaultOpen={isAwaitingStreamContent} />
           )}
           {hasToolEvents && <ToolTraceBlock events={toolEvents ?? []} isStreaming={isStreaming} />}
+          {hasToolEvents && <BrowserArtifactPreviews events={toolEvents ?? []} />}
           {hasText && <Markdown content={text} className="text-sm" />}
           {hasApprovals &&
             approvals.map((approval) => (

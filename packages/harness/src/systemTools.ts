@@ -37,6 +37,10 @@ import {
   MEMORY_TOOL_MAP,
   executeMemoryTool,
   type MemoryToolContext,
+  BROWSER_TOOLS,
+  BROWSER_TOOL_MAP,
+  executeBrowserTool,
+  BrowserSessionManager,
 } from './tools/index.js';
 import {
   SYSTEM_TOOL_PREFIX,
@@ -77,6 +81,7 @@ export const SYSTEM_TOOL_RISK: Record<string, RiskTier> = {
   ...QUALITY_GATE_MAP,
   ...REPO_DISCOVERY_TOOL_MAP,
   ...MEMORY_TOOL_MAP,
+  ...BROWSER_TOOL_MAP,
 } as const;
 
 export const SYSTEM_TOOLS: readonly ContractTool[] = [
@@ -182,6 +187,8 @@ export const SYSTEM_TOOLS: readonly ContractTool[] = [
   ...REPO_DISCOVERY_TOOLS,
   // Memory management, scoped to the current session/agent
   ...MEMORY_TOOLS,
+  // Governed Playwright-backed browser lifecycle and read-only evidence tools
+  ...BROWSER_TOOLS,
   // Lazy skill loading — fetch full skill instructions on demand
   {
     id: ids.getSkillDetail,
@@ -337,6 +344,7 @@ export function createSystemToolExecutor(options?: {
   const workspaceRoot = existsSync(configuredWorkspaceRoot)
     ? configuredWorkspaceRoot
     : process.cwd();
+  const browserManager = new BrowserSessionManager({ workspaceRoot });
   return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
     // Core tools
     switch (toolId) {
@@ -389,6 +397,9 @@ export function createSystemToolExecutor(options?: {
 
     const memoryResult = await executeMemoryTool(toolId, args, options?.memory);
     if (memoryResult) return memoryResult;
+
+    const browserResult = await executeBrowserTool(toolId, args, { manager: browserManager });
+    if (browserResult) return browserResult;
 
     return {
       type: 'error',

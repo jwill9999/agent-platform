@@ -5,6 +5,8 @@ import { ChevronDown, CircleAlert, CircleCheck, CircleSlash, Wrench } from 'luci
 
 import type { ToolTraceEvent } from '@/hooks/use-harness-chat';
 import { cn } from '@/lib/cn';
+import { formatFileSize } from '@/lib/workspace-files';
+import { summarizeBrowserToolResult } from '@/lib/browser-tool-results';
 
 type Props = Readonly<{
   events: readonly ToolTraceEvent[];
@@ -44,6 +46,55 @@ function StatusIcon({ status }: Readonly<{ status: ReturnType<typeof eventStatus
   if (status === 'denied') return <CircleSlash className="h-3.5 w-3.5 text-amber-600" />;
   if (status === 'error') return <CircleAlert className="h-3.5 w-3.5 text-amber-600" />;
   return <Wrench className="h-3.5 w-3.5 text-muted-foreground" />;
+}
+
+function BrowserToolPreview({ data }: Readonly<{ data: unknown }>) {
+  const summary = summarizeBrowserToolResult(data);
+  if (!summary) return null;
+  return (
+    <div className="mt-2 space-y-2 rounded border border-border/70 bg-muted/40 p-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">{summary.kind}</span>
+        <span className="rounded bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">
+          {summary.status}
+        </span>
+        {summary.policy && (
+          <span className="rounded bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">
+            {summary.policy}
+          </span>
+        )}
+      </div>
+      {(summary.title || summary.url) && (
+        <div className="space-y-0.5 text-[11px] text-muted-foreground">
+          {summary.title && <div className="font-medium text-foreground">{summary.title}</div>}
+          {summary.url && <div className="break-all">{summary.url}</div>}
+        </div>
+      )}
+      {summary.error && <p className="text-[11px] text-amber-700">{summary.error}</p>}
+      {summary.artifacts.length > 0 && (
+        <div className="space-y-1">
+          {summary.artifacts.map((artifact) => (
+            <div key={artifact.id} className="space-y-1">
+              <div className="flex min-w-0 items-center gap-2 text-[11px]">
+                <span className="truncate text-foreground">{artifact.label}</span>
+                <span className="text-muted-foreground">{artifact.kind}</span>
+                <span className="text-muted-foreground">{formatFileSize(artifact.sizeBytes)}</span>
+                {artifact.truncated && <span className="text-amber-700">truncated</span>}
+                {artifact.downloadHref && (
+                  <a
+                    href={artifact.downloadHref}
+                    className="ml-auto text-primary underline-offset-2 hover:underline"
+                  >
+                    Open
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ToolTraceBlock({ events, isStreaming }: Props) {
@@ -111,11 +162,14 @@ export function ToolTraceBlock({ events, isStreaming }: Props) {
                 {event.type === 'error' && (
                   <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{event.message}</p>
                 )}
-                {event.type === 'result' && (
-                  <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted/50 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
-                    {formatToolResultPreview(event.data)}
-                  </pre>
-                )}
+                {event.type === 'result' &&
+                  (summarizeBrowserToolResult(event.data) ? (
+                    <BrowserToolPreview data={event.data} />
+                  ) : (
+                    <pre className="mt-2 max-h-48 overflow-auto rounded bg-muted/50 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                      {formatToolResultPreview(event.data)}
+                    </pre>
+                  ))}
               </li>
             );
           })}
