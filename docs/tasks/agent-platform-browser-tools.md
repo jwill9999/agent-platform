@@ -7,6 +7,15 @@
 
 Add governed browser automation for web UI validation and general automation tasks. The browser tool should support navigation, snapshots, screenshots, clicks, typing, and closing sessions with explicit policy controls.
 
+## Implementation Direction
+
+- **Core runtime:** Playwright, owned inside the platform runtime.
+- **Optional adapters:** Playwright MCP and future remote browser providers can be discovered and used as providers, but the core browser tools should not depend on a user-configured MCP server.
+- **Initial scope:** local/dev web apps first, including `localhost`, `127.0.0.1`, and configured project URLs. External websites require explicit domain policy.
+- **Policy ownership:** domain allow/deny rules, action risk scoring, HITL routing, evidence bounding, and artifact storage are platform-owned.
+- **UI-quality relationship:** this epic captures browser evidence and enforces policy. UI/UX grading belongs to `agent-platform-ui-quality-sensors` and should consume these evidence artifacts later.
+- **Accessibility evidence:** prefer ARIA snapshots and later Axe-style rule checks; do not build new work around deprecated Playwright accessibility snapshot APIs.
+
 ## Capability Map
 
 ```json
@@ -50,3 +59,4 @@ flowchart LR
 - Mutating actions are risk-scored and approval-gated when appropriate.
 - Screenshots/snapshots are stored as evidence artifacts.
 - Tests cover successful UI validation and blocked risky actions.
+- Child task specs exist for `.1` through `.5` and Beads dependencies match the proposed chain.

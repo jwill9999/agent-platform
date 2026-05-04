@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Planned next epic `agent-platform-browser-tools` on `feature/agent-platform-browser-tools`: claimed the epic, created child Beads tasks `.1` through `.5`, added chained dependencies, and wrote specs documenting Playwright as the core runtime with platform-owned policy/HITL/evidence handling.
+- **Date:** 2026-05-04
 - **Session:** Merged `origin/main` into `task/agent-platform-feedback-sensors.6`, resolved conflicts in Beads interactions, `sessionsRouter`, and `session.md`, and verified the refreshed branch with focused API checks plus root typecheck/lint.
 - **Date:** 2026-05-04
 - **Session:** Completed and closed `agent-platform-feedback-sensors.6` on `task/agent-platform-feedback-sensors.6`: exposed session sensor dashboards through API/contracts, moved sensor status into a right-side feedback drawer, added API/E2E coverage, created follow-up epic `agent-platform-branch-feedback-status`, opened PR #134 to `feature/feedback-sensors-harness`, and pushed through the pre-push gate.
@@ -246,6 +248,22 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Browser tools epic planned
+
+Branch state: `feature/agent-platform-browser-tools` contains planning docs for the next P1 epic.
+
+- Claimed `agent-platform-browser-tools` in Beads.
+- Created child tasks `agent-platform-browser-tools.1` through `.5`.
+- Linked each child to `agent-platform-browser-tools` and chained dependencies `.1 -> .2 -> .3 -> .4 -> .5`.
+- Added specs:
+  - `docs/tasks/agent-platform-browser-tools.1.md`
+  - `docs/tasks/agent-platform-browser-tools.2.md`
+  - `docs/tasks/agent-platform-browser-tools.3.md`
+  - `docs/tasks/agent-platform-browser-tools.4.md`
+  - `docs/tasks/agent-platform-browser-tools.5.md`
+- Updated the epic spec to record the implementation direction: Playwright as the internal runtime, optional MCP/browser adapters, local/dev URLs first, platform-owned policy/HITL/evidence storage, and UI-quality grading deferred to `agent-platform-ui-quality-sensors`.
+- Updated `docs/tasks/README.md` so Browser tools points at the child spec files.
 
 ### Sensor controls and right feedback drawer completed
 
@@ -565,13 +583,15 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-feedback-sensors.6`
-- **Current base:** refreshed with `origin/main`
-- **Current work:** `.6` implementation is complete, Beads is closed locally, and PR #134 is open to `feature/feedback-sensors-harness`.
-- **Remote sync:** branch tracks `origin/task/agent-platform-feedback-sensors.6`; merge-from-main resolution is ready to commit and push.
+- **Current branch:** `feature/agent-platform-browser-tools`
+- **Current base:** `origin/main`
+- **Current work:** Browser-tools epic planning and child specs are ready to commit and push.
+- **Remote sync:** branch has not been pushed yet.
 
 ### Beads
 
+- `agent-platform-browser-tools` is claimed/in progress locally.
+- `agent-platform-browser-tools.1` through `.5` are open and chained in Beads.
 - `agent-platform-feedback-sensors` is closed locally.
 - `agent-platform-feedback-sensors.1` is closed.
 - `agent-platform-feedback-sensors.2` is closed.
@@ -587,6 +607,8 @@ Quality gates passed:
 
 ### Quality
 
+- Browser-tools planning docs:
+  - `git diff --check` passed.
 - Latest `.6` gates passed:
   - `pnpm typecheck`
   - `pnpm lint`
@@ -601,10 +623,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the `origin/main` merge into `task/agent-platform-feedback-sensors.6`.
-2. Confirm PR #134 updates cleanly after push and let CI run.
+1. Commit and push `feature/agent-platform-browser-tools`.
+2. After owner confirmation, claim `agent-platform-browser-tools.1` and create `task/agent-platform-browser-tools.1` from the feature branch.
 3. Ask the owner to run `bd dolt push` or rerun Beads sync when GitHub DNS/auth is available.
-4. Schedule refinement for `agent-platform-branch-feedback-status` before breaking it into implementation tasks.
+4. Let PR #134 pipelines finish before merging feedback-sensors into its feature branch.
 
 ---
 
