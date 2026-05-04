@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Added and closed `agent-platform-browser-tools-guide` on `feature/agent-platform-operator-experience`: created the practical Browser Tools Guide, linked it from the browser-tools epic and task index, and pushed Beads state for the completed documentation task.
+- **Date:** 2026-05-05
 - **Session:** Captured future operator-experience direction on `feature/agent-platform-operator-experience`: added Beads epic `agent-platform-operator-experience`, created `docs/tasks/agent-platform-operator-experience.md`, updated the task-spec index, and saved project memory for human-readable tool activity, HITL approvals, artifact/workbench UX, and Docker/host integration constraints.
 - **Date:** 2026-05-04
 - **Session:** Corrected full-page browser screenshot handling on `task/agent-platform-browser-tools.5`: the viewer now opens in fit-page mode with opt-in fit-width/zoom, chat previews are scrollable instead of cropped, and default screenshot artifacts now keep multi-megabyte PNGs intact instead of truncating at 2 MB.
