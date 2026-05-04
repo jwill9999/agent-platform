@@ -15,6 +15,7 @@ import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { NativeToolExecutor } from '../src/types.js';
 import type { ToolAuditLogger } from '../src/audit/toolAuditLog.js';
 import { PathJail } from '../src/security/pathJail.js';
+import { BROWSER_TOOL_IDS } from '../src/tools/browserTools.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -607,6 +608,105 @@ describe('toolDispatchNode', () => {
         riskTier: 'high',
       }),
     );
+  });
+
+  it('creates durable approval requests for external browser URLs', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: BROWSER_TOOL_IDS.navigate,
+      data: { status: 'succeeded' },
+    });
+    const emitted: Output[] = [];
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(
+        makeApprovalRequest({
+          toolName: BROWSER_TOOL_IDS.navigate,
+          argsJson: '{"sessionId":"browser-session-1","url":"https://example.com"}',
+          riskTier: 'medium',
+        }),
+      ),
+    };
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      emitter: { emit: (event) => emitted.push(event), end: vi.fn() },
+      approvalRequests,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-approval',
+        runId: 'run-1',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [
+            {
+              id: 'tc-browser-url',
+              name: BROWSER_TOOL_IDS.navigate,
+              args: { sessionId: 'browser-session-1', url: 'https://example.com' },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(approvalRequests.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: BROWSER_TOOL_IDS.navigate,
+        args: { sessionId: 'browser-session-1', url: 'https://example.com' },
+        riskTier: 'medium',
+      }),
+    );
+    expect(emitted).toEqual([
+      expect.objectContaining({
+        type: 'approval_required',
+        toolName: BROWSER_TOOL_IDS.navigate,
+        riskTier: 'medium',
+        argsPreview: { sessionId: 'browser-session-1', url: 'https://example.com' },
+      }),
+    ]);
+    expect(result).toMatchObject({ halted: true, messages: [] });
+  });
+
+  it('marks external browser URL tool calls as approved when resuming', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: BROWSER_TOOL_IDS.navigate,
+      data: { status: 'succeeded' },
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent(),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvedToolCallIds: new Set(['tc-browser-url']),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    await node(
+      makeState({
+        sessionId: 'session-approval',
+        runId: 'run-1',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [
+            {
+              id: 'tc-browser-url',
+              name: BROWSER_TOOL_IDS.navigate,
+              args: { sessionId: 'browser-session-1', url: 'https://example.com' },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).toHaveBeenCalledWith(BROWSER_TOOL_IDS.navigate, {
+      sessionId: 'browser-session-1',
+      url: 'https://example.com',
+      approved: true,
+    });
   });
 
   it('gates registry tools that explicitly require approval', async () => {

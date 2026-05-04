@@ -136,6 +136,11 @@ the web service at `http://web:3001`. The default browser URL policy allowlists
 that Compose service hostname for local UI verification, while external domains
 still require approval.
 
+External browser start/navigation requests use the normal human-in-the-loop
+approval flow. The first attempt should render an approval card in chat; after
+approval, the session resume path reruns the browser action and captures the
+requested evidence.
+
 Troubleshooting:
 
 - If browser tools return `BROWSER_RUNTIME_UNAVAILABLE`, rebuild the API image

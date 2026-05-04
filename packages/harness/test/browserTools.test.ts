@@ -123,6 +123,25 @@ describe('browser tools', () => {
     }
   });
 
+  it('opens external URLs after durable approval resumes the browser action', async () => {
+    const page = makePage({ url: () => 'https://example.com/' });
+    const manager = new BrowserSessionManager({ driver: makeDriver(page) });
+    const result = await executeBrowserTool(
+      BROWSER_TOOL_IDS.start,
+      { url: 'https://example.com/', approved: true },
+      { manager },
+    );
+
+    expect(result?.type).toBe('tool_result');
+    if (result?.type === 'tool_result') {
+      expect(result.data.status).toBe('succeeded');
+      expect(result.data.policyDecision).toMatchObject({
+        state: 'allowed',
+        matchedRule: 'browser_url_approved',
+      });
+    }
+  });
+
   it('allows local navigation and captures bounded before and after evidence', async () => {
     await withWorkspace(async (workspaceRoot) => {
       let currentUrl = 'http://localhost:3001/';

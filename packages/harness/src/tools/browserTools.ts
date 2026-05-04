@@ -291,12 +291,14 @@ type StartOptions = {
   url?: string;
   viewport?: BrowserViewport;
   timeoutMs?: number;
+  approved?: boolean;
 };
 
 type NavigateOptions = {
   sessionId: string;
   url: string;
   timeoutMs?: number;
+  approved?: boolean;
 };
 
 type InteractionOptions = {
@@ -635,6 +637,18 @@ export class BrowserSessionManager {
     const pageState = await this.readPageState(stored.runtime.page, this.now());
     const policyDecision = evaluateBrowserUrlPolicy(pageState.url, this.policyProfile);
     if (policyDecision.state !== 'allowed') {
+      if (options.approved && policyDecision.state === 'approval_required') {
+        const after = await this.capturePageEvidence(
+          options.sessionId,
+          'After navigation',
+          DEFAULT_TEXT_BYTES,
+        );
+        return {
+          session: this.touch(stored, pageState, before.length + after.length),
+          evidence: [...before, ...after],
+          policyDecision: buildApprovedUrlDecision('navigate'),
+        };
+      }
       return {
         session: this.touch(stored, pageState, before.length),
         evidence: before,
@@ -919,6 +933,19 @@ function resultEnvelope(toolId: string, result: BrowserActionResult): Output {
   return toolResult(toolId, result as unknown as Record<string, unknown>);
 }
 
+function isApprovedUrlPolicyOverride(args: Record<string, unknown>): boolean {
+  return args.approved === true;
+}
+
+function buildApprovedUrlDecision(kind: string): BrowserPolicyDecision {
+  return {
+    state: 'allowed',
+    riskTier: 'medium',
+    reasons: [`Human approved browser ${kind} for an external URL`],
+    matchedRule: 'browser_url_approved',
+  };
+}
+
 async function handleStart(
   toolId: string,
   args: Record<string, unknown>,
@@ -929,7 +956,10 @@ async function handleStart(
   const sessionId = stringArg(args, 'sessionId');
   if (url) {
     const policyDecision = evaluateBrowserUrlPolicy(url);
-    if (policyDecision.state !== 'allowed') {
+    if (
+      policyDecision.state === 'denied' ||
+      (policyDecision.state !== 'allowed' && !isApprovedUrlPolicyOverride(args))
+    ) {
       return resultEnvelope(
         toolId,
         buildResult({
@@ -949,6 +979,7 @@ async function handleStart(
       sessionId: sessionId || undefined,
       url: url || undefined,
       timeoutMs: typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined,
+      approved: isApprovedUrlPolicyOverride(args),
     });
     return resultEnvelope(
       toolId,
@@ -956,7 +987,10 @@ async function handleStart(
         kind: 'start',
         sessionId: session.id,
         status: 'succeeded',
-        policyDecision: buildAllowedDecision('start'),
+        policyDecision:
+          url && isApprovedUrlPolicyOverride(args)
+            ? buildApprovedUrlDecision('start')
+            : buildAllowedDecision('start'),
         page: session.page,
         startedAtMs,
         completedAtMs: Date.now(),
@@ -989,7 +1023,10 @@ async function handleNavigate(
   const sessionId = stringArg(args, 'sessionId');
   const url = stringArg(args, 'url');
   const policyDecision = evaluateBrowserUrlPolicy(url);
-  if (policyDecision.state !== 'allowed') {
+  if (
+    policyDecision.state === 'denied' ||
+    (policyDecision.state !== 'allowed' && !isApprovedUrlPolicyOverride(args))
+  ) {
     return resultEnvelope(
       toolId,
       buildResult({
@@ -1008,6 +1045,7 @@ async function handleNavigate(
       sessionId,
       url,
       timeoutMs: typeof args.timeoutMs === 'number' ? args.timeoutMs : undefined,
+      approved: isApprovedUrlPolicyOverride(args),
     });
     if (!navigation) {
       return unavailableSessionResult(toolId, 'navigate', sessionId, startedAtMs);

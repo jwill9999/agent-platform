@@ -110,7 +110,14 @@ function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
 }
 
 type TestDb = ReturnType<typeof openDatabase>['db'];
-type ChatEvent = { type: string; approvalRequestId?: string; code?: string; message?: string };
+type ChatEvent = {
+  type: string;
+  approvalRequestId?: string;
+  toolName?: string;
+  riskTier?: string;
+  code?: string;
+  message?: string;
+};
 
 function parseNdjsonEvents(text: string): ChatEvent[] {
   return String(text)
@@ -379,6 +386,38 @@ describe('POST /v1/chat (session-aware)', () => {
         { id: 'tc-approval', name: 'sys_bash', args: { command: 'date' } },
       ]);
       await expectToolExecutionCount(db, sessionId, 'pending', 1);
+      await expectToolExecutionCount(db, sessionId, 'success', 0);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('streams approval_required for external browser URLs before execution', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionId = await createDefaultSession(app);
+      mockToolCallStream('sys_browser_start', { url: 'https://example.com' });
+      const chatRes = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Open example.com' })
+        .expect(200);
+
+      const events = parseNdjsonEvents(chatRes.text);
+      const approvalEvent = events.find((event) => event.type === 'approval_required');
+      expect(approvalEvent).toMatchObject({
+        type: 'approval_required',
+        toolName: 'sys_browser_start',
+        riskTier: 'medium',
+      });
+
+      const { listApprovalRequests } = await import('@agent-platform/db');
+      expect(
+        listApprovalRequests(db, { sessionId, status: 'pending', limit: 10, offset: 0 }),
+      ).toHaveLength(1);
       await expectToolExecutionCount(db, sessionId, 'success', 0);
     } finally {
       restoreChatEnv(envSnap);

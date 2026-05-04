@@ -6,6 +6,7 @@ import type {
   Skill,
   Tool as ContractTool,
 } from '@agent-platform/contracts';
+import { evaluateBrowserUrlPolicy } from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
@@ -22,6 +23,7 @@ import { validateBashWorkspacePolicy } from '../security/bashWorkspacePolicy.js'
 import { ToolRateLimiter } from '../security/rateLimiter.js';
 import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
 import { CODING_APPLY_PATCH_ID } from '../tools/index.js';
+import { BROWSER_TOOL_IDS } from '../tools/browserTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
 import { scanOutput } from '../security/outputGuard.js';
@@ -312,6 +314,29 @@ function parseArgsPreview(argsJson: string): unknown {
   } catch {
     return {};
   }
+}
+
+function stringArgValue(args: Record<string, unknown>, key: string): string | undefined {
+  const value = args[key];
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function browserUrlApprovalReason(call: ToolCallIntent): string | undefined {
+  if (call.name !== BROWSER_TOOL_IDS.start && call.name !== BROWSER_TOOL_IDS.navigate) {
+    return undefined;
+  }
+  const url = stringArgValue(call.args, 'url');
+  if (!url) return undefined;
+  const decision = evaluateBrowserUrlPolicy(url);
+  if (decision.state !== 'approval_required') return undefined;
+  return decision.reasons.at(0) ?? 'Browser URL policy requires human approval.';
+}
+
+function markBrowserUrlApproved(call: ToolCallIntent): ToolCallIntent {
+  if (call.name !== BROWSER_TOOL_IDS.start && call.name !== BROWSER_TOOL_IDS.navigate) {
+    return call;
+  }
+  return { ...call, args: { ...call.args, approved: true } };
 }
 
 async function createApprovalRequiredOutput(
@@ -837,8 +862,63 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
 
       const toolMetadata = resolveToolMetadata(safeCall, ctx);
-      const approval = evaluateApprovalPolicy(toolMetadata);
       const approvedForResume = ctx.approvedToolCallIds?.has(safeCall.id) ?? false;
+      const browserUrlReason = browserUrlApprovalReason(safeCall);
+      if (browserUrlReason && !approvedForResume) {
+        const output = ctx.approvalRequests
+          ? await createApprovalRequiredOutput(ctx, state, safeCall, 'medium', browserUrlReason)
+          : buildApprovalRequiredOutput(safeCall, browserUrlReason);
+
+        await emitToolOutput(ctx, output);
+        traceEvents.push({
+          type: 'tool_approval_required',
+          toolId: safeCall.name,
+          step,
+          riskTier: 'medium',
+        });
+        traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok: false });
+
+        if (!ctx.approvalRequests) {
+          ctx.auditLog?.logDenied(
+            safeCall.name,
+            safeCall.args,
+            ctx.agent.id,
+            state.sessionId ?? '',
+            browserUrlReason,
+            'medium',
+          );
+          toolMessages.push({
+            role: 'tool',
+            toolCallId: safeCall.id,
+            toolName: safeCall.name,
+            content: outputToContent(safeCall.name, output),
+          });
+          continue;
+        }
+
+        ctx.auditLog?.logPendingApproval(
+          safeCall.name,
+          safeCall.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          'medium',
+        );
+
+        return {
+          halted: true,
+          llmOutput: null,
+          messages: toolMessages,
+          trace: traceEvents,
+          totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+          totalToolCalls: toolCallCount,
+        };
+      }
+
+      if (approvedForResume) {
+        safeCall = markBrowserUrlApproved(safeCall);
+      }
+
+      const approval = evaluateApprovalPolicy(toolMetadata);
       if (approval.required && !approvedForResume) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
