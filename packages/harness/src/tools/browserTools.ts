@@ -37,7 +37,7 @@ const DEFAULT_VIEWPORT: BrowserViewport = {
   isMobile: false,
 };
 const DEFAULT_TEXT_BYTES = 200_000;
-const DEFAULT_SCREENSHOT_BYTES = 2_000_000;
+const DEFAULT_SCREENSHOT_BYTES = 12_000_000;
 const DEFAULT_BROWSER_TEMP_SUBDIR = '.agent-platform/tmp/browser';
 
 export const BROWSER_TOOL_IDS = {

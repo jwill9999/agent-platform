@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Corrected full-page browser screenshot handling on `task/agent-platform-browser-tools.5`: the viewer now opens in fit-page mode with opt-in fit-width/zoom, chat previews are scrollable instead of cropped, and default screenshot artifacts now keep multi-megabyte PNGs intact instead of truncating at 2 MB.
+- **Date:** 2026-05-04
 - **Session:** Improved browser screenshot viewing on `task/agent-platform-browser-tools.5`: full-page screenshots now render as cropped readable thumbnails in chat and open into a width-filling, scrollable in-chat viewer with zoom controls.
 - **Date:** 2026-05-04
 - **Session:** Fixed the browser runtime `ENOSPC` launch failure path on `task/agent-platform-browser-tools.5`: Docker build cache had filled the container overlay, cache was pruned, and Playwright temp profiles now default to the host-backed workspace temp directory instead of container `/tmp`.
@@ -260,6 +262,36 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Browser screenshot full-page handling corrected
+
+Branch state: `task/agent-platform-browser-tools.5` has an additional follow-up fix pending commit.
+
+- Reviewed owner screenshots showing that the previous chat thumbnail still cropped full-page screenshots and the modal felt zoomed in because it defaulted to fit-width.
+- Identified a deeper capture-side issue: the screenshot artifact was marked `truncated`, so the PNG itself could be cut at the 2 MB default cap before the UI ever received it.
+- Changed chat previews to use a full-width, scrollable screenshot area instead of `object-cover` cropping.
+- Changed the modal to open in fit-page mode first, so the whole screenshot is visible before the user chooses fit-width or zoom.
+- Kept fit-width and 100-200% zoom controls for detailed inspection.
+- Raised the default screenshot artifact limit from 2 MB to 12 MB and added regression coverage proving a 2.2 MB screenshot is stored intact by default.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/web run build`
+- `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/harness run build`
+- `pnpm format:check`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP was not exposed in the current tool surface.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with affected web/harness typecheck, lint, tests, builds, formatting, and diff whitespace checks.
 
 ### Browser screenshot viewer improved
 
@@ -780,8 +812,8 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-browser-tools.5`
 - **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4` -> `.5`
-- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up fixes cover approved-browser-session continuity, Playwright temp storage under Docker, and full-page screenshot viewing.
-- **Remote sync:** pending commit/push for the screenshot viewer fix and this session handoff update.
+- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up fixes cover approved-browser-session continuity, Playwright temp storage under Docker, and full-page screenshot capture/viewing.
+- **Remote sync:** pending commit/push for the full-page screenshot handling fix and this session handoff update.
 
 ### Beads
 
@@ -806,6 +838,17 @@ Quality gates passed:
 
 ### Quality
 
+- Latest full-page browser screenshot handling gates passed:
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run test`
+  - `pnpm --filter @agent-platform/web run build`
+  - `pnpm --filter @agent-platform/harness exec vitest run test/browserTools.test.ts`
+  - `pnpm --filter @agent-platform/harness run typecheck`
+  - `pnpm --filter @agent-platform/harness run lint`
+  - `pnpm --filter @agent-platform/harness run build`
+  - `pnpm format:check`
+  - `git diff --check`
 - Latest browser screenshot viewer gates passed:
   - `pnpm --filter @agent-platform/web run typecheck`
   - `pnpm --filter @agent-platform/web run lint`
@@ -856,10 +899,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the screenshot viewer fix plus `session.md` handoff update.
-2. Ask the owner to manually retest a full-page external screenshot; the chat thumbnail should be readable and the modal should fill width with vertical scrolling.
-3. Rebuild/restart the API container when convenient so Compose applies `AGENT_BROWSER_TMPDIR` and `TMPDIR`.
-4. Watch PR #137 pipelines and address any feedback.
+1. Commit and push the full-page screenshot handling fix plus `session.md` handoff update.
+2. Ask the owner to capture a new external full-page screenshot; existing truncated artifacts cannot be repaired retroactively.
+3. In the viewer, confirm the modal opens with the whole screenshot visible, then use fit-width/zoom only when inspecting details.
+4. Rebuild/restart the API container when convenient so Compose applies `AGENT_BROWSER_TMPDIR` and `TMPDIR`.
+5. Watch PR #137 pipelines and address any feedback.
 
 ---
 

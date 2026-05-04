@@ -21,6 +21,8 @@ type PreviewArtifact = BrowserToolArtifactPreview & {
   pageUrl?: string;
 };
 
+type ViewMode = 'page' | 'width' | 'zoom';
+
 const MIN_ZOOM = 100;
 const MAX_ZOOM = 200;
 const ZOOM_STEP = 25;
@@ -48,17 +50,33 @@ function browserImageArtifacts(events: readonly ToolTraceEvent[]): PreviewArtifa
 export function BrowserArtifactPreviews({ events }: Props) {
   const artifacts = useMemo(() => browserImageArtifacts(events), [events]);
   const [selected, setSelected] = useState<PreviewArtifact | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('page');
   const [zoomPercent, setZoomPercent] = useState(100);
 
   if (artifacts.length === 0) return null;
 
   const openArtifact = (artifact: PreviewArtifact) => {
     setSelected(artifact);
+    setViewMode('page');
     setZoomPercent(100);
   };
 
-  const zoomOut = () => setZoomPercent((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP));
-  const zoomIn = () => setZoomPercent((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP));
+  const zoomOut = () => {
+    setViewMode('zoom');
+    setZoomPercent((value) => Math.max(MIN_ZOOM, value - ZOOM_STEP));
+  };
+  const zoomIn = () => {
+    setViewMode('zoom');
+    setZoomPercent((value) => Math.min(MAX_ZOOM, value + ZOOM_STEP));
+  };
+  const showFitPage = () => {
+    setViewMode('page');
+    setZoomPercent(100);
+  };
+  const showFitWidth = () => {
+    setViewMode('width');
+    setZoomPercent(100);
+  };
 
   return (
     <>
@@ -71,13 +89,13 @@ export function BrowserArtifactPreviews({ events }: Props) {
             <button
               type="button"
               onClick={() => openArtifact(artifact)}
-              className="block h-56 w-full cursor-zoom-in overflow-hidden bg-muted/30 text-left"
+              className="block max-h-[420px] w-full cursor-zoom-in overflow-auto bg-muted/30 text-left"
               aria-label={`Open ${artifact.label}`}
             >
               <img
                 src={artifact.previewHref}
                 alt={artifact.label}
-                className="h-auto min-h-full w-full object-cover object-top"
+                className="block h-auto w-full"
               />
             </button>
             <figcaption className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
@@ -110,17 +128,33 @@ export function BrowserArtifactPreviews({ events }: Props) {
                 </div>
                 <Button
                   type="button"
+                  variant={viewMode === 'page' ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={showFitPage}
+                >
+                  Fit page
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === 'width' ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={showFitWidth}
+                >
+                  Fit width
+                </Button>
+                <Button
+                  type="button"
                   variant="outline"
                   size="icon-sm"
                   onClick={zoomOut}
-                  disabled={zoomPercent <= MIN_ZOOM}
+                  disabled={viewMode === 'page' || zoomPercent <= MIN_ZOOM}
                   aria-label="Zoom out"
                   title="Zoom out"
                 >
                   <ZoomOut className="h-4 w-4" />
                 </Button>
                 <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
-                  {zoomPercent}%
+                  {viewMode === 'page' ? 'Fit' : viewMode === 'width' ? 'Width' : `${zoomPercent}%`}
                 </span>
                 <Button
                   type="button"
@@ -137,26 +171,36 @@ export function BrowserArtifactPreviews({ events }: Props) {
                   type="button"
                   variant="outline"
                   size="icon-sm"
-                  onClick={() => setZoomPercent(100)}
-                  disabled={zoomPercent === 100}
+                  onClick={showFitPage}
+                  disabled={viewMode === 'page'}
                   aria-label="Reset zoom"
-                  title="Reset zoom"
+                  title="Fit page"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="min-h-0 overflow-auto bg-muted/40 p-4">
-                <div
-                  className="mx-auto min-w-full"
-                  style={{ width: `${Math.max(100, zoomPercent)}%` }}
-                >
+              {viewMode === 'page' ? (
+                <div className="flex min-h-0 items-start justify-center overflow-auto bg-muted/40 p-4">
                   <img
                     src={selected.previewHref}
                     alt={selected.label}
-                    className="block h-auto w-full max-w-none rounded-sm bg-background shadow-sm"
+                    className="block max-h-full max-w-full rounded-sm bg-background object-contain shadow-sm"
                   />
                 </div>
-              </div>
+              ) : (
+                <div className="min-h-0 overflow-auto bg-muted/40 p-4">
+                  <div
+                    className="mx-auto min-w-full"
+                    style={{ width: `${viewMode === 'width' ? 100 : zoomPercent}%` }}
+                  >
+                    <img
+                      src={selected.previewHref}
+                      alt={selected.label}
+                      className="block h-auto w-full max-w-none rounded-sm bg-background shadow-sm"
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
         </DialogContent>

@@ -299,6 +299,34 @@ describe('browser tools', () => {
     });
   });
 
+  it('keeps multi-megabyte screenshots intact by default', async () => {
+    await withWorkspace(async (workspaceRoot) => {
+      const screenshot = Buffer.alloc(2_200_000, 1);
+      const page = makePage({ screenshot: vi.fn(async () => screenshot) });
+      const manager = new BrowserSessionManager({ driver: makeDriver(page), workspaceRoot });
+      const start = await manager.start({ url: 'http://localhost:3001/' });
+      const result = await executeBrowserTool(
+        BROWSER_TOOL_IDS.screenshot,
+        { sessionId: start.id },
+        { manager },
+      );
+
+      expect(result?.type).toBe('tool_result');
+      if (result?.type === 'tool_result') {
+        const [artifact] = result.data.evidence;
+        expect(artifact).toMatchObject({
+          kind: 'screenshot',
+          truncated: false,
+          sizeBytes: screenshot.byteLength,
+          maxBytes: 12_000_000,
+        });
+        await expect(stat(String(artifact.uri))).resolves.toMatchObject({
+          size: screenshot.byteLength,
+        });
+      }
+    });
+  });
+
   it('clicks a safe local target through a user-facing locator', async () => {
     await withWorkspace(async (workspaceRoot) => {
       const locator = makeLocator();
