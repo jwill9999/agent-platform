@@ -1018,3 +1018,10 @@ Tracked in Beads: `agent-platform-lt6`
 - Cleaned Sonar code-smell findings: nested ternary labels/actions, in-place sort in response construction, repeated `push`, redundant role assertion, and `filter().at(0)`.
 - Verification completed: `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `git diff --check`, focused browser/contract tests, browser integration test with local-server escalation, and full `pnpm test` with local-server escalation all pass.
 - SonarQube CLI file-level `sonar verify` could not run because SonarCloud returned `403` for A3S analysis not being activated in the organization; final Sonar status requires the pushed PR analysis rerun.
+
+## 2026-05-05 Skill Authoring Direction
+
+- Created Beads epic `agent-platform-skill-authoring` with spec `docs/tasks/agent-platform-skill-authoring.md`.
+- Direction: move beyond DB-backed skill prompt records toward governed skill packages that may include instructions, tool dependencies, scripts, references, assets, examples, tests, and policy metadata.
+- Product goal: users describe the desired capability in natural language, then an agent collaborates with them to design, scaffold, validate, and activate the skill under harness security and approval constraints.
+- Key constraint: skill-owned scripts/functions must not bypass sandboxing, path jail, approval, observability, or capability assignment controls.

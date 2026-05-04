@@ -81,6 +81,7 @@ Spec: docs/tasks/<issue-id>.md
 | Scheduler               | `agent-platform-scheduler`               | child specs pending                         |
 | Multi-agent             | `agent-platform-multi-agent`             | child specs pending                         |
 | Capability registry     | `agent-platform-capability-registry`     | child specs pending                         |
+| Skill authoring         | `agent-platform-skill-authoring`         | child specs pending                         |
 | Feedback sensors        | `agent-platform-feedback-sensors`        | `agent-platform-feedback-sensors.{1-6}.md`  |
 | UI quality sensors      | `agent-platform-ui-quality-sensors`      | child specs pending                         |
 | Session handoff hygiene | `agent-platform-session-handoff-hygiene` | `agent-platform-session-handoff-hygiene.md` |
