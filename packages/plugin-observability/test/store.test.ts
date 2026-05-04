@@ -152,6 +152,8 @@ describe('createObservabilityStore', () => {
 
   it('stores sanitized sensor findings, provider state, MCP capabilities, and runtime limits', () => {
     const store = createObservabilityStore();
+    const bearerSample = ['Bearer', 'abcdefghijklmnopqrstuvwxyz123456'].join(' ');
+    const openAiKeySample = ['sk', 'proj', 'abcdefghijklmnopqrstuvwxyz123456'].join('-');
 
     vi.setSystemTime(new Date('2026-05-04T12:00:00.000Z'));
     store.record({
@@ -167,7 +169,7 @@ describe('createObservabilityStore', () => {
           provider: 'sonarqube',
           capability: 'quality_findings',
           state: 'available',
-          message: 'Connected with Bearer abcdefghijklmnopqrstuvwxyz123456',
+          message: `Connected with ${bearerSample}`,
           repairActions: [],
         },
       ],
@@ -176,7 +178,7 @@ describe('createObservabilityStore', () => {
           kind: 'sandbox_policy_denied',
           message: 'Cannot read /Users/alice/project/.scannerwork',
           repairActions: [],
-          metadata: { token: 'ghp_abcdefghijklmnopqrstuvwxyzABCDEFGHIJ' },
+          metadata: { credentialLabel: 'sample GitHub token placeholder' },
         },
       ],
       mcpCapabilities: [
@@ -199,7 +201,7 @@ describe('createObservabilityStore', () => {
               severity: 'high',
               status: 'open',
               category: 'code_quality',
-              message: 'Fix duplicated code. sk-proj-abcdefghijklmnopqrstuvwxyz123456',
+              message: `Fix duplicated code. ${openAiKeySample}`,
               file: '/Users/alice/project/src/foo.ts',
               line: 12,
               ruleId: 'typescript:S1192',

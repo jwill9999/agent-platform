@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { SensorFinding } from '@agent-platform/contracts';
+import type { Output, SensorFinding } from '@agent-platform/contracts';
 import {
   runFeedbackSensors,
   runInferentialSensors,
   type InferentialSensorEvaluator,
 } from '../src/sensors/inferentialSensorRunner.js';
 import { QUALITY_GATE_TOOL_ID } from '../src/tools/qualityGateTool.js';
-import type { Output } from '@agent-platform/contracts';
 
 function qualityGateOutput(ok: boolean): Output {
   return {
