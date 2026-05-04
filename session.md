@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Merged `origin/main` into `task/agent-platform-feedback-sensors.6`, resolved conflicts in Beads interactions, `sessionsRouter`, and `session.md`, and verified the refreshed branch with focused API checks plus root typecheck/lint.
+- **Date:** 2026-05-04
 - **Session:** Completed and closed `agent-platform-feedback-sensors.6` on `task/agent-platform-feedback-sensors.6`: exposed session sensor dashboards through API/contracts, moved sensor status into a right-side feedback drawer, added API/E2E coverage, created follow-up epic `agent-platform-branch-feedback-status`, opened PR #134 to `feature/feedback-sensors-harness`, and pushed through the pre-push gate.
 - **Date:** 2026-05-04
 - **Session:** Claimed `agent-platform-feedback-sensors.6` and created `task/agent-platform-feedback-sensors.6` from the pushed `.5` branch tip. Next work: expose sensor configuration/results/provider/runtime states through API/UI and add end-to-end validation for self-correction and completion gates.
@@ -43,6 +45,14 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added IDE/plugin feedback-provider requirements to the feedback-sensors specs, including bounded terminal-output ingestion, diagnostics/problem providers, setup guidance, and provider availability states.
 - **Date:** 2026-05-03
 - **Session:** Refined `agent-platform-feedback-sensors` specs after owner review to make sensors source-aware, cadence-aware, provider-auth-aware, and focused on pre-push local validation plus post-push GitHub/SonarQube/CodeQL/review feedback import.
+- **Date:** 2026-05-03
+- **Session:** Confirmed `agent-platform-scheduler` is already closed in Beads, then claimed the next planned epic `agent-platform-feedback-sensors`. Child tasks `.1` through `.6` already exist with specs; implementation should wait for owner refinement before claiming `.1`.
+- **Date:** 2026-05-03
+- **Session:** README was checked after the docs audit and updated with a concise current-capabilities section plus a link to the implemented Memory Model guide.
+- **Date:** 2026-05-03
+- **Session:** Audited and updated feature documentation after the scheduler/feedback-sensors merge: README now links the Scheduler guide; API docs include scheduler delete/update details and local timezone behaviour; database docs cover projects, memory, working memory, HITL approvals, and scheduler tables/migrations; scheduler docs cover edit/delete/manual refresh behaviour.
+- **Date:** 2026-05-03
+- **Session:** Feedback-sensors planning branch was merged to `main`; local `main` is updated and old feature/task branches were pruned. No implementation task is active. Pause here until the owner is ready to refine and claim the first feedback-sensors task.
 - **Date:** 2026-05-03
 - **Session:** Added follow-up Beads task `agent-platform-session-handoff-hygiene` with a spec for capping/rotating `session.md`; linked it as a dependency of `agent-platform-context-optimisation`.
 - **Date:** 2026-05-03
@@ -239,7 +249,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ### Sensor controls and right feedback drawer completed
 
-Branch state: `task/agent-platform-feedback-sensors.6` contains the final feedback-sensors task.
+Branch state: `task/agent-platform-feedback-sensors.6` contains the final feedback-sensors task and has been refreshed with `origin/main`.
+
+- Preserved the scheduler/project work and documentation updates merged to `main`.
+- Preserved the feedback-sensors implementation branch work on top of the refreshed mainline.
 
 - Added shared `SensorDashboardResponse` contracts for session-scoped sensor dashboards, MCP capability availability, repeated-failure patterns, feedback candidates, setup guidance, and status summaries.
 - Added `GET /v1/sessions/:id/sensors` and `POST /v1/sessions/:id/sensors/retry`.
@@ -553,10 +566,9 @@ Quality gates passed:
 ### Git
 
 - **Current branch:** `task/agent-platform-feedback-sensors.6`
-- **Current base:** `feature/feedback-sensors-harness`
-- **Latest task commit:** `5f8b81e Expose sensor feedback drawer`; `session.md` still needs a follow-up commit after this handoff update.
-- **Current work:** `.6` implementation is complete and Beads is closed locally. Branch still needs this handoff commit and push.
-- **Remote sync:** branch tracks `origin/task/agent-platform-feedback-sensors.6`; latest `.6` implementation commit is local until pushed.
+- **Current base:** refreshed with `origin/main`
+- **Current work:** `.6` implementation is complete, Beads is closed locally, and PR #134 is open to `feature/feedback-sensors-harness`.
+- **Remote sync:** branch tracks `origin/task/agent-platform-feedback-sensors.6`; merge-from-main resolution is ready to commit and push.
 
 ### Beads
 
@@ -583,13 +595,14 @@ Quality gates passed:
   - focused API sensor dashboard integration test
   - focused Playwright sensor drawer test
 - `pnpm docs:lint` is blocked by ignored generated workspace content under `.agent-platform`; tracked docs pass with `.agent-platform` excluded.
+- After the `main` merge, focused API/contracts checks plus root typecheck/lint passed.
 
 ---
 
 ## Next (priority order)
 
-1. Commit this `session.md` handoff update and push `task/agent-platform-feedback-sensors.6`.
-2. Open or refresh the PR from `task/agent-platform-feedback-sensors.6` to `feature/feedback-sensors-harness`.
+1. Commit and push the `origin/main` merge into `task/agent-platform-feedback-sensors.6`.
+2. Confirm PR #134 updates cleanly after push and let CI run.
 3. Ask the owner to run `bd dolt push` or rerun Beads sync when GitHub DNS/auth is available.
 4. Schedule refinement for `agent-platform-branch-feedback-status` before breaking it into implementation tasks.
 
@@ -599,6 +612,7 @@ Quality gates passed:
 
 - SonarQube MCP tools and IDE Problems were not exposed in this session; fallback typecheck/lint/test/E2E gates passed.
 - Beads Dolt auto-push failed due GitHub DNS/auth from the sandbox; push the git branch normally and sync Beads/Dolt when network/auth is available.
+- SonarQube CLI issue listing is blocked until the owner completes `sonar auth login -o jwill9999`.
 
 ---
 

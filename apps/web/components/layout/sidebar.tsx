@@ -20,6 +20,7 @@ import {
   History,
   FolderOpen,
   Brain,
+  CalendarClock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './sidebar-context';
@@ -83,6 +84,12 @@ const settingsNavigation = [
     href: '/settings/memory',
     icon: Brain,
     description: 'Review memories',
+  },
+  {
+    name: 'Scheduler',
+    href: '/settings/scheduler',
+    icon: CalendarClock,
+    description: 'Manage background jobs',
   },
   {
     name: 'MCP Servers',

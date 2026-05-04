@@ -2,12 +2,14 @@ import { SessionCreateBodySchema, SessionRecordSchema } from '@agent-platform/co
 import {
   createSession,
   deleteSession,
+  findProject,
   getAgent,
   getWorkingMemoryArtifact,
   getSession,
   listMessagesBySession,
   listSessions,
   replaceSession,
+  updateSessionProject,
 } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
@@ -130,6 +132,21 @@ export function createSessionsRouter(
       }
       replaceSession(db, record);
       res.json({ data: record });
+    }),
+  );
+
+  router.put(
+    '/:id/project',
+    asyncHandler(async (req, res) => {
+      const id = requireParam(req.params, 'id');
+      const body = parseBody(SessionRecordSchema.pick({ projectId: true }).partial(), req.body);
+      const session = getSession(db, id);
+      if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
+      if (body.projectId && !findProject(db, body.projectId)) {
+        throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      }
+      updateSessionProject(db, id, body.projectId ?? null);
+      res.json({ data: getSession(db, id) });
     }),
   );
 

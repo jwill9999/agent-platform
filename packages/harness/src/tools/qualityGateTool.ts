@@ -75,6 +75,7 @@ export const QUALITY_GATE_TOOLS: readonly ContractTool[] = [
 
 type QualityGateOptions = {
   workspaceRoot?: string;
+  defaultRepoPath?: string;
   pnpmBin?: string;
 };
 
@@ -149,9 +150,8 @@ async function resolveRepoPath(
   options?: QualityGateOptions,
 ): Promise<string> {
   const workspaceRoot = await realpath(options?.workspaceRoot ?? process.cwd());
-  const candidate = isAbsolute(inputRepoPath)
-    ? inputRepoPath
-    : resolve(workspaceRoot, inputRepoPath);
+  const requested = inputRepoPath || options?.defaultRepoPath || '.';
+  const candidate = isAbsolute(requested) ? requested : resolve(workspaceRoot, requested);
 
   try {
     await access(candidate, constants.R_OK);
@@ -354,7 +354,10 @@ async function handleRunQualityGate(
   const startedAtMs = Date.now();
   try {
     const input = CodingRunQualityGateInputSchema.parse(args);
-    const repoPath = await resolveRepoPath(input.repoPath, options);
+    const repoPath = await resolveRepoPath(
+      typeof args.repoPath === 'string' ? input.repoPath : '',
+      options,
+    );
     const packageName = await normalizePackageName(repoPath, input.packageName);
     const command = buildCommand(input.profile, packageName, resolvePnpmBin(options?.pnpmBin));
     const timeoutMs = Math.min(input.timeoutMs ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);

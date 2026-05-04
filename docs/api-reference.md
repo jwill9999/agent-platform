@@ -82,6 +82,18 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `DELETE /v1/memories/:id`                  |    ✅    |       ✅        | Delete a memory record                       |
 | `POST /v1/memories/clear`                  |    ✅    |       ✅        | Explicit clear-by-scope memory action        |
 | `POST /v1/memories/self-learning/evaluate` |    —     |       ✅        | Generate review-gated self-learning proposal |
+| `GET /v1/scheduler`                        |    ✅    |       ✅        | Scheduler dashboard list/filter              |
+| `POST /v1/scheduler`                       |    ✅    |       ✅        | Create a scheduled job                       |
+| `GET /v1/scheduler/:id`                    |    ✅    |       ✅        | Scheduler dashboard detail                   |
+| `PUT /v1/scheduler/:id`                    |    ✅    |       ✅        | Update a scheduled job                       |
+| `DELETE /v1/scheduler/:id`                 |    ✅    |       ✅        | Delete a scheduled job and run history       |
+| `POST /v1/scheduler/:id/pause`             |    ✅    |       ✅        | Pause a scheduled job                        |
+| `POST /v1/scheduler/:id/resume`            |    ✅    |       ✅        | Resume a scheduled job                       |
+| `POST /v1/scheduler/:id/run`               |    ✅    |       ✅        | Request an immediate run                     |
+| `GET /v1/scheduler/:id/runs`               |    ✅    |       ✅        | List run attempts for a job                  |
+| `GET /v1/scheduler/runs/:runId`            |    ✅    |       ✅        | Get one run attempt                          |
+| `POST /v1/scheduler/runs/:runId/cancel`    |    ✅    |       ✅        | Request cancellation for a running attempt   |
+| `GET /v1/scheduler/runs/:runId/logs`       |    ✅    |       ✅        | Inspect bounded run logs and notifications   |
 | `GET /v1/model-configs`                    |    ✅    |       ✅        | Model configs dashboard                      |
 | `POST /v1/model-configs`                   |    ✅    |       ✅        | Model configs dashboard — create             |
 | `PUT /v1/model-configs/:id`                |    ✅    |       ✅        | Model configs dashboard — edit               |
@@ -334,6 +346,31 @@ Body schema: `SessionCreateBodySchema` — requires `agentId`. Agent must exist 
 Review requests use `{ "decision": "approved" | "rejected", "reason"?: "..." }`. Clear requests require `{ "scope": "...", "scopeId"?: "...", "confirm": true }` and may include status/review/safety filters. Cleanup requests target expired memories only; they default to dry-run and require `{ "dryRun": false, "confirm": true }` before deletion. Destructive memory operations are logged without memory content.
 
 `POST /v1/memories/self-learning/evaluate` currently supports the narrow `recoverable_workspace_path_errors` objective. It combines supplied observed outcomes, recent observability errors for the session, and pending failure candidates. If the configured threshold is reached, it creates a `pending` / `unreviewed` `failure_learning` memory tagged `self-learning`; it does not create Beads tasks, code changes, policy changes, or prompt changes. Approval still happens through the normal memory review endpoint/UI.
+
+### Scheduler
+
+| Method   | Path                               | Description                                      |
+| -------- | ---------------------------------- | ------------------------------------------------ |
+| `GET`    | `/v1/scheduler`                    | List scheduled jobs with scope/status filters    |
+| `POST`   | `/v1/scheduler`                    | Create a scheduled job                           |
+| `GET`    | `/v1/scheduler/:id`                | Get one scheduled job                            |
+| `PUT`    | `/v1/scheduler/:id`                | Update name, instructions, schedule, or metadata |
+| `DELETE` | `/v1/scheduler/:id`                | Delete a job and its runs/logs                   |
+| `POST`   | `/v1/scheduler/:id/pause`          | Pause a scheduled job                            |
+| `POST`   | `/v1/scheduler/:id/resume`         | Resume a scheduled job                           |
+| `POST`   | `/v1/scheduler/:id/run`            | Mark a job due for immediate execution           |
+| `GET`    | `/v1/scheduler/:id/runs`           | List run attempts for a job                      |
+| `GET`    | `/v1/scheduler/runs/:runId`        | Get one run attempt                              |
+| `POST`   | `/v1/scheduler/runs/:runId/cancel` | Request best-effort cancellation                 |
+| `GET`    | `/v1/scheduler/runs/:runId/logs`   | Inspect bounded logs and notification entries    |
+
+Jobs support `one_off`, `delayed`, and interval-based `recurring` schedules. The local API-owned scheduler is enabled by default and can be disabled with `SCHEDULER_ENABLED=false`. Poll and lease timing can be tuned with `SCHEDULER_POLL_INTERVAL_MS` and `SCHEDULER_LEASE_MS`.
+
+Create and update requests accept user-facing job fields such as `name`, `description`, `instructions`, `scheduleType`, `runAtMs`, `intervalMs`, `timezone`, `status`, retry policy, timeout, and metadata. The Settings Scheduler UI uses the browser/system timezone when creating and editing jobs. `DELETE /v1/scheduler/:id` removes the scheduled job and cascades its persisted run/log history.
+
+Built-in scheduled targets are deliberately narrow. `scheduler.noop` is the default smoke-test target, and `memory.cleanup_expired.dry_run` reports expired-memory cleanup matches without deleting records. Destructive memory cleanup still requires the explicit `/v1/memories/cleanup` confirmation path. Unsupported `agent_turn` scheduler targets fail closed until routed through the normal agent/HITL policy path.
+
+Terminal run states emit durable notification log entries visible through `/v1/scheduler/runs/:runId/logs` and the Settings Scheduler page. Current notification kinds are `scheduler.job_succeeded`, `scheduler.job_failed`, `scheduler.job_cancelled`, and `scheduler.job_retry_exhausted`.
 
 ### Chat
 

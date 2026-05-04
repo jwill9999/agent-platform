@@ -7,6 +7,7 @@ const links = [
   { href: '/settings/tools', label: 'Tools' },
   { href: '/settings/workspace', label: 'Workspace' },
   { href: '/settings/memory', label: 'Memory' },
+  { href: '/settings/scheduler', label: 'Scheduler' },
   { href: '/settings/sessions', label: 'Sessions' },
   { href: '/settings/plugins', label: 'Plugins' },
   { href: '/settings/models', label: 'Models' },

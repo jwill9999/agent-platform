@@ -131,6 +131,7 @@ export const REPO_DISCOVERY_TOOLS: readonly ContractTool[] = [
 
 type RepoDiscoveryOptions = {
   workspaceRoot?: string;
+  defaultRepoPath?: string;
 };
 
 type WalkEntry = {
@@ -167,9 +168,8 @@ async function resolveRepoPath(
   options?: RepoDiscoveryOptions,
 ): Promise<string> {
   const workspaceRoot = await realpath(options?.workspaceRoot ?? process.cwd());
-  const candidate = isAbsolute(inputRepoPath)
-    ? inputRepoPath
-    : resolve(workspaceRoot, inputRepoPath);
+  const requested = inputRepoPath || options?.defaultRepoPath || '.';
+  const candidate = isAbsolute(requested) ? requested : resolve(workspaceRoot, requested);
 
   try {
     await access(candidate, constants.R_OK);
@@ -361,7 +361,10 @@ async function handleRepoMap(
   const startedAtMs = Date.now();
   try {
     const input = CodingRepoMapInputSchema.parse(args);
-    const repoPath = await resolveRepoPath(input.repoPath, options);
+    const repoPath = await resolveRepoPath(
+      typeof args.repoPath === 'string' ? input.repoPath : '',
+      options,
+    );
     const walk = await walkRepository(repoPath, input.maxDepth ?? DEFAULT_MAX_DEPTH);
     const files = walk.entries
       .slice(0, Math.min(input.maxFiles ?? DEFAULT_MAX_FILES, HARD_MAX_FILES))
@@ -419,7 +422,10 @@ async function handleCodeSearch(
   const startedAtMs = Date.now();
   try {
     const input = CodingCodeSearchInputSchema.parse(args);
-    const repoPath = await resolveRepoPath(input.repoPath, options);
+    const repoPath = await resolveRepoPath(
+      typeof args.repoPath === 'string' ? input.repoPath : '',
+      options,
+    );
     const matcher = buildSearchRegex(input.query, input.regex, input.caseSensitive);
     const walk = await walkRepository(repoPath);
     const matches: CodingCodeSearchMatch[] = [];
@@ -503,7 +509,10 @@ async function handleFindRelatedTests(
   const startedAtMs = Date.now();
   try {
     const input = CodingFindRelatedTestsInputSchema.parse(args);
-    const repoPath = await resolveRepoPath(input.repoPath, options);
+    const repoPath = await resolveRepoPath(
+      typeof args.repoPath === 'string' ? input.repoPath : '',
+      options,
+    );
     const targetPath = isAbsolute(input.path) ? relative(repoPath, input.path) : input.path;
     if (targetPath.startsWith('..')) {
       throw new Error(`Path "${input.path}" is outside the repository`);
