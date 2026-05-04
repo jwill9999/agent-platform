@@ -254,6 +254,9 @@ export type BrowserPolicyProfile = z.infer<typeof BrowserPolicyProfileSchema>;
 export const DEFAULT_BROWSER_POLICY_PROFILE = BrowserPolicyProfileSchema.parse({
   id: 'default-browser-policy',
   name: 'Default browser policy',
+  urlPolicy: {
+    allowedDomains: ['web'],
+  },
 });
 
 export const BrowserPolicyDecisionSchema = z

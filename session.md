@@ -305,6 +305,9 @@ Branch state: `task/agent-platform-browser-tools.4` contains the cumulative brow
   - `agent-platform-browser-tools.4` - browser evidence observability through API routes and compact chat UI summaries.
 - Added shared browser contracts in `packages/contracts/src/browserTool.ts`, exported through `packages/contracts/src/index.ts`.
 - Added Playwright-backed harness browser tools in `packages/harness/src/tools/browserTools.ts`, with Docker-friendly Chromium resolution, bounded artifacts, sidecar metadata, URL policy, approval-required states, and structured runtime limitations.
+- Updated the default browser URL policy to allow the Docker Compose `web`
+  service hostname, so manual in-container browser-tool prompts can open
+  `http://web:3001` without an external-domain approval interruption.
 - Added API routes under `/v1/browser/artifacts` to list browser artifact sidecars and download bounded workspace-relative artifacts through `PathJail`.
 - Updated chat tool rendering to summarize browser tool results and link evidence artifacts without flooding the transcript with raw JSON.
 - Updated API/architecture/task docs and all `.1` through `.4` task specs.

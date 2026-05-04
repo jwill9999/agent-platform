@@ -106,6 +106,12 @@ describe('browser tool contracts', () => {
       matchedRule: 'localhost_allowed',
     });
 
+    expect(evaluateBrowserUrlPolicy('http://web:3001')).toMatchObject({
+      state: 'allowed',
+      riskTier: 'medium',
+      matchedRule: 'domain_allowed',
+    });
+
     expect(evaluateBrowserUrlPolicy('https://example.com')).toMatchObject({
       state: 'approval_required',
       riskTier: 'medium',

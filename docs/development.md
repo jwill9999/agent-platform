@@ -130,6 +130,11 @@ Browser evidence is written under the workspace at
 chat UI renders compact browser activity summaries and links to artifacts
 instead of copying raw DOM, ARIA, or screenshot payloads into the transcript.
 
+When exercising the tools from inside the Docker Compose API container, target
+the web service at `http://web:3001`. The default browser URL policy allowlists
+that Compose service hostname for local UI verification, while external domains
+still require approval.
+
 Troubleshooting:
 
 - If browser tools return `BROWSER_RUNTIME_UNAVAILABLE`, rebuild the API image
