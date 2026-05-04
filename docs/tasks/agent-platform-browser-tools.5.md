@@ -70,21 +70,21 @@ This is the segment tip. Open one PR from `task/agent-platform-browser-tools.5` 
 
 ## Definition of done
 
-- [ ] Browser tools pass representative local UI E2E flows.
-- [ ] Risky actions are blocked or approval-gated in E2E/security coverage.
-- [ ] Docker/runtime setup and limitations are documented.
-- [ ] Browser artifacts are bounded and not dumped into chat by default.
-- [ ] Segment-tip PR is opened from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`.
-- [ ] Browser-tools epic checklist is complete.
+- [x] Browser tools pass representative local UI E2E flows.
+- [x] Risky actions are blocked or approval-gated in E2E/security coverage.
+- [x] Docker/runtime setup and limitations are documented.
+- [x] Browser artifacts are bounded and not dumped into chat by default.
+- [x] Segment-tip PR is opened from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`: https://github.com/jwill9999/agent-platform/pull/137
+- [x] Browser-tools epic checklist is complete.
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-browser-tools.4`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
-- [ ] If segment tip: PR opened `task/agent-platform-browser-tools.5 -> feature/agent-platform-browser-tools`
-- [ ] `bd close agent-platform-browser-tools.5 --reason "Browser tools validated end to end"`
-- [ ] `decisions.md` updated only if architectural decision changed
-- [ ] `session.md` updated if handoff needed
+- [x] Task branch created from `task/agent-platform-browser-tools.4`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
+- [x] If segment tip: PR opened `task/agent-platform-browser-tools.5 -> feature/agent-platform-browser-tools`: https://github.com/jwill9999/agent-platform/pull/137
+- [x] `bd close agent-platform-browser-tools.5 --reason "Browser tools validated end to end"`
+- [x] `decisions.md` updated only if architectural decision changed (not required)
+- [x] `session.md` updated if handoff needed
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-04

@@ -1,5 +1,19 @@
 /* global console, process */
 import { spawnSync } from 'node:child_process';
+import { accessSync, constants } from 'node:fs';
+import { join } from 'node:path';
+
+const FIXED_BIN_DIRECTORIES = [
+  '/usr/local/sbin',
+  '/usr/local/bin',
+  '/usr/sbin',
+  '/usr/bin',
+  '/sbin',
+  '/bin',
+  '/opt/homebrew/bin',
+];
+
+const FIXED_PATH = FIXED_BIN_DIRECTORIES.join(':');
 
 const REQUIRED_COMMANDS = [
   { name: 'git', versionArgs: ['--version'] },
@@ -16,16 +30,24 @@ const REQUIRED_COMMANDS = [
 ];
 
 function commandPath(command) {
-  const result = spawnSync('sh', ['-lc', `command -v ${command}`], {
-    encoding: 'utf8',
-  });
-  if (result.status !== 0) return null;
-  return result.stdout.trim() || null;
+  if (command === 'node') return process.execPath;
+
+  for (const directory of FIXED_BIN_DIRECTORIES) {
+    const candidate = join(directory, command);
+    try {
+      accessSync(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Try the next fixed directory.
+    }
+  }
+  return null;
 }
 
 function commandVersion(command, versionArgs) {
   const result = spawnSync(command, versionArgs, {
     encoding: 'utf8',
+    env: { ...process.env, PATH: FIXED_PATH },
     timeout: 5000,
   });
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
@@ -39,7 +61,7 @@ const results = REQUIRED_COMMANDS.map((command) => {
     name: command.name,
     found: path !== null,
     path,
-    version: path ? commandVersion(command.name, command.versionArgs) : null,
+    version: path ? commandVersion(path, command.versionArgs) : null,
   };
 });
 
@@ -50,7 +72,9 @@ for (const result of results) {
 }
 
 if (missing.length > 0) {
-  console.error(`Missing required coding runtime commands: ${missing.map((m) => m.name).join(', ')}`);
+  console.error(
+    `Missing required coding runtime commands: ${missing.map((m) => m.name).join(', ')}`,
+  );
   process.exit(1);
 }
 

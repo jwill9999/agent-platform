@@ -128,6 +128,38 @@ Sensor results are emitted as structured observability events, not chat transcri
 
 Coding sensors are selected for coding-profile agents and repository task contexts. Personal-assistant profile sessions show coding gates as disabled or manual-only unless a repository task explicitly needs them. Provider connection remains explicit: unavailable or auth-required providers surface repair actions such as GitHub CLI authentication, SonarQube MCP or IDE plugin setup, CodeQL configuration, and retry discovery.
 
+## Browser Automation Contracts
+
+Browser automation is modeled as a platform-owned tool pack rather than a direct dependency on an MCP browser server. Shared contracts in `packages/contracts` define browser sessions, page state, action requests/results, policy decisions, and bounded evidence artifacts. Playwright is the intended first internal runtime, while MCP/browser providers can be added later as adapters.
+
+The policy model classifies snapshot and screenshot actions as read-only, session start/navigation/close as medium risk, and click/type/press as high risk when they can mutate state or submit data. URL policy covers localhost development URLs, external-domain approval, deny lists, protocol restrictions, redirects, and artifact redaction/bounding. UI/UX grading is intentionally separate and belongs to the UI quality sensor epic; browser tools provide evidence and policy enforcement.
+
+The first runtime implementation lives in the harness system-tool surface as
+`sys_browser_start`, `sys_browser_navigate`, `sys_browser_snapshot`,
+`sys_browser_screenshot`, `sys_browser_click`, `sys_browser_type`,
+`sys_browser_press`, and `sys_browser_close`. The session manager keeps
+Playwright contexts in-process for the lifetime of the native tool executor,
+expires inactive sessions, and writes bounded evidence under the active
+workspace at `.agent-platform/browser/<session-id>/`. Docker deployments should
+provide a Chromium binary through the image or
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`; when the browser cannot launch, the tool
+returns an explicit runtime-unavailable result instead of failing opaquely.
+
+Navigation checks URL policy before the action and again after redirects.
+Interaction tools resolve locators through user-facing attributes first
+(role/name, label, text, placeholder, alt text, title, and test id) before
+falling back to explicit selectors. Submit-like, destructive, and sensitive
+input actions are classified as approval-required and return structured policy
+decisions when approval has not been granted.
+
+Browser evidence is exposed without chat spam through metadata sidecars and API
+routes under `/v1/browser/artifacts`. Each screenshot, DOM summary, and ARIA
+snapshot writes a bounded artifact plus a JSON sidecar containing the contract
+metadata needed by the UI and later UI-quality sensors. The chat UI detects
+browser tool results and renders a compact activity preview with current page
+state, policy status, and artifact links instead of dumping the raw tool result
+JSON into the transcript.
+
 ## API Clean Architecture
 
 The API app (`apps/api`) follows a layered architecture:

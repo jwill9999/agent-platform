@@ -74,19 +74,19 @@ Branch `task/agent-platform-browser-tools.3` from `task/agent-platform-browser-t
 
 ## Definition of done
 
-- [ ] Navigation and input browser tools are implemented.
-- [ ] Policy/HITL enforcement protects risky actions.
-- [ ] Locator strategy favors user-facing selectors.
-- [ ] Before/after action evidence is bounded and policy-aware.
-- [ ] Quality gates pass for touched packages.
+- [x] Navigation and input browser tools are implemented.
+- [x] Policy/HITL enforcement protects risky actions.
+- [x] Locator strategy favors user-facing selectors.
+- [x] Before/after action evidence is bounded and policy-aware.
+- [x] Quality gates pass for touched packages.
 
 ## Sign-off
 
-- [ ] Task branch created from `task/agent-platform-browser-tools.2`
-- [ ] Required tests executed and passing
-- [ ] Checklists in this document are complete
+- [x] Task branch created from `task/agent-platform-browser-tools.2`
+- [x] Required tests executed and passing
+- [x] Checklists in this document are complete
 - [ ] PR: N/A - merge at segment end
-- [ ] `bd close agent-platform-browser-tools.3 --reason "Governed navigation and input actions added"`
+- [x] `bd close agent-platform-browser-tools.3 --reason "Governed navigation and input actions added"`
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
 
