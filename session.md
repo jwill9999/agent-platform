@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-04
+- **Session:** Fixed a browser-tools approval-resume regression on `task/agent-platform-browser-tools.5`: approved external browser starts now share the same runtime tool executor with the resumed graph, so immediate follow-up snapshot/screenshot calls keep access to the active browser session.
+- **Date:** 2026-05-04
 - **Session:** Implemented `agent-platform-browser-tools.5` on `task/agent-platform-browser-tools.5`: added real Playwright browser-tool integration validation, documented browser runtime troubleshooting, completed the browser-tools epic checklist, and verified root typecheck/lint/test/format plus Playwright E2E after applying the E2E seed.
 - **Date:** 2026-05-04
 - **Session:** Updated the docs-policy hook on `task/agent-platform-browser-tools.5` so agents are explicitly instructed to scan/update docs or record TODOs at hook time, and fixed SonarCloud hotspot `javascript:S4036` in `scripts/coding-runtime-verify.mjs` by resolving commands from fixed absolute directories instead of ambient `PATH`.
@@ -254,6 +256,31 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Browser approval resume session continuity fixed
+
+Branch state: `task/agent-platform-browser-tools.5` is ahead of origin with follow-up commit `82ddcb2`.
+
+- Investigated a manual browser-tool run where approving `https://bbc.co.uk` successfully opened the page, but the immediate `sys_browser_snapshot` and `sys_browser_screenshot` calls failed with `BROWSER_SESSION_UNAVAILABLE`.
+- Root cause: `handleSessionResume` executed the approved browser start with one native system-tool executor, then built a separate resumed runtime graph with a new executor. Browser sessions are stored in the executor-owned `BrowserSessionManager`, so the continuation graph could not see the approved start session.
+- Added a shared runtime native-tool executor path for approval resume. The approved tool dispatch and resumed graph now receive the same executor instance for that resume cycle.
+- Added a focused API regression test with a stateful fake browser executor. The test fails if `sys_browser_start` and the follow-up `sys_browser_snapshot` use different executor instances.
+- Exposed the test-only executor factory through the v1 chat router options so the regression can be validated without launching a real browser.
+
+Quality gates passed:
+
+- `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts` (required sandbox escalation for Supertest listener binding)
+- `pnpm --filter @agent-platform/api run typecheck`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/api run build`
+- `pnpm format:check`
+- `git diff --check`
+
+Completion gate:
+
+- SonarQube MCP did not become available through tool discovery in this session.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with focused tests, typecheck, lint, build, formatting, and diff whitespace checks.
 
 ### Browser tools validation implemented
 
@@ -691,8 +718,8 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-browser-tools.5`
 - **Current base:** chained from `feature/agent-platform-browser-tools` through task branches `.1` -> `.2` -> `.3` -> `.4` -> `.5`
-- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`.
-- **Remote sync:** pending only for the final Beads/spec closeout commit.
+- **Current work:** browser-tools epic is complete locally; PR #137 is open from `task/agent-platform-browser-tools.5` to `feature/agent-platform-browser-tools`; follow-up commit `82ddcb2` fixes approved-browser-session continuity.
+- **Remote sync:** pending push for `82ddcb2` plus this session handoff update.
 
 ### Beads
 
@@ -717,6 +744,13 @@ Quality gates passed:
 
 ### Quality
 
+- Latest browser approval resume fix gates passed:
+  - `pnpm --filter @agent-platform/api exec vitest run test/sessionChat.integration.test.ts`
+  - `pnpm --filter @agent-platform/api run typecheck`
+  - `pnpm --filter @agent-platform/api run lint`
+  - `pnpm --filter @agent-platform/api run build`
+  - `pnpm format:check`
+  - `git diff --check`
 - Browser-tools `.1-.4` gates passed:
   - `pnpm typecheck`
   - `pnpm lint`
@@ -745,9 +779,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the final Beads/spec closeout update for `.5`.
-2. Ask the owner to run `bd dolt push` if Beads remote sync is still blocked through SSH/DNS.
-3. Watch PR #137 pipelines and address any feedback.
+1. Commit and push the `session.md` handoff update.
+2. Run `git pull --rebase`, `bd dolt push`, and `git push` for `task/agent-platform-browser-tools.5`.
+3. Ask the owner to manually retest: approve an external browser start, then confirm snapshot/screenshot run in the same resumed flow without `BROWSER_SESSION_UNAVAILABLE`.
+4. Watch PR #137 pipelines and address any feedback.
 
 ---
 
