@@ -55,6 +55,8 @@ import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 import { CriticBadges } from '@/components/chat/critic-badges';
 import { ThinkingBlock } from '@/components/chat/thinking-block';
 import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
+import { WorkbenchCodeEditor } from '@/components/ide/workbench-code-editor';
+import { getWorkbenchLanguage, updateWorkbenchTabContent } from '@/lib/code-workbench-editor';
 
 // ---------------------------------------------------------------------------
 // Small presentational components
@@ -163,27 +165,7 @@ function getFileIcon(filename: string) {
 }
 
 function getLanguage(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'ts':
-    case 'tsx':
-      return 'typescript';
-    case 'js':
-    case 'jsx':
-      return 'javascript';
-    case 'json':
-      return 'json';
-    case 'css':
-      return 'css';
-    case 'html':
-      return 'html';
-    case 'md':
-      return 'markdown';
-    case 'py':
-      return 'python';
-    default:
-      return 'plaintext';
-  }
+  return getWorkbenchLanguage(filename);
 }
 
 /** Match {@link Message} / chat — prefer `parts`, fall back to legacy `content`. */
@@ -573,14 +555,11 @@ function EditorPanel({
         <span>{activeFile.language}</span>
         <span>{activeFile.content.split('\n').length} lines</span>
       </div>
-      <textarea
+      <WorkbenchCodeEditor
         value={activeFile.content}
-        onChange={(e) => {
-          onContentChange(e.target.value);
-        }}
-        className="flex-1 w-full p-4 font-mono text-sm resize-none bg-background text-foreground focus:outline-none leading-6"
-        spellCheck={false}
-        style={{ tabSize: 2 }}
+        language={getWorkbenchLanguage(activeFile.name)}
+        onChange={onContentChange}
+        ariaLabel={`Code editor for ${activeFile.name}`}
       />
     </div>
   );
@@ -1026,9 +1005,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const handleContentChange = useCallback(
     (content: string) => {
       if (!activeTab) return;
-      setOpenTabs((prev) =>
-        prev.map((tab) => (tab.path === activeTab ? { ...tab, content, isDirty: true } : tab)),
-      );
+      setOpenTabs((prev) => updateWorkbenchTabContent(prev, activeTab, content));
     },
     [activeTab],
   );
