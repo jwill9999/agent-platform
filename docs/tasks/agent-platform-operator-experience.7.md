@@ -12,6 +12,8 @@ Define frontend workflow patterns for branch state, check status, diffs, and rev
 
 Do not add backend contracts in this task.
 
+The workflow patterns are documented in [Operator Branch And Diff Workflows](../design/operator-branch-diff-workflows.md).
+
 ## Stack constraints
 
 Use Next.js App Router, shadcn/ui, Tailwind CSS, and TypeScript. Do not introduce new UI libraries, change data contracts, or add backend logic.
@@ -49,15 +51,15 @@ Branch `task/agent-platform-operator-experience.7` from `task/agent-platform-ope
 
 ## Definition of done
 
-- [ ] Branch and diff workflow states are documented.
-- [ ] Review/approval decision patterns are documented.
-- [ ] Relationship to `agent-platform-branch-feedback-status` is explicit.
-- [ ] No backend contracts or new UI libraries are introduced.
+- [x] Branch and diff workflow states are documented.
+- [x] Review/approval decision patterns are documented.
+- [x] Relationship to `agent-platform-branch-feedback-status` is explicit.
+- [x] No backend contracts or new UI libraries are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-operator-experience.7 --reason "Branch and diff approval workflows designed"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-operator-experience.7 --reason "Branch and diff approval workflows designed"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05

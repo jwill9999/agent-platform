@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Completed design work for `agent-platform-operator-experience.7` on `task/agent-platform-operator-experience.7`: added branch and diff workflow patterns covering branch status states, diff review shell, branch approval decision states, CI/SonarQube/CodeQL/review feedback linkage, unavailable states, and the implementation boundary with `agent-platform-branch-feedback-status`.
+- **Date:** 2026-05-05
 - **Session:** Completed `agent-platform-operator-experience.6` on `task/agent-platform-operator-experience.6`: added generalized artifact viewer patterns, mapped browser evidence into image/text/JSON/download artifact cards, kept screenshots in the in-app zoomable viewer, added text/JSON in-app inspection, documented artifact states, and added focused artifact tests.
 - **Date:** 2026-05-05
 - **Session:** Follow-up on `task/agent-platform-operator-experience.5`: fixed the `/e2e/approval-card` visual fixture so it owns an absolute inset scroll container inside the app shell's overflow-hidden layout.
