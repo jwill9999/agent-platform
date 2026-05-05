@@ -12,6 +12,8 @@ Define the frontend display model that turns existing tool activity into human-r
 
 This task must not change backend contracts. It should consume or adapt existing frontend stream/tool result shapes only.
 
+Display model: [Operator Tool Event Display Model](../design/operator-tool-event-display-model.md).
+
 ## Stack constraints
 
 Use Next.js App Router, shadcn/ui, Tailwind CSS, and TypeScript. Do not introduce new UI libraries, change data contracts, or add backend logic.
@@ -50,16 +52,16 @@ Branch `task/agent-platform-operator-experience.2` from `task/agent-platform-ope
 
 ## Definition of done
 
-- [ ] Existing tool activity inputs are inventoried.
-- [ ] Tool labels and summary copy rules are documented.
-- [ ] Status/risk vocabulary is documented.
-- [ ] Details/debug affordance rules are documented.
-- [ ] No backend contracts or new UI libraries are introduced.
+- [x] Existing tool activity inputs are inventoried.
+- [x] Tool labels and summary copy rules are documented.
+- [x] Status/risk vocabulary is documented.
+- [x] Details/debug affordance rules are documented.
+- [x] No backend contracts or new UI libraries are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-operator-experience.2 --reason "Human-readable tool event model defined"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-operator-experience.2 --reason "Human-readable tool event model defined"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05
