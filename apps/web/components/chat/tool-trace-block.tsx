@@ -11,6 +11,7 @@ import {
   type OperatorToolEventDisplay,
   type OperatorToolEventStatus,
 } from '@/lib/operator-tool-event-display';
+import { createTraceEntries, traceSummary } from '@/lib/operator-trace-view';
 
 type Props = Readonly<{
   events: readonly ToolTraceEvent[];
@@ -90,6 +91,90 @@ function TechnicalDetails({ display }: Readonly<{ display: OperatorToolEventDisp
   );
 }
 
+function TraceDetails({ events }: Readonly<{ events: readonly ToolTraceEvent[] }>) {
+  const entries = createTraceEntries(events);
+  if (entries.length === 0) return null;
+
+  return (
+    <details className="mt-3 rounded border border-border/70 bg-background">
+      <summary className="cursor-pointer px-3 py-2 text-[11px] font-medium text-muted-foreground">
+        Trace details · {traceSummary(entries)}
+      </summary>
+      <div className="flex flex-col gap-2 border-t border-border/70 p-2">
+        {entries.map((entry) => (
+          <div key={entry.id} className="rounded border border-border/70 bg-muted/20 p-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                #{entry.sequence}
+              </span>
+              <StatusIcon status={entry.status} />
+              <span className="truncate font-medium">{entry.label}</span>
+              <span className={statusBadgeClass(entry.status)}>{entry.statusLabel}</span>
+            </div>
+            <dl className="mt-2 grid gap-1 text-[11px] text-muted-foreground sm:grid-cols-2">
+              <div>
+                <dt className="font-medium text-foreground">Type</dt>
+                <dd>{entry.kind}</dd>
+              </div>
+              {entry.toolId && (
+                <div>
+                  <dt className="font-medium text-foreground">Tool</dt>
+                  <dd className="break-all">{entry.toolId}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="font-medium text-foreground">Trace id</dt>
+                <dd className="break-all">{entry.traceId ?? 'Unavailable'}</dd>
+              </div>
+              {entry.target && (
+                <div>
+                  <dt className="font-medium text-foreground">Target</dt>
+                  <dd className="break-all">{entry.target}</dd>
+                </div>
+              )}
+              {entry.policy && (
+                <div>
+                  <dt className="font-medium text-foreground">Policy</dt>
+                  <dd className="break-all">{entry.policy}</dd>
+                </div>
+              )}
+              {entry.errorCode && (
+                <div>
+                  <dt className="font-medium text-foreground">Error code</dt>
+                  <dd className="break-all">{entry.errorCode}</dd>
+                </div>
+              )}
+              {entry.errorMessage && (
+                <div>
+                  <dt className="font-medium text-foreground">Error</dt>
+                  <dd className="break-all">{entry.errorMessage}</dd>
+                </div>
+              )}
+              {entry.artifactCount > 0 && (
+                <div>
+                  <dt className="font-medium text-foreground">Artifacts</dt>
+                  <dd>{entry.artifactCount}</dd>
+                </div>
+              )}
+            </dl>
+            {entry.payload && (
+              <details className="mt-2 rounded border border-border/70 bg-background/70">
+                <summary className="cursor-pointer px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                  Payload
+                  {entry.redacted ? ' · redacted' : ''}
+                </summary>
+                <pre className="max-h-48 overflow-auto border-t border-border/70 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                  {entry.payload}
+                </pre>
+              </details>
+            )}
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 export function ToolTraceBlock({ events, isStreaming }: Props) {
   const [open, setOpen] = useState(isStreaming);
   const wasStreaming = useRef(isStreaming);
@@ -156,6 +241,7 @@ export function ToolTraceBlock({ events, isStreaming }: Props) {
             );
           })}
         </ol>
+        <TraceDetails events={events} />
       </div>
     </details>
   );

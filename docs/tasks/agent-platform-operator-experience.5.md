@@ -47,15 +47,15 @@ Branch `task/agent-platform-operator-experience.5` from `task/agent-platform-ope
 
 ## Definition of done
 
-- [ ] Engineer-facing trace/details view is specified or implemented.
-- [ ] Normal chat remains summary-first.
-- [ ] Policy decisions, approvals, trace ids, errors, and payloads are inspectable when present.
-- [ ] No backend contracts or new UI libraries are introduced.
+- [x] Engineer-facing trace/details view is specified or implemented.
+- [x] Normal chat remains summary-first.
+- [x] Policy decisions, trace ids, errors, artifacts, and payloads are inspectable when present.
+- [x] No backend contracts or new UI libraries are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-operator-experience.5 --reason "Toolchain observability trace view added"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-operator-experience.5 --reason "Toolchain observability trace view added"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05
