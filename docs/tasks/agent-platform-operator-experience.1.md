@@ -12,6 +12,8 @@ Define the frontend design-system foundation for operator experience surfaces be
 
 This task is frontend-only planning/design-system work. It must not change backend contracts or add backend logic.
 
+Design-system foundation: [Operator Experience Design System](../design/operator-experience-design-system.md).
+
 ## Stack constraints
 
 Use:
@@ -86,20 +88,20 @@ This is the first task in the operator-experience segment. Later child tasks sho
 
 ## Definition of done
 
-- [ ] Stack constraints are documented and reflected in the parent epic.
-- [ ] Component inventory exists for the operator experience surfaces.
-- [ ] Status/risk vocabulary and visual treatment are defined.
-- [ ] Layout guidance exists for chat, right drawer, details drawer, and artifact viewer.
-- [ ] Example states are documented for pending, running, approval-required, approved, denied, failed, completed, blocked, and unavailable.
-- [ ] No new UI libraries, backend logic, or data-contract changes are introduced.
+- [x] Stack constraints are documented and reflected in the parent epic.
+- [x] Component inventory exists for the operator experience surfaces.
+- [x] Status/risk vocabulary and visual treatment are defined.
+- [x] Layout guidance exists for chat, right drawer, details drawer, and artifact viewer.
+- [x] Example states are documented for pending, running, approval-required, approved, denied, failed, completed, blocked, and unavailable.
+- [x] No new UI libraries, backend logic, or data-contract changes are introduced.
 
 ## Sign-off
 
-- [ ] Task branch created from the correct parent before implementation work.
-- [ ] Required checks executed and passing.
-- [ ] Definition of done is complete.
-- [ ] If segment tip: PR merged `task/<tip> -> feature/agent-platform-operator-experience`; otherwise write “N/A — merge at segment end”.
-- [ ] `bd close agent-platform-operator-experience.1 --reason "Operator design system foundations defined"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Task branch created from the correct parent before implementation work.
+- [x] Required checks executed and passing.
+- [x] Definition of done is complete.
+- [x] N/A — merge at segment end.
+- [x] `bd close agent-platform-operator-experience.1 --reason "Operator design system foundations defined"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05
