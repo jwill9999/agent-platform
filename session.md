@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-06
+- **Session:** Completed `agent-platform-code-workbench.6` on `task/agent-platform-code-workbench.6`: added a frontend-only branch/change summary model and compact IDE chat sidebar panel showing workspace, explicit branch-provider unavailable state, local dirty open tabs, and pending diff-review proposals. Live branch discovery, PR/check import, GitHub, CodeQL, SonarQube, reviews, and provider auth remain owned by `agent-platform-branch-feedback-status`.
+- **Date:** 2026-05-06
 - **Session:** Completed `agent-platform-code-workbench.5` on `task/agent-platform-code-workbench.5`: added frontend-only diff-first edit review for assistant code-block changes, with pending edit proposals, unified-style line diffs, explicit Apply/Reject controls, dirty-tab updates only after Apply, and reject behavior that leaves files unchanged.
 - **Date:** 2026-05-06
 - **Session:** Completed `agent-platform-code-workbench.4` on `task/agent-platform-code-workbench.4`: added safe workbench file-reference parsing, rendered inline Markdown code and Markdown links as open-in-workbench actions when they resolve inside the active file tree, and surfaced unavailable states for no workspace, missing files, directories, and unsupported file types without adding backend contracts.

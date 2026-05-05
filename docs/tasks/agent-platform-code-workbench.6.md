@@ -47,22 +47,37 @@ Branch `task/agent-platform-code-workbench.6` from `task/agent-platform-code-wor
 
 ## Tests
 
-- focused web tests if UI is implemented
-- documentation/spec checks if design-only
-- manual check that sidebar states do not imply unavailable provider data exists
+- [x] `pnpm --filter @agent-platform/web run test`
+- [x] `pnpm --filter @agent-platform/web run typecheck`
+- [x] `pnpm --filter @agent-platform/web run lint`
+- [x] `pnpm --filter @agent-platform/web run build`
+- [x] Focused unit tests cover clean, dirty, and pending-review local changed-file states.
+
+## Implementation notes
+
+- Added `apps/web/lib/code-workbench-branch-summary.ts` as the frontend-only branch/change summary
+  model.
+- Added a compact workbench branch panel to the IDE chat sidebar.
+- The panel shows workspace name, explicit `Branch not connected` copy, local changed-file count,
+  dirty files from open tabs, and pending review proposals from the diff-first edit flow.
+- Provider rows are explicit unavailable states for Git branch discovery and remote checks.
+- This task intentionally does not discover branches, PRs, GitHub checks, CodeQL, SonarQube,
+  reviews, or provider auth state.
+- Live branch/provider discovery remains owned by `agent-platform-branch-feedback-status`.
+- SonarQube MCP was not callable in this session, so the fallback completion gate was used.
 
 ## Definition of done
 
-- [ ] Workbench sidebar model for changed files/branch summary is defined or implemented.
-- [ ] States align with operator branch/diff workflow docs.
-- [ ] Provider-unavailable states are clear.
-- [ ] Relationship to `agent-platform-branch-feedback-status` is explicit.
-- [ ] No remote provider contracts are introduced.
+- [x] Workbench sidebar model for changed files/branch summary is defined or implemented.
+- [x] States align with operator branch/diff workflow docs.
+- [x] Provider-unavailable states are clear.
+- [x] Relationship to `agent-platform-branch-feedback-status` is explicit.
+- [x] No remote provider contracts are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-code-workbench.6 --reason "Branch and Git sidebar integration prepared"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-code-workbench.6 --reason "Branch and Git sidebar integration prepared"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05

@@ -16,6 +16,7 @@ import {
   FileType,
   Folder,
   Diff,
+  GitBranch,
   Search,
   Send,
   Sparkles,
@@ -73,6 +74,10 @@ import {
   createWorkbenchEditProposal,
   type WorkbenchEditProposal,
 } from '@/lib/code-workbench-edit-review';
+import {
+  buildWorkbenchBranchSummary,
+  type WorkbenchBranchSummary,
+} from '@/lib/code-workbench-branch-summary';
 
 // ---------------------------------------------------------------------------
 // Small presentational components
@@ -675,6 +680,7 @@ function ChatPanel({
   setChatInput,
   onSendMessage,
   contextDraft,
+  branchSummary,
   activeFile,
   includeActiveFile,
   pinnedPaths,
@@ -700,6 +706,7 @@ function ChatPanel({
   setChatInput: (v: string) => void;
   onSendMessage: () => void;
   contextDraft: WorkbenchContextDraft;
+  branchSummary: WorkbenchBranchSummary;
   activeFile: OpenTab | undefined;
   includeActiveFile: boolean;
   pinnedPaths: ReadonlySet<string>;
@@ -753,6 +760,8 @@ function ChatPanel({
           <span className="font-medium text-sm truncate">AI Assistant</span>
         </div>
       </div>
+
+      <WorkbenchBranchPanel summary={branchSummary} />
 
       {/* Messages */}
       <ScrollArea className="flex-1 px-4">
@@ -853,6 +862,52 @@ function ChatPanel({
             <Send className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkbenchBranchPanel({ summary }: Readonly<{ summary: WorkbenchBranchSummary }>) {
+  return (
+    <div className="border-b border-border bg-card/30 px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
+            <span className="truncate">{summary.branchLabel}</span>
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {summary.workspaceName} · {summary.stateLabel}
+          </p>
+        </div>
+        <span className="rounded-md border border-border bg-background px-2 py-0.5 text-xs">
+          {summary.changedFiles.length} changed
+        </span>
+      </div>
+
+      {summary.changedFiles.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {summary.changedFiles.map((file) => (
+            <div
+              key={file.path}
+              className="flex items-center justify-between gap-2 rounded border border-border/70 bg-background/60 px-2 py-1 text-xs"
+            >
+              <span className="truncate">{file.name}</span>
+              <span className="shrink-0 text-muted-foreground">
+                {file.state === 'pending_review' ? 'review pending' : 'modified'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-2 space-y-1">
+        {summary.providers.map((provider) => (
+          <div key={provider.label} className="text-[11px] leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground">{provider.label} unavailable:</span>{' '}
+            {provider.description}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1098,6 +1153,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const freshContextFiles = useMemo(
     () => getFreshContextFiles(contextFiles, openTabs),
     [contextFiles, openTabs],
+  );
+  const branchSummary = useMemo(
+    () =>
+      buildWorkbenchBranchSummary({
+        workspaceName: fs.rootName,
+        openTabs,
+        pendingProposalPath: editProposal?.path,
+      }),
+    [editProposal?.path, fs.rootName, openTabs],
   );
   const contextDraft = useMemo(
     () =>
@@ -1696,6 +1760,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 setChatInput={setChatInput}
                 onSendMessage={handleSendMessage}
                 contextDraft={contextDraft}
+                branchSummary={branchSummary}
                 activeFile={activeFile}
                 includeActiveFile={includeActiveFile}
                 pinnedPaths={pinnedContextPaths}
