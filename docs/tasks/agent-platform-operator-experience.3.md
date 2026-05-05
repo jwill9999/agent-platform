@@ -49,15 +49,15 @@ Branch `task/agent-platform-operator-experience.3` from `task/agent-platform-ope
 
 ## Definition of done
 
-- [ ] User-facing activity no longer defaults to raw JSON/system payloads.
-- [ ] Technical payloads remain inspectable through explicit details.
-- [ ] Failed and approval-required states remain understandable.
-- [ ] No backend contracts or new UI libraries are introduced.
+- [x] User-facing activity no longer defaults to raw JSON/system payloads.
+- [x] Technical payloads remain inspectable through explicit details.
+- [x] Failed and approval-required states remain understandable.
+- [x] No backend contracts or new UI libraries are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-operator-experience.3 --reason "Activity feed separated from debug payloads"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-operator-experience.3 --reason "Activity feed separated from debug payloads"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05
