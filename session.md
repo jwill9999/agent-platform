@@ -7,6 +7,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-06
+- **Session:** Completed `agent-platform-code-workbench.4` on `task/agent-platform-code-workbench.4`: added safe workbench file-reference parsing, rendered inline Markdown code and Markdown links as open-in-workbench actions when they resolve inside the active file tree, and surfaced unavailable states for no workspace, missing files, directories, and unsupported file types without adding backend contracts.
 - **Date:** 2026-05-05
 - **Session:** Completed `agent-platform-code-workbench.3` on `task/agent-platform-code-workbench.3`: added a visible code-context panel for the IDE chat showing workspace, active file inclusion, pinned files, sanitisation/exclusion warnings, and next-message context counts. Fixed broken pinning by reading unloaded explorer file content when possible and deriving pinned context from fresh open-tab content, so the sanitised user-visible context now matches what is submitted to the agent.
 - **Date:** 2026-05-05

@@ -61,6 +61,12 @@ import {
   buildWorkbenchContextDraft,
   type WorkbenchContextDraft,
 } from '@/lib/code-workbench-context';
+import {
+  isSupportedWorkbenchTextPath,
+  parseWorkbenchFileReference,
+  type WorkbenchFileReferenceStatus,
+} from '@/lib/code-workbench-file-references';
+import type { WorkbenchFileReferenceAction } from '@/components/ide/ide-markdown';
 
 // ---------------------------------------------------------------------------
 // Small presentational components
@@ -89,6 +95,7 @@ function AssistantContent({
   activeFile,
   onApplyCode,
   onCreateFile,
+  getFileReferenceAction,
   criticEvents,
   thinking,
 }: Readonly<{
@@ -98,6 +105,7 @@ function AssistantContent({
   activeFile: { path: string; name: string } | null;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  getFileReferenceAction?: (reference: string) => WorkbenchFileReferenceAction | null;
   criticEvents?: readonly CriticEvent[];
   thinking?: string;
 }>) {
@@ -125,6 +133,7 @@ function AssistantContent({
         contextFiles={allFiles}
         onApplyCode={onApplyCode}
         onCreateFile={onCreateFile}
+        getFileReferenceAction={getFileReferenceAction}
       />
     </>
   );
@@ -590,6 +599,7 @@ function ChatPanel({
   onClearContext,
   onApplyCode,
   onCreateFile,
+  getFileReferenceAction,
   agents,
   selectedAgentId,
   onAgentChange,
@@ -613,6 +623,7 @@ function ChatPanel({
   onClearContext: () => void;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  getFileReferenceAction: (reference: string) => WorkbenchFileReferenceAction | null;
   agents: Agent[];
   selectedAgentId: string | null;
   onAgentChange: (id: string) => void;
@@ -702,6 +713,7 @@ function ChatPanel({
                         activeFile={null}
                         onApplyCode={onApplyCode}
                         onCreateFile={onCreateFile}
+                        getFileReferenceAction={getFileReferenceAction}
                         criticEvents={criticEventsByMessage[message.id]}
                         thinking={thinkingByMessage[message.id]}
                       />
@@ -938,6 +950,23 @@ function getAssistantContextFiles(
     path: file.path,
     name: file.path.split('/').pop() ?? file.path,
   }));
+}
+
+function fileReferenceLabel(status: WorkbenchFileReferenceStatus, path: string): string {
+  switch (status) {
+    case 'available':
+      return `Open ${path} in workbench`;
+    case 'no_workspace':
+      return 'Open a workspace before opening file references';
+    case 'outside_workspace':
+      return 'This file reference is outside the active workspace';
+    case 'directory':
+      return 'This reference points to a folder, not a file';
+    case 'unsupported':
+      return 'This file type is not available for workbench preview';
+    case 'not_found':
+      return 'This file was not found in the active workspace';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1261,6 +1290,54 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setIsPathDialogOpen(false);
   }, [pathInput, findFileByPath, handleFileSelect]);
 
+  const getFileReferenceAction = useCallback(
+    (reference: string): WorkbenchFileReferenceAction | null => {
+      const parsed = parseWorkbenchFileReference(reference);
+      if (!parsed) return null;
+
+      if (fileTree.length === 0) {
+        const status: WorkbenchFileReferenceStatus = 'no_workspace';
+        return {
+          path: parsed.path,
+          status,
+          label: fileReferenceLabel(status, parsed.path),
+        };
+      }
+
+      if (!isSupportedWorkbenchTextPath(parsed.path)) {
+        const status: WorkbenchFileReferenceStatus = 'unsupported';
+        return {
+          path: parsed.path,
+          status,
+          label: fileReferenceLabel(status, parsed.path),
+        };
+      }
+
+      const node = findFileByPath(parsed.path);
+      const status: WorkbenchFileReferenceStatus =
+        node?.type === 'file'
+          ? 'available'
+          : node?.type === 'directory'
+            ? 'directory'
+            : 'not_found';
+
+      return {
+        path: parsed.path,
+        status,
+        label: fileReferenceLabel(status, parsed.path),
+        open:
+          status === 'available' && node
+            ? () => {
+                handleFileSelect(node).catch(() => {
+                  toast.error(`Failed to open ${node.name}`);
+                });
+              }
+            : undefined,
+      };
+    },
+    [fileTree.length, findFileByPath, handleFileSelect],
+  );
+
   // --- Chat send ---
 
   const handleSendMessage = useCallback(() => {
@@ -1508,6 +1585,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 onClearContext={handleClearContext}
                 onApplyCode={handleApplyCode}
                 onCreateFile={handleCreateFile}
+                getFileReferenceAction={getFileReferenceAction}
                 agents={agents}
                 selectedAgentId={selectedAgentId}
                 onAgentChange={setSelectedAgentId}

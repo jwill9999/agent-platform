@@ -4,8 +4,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, Play, FileCode, FilePlus, Diff } from 'lucide-react';
-import { useState, useCallback, createContext, useContext, useMemo } from 'react';
+import { Copy, Check, Play, FileCode, FilePlus, Diff, FolderOpen } from 'lucide-react';
+import React, { useState, useCallback, createContext, useContext, useMemo } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +14,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import type { WorkbenchFileReferenceStatus } from '@/lib/code-workbench-file-references';
+import { parseWorkbenchFileReference } from '@/lib/code-workbench-file-references';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,7 +28,15 @@ interface IDEMarkdownProps {
   onApplyCode?: (code: string, targetFile?: string, mode?: 'replace' | 'insert') => void;
   onCreateFile?: (code: string, suggestedName?: string) => void;
   onShowDiff?: (code: string, targetFile?: string) => void;
+  getFileReferenceAction?: (reference: string) => WorkbenchFileReferenceAction | null;
 }
+
+export type WorkbenchFileReferenceAction = {
+  path: string;
+  status: WorkbenchFileReferenceStatus;
+  label: string;
+  open?: () => void;
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -300,6 +310,32 @@ function InlineCode({ children }: Readonly<{ children: React.ReactNode }>) {
   );
 }
 
+function FileReferenceButton({
+  children,
+  action,
+}: Readonly<{ children: React.ReactNode; action: WorkbenchFileReferenceAction }>) {
+  const canOpen = action.status === 'available' && action.open;
+  return (
+    <button
+      type="button"
+      disabled={!canOpen}
+      title={action.label}
+      onClick={() => {
+        action.open?.();
+      }}
+      className={cn(
+        'inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 align-baseline font-mono text-sm',
+        canOpen
+          ? 'border-primary/25 bg-primary/10 text-primary hover:bg-primary/15'
+          : 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+      )}
+    >
+      <FolderOpen className="h-3 w-3 shrink-0" />
+      <span className="truncate">{children}</span>
+    </button>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Markdown element renderers
 // ---------------------------------------------------------------------------
@@ -348,6 +384,12 @@ function MarkdownAnchor({
   href,
   children,
 }: Readonly<{ href?: string; children?: React.ReactNode }>) {
+  const { getFileReferenceAction } = useContext(IDEMarkdownContext);
+  const action = href ? getFileReferenceAction?.(href) : null;
+  if (action) {
+    return <FileReferenceButton action={action}>{children}</FileReferenceButton>;
+  }
+
   return (
     <a
       href={href}
@@ -373,9 +415,7 @@ function MarkdownThead({ children }: Readonly<{ children?: React.ReactNode }>) {
 }
 
 function MarkdownTh({ children }: Readonly<{ children?: React.ReactNode }>) {
-  return (
-    <th className="px-4 py-2 text-left font-medium border-b border-border">{children}</th>
-  );
+  return <th className="px-4 py-2 text-left font-medium border-b border-border">{children}</th>;
 }
 
 function MarkdownTd({ children }: Readonly<{ children?: React.ReactNode }>) {
@@ -407,6 +447,7 @@ interface IDEMarkdownContextValue {
   onApplyCode?: (code: string, targetFile?: string, mode?: 'replace' | 'insert') => void;
   onCreateFile?: (code: string, suggestedName?: string) => void;
   onShowDiff?: (code: string, targetFile?: string) => void;
+  getFileReferenceAction?: (reference: string) => WorkbenchFileReferenceAction | null;
 }
 
 const IDEMarkdownContext = createContext<IDEMarkdownContextValue>({});
@@ -415,11 +456,17 @@ function MarkdownCodeRenderer({
   className: codeClassName,
   children,
 }: Readonly<{ className?: string; children?: React.ReactNode }>) {
-  const { contextFiles, onApplyCode, onCreateFile, onShowDiff } = useContext(IDEMarkdownContext);
+  const { contextFiles, onApplyCode, onCreateFile, onShowDiff, getFileReferenceAction } =
+    useContext(IDEMarkdownContext);
   const match = /language-(\w+)/.exec(codeClassName ?? '');
   const isInline = !match && !codeClassName;
 
   if (isInline) {
+    const text = String(children);
+    const action = parseWorkbenchFileReference(text) ? getFileReferenceAction?.(text) : null;
+    if (action) {
+      return <FileReferenceButton action={action}>{children}</FileReferenceButton>;
+    }
     return <InlineCode>{children}</InlineCode>;
   }
 
@@ -464,10 +511,11 @@ export function IDEMarkdown({
   onApplyCode,
   onCreateFile,
   onShowDiff,
+  getFileReferenceAction,
 }: Readonly<IDEMarkdownProps>) {
   const ctxValue = useMemo(
-    () => ({ contextFiles, onApplyCode, onCreateFile, onShowDiff }),
-    [contextFiles, onApplyCode, onCreateFile, onShowDiff],
+    () => ({ contextFiles, onApplyCode, onCreateFile, onShowDiff, getFileReferenceAction }),
+    [contextFiles, onApplyCode, onCreateFile, onShowDiff, getFileReferenceAction],
   );
 
   return (

@@ -50,22 +50,37 @@ Branch `task/agent-platform-code-workbench.4` from `task/agent-platform-code-wor
 
 ## Tests
 
-- unit tests for file reference parsing/resolution
-- web tests for opening references from chat/tool surfaces where practical
-- manual check with valid, missing, binary, and outside-workspace paths
+- [x] `pnpm --filter @agent-platform/web run test`
+- [x] `pnpm --filter @agent-platform/web run typecheck`
+- [x] `pnpm --filter @agent-platform/web run lint`
+- [x] `pnpm --filter @agent-platform/web run build`
+- [x] Markdown render tests cover openable and unavailable file-reference states.
+
+## Implementation notes
+
+- Added `apps/web/lib/code-workbench-file-references.ts` for safe file-reference parsing and
+  supported text-file classification.
+- Inline Markdown code and Markdown links that resolve to workspace paths now render as workbench
+  file actions.
+- Available references open through the existing workbench file selection path.
+- Missing, unsupported, directory, and no-workspace states render as disabled actions with clear
+  titles instead of silently failing.
+- Resolution is scoped to the current workbench file tree; no backend or remote provider contracts
+  were introduced.
+- SonarQube MCP was not callable in this session, so the fallback completion gate was used.
 
 ## Definition of done
 
-- [ ] File references can open files in the workbench when available.
-- [ ] Resolution is scoped to the active project/workspace.
-- [ ] Unsafe or unavailable paths show clear states.
-- [ ] Existing artifact and chat rendering remains stable.
-- [ ] No remote provider contracts are introduced.
+- [x] File references can open files in the workbench when available.
+- [x] Resolution is scoped to the active project/workspace.
+- [x] Unsafe or unavailable paths show clear states.
+- [x] Existing artifact and chat rendering remains stable.
+- [x] No remote provider contracts are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-code-workbench.4 --reason "Files can open from chat and workbench evidence"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-code-workbench.4 --reason "Files can open from chat and workbench evidence"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05
