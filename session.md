@@ -8,6 +8,30 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Completed design work for `agent-platform-operator-experience.9` on `task/agent-platform-operator-experience.9`: documented Docker host integration constraints, local Docker versus hosted versus desktop deployment modes, supported/unsupported/future bridge behavior, user-facing unavailable-state copy, and security requirements for any future host bridge.
+- **Date:** 2026-05-05
+- **Session:** Completed design work for `agent-platform-operator-experience.8` on `task/agent-platform-operator-experience.8`: added the IDE/workbench architecture reassessment recommending a hybrid model, with the platform focused on branch/diff review, evidence, artifacts, approvals, and bounded inspection while host IDE/browser handoff remains optional for deep editing and plugin feedback.
+- **Date:** 2026-05-05
+- **Session:** Claimed `agent-platform-operator-experience.8` and created `task/agent-platform-operator-experience.8` from the pushed `.7` branch tip. Next work is the IDE/workbench architecture reassessment.
+- **Date:** 2026-05-05
+- **Session:** Completed design work for `agent-platform-operator-experience.7` on `task/agent-platform-operator-experience.7`: added branch and diff workflow patterns covering branch status states, diff review shell, branch approval decision states, CI/SonarQube/CodeQL/review feedback linkage, unavailable states, and the implementation boundary with `agent-platform-branch-feedback-status`.
+- **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-operator-experience.6` on `task/agent-platform-operator-experience.6`: added generalized artifact viewer patterns, mapped browser evidence into image/text/JSON/download artifact cards, kept screenshots in the in-app zoomable viewer, added text/JSON in-app inspection, documented artifact states, and added focused artifact tests.
+- **Date:** 2026-05-05
+- **Session:** Follow-up on `task/agent-platform-operator-experience.5`: fixed the `/e2e/approval-card` visual fixture so it owns an absolute inset scroll container inside the app shell's overflow-hidden layout.
+- **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-operator-experience.5` on `task/agent-platform-operator-experience.5`: added a frontend-only operator trace view model, exposed a nested engineer-facing Trace details panel inside tool activity, surfaced existing trace ids/policy/errors/artifact counts/payloads when available, and added focused trace view tests.
+- **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-operator-experience.4` on `task/agent-platform-operator-experience.4`: added a frontend-only approval display mapper, redesigned HITL approval cards around action/target/reason/risk/outcome copy, moved raw/redacted approval payloads behind technical details, expanded the approval-card E2E fixture states, and added focused mapper tests.
+- **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-operator-experience.3` on `task/agent-platform-operator-experience.3`: added a frontend-only operator tool event display mapper, updated chat tool activity rows to show human-readable summaries by default, moved raw/redacted payloads behind nested technical details, preserved browser artifacts, and added focused mapper tests.
+- **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-operator-experience.2` on `task/agent-platform-operator-experience.2`: added `docs/design/operator-tool-event-display-model.md` defining current frontend tool inputs, display statuses, risk mapping, friendly tool labels, summary copy rules, details affordances, browser policy copy, approval states, and implementation guidance without changing contracts.
+- **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-operator-experience.1` on `task/agent-platform-operator-experience.1`: added `docs/design/operator-experience-design-system.md` defining stack constraints, product posture, layout rules, status/risk vocabulary, component inventory, artifact/debug/approval patterns, example states, and follow-up task alignment.
+- **Date:** 2026-05-05
+- **Session:** Expanded `agent-platform-operator-experience` into a full Beads task chain on `feature/agent-platform-operator-experience-tasks`: child tasks `.1` through `.9` now cover design-system foundations, human-readable tool events, activity/debug separation, approval cards, observability details, artifact viewers, branch/diff review, IDE/workbench direction, and Docker host constraints.
+- **Date:** 2026-05-05
 - **Session:** Baked operator-experience design-system constraints into planning on `main`: parent epic now requires Next.js App Router, shadcn/ui, Tailwind CSS, and TypeScript, and child task `agent-platform-operator-experience.1` captures the design-system foundation work with no new UI libraries, backend logic, or data-contract changes.
 - **Date:** 2026-05-05
 - **Session:** Captured agent-governed authoring refinement context on `feature/agent-platform-operator-experience`: added planning note `docs/planning/agent-governed-authoring.md`, created Beads epic `agent-platform-agent-profile-governance`, linked related epics, and saved project memory for collaborative skill/profile authoring, policy scopes, orchestration guardrails, artifacts, and phased observability.

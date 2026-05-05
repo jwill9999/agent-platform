@@ -43,6 +43,40 @@ describe('browser tool result helpers', () => {
     expect(JSON.stringify(summary)).not.toContain('raw content');
   });
 
+  it('creates inline preview links for text and JSON artifacts', () => {
+    const summary = summarizeBrowserToolResult({
+      kind: 'snapshot',
+      status: 'succeeded',
+      evidence: [
+        {
+          id: 'artifact-text',
+          kind: 'snapshot',
+          label: 'Page snapshot',
+          mimeType: 'text/plain',
+          sizeBytes: 100,
+          truncated: false,
+          metadata: {
+            workspaceRelativePath: '.agent-platform/browser/session/snapshot.txt',
+          },
+        },
+        {
+          id: 'artifact-json',
+          kind: 'report',
+          label: 'Report',
+          mimeType: 'application/json',
+          sizeBytes: 100,
+          truncated: false,
+          metadata: {
+            workspaceRelativePath: '.agent-platform/browser/session/report.json',
+          },
+        },
+      ],
+    });
+
+    expect(summary?.artifacts[0]?.previewHref).toContain('disposition=inline');
+    expect(summary?.artifacts[1]?.previewHref).toContain('disposition=inline');
+  });
+
   it('returns null for non-browser-shaped tool data', () => {
     expect(summarizeBrowserToolResult({ stdout: 'ok' })).toBeNull();
   });

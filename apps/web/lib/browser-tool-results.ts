@@ -45,7 +45,13 @@ function artifactPreviewHref(
   artifact: Record<string, unknown>,
   mimeType: string,
 ): string | undefined {
-  if (!mimeType.startsWith('image/')) return undefined;
+  if (
+    !mimeType.startsWith('image/') &&
+    !mimeType.startsWith('text/') &&
+    mimeType !== 'application/json'
+  ) {
+    return undefined;
+  }
   const downloadHref = artifactDownloadHref(artifact);
   return downloadHref ? `${downloadHref}&disposition=inline` : undefined;
 }
