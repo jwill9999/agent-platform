@@ -76,6 +76,7 @@ Spec: docs/tasks/<issue-id>.md
 | Coding tools             | `agent-platform-code-tools`               | `agent-platform-code-tools.{1-7}.md`                                             |
 | Browser tools            | `agent-platform-browser-tools`            | `agent-platform-browser-tools.{1-5}.md`, `agent-platform-browser-tools-guide.md` |
 | Operator experience      | `agent-platform-operator-experience`      | `agent-platform-operator-experience.{1-9}.md`                                    |
+| Code workbench           | `agent-platform-code-workbench`           | `agent-platform-code-workbench.{1-7}.md`                                         |
 | Research tools           | `agent-platform-research-tools`           | child specs pending                                                              |
 | Memory management        | `agent-platform-memory`                   | child specs pending                                                              |
 | Scheduler                | `agent-platform-scheduler`                | child specs pending                                                              |
