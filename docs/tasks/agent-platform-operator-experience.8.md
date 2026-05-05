@@ -12,6 +12,8 @@ Reassess whether the product should keep extending the embedded IDE, support ext
 
 This task is architectural/design documentation unless explicitly expanded during refinement.
 
+The reassessment is documented in [Operator IDE And Workbench Architecture](../design/operator-ide-workbench-architecture.md).
+
 ## Stack constraints
 
 Use Next.js App Router, shadcn/ui, Tailwind CSS, and TypeScript for any frontend prototypes. Do not introduce new UI libraries, change data contracts, or add backend logic in this task.
@@ -52,16 +54,16 @@ Branch `task/agent-platform-operator-experience.8` from `task/agent-platform-ope
 
 ## Definition of done
 
-- [ ] Current IDE/workbench state is documented.
-- [ ] Embedded, external, and hybrid approaches are compared.
-- [ ] Docker and plugin implications are documented.
-- [ ] Recommended next path is stated.
-- [ ] No backend contracts or new UI libraries are introduced.
+- [x] Current IDE/workbench state is documented.
+- [x] Embedded, external, and hybrid approaches are compared.
+- [x] Docker and plugin implications are documented.
+- [x] Recommended next path is stated.
+- [x] No backend contracts or new UI libraries are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-operator-experience.8 --reason "IDE and workbench architecture reassessed"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-operator-experience.8 --reason "IDE and workbench architecture reassessed"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05
