@@ -50,13 +50,17 @@ import { useHarnessChat } from '@/hooks/use-harness-chat';
 import type { FileNode } from '@/hooks/use-file-system';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgent } from '@/lib/default-agent';
-import { formatFileContext, sanitiseFileContext } from '@/lib/file-context';
+import { formatFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 import { CriticBadges } from '@/components/chat/critic-badges';
 import { ThinkingBlock } from '@/components/chat/thinking-block';
 import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
 import { WorkbenchCodeEditor } from '@/components/ide/workbench-code-editor';
 import { getWorkbenchLanguage, updateWorkbenchTabContent } from '@/lib/code-workbench-editor';
+import {
+  buildWorkbenchContextDraft,
+  type WorkbenchContextDraft,
+} from '@/lib/code-workbench-context';
 
 // ---------------------------------------------------------------------------
 // Small presentational components
@@ -575,8 +579,12 @@ function ChatPanel({
   chatInput,
   setChatInput,
   onSendMessage,
-  contextFiles,
+  contextDraft,
   activeFile,
+  includeActiveFile,
+  pinnedPaths,
+  workspaceName,
+  onToggleIncludeActiveFile,
   onAddToContext,
   onRemoveFromContext,
   onClearContext,
@@ -594,8 +602,12 @@ function ChatPanel({
   chatInput: string;
   setChatInput: (v: string) => void;
   onSendMessage: () => void;
-  contextFiles: OpenTab[];
+  contextDraft: WorkbenchContextDraft;
   activeFile: OpenTab | undefined;
+  includeActiveFile: boolean;
+  pinnedPaths: ReadonlySet<string>;
+  workspaceName: string;
+  onToggleIncludeActiveFile: () => void;
   onAddToContext: (tab: OpenTab) => void;
   onRemoveFromContext: (path: string) => void;
   onClearContext: () => void;
@@ -686,8 +698,8 @@ function ChatPanel({
                       <AssistantContent
                         message={message}
                         awaiting={awaitingAssistant}
-                        contextFiles={contextFiles}
-                        activeFile={activeFile ?? null}
+                        contextFiles={getAssistantContextFiles(contextDraft)}
+                        activeFile={null}
                         onApplyCode={onApplyCode}
                         onCreateFile={onCreateFile}
                         criticEvents={criticEventsByMessage[message.id]}
@@ -705,15 +717,15 @@ function ChatPanel({
 
       {/* Input */}
       <div className="p-3 border-t border-border bg-card/30">
-        <ContextFilesIndicator
-          contextFiles={contextFiles}
+        <WorkbenchContextPanel
+          contextDraft={contextDraft}
           activeFile={activeFile}
-          onRemoveFromContext={onRemoveFromContext}
-        />
-        <ContextActionButtons
-          activeFile={activeFile}
-          contextFiles={contextFiles}
+          includeActiveFile={includeActiveFile}
+          pinnedPaths={pinnedPaths}
+          workspaceName={workspaceName}
+          onToggleIncludeActiveFile={onToggleIncludeActiveFile}
           onAddToContext={onAddToContext}
+          onRemoveFromContext={onRemoveFromContext}
           onClearContext={onClearContext}
         />
         <div className="flex gap-2">
@@ -746,100 +758,186 @@ function ChatPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Context indicators (small sub-components)
+// Context panel (small sub-components)
 // ---------------------------------------------------------------------------
 
-function ContextFilesIndicator({
-  contextFiles,
+function WorkbenchContextPanel({
+  contextDraft,
   activeFile,
+  includeActiveFile,
+  pinnedPaths,
+  workspaceName,
+  onToggleIncludeActiveFile,
+  onAddToContext,
   onRemoveFromContext,
+  onClearContext,
 }: Readonly<{
-  contextFiles: OpenTab[];
+  contextDraft: WorkbenchContextDraft;
   activeFile: OpenTab | undefined;
+  includeActiveFile: boolean;
+  pinnedPaths: ReadonlySet<string>;
+  workspaceName: string;
+  onToggleIncludeActiveFile: () => void;
+  onAddToContext: (tab: OpenTab) => void;
   onRemoveFromContext: (path: string) => void;
+  onClearContext: () => void;
 }>) {
-  if (contextFiles.length === 0 && !activeFile) return null;
+  if (contextDraft.entries.length === 0 && !activeFile) return null;
+
+  const activeIsPinned = Boolean(activeFile && pinnedPaths.has(activeFile.path));
+  const activeStatus = activeIsPinned
+    ? 'Pinned'
+    : includeActiveFile
+      ? 'Auto-included'
+      : 'Not included';
 
   return (
-    <div className="mb-2">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Paperclip className="h-3 w-3 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Context files (visible to AI):</span>
-      </div>
-      <div className="flex flex-wrap gap-1">
-        {contextFiles.map((f) => (
-          <div
-            key={f.path}
-            className="flex items-center gap-1 px-2 py-0.5 bg-secondary/70 rounded text-xs"
+    <div className="mb-2 rounded-md border border-border bg-background/60 p-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">Code context</span>
+          </div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Workspace: {workspaceName}. {contextDraft.includedCount} file
+            {contextDraft.includedCount === 1 ? '' : 's'} will be sent with the next message
+            {contextDraft.totalCharacters > 0
+              ? ` (${contextDraft.totalCharacters.toLocaleString()} chars)`
+              : ''}
+            .
+          </p>
+        </div>
+        {pinnedPaths.size > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[11px] text-muted-foreground"
+            onClick={onClearContext}
           >
-            <FileCode className="h-3 w-3 text-muted-foreground" />
-            <span className="truncate max-w-[100px]">{f.name}</span>
-            <button
-              onClick={() => {
-                onRemoveFromContext(f.path);
-              }}
-              className="ml-0.5 hover:text-destructive"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ))}
-        {activeFile && !contextFiles.some((f) => f.path === activeFile.path) && (
-          <div className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded text-xs">
-            <FileCode className="h-3 w-3 text-primary" />
-            <span className="truncate max-w-[100px]">{activeFile.name}</span>
-            <span className="text-muted-foreground">(active)</span>
-          </div>
+            Clear
+          </Button>
         )}
       </div>
+
+      {activeFile && (
+        <div className="mt-2 rounded border border-border/70 bg-card/50 p-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs">
+                <FileCode className="h-3.5 w-3.5 text-primary" />
+                <span className="truncate font-medium">{activeFile.name}</span>
+                {activeFile.isDirty && (
+                  <span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                    unsaved
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                Active file · {activeStatus}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {!activeIsPinned && (
+                <Button
+                  variant={includeActiveFile ? 'secondary' : 'outline'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={onToggleIncludeActiveFile}
+                >
+                  {includeActiveFile ? 'Exclude' : 'Include'}
+                </Button>
+              )}
+              {!activeIsPinned && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    onAddToContext(activeFile);
+                  }}
+                >
+                  Pin
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {contextDraft.entries.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {contextDraft.entries.map((entry) => (
+            <div
+              key={entry.path}
+              className={cn(
+                'flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-xs',
+                entry.status === 'included'
+                  ? 'border-border/70 bg-secondary/35'
+                  : 'border-destructive/25 bg-destructive/5',
+              )}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="truncate font-medium">{entry.name}</span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {entry.source === 'active' ? 'active' : 'pinned'}
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                  {entry.status === 'included'
+                    ? `${entry.language ?? 'text'} · ${entry.characters.toLocaleString()} chars`
+                    : 'Excluded from the next message'}
+                </p>
+              </div>
+              {entry.source === 'pinned' && (
+                <button
+                  type="button"
+                  aria-label={`Remove ${entry.name} from context`}
+                  onClick={() => {
+                    onRemoveFromContext(entry.path);
+                  }}
+                  className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {contextDraft.warnings.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {contextDraft.warnings.map((warning) => (
+            <p
+              key={warning}
+              className="text-[11px] leading-snug text-amber-700 dark:text-amber-300"
+            >
+              {warning}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function ContextActionButtons({
-  activeFile,
-  contextFiles,
-  onAddToContext,
-  onClearContext,
-}: Readonly<{
-  activeFile: OpenTab | undefined;
-  contextFiles: OpenTab[];
-  onAddToContext: (tab: OpenTab) => void;
-  onClearContext: () => void;
-}>) {
-  const showPinButton = activeFile && !contextFiles.some((f) => f.path === activeFile.path);
-  const showClearButton = contextFiles.length > 0;
+function getFreshContextFiles(contextFiles: OpenTab[], openTabs: OpenTab[]): OpenTab[] {
+  return contextFiles.map((contextFile) => {
+    const current = openTabs.find((tab) => tab.path === contextFile.path);
+    return current ?? contextFile;
+  });
+}
 
-  if (!showPinButton && !showClearButton) return null;
-
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      {showPinButton && activeFile && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5 text-xs h-7"
-          onClick={() => {
-            onAddToContext(activeFile);
-          }}
-        >
-          <Plus className="h-3 w-3" />
-          Pin {activeFile.name}
-        </Button>
-      )}
-      {showClearButton && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 text-xs h-7 text-muted-foreground"
-          onClick={onClearContext}
-        >
-          <X className="h-3 w-3" />
-          Clear all
-        </Button>
-      )}
-    </div>
-  );
+function getAssistantContextFiles(
+  contextDraft: WorkbenchContextDraft,
+): { path: string; name: string }[] {
+  return contextDraft.sanitisedFiles.map((file) => ({
+    path: file.path,
+    name: file.path.split('/').pop() ?? file.path,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -875,19 +973,26 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [contextFiles, setContextFiles] = useState<OpenTab[]>([]);
+  const [includeActiveFile, setIncludeActiveFile] = useState(true);
 
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
-
-  const contextFilesForMessage = useMemo(() => {
-    const files: { file: string; code: string }[] = [];
-    for (const f of contextFiles) {
-      files.push({ file: f.path, code: f.content });
-    }
-    if (activeFile && !contextFiles.some((f) => f.path === activeFile.path)) {
-      files.push({ file: activeFile.path, code: activeFile.content });
-    }
-    return files;
-  }, [contextFiles, activeFile]);
+  const freshContextFiles = useMemo(
+    () => getFreshContextFiles(contextFiles, openTabs),
+    [contextFiles, openTabs],
+  );
+  const contextDraft = useMemo(
+    () =>
+      buildWorkbenchContextDraft({
+        pinnedFiles: freshContextFiles,
+        activeFile,
+        includeActiveFile,
+      }),
+    [freshContextFiles, activeFile, includeActiveFile],
+  );
+  const pinnedContextPaths = useMemo(
+    () => new Set(contextFiles.map((file) => file.path)),
+    [contextFiles],
+  );
 
   const {
     messages,
@@ -1057,6 +1162,40 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setContextFiles([]);
   }, []);
 
+  const handleToggleIncludeActiveFile = useCallback(() => {
+    setIncludeActiveFile((current) => !current);
+  }, []);
+
+  const handleAddNodeToContext = useCallback(
+    async (node: FileNode) => {
+      if (node.type !== 'file') return;
+      const openTab = openTabs.find((tab) => tab.path === node.path);
+      if (openTab) {
+        handleAddToContext(openTab);
+        return;
+      }
+
+      let content = node.content ?? '';
+      if (node.handle) {
+        try {
+          content = await fs.readFile(node);
+        } catch {
+          content = `// Failed to read ${node.path}\n`;
+        }
+      }
+
+      handleAddToContext({
+        path: node.path,
+        name: node.name,
+        content,
+        isDirty: false,
+        language: getLanguage(node.name),
+        handle: node.handle as FileSystemFileHandle | undefined,
+      });
+    },
+    [fs, handleAddToContext, openTabs],
+  );
+
   // --- Code apply from AI ---
 
   const handleApplyCode = useCallback(
@@ -1127,12 +1266,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const handleSendMessage = useCallback(() => {
     const userLine = chatInput.trim();
     if (!userLine || !sessionId) return;
-    const { files } = sanitiseFileContext(contextFilesForMessage);
-    const prefix = formatFileContext(files);
+    const prefix = formatFileContext(contextDraft.sanitisedFiles);
     const messageForApi = prefix ? `${prefix}\n${userLine}` : userLine;
     sendMessage(messageForApi, userLine).catch(() => {});
     setChatInput('');
-  }, [chatInput, sessionId, contextFilesForMessage, sendMessage]);
+  }, [chatInput, sessionId, contextDraft, sendMessage]);
 
   // --- Keyboard shortcuts ---
 
@@ -1299,15 +1437,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         node={node}
                         onFileSelect={handleFileSelect}
                         onAddToContext={(n) => {
-                          if (n.content) {
-                            handleAddToContext({
-                              path: n.path,
-                              name: n.name,
-                              content: n.content,
-                              isDirty: false,
-                              language: getLanguage(n.name),
-                            });
-                          }
+                          handleAddNodeToContext(n).catch(() => {
+                            toast.error(`Failed to add ${n.name} to context`);
+                          });
                         }}
                         selectedPath={activeTab}
                         contextPaths={contextFiles.map((f) => f.path)}
@@ -1365,8 +1497,12 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 chatInput={chatInput}
                 setChatInput={setChatInput}
                 onSendMessage={handleSendMessage}
-                contextFiles={contextFiles}
+                contextDraft={contextDraft}
                 activeFile={activeFile}
+                includeActiveFile={includeActiveFile}
+                pinnedPaths={pinnedContextPaths}
+                workspaceName={fs.rootName ?? 'No folder open'}
+                onToggleIncludeActiveFile={handleToggleIncludeActiveFile}
                 onAddToContext={handleAddToContext}
                 onRemoveFromContext={handleRemoveFromContext}
                 onClearContext={handleClearContext}

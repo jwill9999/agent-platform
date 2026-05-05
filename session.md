@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-code-workbench.3` on `task/agent-platform-code-workbench.3`: added a visible code-context panel for the IDE chat showing workspace, active file inclusion, pinned files, sanitisation/exclusion warnings, and next-message context counts. Fixed broken pinning by reading unloaded explorer file content when possible and deriving pinned context from fresh open-tab content, so the sanitised user-visible context now matches what is submitted to the agent.
+- **Date:** 2026-05-05
 - **Session:** Completed `agent-platform-code-workbench.2` on `task/agent-platform-code-workbench.2`: replaced the IDE textarea with a focused CodeMirror 6 editor baseline, added language mapping and dirty-state helpers, added focused web tests, and verified `/ide` with unit tests, typecheck, lint, build, and a headless browser check confirming the editor, line-number gutter, and opened file content. SonarQube MCP was not callable, so the repo fallback gate was used.
 - **Date:** 2026-05-05
 - **Session:** Started `agent-platform-code-workbench.1` on `task/agent-platform-code-workbench.1`: added the Code Workbench Product Model documenting project-scoped code chats versus general chats, workbench surfaces, active/pinned/selected file context rules, agent visibility states, diff-first edit flow, branch/artifact relationships, deployment boundaries, design constraints, and open refinement questions.

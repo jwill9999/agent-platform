@@ -49,21 +49,37 @@ Branch `task/agent-platform-code-workbench.3` from `task/agent-platform-code-wor
 
 ## Tests
 
-- focused web unit tests for context mapping
-- targeted manual check: active file, pinned files, excluded files, sent prompt context
+- [x] `pnpm --filter @agent-platform/web run test`
+- [x] `pnpm --filter @agent-platform/web run typecheck`
+- [x] `pnpm --filter @agent-platform/web run lint`
+- [x] `pnpm --filter @agent-platform/web run build`
+- [x] Headless browser smoke test confirmed an opened file can be pinned, shows as `Pinned`,
+      appears in the next-message context count, and exposes a remove control.
+
+## Implementation notes
+
+- Added a shared code-context draft model in `apps/web/lib/code-workbench-context.ts`.
+- The chat context panel now shows workspace, active file state, include/exclude active-file
+  control, pinned files, excluded/sanitisation warnings, and next-message context counts.
+- Message submission now uses the same sanitised context draft shown to the user.
+- Pinned files refresh from matching open tabs, so unsaved editor changes are reflected in the next
+  message context.
+- Explorer pinning now reads file content through the File System Access handle when needed instead
+  of silently doing nothing for unloaded files.
+- SonarQube MCP was not callable in this session, so the fallback completion gate was used.
 
 ## Definition of done
 
-- [ ] Active file context is visible in the side-panel chat.
-- [ ] Pinned/included files are visible and controllable.
-- [ ] User-visible context matches submitted sanitized context.
-- [ ] Unavailable/excluded file states are clear.
-- [ ] Existing chat behavior remains intact.
+- [x] Active file context is visible in the side-panel chat.
+- [x] Pinned/included files are visible and controllable.
+- [x] User-visible context matches submitted sanitized context.
+- [x] Unavailable/excluded file states are clear.
+- [x] Existing chat behavior remains intact.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-code-workbench.3 --reason "Active and pinned file context exposed to chat"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-code-workbench.3 --reason "Active and pinned file context exposed to chat"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05
