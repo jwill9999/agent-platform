@@ -10,6 +10,8 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 Document constraints and user-facing expectations for Docker-hosted execution when workflows need host browser, host IDE, local files, plugins, terminal output, or desktop application integration. This should distinguish supported behavior, unsupported behavior, and future bridge/helper possibilities.
 
+The constraints are documented in [Docker Host Integration Constraints](../design/docker-host-integration-constraints.md).
+
 ## Stack constraints
 
 Use Next.js App Router, shadcn/ui, Tailwind CSS, and TypeScript for any frontend prototypes. Do not introduce new UI libraries, change data contracts, or add backend logic in this task.
@@ -54,17 +56,17 @@ This is the current segment tip. If the full chain is implemented linearly, open
 
 ## Definition of done
 
-- [ ] Docker/host boundaries are documented.
-- [ ] Supported, unsupported, and future host integration paths are clear.
-- [ ] Security concerns for host bridges are documented.
-- [ ] User-facing unsupported-state guidance exists.
-- [ ] No backend contracts or new UI libraries are introduced.
+- [x] Docker/host boundaries are documented.
+- [x] Supported, unsupported, and future host integration paths are clear.
+- [x] Security concerns for host bridges are documented.
+- [x] User-facing unsupported-state guidance exists.
+- [x] No backend contracts or new UI libraries are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] If segment tip: PR merged `task/agent-platform-operator-experience.9 -> feature/agent-platform-operator-experience`; otherwise write “N/A — merge at segment end”.
-- [ ] `bd close agent-platform-operator-experience.9 --reason "Docker host integration constraints documented"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] N/A — owner will merge segment tip `task/agent-platform-operator-experience.9 -> feature/agent-platform-operator-experience` after this branch is pushed.
+- [x] `bd close agent-platform-operator-experience.9 --reason "Docker host integration constraints documented"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05

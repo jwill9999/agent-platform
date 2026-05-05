@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Completed design work for `agent-platform-operator-experience.9` on `task/agent-platform-operator-experience.9`: documented Docker host integration constraints, local Docker versus hosted versus desktop deployment modes, supported/unsupported/future bridge behavior, user-facing unavailable-state copy, and security requirements for any future host bridge.
+- **Date:** 2026-05-05
 - **Session:** Completed design work for `agent-platform-operator-experience.8` on `task/agent-platform-operator-experience.8`: added the IDE/workbench architecture reassessment recommending a hybrid model, with the platform focused on branch/diff review, evidence, artifacts, approvals, and bounded inspection while host IDE/browser handoff remains optional for deep editing and plugin feedback.
 - **Date:** 2026-05-05
 - **Session:** Claimed `agent-platform-operator-experience.8` and created `task/agent-platform-operator-experience.8` from the pushed `.7` branch tip. Next work is the IDE/workbench architecture reassessment.
