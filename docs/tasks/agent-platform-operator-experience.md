@@ -35,6 +35,21 @@ The broader frontend is functional, but the design system needs a stronger produ
 - Do not make every user-facing card expose raw JSON by default.
 - Do not decide the final IDE architecture without a focused trade-off review.
 - Do not bypass existing approval, URL, path, or tool-risk policies.
+- Do not introduce new UI libraries.
+- Do not change backend data contracts as part of design-system work.
+- Do not include backend logic in design-system foundation tasks.
+
+## Frontend Stack Constraints
+
+Operator experience UI work must use the existing frontend stack:
+
+- Next.js App Router for structure and routing.
+- shadcn/ui components for reusable primitives.
+- Tailwind CSS for styling.
+- TypeScript for implementation.
+- Radix behavior only through shadcn/ui primitives.
+
+Do not add new component libraries, styling systems, state-management libraries, or animation libraries for this epic without a separate architectural decision.
 
 ## Capability Map
 
@@ -50,14 +65,15 @@ The broader frontend is functional, but the design system needs a stronger produ
 
 | Order | Proposed task                                | Notes                                                                                                                                   |
 | ----- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | Define human-readable tool event model       | Map tool ids, arguments, risk tiers, and states to safe display labels and summaries.                                                   |
-| 2     | Split activity feed from debug payloads      | Keep the primary chat feed simple; move JSON, trace ids, and raw tool output into "View details" or a side inspector.                   |
-| 3     | Redesign HITL approval cards                 | Use action-oriented copy, risk badges, reason panels, and clear Approve/Deny controls.                                                  |
-| 4     | Add toolchain observability trace view       | Capture all backend tool lifecycle events for engineer debugging without overwhelming end users.                                        |
-| 5     | Establish artifact viewer design patterns    | Cover screenshots, browser snapshots, file artifacts, branch summaries, and generated evidence.                                         |
-| 6     | Design branch/diff approval workflows        | Coordinate with `agent-platform-branch-feedback-status` so branch state and diffs become user-reviewable artifacts.                     |
-| 7     | Reassess IDE/workbench architecture          | Coordinate with `agent-platform-ide-rethink`; decide whether to keep expanding the embedded IDE or support host/external-app workflows. |
-| 8     | Document Docker/host integration constraints | Capture limitations for opening host browsers, IDEs, local files, plugins, and desktop applications from containerized services.        |
+| 1     | Define operator design system foundations    | Lock stack constraints, visual language, component inventory, status/risk vocabulary, layout rules, and example states.                 |
+| 2     | Define human-readable tool event model       | Map tool ids, arguments, risk tiers, and states to safe display labels and summaries.                                                   |
+| 3     | Split activity feed from debug payloads      | Keep the primary chat feed simple; move JSON, trace ids, and raw tool output into "View details" or a side inspector.                   |
+| 4     | Redesign HITL approval cards                 | Use action-oriented copy, risk badges, reason panels, and clear Approve/Deny controls.                                                  |
+| 5     | Add toolchain observability trace view       | Capture all backend tool lifecycle events for engineer debugging without overwhelming end users.                                        |
+| 6     | Establish artifact viewer design patterns    | Cover screenshots, browser snapshots, file artifacts, branch summaries, and generated evidence.                                         |
+| 7     | Design branch/diff approval workflows        | Coordinate with `agent-platform-branch-feedback-status` so branch state and diffs become user-reviewable artifacts.                     |
+| 8     | Reassess IDE/workbench architecture          | Coordinate with `agent-platform-ide-rethink`; decide whether to keep expanding the embedded IDE or support host/external-app workflows. |
+| 9     | Document Docker/host integration constraints | Capture limitations for opening host browsers, IDEs, local files, plugins, and desktop applications from containerized services.        |
 
 ## Related Existing Work
 
@@ -73,7 +89,8 @@ Additional cross-epic planning context is captured in [Agent-Governed Authoring]
 ## Design Notes
 
 - Prefer a calm, product-level UI over log-style output.
-- Use existing component conventions and shadcn-style primitives where appropriate.
+- Use existing component conventions and shadcn/ui primitives.
+- Use Tailwind utility classes and semantic variants rather than new styling libraries.
 - Keep raw JSON available, but collapsed under advanced/debug controls.
 - Use friendly action names rather than internal ids:
   - `sys_browser_start` -> "Open browser page"
@@ -96,6 +113,7 @@ Additional cross-epic planning context is captured in [Agent-Governed Authoring]
 ## Definition of Done
 
 - Epic has child task specs before implementation begins.
+- Design-system constraints explicitly require Next.js App Router, shadcn/ui, Tailwind CSS, and TypeScript.
 - User-facing activity and approval surfaces no longer expose internal ids or raw JSON by default.
 - Engineers can still inspect raw tool payloads, policy decisions, trace ids, and backend state.
 - Artifact viewer patterns cover browser screenshots, snapshots, branch state, diffs, and code evidence.
