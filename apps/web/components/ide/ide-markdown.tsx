@@ -91,7 +91,7 @@ function CodeBlockApplyActions({
           <Diff className="h-3.5 w-3.5" />
           Diff
         </Button>
-        <ApplyButton matchingFile={matchingFile} onApply={onApply} applied={applied} />
+        <ReviewButton matchingFile={matchingFile} onApply={onApply} applied={applied} />
         {onCreateFile && <CreateFileButton onClick={onCreateFile} />}
       </>
     );
@@ -100,7 +100,7 @@ function CodeBlockApplyActions({
   if (matchingFile) {
     return (
       <>
-        <ApplyButton matchingFile={matchingFile} onApply={onApply} applied={applied} />
+        <ReviewButton matchingFile={matchingFile} onApply={onApply} applied={applied} />
         {onCreateFile && <CreateFileButton onClick={onCreateFile} />}
       </>
     );
@@ -142,7 +142,7 @@ function CodeBlockApplyActions({
   return null;
 }
 
-function ApplyButton({
+function ReviewButton({
   matchingFile,
   onApply,
   applied,
@@ -163,12 +163,12 @@ function ApplyButton({
       {applied ? (
         <>
           <Check className="h-3.5 w-3.5" />
-          Applied
+          Opened
         </>
       ) : (
         <>
           <Play className="h-3.5 w-3.5" />
-          Apply to {matchingFile.name}
+          Review for {matchingFile.name}
         </>
       )}
     </Button>

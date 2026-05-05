@@ -15,9 +15,11 @@ import {
   FileText,
   FileType,
   Folder,
+  Diff,
   Search,
   Send,
   Sparkles,
+  Check,
   PanelLeftClose,
   PanelRightClose,
   PanelBottomClose,
@@ -67,6 +69,10 @@ import {
   type WorkbenchFileReferenceStatus,
 } from '@/lib/code-workbench-file-references';
 import type { WorkbenchFileReferenceAction } from '@/components/ide/ide-markdown';
+import {
+  createWorkbenchEditProposal,
+  type WorkbenchEditProposal,
+} from '@/lib/code-workbench-edit-review';
 
 // ---------------------------------------------------------------------------
 // Small presentational components
@@ -95,6 +101,7 @@ function AssistantContent({
   activeFile,
   onApplyCode,
   onCreateFile,
+  onShowDiff,
   getFileReferenceAction,
   criticEvents,
   thinking,
@@ -105,6 +112,7 @@ function AssistantContent({
   activeFile: { path: string; name: string } | null;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  onShowDiff?: (code: string, targetFile?: string) => void;
   getFileReferenceAction?: (reference: string) => WorkbenchFileReferenceAction | null;
   criticEvents?: readonly CriticEvent[];
   thinking?: string;
@@ -133,6 +141,7 @@ function AssistantContent({
         contextFiles={allFiles}
         onApplyCode={onApplyCode}
         onCreateFile={onCreateFile}
+        onShowDiff={onShowDiff}
         getFileReferenceAction={getFileReferenceAction}
       />
     </>
@@ -539,12 +548,18 @@ function EditorTabs({
 
 function EditorPanel({
   activeFile,
+  editProposal,
   onContentChange,
   onOpenPathDialog,
+  onApplyProposal,
+  onRejectProposal,
 }: Readonly<{
   activeFile: OpenTab | undefined;
+  editProposal: WorkbenchEditProposal | null;
   onContentChange: (content: string) => void;
   onOpenPathDialog: () => void;
+  onApplyProposal: () => void;
+  onRejectProposal: () => void;
 }>) {
   if (!activeFile) {
     return (
@@ -568,12 +583,83 @@ function EditorPanel({
         <span>{activeFile.language}</span>
         <span>{activeFile.content.split('\n').length} lines</span>
       </div>
+      {editProposal && (
+        <EditProposalPanel
+          proposal={editProposal}
+          onApply={onApplyProposal}
+          onReject={onRejectProposal}
+        />
+      )}
       <WorkbenchCodeEditor
         value={activeFile.content}
         language={getWorkbenchLanguage(activeFile.name)}
         onChange={onContentChange}
         ariaLabel={`Code editor for ${activeFile.name}`}
       />
+    </div>
+  );
+}
+
+function EditProposalPanel({
+  proposal,
+  onApply,
+  onReject,
+}: Readonly<{
+  proposal: WorkbenchEditProposal;
+  onApply: () => void;
+  onReject: () => void;
+}>) {
+  return (
+    <div className="border-b border-border bg-card/80">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Diff className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Review proposed edit</span>
+            {proposal.isNewFile && (
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                new file
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{proposal.path}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onReject}>
+            <X className="h-3.5 w-3.5" />
+            Reject
+          </Button>
+          <Button size="sm" className="h-8 gap-1.5" onClick={onApply}>
+            <Check className="h-3.5 w-3.5" />
+            Apply
+          </Button>
+        </div>
+      </div>
+      <ScrollArea className="max-h-64 border-t border-border bg-background">
+        <div className="min-w-max py-2 font-mono text-xs">
+          {proposal.diff.map((line, index) => (
+            <div
+              key={`${line.kind}-${index}`}
+              className={cn(
+                'grid grid-cols-[3rem_3rem_1.5rem_1fr] gap-2 px-4 py-0.5',
+                line.kind === 'added' && 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+                line.kind === 'removed' && 'bg-destructive/10 text-destructive',
+              )}
+            >
+              <span className="select-none text-right text-muted-foreground">
+                {line.oldLineNumber ?? ''}
+              </span>
+              <span className="select-none text-right text-muted-foreground">
+                {line.newLineNumber ?? ''}
+              </span>
+              <span className="select-none">
+                {line.kind === 'added' ? '+' : line.kind === 'removed' ? '-' : ' '}
+              </span>
+              <span className="whitespace-pre">{line.content || ' '}</span>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
     </div>
   );
 }
@@ -599,6 +685,7 @@ function ChatPanel({
   onClearContext,
   onApplyCode,
   onCreateFile,
+  onShowDiff,
   getFileReferenceAction,
   agents,
   selectedAgentId,
@@ -623,6 +710,7 @@ function ChatPanel({
   onClearContext: () => void;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  onShowDiff: (code: string, targetFile?: string) => void;
   getFileReferenceAction: (reference: string) => WorkbenchFileReferenceAction | null;
   agents: Agent[];
   selectedAgentId: string | null;
@@ -713,6 +801,7 @@ function ChatPanel({
                         activeFile={null}
                         onApplyCode={onApplyCode}
                         onCreateFile={onCreateFile}
+                        onShowDiff={onShowDiff}
                         getFileReferenceAction={getFileReferenceAction}
                         criticEvents={criticEventsByMessage[message.id]}
                         thinking={thinkingByMessage[message.id]}
@@ -1003,6 +1092,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [chatInput, setChatInput] = useState('');
   const [contextFiles, setContextFiles] = useState<OpenTab[]>([]);
   const [includeActiveFile, setIncludeActiveFile] = useState(true);
+  const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
 
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
   const freshContextFiles = useMemo(
@@ -1232,23 +1322,49 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       if (!targetFile) return;
       const existing = openTabs.find((tab) => tab.path === targetFile);
       if (existing) {
-        setOpenTabs((prev) =>
-          prev.map((tab) =>
-            tab.path === targetFile ? { ...tab, content: code, isDirty: true } : tab,
-          ),
+        setEditProposal(
+          createWorkbenchEditProposal({
+            path: targetFile,
+            before: existing.content,
+            after: code,
+          }),
         );
         setActiveTab(targetFile);
       } else {
         const name = targetFile.split('/').pop() ?? 'untitled';
+        setEditProposal(
+          createWorkbenchEditProposal({
+            path: targetFile,
+            before: '',
+            after: code,
+          }),
+        );
         setOpenTabs((prev) => [
           ...prev,
-          { path: targetFile, name, content: code, isDirty: true, language: getLanguage(name) },
+          { path: targetFile, name, content: '', isDirty: false, language: getLanguage(name) },
         ]);
         setActiveTab(targetFile);
       }
     },
     [openTabs],
   );
+
+  const handleRejectProposal = useCallback(() => {
+    setEditProposal(null);
+  }, []);
+
+  const handleApplyProposal = useCallback(() => {
+    if (!editProposal) return;
+    setOpenTabs((prev) =>
+      prev.map((tab) =>
+        tab.path === editProposal.path
+          ? { ...tab, content: editProposal.after, isDirty: true }
+          : tab,
+      ),
+    );
+    setActiveTab(editProposal.path);
+    setEditProposal(null);
+  }, [editProposal]);
 
   const handleCreateFile = useCallback((code: string, suggestedName = 'new-file.ts') => {
     const path = `/src/${suggestedName}`;
@@ -1544,10 +1660,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 />
                 <EditorPanel
                   activeFile={activeFile}
+                  editProposal={
+                    editProposal && editProposal.path === activeFile?.path ? editProposal : null
+                  }
                   onContentChange={handleContentChange}
                   onOpenPathDialog={() => {
                     setIsPathDialogOpen(true);
                   }}
+                  onApplyProposal={handleApplyProposal}
+                  onRejectProposal={handleRejectProposal}
                 />
               </div>
             </ResizablePanel>
@@ -1585,6 +1706,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 onClearContext={handleClearContext}
                 onApplyCode={handleApplyCode}
                 onCreateFile={handleCreateFile}
+                onShowDiff={handleApplyCode}
                 getFileReferenceAction={getFileReferenceAction}
                 agents={agents}
                 selectedAgentId={selectedAgentId}
