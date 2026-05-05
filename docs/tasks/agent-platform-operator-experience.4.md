@@ -47,16 +47,16 @@ Branch `task/agent-platform-operator-experience.4` from `task/agent-platform-ope
 
 ## Definition of done
 
-- [ ] Approval cards explain action, target, reason, risk, and result.
-- [ ] Raw JSON is not the default approval-card content.
-- [ ] Approve and Deny actions are visually clear.
-- [ ] High-risk/external/destructive actions have distinct treatment when existing data supports it.
-- [ ] No backend contracts or new UI libraries are introduced.
+- [x] Approval cards explain action, target, reason, risk, and result.
+- [x] Raw JSON is not the default approval-card content.
+- [x] Approve and Deny actions are visually clear.
+- [x] High-risk/external/destructive actions have distinct treatment when existing data supports it.
+- [x] No backend contracts or new UI libraries are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-operator-experience.4 --reason "HITL approval cards redesigned"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-operator-experience.4 --reason "HITL approval cards redesigned"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05

@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-operator-experience.4` on `task/agent-platform-operator-experience.4`: added a frontend-only approval display mapper, redesigned HITL approval cards around action/target/reason/risk/outcome copy, moved raw/redacted approval payloads behind technical details, expanded the approval-card E2E fixture states, and added focused mapper tests.
+- **Date:** 2026-05-05
 - **Session:** Completed `agent-platform-operator-experience.3` on `task/agent-platform-operator-experience.3`: added a frontend-only operator tool event display mapper, updated chat tool activity rows to show human-readable summaries by default, moved raw/redacted payloads behind nested technical details, preserved browser artifacts, and added focused mapper tests.
 - **Date:** 2026-05-05
 - **Session:** Completed `agent-platform-operator-experience.2` on `task/agent-platform-operator-experience.2`: added `docs/design/operator-tool-event-display-model.md` defining current frontend tool inputs, display statuses, risk mapping, friendly tool labels, summary copy rules, details affordances, browser policy copy, approval states, and implementation guidance without changing contracts.
