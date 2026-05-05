@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Expanded `agent-platform-operator-experience` into a full Beads task chain on `feature/agent-platform-operator-experience-tasks`: child tasks `.1` through `.9` now cover design-system foundations, human-readable tool events, activity/debug separation, approval cards, observability details, artifact viewers, branch/diff review, IDE/workbench direction, and Docker host constraints.
+- **Date:** 2026-05-05
 - **Session:** Baked operator-experience design-system constraints into planning on `main`: parent epic now requires Next.js App Router, shadcn/ui, Tailwind CSS, and TypeScript, and child task `agent-platform-operator-experience.1` captures the design-system foundation work with no new UI libraries, backend logic, or data-contract changes.
 - **Date:** 2026-05-05
 - **Session:** Captured agent-governed authoring refinement context on `feature/agent-platform-operator-experience`: added planning note `docs/planning/agent-governed-authoring.md`, created Beads epic `agent-platform-agent-profile-governance`, linked related epics, and saved project memory for collaborative skill/profile authoring, policy scopes, orchestration guardrails, artifacts, and phased observability.

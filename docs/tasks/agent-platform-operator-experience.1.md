@@ -42,9 +42,9 @@ Execution order is enforced in **Beads** with **`blocks`** edges. Do **not** clo
 
 ### Downstream — waiting on this task
 
-| Issue                                  | Spec |
-| -------------------------------------- | ---- |
-| Future operator-experience child tasks | TBD  |
+| Issue                                  | Spec                                                                                |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| `agent-platform-operator-experience.2` | [Define human-readable tool event model](./agent-platform-operator-experience.2.md) |
 
 ### Planning notes
 
