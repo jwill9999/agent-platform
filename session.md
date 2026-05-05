@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Started `agent-platform-code-workbench.1` on `task/agent-platform-code-workbench.1`: added the Code Workbench Product Model documenting project-scoped code chats versus general chats, workbench surfaces, active/pinned/selected file context rules, agent visibility states, diff-first edit flow, branch/artifact relationships, deployment boundaries, design constraints, and open refinement questions.
+- **Date:** 2026-05-05
 - **Session:** Created the `agent-platform-code-workbench` Beads epic on `feature/agent-platform-code-workbench`, added child tasks `.1` through `.7`, wired linear dependencies, and drafted specs for a project-scoped Codex-style code workbench with proper editor baseline, visible chat file context, file-open workflows, diff-first edit review, branch/Git sidebar preparation, and verification guidance. Updated `agent-platform-ide-rethink` as superseded/refined by this epic. Code workbench specs preserve the operator-experience design strategy: shadcn/ui, Radix primitives, Tailwind CSS, TypeScript, lucide icons, and CodeMirror only as a focused editor engine if added.
 - **Date:** 2026-05-05
 - **Session:** Completed design work for `agent-platform-operator-experience.9` on `task/agent-platform-operator-experience.9`: documented Docker host integration constraints, local Docker versus hosted versus desktop deployment modes, supported/unsupported/future bridge behavior, user-facing unavailable-state copy, and security requirements for any future host bridge.

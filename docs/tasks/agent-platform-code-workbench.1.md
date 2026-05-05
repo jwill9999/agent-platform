@@ -20,6 +20,8 @@ The model must distinguish:
 
 This task is documentation/design only.
 
+The product model is documented in [Code Workbench Product Model](../design/code-workbench-product-model.md).
+
 ## Implementation plan
 
 1. Document the project/grouping model for code work.
@@ -38,16 +40,16 @@ Branch `task/agent-platform-code-workbench.1` from `feature/agent-platform-code-
 
 ## Definition of done
 
-- [ ] Project-scoped code workbench model is documented.
-- [ ] General chat versus project chat behavior is defined.
-- [ ] File/context visibility rules are documented.
-- [ ] Non-goals and implementation constraints are clear.
-- [ ] No backend contracts or new UI libraries are introduced.
+- [x] Project-scoped code workbench model is documented.
+- [x] General chat versus project chat behavior is defined.
+- [x] File/context visibility rules are documented.
+- [x] Non-goals and implementation constraints are clear.
+- [x] No backend contracts or new UI libraries are introduced.
 
 ## Sign-off
 
-- [ ] Required checks pass.
-- [ ] `bd close agent-platform-code-workbench.1 --reason "Code workbench product model defined"`
-- [ ] `session.md` updated if handoff needed.
+- [x] Required checks pass.
+- [x] `bd close agent-platform-code-workbench.1 --reason "Code workbench product model defined"`
+- [x] `session.md` updated if handoff needed.
 
 **Reviewer / owner:** Jason Williams **Date:** 2026-05-05
