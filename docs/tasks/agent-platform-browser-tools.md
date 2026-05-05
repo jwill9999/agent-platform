@@ -111,3 +111,7 @@ sidecar metadata.
 - [x] Screenshots/snapshots are stored as evidence artifacts.
 - [x] Tests cover successful UI validation and blocked risky actions.
 - [x] Child task specs exist for `.1` through `.5` and Beads dependencies match the proposed chain.
+
+## Usage Guide
+
+For practical usage patterns, example prompts, approval behaviour, artifact inspection, and troubleshooting, see [Browser Tools Guide](../browser-tools.md).
