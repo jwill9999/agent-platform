@@ -59,7 +59,7 @@ export default function ApprovalCardE2ePage() {
   ];
 
   return (
-    <main className="p-6">
+    <main className="absolute inset-0 overflow-y-auto p-6 pb-24">
       <h1 className="mb-4 text-lg font-semibold">E2E approval-card verify</h1>
       <div className="flex max-w-3xl flex-col gap-4">
         {approvals.map((approval) => (

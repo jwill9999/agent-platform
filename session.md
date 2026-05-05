@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Follow-up on `task/agent-platform-operator-experience.5`: fixed the `/e2e/approval-card` visual fixture so it owns an absolute inset scroll container inside the app shell's overflow-hidden layout.
+- **Date:** 2026-05-05
 - **Session:** Completed `agent-platform-operator-experience.5` on `task/agent-platform-operator-experience.5`: added a frontend-only operator trace view model, exposed a nested engineer-facing Trace details panel inside tool activity, surfaced existing trace ids/policy/errors/artifact counts/payloads when available, and added focused trace view tests.
 - **Date:** 2026-05-05
 - **Session:** Completed `agent-platform-operator-experience.4` on `task/agent-platform-operator-experience.4`: added a frontend-only approval display mapper, redesigned HITL approval cards around action/target/reason/risk/outcome copy, moved raw/redacted approval payloads behind technical details, expanded the approval-card E2E fixture states, and added focused mapper tests.
