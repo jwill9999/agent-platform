@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-05
+- **Session:** Claimed `agent-platform-operator-experience.8` and created `task/agent-platform-operator-experience.8` from the pushed `.7` branch tip. Next work is the IDE/workbench architecture reassessment.
+- **Date:** 2026-05-05
 - **Session:** Completed design work for `agent-platform-operator-experience.7` on `task/agent-platform-operator-experience.7`: added branch and diff workflow patterns covering branch status states, diff review shell, branch approval decision states, CI/SonarQube/CodeQL/review feedback linkage, unavailable states, and the implementation boundary with `agent-platform-branch-feedback-status`.
 - **Date:** 2026-05-05
 - **Session:** Completed `agent-platform-operator-experience.6` on `task/agent-platform-operator-experience.6`: added generalized artifact viewer patterns, mapped browser evidence into image/text/JSON/download artifact cards, kept screenshots in the in-app zoomable viewer, added text/JSON in-app inspection, documented artifact states, and added focused artifact tests.
