@@ -53,6 +53,40 @@ Out of scope:
 - Hosted remote checkout management.
 - Cross-project knowledge-base synchronization.
 
+## Ticket Delivery Skill
+
+Implementation work for this epic should use the same ticket-delivery skill as Epic 1:
+
+1. Claim the Beads task and create `task/<issue-id>` from the current `feature/agent-platform-project-onboarding`
+   branch, or from the active feature branch chosen when Epic 2 starts.
+2. Re-read the task spec and write down the task-specific testing strategy before changing code.
+3. Implement the task with focused tests first where practical.
+4. Run the local quality gates named in the task's testing strategy.
+5. Push the task branch.
+6. Open a pull request from `task/<issue-id>` to the Epic 2 feature branch.
+7. Monitor GitHub checks and review feedback until the pull request is green.
+8. If checks fail or review finds issues, fix them on the same task branch, rerun relevant local
+   gates, push again, and continue monitoring.
+9. Merge the task PR only after local gates, remote checks, and task Definition of Done are satisfied.
+10. Close the Beads task, update `session.md` when useful, and move to the next task from the updated
+    feature branch.
+
+This epic intentionally uses **one PR per ticket** so each onboarding behavior is independently
+reviewable and testable. This overrides the repository's default chained-segment PR workflow for this
+epic.
+
+## Testing Strategy Requirements
+
+Each child task must keep a concrete testing strategy in its **Tests And Verification** section. The
+strategy must identify:
+
+- local unit/contract/component tests to add or update.
+- integration tests needed for assessment, persistence, runtime, or approval boundaries.
+- Playwright coverage for user-visible onboarding behavior.
+- filesystem assertions for `AGENTS.md` draft/finalization/update behavior.
+- CI/GitHub checks that must be monitored on the task pull request.
+- deterministic fixture projects needed by the task.
+
 ## Proposed Task Chain
 
 | Task                                  | Purpose                                                      |

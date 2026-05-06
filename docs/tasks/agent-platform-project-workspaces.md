@@ -67,6 +67,40 @@ Out of scope for this epic:
 
 Those items belong to `agent-platform-project-onboarding`.
 
+## Ticket Delivery Skill
+
+Implementation work for this epic should follow a repeatable ticket-delivery skill. The skill is
+defined here during planning so each task can be executed and verified consistently:
+
+1. Claim the Beads task and create `task/<issue-id>` from the current `feature/agent-platform-project-workspaces`
+   branch.
+2. Re-read the task spec and write down the task-specific testing strategy before changing code.
+3. Implement the task with focused tests first where practical.
+4. Run the local quality gates named in the task's testing strategy.
+5. Push the task branch.
+6. Open a pull request from `task/<issue-id>` to `feature/agent-platform-project-workspaces`.
+7. Monitor GitHub checks and review feedback until the pull request is green.
+8. If checks fail or review finds issues, fix them on the same task branch, rerun relevant local
+   gates, push again, and continue monitoring.
+9. Merge the task PR only after local gates, remote checks, and task Definition of Done are satisfied.
+10. Close the Beads task, update `session.md` when useful, and move to the next task from the updated
+    feature branch.
+
+This epic intentionally uses **one PR per ticket** so each task is independently reviewable and
+testable. This overrides the repository's default chained-segment PR workflow for this epic.
+
+## Testing Strategy Requirements
+
+Each child task must keep a concrete testing strategy in its **Tests And Verification** section. The
+strategy must identify:
+
+- local unit/contract/component tests to add or update.
+- integration tests needed for API, DB, runtime, tool, or Docker boundaries.
+- Playwright coverage when user-visible behavior or end-to-end safety is involved.
+- filesystem assertions for Project-root behavior and wrong-root write prevention.
+- CI/GitHub checks that must be monitored on the task pull request.
+- any known test fixture data required by the task.
+
 ## Proposed Task Chain
 
 | Task                                  | Purpose                                                       |

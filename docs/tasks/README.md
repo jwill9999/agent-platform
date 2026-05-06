@@ -19,7 +19,7 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
 5. **Git (mandatory)** — **Never commit directly to `main`.**
    - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-persistence`, `task/agent-platform-mov.1`).
    - **Chained segments (default):** tasks run **in order** on Git. The **first** task in a segment branches from **`feature/<feature-name>`**. **Each following** task branches from the **previous task’s branch** (after that task is complete and pushed). **Intermediate** tasks do **not** get their own PR to `feature`—only the **last task in the segment** opens **one PR** from **`task/<tip>` → `feature/<feature-name>`**, merging the whole chain. Then the **next** segment’s first task branches from the **updated** `feature` branch.
-   - **Sign-off:** **unit tests** pass; checklist complete; **`bd close`** per task when its work is done. **PR to `feature`** only on the **segment tip** (unless a spec explicitly says otherwise).
+   - **Sign-off:** **unit tests** pass; checklist complete; **`bd close`** per task when its work is done. **PR to `feature`** only on the **segment tip** (unless a spec explicitly says otherwise). When a spec requires a PR per ticket, open the task PR after local gates pass, monitor GitHub checks/reviews until green, fix failures on the same task branch, then merge before closing the Bead.
    - **Release:** when ready, run integration testing and ensure CI/CD pipelines are green, then merge **`feature/<feature-name>` → `main`** via one PR.
 
 6. **Template** — Copy [`_template.md`](./_template.md) when creating a new task spec; then wire the Beads issue.
@@ -54,6 +54,7 @@ Spec: docs/tasks/<issue-id>.md
 2. Create spec file from [`_template.md`](./_template.md) as `docs/tasks/<issue-id>.md`.
 3. Update Beads description so the first line points to the spec file.
 4. Ensure acceptance criteria in Beads and Definition of Done in spec are aligned.
+5. Add a concrete testing strategy to the task spec before implementation starts.
 
 ### Validation checklist
 

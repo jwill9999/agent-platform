@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Added the ticket-delivery skill expectation to the Project workspace and Project onboarding epic specs: each task uses one PR per ticket into the feature branch, local gates must pass before PR, GitHub checks/reviews are monitored until green, failures are fixed iteratively on the same branch, and every task spec must include a concrete testing strategy before implementation starts.
+- **Date:** 2026-05-07
 - **Session:** Refined the Project feature into two epics on `feature/agent-platform-project-workspaces`: Epic 1 `agent-platform-project-workspaces` now covers Project vs Chat entry paths, backend-accessible Project binding, `/workspace` and tool scoping, the minimal `AGENTS.md` write safety gate, and Playwright E2E verification. Created Epic 2 `agent-platform-project-onboarding` for the full `AGENTS.md` lifecycle: read-only assessment, gap analysis, collaborative onboarding dialogue, review/approval, closeout update candidates, refresh/rescan, and Playwright E2E. Beads dependencies chain Epic 2 after Epic 1.
 - **Date:** 2026-05-06
 - **Session:** Main was updated after the code-workbench merge and stale branches were pruned. Claimed the next P1 epic, `agent-platform-project-workspaces`, pushed the Beads/Dolt state, and created `feature/agent-platform-project-workspaces` from `main` for refinement/planning. Start with the epic spec at `docs/tasks/agent-platform-project-workspaces.md`; first implementation task is `agent-platform-project-workspaces.1` once refinement is complete.
