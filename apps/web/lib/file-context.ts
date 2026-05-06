@@ -347,10 +347,18 @@ export function formatFileContext(files: SanitisedFile[]): string {
   if (files.length === 0) return '';
 
   const blocks = files.map((f) => `--- ${f.path} ---\n\`\`\`${f.language}\n${f.code}\n\`\`\``);
+  const editGuidance = [
+    'Workbench edit guidance:',
+    '- These files are open in the browser code workbench and may not exactly match the backend container filesystem.',
+    '- If the user asks you to change one of these files, propose the updated file content for review instead of using backend file-editing tools.',
+    '- Return the replacement as a fenced code block tagged with the language and path, for example ```typescript:/src/app.ts.',
+    '- Do not ask the user to copy line endings, whitespace, or exact first lines when the attached file content is sufficient to produce a reviewed replacement.',
+  ];
 
   return [
     '<file_context>',
     'The following files have been provided as context for your reference:',
+    ...editGuidance,
     '',
     ...blocks,
     '</file_context>',
