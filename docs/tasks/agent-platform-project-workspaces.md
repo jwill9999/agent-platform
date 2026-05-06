@@ -1,4 +1,4 @@
-# Epic: Project workspace binding
+# Epic: Project workspace binding and safety gate
 
 **Beads issue:** `agent-platform-project-workspaces`  
 **Spec file:** `docs/tasks/agent-platform-project-workspaces.md` (this file)
@@ -7,60 +7,92 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Objective
 
-Make code workbench sessions operate on a single active project workspace so the IDE tree, chat
-context, terminal, agent tools, Git state, and sensors all refer to the same root.
+Make code-related work run inside an explicit Project that is backed by a command-line-accessible
+working tree. Project sessions must use the coding agent by default, resolve `/workspace` to the
+active Project root, and expose file/Git/terminal/test/Docker/sensor tools only when the Project
+state allows them.
 
-The canonical agent-facing path is `/workspace`. Internally, `/workspace` must resolve to the active
-project root for the current session, not a default Docker directory unrelated to the folder the user
-opened.
+This epic intentionally delivers the functional and testable foundation. The richer collaborative
+`AGENTS.md` onboarding lifecycle is delivered by the follow-up epic
+`agent-platform-project-onboarding`.
 
-## Problem
+## Product Decisions
 
-The current workbench has two filesystem realities:
+- The user chooses either **Open Project** or **Open Chat** before entering the main interface.
+- **Open Project** creates or selects a code Project, defaults to the coding agent, and uses the
+  project/code interface.
+- **Open Chat** opens a general chat, defaults to the personal assistant, and does not expose branch
+  pickers, Git tools, terminal tools, project file trees, or code-write tools by default.
+- A Project is a backend-accessible working tree. Browser-only folder access is not enough for
+  code-agent execution.
+- The working tree can be a monorepo. Root `AGENTS.md` provides repo-wide guidance; nested
+  `AGENTS.md` files may refine app/package/service-specific guidance.
+- If monorepo scope is ambiguous, the agent asks the user instead of guessing.
+- Root `AGENTS.md` is required before code writes. Missing or unapproved onboarding state permits
+  read-only investigation and chat, but blocks writes, deletes, file creation, commits, and
+  destructive commands.
+- Tool exposure is policy-driven from Project capability and onboarding state, not prompt-only.
+- `/workspace` is the canonical agent-facing path for the active Project root.
 
-- the browser can open a host folder through File System Access handles
-- the backend agent tools write to the API container's `/workspace`
+## Terms
 
-This lets the user view one project while the agent writes somewhere else. Prompt instructions are
-not sufficient because the model can still choose backend file tools. The architecture needs a
-project workspace boundary that makes the correct root explicit and enforceable.
+- **Project working tree:** backend-accessible repository or folder selected by the user.
+- **Project root:** the path exposed to the coding agent as `/workspace`.
+- **Repository root:** the Git boundary, which is usually the Project root but may be discovered
+  separately.
+- **Subproject scope:** app/package/service within a monorepo.
+- **General chat workspace:** non-project storage/artifact area for personal assistant chats.
 
-## Product Model
+## Epic 1 Scope
 
-```text
-Project
-  Workspace root
-  Capability state
-  Git/branch state
-  File tree
-  Terminal cwd
-  Chats
-    Chat sessions bound to this project
-```
+In scope:
 
-Workspace capability states:
+- Project vs Chat entry-path split.
+- Default agent selection by mode: coding agent for Project, personal assistant for Chat.
+- Project metadata and onboarding state foundation.
+- Backend-accessible working-tree validation.
+- `/workspace` resolver and PathJail/tool scoping.
+- Capability-based tool gating.
+- Root and nested `AGENTS.md` context loading.
+- Minimal onboarding safety gate: approved onboarding required before code writes.
+- Automated and Playwright E2E verification that acts as a human using the UI.
 
-- `frontend_only`: browser can read/write selected files, backend cannot run project file tools.
-- `backend_mounted`: backend tools, terminal, Git, and sensors operate on the active project root.
-- `remote_managed`: hosted checkout controlled by the platform.
-- `readonly`: inspect-only project.
+Out of scope for this epic:
+
+- LLM-led project gap analysis.
+- Collaborative `AGENTS.md` drafting/revision dialogue.
+- Initial `AGENTS.md` review/approval UI polish.
+- Closeout update candidates and refresh/rescan actions.
+- Multi-agent orchestration beyond mode-based default agent selection.
+
+Those items belong to `agent-platform-project-onboarding`.
 
 ## Proposed Task Chain
 
-| Task                                  | Purpose                                                   |
-| ------------------------------------- | --------------------------------------------------------- |
-| `agent-platform-project-workspaces.1` | Define project workspace model and capability states      |
-| `agent-platform-project-workspaces.2` | Bind workbench chats and sessions to an active project    |
-| `agent-platform-project-workspaces.3` | Add backend workspace resolver and path-jail mapping      |
-| `agent-platform-project-workspaces.4` | Support frontend create file/folder in browser workspaces |
-| `agent-platform-project-workspaces.5` | Gate agent tools by workspace capability state            |
-| `agent-platform-project-workspaces.6` | Add verification and migration coverage                   |
+| Task                                  | Purpose                                                       |
+| ------------------------------------- | ------------------------------------------------------------- |
+| `agent-platform-project-workspaces.1` | Define Project, mode, capability, and onboarding state model  |
+| `agent-platform-project-workspaces.2` | Add Project vs Chat entry paths and default agent selection   |
+| `agent-platform-project-workspaces.3` | Bind Project sessions to a backend-accessible working tree    |
+| `agent-platform-project-workspaces.4` | Resolve `/workspace` and scope runtime tools to the Project   |
+| `agent-platform-project-workspaces.5` | Enforce `AGENTS.md` onboarding gate and instruction context   |
+| `agent-platform-project-workspaces.6` | Verify Project binding, safety gate, and Playwright E2E flows |
 
-## Definition Of Done
+## Epic Definition Of Done
 
-- [ ] Each child task has a spec linked from Beads.
-- [ ] Workbench sessions have an explicit project/workspace binding.
-- [ ] Agent-facing `/workspace` consistently means the active project root.
-- [ ] Creating and editing files lands in the active project, not a default container path.
-- [ ] Tool exposure is derived from workspace capability state.
-- [ ] Manual and automated verification covers browser-only and backend-mounted projects.
+- [ ] Each child task has a Beads issue, spec file, dependency edge, and Definition of Done.
+- [ ] Users can choose Project or Chat before entering the main work surface.
+- [ ] Project mode defaults to the coding agent and Chat mode defaults to the personal assistant.
+- [ ] Chat mode remains project-neutral and does not expose code/project tools by default.
+- [ ] Project mode requires a backend-accessible working tree before code-agent tools run.
+- [ ] Project sessions persist explicit Project metadata and onboarding state.
+- [ ] `/workspace` resolves to the active Project root for code-agent sessions.
+- [ ] File, Git, terminal, test, Docker, and sensor tools are scoped to the active Project root.
+- [ ] Missing or unapproved root `AGENTS.md` allows read-only investigation but blocks code writes,
+      deletions, file creation, commits, and destructive commands.
+- [ ] Root `AGENTS.md` and relevant nested `AGENTS.md` files are included in code-agent context.
+- [ ] Ambiguous monorepo scope triggers a user question instead of an assumed edit path.
+- [ ] Playwright E2E covers Project opening, Chat opening, tool visibility, onboarding gate behavior,
+      wrong-root write prevention, and a successful approved Project code interaction.
+- [ ] The follow-up epic `agent-platform-project-onboarding` exists and is dependency-linked so the
+      full feature goal is not lost.

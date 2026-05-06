@@ -1,29 +1,47 @@
-# Task: Define project workspace model and capability states
+# Task: Define Project mode, capability, and onboarding state model
 
 **Beads issue:** `agent-platform-project-workspaces.1`  
 **Spec file:** `docs/tasks/agent-platform-project-workspaces.1.md`
 
 ## Summary
 
-Define the canonical project workspace data model and capability states used by the workbench,
-runtime, terminal, Git status, and feedback sensors.
+Define the shared model for Project mode, Chat mode, project working trees, capability states,
+onboarding states, and instruction-file scope. Follow-on tasks must be able to depend on explicit
+semantics instead of guessing what a "workspace" means.
 
 ## Requirements
 
-- Introduce a clear `ProjectWorkspace` concept in contracts or app-local types.
-- Capture project identity, display name, root label, source type, capability state, and optional
-  backend mount metadata.
-- Define how sessions bind to a project.
-- Define the user-facing rule that `/workspace` means the active project root inside agent/runtime
-  context.
-- Document unsupported states clearly, especially browser-only projects without backend mounts.
+- Define distinct user modes:
+  - `project`: code/project interface, default coding agent, project-scoped tools.
+  - `chat`: general chat interface, default personal assistant, no project/code tools by default.
+- Define a Project as a backend-accessible working tree, not merely a browser-selected folder.
+- Capture Project identity, display name, project root, repository root, active branch/worktree
+  identity, optional active subproject scope, capability state, onboarding state, and default agent.
+- Define capability states for Epic 1:
+  - `backend_accessible`: backend can inspect and run commands in the working tree.
+  - `readonly`: backend can inspect but writes/destructive commands are blocked.
+  - `unavailable`: backend cannot access the requested working tree.
+- Define onboarding states:
+  - `missing`: root `AGENTS.md` was not found.
+  - `in_progress`: onboarding started or needs human/agent review.
+  - `approved`: code writes are allowed subject to capability policy.
+  - `needs_review`: file exists but metadata approval is absent or stale.
+- Define instruction precedence: root `AGENTS.md` applies repo-wide; nearest nested `AGENTS.md`
+  refines root guidance for subproject scope.
+- Define `/workspace` as the canonical agent-facing path for the active Project root.
+- Define the distinction between Project working tree and general chat workspace.
 
 ## Implementation Plan
 
-1. Review existing project/session/workspace records and avoid duplicating concepts.
-2. Add or refine shared types for workspace source and capability state.
-3. Document the mapping between browser folder handles, backend-mounted paths, and remote projects.
-4. Add lightweight tests for any new pure mapping helpers.
+1. Review existing session, project, workspace, agent, and workbench contracts to avoid duplicate
+   concepts.
+2. Add or refine shared types/contracts for mode, Project metadata, capability state, onboarding
+   state, and instruction-file references.
+3. Add pure helper functions for deriving tool/write eligibility from capability plus onboarding
+   state.
+4. Document the terminology in architecture or task docs so future tasks do not reintroduce
+   ambiguous "workspace" behavior.
+5. Add focused unit tests for the helper functions and type guards.
 
 ## Dependency Order
 
@@ -31,14 +49,22 @@ runtime, terminal, Git status, and feedback sensors.
 | -------- | ------------------------------------- |
 | none     | `agent-platform-project-workspaces.2` |
 
+Keep Beads dependencies aligned with this table.
+
 ## Tests And Verification
 
-- Unit tests for capability-state helpers, if introduced.
+- Unit tests for mode/capability/onboarding helper behavior.
 - Typecheck across touched packages.
-- Spec review confirms browser-only and backend-mounted states are explicit.
+- Contract tests if shared API schemas are changed.
+- Spec review confirms Project working tree, Project root, repository root, subproject scope, and
+  general chat workspace are not conflated.
 
 ## Definition Of Done
 
-- [ ] Project workspace model exists in code or a documented contract ready for implementation.
-- [ ] Capability states are named and testable.
+- [ ] Project and Chat modes are named, typed, and documented.
+- [ ] Project metadata can represent a backend-accessible monorepo or single-app repo.
+- [ ] Capability and onboarding states are named and testable.
+- [ ] The write gate is expressible as code: writes require an eligible capability and approved
+      onboarding state.
+- [ ] Instruction-file precedence is defined for root and nested `AGENTS.md`.
 - [ ] Follow-on tasks can depend on the model without guessing semantics.
