@@ -12,10 +12,6 @@ interface FSHandleWithPermission extends FileSystemDirectoryHandle {
   queryPermission(desc: PermissionDescriptor): Promise<PermissionState>;
   requestPermission(desc: PermissionDescriptor): Promise<PermissionState>;
 }
-interface FSFileHandleWithPermission extends FileSystemFileHandle {
-  queryPermission(desc: PermissionDescriptor): Promise<PermissionState>;
-  requestPermission(desc: PermissionDescriptor): Promise<PermissionState>;
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -233,21 +229,6 @@ async function tryPermission(
   return perm === 'granted';
 }
 
-async function requestReadPermission(h: FSHandleWithPermission): Promise<boolean> {
-  const current = await h.queryPermission({ mode: 'read' });
-  if (current === 'granted') return true;
-  if (current !== 'prompt') return false;
-  return (await h.requestPermission({ mode: 'read' })) === 'granted';
-}
-
-async function requestFileWritePermission(handle: FileSystemFileHandle): Promise<boolean> {
-  const h = handle as FSFileHandleWithPermission;
-  const current = await h.queryPermission({ mode: 'readwrite' });
-  if (current === 'granted') return true;
-  if (current !== 'prompt') return false;
-  return (await h.requestPermission({ mode: 'readwrite' })) === 'granted';
-}
-
 async function restorePersistedFolder(
   isCancelled: () => boolean,
   loadTree: (handle: FileSystemDirectoryHandle, source: 'restore') => Promise<void>,
@@ -402,15 +383,28 @@ export function useFileSystem(): UseFileSystemReturn {
       return;
     }
 
-    directoryPickerInFlightRef.current = true;
-    setIsOpeningDirectory(true);
     setError(null);
     const h = handle as FSHandleWithPermission;
     try {
-      if (await requestReadPermission(h)) {
+      let rw = await h.queryPermission({ mode: 'readwrite' });
+      if (rw !== 'granted') {
+        rw = await h.requestPermission({ mode: 'readwrite' });
+      }
+      if (rw === 'granted') {
         userPickedFolderThisSessionRef.current = false;
-        directoryPickerInFlightRef.current = false;
-        setIsOpeningDirectory(false);
+        await loadTree(handle, 'restore');
+        await persistHandle(handle);
+        clearReconnectState();
+        fsDebugLog('reconnect:ok_readwrite');
+        return;
+      }
+
+      let r = await h.queryPermission({ mode: 'read' });
+      if (r !== 'granted') {
+        r = await h.requestPermission({ mode: 'read' });
+      }
+      if (r === 'granted') {
+        userPickedFolderThisSessionRef.current = false;
         await loadTree(handle, 'restore');
         await persistHandle(handle);
         clearReconnectState();
@@ -427,9 +421,6 @@ export function useFileSystem(): UseFileSystemReturn {
       const message = err instanceof Error ? err.message : 'Failed to restore folder';
       fsDebugLog('reconnect:error', message);
       setError(message);
-    } finally {
-      directoryPickerInFlightRef.current = false;
-      setIsOpeningDirectory(false);
     }
   }, [loadTree, clearReconnectState]);
 
@@ -447,10 +438,8 @@ export function useFileSystem(): UseFileSystemReturn {
     setIsOpeningDirectory(true);
     setError(null);
     try {
-      const handle = await globalThis.window.showDirectoryPicker({ mode: 'read' });
+      const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
       fsDebugLog('picker:resolved', handle.name);
-      directoryPickerInFlightRef.current = false;
-      setIsOpeningDirectory(false);
       // Before loadTree: block mount-time restore from applying a stale persisted handle after this.
       userPickedFolderThisSessionRef.current = true;
       await loadTree(handle, 'picker');
@@ -491,11 +480,6 @@ export function useFileSystem(): UseFileSystemReturn {
     if (handle?.kind !== 'file') return false;
 
     try {
-      if (!(await requestFileWritePermission(handle))) {
-        setError('Write permission was not granted for this file.');
-        return false;
-      }
-
       const writable = await handle.createWritable();
       await writable.write(content);
       await writable.close();
