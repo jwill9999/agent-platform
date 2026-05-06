@@ -76,14 +76,19 @@ defined here during planning so each task can be executed and verified consisten
    branch.
 2. Re-read the task spec and write down the task-specific testing strategy before changing code.
 3. Implement the task with focused tests first where practical.
-4. Run the local quality gates named in the task's testing strategy.
-5. Push the task branch.
-6. Open a pull request from `task/<issue-id>` to `feature/agent-platform-project-workspaces`.
-7. Monitor GitHub checks and review feedback until the pull request is green.
-8. If checks fail or review finds issues, fix them on the same task branch, rerun relevant local
-   gates, push again, and continue monitoring.
-9. Merge the task PR only after local gates, remote checks, and task Definition of Done are satisfied.
-10. Close the Beads task, update `session.md` when useful, and move to the next task from the updated
+4. Build and run local quality gates before pushing: formatting, linting, unit tests, and any
+   relevant integration/E2E tests from the task's strategy. If the task changes runtime or UI
+   behavior, include Playwright-driven verification that acts through the interface and checks the
+   expected result.
+5. Do not push or open the task PR while required local gates are failing.
+6. Push the task branch after local gates are green.
+7. Open a pull request from `task/<issue-id>` to `feature/agent-platform-project-workspaces`.
+8. Monitor GitHub checks, logs, artifacts, and review feedback until the pull request is green.
+9. If checks fail or review finds issues, inspect the CI logs/artifacts with GitHub tooling, fix the
+   issue on the same task branch, rerun relevant local gates, push again, and continue monitoring.
+10. Merge the task PR only after local gates, remote checks, reviews, and task Definition of Done are
+    satisfied.
+11. Close the Beads task, update `session.md` when useful, and move to the next task from the updated
     feature branch.
 
 This epic intentionally uses **one PR per ticket** so each task is independently reviewable and
@@ -94,12 +99,20 @@ testable. This overrides the repository's default chained-segment PR workflow fo
 Each child task must keep a concrete testing strategy in its **Tests And Verification** section. The
 strategy must identify:
 
+- mandatory local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`, unless the
+  task spec explains why a narrower gate is sufficient.
 - local unit/contract/component tests to add or update.
 - integration tests needed for API, DB, runtime, tool, or Docker boundaries.
-- Playwright coverage when user-visible behavior or end-to-end safety is involved.
+- Playwright coverage when user-visible behavior or end-to-end safety is involved. The strategy must
+  define the UI actions Playwright performs and the visible/filesystem outputs it asserts.
 - filesystem assertions for Project-root behavior and wrong-root write prevention.
-- CI/GitHub checks that must be monitored on the task pull request.
+- CI/GitHub checks, logs, and artifacts that must be monitored on the task pull request.
 - any known test fixture data required by the task.
+
+Never mark a task done, close its Bead, or merge its task PR while local gates, Playwright checks,
+GitHub Actions checks, or review-required feedback remain unresolved. A task is done only when the
+implementation is complete, local testing strategy passes, required UI/Playwright verification
+passes, and CI/CD pipelines are green.
 
 ## Proposed Task Chain
 
@@ -130,3 +143,5 @@ strategy must identify:
       wrong-root write prevention, and a successful approved Project code interaction.
 - [ ] The follow-up epic `agent-platform-project-onboarding` exists and is dependency-linked so the
       full feature goal is not lost.
+- [ ] Every Epic 1 task is closed only after implementation is complete, local gates pass,
+      Playwright/UI verification passes where required, and GitHub Actions checks are green.

@@ -8,6 +8,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Clarified the definition of done for Project workspace/onboarding work: pushed code is not done by itself. A task is done only when implementation is complete, local build/format/lint/unit and relevant E2E/Playwright checks pass, GitHub Actions/CI pipelines pass, and any review-required feedback is resolved. Failed CI means the task remains open and must be iterated until green.
+- **Date:** 2026-05-07
+- **Session:** Tightened the ticket-delivery skill requirements: agents must build and run local formatting, linting, unit, and relevant integration/E2E/Playwright gates before pushing/opening task PRs; Playwright strategies must specify UI actions and observable assertions; GitHub Actions logs/artifacts and reviews must be monitored after PR creation; no task can be closed, signed off, or merged while local gates, Playwright checks, CI checks, or review-required feedback remain unresolved.
+- **Date:** 2026-05-07
 - **Session:** Added the ticket-delivery skill expectation to the Project workspace and Project onboarding epic specs: each task uses one PR per ticket into the feature branch, local gates must pass before PR, GitHub checks/reviews are monitored until green, failures are fixed iteratively on the same branch, and every task spec must include a concrete testing strategy before implementation starts.
 - **Date:** 2026-05-07
 - **Session:** Refined the Project feature into two epics on `feature/agent-platform-project-workspaces`: Epic 1 `agent-platform-project-workspaces` now covers Project vs Chat entry paths, backend-accessible Project binding, `/workspace` and tool scoping, the minimal `AGENTS.md` write safety gate, and Playwright E2E verification. Created Epic 2 `agent-platform-project-onboarding` for the full `AGENTS.md` lifecycle: read-only assessment, gap analysis, collaborative onboarding dialogue, review/approval, closeout update candidates, refresh/rescan, and Playwright E2E. Beads dependencies chain Epic 2 after Epic 1.
