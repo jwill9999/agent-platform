@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-06
+- **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: IDE chat assistant bubbles now render hidden tool activity, browser artifact previews, and HITL approval cards from `useHarnessChat`, preventing empty bubbles when the agent attempts tool-backed work such as editing `README.md`. Added regression coverage for tool-only and approval-only IDE assistant responses.
+- **Date:** 2026-05-06
 - **Session:** Completed `agent-platform-code-workbench.6` on `task/agent-platform-code-workbench.6`: added a frontend-only branch/change summary model and compact IDE chat sidebar panel showing workspace, explicit branch-provider unavailable state, local dirty open tabs, and pending diff-review proposals. Live branch discovery, PR/check import, GitHub, CodeQL, SonarQube, reviews, and provider auth remain owned by `agent-platform-branch-feedback-status`.
 - **Date:** 2026-05-06
 - **Session:** Completed `agent-platform-code-workbench.5` on `task/agent-platform-code-workbench.5`: added frontend-only diff-first edit review for assistant code-block changes, with pending edit proposals, unified-style line diffs, explicit Apply/Reject controls, dirty-tab updates only after Apply, and reject behavior that leaves files unchanged.
@@ -309,29 +311,23 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Operator experience epic captured
+### Code workbench IDE chat feedback fixed
 
-Branch state: `feature/agent-platform-operator-experience` contains documentation-only planning work.
+Branch state: `task/agent-platform-code-workbench.6` contains the completed task 6 implementation plus a follow-up bug fix.
 
-- Added project memory for the product direction: user-facing tool activity and HITL approvals should be human-readable by default, with raw payloads/internal ids/policy decisions/trace ids kept in explicit debug or observability views.
-- Created Beads epic `agent-platform-operator-experience`.
-- Added `docs/tasks/agent-platform-operator-experience.md` covering:
-  - human-readable tool activity feed
-  - approval-card redesign
-  - structured toolchain observability
-  - artifact viewers for screenshots, snapshots, branch state, diffs, and code evidence
-  - IDE/workbench direction
-  - Docker/container constraints for host browser, IDE, plugins, and desktop-app access
-- Updated `docs/tasks/README.md` epic index.
+- Investigated an owner-reported manual test where asking the IDE assistant to change the README title created an empty assistant bubble.
+- Root cause: the IDE chat panel used `useHarnessChat` but only rendered assistant text/thinking/critic state. Tool events and HITL approval events were recorded by the hook but not passed into the IDE assistant renderer.
+- Fixed the IDE assistant renderer to show tool activity, browser artifact previews, and approval cards in the right chat panel, including tool-only and approval-only responses.
+- Added regression coverage in `apps/web/test/ide-assistant-content.test.ts`.
 
 Verification:
 
-- `pnpm exec prettier --check docs/tasks/agent-platform-operator-experience.md docs/tasks/README.md`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test -- test/ide-assistant-content.test.ts` (package runner executed 22 files / 86 tests)
+- `pnpm --filter @agent-platform/web run build`
+- `pnpm exec prettier --check apps/web/components/ide/ide-with-chat.tsx apps/web/test/ide-assistant-content.test.ts`
 - `git diff --check`
-
-Notes:
-
-- Beads local state was updated, but Dolt auto-push failed because GitHub DNS/auth was unavailable from the sandbox. Run `bd dolt push` once network/auth is available.
 
 ### Browser screenshot full-page handling corrected
 
@@ -880,13 +876,15 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `feature/agent-platform-operator-experience`
-- **Current base:** created from updated `main` after the browser-tools work was merged and old branches were pruned.
-- **Current work:** documentation-only planning branch for the future operator-experience epic.
-- **Remote sync:** pending push for `feature/agent-platform-operator-experience` after this session handoff update is amended/committed.
+- **Current branch:** `task/agent-platform-code-workbench.6`
+- **Current base:** chained from `task/agent-platform-code-workbench.5`.
+- **Current work:** task 6 is closed and pushed; a follow-up fix for IDE chat tool/approval rendering is committed locally and should be pushed before moving to task 7.
+- **Remote sync:** pending push for the latest follow-up commit after this session handoff update is committed.
 
 ### Beads
 
+- `agent-platform-code-workbench.6` is closed.
+- `agent-platform-code-workbench.7` is the next ready child task: Document code workbench verification guide.
 - `agent-platform-browser-tools` is closed locally.
 - `agent-platform-browser-tools.1` is closed locally.
 - `agent-platform-browser-tools.2` is closed locally.
@@ -970,11 +968,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Finish this documentation closeout: amend/commit `session.md`, push `feature/agent-platform-operator-experience`, and run `bd dolt push` when network/auth is available.
-2. Discuss whether `agent-platform-operator-experience` should be broken into child tasks now or left as a parked follow-up epic.
-3. If task breakdown starts, begin with the human-readable tool event model, then HITL approval redesign, then artifact/workbench design patterns.
-4. Keep related existing epics linked: `agent-platform-branch-feedback-status`, `agent-platform-ide-rethink`, `agent-platform-ui-quality-sensors`, and `agent-platform-capability-registry`.
-5. Do not start the next implementation epic tonight unless the owner explicitly changes direction.
+1. Commit the `session.md` handoff update and push `task/agent-platform-code-workbench.6` with the IDE chat feedback fix.
+2. Ask the owner to retest `/ide` by opening `README.md` and asking for a title change; the assistant should now show tool activity or an approval card instead of an empty bubble.
+3. Once accepted, claim `agent-platform-code-workbench.7` and document the code workbench verification guide.
+4. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
 
 ---
 

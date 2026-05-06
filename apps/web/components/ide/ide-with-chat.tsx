@@ -49,14 +49,22 @@ import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
 import { Terminal } from '@/components/ide/terminal';
 import { useFileSystem } from '@/hooks/use-file-system';
-import { useHarnessChat } from '@/hooks/use-harness-chat';
+import {
+  useHarnessChat,
+  type ApprovalCardState,
+  type ApprovalDecision,
+  type ToolTraceEvent,
+} from '@/hooks/use-harness-chat';
 import type { FileNode } from '@/hooks/use-file-system';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgent } from '@/lib/default-agent';
 import { formatFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
+import { ApprovalCard } from '@/components/chat/approval-card';
 import { CriticBadges } from '@/components/chat/critic-badges';
+import { BrowserArtifactPreviews } from '@/components/chat/browser-artifact-previews';
 import { ThinkingBlock } from '@/components/chat/thinking-block';
+import { ToolTraceBlock } from '@/components/chat/tool-trace-block';
 import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
 import { WorkbenchCodeEditor } from '@/components/ide/workbench-code-editor';
 import { getWorkbenchLanguage, updateWorkbenchTabContent } from '@/lib/code-workbench-editor';
@@ -99,7 +107,7 @@ function StatusLabel({
   );
 }
 
-function AssistantContent({
+export function AssistantContent({
   message,
   awaiting,
   contextFiles,
@@ -110,6 +118,9 @@ function AssistantContent({
   getFileReferenceAction,
   criticEvents,
   thinking,
+  toolEvents,
+  approvals,
+  onApprovalDecision,
 }: Readonly<{
   message: UIMessage;
   awaiting: boolean;
@@ -121,12 +132,27 @@ function AssistantContent({
   getFileReferenceAction?: (reference: string) => WorkbenchFileReferenceAction | null;
   criticEvents?: readonly CriticEvent[];
   thinking?: string;
+  toolEvents?: readonly ToolTraceEvent[];
+  approvals?: readonly ApprovalCardState[];
+  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
+  const hasToolEvents = Boolean(toolEvents?.length);
+  const hasApprovals = Boolean(approvals?.length);
+
   if (awaiting) {
     return (
       <>
         {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
         {thinking ? <ThinkingBlock content={thinking} defaultOpen /> : null}
+        {hasToolEvents ? <ToolTraceBlock events={toolEvents ?? []} isStreaming /> : null}
+        {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
+        {approvals?.map((approval) => (
+          <ApprovalCard
+            key={approval.approvalRequestId}
+            approval={approval}
+            onDecision={onApprovalDecision}
+          />
+        ))}
         <span className="sr-only" aria-busy="true" aria-live="polite">
           Assistant is responding
         </span>
@@ -141,6 +167,8 @@ function AssistantContent({
     <>
       {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
       {thinking ? <ThinkingBlock content={thinking} /> : null}
+      {hasToolEvents ? <ToolTraceBlock events={toolEvents ?? []} isStreaming={false} /> : null}
+      {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
       <IDEMarkdown
         content={getMessageText(message)}
         contextFiles={allFiles}
@@ -149,6 +177,20 @@ function AssistantContent({
         onShowDiff={onShowDiff}
         getFileReferenceAction={getFileReferenceAction}
       />
+      {approvals?.map((approval) => (
+        <ApprovalCard
+          key={approval.approvalRequestId}
+          approval={approval}
+          onDecision={onApprovalDecision}
+        />
+      ))}
+      {!getMessageText(message).trim() &&
+        !thinking?.trim() &&
+        !hasToolEvents &&
+        !hasApprovals &&
+        (!criticEvents || criticEvents.length === 0) && (
+          <p className="text-xs text-muted-foreground">No assistant response was returned.</p>
+        )}
     </>
   );
 }
@@ -699,6 +741,9 @@ function ChatPanel({
   sessionReady,
   criticEventsByMessage,
   thinkingByMessage,
+  toolEventsByMessage,
+  approvalEventsByMessage,
+  onApprovalDecision,
 }: Readonly<{
   messages: UIMessage[];
   isLoading: boolean;
@@ -725,6 +770,9 @@ function ChatPanel({
   sessionReady: boolean;
   criticEventsByMessage: Record<string, CriticEvent[]>;
   thinkingByMessage: Record<string, string>;
+  toolEventsByMessage: Record<string, ToolTraceEvent[]>;
+  approvalEventsByMessage: Record<string, ApprovalCardState[]>;
+  onApprovalDecision: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -814,6 +862,9 @@ function ChatPanel({
                         getFileReferenceAction={getFileReferenceAction}
                         criticEvents={criticEventsByMessage[message.id]}
                         thinking={thinkingByMessage[message.id]}
+                        toolEvents={toolEventsByMessage[message.id]}
+                        approvals={approvalEventsByMessage[message.id]}
+                        onApprovalDecision={onApprovalDecision}
                       />
                     )}
                   </div>
@@ -1185,6 +1236,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setError: setHarnessError,
     criticEventsByMessage,
     thinkingByMessage,
+    toolEventsByMessage,
+    approvalEventsByMessage,
+    decideApproval,
   } = useHarnessChat(sessionId);
 
   useEffect(() => {
@@ -1779,6 +1833,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 sessionReady={Boolean(sessionId)}
                 criticEventsByMessage={criticEventsByMessage}
                 thinkingByMessage={thinkingByMessage}
+                toolEventsByMessage={toolEventsByMessage}
+                approvalEventsByMessage={approvalEventsByMessage}
+                onApprovalDecision={decideApproval}
               />
             </ResizablePanel>
           </>
