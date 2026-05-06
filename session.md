@@ -7,6 +7,32 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-06
+- **Session:** Deferred `agent-platform-code-workbench.7`, committed the project-workspaces follow-up planning on `task/agent-platform-code-workbench.6`, and prepared the branch for push. The next implementation priority after merge is `agent-platform-project-workspaces.1`.
+- **Date:** 2026-05-06
+- **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: corrected the folder picker follow-up to use the stable `showDirectoryPicker({ mode: 'readwrite' })` behavior again, while retaining only the narrow native picker re-entry guard. Playwright stub verification confirmed the Explorer renders a returned folder and that the app calls the picker with `readwrite`.
+- **Date:** 2026-05-06
+- **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: restored the previous working IDE folder picker pattern by opening folders with read permission first, guarding native picker re-entry, and requesting write permission only when saving files. Playwright stub verification confirmed the Explorer renders a selected folder when the picker returns a handle; the running Docker image must be rebuilt to exercise the local source change.
+- **Date:** 2026-05-06
+- **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: guarded IDE Markdown replacement actions so truncated Markdown code blocks with unmatched nested fences no longer expose Apply/Diff, and filename-bearing fences such as `markdown:README.md` now route to the correct review action.
+- **Date:** 2026-05-06
+- **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: clarified browser workbench file-context instructions so agents propose reviewed replacement code blocks for attached files instead of attempting backend/container patch tools against host-selected File System Access API files.
+- **Date:** 2026-05-06
+- **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: IDE chat assistant bubbles now render hidden tool activity, browser artifact previews, and HITL approval cards from `useHarnessChat`, preventing empty bubbles when the agent attempts tool-backed work such as editing `README.md`. Added regression coverage for tool-only and approval-only IDE assistant responses.
+- **Date:** 2026-05-06
+- **Session:** Completed `agent-platform-code-workbench.6` on `task/agent-platform-code-workbench.6`: added a frontend-only branch/change summary model and compact IDE chat sidebar panel showing workspace, explicit branch-provider unavailable state, local dirty open tabs, and pending diff-review proposals. Live branch discovery, PR/check import, GitHub, CodeQL, SonarQube, reviews, and provider auth remain owned by `agent-platform-branch-feedback-status`.
+- **Date:** 2026-05-06
+- **Session:** Completed `agent-platform-code-workbench.5` on `task/agent-platform-code-workbench.5`: added frontend-only diff-first edit review for assistant code-block changes, with pending edit proposals, unified-style line diffs, explicit Apply/Reject controls, dirty-tab updates only after Apply, and reject behavior that leaves files unchanged.
+- **Date:** 2026-05-06
+- **Session:** Completed `agent-platform-code-workbench.4` on `task/agent-platform-code-workbench.4`: added safe workbench file-reference parsing, rendered inline Markdown code and Markdown links as open-in-workbench actions when they resolve inside the active file tree, and surfaced unavailable states for no workspace, missing files, directories, and unsupported file types without adding backend contracts.
+- **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-code-workbench.3` on `task/agent-platform-code-workbench.3`: added a visible code-context panel for the IDE chat showing workspace, active file inclusion, pinned files, sanitisation/exclusion warnings, and next-message context counts. Fixed broken pinning by reading unloaded explorer file content when possible and deriving pinned context from fresh open-tab content, so the sanitised user-visible context now matches what is submitted to the agent.
+- **Date:** 2026-05-05
+- **Session:** Completed `agent-platform-code-workbench.2` on `task/agent-platform-code-workbench.2`: replaced the IDE textarea with a focused CodeMirror 6 editor baseline, added language mapping and dirty-state helpers, added focused web tests, and verified `/ide` with unit tests, typecheck, lint, build, and a headless browser check confirming the editor, line-number gutter, and opened file content. SonarQube MCP was not callable, so the repo fallback gate was used.
+- **Date:** 2026-05-05
+- **Session:** Started `agent-platform-code-workbench.1` on `task/agent-platform-code-workbench.1`: added the Code Workbench Product Model documenting project-scoped code chats versus general chats, workbench surfaces, active/pinned/selected file context rules, agent visibility states, diff-first edit flow, branch/artifact relationships, deployment boundaries, design constraints, and open refinement questions.
+- **Date:** 2026-05-05
+- **Session:** Created the `agent-platform-code-workbench` Beads epic on `feature/agent-platform-code-workbench`, added child tasks `.1` through `.7`, wired linear dependencies, and drafted specs for a project-scoped Codex-style code workbench with proper editor baseline, visible chat file context, file-open workflows, diff-first edit review, branch/Git sidebar preparation, and verification guidance. Updated `agent-platform-ide-rethink` as superseded/refined by this epic. Code workbench specs preserve the operator-experience design strategy: shadcn/ui, Radix primitives, Tailwind CSS, TypeScript, lucide icons, and CodeMirror only as a focused editor engine if added.
 - **Date:** 2026-05-05
 - **Session:** Completed design work for `agent-platform-operator-experience.9` on `task/agent-platform-operator-experience.9`: documented Docker host integration constraints, local Docker versus hosted versus desktop deployment modes, supported/unsupported/future bridge behavior, user-facing unavailable-state copy, and security requirements for any future host bridge.
 - **Date:** 2026-05-05
@@ -295,29 +321,52 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Operator experience epic captured
+### Project workspace binding follow-up scoped
 
-Branch state: `feature/agent-platform-operator-experience` contains documentation-only planning work.
+Branch state: `task/agent-platform-code-workbench.6` now contains the code workbench follow-up fixes plus the next epic planning.
 
-- Added project memory for the product direction: user-facing tool activity and HITL approvals should be human-readable by default, with raw payloads/internal ids/policy decisions/trace ids kept in explicit debug or observability views.
-- Created Beads epic `agent-platform-operator-experience`.
-- Added `docs/tasks/agent-platform-operator-experience.md` covering:
-  - human-readable tool activity feed
-  - approval-card redesign
-  - structured toolchain observability
-  - artifact viewers for screenshots, snapshots, branch state, diffs, and code evidence
-  - IDE/workbench direction
-  - Docker/container constraints for host browser, IDE, plugins, and desktop-app access
-- Updated `docs/tasks/README.md` epic index.
+- Deferred `agent-platform-code-workbench.7` until 2026-05-20 because the verification guide should follow the workspace-binding architecture rather than document the current partial behavior.
+- Created Beads epic `agent-platform-project-workspaces` with tasks `.1` through `.6`.
+- Added specs for project workspace model, workbench chat binding, `/workspace` active-project resolution, browser create file/folder behavior, capability-gated tools, and verification.
+- Updated `docs/tasks/README.md` so the new epic is discoverable.
+- Kept the rejected `disabledToolIds` approach out of the codebase; the next work should solve the root source-of-truth split between browser-selected host folders and backend `/workspace`.
+- Committed the current changes as `4db2320` (`Document project workspace binding epic`).
 
 Verification:
 
-- `pnpm exec prettier --check docs/tasks/agent-platform-operator-experience.md docs/tasks/README.md`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test -- test/use-harness-chat.test.ts test/file-context.test.ts test/chat-route.test.ts`
+- `pnpm docs:lint:md` remains blocked by pre-existing markdownlint issues under `.agent-platform/workspaces/default/...`, not the new task specs.
+
+### Code workbench IDE chat feedback fixed
+
+Branch state: `task/agent-platform-code-workbench.6` contains the completed task 6 implementation plus a follow-up bug fix.
+
+- Investigated an owner-reported manual test where asking the IDE assistant to change the README title created an empty assistant bubble.
+- Root cause: the IDE chat panel used `useHarnessChat` but only rendered assistant text/thinking/critic state. Tool events and HITL approval events were recorded by the hook but not passed into the IDE assistant renderer.
+- Fixed the IDE assistant renderer to show tool activity, browser artifact previews, and approval cards in the right chat panel, including tool-only and approval-only responses.
+- Confirmed the follow-up edit failure was caused by a source-of-truth mismatch: browser workbench files can come from the host via the browser File System Access API, while backend edit tools run in the Docker workspace/path jail. Added file-context guidance telling agents to propose reviewed replacement code blocks for attached workbench files instead of patching backend files.
+- Investigated the next owner screenshot where Apply replaced README with only the first section. Root cause: Markdown replacements containing nested ``` fences can be parsed as partial/truncated code blocks. The IDE now hides Apply/Diff for Markdown blocks with unmatched nested fences and asks for a valid reviewed replacement instead.
+- Updated code fence parsing to preserve filename hints such as `markdown:README.md`, so correctly fenced replacements can route straight to the intended file review action.
+- Addressed the folder-open regression by preserving the stable `showDirectoryPicker({ mode: 'readwrite' })` path and keeping only a narrow single-flight guard for native picker re-entry.
+- Added regression coverage in `apps/web/test/ide-assistant-content.test.ts`.
+- Added regression coverage in `apps/web/test/file-context.test.ts`.
+- Added regression coverage in `apps/web/test/ide-markdown-file-reference.test.ts`.
+
+Verification:
+
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test -- test/ide-assistant-content.test.ts` (package runner executed 22 files / 86 tests)
+- `pnpm --filter @agent-platform/web run test -- test/file-context.test.ts test/ide-assistant-content.test.ts` (package runner executed 22 files / 87 tests)
+- `pnpm --filter @agent-platform/web run test -- test/ide-markdown-file-reference.test.ts test/file-context.test.ts` (package runner executed 22 files / 89 tests)
+- `pnpm --filter @agent-platform/web run build`
+- Playwright stub check against `/ide` with a fake directory picker confirmed the Explorer renders `demo-folder` and `README.md` after a handle is returned and that the picker is invoked with `{ mode: 'readwrite' }`.
+- `pnpm exec prettier --check apps/web/components/ide/ide-with-chat.tsx apps/web/test/ide-assistant-content.test.ts`
+- `pnpm exec prettier --check apps/web/lib/file-context.ts apps/web/test/file-context.test.ts`
+- `pnpm exec prettier --check apps/web/components/ide/ide-markdown.tsx apps/web/test/ide-markdown-file-reference.test.ts apps/web/lib/file-context.ts apps/web/test/file-context.test.ts`
 - `git diff --check`
-
-Notes:
-
-- Beads local state was updated, but Dolt auto-push failed because GitHub DNS/auth was unavailable from the sandbox. Run `bd dolt push` once network/auth is available.
 
 ### Browser screenshot full-page handling corrected
 
@@ -866,13 +915,18 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `feature/agent-platform-operator-experience`
-- **Current base:** created from updated `main` after the browser-tools work was merged and old branches were pruned.
-- **Current work:** documentation-only planning branch for the future operator-experience epic.
-- **Remote sync:** pending push for `feature/agent-platform-operator-experience` after this session handoff update is amended/committed.
+- **Current branch:** `task/agent-platform-code-workbench.6`
+- **Current base:** chained from `task/agent-platform-code-workbench.5`.
+- **Current work:** task 6 is closed; follow-up fixes and project-workspaces planning are committed locally.
+- **Remote sync:** pending push after this session handoff update is committed.
 
 ### Beads
 
+- `agent-platform-code-workbench.6` is closed.
+- `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
+- `agent-platform-project-workspaces` is open as the next P1 epic.
+- `agent-platform-project-workspaces.1` is the next ready child task: Define project workspace model.
+- `agent-platform-project-workspaces.2` through `.6` are open and linearly blocked behind `.1`.
 - `agent-platform-browser-tools` is closed locally.
 - `agent-platform-browser-tools.1` is closed locally.
 - `agent-platform-browser-tools.2` is closed locally.
@@ -956,11 +1010,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Finish this documentation closeout: amend/commit `session.md`, push `feature/agent-platform-operator-experience`, and run `bd dolt push` when network/auth is available.
-2. Discuss whether `agent-platform-operator-experience` should be broken into child tasks now or left as a parked follow-up epic.
-3. If task breakdown starts, begin with the human-readable tool event model, then HITL approval redesign, then artifact/workbench design patterns.
-4. Keep related existing epics linked: `agent-platform-branch-feedback-status`, `agent-platform-ide-rethink`, `agent-platform-ui-quality-sensors`, and `agent-platform-capability-registry`.
-5. Do not start the next implementation epic tonight unless the owner explicitly changes direction.
+1. Commit this `session.md` handoff update and push `task/agent-platform-code-workbench.6`.
+2. Owner creates the PR and merges after CI/review.
+3. After merge, claim `agent-platform-project-workspaces.1` and implement the project workspace model first.
+4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
+5. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
 
 ---
 

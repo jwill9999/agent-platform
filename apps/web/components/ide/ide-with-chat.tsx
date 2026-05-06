@@ -15,9 +15,12 @@ import {
   FileText,
   FileType,
   Folder,
+  Diff,
+  GitBranch,
   Search,
   Send,
   Sparkles,
+  Check,
   PanelLeftClose,
   PanelRightClose,
   PanelBottomClose,
@@ -46,15 +49,43 @@ import { toast } from 'sonner';
 import { IDEMarkdown } from '@/components/ide/ide-markdown';
 import { Terminal } from '@/components/ide/terminal';
 import { useFileSystem } from '@/hooks/use-file-system';
-import { useHarnessChat } from '@/hooks/use-harness-chat';
+import {
+  useHarnessChat,
+  type ApprovalCardState,
+  type ApprovalDecision,
+  type ToolTraceEvent,
+} from '@/hooks/use-harness-chat';
 import type { FileNode } from '@/hooks/use-file-system';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgent } from '@/lib/default-agent';
-import { formatFileContext, sanitiseFileContext } from '@/lib/file-context';
+import { formatFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
+import { ApprovalCard } from '@/components/chat/approval-card';
 import { CriticBadges } from '@/components/chat/critic-badges';
+import { BrowserArtifactPreviews } from '@/components/chat/browser-artifact-previews';
 import { ThinkingBlock } from '@/components/chat/thinking-block';
+import { ToolTraceBlock } from '@/components/chat/tool-trace-block';
 import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
+import { WorkbenchCodeEditor } from '@/components/ide/workbench-code-editor';
+import { getWorkbenchLanguage, updateWorkbenchTabContent } from '@/lib/code-workbench-editor';
+import {
+  buildWorkbenchContextDraft,
+  type WorkbenchContextDraft,
+} from '@/lib/code-workbench-context';
+import {
+  isSupportedWorkbenchTextPath,
+  parseWorkbenchFileReference,
+  type WorkbenchFileReferenceStatus,
+} from '@/lib/code-workbench-file-references';
+import type { WorkbenchFileReferenceAction } from '@/components/ide/ide-markdown';
+import {
+  createWorkbenchEditProposal,
+  type WorkbenchEditProposal,
+} from '@/lib/code-workbench-edit-review';
+import {
+  buildWorkbenchBranchSummary,
+  type WorkbenchBranchSummary,
+} from '@/lib/code-workbench-branch-summary';
 
 // ---------------------------------------------------------------------------
 // Small presentational components
@@ -76,15 +107,20 @@ function StatusLabel({
   );
 }
 
-function AssistantContent({
+export function AssistantContent({
   message,
   awaiting,
   contextFiles,
   activeFile,
   onApplyCode,
   onCreateFile,
+  onShowDiff,
+  getFileReferenceAction,
   criticEvents,
   thinking,
+  toolEvents,
+  approvals,
+  onApprovalDecision,
 }: Readonly<{
   message: UIMessage;
   awaiting: boolean;
@@ -92,14 +128,31 @@ function AssistantContent({
   activeFile: { path: string; name: string } | null;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  onShowDiff?: (code: string, targetFile?: string) => void;
+  getFileReferenceAction?: (reference: string) => WorkbenchFileReferenceAction | null;
   criticEvents?: readonly CriticEvent[];
   thinking?: string;
+  toolEvents?: readonly ToolTraceEvent[];
+  approvals?: readonly ApprovalCardState[];
+  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
+  const hasToolEvents = Boolean(toolEvents?.length);
+  const hasApprovals = Boolean(approvals?.length);
+
   if (awaiting) {
     return (
       <>
         {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
         {thinking ? <ThinkingBlock content={thinking} defaultOpen /> : null}
+        {hasToolEvents ? <ToolTraceBlock events={toolEvents ?? []} isStreaming /> : null}
+        {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
+        {approvals?.map((approval) => (
+          <ApprovalCard
+            key={approval.approvalRequestId}
+            approval={approval}
+            onDecision={onApprovalDecision}
+          />
+        ))}
         <span className="sr-only" aria-busy="true" aria-live="polite">
           Assistant is responding
         </span>
@@ -114,12 +167,30 @@ function AssistantContent({
     <>
       {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
       {thinking ? <ThinkingBlock content={thinking} /> : null}
+      {hasToolEvents ? <ToolTraceBlock events={toolEvents ?? []} isStreaming={false} /> : null}
+      {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
       <IDEMarkdown
         content={getMessageText(message)}
         contextFiles={allFiles}
         onApplyCode={onApplyCode}
         onCreateFile={onCreateFile}
+        onShowDiff={onShowDiff}
+        getFileReferenceAction={getFileReferenceAction}
       />
+      {approvals?.map((approval) => (
+        <ApprovalCard
+          key={approval.approvalRequestId}
+          approval={approval}
+          onDecision={onApprovalDecision}
+        />
+      ))}
+      {!getMessageText(message).trim() &&
+        !thinking?.trim() &&
+        !hasToolEvents &&
+        !hasApprovals &&
+        (!criticEvents || criticEvents.length === 0) && (
+          <p className="text-xs text-muted-foreground">No assistant response was returned.</p>
+        )}
     </>
   );
 }
@@ -163,27 +234,7 @@ function getFileIcon(filename: string) {
 }
 
 function getLanguage(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'ts':
-    case 'tsx':
-      return 'typescript';
-    case 'js':
-    case 'jsx':
-      return 'javascript';
-    case 'json':
-      return 'json';
-    case 'css':
-      return 'css';
-    case 'html':
-      return 'html';
-    case 'md':
-      return 'markdown';
-    case 'py':
-      return 'python';
-    default:
-      return 'plaintext';
-  }
+  return getWorkbenchLanguage(filename);
 }
 
 /** Match {@link Message} / chat — prefer `parts`, fall back to legacy `content`. */
@@ -319,7 +370,12 @@ function FileTreeNode({
 // Toolbar
 // ---------------------------------------------------------------------------
 
-function getFolderButtonLabel(isLoading: boolean, rootName: string | null): string {
+function getFolderButtonLabel(
+  isLoading: boolean,
+  isOpeningDirectory: boolean,
+  rootName: string | null,
+): string {
+  if (isOpeningDirectory) return 'Opening...';
   if (isLoading) return 'Loading...';
   if (rootName) return `Close ${rootName}`;
   return 'Open Folder';
@@ -342,6 +398,7 @@ function IDEToolbar({
   onLoadFromPath,
   onOpenFolder,
   isLoadingFolder,
+  isOpeningFolder,
   rootName,
   onRefreshFolder,
   onCloseFolder,
@@ -362,6 +419,7 @@ function IDEToolbar({
   onLoadFromPath: () => void;
   onOpenFolder: () => void;
   isLoadingFolder: boolean;
+  isOpeningFolder: boolean;
   rootName: string | null;
   onRefreshFolder: () => void;
   onCloseFolder: () => void;
@@ -381,7 +439,8 @@ function IDEToolbar({
   const chatLabel = showChat ? 'Hide' : 'AI';
   const ChatIcon = showChat ? PanelRightClose : MessageSquare;
 
-  const folderLabel = getFolderButtonLabel(isLoadingFolder, rootName);
+  const folderLabel = getFolderButtonLabel(isLoadingFolder, isOpeningFolder, rootName);
+  const folderActionDisabled = isLoadingFolder || isOpeningFolder;
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
@@ -431,7 +490,7 @@ function IDEToolbar({
           size="sm"
           className="gap-2"
           onClick={rootName ? onCloseFolder : onOpenFolder}
-          disabled={isLoadingFolder}
+          disabled={folderActionDisabled}
         >
           <FolderOpen className="h-4 w-4" />
           {folderLabel}
@@ -441,7 +500,7 @@ function IDEToolbar({
             variant="ghost"
             size="sm"
             onClick={onRefreshFolder}
-            disabled={isLoadingFolder}
+            disabled={folderActionDisabled}
             title="Refresh file tree"
           >
             <RefreshCw className="h-4 w-4" />
@@ -544,12 +603,18 @@ function EditorTabs({
 
 function EditorPanel({
   activeFile,
+  editProposal,
   onContentChange,
   onOpenPathDialog,
+  onApplyProposal,
+  onRejectProposal,
 }: Readonly<{
   activeFile: OpenTab | undefined;
+  editProposal: WorkbenchEditProposal | null;
   onContentChange: (content: string) => void;
   onOpenPathDialog: () => void;
+  onApplyProposal: () => void;
+  onRejectProposal: () => void;
 }>) {
   if (!activeFile) {
     return (
@@ -573,15 +638,83 @@ function EditorPanel({
         <span>{activeFile.language}</span>
         <span>{activeFile.content.split('\n').length} lines</span>
       </div>
-      <textarea
+      {editProposal && (
+        <EditProposalPanel
+          proposal={editProposal}
+          onApply={onApplyProposal}
+          onReject={onRejectProposal}
+        />
+      )}
+      <WorkbenchCodeEditor
         value={activeFile.content}
-        onChange={(e) => {
-          onContentChange(e.target.value);
-        }}
-        className="flex-1 w-full p-4 font-mono text-sm resize-none bg-background text-foreground focus:outline-none leading-6"
-        spellCheck={false}
-        style={{ tabSize: 2 }}
+        language={getWorkbenchLanguage(activeFile.name)}
+        onChange={onContentChange}
+        ariaLabel={`Code editor for ${activeFile.name}`}
       />
+    </div>
+  );
+}
+
+function EditProposalPanel({
+  proposal,
+  onApply,
+  onReject,
+}: Readonly<{
+  proposal: WorkbenchEditProposal;
+  onApply: () => void;
+  onReject: () => void;
+}>) {
+  return (
+    <div className="border-b border-border bg-card/80">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Diff className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Review proposed edit</span>
+            {proposal.isNewFile && (
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                new file
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{proposal.path}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={onReject}>
+            <X className="h-3.5 w-3.5" />
+            Reject
+          </Button>
+          <Button size="sm" className="h-8 gap-1.5" onClick={onApply}>
+            <Check className="h-3.5 w-3.5" />
+            Apply
+          </Button>
+        </div>
+      </div>
+      <ScrollArea className="max-h-64 border-t border-border bg-background">
+        <div className="min-w-max py-2 font-mono text-xs">
+          {proposal.diff.map((line, index) => (
+            <div
+              key={`${line.kind}-${index}`}
+              className={cn(
+                'grid grid-cols-[3rem_3rem_1.5rem_1fr] gap-2 px-4 py-0.5',
+                line.kind === 'added' && 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+                line.kind === 'removed' && 'bg-destructive/10 text-destructive',
+              )}
+            >
+              <span className="select-none text-right text-muted-foreground">
+                {line.oldLineNumber ?? ''}
+              </span>
+              <span className="select-none text-right text-muted-foreground">
+                {line.newLineNumber ?? ''}
+              </span>
+              <span className="select-none">
+                {line.kind === 'added' ? '+' : line.kind === 'removed' ? '-' : ' '}
+              </span>
+              <span className="whitespace-pre">{line.content || ' '}</span>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
     </div>
   );
 }
@@ -596,38 +729,58 @@ function ChatPanel({
   chatInput,
   setChatInput,
   onSendMessage,
-  contextFiles,
+  contextDraft,
+  branchSummary,
   activeFile,
+  includeActiveFile,
+  pinnedPaths,
+  workspaceName,
+  onToggleIncludeActiveFile,
   onAddToContext,
   onRemoveFromContext,
   onClearContext,
   onApplyCode,
   onCreateFile,
+  onShowDiff,
+  getFileReferenceAction,
   agents,
   selectedAgentId,
   onAgentChange,
   sessionReady,
   criticEventsByMessage,
   thinkingByMessage,
+  toolEventsByMessage,
+  approvalEventsByMessage,
+  onApprovalDecision,
 }: Readonly<{
   messages: UIMessage[];
   isLoading: boolean;
   chatInput: string;
   setChatInput: (v: string) => void;
   onSendMessage: () => void;
-  contextFiles: OpenTab[];
+  contextDraft: WorkbenchContextDraft;
+  branchSummary: WorkbenchBranchSummary;
   activeFile: OpenTab | undefined;
+  includeActiveFile: boolean;
+  pinnedPaths: ReadonlySet<string>;
+  workspaceName: string;
+  onToggleIncludeActiveFile: () => void;
   onAddToContext: (tab: OpenTab) => void;
   onRemoveFromContext: (path: string) => void;
   onClearContext: () => void;
   onApplyCode: (code: string, targetFile?: string) => void;
   onCreateFile: (code: string, suggestedName?: string) => void;
+  onShowDiff: (code: string, targetFile?: string) => void;
+  getFileReferenceAction: (reference: string) => WorkbenchFileReferenceAction | null;
   agents: Agent[];
   selectedAgentId: string | null;
   onAgentChange: (id: string) => void;
   sessionReady: boolean;
   criticEventsByMessage: Record<string, CriticEvent[]>;
   thinkingByMessage: Record<string, string>;
+  toolEventsByMessage: Record<string, ToolTraceEvent[]>;
+  approvalEventsByMessage: Record<string, ApprovalCardState[]>;
+  onApprovalDecision: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -663,6 +816,8 @@ function ChatPanel({
           <span className="font-medium text-sm truncate">AI Assistant</span>
         </div>
       </div>
+
+      <WorkbenchBranchPanel summary={branchSummary} />
 
       {/* Messages */}
       <ScrollArea className="flex-1 px-4">
@@ -707,12 +862,17 @@ function ChatPanel({
                       <AssistantContent
                         message={message}
                         awaiting={awaitingAssistant}
-                        contextFiles={contextFiles}
-                        activeFile={activeFile ?? null}
+                        contextFiles={getAssistantContextFiles(contextDraft)}
+                        activeFile={null}
                         onApplyCode={onApplyCode}
                         onCreateFile={onCreateFile}
+                        onShowDiff={onShowDiff}
+                        getFileReferenceAction={getFileReferenceAction}
                         criticEvents={criticEventsByMessage[message.id]}
                         thinking={thinkingByMessage[message.id]}
+                        toolEvents={toolEventsByMessage[message.id]}
+                        approvals={approvalEventsByMessage[message.id]}
+                        onApprovalDecision={onApprovalDecision}
                       />
                     )}
                   </div>
@@ -726,15 +886,15 @@ function ChatPanel({
 
       {/* Input */}
       <div className="p-3 border-t border-border bg-card/30">
-        <ContextFilesIndicator
-          contextFiles={contextFiles}
+        <WorkbenchContextPanel
+          contextDraft={contextDraft}
           activeFile={activeFile}
-          onRemoveFromContext={onRemoveFromContext}
-        />
-        <ContextActionButtons
-          activeFile={activeFile}
-          contextFiles={contextFiles}
+          includeActiveFile={includeActiveFile}
+          pinnedPaths={pinnedPaths}
+          workspaceName={workspaceName}
+          onToggleIncludeActiveFile={onToggleIncludeActiveFile}
           onAddToContext={onAddToContext}
+          onRemoveFromContext={onRemoveFromContext}
           onClearContext={onClearContext}
         />
         <div className="flex gap-2">
@@ -766,101 +926,250 @@ function ChatPanel({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Context indicators (small sub-components)
-// ---------------------------------------------------------------------------
-
-function ContextFilesIndicator({
-  contextFiles,
-  activeFile,
-  onRemoveFromContext,
-}: Readonly<{
-  contextFiles: OpenTab[];
-  activeFile: OpenTab | undefined;
-  onRemoveFromContext: (path: string) => void;
-}>) {
-  if (contextFiles.length === 0 && !activeFile) return null;
-
+function WorkbenchBranchPanel({ summary }: Readonly<{ summary: WorkbenchBranchSummary }>) {
   return (
-    <div className="mb-2">
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Paperclip className="h-3 w-3 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Context files (visible to AI):</span>
+    <div className="border-b border-border bg-card/30 px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
+            <span className="truncate">{summary.branchLabel}</span>
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {summary.workspaceName} · {summary.stateLabel}
+          </p>
+        </div>
+        <span className="rounded-md border border-border bg-background px-2 py-0.5 text-xs">
+          {summary.changedFiles.length} changed
+        </span>
       </div>
-      <div className="flex flex-wrap gap-1">
-        {contextFiles.map((f) => (
-          <div
-            key={f.path}
-            className="flex items-center gap-1 px-2 py-0.5 bg-secondary/70 rounded text-xs"
-          >
-            <FileCode className="h-3 w-3 text-muted-foreground" />
-            <span className="truncate max-w-[100px]">{f.name}</span>
-            <button
-              onClick={() => {
-                onRemoveFromContext(f.path);
-              }}
-              className="ml-0.5 hover:text-destructive"
+
+      {summary.changedFiles.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {summary.changedFiles.map((file) => (
+            <div
+              key={file.path}
+              className="flex items-center justify-between gap-2 rounded border border-border/70 bg-background/60 px-2 py-1 text-xs"
             >
-              <X className="h-3 w-3" />
-            </button>
+              <span className="truncate">{file.name}</span>
+              <span className="shrink-0 text-muted-foreground">
+                {file.state === 'pending_review' ? 'review pending' : 'modified'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-2 space-y-1">
+        {summary.providers.map((provider) => (
+          <div key={provider.label} className="text-[11px] leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground">{provider.label} unavailable:</span>{' '}
+            {provider.description}
           </div>
         ))}
-        {activeFile && !contextFiles.some((f) => f.path === activeFile.path) && (
-          <div className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded text-xs">
-            <FileCode className="h-3 w-3 text-primary" />
-            <span className="truncate max-w-[100px]">{activeFile.name}</span>
-            <span className="text-muted-foreground">(active)</span>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-function ContextActionButtons({
+// ---------------------------------------------------------------------------
+// Context panel (small sub-components)
+// ---------------------------------------------------------------------------
+
+function WorkbenchContextPanel({
+  contextDraft,
   activeFile,
-  contextFiles,
+  includeActiveFile,
+  pinnedPaths,
+  workspaceName,
+  onToggleIncludeActiveFile,
   onAddToContext,
+  onRemoveFromContext,
   onClearContext,
 }: Readonly<{
+  contextDraft: WorkbenchContextDraft;
   activeFile: OpenTab | undefined;
-  contextFiles: OpenTab[];
+  includeActiveFile: boolean;
+  pinnedPaths: ReadonlySet<string>;
+  workspaceName: string;
+  onToggleIncludeActiveFile: () => void;
   onAddToContext: (tab: OpenTab) => void;
+  onRemoveFromContext: (path: string) => void;
   onClearContext: () => void;
 }>) {
-  const showPinButton = activeFile && !contextFiles.some((f) => f.path === activeFile.path);
-  const showClearButton = contextFiles.length > 0;
+  if (contextDraft.entries.length === 0 && !activeFile) return null;
 
-  if (!showPinButton && !showClearButton) return null;
+  const activeIsPinned = Boolean(activeFile && pinnedPaths.has(activeFile.path));
+  const activeStatus = activeIsPinned
+    ? 'Pinned'
+    : includeActiveFile
+      ? 'Auto-included'
+      : 'Not included';
 
   return (
-    <div className="flex items-center gap-2 mb-2">
-      {showPinButton && activeFile && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5 text-xs h-7"
-          onClick={() => {
-            onAddToContext(activeFile);
-          }}
-        >
-          <Plus className="h-3 w-3" />
-          Pin {activeFile.name}
-        </Button>
+    <div className="mb-2 rounded-md border border-border bg-background/60 p-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">Code context</span>
+          </div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Workspace: {workspaceName}. {contextDraft.includedCount} file
+            {contextDraft.includedCount === 1 ? '' : 's'} will be sent with the next message
+            {contextDraft.totalCharacters > 0
+              ? ` (${contextDraft.totalCharacters.toLocaleString()} chars)`
+              : ''}
+            .
+          </p>
+        </div>
+        {pinnedPaths.size > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[11px] text-muted-foreground"
+            onClick={onClearContext}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {activeFile && (
+        <div className="mt-2 rounded border border-border/70 bg-card/50 p-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs">
+                <FileCode className="h-3.5 w-3.5 text-primary" />
+                <span className="truncate font-medium">{activeFile.name}</span>
+                {activeFile.isDirty && (
+                  <span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                    unsaved
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                Active file · {activeStatus}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {!activeIsPinned && (
+                <Button
+                  variant={includeActiveFile ? 'secondary' : 'outline'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={onToggleIncludeActiveFile}
+                >
+                  {includeActiveFile ? 'Exclude' : 'Include'}
+                </Button>
+              )}
+              {!activeIsPinned && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    onAddToContext(activeFile);
+                  }}
+                >
+                  Pin
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
-      {showClearButton && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 text-xs h-7 text-muted-foreground"
-          onClick={onClearContext}
-        >
-          <X className="h-3 w-3" />
-          Clear all
-        </Button>
+
+      {contextDraft.entries.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {contextDraft.entries.map((entry) => (
+            <div
+              key={entry.path}
+              className={cn(
+                'flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-xs',
+                entry.status === 'included'
+                  ? 'border-border/70 bg-secondary/35'
+                  : 'border-destructive/25 bg-destructive/5',
+              )}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="truncate font-medium">{entry.name}</span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {entry.source === 'active' ? 'active' : 'pinned'}
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                  {entry.status === 'included'
+                    ? `${entry.language ?? 'text'} · ${entry.characters.toLocaleString()} chars`
+                    : 'Excluded from the next message'}
+                </p>
+              </div>
+              {entry.source === 'pinned' && (
+                <button
+                  type="button"
+                  aria-label={`Remove ${entry.name} from context`}
+                  onClick={() => {
+                    onRemoveFromContext(entry.path);
+                  }}
+                  className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {contextDraft.warnings.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {contextDraft.warnings.map((warning) => (
+            <p
+              key={warning}
+              className="text-[11px] leading-snug text-amber-700 dark:text-amber-300"
+            >
+              {warning}
+            </p>
+          ))}
+        </div>
       )}
     </div>
   );
+}
+
+function getFreshContextFiles(contextFiles: OpenTab[], openTabs: OpenTab[]): OpenTab[] {
+  return contextFiles.map((contextFile) => {
+    const current = openTabs.find((tab) => tab.path === contextFile.path);
+    return current ?? contextFile;
+  });
+}
+
+function getAssistantContextFiles(
+  contextDraft: WorkbenchContextDraft,
+): { path: string; name: string }[] {
+  return contextDraft.sanitisedFiles.map((file) => ({
+    path: file.path,
+    name: file.path.split('/').pop() ?? file.path,
+  }));
+}
+
+function fileReferenceLabel(status: WorkbenchFileReferenceStatus, path: string): string {
+  switch (status) {
+    case 'available':
+      return `Open ${path} in workbench`;
+    case 'no_workspace':
+      return 'Open a workspace before opening file references';
+    case 'outside_workspace':
+      return 'This file reference is outside the active workspace';
+    case 'directory':
+      return 'This reference points to a folder, not a file';
+    case 'unsupported':
+      return 'This file type is not available for workbench preview';
+    case 'not_found':
+      return 'This file was not found in the active workspace';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -896,19 +1205,36 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [contextFiles, setContextFiles] = useState<OpenTab[]>([]);
+  const [includeActiveFile, setIncludeActiveFile] = useState(true);
+  const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
 
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
-
-  const contextFilesForMessage = useMemo(() => {
-    const files: { file: string; code: string }[] = [];
-    for (const f of contextFiles) {
-      files.push({ file: f.path, code: f.content });
-    }
-    if (activeFile && !contextFiles.some((f) => f.path === activeFile.path)) {
-      files.push({ file: activeFile.path, code: activeFile.content });
-    }
-    return files;
-  }, [contextFiles, activeFile]);
+  const freshContextFiles = useMemo(
+    () => getFreshContextFiles(contextFiles, openTabs),
+    [contextFiles, openTabs],
+  );
+  const branchSummary = useMemo(
+    () =>
+      buildWorkbenchBranchSummary({
+        workspaceName: fs.rootName,
+        openTabs,
+        pendingProposalPath: editProposal?.path,
+      }),
+    [editProposal?.path, fs.rootName, openTabs],
+  );
+  const contextDraft = useMemo(
+    () =>
+      buildWorkbenchContextDraft({
+        pinnedFiles: freshContextFiles,
+        activeFile,
+        includeActiveFile,
+      }),
+    [freshContextFiles, activeFile, includeActiveFile],
+  );
+  const pinnedContextPaths = useMemo(
+    () => new Set(contextFiles.map((file) => file.path)),
+    [contextFiles],
+  );
 
   const {
     messages,
@@ -918,6 +1244,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setError: setHarnessError,
     criticEventsByMessage,
     thinkingByMessage,
+    toolEventsByMessage,
+    approvalEventsByMessage,
+    decideApproval,
   } = useHarnessChat(sessionId);
 
   useEffect(() => {
@@ -1026,9 +1355,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const handleContentChange = useCallback(
     (content: string) => {
       if (!activeTab) return;
-      setOpenTabs((prev) =>
-        prev.map((tab) => (tab.path === activeTab ? { ...tab, content, isDirty: true } : tab)),
-      );
+      setOpenTabs((prev) => updateWorkbenchTabContent(prev, activeTab, content));
     },
     [activeTab],
   );
@@ -1080,6 +1407,40 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setContextFiles([]);
   }, []);
 
+  const handleToggleIncludeActiveFile = useCallback(() => {
+    setIncludeActiveFile((current) => !current);
+  }, []);
+
+  const handleAddNodeToContext = useCallback(
+    async (node: FileNode) => {
+      if (node.type !== 'file') return;
+      const openTab = openTabs.find((tab) => tab.path === node.path);
+      if (openTab) {
+        handleAddToContext(openTab);
+        return;
+      }
+
+      let content = node.content ?? '';
+      if (node.handle) {
+        try {
+          content = await fs.readFile(node);
+        } catch {
+          content = `// Failed to read ${node.path}\n`;
+        }
+      }
+
+      handleAddToContext({
+        path: node.path,
+        name: node.name,
+        content,
+        isDirty: false,
+        language: getLanguage(node.name),
+        handle: node.handle as FileSystemFileHandle | undefined,
+      });
+    },
+    [fs, handleAddToContext, openTabs],
+  );
+
   // --- Code apply from AI ---
 
   const handleApplyCode = useCallback(
@@ -1087,23 +1448,49 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       if (!targetFile) return;
       const existing = openTabs.find((tab) => tab.path === targetFile);
       if (existing) {
-        setOpenTabs((prev) =>
-          prev.map((tab) =>
-            tab.path === targetFile ? { ...tab, content: code, isDirty: true } : tab,
-          ),
+        setEditProposal(
+          createWorkbenchEditProposal({
+            path: targetFile,
+            before: existing.content,
+            after: code,
+          }),
         );
         setActiveTab(targetFile);
       } else {
         const name = targetFile.split('/').pop() ?? 'untitled';
+        setEditProposal(
+          createWorkbenchEditProposal({
+            path: targetFile,
+            before: '',
+            after: code,
+          }),
+        );
         setOpenTabs((prev) => [
           ...prev,
-          { path: targetFile, name, content: code, isDirty: true, language: getLanguage(name) },
+          { path: targetFile, name, content: '', isDirty: false, language: getLanguage(name) },
         ]);
         setActiveTab(targetFile);
       }
     },
     [openTabs],
   );
+
+  const handleRejectProposal = useCallback(() => {
+    setEditProposal(null);
+  }, []);
+
+  const handleApplyProposal = useCallback(() => {
+    if (!editProposal) return;
+    setOpenTabs((prev) =>
+      prev.map((tab) =>
+        tab.path === editProposal.path
+          ? { ...tab, content: editProposal.after, isDirty: true }
+          : tab,
+      ),
+    );
+    setActiveTab(editProposal.path);
+    setEditProposal(null);
+  }, [editProposal]);
 
   const handleCreateFile = useCallback((code: string, suggestedName = 'new-file.ts') => {
     const path = `/src/${suggestedName}`;
@@ -1145,17 +1532,64 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setIsPathDialogOpen(false);
   }, [pathInput, findFileByPath, handleFileSelect]);
 
+  const getFileReferenceAction = useCallback(
+    (reference: string): WorkbenchFileReferenceAction | null => {
+      const parsed = parseWorkbenchFileReference(reference);
+      if (!parsed) return null;
+
+      if (fileTree.length === 0) {
+        const status: WorkbenchFileReferenceStatus = 'no_workspace';
+        return {
+          path: parsed.path,
+          status,
+          label: fileReferenceLabel(status, parsed.path),
+        };
+      }
+
+      if (!isSupportedWorkbenchTextPath(parsed.path)) {
+        const status: WorkbenchFileReferenceStatus = 'unsupported';
+        return {
+          path: parsed.path,
+          status,
+          label: fileReferenceLabel(status, parsed.path),
+        };
+      }
+
+      const node = findFileByPath(parsed.path);
+      const status: WorkbenchFileReferenceStatus =
+        node?.type === 'file'
+          ? 'available'
+          : node?.type === 'directory'
+            ? 'directory'
+            : 'not_found';
+
+      return {
+        path: parsed.path,
+        status,
+        label: fileReferenceLabel(status, parsed.path),
+        open:
+          status === 'available' && node
+            ? () => {
+                handleFileSelect(node).catch(() => {
+                  toast.error(`Failed to open ${node.name}`);
+                });
+              }
+            : undefined,
+      };
+    },
+    [fileTree.length, findFileByPath, handleFileSelect],
+  );
+
   // --- Chat send ---
 
   const handleSendMessage = useCallback(() => {
     const userLine = chatInput.trim();
     if (!userLine || !sessionId) return;
-    const { files } = sanitiseFileContext(contextFilesForMessage);
-    const prefix = formatFileContext(files);
+    const prefix = formatFileContext(contextDraft.sanitisedFiles);
     const messageForApi = prefix ? `${prefix}\n${userLine}` : userLine;
     sendMessage(messageForApi, userLine).catch(() => {});
     setChatInput('');
-  }, [chatInput, sessionId, contextFilesForMessage, sendMessage]);
+  }, [chatInput, sessionId, contextDraft, sendMessage]);
 
   // --- Keyboard shortcuts ---
 
@@ -1213,6 +1647,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         onLoadFromPath={handleLoadFromPath}
         onOpenFolder={fs.openDirectory}
         isLoadingFolder={fs.isLoading}
+        isOpeningFolder={fs.isOpeningDirectory}
         rootName={fs.rootName}
         onRefreshFolder={fs.refresh}
         onCloseFolder={fs.closeDirectory}
@@ -1300,9 +1735,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                             size="sm"
                             className="gap-2"
                             onClick={fs.openDirectory}
+                            disabled={fs.isOpeningDirectory}
                           >
                             <FolderOpen className="h-4 w-4" />
-                            Open Folder
+                            {fs.isOpeningDirectory ? 'Opening...' : 'Open Folder'}
                           </Button>
                         </div>
                       )}
@@ -1322,15 +1758,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         node={node}
                         onFileSelect={handleFileSelect}
                         onAddToContext={(n) => {
-                          if (n.content) {
-                            handleAddToContext({
-                              path: n.path,
-                              name: n.name,
-                              content: n.content,
-                              isDirty: false,
-                              language: getLanguage(n.name),
-                            });
-                          }
+                          handleAddNodeToContext(n).catch(() => {
+                            toast.error(`Failed to add ${n.name} to context`);
+                          });
                         }}
                         selectedPath={activeTab}
                         contextPaths={contextFiles.map((f) => f.path)}
@@ -1358,10 +1788,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 />
                 <EditorPanel
                   activeFile={activeFile}
+                  editProposal={
+                    editProposal && editProposal.path === activeFile?.path ? editProposal : null
+                  }
                   onContentChange={handleContentChange}
                   onOpenPathDialog={() => {
                     setIsPathDialogOpen(true);
                   }}
+                  onApplyProposal={handleApplyProposal}
+                  onRejectProposal={handleRejectProposal}
                 />
               </div>
             </ResizablePanel>
@@ -1388,19 +1823,29 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 chatInput={chatInput}
                 setChatInput={setChatInput}
                 onSendMessage={handleSendMessage}
-                contextFiles={contextFiles}
+                contextDraft={contextDraft}
+                branchSummary={branchSummary}
                 activeFile={activeFile}
+                includeActiveFile={includeActiveFile}
+                pinnedPaths={pinnedContextPaths}
+                workspaceName={fs.rootName ?? 'No folder open'}
+                onToggleIncludeActiveFile={handleToggleIncludeActiveFile}
                 onAddToContext={handleAddToContext}
                 onRemoveFromContext={handleRemoveFromContext}
                 onClearContext={handleClearContext}
                 onApplyCode={handleApplyCode}
                 onCreateFile={handleCreateFile}
+                onShowDiff={handleApplyCode}
+                getFileReferenceAction={getFileReferenceAction}
                 agents={agents}
                 selectedAgentId={selectedAgentId}
                 onAgentChange={setSelectedAgentId}
                 sessionReady={Boolean(sessionId)}
                 criticEventsByMessage={criticEventsByMessage}
                 thinkingByMessage={thinkingByMessage}
+                toolEventsByMessage={toolEventsByMessage}
+                approvalEventsByMessage={approvalEventsByMessage}
+                onApprovalDecision={decideApproval}
               />
             </ResizablePanel>
           </>

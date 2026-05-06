@@ -194,6 +194,11 @@ export type StreamRenderResult =
   | { approvalRequired: ApprovalRequiredStreamEvent }
   | null;
 
+type StreamAssistantResult = {
+  text: string;
+  errorMessage: string | null;
+};
+
 function renderThinkingEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.content !== 'string') return null;
   const critic = parseCriticContent(o.content.trimStart());
@@ -519,8 +524,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   );
 
   const streamAssistantResponse = useCallback(
-    async (assistantId: string, body: ReadableStream<Uint8Array>): Promise<string> => {
+    async (
+      assistantId: string,
+      body: ReadableStream<Uint8Array>,
+    ): Promise<StreamAssistantResult> => {
       let accumulated = '';
+      let streamErrorMessage: string | null = null;
       let pendingRevisionReset = false;
       await readNdjsonStream(
         body,
@@ -533,7 +542,10 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
             accumulated += chunk;
           }
         },
-        (msg) => setError(msg),
+        (msg) => {
+          streamErrorMessage = msg;
+          setError(msg);
+        },
         (event) => {
           appendCriticEvent(assistantId, event);
           if (event.kind === 'revise') {
@@ -548,7 +560,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         (event) => appendToolTrace(assistantId, event),
         (event) => appendApprovalRequired(assistantId, event),
       );
-      return accumulated;
+      return { text: accumulated, errorMessage: streamErrorMessage };
     },
     [appendApprovalRequired, appendCriticEvent, appendThinking, appendToolTrace],
   );
@@ -584,10 +596,14 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         if (!res.ok) throw new Error(await parseErrorResponse(res));
         if (!res.body) throw new Error('No response body');
 
-        const accumulated = await streamAssistantResponse(assistantId, res.body);
+        const result = await streamAssistantResponse(assistantId, res.body);
+        const finalText =
+          result.text.trim() || !result.errorMessage
+            ? result.text
+            : `The agent run failed before returning a response.\n\n${result.errorMessage}`;
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
-        updateAssistantMessage(assistantId, accumulated);
+        updateAssistantMessage(assistantId, finalText);
         setThinkingByMessage((prev) => {
           const current = prev[assistantId];
           if (current === THINKING_PLACEHOLDER || current === THINKING_REVISE_PLACEHOLDER) {
@@ -667,7 +683,11 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
 
         let accumulated = '';
         if (res.body && !res.headers.get('content-type')?.includes('application/json')) {
-          accumulated = await streamAssistantResponse(assistantId, res.body);
+          const result = await streamAssistantResponse(assistantId, res.body);
+          accumulated =
+            result.text.trim() || !result.errorMessage
+              ? result.text
+              : `The agent run failed before returning a response.\n\n${result.errorMessage}`;
         }
 
         updateAssistantMessage(assistantId, accumulated);

@@ -1,5 +1,10 @@
 # agent-platform-ide-rethink - Reassess code viewing/editing experience
 
+> Status: closed as superseded/refined by
+> [`agent-platform-code-workbench`](./agent-platform-code-workbench.md).
+> The selected direction is a bounded internal code workbench with a proper editor engine,
+> chat-visible file context, and diff-first review. External IDE handoff remains optional/future.
+
 ## Summary
 
 Reassess whether the platform should maintain a bespoke browser-based IDE/file tree, embed an existing editor experience, or lean on agent-visible repository tools plus external developer tooling.

@@ -347,10 +347,20 @@ export function formatFileContext(files: SanitisedFile[]): string {
   if (files.length === 0) return '';
 
   const blocks = files.map((f) => `--- ${f.path} ---\n\`\`\`${f.language}\n${f.code}\n\`\`\``);
+  const editGuidance = [
+    'Workbench edit guidance:',
+    '- These files are open in the browser code workbench and may not exactly match the backend container filesystem.',
+    '- If the user asks you to change one of these files, do not call backend filesystem or patch tools such as sys_write_file, sys_append_file, or coding_apply_patch.',
+    '- If a change is needed, propose the updated file content for review in the browser workbench instead of editing the backend container filesystem.',
+    '- Return the replacement as a fenced code block tagged with the language and path, for example ```typescript:/src/app.ts.',
+    '- For Markdown files that contain fenced code blocks, wrap the replacement with a longer outer fence such as ````markdown:README.md so inner ``` fences do not truncate the proposed replacement.',
+    '- Do not ask the user to copy line endings, whitespace, or exact first lines when the attached file content is sufficient to produce a reviewed replacement.',
+  ];
 
   return [
     '<file_context>',
     'The following files have been provided as context for your reference:',
+    ...editGuidance,
     '',
     ...blocks,
     '</file_context>',

@@ -37,6 +37,8 @@ export interface UseFileSystemReturn {
   fileTree: FileNode[];
   /** Whether the tree is currently loading */
   isLoading: boolean;
+  /** Whether the browser directory picker is currently open */
+  isOpeningDirectory: boolean;
   /** Error message if any */
   error: string | null;
   /** Open a directory picker and load the tree */
@@ -63,6 +65,14 @@ export interface UseFileSystemReturn {
 
 function isFileSystemAccessSupported(): boolean {
   return globalThis.window !== undefined && 'showDirectoryPicker' in globalThis.window;
+}
+
+function isDirectoryPromptAlreadyActiveError(err: unknown): boolean {
+  return (
+    err instanceof DOMException &&
+    err.name === 'InvalidStateError' &&
+    err.message.toLowerCase().includes('picker already active')
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -216,16 +226,7 @@ async function tryPermission(
 ): Promise<boolean> {
   const perm = await h.queryPermission({ mode });
   if (isCancelled()) return false;
-  if (perm === 'granted') return true;
-  if (perm !== 'prompt') return false;
-  try {
-    const result = await h.requestPermission({ mode });
-    if (isCancelled()) return false;
-    return result === 'granted';
-  } catch {
-    fsDebugLog(`restore:requestPermission_${mode}_threw`);
-    return false;
-  }
+  return perm === 'granted';
 }
 
 async function restorePersistedFolder(
@@ -273,8 +274,10 @@ export function useFileSystem(): UseFileSystemReturn {
   const [rootName, setRootName] = useState<string | null>(null);
   const [isDirectoryOpen, setIsDirectoryOpen] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  const [isOpeningDirectory, setIsOpeningDirectory] = useState(false);
 
   const rootHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
+  const directoryPickerInFlightRef = useRef(false);
   /** Bumps on each loadTree start; only the latest completion may commit state (avoids races with restore vs picker). */
   const loadGenerationRef = useRef(0);
   /**
@@ -366,6 +369,10 @@ export function useFileSystem(): UseFileSystemReturn {
   }, [loadTree]);
 
   const reconnectFolder = useCallback(async () => {
+    if (directoryPickerInFlightRef.current) {
+      fsDebugLog('reconnect:prompt_already_active');
+      return;
+    }
     const handle = pendingRestoreHandleRef.current ?? (await loadPersistedHandle());
     if (!handle) {
       clearReconnectState();
@@ -407,6 +414,10 @@ export function useFileSystem(): UseFileSystemReturn {
 
       setError('Permission was not granted. Try Open Folder again.');
     } catch (err) {
+      if (isDirectoryPromptAlreadyActiveError(err)) {
+        fsDebugLog('reconnect:prompt_already_active_error');
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to restore folder';
       fsDebugLog('reconnect:error', message);
       setError(message);
@@ -418,7 +429,14 @@ export function useFileSystem(): UseFileSystemReturn {
       setError('File System Access API is not supported in this browser. Use Chrome or Edge.');
       return;
     }
+    if (directoryPickerInFlightRef.current) {
+      fsDebugLog('picker:already_open');
+      return;
+    }
 
+    directoryPickerInFlightRef.current = true;
+    setIsOpeningDirectory(true);
+    setError(null);
     try {
       const handle = await globalThis.window.showDirectoryPicker({ mode: 'readwrite' });
       fsDebugLog('picker:resolved', handle.name);
@@ -434,9 +452,16 @@ export function useFileSystem(): UseFileSystemReturn {
         fsDebugLog('picker:cancelled');
         return;
       }
+      if (isDirectoryPromptAlreadyActiveError(err)) {
+        fsDebugLog('picker:already_active_error');
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to open directory';
       fsDebugLog('picker:error', message);
       setError(message);
+    } finally {
+      directoryPickerInFlightRef.current = false;
+      setIsOpeningDirectory(false);
     }
   }, [loadTree, clearReconnectState]);
 
@@ -487,6 +512,7 @@ export function useFileSystem(): UseFileSystemReturn {
     rootName,
     fileTree,
     isLoading,
+    isOpeningDirectory,
     error,
     openDirectory,
     readFile,

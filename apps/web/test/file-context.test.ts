@@ -130,6 +130,17 @@ describe('formatFileContext', () => {
     expect(output).toContain('console.log("hi")');
   });
 
+  it('instructs agents to propose reviewed workbench replacements instead of backend patches', () => {
+    const output = formatFileContext([
+      { path: '/README.md', code: '# Agent Platform', language: 'markdown' },
+    ]);
+
+    expect(output).toContain('Workbench edit guidance');
+    expect(output).toContain('propose the updated file content for review');
+    expect(output).toContain('```typescript:/src/app.ts');
+    expect(output).toContain('Do not ask the user to copy line endings');
+  });
+
   it('includes multiple files', () => {
     const output = formatFileContext([
       { path: '/a.ts', code: 'a', language: 'typescript' },

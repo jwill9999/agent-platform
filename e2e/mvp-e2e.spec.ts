@@ -141,13 +141,20 @@ test.describe('MVP E2E (compose-backed)', () => {
     await page.goto('/e2e/approval-card');
 
     await expect(page.getByRole('heading', { name: 'E2E approval-card verify' })).toBeVisible();
-    await expect(page.getByTestId('approval-card')).toHaveCount(2);
-    await expect(page.getByLabel('Approval required for sys_bash').first()).toContainText(
-      'Pending',
+    await expect(page.getByTestId('approval-card')).toHaveCount(5);
+    const pendingApproval = page.getByLabel('Approval required to open browser page');
+    await expect(pendingApproval).toContainText('Waiting for approval');
+    await expect(page.getByLabel('Run terminal command completed')).toContainText(
+      'Approved action completed',
     );
-    await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reject' })).toBeVisible();
-    await expect(page.getByText('[REDACTED]')).toBeVisible();
-    await expect(page.getByText('Executed')).toBeVisible();
+    await expect(page.getByLabel('Write file denied')).toContainText('Denied');
+    await expect(page.getByLabel('Run terminal command expired')).toContainText('Expired');
+    await expect(page.getByLabel('Click page element needs attention')).toContainText(
+      'Approval action failed',
+    );
+    await expect(pendingApproval.getByRole('button', { name: 'Approve' })).toBeVisible();
+    await expect(pendingApproval.getByRole('button', { name: 'Deny' })).toBeVisible();
+    await pendingApproval.getByText('Technical details').click();
+    await expect(pendingApproval.getByText('[REDACTED]')).toBeVisible();
   });
 });

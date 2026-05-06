@@ -4,8 +4,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check, Play, FileCode, FilePlus, Diff } from 'lucide-react';
-import { useState, useCallback, createContext, useContext, useMemo } from 'react';
+import { Copy, Check, Play, FileCode, FilePlus, Diff, FolderOpen } from 'lucide-react';
+import React, { useState, useCallback, createContext, useContext, useMemo } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +14,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import type { WorkbenchFileReferenceStatus } from '@/lib/code-workbench-file-references';
+import { parseWorkbenchFileReference } from '@/lib/code-workbench-file-references';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,7 +28,15 @@ interface IDEMarkdownProps {
   onApplyCode?: (code: string, targetFile?: string, mode?: 'replace' | 'insert') => void;
   onCreateFile?: (code: string, suggestedName?: string) => void;
   onShowDiff?: (code: string, targetFile?: string) => void;
+  getFileReferenceAction?: (reference: string) => WorkbenchFileReferenceAction | null;
 }
+
+export type WorkbenchFileReferenceAction = {
+  path: string;
+  status: WorkbenchFileReferenceStatus;
+  label: string;
+  open?: () => void;
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -55,6 +65,15 @@ function detectFilenameFromCode(code: string): string | undefined {
   return undefined;
 }
 
+function isMarkdownLanguage(language: string): boolean {
+  return language === 'markdown' || language === 'md' || language === 'mdx';
+}
+
+function hasUnbalancedMarkdownFence(code: string): boolean {
+  const fenceCount = code.split('\n').filter((line) => /^\s*(?:`{3,}|~{3,})/.test(line)).length;
+  return fenceCount % 2 === 1;
+}
+
 // ---------------------------------------------------------------------------
 // CodeBlockWithApply
 // ---------------------------------------------------------------------------
@@ -81,7 +100,7 @@ function CodeBlockApplyActions({
           <Diff className="h-3.5 w-3.5" />
           Diff
         </Button>
-        <ApplyButton matchingFile={matchingFile} onApply={onApply} applied={applied} />
+        <ReviewButton matchingFile={matchingFile} onApply={onApply} applied={applied} />
         {onCreateFile && <CreateFileButton onClick={onCreateFile} />}
       </>
     );
@@ -90,7 +109,7 @@ function CodeBlockApplyActions({
   if (matchingFile) {
     return (
       <>
-        <ApplyButton matchingFile={matchingFile} onApply={onApply} applied={applied} />
+        <ReviewButton matchingFile={matchingFile} onApply={onApply} applied={applied} />
         {onCreateFile && <CreateFileButton onClick={onCreateFile} />}
       </>
     );
@@ -132,7 +151,7 @@ function CodeBlockApplyActions({
   return null;
 }
 
-function ApplyButton({
+function ReviewButton({
   matchingFile,
   onApply,
   applied,
@@ -153,12 +172,12 @@ function ApplyButton({
       {applied ? (
         <>
           <Check className="h-3.5 w-3.5" />
-          Applied
+          Opened
         </>
       ) : (
         <>
           <Play className="h-3.5 w-3.5" />
-          Apply to {matchingFile.name}
+          Review for {matchingFile.name}
         </>
       )}
     </Button>
@@ -171,6 +190,22 @@ function CreateFileButton({ onClick }: Readonly<{ onClick: () => void }>) {
       <FilePlus className="h-3.5 w-3.5" />
       New File
     </Button>
+  );
+}
+
+function InvalidMarkdownReplacementNotice({
+  filename,
+}: Readonly<{ filename: string | undefined }>) {
+  return (
+    <div className="m-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950">
+      <div className="text-sm font-medium">Replacement is incomplete</div>
+      <p className="mt-1 text-xs leading-relaxed">
+        The assistant returned a Markdown replacement that contains an unmatched nested code fence,
+        so this artifact may only contain the first part of {filename ?? 'the file'}. Ask the
+        assistant to resend the full replacement using a longer outer fence, for example{' '}
+        <code className="rounded bg-background/70 px-1 font-mono">````markdown:README.md</code>.
+      </p>
+    </div>
   );
 }
 
@@ -194,6 +229,7 @@ function CodeBlockWithApply({
 
   const { lang, filename } = extractFilename(language);
   const detectedFilename = filename ?? detectFilenameFromCode(value);
+  const blocksApply = isMarkdownLanguage(lang) && hasUnbalancedMarkdownFence(value);
 
   const matchingFile = contextFiles?.find(
     (f) => detectedFilename && (f.path.endsWith(detectedFilename) || f.name === detectedFilename),
@@ -227,7 +263,7 @@ function CodeBlockWithApply({
     onCreateFile?.(value, suggestedName);
   }, [value, detectedFilename, lang, onCreateFile]);
 
-  const hasActions = onApplyCode || onCreateFile || onShowDiff;
+  const hasActions = !blocksApply && (onApplyCode || onCreateFile || onShowDiff);
 
   return (
     <div className="relative group my-4 rounded-lg overflow-hidden border border-border bg-muted/30">
@@ -251,6 +287,14 @@ function CodeBlockWithApply({
               applied={applied}
             />
           )}
+          {blocksApply && (
+            <span
+              className="rounded bg-amber-500/10 px-2 py-1 text-xs text-amber-700"
+              title="This Markdown block contains an unmatched nested code fence, so it may be truncated."
+            >
+              Review unavailable
+            </span>
+          )}
           <button
             onClick={() => {
               copyToClipboard();
@@ -271,6 +315,7 @@ function CodeBlockWithApply({
           </button>
         </div>
       </div>
+      {blocksApply && <InvalidMarkdownReplacementNotice filename={detectedFilename} />}
       <SyntaxHighlighter
         language={lang}
         style={oneLight}
@@ -297,6 +342,32 @@ function InlineCode({ children }: Readonly<{ children: React.ReactNode }>) {
     <code className="px-1.5 py-0.5 rounded-md bg-muted text-sm font-mono text-foreground">
       {children}
     </code>
+  );
+}
+
+function FileReferenceButton({
+  children,
+  action,
+}: Readonly<{ children: React.ReactNode; action: WorkbenchFileReferenceAction }>) {
+  const canOpen = action.status === 'available' && action.open;
+  return (
+    <button
+      type="button"
+      disabled={!canOpen}
+      title={action.label}
+      onClick={() => {
+        action.open?.();
+      }}
+      className={cn(
+        'inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 align-baseline font-mono text-sm',
+        canOpen
+          ? 'border-primary/25 bg-primary/10 text-primary hover:bg-primary/15'
+          : 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+      )}
+    >
+      <FolderOpen className="h-3 w-3 shrink-0" />
+      <span className="truncate">{children}</span>
+    </button>
   );
 }
 
@@ -348,6 +419,12 @@ function MarkdownAnchor({
   href,
   children,
 }: Readonly<{ href?: string; children?: React.ReactNode }>) {
+  const { getFileReferenceAction } = useContext(IDEMarkdownContext);
+  const action = href ? getFileReferenceAction?.(href) : null;
+  if (action) {
+    return <FileReferenceButton action={action}>{children}</FileReferenceButton>;
+  }
+
   return (
     <a
       href={href}
@@ -373,9 +450,7 @@ function MarkdownThead({ children }: Readonly<{ children?: React.ReactNode }>) {
 }
 
 function MarkdownTh({ children }: Readonly<{ children?: React.ReactNode }>) {
-  return (
-    <th className="px-4 py-2 text-left font-medium border-b border-border">{children}</th>
-  );
+  return <th className="px-4 py-2 text-left font-medium border-b border-border">{children}</th>;
 }
 
 function MarkdownTd({ children }: Readonly<{ children?: React.ReactNode }>) {
@@ -407,6 +482,7 @@ interface IDEMarkdownContextValue {
   onApplyCode?: (code: string, targetFile?: string, mode?: 'replace' | 'insert') => void;
   onCreateFile?: (code: string, suggestedName?: string) => void;
   onShowDiff?: (code: string, targetFile?: string) => void;
+  getFileReferenceAction?: (reference: string) => WorkbenchFileReferenceAction | null;
 }
 
 const IDEMarkdownContext = createContext<IDEMarkdownContextValue>({});
@@ -415,11 +491,17 @@ function MarkdownCodeRenderer({
   className: codeClassName,
   children,
 }: Readonly<{ className?: string; children?: React.ReactNode }>) {
-  const { contextFiles, onApplyCode, onCreateFile, onShowDiff } = useContext(IDEMarkdownContext);
-  const match = /language-(\w+)/.exec(codeClassName ?? '');
+  const { contextFiles, onApplyCode, onCreateFile, onShowDiff, getFileReferenceAction } =
+    useContext(IDEMarkdownContext);
+  const match = /^language-(.+)$/.exec(codeClassName ?? '');
   const isInline = !match && !codeClassName;
 
   if (isInline) {
+    const text = String(children);
+    const action = parseWorkbenchFileReference(text) ? getFileReferenceAction?.(text) : null;
+    if (action) {
+      return <FileReferenceButton action={action}>{children}</FileReferenceButton>;
+    }
     return <InlineCode>{children}</InlineCode>;
   }
 
@@ -464,10 +546,11 @@ export function IDEMarkdown({
   onApplyCode,
   onCreateFile,
   onShowDiff,
+  getFileReferenceAction,
 }: Readonly<IDEMarkdownProps>) {
   const ctxValue = useMemo(
-    () => ({ contextFiles, onApplyCode, onCreateFile, onShowDiff }),
-    [contextFiles, onApplyCode, onCreateFile, onShowDiff],
+    () => ({ contextFiles, onApplyCode, onCreateFile, onShowDiff, getFileReferenceAction }),
+    [contextFiles, onApplyCode, onCreateFile, onShowDiff, getFileReferenceAction],
   );
 
   return (
