@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Final planning pass added explicit per-task testing strategies to every Project workspace and Project onboarding child spec, including mandatory local gates, focused tests, Playwright UI actions/assertions where applicable, CI/GitHub monitoring, and no-close/no-merge until all gates are green.
+- **Date:** 2026-05-07
 - **Session:** Clarified the definition of done for Project workspace/onboarding work: pushed code is not done by itself. A task is done only when implementation is complete, local build/format/lint/unit and relevant E2E/Playwright checks pass, GitHub Actions/CI pipelines pass, and any review-required feedback is resolved. Failed CI means the task remains open and must be iterated until green.
 - **Date:** 2026-05-07
 - **Session:** Tightened the ticket-delivery skill requirements: agents must build and run local formatting, linting, unit, and relevant integration/E2E/Playwright gates before pushing/opening task PRs; Playwright strategies must specify UI actions and observable assertions; GitHub Actions logs/artifacts and reviews must be monitored after PR creation; no task can be closed, signed off, or merged while local gates, Playwright checks, CI checks, or review-required feedback remain unresolved.

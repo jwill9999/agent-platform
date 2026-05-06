@@ -41,6 +41,14 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
+  - Focused tests: read-only evidence collection, truncation, structured LLM-output parsing,
+    invalid-output fallback, persistence, and missing/sufficient/insufficient fixture Projects.
+  - Playwright: run first-load assessment flows for sufficient and insufficient fixture Projects;
+    assert visible assessment summary, evidence, gaps, questions, and onboarding state.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Unit tests for evidence collection boundaries and truncation.
 - Tests for structured LLM output parsing and invalid-output fallback.
 - Integration tests for missing, sufficient, and insufficient `AGENTS.md` fixture projects.

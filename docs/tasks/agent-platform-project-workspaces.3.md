@@ -46,6 +46,15 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
+  - Focused tests: API/session/persistence tests for valid path, invalid path, Project metadata,
+    repository root, branch identity, and Project/Chat separation.
+  - Playwright: open a valid fixture Project and an invalid/inaccessible path; assert Project
+    metadata appears only for the valid path and code-agent tools stay unavailable for the invalid
+    path.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - API tests for creating/selecting Project records with valid and invalid backend paths.
 - Repository-root/branch detection tests.
 - Session tests proving Project chat sessions persist Project id and Chat sessions do not.

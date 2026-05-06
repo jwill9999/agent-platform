@@ -41,6 +41,14 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
+  - Focused tests: component/API tests for mode selection, default agent resolution, and Chat
+    remaining project-neutral.
+  - Playwright: choose **Open Chat** and **Open Project** through the UI; assert default agent labels,
+    visible controls, and absence of project tools in Chat.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Component tests for entry-path rendering and mode-specific default agent selection.
 - API/contract tests if session creation carries mode or default-agent metadata.
 - Playwright flow: choose **Open Chat**, verify personal-assistant/default-chat UI and no project

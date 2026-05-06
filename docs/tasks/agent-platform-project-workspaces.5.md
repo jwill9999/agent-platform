@@ -53,6 +53,15 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, and relevant
+    integration/E2E gates for tool policy.
+  - Focused tests: `AGENTS.md` discovery, nested precedence, prompt/context assembly, read-only tool
+    allowance, and write/destructive-tool denial before approval.
+  - Playwright: open missing/unapproved and approved fixture Projects; verify read-only inspection,
+    blocked write before approval, and allowed write after approval.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Unit tests for `AGENTS.md` discovery and nested precedence.
 - Prompt/context tests proving root and relevant nested instructions are included.
 - Tool-policy tests proving read-only tools remain available while write/destructive tools are

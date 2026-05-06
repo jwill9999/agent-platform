@@ -46,6 +46,14 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
+  - Focused tests: onboarding dialogue state, question/answer handling, draft revision persistence,
+    and write-tool denial during onboarding.
+  - Playwright: start onboarding for a missing-instructions fixture, answer the agent's questions,
+    and assert the visible draft updates without unlocking code writes.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Unit/integration tests for onboarding dialogue state and draft revisions.
 - Prompt/context tests proving onboarding dialogue cannot receive write/destructive tools.
 - UI tests for question, answer, draft preview, and revision history states.

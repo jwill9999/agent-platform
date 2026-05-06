@@ -38,6 +38,15 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, and relevant
+    integration/E2E gates for approval unlock behavior.
+  - Focused tests: approve, reject, request-changes, approval metadata, draft finalization, and tool
+    gating immediately after approval.
+  - Playwright: review a draft, reject/request changes, approve a revised draft, verify
+    `AGENTS.md` is finalized, then verify a code write is allowed and lands in the Project root.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - API/use-case tests for approve, reject, request changes, and approval metadata.
 - File-write tests for finalizing draft root `AGENTS.md`.
 - UI tests for review/approve/reject states.

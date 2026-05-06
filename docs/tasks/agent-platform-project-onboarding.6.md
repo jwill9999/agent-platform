@@ -54,6 +54,15 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e`
+    against the Docker runtime.
+  - Focused tests: fixture cleanup and any lower-level regressions required to stabilize E2E.
+  - Playwright: drive the full onboarding lifecycle through the UI for sufficient, missing,
+    insufficient, nested, and ambiguous Project instruction states; assert visible outputs and
+    filesystem results.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Full relevant unit/integration suite.
 - Playwright E2E against the Docker runtime.
 - CI-compatible fixture cleanup so generated files do not leak into the repo.

@@ -41,6 +41,14 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
+  - Focused tests: candidate filtering, policy classification, closeout proposal, apply/reject,
+    refresh no-change, refresh proposed-update, and material-drift states.
+  - Playwright: create/apply/reject closeout update candidates and run refresh/rescan through the UI;
+    assert visible state and `AGENTS.md` filesystem results.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Unit tests for candidate filtering and policy classification.
 - Integration tests for closeout update proposal and apply/reject.
 - Refresh/rescan tests for no-change, proposed-update, and material-drift states.

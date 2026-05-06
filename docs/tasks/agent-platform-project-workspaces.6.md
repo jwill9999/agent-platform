@@ -53,6 +53,15 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e`
+    against the Docker runtime.
+  - Focused tests: fixture setup/cleanup plus regression tests for Project/Chat split, onboarding
+    gate, wrong-root write prevention, approved writes, and monorepo ambiguity.
+  - Playwright: perform all user-visible flows through the UI and assert visible outputs plus
+    filesystem state.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Root typecheck, lint, format check, and relevant unit/integration tests.
 - Playwright E2E against a running Docker stack.
 - Regression: a code-agent write request cannot land in default Docker `/workspace` when a Project is

@@ -45,6 +45,15 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, and relevant tool/runtime
+    integration tests.
+  - Focused tests: resolver, PathJail, tool dispatch, terminal cwd, Git root, test runner root,
+    Docker root, and sensor root behavior.
+  - Playwright: drive a code-agent write through the UI and assert the resulting file appears inside
+    the active Project fixture, not the default Docker workspace.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Unit tests for `/workspace` resolution.
 - PathJail tests for allowed and rejected paths.
 - Tool dispatch tests proving file writes, Git commands, terminal commands, test commands, Docker

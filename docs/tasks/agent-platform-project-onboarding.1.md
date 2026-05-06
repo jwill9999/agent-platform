@@ -48,6 +48,14 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
+  - Focused tests: contract/schema tests for assessment output, draft, approval, refresh, fixture
+    states, and onboarding transitions.
+  - Playwright: not required unless this task introduces visible state UI; if it does, verify state
+    labels and transition affordances through the browser.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
 - Contract/schema tests for assessment output.
 - Unit tests for onboarding state transitions.
 - Persistence tests if schema/migrations are added.
