@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-06
+- **Session:** Main was updated after the code-workbench merge and stale branches were pruned. Claimed the next P1 epic, `agent-platform-project-workspaces`, pushed the Beads/Dolt state, and created `feature/agent-platform-project-workspaces` from `main` for refinement/planning. Start with the epic spec at `docs/tasks/agent-platform-project-workspaces.md`; first implementation task is `agent-platform-project-workspaces.1` once refinement is complete.
+- **Date:** 2026-05-06
 - **Session:** Deferred `agent-platform-code-workbench.7`, committed the project-workspaces follow-up planning on `task/agent-platform-code-workbench.6`, and prepared the branch for push. The next implementation priority after merge is `agent-platform-project-workspaces.1`.
 - **Date:** 2026-05-06
 - **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: corrected the folder picker follow-up to use the stable `showDirectoryPicker({ mode: 'readwrite' })` behavior again, while retaining only the narrow native picker re-entry guard. Playwright stub verification confirmed the Explorer renders a returned folder and that the app calls the picker with `readwrite`.
