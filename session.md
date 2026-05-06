@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-06
+- **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: guarded IDE Markdown replacement actions so truncated Markdown code blocks with unmatched nested fences no longer expose Apply/Diff, and filename-bearing fences such as `markdown:README.md` now route to the correct review action.
+- **Date:** 2026-05-06
 - **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: clarified browser workbench file-context instructions so agents propose reviewed replacement code blocks for attached files instead of attempting backend/container patch tools against host-selected File System Access API files.
 - **Date:** 2026-05-06
 - **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: IDE chat assistant bubbles now render hidden tool activity, browser artifact previews, and HITL approval cards from `useHarnessChat`, preventing empty bubbles when the agent attempts tool-backed work such as editing `README.md`. Added regression coverage for tool-only and approval-only IDE assistant responses.
@@ -321,8 +323,11 @@ Branch state: `task/agent-platform-code-workbench.6` contains the completed task
 - Root cause: the IDE chat panel used `useHarnessChat` but only rendered assistant text/thinking/critic state. Tool events and HITL approval events were recorded by the hook but not passed into the IDE assistant renderer.
 - Fixed the IDE assistant renderer to show tool activity, browser artifact previews, and approval cards in the right chat panel, including tool-only and approval-only responses.
 - Confirmed the follow-up edit failure was caused by a source-of-truth mismatch: browser workbench files can come from the host via the browser File System Access API, while backend edit tools run in the Docker workspace/path jail. Added file-context guidance telling agents to propose reviewed replacement code blocks for attached workbench files instead of patching backend files.
+- Investigated the next owner screenshot where Apply replaced README with only the first section. Root cause: Markdown replacements containing nested ``` fences can be parsed as partial/truncated code blocks. The IDE now hides Apply/Diff for Markdown blocks with unmatched nested fences and asks for a valid reviewed replacement instead.
+- Updated code fence parsing to preserve filename hints such as `markdown:README.md`, so correctly fenced replacements can route straight to the intended file review action.
 - Added regression coverage in `apps/web/test/ide-assistant-content.test.ts`.
 - Added regression coverage in `apps/web/test/file-context.test.ts`.
+- Added regression coverage in `apps/web/test/ide-markdown-file-reference.test.ts`.
 
 Verification:
 
@@ -330,9 +335,11 @@ Verification:
 - `pnpm --filter @agent-platform/web run lint`
 - `pnpm --filter @agent-platform/web run test -- test/ide-assistant-content.test.ts` (package runner executed 22 files / 86 tests)
 - `pnpm --filter @agent-platform/web run test -- test/file-context.test.ts test/ide-assistant-content.test.ts` (package runner executed 22 files / 87 tests)
+- `pnpm --filter @agent-platform/web run test -- test/ide-markdown-file-reference.test.ts test/file-context.test.ts` (package runner executed 22 files / 89 tests)
 - `pnpm --filter @agent-platform/web run build`
 - `pnpm exec prettier --check apps/web/components/ide/ide-with-chat.tsx apps/web/test/ide-assistant-content.test.ts`
 - `pnpm exec prettier --check apps/web/lib/file-context.ts apps/web/test/file-context.test.ts`
+- `pnpm exec prettier --check apps/web/components/ide/ide-markdown.tsx apps/web/test/ide-markdown-file-reference.test.ts apps/web/lib/file-context.ts apps/web/test/file-context.test.ts`
 - `git diff --check`
 
 ### Browser screenshot full-page handling corrected
@@ -884,7 +891,7 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-code-workbench.6`
 - **Current base:** chained from `task/agent-platform-code-workbench.5`.
-- **Current work:** task 6 is closed and pushed; follow-up fixes for IDE chat tool/approval rendering and workbench edit guidance are committed locally and should be pushed before moving to task 7.
+- **Current work:** task 6 is closed and pushed; follow-up fixes for IDE chat tool/approval rendering, workbench edit guidance, and truncated Markdown apply prevention are committed locally and should be pushed before moving to task 7.
 - **Remote sync:** pending push for the latest follow-up commit after this session handoff update is committed.
 
 ### Beads
@@ -974,8 +981,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit the `session.md` handoff update and push `task/agent-platform-code-workbench.6` with the IDE chat feedback and workbench edit-guidance fixes.
-2. Ask the owner to retest `/ide` by opening `README.md` and asking for a title change; the assistant should now propose a reviewed replacement code block/diff path instead of trying brittle backend patches or asking for exact line endings.
+1. Commit the `session.md` handoff update and push `task/agent-platform-code-workbench.6` with the IDE chat feedback, workbench edit-guidance, and truncated Markdown apply-prevention fixes.
+2. Ask the owner to retest `/ide` by opening `README.md` and asking for a title change; the assistant should now propose a correctly fenced reviewed replacement, and the UI should not allow Apply on a partial/truncated Markdown block.
 3. Once accepted, claim `agent-platform-code-workbench.7` and document the code workbench verification guide.
 4. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
 

@@ -38,4 +38,41 @@ describe('IDEMarkdown file references', () => {
     expect(html).toContain('This file was not found in the active workspace');
     expect(html).toContain('disabled=""');
   });
+
+  it('does not offer apply actions for truncated markdown replacement blocks', () => {
+    const html = renderToStaticMarkup(
+      createElement(IDEMarkdown, {
+        content: ['````markdown', '# Agent Platforms', '', '```bash', 'make', '````'].join('\n'),
+        contextFiles: [{ path: '/README.md', name: 'README.md' }],
+        onApplyCode: () => {},
+        onShowDiff: () => {},
+      }),
+    );
+
+    expect(html).toContain('Review unavailable');
+    expect(html).not.toContain('Apply to...');
+    expect(html).not.toContain('Diff');
+  });
+
+  it('uses filenames from code fence info strings for review actions', () => {
+    const html = renderToStaticMarkup(
+      createElement(IDEMarkdown, {
+        content: [
+          '````markdown:README.md',
+          '# Agent Platforms',
+          '',
+          '```bash',
+          'make',
+          '```',
+          '````',
+        ].join('\n'),
+        contextFiles: [{ path: '/README.md', name: 'README.md' }],
+        onApplyCode: () => {},
+        onShowDiff: () => {},
+      }),
+    );
+
+    expect(html).toContain('Review for README.md');
+    expect(html).toContain('Diff');
+  });
 });

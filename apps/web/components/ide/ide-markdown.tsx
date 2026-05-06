@@ -65,6 +65,15 @@ function detectFilenameFromCode(code: string): string | undefined {
   return undefined;
 }
 
+function isMarkdownLanguage(language: string): boolean {
+  return language === 'markdown' || language === 'md' || language === 'mdx';
+}
+
+function hasUnbalancedMarkdownFence(code: string): boolean {
+  const fenceCount = code.split('\n').filter((line) => /^\s*(?:`{3,}|~{3,})/.test(line)).length;
+  return fenceCount % 2 === 1;
+}
+
 // ---------------------------------------------------------------------------
 // CodeBlockWithApply
 // ---------------------------------------------------------------------------
@@ -204,6 +213,7 @@ function CodeBlockWithApply({
 
   const { lang, filename } = extractFilename(language);
   const detectedFilename = filename ?? detectFilenameFromCode(value);
+  const blocksApply = isMarkdownLanguage(lang) && hasUnbalancedMarkdownFence(value);
 
   const matchingFile = contextFiles?.find(
     (f) => detectedFilename && (f.path.endsWith(detectedFilename) || f.name === detectedFilename),
@@ -237,7 +247,7 @@ function CodeBlockWithApply({
     onCreateFile?.(value, suggestedName);
   }, [value, detectedFilename, lang, onCreateFile]);
 
-  const hasActions = onApplyCode || onCreateFile || onShowDiff;
+  const hasActions = !blocksApply && (onApplyCode || onCreateFile || onShowDiff);
 
   return (
     <div className="relative group my-4 rounded-lg overflow-hidden border border-border bg-muted/30">
@@ -260,6 +270,14 @@ function CodeBlockWithApply({
               onCreateFile={onCreateFile ? handleCreateFile : undefined}
               applied={applied}
             />
+          )}
+          {blocksApply && (
+            <span
+              className="rounded bg-amber-500/10 px-2 py-1 text-xs text-amber-700"
+              title="This Markdown block contains an unmatched nested code fence, so it may be truncated."
+            >
+              Review unavailable
+            </span>
           )}
           <button
             onClick={() => {
@@ -458,7 +476,7 @@ function MarkdownCodeRenderer({
 }: Readonly<{ className?: string; children?: React.ReactNode }>) {
   const { contextFiles, onApplyCode, onCreateFile, onShowDiff, getFileReferenceAction } =
     useContext(IDEMarkdownContext);
-  const match = /language-(\w+)/.exec(codeClassName ?? '');
+  const match = /^language-(.+)$/.exec(codeClassName ?? '');
   const isInline = !match && !codeClassName;
 
   if (isInline) {

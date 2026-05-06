@@ -352,6 +352,7 @@ export function formatFileContext(files: SanitisedFile[]): string {
     '- These files are open in the browser code workbench and may not exactly match the backend container filesystem.',
     '- If the user asks you to change one of these files, propose the updated file content for review instead of using backend file-editing tools.',
     '- Return the replacement as a fenced code block tagged with the language and path, for example ```typescript:/src/app.ts.',
+    '- For Markdown files that contain fenced code blocks, wrap the replacement with a longer outer fence such as ````markdown:README.md so inner ``` fences do not truncate the proposed replacement.',
     '- Do not ask the user to copy line endings, whitespace, or exact first lines when the attached file content is sufficient to produce a reviewed replacement.',
   ];
 
