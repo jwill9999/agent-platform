@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-06
+- **Session:** Deferred `agent-platform-code-workbench.7`, committed the project-workspaces follow-up planning on `task/agent-platform-code-workbench.6`, and prepared the branch for push. The next implementation priority after merge is `agent-platform-project-workspaces.1`.
+- **Date:** 2026-05-06
 - **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: corrected the folder picker follow-up to use the stable `showDirectoryPicker({ mode: 'readwrite' })` behavior again, while retaining only the narrow native picker re-entry guard. Playwright stub verification confirmed the Explorer renders a returned folder and that the app calls the picker with `readwrite`.
 - **Date:** 2026-05-06
 - **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: restored the previous working IDE folder picker pattern by opening folders with read permission first, guarding native picker re-entry, and requesting write permission only when saving files. Playwright stub verification confirmed the Explorer renders a selected folder when the picker returns a handle; the running Docker image must be rebuilt to exercise the local source change.
@@ -318,6 +320,24 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Project workspace binding follow-up scoped
+
+Branch state: `task/agent-platform-code-workbench.6` now contains the code workbench follow-up fixes plus the next epic planning.
+
+- Deferred `agent-platform-code-workbench.7` until 2026-05-20 because the verification guide should follow the workspace-binding architecture rather than document the current partial behavior.
+- Created Beads epic `agent-platform-project-workspaces` with tasks `.1` through `.6`.
+- Added specs for project workspace model, workbench chat binding, `/workspace` active-project resolution, browser create file/folder behavior, capability-gated tools, and verification.
+- Updated `docs/tasks/README.md` so the new epic is discoverable.
+- Kept the rejected `disabledToolIds` approach out of the codebase; the next work should solve the root source-of-truth split between browser-selected host folders and backend `/workspace`.
+- Committed the current changes as `4db2320` (`Document project workspace binding epic`).
+
+Verification:
+
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run test -- test/use-harness-chat.test.ts test/file-context.test.ts test/chat-route.test.ts`
+- `pnpm docs:lint:md` remains blocked by pre-existing markdownlint issues under `.agent-platform/workspaces/default/...`, not the new task specs.
 
 ### Code workbench IDE chat feedback fixed
 
@@ -897,13 +917,16 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-code-workbench.6`
 - **Current base:** chained from `task/agent-platform-code-workbench.5`.
-- **Current work:** task 6 is closed and pushed; follow-up fixes for IDE chat tool/approval rendering, workbench edit guidance, truncated Markdown apply prevention, and folder picker regression are committed locally and should be pushed before moving to task 7. The latest folder-picker follow-up supersedes the earlier read-mode attempt.
-- **Remote sync:** pending push for the latest follow-up commit after this session handoff update is committed.
+- **Current work:** task 6 is closed; follow-up fixes and project-workspaces planning are committed locally.
+- **Remote sync:** pending push after this session handoff update is committed.
 
 ### Beads
 
 - `agent-platform-code-workbench.6` is closed.
-- `agent-platform-code-workbench.7` is the next ready child task: Document code workbench verification guide.
+- `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
+- `agent-platform-project-workspaces` is open as the next P1 epic.
+- `agent-platform-project-workspaces.1` is the next ready child task: Define project workspace model.
+- `agent-platform-project-workspaces.2` through `.6` are open and linearly blocked behind `.1`.
 - `agent-platform-browser-tools` is closed locally.
 - `agent-platform-browser-tools.1` is closed locally.
 - `agent-platform-browser-tools.2` is closed locally.
@@ -987,10 +1010,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit the `session.md` handoff update and push `task/agent-platform-code-workbench.6` with the IDE chat feedback, workbench edit-guidance, truncated Markdown apply-prevention, and folder picker fixes.
-2. Tomorrow after `make restart`, ask the owner to manually test: open a real folder and confirm files appear in Explorer/editor; then ask the agent to update a Markdown file and confirm the review/apply flow does not truncate the file.
-3. Once accepted, claim `agent-platform-code-workbench.7` and document the code workbench verification guide.
-4. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
+1. Commit this `session.md` handoff update and push `task/agent-platform-code-workbench.6`.
+2. Owner creates the PR and merges after CI/review.
+3. After merge, claim `agent-platform-project-workspaces.1` and implement the project workspace model first.
+4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
+5. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
 
 ---
 
