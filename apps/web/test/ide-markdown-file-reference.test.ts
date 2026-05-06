@@ -50,6 +50,9 @@ describe('IDEMarkdown file references', () => {
     );
 
     expect(html).toContain('Review unavailable');
+    expect(html).toContain('Replacement is incomplete');
+    expect(html).toContain('assistant returned a Markdown replacement');
+    expect(html).toContain('````markdown:README.md');
     expect(html).not.toContain('Apply to...');
     expect(html).not.toContain('Diff');
   });

@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-06
+- **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: restored the previous working IDE folder picker pattern by opening folders with read permission first, guarding native picker re-entry, and requesting write permission only when saving files. Playwright stub verification confirmed the Explorer renders a selected folder when the picker returns a handle; the running Docker image must be rebuilt to exercise the local source change.
+- **Date:** 2026-05-06
 - **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: guarded IDE Markdown replacement actions so truncated Markdown code blocks with unmatched nested fences no longer expose Apply/Diff, and filename-bearing fences such as `markdown:README.md` now route to the correct review action.
 - **Date:** 2026-05-06
 - **Session:** Follow-up fix on `task/agent-platform-code-workbench.6`: clarified browser workbench file-context instructions so agents propose reviewed replacement code blocks for attached files instead of attempting backend/container patch tools against host-selected File System Access API files.
@@ -325,6 +327,7 @@ Branch state: `task/agent-platform-code-workbench.6` contains the completed task
 - Confirmed the follow-up edit failure was caused by a source-of-truth mismatch: browser workbench files can come from the host via the browser File System Access API, while backend edit tools run in the Docker workspace/path jail. Added file-context guidance telling agents to propose reviewed replacement code blocks for attached workbench files instead of patching backend files.
 - Investigated the next owner screenshot where Apply replaced README with only the first section. Root cause: Markdown replacements containing nested ``` fences can be parsed as partial/truncated code blocks. The IDE now hides Apply/Diff for Markdown blocks with unmatched nested fences and asks for a valid reviewed replacement instead.
 - Updated code fence parsing to preserve filename hints such as `markdown:README.md`, so correctly fenced replacements can route straight to the intended file review action.
+- Addressed the folder-open regression by reapplying the earlier working approach: `showDirectoryPicker({ mode: 'read' })`, single-flight native picker guard, read-only tree loading, and write-permission prompt only on save.
 - Added regression coverage in `apps/web/test/ide-assistant-content.test.ts`.
 - Added regression coverage in `apps/web/test/file-context.test.ts`.
 - Added regression coverage in `apps/web/test/ide-markdown-file-reference.test.ts`.
@@ -337,6 +340,7 @@ Verification:
 - `pnpm --filter @agent-platform/web run test -- test/file-context.test.ts test/ide-assistant-content.test.ts` (package runner executed 22 files / 87 tests)
 - `pnpm --filter @agent-platform/web run test -- test/ide-markdown-file-reference.test.ts test/file-context.test.ts` (package runner executed 22 files / 89 tests)
 - `pnpm --filter @agent-platform/web run build`
+- Playwright stub check against `/ide` with a fake directory picker confirmed the Explorer renders `demo-folder` and `README.md` after a handle is returned. The current running Docker image was still serving the previous build until `make restart`.
 - `pnpm exec prettier --check apps/web/components/ide/ide-with-chat.tsx apps/web/test/ide-assistant-content.test.ts`
 - `pnpm exec prettier --check apps/web/lib/file-context.ts apps/web/test/file-context.test.ts`
 - `pnpm exec prettier --check apps/web/components/ide/ide-markdown.tsx apps/web/test/ide-markdown-file-reference.test.ts apps/web/lib/file-context.ts apps/web/test/file-context.test.ts`
@@ -891,7 +895,7 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-code-workbench.6`
 - **Current base:** chained from `task/agent-platform-code-workbench.5`.
-- **Current work:** task 6 is closed and pushed; follow-up fixes for IDE chat tool/approval rendering, workbench edit guidance, and truncated Markdown apply prevention are committed locally and should be pushed before moving to task 7.
+- **Current work:** task 6 is closed and pushed; follow-up fixes for IDE chat tool/approval rendering, workbench edit guidance, truncated Markdown apply prevention, and folder picker regression are committed locally and should be pushed before moving to task 7.
 - **Remote sync:** pending push for the latest follow-up commit after this session handoff update is committed.
 
 ### Beads
@@ -981,8 +985,8 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit the `session.md` handoff update and push `task/agent-platform-code-workbench.6` with the IDE chat feedback, workbench edit-guidance, and truncated Markdown apply-prevention fixes.
-2. Ask the owner to retest `/ide` by opening `README.md` and asking for a title change; the assistant should now propose a correctly fenced reviewed replacement, and the UI should not allow Apply on a partial/truncated Markdown block.
+1. Commit the `session.md` handoff update and push `task/agent-platform-code-workbench.6` with the IDE chat feedback, workbench edit-guidance, truncated Markdown apply-prevention, and folder picker fixes.
+2. Tomorrow after `make restart`, ask the owner to manually test: open a real folder and confirm files appear in Explorer/editor; then ask the agent to update a Markdown file and confirm the review/apply flow does not truncate the file.
 3. Once accepted, claim `agent-platform-code-workbench.7` and document the code workbench verification guide.
 4. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
 

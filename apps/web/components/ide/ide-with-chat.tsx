@@ -370,7 +370,12 @@ function FileTreeNode({
 // Toolbar
 // ---------------------------------------------------------------------------
 
-function getFolderButtonLabel(isLoading: boolean, rootName: string | null): string {
+function getFolderButtonLabel(
+  isLoading: boolean,
+  isOpeningDirectory: boolean,
+  rootName: string | null,
+): string {
+  if (isOpeningDirectory) return 'Opening...';
   if (isLoading) return 'Loading...';
   if (rootName) return `Close ${rootName}`;
   return 'Open Folder';
@@ -393,6 +398,7 @@ function IDEToolbar({
   onLoadFromPath,
   onOpenFolder,
   isLoadingFolder,
+  isOpeningFolder,
   rootName,
   onRefreshFolder,
   onCloseFolder,
@@ -413,6 +419,7 @@ function IDEToolbar({
   onLoadFromPath: () => void;
   onOpenFolder: () => void;
   isLoadingFolder: boolean;
+  isOpeningFolder: boolean;
   rootName: string | null;
   onRefreshFolder: () => void;
   onCloseFolder: () => void;
@@ -432,7 +439,8 @@ function IDEToolbar({
   const chatLabel = showChat ? 'Hide' : 'AI';
   const ChatIcon = showChat ? PanelRightClose : MessageSquare;
 
-  const folderLabel = getFolderButtonLabel(isLoadingFolder, rootName);
+  const folderLabel = getFolderButtonLabel(isLoadingFolder, isOpeningFolder, rootName);
+  const folderActionDisabled = isLoadingFolder || isOpeningFolder;
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
@@ -482,7 +490,7 @@ function IDEToolbar({
           size="sm"
           className="gap-2"
           onClick={rootName ? onCloseFolder : onOpenFolder}
-          disabled={isLoadingFolder}
+          disabled={folderActionDisabled}
         >
           <FolderOpen className="h-4 w-4" />
           {folderLabel}
@@ -492,7 +500,7 @@ function IDEToolbar({
             variant="ghost"
             size="sm"
             onClick={onRefreshFolder}
-            disabled={isLoadingFolder}
+            disabled={folderActionDisabled}
             title="Refresh file tree"
           >
             <RefreshCw className="h-4 w-4" />
@@ -1639,6 +1647,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         onLoadFromPath={handleLoadFromPath}
         onOpenFolder={fs.openDirectory}
         isLoadingFolder={fs.isLoading}
+        isOpeningFolder={fs.isOpeningDirectory}
         rootName={fs.rootName}
         onRefreshFolder={fs.refresh}
         onCloseFolder={fs.closeDirectory}
@@ -1726,9 +1735,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                             size="sm"
                             className="gap-2"
                             onClick={fs.openDirectory}
+                            disabled={fs.isOpeningDirectory}
                           >
                             <FolderOpen className="h-4 w-4" />
-                            Open Folder
+                            {fs.isOpeningDirectory ? 'Opening...' : 'Open Folder'}
                           </Button>
                         </div>
                       )}

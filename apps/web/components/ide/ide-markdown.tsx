@@ -193,6 +193,22 @@ function CreateFileButton({ onClick }: Readonly<{ onClick: () => void }>) {
   );
 }
 
+function InvalidMarkdownReplacementNotice({
+  filename,
+}: Readonly<{ filename: string | undefined }>) {
+  return (
+    <div className="m-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-950">
+      <div className="text-sm font-medium">Replacement is incomplete</div>
+      <p className="mt-1 text-xs leading-relaxed">
+        The assistant returned a Markdown replacement that contains an unmatched nested code fence,
+        so this artifact may only contain the first part of {filename ?? 'the file'}. Ask the
+        assistant to resend the full replacement using a longer outer fence, for example{' '}
+        <code className="rounded bg-background/70 px-1 font-mono">````markdown:README.md</code>.
+      </p>
+    </div>
+  );
+}
+
 function CodeBlockWithApply({
   language,
   value,
@@ -299,6 +315,7 @@ function CodeBlockWithApply({
           </button>
         </div>
       </div>
+      {blocksApply && <InvalidMarkdownReplacementNotice filename={detectedFilename} />}
       <SyntaxHighlighter
         language={lang}
         style={oneLight}
