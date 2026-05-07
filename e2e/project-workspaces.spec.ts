@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
@@ -31,12 +31,17 @@ function resetFixtureDir(name: string): { hostPath: string; containerPath: strin
   const hostPath = join(workspaceHostPath(), 'e2e-project-workspaces', `${suiteRunId}-${name}`);
   rmSync(hostPath, { recursive: true, force: true });
   mkdirSync(hostPath, { recursive: true });
+  chmodSync(hostPath, 0o777);
   return { hostPath, containerPath: toContainerWorkspacePath(hostPath) };
 }
 
 function writeRepoFixture(root: string, options: { includeInstructions: boolean }) {
   mkdirSync(join(root, 'apps', 'web'), { recursive: true });
   mkdirSync(join(root, 'packages', 'api'), { recursive: true });
+  chmodSync(join(root, 'apps'), 0o777);
+  chmodSync(join(root, 'apps', 'web'), 0o777);
+  chmodSync(join(root, 'packages'), 0o777);
+  chmodSync(join(root, 'packages', 'api'), 0o777);
   writeFileSync(
     join(root, 'package.json'),
     JSON.stringify({ name: 'e2e-monorepo', private: true, workspaces: ['apps/*', 'packages/*'] }),
@@ -178,7 +183,8 @@ test.describe('Project workspace E2E', () => {
         response.request().method() === 'POST',
     );
     await binding.getByRole('button', { name: 'Approve draft' }).click();
-    expect((await approvalResponse).ok()).toBeTruthy();
+    const response = await approvalResponse;
+    expect(response.ok(), await response.text()).toBeTruthy();
     await expect(binding.getByText('Instructions approved')).toBeVisible({ timeout: 15_000 });
     await expect(binding.getByText('Code edits and write tools are available')).toBeVisible({
       timeout: 15_000,
