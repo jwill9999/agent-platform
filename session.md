@@ -962,7 +962,7 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-project-workspaces.1`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** `agent-platform-project-workspaces.1` implementation and handoff are committed locally through `c01f3c2`; Bead was reopened because remote PR/CI/Sonar/review gates have not run.
+- **Current work:** `agent-platform-project-workspaces.1` implementation and handoff are committed locally; the erroneous Beads closeout commit was reverted and the Bead is open because remote PR/CI/Sonar/review gates have not run.
 - **Remote sync:** pending push; sandbox DNS/auth previously blocked Beads Dolt auto-push.
 
 ### Beads

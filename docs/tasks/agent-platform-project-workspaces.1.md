@@ -69,6 +69,13 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
+The implementation checklist below is necessary but not sufficient to close this ticket in Beads.
+The ticket remains open until the PR feedback loop is complete: the task branch is pushed, a PR is
+opened into `feature/agent-platform-project-workspaces`, GitHub Actions/pipelines are green,
+SonarQube or the documented fallback feedback gate is resolved, and any review-required feedback is
+handled. If any remote gate fails, iterate on this same task branch until it passes before closing
+the Bead.
+
 - [x] Project and Chat modes are named, typed, and documented.
 - [x] Project metadata can represent a backend-accessible monorepo or single-app repo.
 - [x] Capability and onboarding states are named and testable.
