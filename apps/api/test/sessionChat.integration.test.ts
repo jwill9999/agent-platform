@@ -144,11 +144,11 @@ async function createPendingToolApproval(
   app: Application,
   sessionId: string,
   toolName = 'sys_bash',
-  args: Record<string, unknown> = { command: 'date' },
+  args?: Record<string, unknown>,
 ) {
   mockStreamText.mockReset();
   mockToolCalls.mockReset();
-  mockToolCallStream(toolName, args);
+  mockToolCallStream(toolName, args ?? { command: 'date' });
   const chatRes = await request(app)
     .post('/v1/chat')
     .send({ sessionId, message: 'Run date' })
