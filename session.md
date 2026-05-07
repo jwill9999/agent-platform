@@ -962,13 +962,13 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-project-workspaces.1`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** `agent-platform-project-workspaces.1` implementation, handoff, and Beads closeout are committed locally through `aba076b`.
+- **Current work:** `agent-platform-project-workspaces.1` implementation and handoff are committed locally through `c01f3c2`; Bead was reopened because remote PR/CI/Sonar/review gates have not run.
 - **Remote sync:** pending push; sandbox DNS/auth previously blocked Beads Dolt auto-push.
 
 ### Beads
 
 - `agent-platform-project-workspaces` is in progress.
-- `agent-platform-project-workspaces.1` is closed locally.
+- `agent-platform-project-workspaces.1` is open locally. Local implementation and local gates passed, but the ticket is not done until the task PR is pushed and GitHub Actions/CI, SonarQube or approved fallback feedback, and review feedback are green/resolved.
 - `agent-platform-project-workspaces.2` is the next child task after `.1` closes: Add Project vs Chat entry paths and default agents.
 - `agent-platform-project-workspaces.3` through `.6` are open and linearly blocked behind earlier tasks.
 - `agent-platform-code-workbench.6` is closed.
@@ -1067,7 +1067,7 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push `task/agent-platform-project-workspaces.1` and sync Beads/Dolt when network/auth allows.
+1. Keep `agent-platform-project-workspaces.1` open; push `task/agent-platform-project-workspaces.1` and sync Beads/Dolt when network/auth allows.
 2. Open PR `task/agent-platform-project-workspaces.1` -> `feature/agent-platform-project-workspaces` and monitor CI/reviews until green.
 3. After `.1` merges, claim `agent-platform-project-workspaces.2` for Project vs Chat entry paths and default agent selection.
 4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
