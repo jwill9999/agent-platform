@@ -16,6 +16,36 @@ import { resolveSessionWorkspace } from '../src/infrastructure/projects/projectW
 type TestDb = ReturnType<typeof openDatabase>['db'];
 type TestOnboardingState = 'missing' | 'approved' | 'needs_review' | 'in_progress';
 
+function backendProjectMetadata(projectRoot: string, onboardingState: TestOnboardingState) {
+  return {
+    backendProjectRoot: projectRoot,
+    repositoryRoot: projectRoot,
+    projectRoot: '/workspace',
+    capabilityState: 'backend_accessible',
+    onboardingState,
+    defaultAgentProfile: 'coding',
+  };
+}
+
+function unavailableProjectSession(db: TestDb) {
+  const project = createProject(db, {
+    name: 'Unavailable Project',
+    metadata: {
+      backendProjectRoot: '/missing/project',
+      repositoryRoot: '/missing/project',
+      projectRoot: '/workspace',
+      capabilityState: 'unavailable',
+      onboardingState: 'missing',
+      defaultAgentProfile: 'coding',
+    },
+  });
+  return createSession(db, {
+    agentId: 'agent-1',
+    mode: 'project',
+    projectId: project.id,
+  });
+}
+
 describe('resolveSessionWorkspace', () => {
   let tmpRoot: string;
   let opened: ReturnType<typeof openDatabase>;
@@ -53,36 +83,6 @@ describe('resolveSessionWorkspace', () => {
       metadata: backendProjectMetadata(options.projectRoot, options.onboardingState ?? 'missing'),
     });
     return createSession(opened.db, {
-      agentId: 'agent-1',
-      mode: 'project',
-      projectId: project.id,
-    });
-  }
-
-  function backendProjectMetadata(projectRoot: string, onboardingState: TestOnboardingState) {
-    return {
-      backendProjectRoot: projectRoot,
-      repositoryRoot: projectRoot,
-      projectRoot: '/workspace',
-      capabilityState: 'backend_accessible',
-      onboardingState,
-      defaultAgentProfile: 'coding',
-    };
-  }
-
-  function unavailableProjectSession(db: TestDb) {
-    const project = createProject(db, {
-      name: 'Unavailable Project',
-      metadata: {
-        backendProjectRoot: '/missing/project',
-        repositoryRoot: '/missing/project',
-        projectRoot: '/workspace',
-        capabilityState: 'unavailable',
-        onboardingState: 'missing',
-        defaultAgentProfile: 'coding',
-      },
-    });
-    return createSession(db, {
       agentId: 'agent-1',
       mode: 'project',
       projectId: project.id,
