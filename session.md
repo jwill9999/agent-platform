@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
-- **Session:** Implemented `agent-platform-project-onboarding.2` on `task/agent-platform-project-onboarding.2`: added read-only Project evidence assessment, persisted structured onboarding assessment metadata, first-load and refresh assessment paths, Project profile/capability/gap/question inference, auto-approval for sufficient existing `AGENTS.md`, drift handling for approved instructions, and a compact user-facing assessment panel in the IDE Project sidebar. Local format/lint/docs/build/unit gates are green; next step is commit, push, PR # into `feature/agent-platform-project-onboarding`, and remote gate/comment monitoring before closing the Bead.
+- **Session:** Closed `agent-platform-project-onboarding.2` after PR #151 passed CI (`verify`, `docker`, `e2e`), docs checks, GitGuardian, and SonarCloud. Fixed the CI-discovered non-git metadata validation bug, updated E2E assertions for the new `in_progress` assessment state, resolved Sonar maintainability findings to 0 unresolved issues, confirmed no actionable review threads, pushed Beads state, and prepared to start `agent-platform-project-onboarding.3`.
 - **Date:** 2026-05-07
 - **Session:** Closed `agent-platform-project-onboarding.1` after PR #150 passed CI/docs/GitGuardian checks, review-thread inspection found no actionable comments, direct Sonar issue search returned 0 unresolved issues, and Sonar agentic file analysis was unavailable because the organization has not enabled Agentic Analysis. Beads Dolt closeout state was pushed; next ready task is `agent-platform-project-onboarding.2`.
 - **Date:** 2026-05-07
