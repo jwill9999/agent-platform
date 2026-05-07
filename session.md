@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
-- **Session:** Continued `agent-platform-project-workspaces.5` on `task/agent-platform-project-workspaces.5`: PR #147 is open against `feature/agent-platform-project-workspaces`; local gates were green but SonarCloud failed on duplication and three maintainability issues. Refactored shared instruction-file parsing, removed non-null assertions, simplified shell read-only policy detection, reduced IDE toolbar complexity, then reduced duplicated test setup in the two SonarCloud-flagged API test files. Bead remains open until PR #147 reruns green and review comments are resolved.
+- **Session:** Continued `agent-platform-project-workspaces.5` on `task/agent-platform-project-workspaces.5`: PR #147 is open against `feature/agent-platform-project-workspaces`; fixed SonarCloud maintainability and duplication findings, then investigated the rerun where SonarCloud passed but GitHub Actions `verify` failed in `browserTools.integration.test.ts`. Hardened browser startup timeout for hosted-runner latency; Bead remains open until PR #147 reruns green and review comments are resolved.
 - **Date:** 2026-05-07
 - **Session:** Claimed `agent-platform-project-workspaces.4` on new branch `task/agent-platform-project-workspaces.4` from the completed `.3` tip. Scope: resolve canonical `/workspace` to the active Project backend root and route file, terminal, Git, test, Docker, and sensor tools through the Project boundary with wrong-root regression coverage.
 - **Date:** 2026-05-07
