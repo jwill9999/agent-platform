@@ -19,7 +19,7 @@ if (sqlitePath) {
 
 const app = createApp({ db: dbHandle?.db ?? null });
 const server = createServer(app);
-attachTerminalWs(server);
+attachTerminalWs(server, { db: dbHandle?.db ?? null });
 const scheduler =
   dbHandle && process.env.SCHEDULER_ENABLED !== 'false'
     ? createSchedulerService(dbHandle.db)

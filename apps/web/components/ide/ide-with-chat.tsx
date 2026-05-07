@@ -1977,7 +1977,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
               <>
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={30} minSize={15} maxSize={60}>
-                  <Terminal explorerFolderOpen={fs.isDirectoryOpen} />
+                  <Terminal sessionId={sessionId} explorerFolderOpen={fs.isDirectoryOpen} />
                 </ResizablePanel>
               </>
             )}

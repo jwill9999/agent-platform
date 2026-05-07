@@ -142,7 +142,20 @@ async function enforcePathJail(
         },
       };
     }
-    return { args: call.args };
+    const commandForExecution = (
+      await Promise.all(
+        result.accesses.map(async (access) => ({
+          original: access.path,
+          resolved: await ctx.pathJail!.enforce(access.path, access.operation),
+        })),
+      )
+    )
+      .sort((a, b) => b.original.length - a.original.length)
+      .reduce(
+        (rewritten, access) => rewritten.split(access.original).join(access.resolved),
+        command,
+      );
+    return { args: { ...call.args, command: commandForExecution } };
   }
 
   const operation = TOOL_PATH_OPERATIONS[call.name];

@@ -3,10 +3,12 @@ import type { Server } from 'node:http';
 import { spawn } from 'node-pty';
 import { WebSocketServer } from 'ws';
 
+import type { DrizzleDb } from '@agent-platform/db';
 import { createLogger } from '@agent-platform/logger';
 
 import { ensureNodePtySpawnHelperExecutable } from './ensureNodePtySpawnHelper.js';
 import { resolveTerminalCwd } from './resolveTerminalCwd.js';
+import { resolveSessionWorkspace } from '../projects/projectWorkspaceResolver.js';
 
 ensureNodePtySpawnHelperExecutable();
 
@@ -126,10 +128,10 @@ function spawnPtyWithFallbacks(cwd: string, cols: number, rows: number): ReturnT
 }
 
 /**
- * Attach a WebSocket → PTY bridge at `/ws/terminal` on the same HTTP server as Express.
+ * Attach a WebSocket -> PTY bridge at `/ws/terminal` on the same HTTP server as Express.
  * Runs a real shell on the API host (local demo / single-user MVP). Not a multi-tenant sandbox.
  */
-export function attachTerminalWs(server: Server): void {
+export function attachTerminalWs(server: Server, options: { db?: DrizzleDb | null } = {}): void {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (request, socket, head) => {
@@ -149,7 +151,12 @@ export function attachTerminalWs(server: Server): void {
     const rows = 24;
     const base = `http://${request.headers.host ?? 'localhost'}`;
     const url = new URL(request.url ?? '/ws/terminal', base);
-    const cwd = resolveTerminalCwd(url.searchParams.get('cwd'));
+    const sessionId = url.searchParams.get('sessionId');
+    const workspaceResolution =
+      options.db && sessionId ? resolveSessionWorkspace(options.db, sessionId) : undefined;
+    const cwd = workspaceResolution?.ok
+      ? workspaceResolution.workspaceRoot
+      : resolveTerminalCwd(url.searchParams.get('cwd'));
 
     let term: ReturnType<typeof spawn>;
     try {

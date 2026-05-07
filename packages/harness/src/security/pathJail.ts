@@ -20,6 +20,8 @@ export interface Mount {
   label: string;
   /** Absolute host path. */
   hostPath: string;
+  /** Optional canonical path exposed to the model, e.g. "/workspace". */
+  containerPath?: string;
   permission: MountPermission;
 }
 
@@ -75,6 +77,7 @@ export class PathJail {
     this.mounts = mounts.map((m) => ({
       ...m,
       hostPath: resolve(m.hostPath),
+      containerPath: m.containerPath ? normalize(m.containerPath) : undefined,
     }));
   }
 
@@ -104,11 +107,25 @@ export class PathJail {
   async validate(targetPath: string, operation: PathOperation): Promise<PathValidationResult> {
     const resolvedMounts = await this.getResolvedMounts();
 
-    // Resolve relative paths against workspace (first rw mount) or cwd
+    // Resolve model-facing container paths to their mounted host paths first.
     let absPath: string;
-    if (isAbsolute(targetPath)) {
+    const normalizedTarget = normalize(targetPath);
+    const containerMount = isAbsolute(normalizedTarget)
+      ? resolvedMounts.find((m) => {
+          if (!m.containerPath) return false;
+          return (
+            normalizedTarget === m.containerPath ||
+            normalizedTarget.startsWith(`${m.containerPath}/`)
+          );
+        })
+      : undefined;
+    if (containerMount?.containerPath) {
+      const rel = relative(containerMount.containerPath, normalizedTarget);
+      absPath = resolve(containerMount.hostPath, rel);
+    } else if (isAbsolute(targetPath)) {
       absPath = normalize(targetPath);
     } else {
+      // Resolve relative paths against workspace (first rw mount) or cwd
       const workspace = resolvedMounts.find((m) => m.permission === 'read_write');
       const base = workspace?.hostPath ?? process.cwd();
       absPath = resolve(base, targetPath);

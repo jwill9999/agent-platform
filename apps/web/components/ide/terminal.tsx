@@ -14,6 +14,7 @@ const TERMINAL_CWD_KEY = 'ide-terminal-cwd';
 
 export interface TerminalProps {
   className?: string;
+  sessionId?: string | null;
   /** When true and no saved cwd, show hint (browser FS API does not expose OS path). */
   explorerFolderOpen?: boolean;
 }
@@ -62,10 +63,12 @@ function getTerminalWsBaseUrl(): string {
   return `${wsProto}//${host}:${apiPort}/ws/terminal`;
 }
 
-function buildTerminalWsUrl(appliedCwd: string | null): string {
+function buildTerminalWsUrl(appliedCwd: string | null, sessionId?: string | null): string {
   const base = getTerminalWsBaseUrl();
   const u = new URL(base);
-  if (appliedCwd?.trim()) {
+  if (sessionId) {
+    u.searchParams.set('sessionId', sessionId);
+  } else if (appliedCwd?.trim()) {
     u.searchParams.set('cwd', appliedCwd.trim());
   }
   return u.toString();
@@ -103,7 +106,8 @@ function formatTerminalFailure(wsUrl: string, closeCode: number, closeReason: st
 
   const reasonSuffix = closeReason ? `: ${closeReason}` : '';
   const healthInfo = `Confirm ${healthUrl} loads in this browser.`;
-  const startInfo = 'Start the API (make api / make up) or set NEXT_PUBLIC_TERMINAL_WS_URL if the API uses another host/port.';
+  const startInfo =
+    'Start the API (make api / make up) or set NEXT_PUBLIC_TERMINAL_WS_URL if the API uses another host/port.';
 
   return `Terminal WebSocket closed (${closeCode}${reasonSuffix}). URL: ${wsUrl}. ${healthInfo} ${startInfo}`;
 }
@@ -122,7 +126,7 @@ function sendResize(ws: WebSocket, cols: number, rows: number): void {
  * Real shell via API WebSocket + node-pty. Optional `cwd` query selects PTY working directory;
  * default server-side is the user home directory when unset.
  */
-export function Terminal({ className, explorerFolderOpen }: Readonly<TerminalProps>) {
+export function Terminal({ className, sessionId, explorerFolderOpen }: Readonly<TerminalProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -186,7 +190,7 @@ export function Terminal({ className, explorerFolderOpen }: Readonly<TerminalPro
       });
     }
 
-    const url = buildTerminalWsUrl(appliedCwd);
+    const url = buildTerminalWsUrl(appliedCwd, sessionId);
     if (!url) {
       setStatus('error');
       setErrorText('Terminal WebSocket URL is not configured.');
@@ -282,9 +286,10 @@ export function Terminal({ className, explorerFolderOpen }: Readonly<TerminalPro
       ws.close();
       term.dispose();
     };
-  }, [sessionKey, appliedCwd]);
+  }, [sessionKey, appliedCwd, sessionId]);
 
-  const showExplorerHint = Boolean(explorerFolderOpen) && !appliedCwd;
+  const isProjectTerminal = Boolean(sessionId);
+  const showExplorerHint = Boolean(explorerFolderOpen) && !appliedCwd && !isProjectTerminal;
 
   return (
     <div className={cn('flex flex-col h-full min-h-0 bg-[#1e1e1e]', className)}>
@@ -308,39 +313,45 @@ export function Terminal({ className, explorerFolderOpen }: Readonly<TerminalPro
           Reconnect
         </Button>
       </div>
-      <div className="px-2 py-2 border-b border-[#3c3c3c] shrink-0 space-y-2">
-        <div className="flex gap-2 items-center">
-          <Input
-            value={cwdInput}
-            onChange={(e) => {
-              setCwdInput(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') applyWorkingDirectory();
-            }}
-            placeholder="Shell working directory (absolute path, e.g. /Users/you/project)"
-            className="h-8 text-xs font-mono bg-[#2d2d2d] border-[#3c3c3c] text-[#d4d4d4] placeholder:text-[#6b6b6b]"
-            spellCheck={false}
-            autoComplete="off"
-            aria-label="Terminal working directory"
-          />
-          <Button type="button" size="sm" className="h-8 shrink-0 text-xs" onClick={applyWorkingDirectory}>
-            Apply
-          </Button>
+      {!isProjectTerminal && (
+        <div className="px-2 py-2 border-b border-[#3c3c3c] shrink-0 space-y-2">
+          <div className="flex gap-2 items-center">
+            <Input
+              value={cwdInput}
+              onChange={(e) => {
+                setCwdInput(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applyWorkingDirectory();
+              }}
+              placeholder="Shell working directory (absolute path, e.g. /Users/you/project)"
+              className="h-8 text-xs font-mono bg-[#2d2d2d] border-[#3c3c3c] text-[#d4d4d4] placeholder:text-[#6b6b6b]"
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="Terminal working directory"
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 shrink-0 text-xs"
+              onClick={applyWorkingDirectory}
+            >
+              Apply
+            </Button>
+          </div>
+          <p className="text-[10px] leading-snug text-[#858585]">
+            {showExplorerHint
+              ? 'Browsers do not expose the folder path from Open Folder. Paste the same absolute path here so the shell matches the Explorer, or leave empty to use your home directory.'
+              : 'Leave empty to use your home directory on the API machine (or set TERMINAL_CWD on the server).'}
+          </p>
         </div>
-        <p className="text-[10px] leading-snug text-[#858585]">
-          {showExplorerHint
-            ? 'Browsers do not expose the folder path from Open Folder. Paste the same absolute path here so the shell matches the Explorer, or leave empty to use your home directory.'
-            : 'Leave empty to use your home directory on the API machine (or set TERMINAL_CWD on the server).'}
-        </p>
-      </div>
-      {errorText && (
-        <div className="px-3 py-2 text-xs text-destructive border-b border-[#3c3c3c] shrink-0">{errorText}</div>
       )}
-      <div
-        ref={containerRef}
-        className="flex-1 min-h-[12rem] min-w-0 w-full overflow-hidden p-1"
-      />
+      {errorText && (
+        <div className="px-3 py-2 text-xs text-destructive border-b border-[#3c3c3c] shrink-0">
+          {errorText}
+        </div>
+      )}
+      <div ref={containerRef} className="flex-1 min-h-[12rem] min-w-0 w-full overflow-hidden p-1" />
     </div>
   );
 }

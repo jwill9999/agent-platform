@@ -30,6 +30,7 @@ import type {
   ApprovalRequest,
   ContextWindow,
   MessageRecord,
+  Output,
   PromptMemoryBundle,
   SensorAgentProfile,
   WorkingMemoryToolSummary,
@@ -76,10 +77,13 @@ import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import type { Request, Response, Router } from 'express';
 import { Router as createRouter } from 'express';
 import { randomUUID } from 'node:crypto';
+import { isAbsolute, relative, sep } from 'node:path';
 import { z } from 'zod';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
+import { resolveSessionWorkspace } from '../../projects/projectWorkspaceResolver.js';
+import type { ProjectWorkspaceResolution } from '../../projects/projectWorkspaceResolver.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
@@ -671,6 +675,64 @@ function resolveSessionProjectPath(db: DrizzleDb, sessionId: string): string | u
   return workingMemory?.activeProject;
 }
 
+function resolveRuntimeWorkspace(
+  db: DrizzleDb,
+  sessionId: string,
+): ProjectWorkspaceResolution | undefined {
+  const session = getSession(db, sessionId);
+  if (!session?.projectId) return undefined;
+  return resolveSessionWorkspace(db, sessionId);
+}
+
+function unavailableProjectToolExecutor(
+  resolution: Extract<ProjectWorkspaceResolution, { ok: false }>,
+): NativeToolExecutor {
+  return async (): Promise<Output> => ({
+    type: 'error',
+    code: resolution.code,
+    message: resolution.message,
+  });
+}
+
+function replaceWorkspacePathFragments(value: string, workspaceRoot: string): string {
+  const direct = value.split(workspaceRoot).join('/workspace');
+  if (sep === '/') return direct;
+  return direct.split(workspaceRoot.split(sep).join('/')).join('/workspace');
+}
+
+function mapProjectWorkspacePaths(value: unknown, workspaceRoot: string): unknown {
+  if (typeof value === 'string') {
+    const rel = relative(workspaceRoot, value);
+    if (rel === '') return '/workspace';
+    if (!rel.startsWith('..') && !isAbsolute(rel)) {
+      return `/workspace/${rel.split(sep).join('/')}`;
+    }
+    return replaceWorkspacePathFragments(value, workspaceRoot);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => mapProjectWorkspacePaths(entry, workspaceRoot));
+  }
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      mapProjectWorkspacePaths(entry, workspaceRoot),
+    ]),
+  );
+}
+
+function projectWorkspaceOutputExecutor(
+  executor: NativeToolExecutor,
+  workspaceResolution: ProjectWorkspaceResolution | undefined,
+): NativeToolExecutor {
+  if (!workspaceResolution?.ok) return executor;
+  return async (toolId, args) =>
+    mapProjectWorkspacePaths(
+      await executor(toolId, args),
+      workspaceResolution.workspaceRoot,
+    ) as Output;
+}
+
 function createRuntimeNativeToolExecutor({
   db,
   agentCtx,
@@ -684,27 +746,40 @@ function createRuntimeNativeToolExecutor({
   sessionId: string;
   options: ChatRouterOptions;
 }): NativeToolExecutor {
-  const defaultRepoPath = resolveSessionProjectPath(db, sessionId);
+  const workspaceResolution = resolveRuntimeWorkspace(db, sessionId);
+  if (workspaceResolution && !workspaceResolution.ok) {
+    return unavailableProjectToolExecutor(workspaceResolution);
+  }
+  const defaultRepoPath = workspaceResolution?.ok
+    ? workspaceResolution.defaultRepoPath
+    : resolveSessionProjectPath(db, sessionId);
+  const workspaceRoot = workspaceResolution?.ok ? workspaceResolution.workspaceRoot : undefined;
   const factoryExecutor = options.systemToolExecutorFactory?.({
     sessionId,
     runId,
     agentId: agentCtx.agent.id,
     defaultRepoPath,
   });
-  if (factoryExecutor) return factoryExecutor;
+  if (factoryExecutor) {
+    return projectWorkspaceOutputExecutor(factoryExecutor, workspaceResolution);
+  }
 
-  return createSystemToolExecutor(
-    options.observabilityStore
-      ? {
-          observability: {
-            store: options.observabilityStore,
-            sessionId,
-            traceId: runId,
-          },
-          memory: { db, sessionId, agentId: agentCtx.agent.id },
-          defaultRepoPath,
-        }
-      : { memory: { db, sessionId, agentId: agentCtx.agent.id }, defaultRepoPath },
+  return projectWorkspaceOutputExecutor(
+    createSystemToolExecutor(
+      options.observabilityStore
+        ? {
+            observability: {
+              store: options.observabilityStore,
+              sessionId,
+              traceId: runId,
+            },
+            memory: { db, sessionId, agentId: agentCtx.agent.id },
+            defaultRepoPath,
+            workspaceRoot,
+          }
+        : { memory: { db, sessionId, agentId: agentCtx.agent.id }, defaultRepoPath, workspaceRoot },
+    ),
+    workspaceResolution,
   );
 }
 
@@ -730,6 +805,8 @@ function createRuntimeToolDispatchNode({
   const resolvedNativeToolExecutor =
     nativeToolExecutor ??
     createRuntimeNativeToolExecutor({ db, agentCtx, runId, sessionId, options });
+  const workspaceResolution = resolveRuntimeWorkspace(db, sessionId);
+  const mounts = workspaceResolution?.ok ? workspaceResolution.mounts : DEFAULT_MOUNTS;
 
   return createToolDispatchNode({
     agent: agentCtx.agent,
@@ -738,7 +815,7 @@ function createRuntimeToolDispatchNode({
     nativeToolExecutor: resolvedNativeToolExecutor,
     emitter,
     dispatcher: agentCtx.pluginDispatcher,
-    pathJail: new PathJail(DEFAULT_MOUNTS),
+    pathJail: new PathJail(mounts),
     auditLog: createAuditLog(db),
     approvalRequests: {
       create: (request) =>

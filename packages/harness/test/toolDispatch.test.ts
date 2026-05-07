@@ -202,7 +202,9 @@ describe('toolDispatchNode', () => {
 
   it('passes workspace-resolved paths to native file tools', async () => {
     const workspace = makeTmpDir();
-    const expectedPath = join(realpathSync(workspace), 'generated', 'report.md');
+    const realWorkspace = realpathSync(workspace);
+    const expectedDir = join(realWorkspace, 'generated');
+    const expectedPath = join(expectedDir, 'report.md');
     const nativeResult: Output = { type: 'tool_result', toolId: 'sys_file_exists', data: true };
     const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
     const ctx: ToolDispatchContext = {
@@ -232,6 +234,101 @@ describe('toolDispatchNode', () => {
 
     expect(nativeExecutor).toHaveBeenCalledWith('sys_file_exists', {
       path: expectedPath,
+    });
+  });
+
+  it('passes canonical /workspace paths as mounted host project paths to native file tools', async () => {
+    const workspace = makeTmpDir();
+    const expectedPath = join(realpathSync(workspace), 'generated', 'report.md');
+    const nativeResult: Output = { type: 'tool_result', toolId: 'sys_write_file', data: true };
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_write_file'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      pathJail: new PathJail([
+        {
+          label: 'workspace',
+          hostPath: workspace,
+          containerPath: '/workspace',
+          permission: 'read_write',
+        },
+      ]),
+      approvedToolCallIds: new Set(['tc-write']),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    try {
+      await node(
+        makeState({
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              {
+                id: 'tc-write',
+                name: 'sys_write_file',
+                args: { path: '/workspace/generated/report.md', content: 'done' },
+              },
+            ],
+          },
+        }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_write_file', {
+      path: expectedPath,
+      content: 'done',
+    });
+  });
+
+  it('passes canonical /workspace paths as mounted host project paths to bash tools', async () => {
+    const workspace = makeTmpDir();
+    const realWorkspace = realpathSync(workspace);
+    const expectedDir = join(realWorkspace, 'generated');
+    const expectedPath = join(expectedDir, 'report.md');
+    const nativeResult: Output = { type: 'tool_result', toolId: 'sys_bash', data: true };
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      pathJail: new PathJail([
+        {
+          label: 'workspace',
+          hostPath: workspace,
+          containerPath: '/workspace',
+          permission: 'read_write',
+        },
+      ]),
+      approvedToolCallIds: new Set(['tc-bash']),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    try {
+      await node(
+        makeState({
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              {
+                id: 'tc-bash',
+                name: 'sys_bash',
+                args: {
+                  command: 'mkdir -p /workspace/generated && touch /workspace/generated/report.md',
+                },
+              },
+            ],
+          },
+        }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
+      command: `mkdir -p ${expectedDir} && touch ${expectedPath}`,
     });
   });
 
