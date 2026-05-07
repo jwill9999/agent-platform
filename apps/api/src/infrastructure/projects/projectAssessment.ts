@@ -153,22 +153,41 @@ function readPackageManifest(root: string, path: string): PackageManifest | unde
 function inferCommands(manifests: readonly PackageManifest[]): ProjectOnboardingCommand[] {
   const commands: ProjectOnboardingCommand[] = [];
   for (const manifest of manifests) {
-    const cwd = dirname(manifest.path);
-    const path = cwd === '.' ? undefined : cwd;
     for (const script of Object.keys(manifest.scripts)) {
-      const kind = commandKind(script);
-      if (!kind) continue;
-      const entry: ProjectOnboardingCommand = {
-        kind,
-        command: `pnpm${path ? ` --filter ${manifest.packageName ?? basename(path)}` : ''} ${script}`,
-        confidence: manifest.packageName ? 0.85 : 0.65,
-      };
-      if (path) entry.path = path;
-      if (manifest.packageName) entry.packageName = manifest.packageName;
-      commands.push(entry);
+      const entry = commandEntry(manifest, script);
+      if (entry) commands.push(entry);
     }
   }
   return commands.slice(0, 20);
+}
+
+function commandEntry(
+  manifest: PackageManifest,
+  script: string,
+): ProjectOnboardingCommand | undefined {
+  const kind = commandKind(script);
+  if (!kind) return undefined;
+
+  const cwd = dirname(manifest.path);
+  const path = cwd === '.' ? undefined : cwd;
+  const entry: ProjectOnboardingCommand = {
+    kind,
+    command: packageCommand(manifest, script, path),
+    confidence: manifest.packageName ? 0.85 : 0.65,
+  };
+  if (path) entry.path = path;
+  if (manifest.packageName) entry.packageName = manifest.packageName;
+  return entry;
+}
+
+function packageCommand(
+  manifest: PackageManifest,
+  script: string,
+  path: string | undefined,
+): string {
+  if (!path) return `pnpm ${script}`;
+  const packageName = manifest.packageName ?? basename(path);
+  return `pnpm --filter ${packageName} ${script}`;
 }
 
 function commandKind(script: string): ProjectOnboardingCommand['kind'] | undefined {
