@@ -67,8 +67,8 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Assessment, draft, approval, and refresh contracts are explicit and typed.
-- [ ] Onboarding state transitions are testable and reject invalid jumps.
-- [ ] Assessment evidence and user-visible summaries are represented separately.
-- [ ] User-visible Project/onboarding labels are separated from runtime/backend metadata.
-- [ ] Playwright fixture states are defined for later E2E tasks.
+- [x] Assessment, draft, approval, and refresh contracts are explicit and typed.
+- [x] Onboarding state transitions are testable and reject invalid jumps.
+- [x] Assessment evidence and user-visible summaries are represented separately.
+- [x] User-visible Project/onboarding labels are separated from runtime/backend metadata.
+- [x] Playwright fixture states are defined for later E2E tasks.
