@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Implemented `agent-platform-project-workspaces.2` on `task/agent-platform-project-workspaces.2`: added explicit Project vs Chat entry paths, persisted session mode, defaulted Chat to the personal assistant and Project IDE sessions to the coding agent, kept Chat project-neutral, updated contract/API/DB/web/E2E coverage, and refactored touched IDE assistant rendering to reduce Sonar complexity. Local format, build, lint, unit, focused integration, and targeted Playwright gates passed; next step is PR creation into `feature/agent-platform-project-workspaces`, then monitor CI/Sonar/Sourcery/review comments before closing the Bead.
+- **Date:** 2026-05-07
 - **Session:** Implemented and locally closed `agent-platform-project-workspaces.1` on `task/agent-platform-project-workspaces.1`: added shared Project/Chat mode contracts, Project workspace binding metadata, capability/onboarding states, write-eligibility helpers, focused contract tests, and architecture documentation. Local build, format, lint, and unit gates passed; broad docs lint remains blocked by ignored `.agent-platform/workspaces/...` Markdown files.
 - **Date:** 2026-05-07
 - **Session:** Opened PR #143 for `agent-platform-project-workspaces.1`, kept the Bead open until remote gates pass, fixed Sourcery review feedback by tightening project-relative path validation and making access policy handling exhaustive, and pushed the review-fix commit for CI rerun.
