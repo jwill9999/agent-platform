@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** After pushing the onboarding/project-experience planning update to PR #149, all GitHub checks passed but SonarCloud reported two minor duplicate-import findings in `apps/api/src/infrastructure/http/v1/chatRouter.ts`. Consolidated the duplicate `@agent-platform/contracts` type import, verified API lint/typecheck plus docs lint/diff check, and prepared the Sonar cleanup commit for push.
+- **Date:** 2026-05-07
 - **Session:** Refined `agent-platform-project-onboarding` and all six child specs so Project is treated as a generic folder/work context with coding as a profile/capability, not the definition of Project. Created follow-up epic `agent-platform-project-experience` with six child tasks for Project profiles, left explorer navigation, project-chat-first entry, optional IDE handoff, user-facing labels/breadcrumbs, and Playwright navigation E2E. Beads dependencies chain the Project experience epic after onboarding.
 - **Date:** 2026-05-07
 - **Session:** Completed cleanup for `agent-platform-project-workspaces.6`: PR #148 is open against `feature/agent-platform-project-workspaces`, all GitHub Actions/docs checks/GitGuardian/SonarCloud gates passed, SonarCloud reports 0 unresolved issues and quality gate OK, review-thread sweep found no actionable comments, Sourcery was skipped only due weekly rate limit, and Beads closed both `.6` and the parent `agent-platform-project-workspaces` epic. Beads Dolt state was pushed; remaining cleanup is pushing the final session/Beads bookkeeping commits.
