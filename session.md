@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Continued `agent-platform-project-workspaces.5` on `task/agent-platform-project-workspaces.5`: PR #147 was already open against `feature/agent-platform-project-workspaces`; local gates were green but SonarCloud failed on duplication and three maintainability issues. Refactored shared instruction-file parsing, removed non-null assertions, simplified shell read-only policy detection, reduced IDE toolbar complexity, reran the full local/Docker/e2e gate, and prepared follow-up commits for push. Bead remains open until PR #147 reruns green and review comments are resolved.
+- **Date:** 2026-05-07
 - **Session:** Claimed `agent-platform-project-workspaces.4` on new branch `task/agent-platform-project-workspaces.4` from the completed `.3` tip. Scope: resolve canonical `/workspace` to the active Project backend root and route file, terminal, Git, test, Docker, and sensor tools through the Project boundary with wrong-root regression coverage.
 - **Date:** 2026-05-07
 - **Session:** Completed and closed `agent-platform-project-workspaces.3` on `task/agent-platform-project-workspaces.3`: PR #145 is open against `feature/agent-platform-project-workspaces`, all local gates and PR checks passed, SonarCloud reports 0 new issues/hotspots after the Git PATH and nested-ternary cleanup, and review-thread inspection found no actionable comments. Next task is `agent-platform-project-workspaces.4` from this branch tip.
@@ -349,42 +351,37 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Project backend workspace binding completed
+### Project onboarding gate PR iteration
 
-Branch state: `task/agent-platform-project-workspaces.3` is pushed and PR #145 is open against `feature/agent-platform-project-workspaces`.
+Branch state: `task/agent-platform-project-workspaces.5` is active. PR #147 is open against `feature/agent-platform-project-workspaces`; do not merge it yet.
 
-- Implemented `agent-platform-project-workspaces.3`: added `POST /v1/projects/open`, backend path validation, Git metadata discovery, persisted Project metadata, Project-mode session binding, and unavailable state handling for inaccessible paths.
-- Added the IDE Project binding panel, disabled terminal use until a backend Project is active, and cleared stale open files/chat/tool context on Project switch or failed open.
-- Added contract, API, and Playwright coverage for `/workspace` success and inaccessible-path failure.
-- Opened PR #145 and kept the Bead open until remote gates completed.
-- Fixed Sonar feedback on PR #145 by replacing a nested toolbar ternary with explicit state and avoiding PATH-resolved `git` execution in the API/test code.
-- PR #145 final head `1e96467` is green across `verify`, `docker`, `e2e`, `markdownlint`, `lychee`, `GitGuardian Security Checks`, `SonarCloud Code Analysis`, and `Sourcery review`.
-- SonarCloud reports the quality gate passed with 0 new issues and 0 security hotspots.
-- GitHub review-thread fetch returned no review threads; Sourcery’s only review body was a stale rate-limit note from the old head while the current Sourcery check passed.
-- Closed `agent-platform-project-workspaces.3` in Beads and pushed the Beads/Dolt state.
+- Continued `agent-platform-project-workspaces.5`: root/nested `AGENTS.md` discovery, approval metadata, Project instruction prompt injection, frontend onboarding status/approval controls, and Project write gating were already implemented and pushed to PR #147.
+- Confirmed GitHub CLI auth works with token scopes `repo` and `workflow`; the previous auth concern is not the current blocker.
+- Inspected PR #147: GitHub Actions were green or running, Sourcery was skipped due weekly rate limit, and SonarCloud failed on new-code duplication plus three issues.
+- Addressed SonarCloud feedback by extracting shared `instructionFiles` parsing, removing unnecessary assertions, replacing the complex read-only shell regex with token-based checks, and reducing `IDEToolbar` cognitive complexity.
+- Local Sonar file-level `sonar verify` remains unavailable for this organization because SonarCloud Agentic Analysis is not activated; PR SonarCloud is the authoritative remote gate.
+- Bead `agent-platform-project-workspaces.5` remains open until PR #147 reruns green and actionable comments/review threads are resolved.
 
 Verification:
 
 - `pnpm format:check`
-- `pnpm build`
+- `pnpm typecheck`
 - `pnpm lint`
 - `pnpm test`
-- `pnpm --filter @agent-platform/contracts run test -- test/project.test.ts`
-- `pnpm --filter @agent-platform/contracts run build`
-- `pnpm --filter @agent-platform/api exec vitest run test/projectsRouter.test.ts`
-- `pnpm --filter @agent-platform/web run typecheck`
-- `pnpm --filter @agent-platform/api run typecheck`
-- `pnpm --filter @agent-platform/web run lint`
-- `pnpm --filter @agent-platform/api run lint`
-- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm exec playwright test -c e2e/playwright.config.ts e2e/mvp-e2e.spec.ts -g "Project path binding"`
-- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm exec playwright test -c e2e/playwright.config.ts e2e/mvp-e2e.spec.ts e2e/input-selectors.spec.ts`
-- Pre-push affected-package build, typecheck, and tests after the Sonar follow-up commit.
+- `pnpm --filter @agent-platform/api test -- projectsRouter.test.ts projectWorkspaceResolver.test.ts sessionChat.integration.test.ts`
+- `pnpm --filter @agent-platform/harness test -- toolDispatch.test.ts`
+- `pnpm --filter @agent-platform/api test`
+- `pnpm build`
+- `pnpm docs:lint`
+- `make up`
+- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e`
+- `git diff --check`
 
 Completion gate:
 
-- SonarQube MCP tools were not exposed, so the repo fallback gate was used locally.
-- Remote SonarCloud analysis was available on PR #145 and passed after iteration.
-- GitHub Actions, SonarCloud, Sourcery, GitGuardian, and review-thread sweep all passed before the Bead was closed.
+- Local fallback gates are green.
+- PR #147 must be pushed, then GitHub checks, SonarCloud, GitGuardian, Sourcery state, and review comments/threads must be inspected again.
+- Do not close Bead `.5` until PR #147 is green and any actionable comments are resolved.
 
 ### Project workspace model implemented
 
@@ -1024,10 +1021,10 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-project-workspaces.4`
+- **Current branch:** `task/agent-platform-project-workspaces.5`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** `agent-platform-project-workspaces.4` is claimed and ready for implementation discovery.
-- **Remote sync:** Git branch and Beads/Dolt state are pushed. Task PRs remain unmerged until the end-of-epic integration point.
+- **Current work:** `agent-platform-project-workspaces.5` is implemented and PR #147 is open; follow-up SonarCloud cleanup commits are ready to push and then monitor.
+- **Remote sync:** Branch was previously pushed. Push the latest commits, wait for PR #147 pipelines/SonarCloud/comment sweep, then close the Bead if green. Task PRs remain unmerged until the end-of-epic integration point.
 
 ### Beads
 
@@ -1035,8 +1032,9 @@ Quality gates passed:
 - `agent-platform-project-workspaces.1` is closed. PR #143 is open and green; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.2` is closed. PR #144 is open and green; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.3` is closed. PR #145 is open and green; it remains unmerged until the end-of-epic integration point.
-- `agent-platform-project-workspaces.4` is in progress: Resolve `/workspace` and scope runtime tools.
-- `agent-platform-project-workspaces.5` and `.6` remain linearly blocked behind earlier tasks.
+- `agent-platform-project-workspaces.4` is closed. PR #146 is open and green; it remains unmerged until the end-of-epic integration point.
+- `agent-platform-project-workspaces.5` is in progress: Project `AGENTS.md` onboarding and write safety gate. PR #147 is open; local gates pass; remote rerun/comment sweep is pending after pushing follow-up commits.
+- `agent-platform-project-workspaces.6` remains linearly blocked behind `.5`.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
 - `agent-platform-browser-tools` is closed locally.
@@ -1173,11 +1171,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Leave PRs #143, #144, and #145 unmerged until the end-of-epic integration point.
-2. Implement `agent-platform-project-workspaces.4`: resolver first, then PathJail/tool dispatch integration and wrong-root regression coverage.
-3. For each task, open the PR, monitor CI/Sonar/Sourcery/review comments, iterate until green/resolved, then close the Bead without merging the PR yet.
-4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
-5. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
+1. Push `task/agent-platform-project-workspaces.5` follow-up commits to refresh PR #147.
+2. Monitor PR #147 GitHub checks, SonarCloud quality gate/issues, GitGuardian, Sourcery state, and review comments/threads; fix anything actionable on the same branch.
+3. Close Bead `agent-platform-project-workspaces.5` only after PR #147 is green and comments are resolved; do not merge PR #147.
+4. Then claim/start `agent-platform-project-workspaces.6` from the `.5` tip and repeat the same PR/gate/comment loop.
+5. Leave PRs #143 through #147 unmerged until the end-of-epic integration point.
 
 ---
 
