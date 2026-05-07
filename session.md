@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Implemented `agent-platform-project-workspaces.1` on `task/agent-platform-project-workspaces.1`: added shared Project/Chat mode contracts, Project workspace binding metadata, capability/onboarding states, write-eligibility helpers, focused contract tests, and architecture documentation. Local build, format, lint, and unit gates passed; broad docs lint remains blocked by ignored `.agent-platform/workspaces/...` Markdown files.
+- **Date:** 2026-05-07
 - **Session:** Final planning pass added explicit per-task testing strategies to every Project workspace and Project onboarding child spec, including mandatory local gates, focused tests, Playwright UI actions/assertions where applicable, CI/GitHub monitoring, and no-close/no-merge until all gates are green.
 - **Date:** 2026-05-07
 - **Session:** Clarified the definition of done for Project workspace/onboarding work: pushed code is not done by itself. A task is done only when implementation is complete, local build/format/lint/unit and relevant E2E/Playwright checks pass, GitHub Actions/CI pipelines pass, and any review-required feedback is resolved. Failed CI means the task remains open and must be iterated until green.
@@ -332,6 +334,37 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ---
 
 ## What happened (this session)
+
+### Project workspace model implemented
+
+Branch state: `task/agent-platform-project-workspaces.1` contains the first Project workspace task.
+
+- Started from `feature/agent-platform-project-workspaces`, claimed `agent-platform-project-workspaces.1`, and created the task branch.
+- Added shared contracts in `packages/contracts/src/project.ts` for Project vs Chat modes, default agent profile, Project capability state, onboarding state, instruction-file references, subproject scope, Project workspace binding metadata, and access/write policy.
+- Exported the new contracts and helpers from `packages/contracts/src/index.ts`.
+- Added focused contract tests in `packages/contracts/test/project.test.ts` covering default agent selection, Project working-tree metadata, root/nested `AGENTS.md` references, read eligibility, and write eligibility.
+- Documented Project vs Chat semantics, `/workspace`, capability states, onboarding states, and instruction precedence in `docs/architecture.md`.
+- Marked the task spec checklist complete in `docs/tasks/agent-platform-project-workspaces.1.md`.
+- Root cause for the initial full `pnpm test` failure was sandbox denial of local TCP bind (`listen EPERM 127.0.0.1`) in browser integration setup; rerunning the suite with approved local server binding passed.
+
+Verification:
+
+- `pnpm --filter @agent-platform/contracts run test -- test/project.test.ts`
+- `pnpm --filter @agent-platform/contracts run typecheck`
+- `pnpm --filter @agent-platform/contracts run test`
+- `pnpm --filter @agent-platform/contracts run lint`
+- `pnpm format:check`
+- `pnpm build`
+- `pnpm lint`
+- `pnpm test` with escalation for browser integration local fixture servers
+- `pnpm exec markdownlint-cli2 docs/architecture.md`
+- `pnpm docs:lint` failed only on ignored generated `.agent-platform/workspaces/default/...` Markdown files, not touched tracked docs.
+
+Completion gate:
+
+- SonarQube MCP/CLI was not available in this session.
+- IDE Problems diagnostics were not exposed in the current tool surface.
+- Fallback gate passed with contracts typecheck/lint/tests, root build/lint/test, formatting, and touched-doc markdownlint.
 
 ### Project workspace binding follow-up scoped
 
@@ -927,18 +960,19 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-code-workbench.6`
-- **Current base:** chained from `task/agent-platform-code-workbench.5`.
-- **Current work:** task 6 is closed; follow-up fixes and project-workspaces planning are committed locally.
-- **Remote sync:** pending push after this session handoff update is committed.
+- **Current branch:** `task/agent-platform-project-workspaces.1`
+- **Current base:** `feature/agent-platform-project-workspaces`.
+- **Current work:** `agent-platform-project-workspaces.1` implementation is committed locally as `907ffe7`.
+- **Remote sync:** pending push after this session handoff update is committed; sandbox DNS/auth previously blocked Beads Dolt auto-push.
 
 ### Beads
 
+- `agent-platform-project-workspaces` is in progress.
+- `agent-platform-project-workspaces.1` is in progress locally and implementation is complete; close after the handoff commit/push succeeds.
+- `agent-platform-project-workspaces.2` is the next child task after `.1` closes: Add Project vs Chat entry paths and default agents.
+- `agent-platform-project-workspaces.3` through `.6` are open and linearly blocked behind earlier tasks.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
-- `agent-platform-project-workspaces` is open as the next P1 epic.
-- `agent-platform-project-workspaces.1` is the next ready child task: Define project workspace model.
-- `agent-platform-project-workspaces.2` through `.6` are open and linearly blocked behind `.1`.
 - `agent-platform-browser-tools` is closed locally.
 - `agent-platform-browser-tools.1` is closed locally.
 - `agent-platform-browser-tools.2` is closed locally.
@@ -961,6 +995,17 @@ Quality gates passed:
 
 ### Quality
 
+- Latest `agent-platform-project-workspaces.1` gates passed:
+  - `pnpm --filter @agent-platform/contracts run test -- test/project.test.ts`
+  - `pnpm --filter @agent-platform/contracts run typecheck`
+  - `pnpm --filter @agent-platform/contracts run test`
+  - `pnpm --filter @agent-platform/contracts run lint`
+  - `pnpm format:check`
+  - `pnpm build`
+  - `pnpm lint`
+  - `pnpm test` with escalation for browser integration local fixture servers
+  - `pnpm exec markdownlint-cli2 docs/architecture.md`
+- `pnpm docs:lint` still fails on ignored local workspace Markdown under `.agent-platform/workspaces/default/...`; touched tracked docs pass markdownlint directly.
 - Latest full-page browser screenshot handling gates passed:
   - `pnpm --filter @agent-platform/web run typecheck`
   - `pnpm --filter @agent-platform/web run lint`
@@ -1022,9 +1067,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit this `session.md` handoff update and push `task/agent-platform-code-workbench.6`.
-2. Owner creates the PR and merges after CI/review.
-3. After merge, claim `agent-platform-project-workspaces.1` and implement the project workspace model first.
+1. Commit this `session.md` handoff update, close `agent-platform-project-workspaces.1`, push the task branch, and sync Beads/Dolt when network/auth allows.
+2. Open PR `task/agent-platform-project-workspaces.1` -> `feature/agent-platform-project-workspaces` and monitor CI/reviews until green.
+3. After `.1` merges, claim `agent-platform-project-workspaces.2` for Project vs Chat entry paths and default agent selection.
 4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
 5. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
 
