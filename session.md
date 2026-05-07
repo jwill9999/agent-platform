@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Completed cleanup for `agent-platform-project-workspaces.6`: PR #148 is open against `feature/agent-platform-project-workspaces`, all GitHub Actions/docs checks/GitGuardian/SonarCloud gates passed, SonarCloud reports 0 unresolved issues and quality gate OK, review-thread sweep found no actionable comments, Sourcery was skipped only due weekly rate limit, and Beads closed both `.6` and the parent `agent-platform-project-workspaces` epic. Beads Dolt state was pushed; remaining cleanup is pushing the final session/Beads bookkeeping commits.
+- **Date:** 2026-05-07
 - **Session:** Closed `agent-platform-project-workspaces.5` after PR #147 passed GitHub Actions (`verify`, `docker`, `e2e`), docs checks, GitGuardian, and SonarCloud with 0 unresolved issues and no review threads. Claimed `agent-platform-project-workspaces.6` on `task/agent-platform-project-workspaces.6`, added deterministic Project workspace Playwright coverage for Chat/Project separation plus missing/review/approved `AGENTS.md` states, and updated architecture/development docs for the minimal Project onboarding gate. Local gates pass: build, format, lint, docs lint, unit tests, diff check, focused Playwright, and full Docker E2E; remaining before close: push PR and remote checks/comments.
 - **Date:** 2026-05-07
 - **Session:** Continued `agent-platform-project-workspaces.5` on `task/agent-platform-project-workspaces.5`: PR #147 is open against `feature/agent-platform-project-workspaces`; fixed SonarCloud maintainability/duplication findings, hardened the browser integration test after Actions `verify` exposed hosted-runner startup latency, and moved remaining Sonar-flagged test helpers to outer scope. Bead remains open until PR #147 reruns green with no unresolved comments/issues.
@@ -353,37 +355,24 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## What happened (this session)
 
-### Project onboarding gate PR iteration
+### Project workspace epic closeout
 
-Branch state: `task/agent-platform-project-workspaces.5` is active. PR #147 is open against `feature/agent-platform-project-workspaces`; do not merge it yet.
+Branch state: `task/agent-platform-project-workspaces.6` is active. PR #148 is open against `feature/agent-platform-project-workspaces`; do not merge it yet.
 
-- Continued `agent-platform-project-workspaces.5`: root/nested `AGENTS.md` discovery, approval metadata, Project instruction prompt injection, frontend onboarding status/approval controls, and Project write gating were already implemented and pushed to PR #147.
-- Confirmed GitHub CLI auth works with token scopes `repo` and `workflow`; the previous auth concern is not the current blocker.
-- Inspected PR #147: GitHub Actions were green or running, Sourcery was skipped due weekly rate limit, and SonarCloud failed on new-code duplication plus three issues.
-- Addressed SonarCloud feedback by extracting shared `instructionFiles` parsing, removing unnecessary assertions, replacing the complex read-only shell regex with token-based checks, and reducing `IDEToolbar` cognitive complexity.
-- Local Sonar file-level `sonar verify` remains unavailable for this organization because SonarCloud Agentic Analysis is not activated; PR SonarCloud is the authoritative remote gate.
-- Bead `agent-platform-project-workspaces.5` remains open until PR #147 reruns green and actionable comments/review threads are resolved.
+- Created PR #148 for `agent-platform-project-workspaces.6` after the local `.6` gates had passed.
+- Monitored PR #148 through GitHub Actions and external checks: `verify`, `docker`, `e2e`, `markdownlint`, `lychee`, GitGuardian, and SonarCloud all passed.
+- Checked review/comment state with the thread-aware GitHub review script: no review threads were present; the only review was Sourcery's weekly rate-limit notice with no actionable code feedback.
+- Queried SonarCloud directly: quality gate `OK`, 0 unresolved issues, 1.3% duplication on new code, and all quality-gate conditions passed.
+- Closed Bead `agent-platform-project-workspaces.6`; Beads auto-closed the parent epic `agent-platform-project-workspaces`.
+- `bd dolt push` initially failed through auto-push due non-interactive GitHub DNS/auth, then succeeded with elevated network access.
+- Added a Beads closeout commit and began final session handoff cleanup.
 
 Verification:
 
-- `pnpm format:check`
-- `pnpm typecheck`
-- `pnpm lint`
-- `pnpm test`
-- `pnpm --filter @agent-platform/api test -- projectsRouter.test.ts projectWorkspaceResolver.test.ts sessionChat.integration.test.ts`
-- `pnpm --filter @agent-platform/harness test -- toolDispatch.test.ts`
-- `pnpm --filter @agent-platform/api test`
-- `pnpm build`
-- `pnpm docs:lint`
-- `make up`
-- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e`
-- `git diff --check`
-
-Completion gate:
-
-- Local fallback gates are green.
-- PR #147 must be pushed, then GitHub checks, SonarCloud, GitGuardian, Sourcery state, and review comments/threads must be inspected again.
-- Do not close Bead `.5` until PR #147 is green and any actionable comments are resolved.
+- Local `.6` gates already passed before PR creation: `pnpm format:check`, `pnpm docs:lint`, `git diff --check`, `pnpm build`, `pnpm lint`, `pnpm test`, focused `e2e/project-workspaces.spec.ts`, and full Docker-backed `pnpm run test:e2e`.
+- PR #148 remote gates passed: `verify`, `docker`, `e2e`, `markdownlint`, `lychee`, `GitGuardian Security Checks`, and `SonarCloud Code Analysis`.
+- SonarCloud direct API checks passed: quality gate `OK`, 0 unresolved issues.
+- GitHub review-thread sweep returned `review_threads: []`.
 
 ### Project workspace model implemented
 
@@ -1023,20 +1012,21 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-project-workspaces.5`
+- **Current branch:** `task/agent-platform-project-workspaces.6`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** `agent-platform-project-workspaces.5` is implemented and PR #147 is open; follow-up SonarCloud cleanup commits are ready to push and then monitor.
-- **Remote sync:** Branch was previously pushed. Push the latest commits, wait for PR #147 pipelines/SonarCloud/comment sweep, then close the Bead if green. Task PRs remain unmerged until the end-of-epic integration point.
+- **Current work:** Project workspace epic implementation is complete. PRs #143 through #148 are open against the feature branch and green/non-actionable; they remain unmerged until the end-of-epic integration point.
+- **Remote sync:** Branch has the final Beads/session bookkeeping commits to push after cleanup. Task PRs remain unmerged until owner-approved epic integration.
 
 ### Beads
 
-- `agent-platform-project-workspaces` is in progress.
+- `agent-platform-project-workspaces` is closed in Beads.
 - `agent-platform-project-workspaces.1` is closed. PR #143 is open and green; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.2` is closed. PR #144 is open and green; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.3` is closed. PR #145 is open and green; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.4` is closed. PR #146 is open and green; it remains unmerged until the end-of-epic integration point.
-- `agent-platform-project-workspaces.5` is in progress: Project `AGENTS.md` onboarding and write safety gate. PR #147 is open; local gates pass; remote rerun/comment sweep is pending after pushing follow-up commits.
-- `agent-platform-project-workspaces.6` remains linearly blocked behind `.5`.
+- `agent-platform-project-workspaces.5` is closed. PR #147 is open and green/non-actionable; it remains unmerged until the end-of-epic integration point.
+- `agent-platform-project-workspaces.6` is closed. PR #148 is open and green/non-actionable; it remains unmerged until the end-of-epic integration point.
+- `agent-platform-project-onboarding.1` is now ready and blocks the next P1 onboarding epic.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
 - `agent-platform-browser-tools` is closed locally.
@@ -1173,11 +1163,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push `task/agent-platform-project-workspaces.5` follow-up commits to refresh PR #147.
-2. Monitor PR #147 GitHub checks, SonarCloud quality gate/issues, GitGuardian, Sourcery state, and review comments/threads; fix anything actionable on the same branch.
-3. Close Bead `agent-platform-project-workspaces.5` only after PR #147 is green and comments are resolved; do not merge PR #147.
-4. Then claim/start `agent-platform-project-workspaces.6` from the `.5` tip and repeat the same PR/gate/comment loop.
-5. Leave PRs #143 through #147 unmerged until the end-of-epic integration point.
+1. Push the final Beads/session cleanup commits on `task/agent-platform-project-workspaces.6`.
+2. Discuss the completed `agent-platform-project-workspaces` epic with the owner and wait for manual/HITL closeout direction before merging.
+3. Keep PRs #143 through #148 open and unmerged until the owner approves the single end-of-epic integration.
+4. After owner discussion/manual testing, either prepare the single epic integration path or start `agent-platform-project-onboarding.1` under the same per-ticket PR/check/comment loop.
 
 ---
 
