@@ -32,6 +32,7 @@ import type {
   MessageRecord,
   Output,
   PromptMemoryBundle,
+  ProjectAccessPolicy,
   SensorAgentProfile,
   WorkingMemoryToolSummary,
 } from '@agent-platform/contracts';
@@ -39,7 +40,6 @@ import {
   compactText,
   DEFAULT_CONTEXT_WINDOW,
   parseStructuredToolError,
-  type ProjectAccessPolicy,
   SessionResumeBodySchema,
 } from '@agent-platform/contracts';
 import {
