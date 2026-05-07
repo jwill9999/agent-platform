@@ -411,6 +411,16 @@ export function assessProjectOnboarding(input: AssessmentInput): {
       : assessmentStatus(hasRootInstructions, sufficiency.sufficient);
   const onboardingLabel = status === 'approved' ? 'Ready' : 'Needs onboarding';
   const folderLabel = basename(input.projectRoot);
+  const display = {
+    projectName: input.projectName,
+    folderLabel,
+    profileLabel: profile
+      .split('_')
+      .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
+      .join(' '),
+    onboardingLabel,
+    ...(input.activeBranch ? { branchLabel: input.activeBranch } : {}),
+  };
 
   const assessment = ProjectOnboardingAssessmentSchema.parse({
     status,
@@ -434,16 +444,7 @@ export function assessProjectOnboarding(input: AssessmentInput): {
           },
         ]
       : [],
-    display: {
-      projectName: input.projectName,
-      folderLabel,
-      profileLabel: profile
-        .split('_')
-        .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-        .join(' '),
-      onboardingLabel,
-      branchLabel: input.activeBranch,
-    },
+    display,
     assessedAtMs: input.nowMs ?? Date.now(),
   });
 

@@ -1359,3 +1359,9 @@ Tracked in Beads: `agent-platform-lt6`
 - Read-only inspection remains available before approval; write tools, mutating shell, and patch tools are hidden from the model and denied if invoked.
 - Verification completed locally: format, typecheck, lint, build, full unit tests, docs lint, Docker rebuild/seed, and Playwright e2e all pass.
 - SonarQube CLI authentication works, but file-level `sonar verify` returns SonarCloud `403` because Agentic Analysis is not activated for the organization; PR SonarCloud remains the required remote quality gate.
+
+## 2026-05-07 Project Onboarding Assessment
+
+- Task `agent-platform-project-onboarding.2` adds deterministic Project assessment contracts, API assessment/open integration, and an IDE assessment panel.
+- PR 151 CI exposed a non-git workspace regression: assessment display metadata included an undefined branch label, causing project-open request validation to fail in Docker E2E.
+- Fixed assessment display metadata to omit unknown branch labels and added a plain-folder API regression test.

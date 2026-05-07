@@ -210,6 +210,27 @@ describe('projectsRouter', () => {
       .expect(409);
   });
 
+  it('opens a plain folder without git metadata and omits unknown branch display data', async () => {
+    const folderDir = path.join(tmpDir, 'plain-folder');
+    mkdirSync(folderDir, { recursive: true });
+    writeFileSync(path.join(folderDir, 'README.md'), 'plain workspace\n');
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: folderDir, name: 'Plain Folder' })
+      .expect(201);
+
+    expect(openedProject.body.data.metadata).toMatchObject({
+      backendProjectRoot: realpathSync(folderDir),
+      capabilityState: 'backend_accessible',
+      onboardingState: 'in_progress',
+      onboardingAssessment: expect.objectContaining({
+        status: 'in_progress',
+        display: expect.not.objectContaining({ branchLabel: expect.anything() }),
+      }),
+    });
+  });
+
   it('auto-approves sufficient existing AGENTS.md instructions during assessment', async () => {
     const repoDir = path.join(tmpDir, 'repo-with-sufficient-agents');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
