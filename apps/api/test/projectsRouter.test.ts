@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -71,6 +72,71 @@ describe('projectsRouter', () => {
     await request(app).delete(`/v1/projects/${created.body.data.id}`).expect(204);
     const active = await request(app).get('/v1/projects').expect(200);
     expect(active.body.data).toEqual([]);
+  });
+
+  it('opens a backend-accessible project, persists repository metadata, and binds project sessions', async () => {
+    const repoDir = path.join(tmpDir, 'repo');
+    execFileSync('git', ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), 'project\n');
+    const repoRealPath = realpathSync(repoDir);
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Backend Repo' })
+      .expect(201);
+
+    expect(openedProject.body.data).toMatchObject({
+      name: 'Backend Repo',
+      workspaceKey: repoRealPath,
+      metadata: {
+        backendProjectRoot: repoRealPath,
+        repositoryRoot: repoRealPath,
+        activeBranch: 'main',
+        capabilityState: 'backend_accessible',
+        onboardingState: 'missing',
+        defaultAgentProfile: 'coding',
+      },
+    });
+
+    const selectedAgain = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Backend Repo Renamed' })
+      .expect(200);
+    expect(selectedAgain.body.data.id).toBe(openedProject.body.data.id);
+    expect(selectedAgain.body.data.name).toBe('Backend Repo Renamed');
+
+    const session = await request(app)
+      .post('/v1/sessions')
+      .send({
+        agentId: 'agent-1',
+        mode: 'project',
+        projectId: openedProject.body.data.id,
+      })
+      .expect(201);
+    expect(session.body.data).toMatchObject({
+      mode: 'project',
+      projectId: openedProject.body.data.id,
+    });
+  });
+
+  it('keeps backend-inaccessible paths unavailable and does not create project records', async () => {
+    const missingPath = path.join(tmpDir, 'missing');
+
+    const unavailable = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: missingPath, name: 'Missing Repo' })
+      .expect(422);
+
+    expect(unavailable.body.error).toMatchObject({
+      code: 'PROJECT_UNAVAILABLE',
+    });
+    expect(unavailable.body.error.details).toMatchObject({
+      capabilityState: 'unavailable',
+      path: missingPath,
+    });
+
+    const listed = await request(app).get('/v1/projects').expect(200);
+    expect(listed.body.data).toEqual([]);
   });
 
   it('returns clear errors for duplicate slugs, invalid workspace paths, and missing session projects', async () => {

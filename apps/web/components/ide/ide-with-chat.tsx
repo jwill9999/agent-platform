@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { Agent, SessionRecord } from '@agent-platform/contracts';
+import type { Agent, ProjectRecord, SessionRecord } from '@agent-platform/contracts';
 import type { UIMessage } from 'ai';
 import {
   FolderOpen,
@@ -460,6 +460,7 @@ function IDEToolbar({
   rootName,
   onRefreshFolder,
   onCloseFolder,
+  canUseProjectTools,
 }: Readonly<{
   showExplorer: boolean;
   setShowExplorer: (v: boolean) => void;
@@ -481,6 +482,7 @@ function IDEToolbar({
   rootName: string | null;
   onRefreshFolder: () => void;
   onCloseFolder: () => void;
+  canUseProjectTools: boolean;
 }>) {
   const explorerVariant = showExplorer ? 'secondary' : 'ghost';
   const explorerTitle = showExplorer ? 'Hide file explorer' : 'Show file explorer';
@@ -488,7 +490,11 @@ function IDEToolbar({
   const ExplorerIcon = showExplorer ? PanelLeftClose : Folder;
 
   const terminalVariant = showTerminal ? 'secondary' : 'ghost';
-  const terminalTitle = showTerminal ? 'Hide terminal' : 'Show terminal';
+  const terminalTitle = canUseProjectTools
+    ? showTerminal
+      ? 'Hide terminal'
+      : 'Show terminal'
+    : 'Open a backend project before using the terminal';
   const terminalLabel = showTerminal ? 'Hide' : 'Terminal';
   const TermIcon = showTerminal ? PanelBottomClose : TerminalIcon;
 
@@ -587,6 +593,7 @@ function IDEToolbar({
           }}
           className="gap-2"
           title={terminalTitle}
+          disabled={!canUseProjectTools}
         >
           <TermIcon className="h-4 w-4" />
           <span className="hidden sm:inline text-xs">{terminalLabel}</span>
@@ -1250,6 +1257,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [searchQuery, setSearchQuery] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
+  const [projectPathInput, setProjectPathInput] = useState('/workspace');
+  const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
+  const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
+  const [isOpeningBackendProject, setIsOpeningBackendProject] = useState(false);
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -1266,6 +1277,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [includeActiveFile, setIncludeActiveFile] = useState(true);
   const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
 
+  const workspaceName = activeProject?.name ?? fs.rootName ?? 'No folder open';
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
   const freshContextFiles = useMemo(
     () => getFreshContextFiles(contextFiles, openTabs),
@@ -1274,11 +1286,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const branchSummary = useMemo(
     () =>
       buildWorkbenchBranchSummary({
-        workspaceName: fs.rootName,
+        workspaceName,
         openTabs,
         pendingProposalPath: editProposal?.path,
       }),
-    [editProposal?.path, fs.rootName, openTabs],
+    [editProposal?.path, workspaceName, openTabs],
   );
   const contextDraft = useMemo(
     () =>
@@ -1324,12 +1336,13 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, []);
 
   useEffect(() => {
-    if (!selectedAgentId) return;
+    if (!selectedAgentId || !activeProject?.id) return;
     void (async () => {
       try {
         const session = await apiPost<SessionRecord>(apiPath('sessions'), {
           agentId: selectedAgentId,
           mode: 'project',
+          projectId: activeProject.id,
         });
         if (session?.id) {
           setSessionId(session.id);
@@ -1342,7 +1355,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         toast.error(e instanceof ApiRequestError ? e.message : 'Failed to create session');
       }
     })();
-  }, [selectedAgentId]);
+  }, [activeProject?.id, selectedAgentId]);
 
   useEffect(() => {
     if (harnessError) {
@@ -1352,6 +1365,46 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, [harnessError, setHarnessError]);
 
   const isLoading = status === 'streaming';
+
+  const clearProjectContext = useCallback(() => {
+    setOpenTabs([]);
+    setActiveTab(null);
+    setContextFiles([]);
+    setEditProposal(null);
+    setChatInput('');
+    setShowTerminal(false);
+    fs.closeDirectory();
+  }, [fs]);
+
+  const handleOpenBackendProject = useCallback(async () => {
+    const path = projectPathInput.trim();
+    if (!path) return;
+
+    setIsOpeningBackendProject(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(apiPath('projects', 'open'), { path });
+      if (!project) {
+        throw new ApiRequestError('Failed to open backend project', 500);
+      }
+      clearProjectContext();
+      setActiveProject(project);
+      setSessionId(null);
+      toast.success(`Opened ${project.name}`);
+    } catch (error) {
+      setActiveProject(null);
+      setSessionId(null);
+      clearProjectContext();
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Backend cannot inspect that project path';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsOpeningBackendProject(false);
+    }
+  }, [clearProjectContext, projectPathInput]);
 
   // --- File operations ---
 
@@ -1710,6 +1763,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         rootName={fs.rootName}
         onRefreshFolder={fs.refresh}
         onCloseFolder={fs.closeDirectory}
+        canUseProjectTools={Boolean(activeProject)}
       />
 
       <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -1756,6 +1810,66 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                       </span>
                     )}
                   </div>
+                </div>
+                <div
+                  className="mx-2 mt-2 rounded-md border border-border bg-background px-3 py-2"
+                  aria-label="Project binding"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Project
+                    </span>
+                    {activeProject ? (
+                      <span className="text-xs text-emerald-600">Backend accessible</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Unavailable</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      aria-label="Backend project path"
+                      value={projectPathInput}
+                      onChange={(event) => {
+                        setProjectPathInput(event.target.value);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          handleOpenBackendProject().catch(() => {});
+                        }
+                      }}
+                      className="h-8 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        handleOpenBackendProject().catch(() => {});
+                      }}
+                      disabled={isOpeningBackendProject}
+                    >
+                      {isOpeningBackendProject ? 'Opening...' : 'Open'}
+                    </Button>
+                  </div>
+                  {activeProject && (
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      <div className="truncate text-foreground">{activeProject.name}</div>
+                      <div className="truncate">
+                        Root: {String(activeProject.metadata.backendProjectRoot ?? '')}
+                      </div>
+                      <div className="truncate">
+                        Repo: {String(activeProject.metadata.repositoryRoot ?? '')}
+                      </div>
+                      {activeProject.metadata.activeBranch && (
+                        <div className="truncate">
+                          Branch: {String(activeProject.metadata.activeBranch)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {projectOpenError && (
+                    <p className="mt-2 text-xs text-destructive">{projectOpenError}</p>
+                  )}
                 </div>
                 {fs.needsFolderReconnect && (
                   <div className="mx-2 mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
@@ -1887,7 +2001,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 activeFile={activeFile}
                 includeActiveFile={includeActiveFile}
                 pinnedPaths={pinnedContextPaths}
-                workspaceName={fs.rootName ?? 'No folder open'}
+                workspaceName={workspaceName}
                 onToggleIncludeActiveFile={handleToggleIncludeActiveFile}
                 onAddToContext={handleAddToContext}
                 onRemoveFromContext={handleRemoveFromContext}

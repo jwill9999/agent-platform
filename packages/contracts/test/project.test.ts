@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ProjectModeSchema,
+  ProjectOpenBodySchema,
   ProjectWorkspaceBindingSchema,
   ProjectCapabilityStateSchema,
   ProjectOnboardingStateSchema,
@@ -14,6 +15,16 @@ describe('Project mode and workspace binding contracts', () => {
     expect(ProjectModeSchema.options).toEqual(['project', 'chat']);
     expect(getDefaultAgentProfileForMode('project')).toBe('coding');
     expect(getDefaultAgentProfileForMode('chat')).toBe('personal_assistant');
+  });
+
+  it('validates backend project open requests', () => {
+    expect(ProjectOpenBodySchema.parse({ path: '/workspace' })).toEqual({ path: '/workspace' });
+    expect(ProjectOpenBodySchema.parse({ path: '/workspace/app', name: 'App' })).toEqual({
+      path: '/workspace/app',
+      name: 'App',
+    });
+
+    expect(() => ProjectOpenBodySchema.parse({ path: '' })).toThrow();
   });
 
   it('captures backend-accessible Project working-tree metadata without conflating chat workspace', () => {

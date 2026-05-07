@@ -54,6 +54,7 @@ export {
   ProjectAccessPolicySchema,
   ProjectRecordSchema,
   ProjectCreateBodySchema,
+  ProjectOpenBodySchema,
   ProjectUpdateBodySchema,
   ProjectQuerySchema,
   getDefaultAgentProfileForMode,
@@ -70,6 +71,7 @@ export {
   type ProjectAccessPolicy,
   type ProjectRecord,
   type ProjectCreateBody,
+  type ProjectOpenBody,
   type ProjectUpdateBody,
   type ProjectQuery,
 } from './project.js';

@@ -87,8 +87,29 @@ test.describe('MVP E2E (compose-backed)', () => {
     await page.getByRole('link', { name: /Open Project/ }).click();
     await expect(page).toHaveURL(/\/ide$/);
     await expect(page.locator('[aria-label="Active agent"]').first()).toContainText('Coding');
+    await expect(page.getByLabel('Backend project path')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Open Folder' }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /Terminal/ })).toBeVisible();
+  });
+
+  test('Project path binding distinguishes backend-accessible and unavailable roots', async ({
+    page,
+  }) => {
+    await page.goto('/ide');
+    const projectBinding = page.getByLabel('Project binding');
+
+    await expect(projectBinding.getByText('Unavailable')).toBeVisible();
+    await page.getByLabel('Backend project path').fill('/workspace');
+    await projectBinding.getByRole('button', { name: 'Open', exact: true }).click();
+    await expect(projectBinding.getByText('Backend accessible')).toBeVisible();
+    await expect(projectBinding.getByText('Root: /workspace')).toBeVisible();
+
+    await page.getByLabel('Backend project path').fill('/definitely-not-mounted-agent-platform');
+    await projectBinding.getByRole('button', { name: 'Open', exact: true }).click();
+    await expect(
+      projectBinding.getByText('Backend cannot inspect that project path'),
+    ).toBeVisible();
+    await expect(projectBinding.getByText('Unavailable')).toBeVisible();
   });
 
   test('tool_result panel renders (fixture page)', async ({ page }) => {

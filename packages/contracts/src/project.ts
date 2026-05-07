@@ -129,6 +129,12 @@ export const ProjectUpdateBodySchema = z.object({
   archivedAtMs: z.number().int().nonnegative().nullable().optional(),
 });
 
+export const ProjectOpenBodySchema = z.object({
+  path: z.string().min(1).max(4000),
+  name: z.string().min(1).max(200).optional(),
+  slug: ProjectSlugSchema.optional(),
+});
+
 export const ProjectQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false),
 });
@@ -184,5 +190,6 @@ export function getProjectAccessPolicy(input: {
 
 export type ProjectRecord = z.infer<typeof ProjectRecordSchema>;
 export type ProjectCreateBody = z.infer<typeof ProjectCreateBodySchema>;
+export type ProjectOpenBody = z.infer<typeof ProjectOpenBodySchema>;
 export type ProjectUpdateBody = z.infer<typeof ProjectUpdateBodySchema>;
 export type ProjectQuery = z.infer<typeof ProjectQuerySchema>;

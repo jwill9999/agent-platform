@@ -1,7 +1,10 @@
 import {
   ProjectCreateBodySchema,
+  ProjectOpenBodySchema,
   ProjectQuerySchema,
   ProjectUpdateBodySchema,
+  type ProjectOpenBody,
+  type ProjectRecord,
 } from '@agent-platform/contracts';
 import {
   archiveProject,
@@ -15,6 +18,9 @@ import {
 } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
+import { execFileSync } from 'node:child_process';
+import { readdirSync, realpathSync, statSync } from 'node:fs';
+import { basename, isAbsolute } from 'node:path';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
@@ -31,6 +37,113 @@ function mapProjectError(error: unknown): never {
     throw new HttpError(400, 'VALIDATION_ERROR', error.message);
   }
   throw error;
+}
+
+type BackendProjectMetadata = {
+  backendProjectRoot: string;
+  repositoryRoot: string;
+  activeBranch?: string;
+  activeWorktreeId?: string;
+  projectRoot: '/workspace';
+  capabilityState: 'backend_accessible';
+  onboardingState: 'missing';
+  defaultAgentProfile: 'coding';
+};
+
+function gitValue(cwd: string, args: string[]): string | undefined {
+  try {
+    const output = execFileSync('git', ['-C', cwd, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return output || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function discoverBackendProjectMetadata(rawPath: string): BackendProjectMetadata {
+  if (!isAbsolute(rawPath)) {
+    throw new HttpError(422, 'PROJECT_UNAVAILABLE', 'Project path must be absolute', {
+      path: rawPath,
+      capabilityState: 'unavailable',
+    });
+  }
+
+  let projectRoot: string;
+  try {
+    projectRoot = realpathSync(rawPath);
+    if (!statSync(projectRoot).isDirectory()) {
+      throw new Error('not a directory');
+    }
+    readdirSync(projectRoot);
+  } catch {
+    throw new HttpError(422, 'PROJECT_UNAVAILABLE', 'Backend cannot inspect that project path', {
+      path: rawPath,
+      capabilityState: 'unavailable',
+    });
+  }
+
+  const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']) ?? projectRoot;
+  const activeBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
+  const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD']);
+
+  const metadata: BackendProjectMetadata = {
+    backendProjectRoot: projectRoot,
+    repositoryRoot,
+    projectRoot: '/workspace',
+    capabilityState: 'backend_accessible',
+    onboardingState: 'missing',
+    defaultAgentProfile: 'coding',
+  };
+  if (activeBranch) metadata.activeBranch = activeBranch;
+  metadata.activeWorktreeId = headSha ? `${repositoryRoot}:${headSha}` : repositoryRoot;
+  return metadata;
+}
+
+function projectNameFor(input: ProjectOpenBody, projectRoot: string): string {
+  return input.name?.trim() || basename(projectRoot) || 'Project';
+}
+
+function findProjectByWorkspaceKey(db: DrizzleDb, workspaceKey: string): ProjectRecord | undefined {
+  return listProjects(db, { includeArchived: true }).find(
+    (project) => project.workspaceKey === workspaceKey,
+  );
+}
+
+function openBackendProject(
+  db: DrizzleDb,
+  input: ProjectOpenBody,
+): {
+  project: ProjectRecord;
+  created: boolean;
+} {
+  const metadata = discoverBackendProjectMetadata(input.path);
+  const existing = findProjectByWorkspaceKey(db, metadata.backendProjectRoot);
+  const name = projectNameFor(input, metadata.backendProjectRoot);
+
+  if (existing) {
+    return {
+      project: updateProject(db, existing.id, {
+        name,
+        slug: input.slug,
+        workspaceKey: metadata.backendProjectRoot,
+        metadata: { ...existing.metadata, ...metadata },
+        archivedAtMs: null,
+      }),
+      created: false,
+    };
+  }
+
+  return {
+    project: createProject(db, {
+      name,
+      slug: input.slug,
+      workspaceKey: metadata.backendProjectRoot,
+      metadata,
+    }),
+    created: true,
+  };
 }
 
 export function createProjectsRouter(db: DrizzleDb): Router {
@@ -59,6 +172,21 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       try {
         const project = createProject(db, parseBody(ProjectCreateBodySchema, req.body));
         res.status(201).json({ data: project });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/open',
+    asyncHandler(async (req, res) => {
+      try {
+        const { project, created } = openBackendProject(
+          db,
+          parseBody(ProjectOpenBodySchema, req.body),
+        );
+        res.status(created ? 201 : 200).json({ data: project });
       } catch (error) {
         mapProjectError(error);
       }

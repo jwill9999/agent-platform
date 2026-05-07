@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Implemented `agent-platform-project-workspaces.3` on `task/agent-platform-project-workspaces.3`: added backend Project open validation through `/v1/projects/open`, persisted backend root/repository/branch/capability/onboarding/default-agent metadata, bound Project sessions to the selected Project id, added the IDE backend Project binding panel with unavailable state and stale-context clearing, and covered valid `/workspace` plus inaccessible paths in API/contract/Playwright tests. Local format, build, lint, unit, focused API/contract, web typecheck, and targeted Playwright gates passed; next step is commit, push, PR, and remote CI/Sonar/Sourcery/comment monitoring before closing the Bead.
+- **Date:** 2026-05-07
 - **Session:** Claimed `agent-platform-project-workspaces.3` on new branch `task/agent-platform-project-workspaces.3` from the completed `.2` tip. Scope: bind Project sessions to backend-accessible working trees, persist root/repo/branch/capability/onboarding state, and keep inaccessible paths unavailable.
 - **Date:** 2026-05-07
 - **Session:** Completed and closed `agent-platform-project-workspaces.2` on `task/agent-platform-project-workspaces.2`: PR #144 to `feature/agent-platform-project-workspaces` is open, all local gates and PR checks passed, SonarCloud reports 0 new issues after the `String.raw` cleanup, and review-thread inspection found no unresolved actionable comments. Next task is `agent-platform-project-workspaces.3` from this branch tip.
