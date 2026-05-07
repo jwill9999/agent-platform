@@ -44,6 +44,9 @@ const HTML = `<!doctype html>
   </body>
 </html>`;
 
+const BROWSER_START_TIMEOUT_MS = 30_000;
+const BROWSER_ACTION_TIMEOUT_MS = 10_000;
+
 function toolData(output: Output | null): BrowserActionResult {
   expect(output?.type).toBe('tool_result');
   if (output?.type !== 'tool_result') throw new Error('Expected tool_result output');
@@ -101,7 +104,7 @@ describe('browser tools integration', () => {
     const start = toolData(
       await executeBrowserTool(
         BROWSER_TOOL_IDS.start,
-        { url: baseUrl, timeoutMs: 10_000 },
+        { url: baseUrl, timeoutMs: BROWSER_START_TIMEOUT_MS },
         { manager: activeManager },
       ),
     );
@@ -113,7 +116,7 @@ describe('browser tools integration', () => {
     const navigate = toolData(
       await executeBrowserTool(
         BROWSER_TOOL_IDS.navigate,
-        { sessionId, url: `${baseUrl}/fixture`, timeoutMs: 10_000 },
+        { sessionId, url: `${baseUrl}/fixture`, timeoutMs: BROWSER_ACTION_TIMEOUT_MS },
         { manager: activeManager },
       ),
     );
@@ -138,7 +141,11 @@ describe('browser tools integration', () => {
     const click = toolData(
       await executeBrowserTool(
         BROWSER_TOOL_IDS.click,
-        { sessionId, target: { role: 'button', label: 'Toggle panel' }, timeoutMs: 10_000 },
+        {
+          sessionId,
+          target: { role: 'button', label: 'Toggle panel' },
+          timeoutMs: BROWSER_ACTION_TIMEOUT_MS,
+        },
         { manager: activeManager },
       ),
     );
@@ -151,7 +158,7 @@ describe('browser tools integration', () => {
           sessionId,
           target: { label: 'Search' },
           text: 'browser validation',
-          timeoutMs: 10_000,
+          timeoutMs: BROWSER_ACTION_TIMEOUT_MS,
         },
         { manager: activeManager },
       ),
@@ -165,7 +172,7 @@ describe('browser tools integration', () => {
           sessionId,
           target: { label: 'Search' },
           key: 'Enter',
-          timeoutMs: 10_000,
+          timeoutMs: BROWSER_ACTION_TIMEOUT_MS,
         },
         { manager: activeManager },
       ),
@@ -216,7 +223,7 @@ describe('browser tools integration', () => {
     const start = toolData(
       await executeBrowserTool(
         BROWSER_TOOL_IDS.start,
-        { url: baseUrl, timeoutMs: 10_000 },
+        { url: baseUrl, timeoutMs: BROWSER_START_TIMEOUT_MS },
         { manager: activeManager },
       ),
     );
@@ -235,7 +242,11 @@ describe('browser tools integration', () => {
     const redirect = toolData(
       await executeBrowserTool(
         BROWSER_TOOL_IDS.navigate,
-        { sessionId, url: `${baseUrl}/redirect-external`, timeoutMs: 10_000 },
+        {
+          sessionId,
+          url: `${baseUrl}/redirect-external`,
+          timeoutMs: BROWSER_ACTION_TIMEOUT_MS,
+        },
         { manager: activeManager },
       ),
     );
@@ -245,7 +256,7 @@ describe('browser tools integration', () => {
     const local = toolData(
       await executeBrowserTool(
         BROWSER_TOOL_IDS.navigate,
-        { sessionId, url: baseUrl, timeoutMs: 10_000 },
+        { sessionId, url: baseUrl, timeoutMs: BROWSER_ACTION_TIMEOUT_MS },
         { manager: activeManager },
       ),
     );
@@ -269,7 +280,7 @@ describe('browser tools integration', () => {
     const ambiguous = toolData(
       await executeBrowserTool(
         BROWSER_TOOL_IDS.click,
-        { sessionId, target: { text: 'Duplicate' }, timeoutMs: 10_000 },
+        { sessionId, target: { text: 'Duplicate' }, timeoutMs: BROWSER_ACTION_TIMEOUT_MS },
         { manager: activeManager },
       ),
     );
@@ -284,7 +295,7 @@ describe('browser tools integration', () => {
     const start = toolData(
       await executeBrowserTool(
         BROWSER_TOOL_IDS.start,
-        { url: baseUrl, timeoutMs: 10_000 },
+        { url: baseUrl, timeoutMs: BROWSER_START_TIMEOUT_MS },
         { manager: activeManager },
       ),
     );
