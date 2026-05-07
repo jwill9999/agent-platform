@@ -1365,3 +1365,4 @@ Tracked in Beads: `agent-platform-lt6`
 - Task `agent-platform-project-onboarding.2` adds deterministic Project assessment contracts, API assessment/open integration, and an IDE assessment panel.
 - PR 151 CI exposed a non-git workspace regression: assessment display metadata included an undefined branch label, causing project-open request validation to fail in Docker E2E.
 - Fixed assessment display metadata to omit unknown branch labels and added a plain-folder API regression test.
+- Updated the Project workspace E2E assertions to match the new assessment flow: incomplete or missing onboarding now reports `in_progress` until approved.

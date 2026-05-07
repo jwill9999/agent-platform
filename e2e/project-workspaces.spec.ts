@@ -86,14 +86,14 @@ test.describe('Project workspace E2E', () => {
     writeRepoFixture(fixture.hostPath, { includeInstructions: true });
 
     const binding = await openProject(page, fixture.containerPath);
-    await expect(binding.getByText('Instructions review required')).toBeVisible();
+    await expect(binding.getByText('Instructions review in progress')).toBeVisible();
     await expect(
       binding.getByText(/Read-only inspection and planning remain available/),
     ).toBeVisible();
     await expect(binding.getByRole('button', { name: 'Approve' })).toBeVisible();
 
     const opened = await findProjectByRoot(request, fixture.containerPath);
-    expect(opened.metadata.onboardingState).toBe('needs_review');
+    expect(opened.metadata.onboardingState).toBe('in_progress');
     expect(opened.metadata.instructionFiles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ scope: 'root', path: 'AGENTS.md' }),
@@ -135,14 +135,14 @@ test.describe('Project workspace E2E', () => {
     writeRepoFixture(fixture.hostPath, { includeInstructions: false });
 
     const binding = await openProject(page, fixture.containerPath);
-    await expect(binding.getByText('Instructions missing')).toBeVisible();
+    await expect(binding.getByText('Instructions review in progress')).toBeVisible();
     await expect(
       binding.getByText(/Read-only inspection and planning remain available/),
     ).toBeVisible();
     await expect(binding.getByRole('button', { name: 'Approve' })).toHaveCount(0);
 
     const opened = await findProjectByRoot(request, fixture.containerPath);
-    expect(opened.metadata.onboardingState).toBe('missing');
+    expect(opened.metadata.onboardingState).toBe('in_progress');
     expect(opened.metadata.instructionFiles).toEqual([]);
   });
 
