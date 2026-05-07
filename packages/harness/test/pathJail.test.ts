@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, symlinkSync, rmSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { PathJail, PathJailError } from '../src/security/pathJail.js';
@@ -103,6 +103,27 @@ describe('PathJail', () => {
     const result = await jail.validate(filePath, 'read');
     expect(result.allowed).toBe(true);
     expect(result.resolvedPath).toContain(workspace);
+  });
+
+  it('maps the canonical /workspace path to the mounted host project root', async () => {
+    const projectRoot = makeTmpDir();
+    try {
+      const projectJail = new PathJail([
+        {
+          label: 'workspace',
+          hostPath: projectRoot,
+          containerPath: '/workspace',
+          permission: 'read_write',
+        },
+      ]);
+
+      const result = await projectJail.validate('/workspace/src/index.ts', 'write');
+
+      expect(result.allowed).toBe(true);
+      expect(result.resolvedPath).toBe(join(realpathSync(projectRoot), 'src', 'index.ts'));
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 
   it('enforce throws PathJailError on denial', async () => {

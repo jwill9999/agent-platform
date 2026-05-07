@@ -3,9 +3,11 @@
 import type {
   Agent,
   ModelConfig,
+  ProjectMode,
   SensorDashboardResponse,
   SessionRecord,
 } from '@agent-platform/contracts';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from '../components/chat/chat';
 import { AgentModelProvider } from '../components/chat/agent-model-context';
@@ -15,10 +17,12 @@ import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
-import { pickDefaultAgent } from '@/lib/default-agent';
+import { Button } from '@/components/ui/button';
+import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
 
 export default function HomePage() {
+  const [selectedMode, setSelectedMode] = useState<ProjectMode | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -63,7 +67,7 @@ export default function HomePage() {
       ]);
       const nextAgents = agentList ?? [];
       setAgents(nextAgents);
-      const def = pickDefaultAgent(nextAgents);
+      const def = pickDefaultAgentForMode(nextAgents, 'chat');
       const withKey = (configList ?? []).filter((c) => c.hasApiKey);
       if (def) {
         setSelectedAgentId((prev) => prev ?? def.id);
@@ -107,6 +111,7 @@ export default function HomePage() {
       try {
         const session = await apiPost<SessionRecord>(apiPath('sessions'), {
           agentId,
+          mode: 'chat',
         });
         if (!session?.id) {
           setSessionError('Failed to create session');
@@ -126,13 +131,14 @@ export default function HomePage() {
   );
 
   useEffect(() => {
+    if (selectedMode !== 'chat') return;
     if (!selectedAgentId) return;
     // Only create a new session when agent selection changes organically
     // (not via resume, which sets sessionId directly)
     if (!isResuming) {
       createSessionForAgent(selectedAgentId).catch(() => {});
     }
-  }, [selectedAgentId, createSessionForAgent, isResuming]);
+  }, [selectedAgentId, createSessionForAgent, isResuming, selectedMode]);
 
   const handleAgentChange = useCallback(
     (agentId: string) => {
@@ -142,6 +148,15 @@ export default function HomePage() {
     },
     [agents, modelConfigs],
   );
+
+  const handleOpenChat = useCallback(() => {
+    setSelectedMode('chat');
+    const def = pickDefaultAgentForMode(agents, 'chat');
+    if (def) {
+      setSelectedAgentId(def.id);
+      setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
+    }
+  }, [agents, modelConfigs]);
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {
@@ -199,6 +214,53 @@ export default function HomePage() {
     },
     [decideApproval, selectedModelConfigId],
   );
+
+  if (!selectedMode) {
+    return (
+      <main className="flex h-full min-h-0 flex-col bg-background">
+        <section className="border-b border-border px-6 py-5">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-1">
+            <h2 className="text-2xl font-semibold text-foreground">Choose a workspace</h2>
+            <p className="text-sm text-muted-foreground">
+              Open a general chat or move into a project coding surface.
+            </p>
+          </div>
+        </section>
+        <section className="flex flex-1 items-center px-6 py-8">
+          <div className="mx-auto grid w-full max-w-5xl gap-4 md:grid-cols-2">
+            <button
+              type="button"
+              className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary"
+              onClick={handleOpenChat}
+            >
+              <span>
+                <span className="block text-lg font-semibold text-foreground">Open Chat</span>
+                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                  Talk with the personal assistant without loading a working tree.
+                </span>
+              </span>
+              <span className="text-sm font-medium text-primary">Personal assistant</span>
+            </button>
+            <Button
+              asChild
+              variant="outline"
+              className="group flex h-auto min-h-44 flex-col items-start justify-between rounded-lg p-5 text-left"
+            >
+              <Link href="/ide">
+                <span>
+                  <span className="block text-lg font-semibold text-foreground">Open Project</span>
+                  <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                    Work with files, branch context, terminal tools, and the coding agent.
+                  </span>
+                </span>
+                <span className="text-sm font-medium text-primary">Coding agent</span>
+              </Link>
+            </Button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0">

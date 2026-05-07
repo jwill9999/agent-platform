@@ -11,6 +11,7 @@ test('agent and model selectors reflect available chat inputs', async ({ page, r
   const hasSavedModelConfig = configBody.data.some((config) => config.hasApiKey);
 
   await page.goto('/');
+  await page.getByRole('button', { name: /Open Chat/ }).click();
   await page.getByRole('heading', { name: 'AI Studio', level: 2 }).waitFor({ timeout: 10000 });
   const input = page.locator('textarea[placeholder*="Send a message"]');
   await expect(input).toBeVisible();

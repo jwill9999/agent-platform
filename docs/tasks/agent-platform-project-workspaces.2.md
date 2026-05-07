@@ -1,28 +1,35 @@
-# Task: Bind workbench chats and sessions to an active project
+# Task: Add Project vs Chat entry paths and default agent selection
 
 **Beads issue:** `agent-platform-project-workspaces.2`  
 **Spec file:** `docs/tasks/agent-platform-project-workspaces.2.md`
 
 ## Summary
 
-Make code workbench chats explicitly inherit the active project workspace instead of operating as
-generic sessions with incidental file context.
+Let users choose between opening a Project and opening a general Chat before reaching the main work
+surface. The selected mode determines the default agent and available interface/tooling.
 
 ## Requirements
 
-- Workbench UI must show which project is active.
-- New workbench chat sessions must be associated with the active project.
-- Chat context should include active project metadata, workspace capability state, and selected/open
-  file context.
-- General chat sessions must not silently inherit project file context.
-- Switching projects must not leave stale file handles or stale chat project state.
+- Add a clear **Open Project** path that leads to the project/code interface.
+- Add a clear **Open Chat** path that leads to a general chat interface.
+- Project mode defaults to the coding agent.
+- Chat mode defaults to the personal assistant.
+- Project mode exposes project-specific surfaces only when a Project is selected: working tree,
+  branch/worktree context, file tree, scoped chat, and code-agent capability status.
+- Chat mode must not expose branch pickers, Git tools, terminal tools, project file trees, or
+  code-write tools by default.
+- General Chat may discuss code conceptually, but it must not operate on a loaded working tree unless
+  a future orchestration/attachment feature explicitly adds that behavior.
+- Keep future orchestration additive; do not require multi-agent routing for the Epic 1 happy path.
 
 ## Implementation Plan
 
-1. Extend session creation or workbench state so a project binding is explicit.
-2. Carry project metadata into the chat prompt/context payload.
-3. Make the branch/status panel read from the active project binding.
-4. Add UI states for no project, project selected, and project unavailable.
+1. Review current chat/workbench routes and entry points.
+2. Add mode selection or split navigation that routes to Project or Chat.
+3. Persist mode on session creation so backend and frontend agree on default agent/capabilities.
+4. Resolve default agent by mode: coding agent for Project, personal assistant for Chat.
+5. Hide or disable project-only controls in Chat mode with user-facing unavailable states.
+6. Add tests that prove Chat sessions do not inherit stale Project context.
 
 ## Dependency Order
 
@@ -30,14 +37,29 @@ generic sessions with incidental file context.
 | ------------------------------------- | ------------------------------------- |
 | `agent-platform-project-workspaces.1` | `agent-platform-project-workspaces.3` |
 
+Keep Beads dependencies aligned with this table.
+
 ## Tests And Verification
 
-- Component or hook tests for active project binding.
-- Manual test: open project A, start chat, switch to project B, confirm context changes.
-- Verify general chat remains project-neutral.
+- Task testing strategy:
+  - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
+  - Focused tests: component/API tests for mode selection, default agent resolution, and Chat
+    remaining project-neutral.
+  - Playwright: choose **Open Chat** and **Open Project** through the UI; assert default agent labels,
+    visible controls, and absence of project tools in Chat.
+  - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
+    before closing the Bead.
+- Component tests for entry-path rendering and mode-specific default agent selection.
+- API/contract tests if session creation carries mode or default-agent metadata.
+- Playwright flow: choose **Open Chat**, verify personal-assistant/default-chat UI and no project
+  tree/branch/Git/terminal controls.
+- Playwright flow: choose **Open Project**, verify project/code UI and coding-agent default state.
 
 ## Definition Of Done
 
-- [ ] Workbench chat has an explicit active project binding.
-- [ ] UI makes active project context visible.
-- [ ] Project switching cannot reuse stale context accidentally.
+- [ ] Users can intentionally choose Project or Chat before entering the main interface.
+- [ ] Project sessions default to the coding agent.
+- [ ] Chat sessions default to the personal assistant.
+- [ ] Project-only code controls are absent or clearly unavailable in Chat.
+- [ ] Chat mode does not silently inherit Project context.
+- [ ] Future orchestration remains an additive architecture concern, not required by this task.
