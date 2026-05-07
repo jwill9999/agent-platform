@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Closed `agent-platform-project-onboarding.1` after PR #150 passed CI/docs/GitGuardian checks, review-thread inspection found no actionable comments, direct Sonar issue search returned 0 unresolved issues, and Sonar agentic file analysis was unavailable because the organization has not enabled Agentic Analysis. Beads Dolt closeout state was pushed; next ready task is `agent-platform-project-onboarding.2`.
+- **Date:** 2026-05-07
 - **Session:** Started the `agent-platform-project-onboarding` epic from updated `main` on `feature/agent-platform-project-onboarding`, claimed `agent-platform-project-onboarding.1`, implemented typed Project onboarding assessment/draft/approval/refresh contracts plus transition tests, verified local gates, synced Beads, and committed the task implementation on `task/agent-platform-project-onboarding.1`. Next step is pushing the task branch, opening the PR into the onboarding feature branch, and monitoring remote checks/review comments before closing the Bead.
 - **Date:** 2026-05-07
 - **Session:** After pushing the onboarding/project-experience planning update to PR #149, all GitHub checks passed but SonarCloud reported two minor duplicate-import findings in `apps/api/src/infrastructure/http/v1/chatRouter.ts`. Consolidated the duplicate `@agent-platform/contracts` type import, verified API lint/typecheck plus docs lint/diff check, and prepared the Sonar cleanup commit for push.
@@ -387,7 +389,8 @@ Verification:
 Completion gate:
 
 - Local fallback gate passed: formatting, lint, docs lint, build, contract typecheck/tests, full unit test suite, and diff whitespace check.
-- Remote completion gate is still pending until the task PR is pushed, opened, checked, and review/Sonar comments are inspected.
+- Remote completion gate passed for PR #150: `verify`, `docker`, `e2e`, `markdownlint`, `lychee`, and GitGuardian passed; GitHub review-thread sweep returned no review threads; direct Sonar issue search returned 0 unresolved issues.
+- Sonar agentic file analysis could not run because the SonarCloud organization has not enabled Agentic Analysis. Sourcery skipped due the weekly diff-character rate limit and left no actionable review threads.
 
 ### Project workspace epic closeout
 
@@ -1048,15 +1051,16 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-project-onboarding.1`
 - **Current base:** `feature/agent-platform-project-onboarding`, created from updated `main` after PR #149 merged.
-- **Current work:** `agent-platform-project-onboarding.1` implementation is committed locally and needs push, PR creation into the feature branch, and remote gate/comment monitoring before Beads closure.
-- **Remote sync:** Beads Dolt state is pushed after the task claim. Code branch is not pushed yet.
+- **Current work:** `agent-platform-project-onboarding.1` is implemented, pushed, PR-gated, and closed in Beads. Prepare `agent-platform-project-onboarding.2` from the `.1` tip.
+- **Remote sync:** Task branch `task/agent-platform-project-onboarding.1` and Beads Dolt state are pushed.
 
 ### Beads
 
 - `agent-platform-project-workspaces` is closed in Beads.
 - `agent-platform-project-workspaces.1` through `.6` are closed.
 - `agent-platform-project-onboarding` is open and refined to treat Project as a generic folder/work context with coding/file-changing behavior as a profile/capability.
-- `agent-platform-project-onboarding.1` is in progress and claimed.
+- `agent-platform-project-onboarding.1` is closed. PR #150 is open and green/non-actionable; it remains unmerged until the end-of-epic integration point.
+- `agent-platform-project-onboarding.2` is ready.
 - `agent-platform-project-experience` is open as a P1 follow-up epic after onboarding, with child tasks `.1` through `.6` covering Project profiles, left explorer navigation, project-chat-first entry, optional IDE handoff, label cleanup/breadcrumbs, and Playwright navigation E2E.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
@@ -1203,10 +1207,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit the `session.md` handoff update on `task/agent-platform-project-onboarding.1`.
-2. Push `task/agent-platform-project-onboarding.1` and open a PR into `feature/agent-platform-project-onboarding`.
-3. Monitor GitHub checks, SonarCloud, GitGuardian, Sourcery/review comments, and review threads; fix and rerun until everything is green/non-actionable.
-4. Close Bead `agent-platform-project-onboarding.1` only after the PR gate and comment sweep pass, then move to `.2` from the chained task tip.
+1. Commit and push the `.1` Beads/session closeout bookkeeping.
+2. Create `task/agent-platform-project-onboarding.2` from the `.1` tip and claim `agent-platform-project-onboarding.2`.
+3. Implement project assessment and gap analysis using the contracts from `.1`.
+4. Repeat the task PR gate before closing `.2`: local gates, PR checks, review-thread sweep, direct Sonar issue query, and fallback gate if Sonar agentic analysis remains unavailable.
 
 ---
 
