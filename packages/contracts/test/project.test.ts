@@ -66,7 +66,7 @@ describe('Project mode and workspace binding contracts', () => {
       '../apps/web',
       'apps/../web',
       'apps//web',
-      'apps\\web',
+      String.raw`apps\web`,
       ' apps/web',
       'apps/web ',
       'apps web',
