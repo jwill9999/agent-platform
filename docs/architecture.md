@@ -128,6 +128,32 @@ Sensor results are emitted as structured observability events, not chat transcri
 
 Coding sensors are selected for coding-profile agents and repository task contexts. Personal-assistant profile sessions show coding gates as disabled or manual-only unless a repository task explicitly needs them. Provider connection remains explicit: unavailable or auth-required providers surface repair actions such as GitHub CLI authentication, SonarQube MCP or IDE plugin setup, CodeQL configuration, and retry discovery.
 
+## Project And Chat Modes
+
+Agent Platform separates **Project** work from general **Chat** work. Project mode is for code and
+repository tasks, defaults to the coding agent profile, and exposes project-scoped file, Git,
+terminal, test, Docker, browser evidence, and sensor tools only when Project policy allows them.
+Chat mode is for general assistant conversations, defaults to the personal-assistant profile, and
+does not expose code or Project tools by default.
+
+A Project is a backend-accessible working tree, not only a browser-selected folder. Project metadata
+must distinguish the Project root, repository root, active branch or worktree identity, optional
+monorepo subproject scope, capability state, onboarding state, default agent profile, and applicable
+instruction files. For agent-facing prompts and tool arguments, `/workspace` is the canonical path
+for the active Project root. General chat workspace storage remains separate from the Project
+working tree.
+
+Project capability has three states: `backend_accessible` means the backend can inspect and run
+eligible commands in the working tree; `readonly` means the backend can inspect but writes and
+destructive commands are blocked; `unavailable` means the backend cannot access the requested
+working tree. Onboarding has four states: `missing`, `in_progress`, `approved`, and `needs_review`.
+Writes require `backend_accessible` capability and `approved` onboarding. Other states may allow
+read-only inspection but block file creation, edits, deletes, commits, and destructive commands.
+
+Instruction precedence is root-first. Root `AGENTS.md` applies to the whole repository. The nearest
+nested `AGENTS.md` may refine the root instructions for an active subproject scope, but it does not
+replace the root safety guidance.
+
 ## Browser Automation Contracts
 
 Browser automation is modeled as a platform-owned tool pack rather than a direct dependency on an MCP browser server. Shared contracts in `packages/contracts` define browser sessions, page state, action requests/results, policy decisions, and bounded evidence artifacts. Playwright is the intended first internal runtime, while MCP/browser providers can be added later as adapters.

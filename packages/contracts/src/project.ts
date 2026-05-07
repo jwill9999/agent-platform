@@ -1,5 +1,37 @@
 import { z } from 'zod';
 
+export const ProjectModeSchema = z.enum(['project', 'chat']);
+export type ProjectMode = z.infer<typeof ProjectModeSchema>;
+
+export const ProjectDefaultAgentProfileSchema = z.enum(['coding', 'personal_assistant']);
+export type ProjectDefaultAgentProfile = z.infer<typeof ProjectDefaultAgentProfileSchema>;
+
+export const ProjectCapabilityStateSchema = z.enum([
+  'backend_accessible',
+  'readonly',
+  'unavailable',
+]);
+export type ProjectCapabilityState = z.infer<typeof ProjectCapabilityStateSchema>;
+
+export const ProjectOnboardingStateSchema = z.enum([
+  'missing',
+  'in_progress',
+  'approved',
+  'needs_review',
+]);
+export type ProjectOnboardingState = z.infer<typeof ProjectOnboardingStateSchema>;
+
+export const ProjectInstructionFileScopeSchema = z.enum(['root', 'nested']);
+export type ProjectInstructionFileScope = z.infer<typeof ProjectInstructionFileScopeSchema>;
+
+const RelativeProjectPathSchema = z
+  .string()
+  .min(1)
+  .max(1000)
+  .refine((value) => !value.startsWith('/') && !value.split('/').includes('..'), {
+    message: 'Path must be project-relative and must not contain parent traversal',
+  });
+
 const ProjectSlugSchema = z
   .string()
   .min(1)
@@ -9,6 +41,45 @@ const ProjectSlugSchema = z
 const ProjectMetadataSchema = z.record(
   z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]),
 );
+
+export const ProjectSubprojectScopeSchema = z.object({
+  path: RelativeProjectPathSchema,
+  packageName: z.string().min(1).max(200).optional(),
+});
+export type ProjectSubprojectScope = z.infer<typeof ProjectSubprojectScopeSchema>;
+
+export const ProjectInstructionFileReferenceSchema = z.object({
+  scope: ProjectInstructionFileScopeSchema,
+  path: RelativeProjectPathSchema,
+  appliesToPath: RelativeProjectPathSchema.optional(),
+  contentHash: z.string().min(1).max(200).optional(),
+  approvedAtMs: z.number().int().nonnegative().optional(),
+});
+export type ProjectInstructionFileReference = z.infer<typeof ProjectInstructionFileReferenceSchema>;
+
+export const ProjectWorkspaceBindingSchema = z.object({
+  projectId: z.string().min(1),
+  displayName: z.string().min(1).max(200),
+  projectRoot: z.literal('/workspace'),
+  repositoryRoot: z.string().min(1).max(1000),
+  activeBranch: z.string().min(1).max(300).optional(),
+  activeWorktreeId: z.string().min(1).max(500).optional(),
+  subprojectScope: ProjectSubprojectScopeSchema.optional(),
+  capabilityState: ProjectCapabilityStateSchema,
+  onboardingState: ProjectOnboardingStateSchema,
+  defaultAgentProfile: ProjectDefaultAgentProfileSchema,
+  instructionFiles: z.array(ProjectInstructionFileReferenceSchema).default([]),
+});
+export type ProjectWorkspaceBinding = z.infer<typeof ProjectWorkspaceBindingSchema>;
+
+export const ProjectAccessPolicySchema = z.object({
+  canInspect: z.boolean(),
+  canWrite: z.boolean(),
+  writeBlockReason: z
+    .enum(['capability_unavailable', 'readonly_capability', 'onboarding_not_approved'])
+    .optional(),
+});
+export type ProjectAccessPolicy = z.infer<typeof ProjectAccessPolicySchema>;
 
 export const ProjectRecordSchema = z.object({
   id: z.string().min(1),
@@ -45,6 +116,45 @@ export const ProjectUpdateBodySchema = z.object({
 export const ProjectQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false),
 });
+
+export function getDefaultAgentProfileForMode(mode: ProjectMode): ProjectDefaultAgentProfile {
+  return mode === 'project' ? 'coding' : 'personal_assistant';
+}
+
+export function getProjectAccessPolicy(input: {
+  capabilityState: ProjectCapabilityState;
+  onboardingState: ProjectOnboardingState;
+}): ProjectAccessPolicy {
+  if (input.capabilityState === 'unavailable') {
+    return {
+      canInspect: false,
+      canWrite: false,
+      writeBlockReason: 'capability_unavailable',
+    };
+  }
+
+  if (input.capabilityState === 'readonly') {
+    return {
+      canInspect: true,
+      canWrite: false,
+      writeBlockReason: 'readonly_capability',
+    };
+  }
+
+  if (input.onboardingState !== 'approved') {
+    return {
+      canInspect: true,
+      canWrite: false,
+      writeBlockReason: 'onboarding_not_approved',
+    };
+  }
+
+  return {
+    canInspect: true,
+    canWrite: true,
+    writeBlockReason: undefined,
+  };
+}
 
 export type ProjectRecord = z.infer<typeof ProjectRecordSchema>;
 export type ProjectCreateBody = z.infer<typeof ProjectCreateBodySchema>;
