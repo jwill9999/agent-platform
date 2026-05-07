@@ -1,9 +1,11 @@
 import { z } from 'zod';
+import { ProjectModeSchema } from './project.js';
 
 /** Persisted chat/session row (API + DB). */
 export const SessionRecordSchema = z.object({
   id: z.string().min(1),
   agentId: z.string().min(1),
+  mode: ProjectModeSchema.default('chat'),
   projectId: z.string().min(1).nullish(),
   title: z.string().nullish(),
   createdAtMs: z.number().int().nonnegative(),
@@ -15,6 +17,7 @@ export type SessionRecord = z.infer<typeof SessionRecordSchema>;
 /** POST /v1/sessions body — id is always system-generated. */
 export const SessionCreateBodySchema = z.object({
   agentId: z.string().min(1),
+  mode: ProjectModeSchema.default('chat'),
   projectId: z.string().min(1).optional(),
 });
 

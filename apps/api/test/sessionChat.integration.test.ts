@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -6,6 +6,7 @@ import {
   closeDatabase,
   createMemory,
   createModelConfig,
+  createProject,
   DEFAULT_AGENT_ID,
   openDatabase,
   parseMasterKeyFromBase64,
@@ -116,6 +117,7 @@ function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
 }
 
 type TestDb = ReturnType<typeof openDatabase>['db'];
+type MockChatApp = Awaited<ReturnType<typeof createSeededApp>>;
 type ChatEvent = {
   type: string;
   approvalRequestId?: string;
@@ -124,6 +126,82 @@ type ChatEvent = {
   code?: string;
   message?: string;
 };
+
+function createChatProject(
+  db: TestDb,
+  options: {
+    name: string;
+    workspaceKey?: string;
+    backendProjectRoot: string;
+    repositoryRoot: string;
+    capabilityState: 'backend_accessible' | 'unavailable';
+    onboardingState?: 'missing' | 'approved' | 'needs_review' | 'in_progress';
+    instructionFiles?: unknown[];
+  },
+) {
+  return createProject(db, {
+    name: options.name,
+    workspaceKey: options.workspaceKey,
+    metadata: {
+      backendProjectRoot: options.backendProjectRoot,
+      repositoryRoot: options.repositoryRoot,
+      projectRoot: '/workspace',
+      capabilityState: options.capabilityState,
+      onboardingState: options.onboardingState ?? 'missing',
+      defaultAgentProfile: 'coding',
+      instructionFiles: options.instructionFiles ?? [],
+    },
+  });
+}
+
+async function createProjectSession(
+  app: Application,
+  db: TestDb,
+  options: Parameters<typeof createChatProject>[1],
+): Promise<string> {
+  const project = createChatProject(db, options);
+  const sessionRes = await request(app)
+    .post('/v1/sessions')
+    .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: project.id })
+    .expect(201);
+  return sessionRes.body.data.id as string;
+}
+
+function mockProjectWrite(id: string, content: string) {
+  mockToolCalls
+    .mockReturnValueOnce([
+      {
+        id,
+        name: 'sys_write_file',
+        args: {
+          path: '/workspace/project-note.txt',
+          content,
+        },
+      },
+    ])
+    .mockReturnValueOnce('Project file written');
+}
+
+function createProjectRoot(dirs: string[]): string {
+  const projectRoot = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-project-chat-root-'));
+  dirs.push(projectRoot);
+  return projectRoot;
+}
+
+async function withMockChatApp(
+  dirs: string[],
+  callback: (ctx: MockChatApp) => Promise<void>,
+): Promise<void> {
+  const envSnap = snapshotChatEnv();
+  const ctx = await createSeededApp(dirs, { mockLlm: true });
+  try {
+    process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+    await callback(ctx);
+  } finally {
+    restoreChatEnv(envSnap);
+    closeDatabase(ctx.sqlite);
+  }
+}
 
 function parseNdjsonEvents(text: string): ChatEvent[] {
   return String(text)
@@ -139,8 +217,15 @@ async function createDefaultSession(app: Application): Promise<string> {
   return sessionRes.body.data.id;
 }
 
-async function createPendingToolApproval(app: Application, sessionId: string) {
-  mockToolCallStream('sys_bash', { command: 'date' });
+async function createPendingToolApproval(
+  app: Application,
+  sessionId: string,
+  toolName = 'sys_bash',
+  args?: Record<string, unknown>,
+) {
+  mockStreamText.mockReset();
+  mockToolCalls.mockReset();
+  mockToolCallStream(toolName, args ?? { command: 'date' });
   const chatRes = await request(app)
     .post('/v1/chat')
     .send({ sessionId, message: 'Run date' })
@@ -438,7 +523,10 @@ describe('POST /v1/chat (session-aware)', () => {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
 
       const sessionId = await createDefaultSession(app);
-      const { approvalRequestId } = await createPendingToolApproval(app, sessionId);
+      const { approvalEvent, approvalRequestId } = await createPendingToolApproval(app, sessionId);
+      const { getApprovalRequest, listMessagesBySession } = await import('@agent-platform/db');
+      expect(approvalEvent?.toolName).toBe('sys_bash');
+      expect(getApprovalRequest(db, approvalRequestId).toolName).toBe('sys_bash');
 
       await request(app)
         .post(`/v1/approval-requests/${approvalRequestId}/approve`)
@@ -454,7 +542,6 @@ describe('POST /v1/chat (session-aware)', () => {
       const events = parseNdjsonEvents(resumeRes.text);
       expect(events.some((event) => event.type === 'tool_result')).toBe(true);
 
-      const { getApprovalRequest, listMessagesBySession } = await import('@agent-platform/db');
       await expectToolExecutionCount(db, sessionId, 'success', 1);
       expect(getApprovalRequest(db, approvalRequestId).resumedAtMs).toEqual(expect.any(Number));
       expect(listMessagesBySession(db, sessionId).map((message) => message.role)).toEqual([
@@ -615,6 +702,115 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
+  it('writes canonical /workspace files inside the bound Project root', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      const sessionId = await createProjectSession(app, db, {
+        name: 'Writable Project',
+        workspaceKey: projectRoot,
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
+      });
+      mockProjectWrite('tc-project-write', 'written in project root');
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Write the project note' })
+        .expect(200);
+      expect(res.text).toContain('tool_result');
+      expect(res.text).toContain('/workspace/project-note.txt');
+      expect(res.text).not.toContain(projectRoot);
+
+      const projectFile = path.join(projectRoot, 'project-note.txt');
+      expect(existsSync(projectFile)).toBe(true);
+      expect(readFileSync(projectFile, 'utf8')).toBe('written in project root');
+    });
+  });
+
+  it('blocks Project writes before AGENTS.md onboarding is approved', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      const sessionId = await createProjectSession(app, db, {
+        name: 'Needs Review Project',
+        workspaceKey: projectRoot,
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'backend_accessible',
+        onboardingState: 'needs_review',
+      });
+      mockProjectWrite('tc-project-write-blocked', 'should not write');
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Write the project note' })
+        .expect(200);
+
+      expect(res.text).not.toContain('tool_result');
+      expect(existsSync(path.join(projectRoot, 'project-note.txt'))).toBe(false);
+    });
+  });
+
+  it('adds root and nearest nested AGENTS.md files to the Project chat prompt', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      mkdirSync(path.join(projectRoot, 'apps', 'web'), { recursive: true });
+      writeFileSync(path.join(projectRoot, 'AGENTS.md'), 'root rule\n');
+      writeFileSync(path.join(projectRoot, 'apps', 'web', 'AGENTS.md'), 'web rule\n');
+      const sessionId = await createProjectSession(app, db, {
+        name: 'Instruction Project',
+        workspaceKey: projectRoot,
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
+        instructionFiles: [
+          { scope: 'root', path: 'AGENTS.md', approvedAtMs: 123 },
+          {
+            scope: 'nested',
+            path: 'apps/web/AGENTS.md',
+            appliesToPath: 'apps/web',
+            approvedAtMs: 123,
+          },
+        ],
+      });
+
+      mockToolCalls.mockReturnValueOnce('Read the instructions');
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Inspect apps/web/page.tsx' })
+        .expect(200);
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; content: string }>;
+      };
+      const systemPrompt = state.messages?.[0]?.content ?? '';
+      expect(systemPrompt).toContain('--- AGENTS.md ---');
+      expect(systemPrompt).toContain('root rule');
+      expect(systemPrompt).toContain('--- apps/web/AGENTS.md ---');
+      expect(systemPrompt).toContain('web rule');
+    });
+  });
+
+  it('rejects canonical /workspace writes when the bound Project is unavailable', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const sessionId = await createProjectSession(app, db, {
+        name: 'Unavailable Project',
+        backendProjectRoot: '/missing/project',
+        repositoryRoot: '/missing/project',
+        capabilityState: 'unavailable',
+      });
+
+      mockProjectWrite('tc-project-write-unavailable', 'should not write');
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Write the project note' })
+        .expect(200);
+
+      expect(res.text).toContain('PROJECT_UNAVAILABLE');
+    });
+  });
+
   it('uses the first saved model config as the platform default when an agent has no override', async () => {
     const envSnap = snapshotChatEnv();
     const previousMasterKey = process.env.SECRETS_MASTER_KEY;
@@ -658,7 +854,6 @@ describe('POST /v1/chat (session-aware)', () => {
       closeDatabase(sqlite);
     }
   });
-
   it('persists inspectable working memory and includes it on later turns', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });

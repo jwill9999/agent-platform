@@ -118,6 +118,13 @@ Docker mounts:
 | `AGENT_WORKSPACE_HOST_PATH` | `/workspace`   | User files: uploads, generated, export |
 | `AGENT_DATA_HOST_PATH`      | `/data`        | App/runtime data such as SQLite        |
 
+Project mode uses `/workspace` as the agent-facing alias for the active backend-accessible Project
+root. In local Docker runs, a Project path such as `/workspace/my-app` must exist under the mounted
+host workspace before it can be opened from the IDE Project panel. A root `AGENTS.md` is required
+before Project writes can be approved; Projects without approved instructions stay read-only for
+inspection and planning. General Chat mode remains separate and does not receive Project/code tools
+by default.
+
 ### Browser Tool Runtime
 
 The governed browser tools use Playwright from the API/harness runtime. The API

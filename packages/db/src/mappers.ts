@@ -161,6 +161,7 @@ export function sessionRowToContract(row: typeof schema.sessions.$inferSelect) {
   return SessionRecordSchema.parse({
     id: row.id,
     agentId: row.agentId,
+    mode: row.mode,
     projectId: row.projectId ?? null,
     title: row.title ?? null,
     createdAtMs: row.createdAtMs,

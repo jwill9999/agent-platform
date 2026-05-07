@@ -90,6 +90,53 @@ function makeTmpDir(): string {
   return dir;
 }
 
+function makeWorkspaceDispatchContext(options: {
+  workspace: string;
+  toolId: string;
+  containerPath?: string;
+  approvedToolCallIds?: string[];
+  canWrite?: boolean;
+}) {
+  const nativeResult: Output = { type: 'tool_result', toolId: options.toolId, data: true };
+  const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
+  const ctx: ToolDispatchContext = {
+    agent: makeAgent({ allowedToolIds: [options.toolId] }),
+    mcpManager: makeMcpManager(),
+    nativeToolExecutor: nativeExecutor,
+    pathJail: new PathJail([
+      {
+        label: 'workspace',
+        hostPath: options.workspace,
+        containerPath: options.containerPath,
+        permission: 'read_write',
+      },
+    ]),
+    approvedToolCallIds: new Set(options.approvedToolCallIds ?? []),
+    projectAccessPolicy:
+      options.canWrite === undefined
+        ? undefined
+        : {
+            canWrite: options.canWrite,
+            writeBlockReason: options.canWrite ? undefined : 'onboarding_not_approved',
+          },
+  };
+  return { nativeExecutor, node: createToolDispatchNode(ctx) };
+}
+
+async function dispatchSingleToolCall(
+  node: ReturnType<typeof createToolDispatchNode>,
+  call: { id: string; name: string; args: Record<string, unknown> },
+) {
+  await node(
+    makeState({
+      llmOutput: {
+        kind: 'tool_calls',
+        calls: [call],
+      },
+    }),
+  );
+}
+
 /** Dispatch a single tool call and assert it produces an error result. */
 const dispatchExpectingError = async (
   ctx: ToolDispatchContext,
@@ -202,30 +249,20 @@ describe('toolDispatchNode', () => {
 
   it('passes workspace-resolved paths to native file tools', async () => {
     const workspace = makeTmpDir();
-    const expectedPath = join(realpathSync(workspace), 'generated', 'report.md');
-    const nativeResult: Output = { type: 'tool_result', toolId: 'sys_file_exists', data: true };
-    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
-    const ctx: ToolDispatchContext = {
-      agent: makeAgent({ allowedToolIds: ['sys_file_exists'] }),
-      mcpManager: makeMcpManager(),
-      nativeToolExecutor: nativeExecutor,
-      pathJail: new PathJail([
-        { label: 'workspace', hostPath: workspace, permission: 'read_write' },
-      ]),
-    };
-    const node = createToolDispatchNode(ctx);
+    const realWorkspace = realpathSync(workspace);
+    const expectedDir = join(realWorkspace, 'generated');
+    const expectedPath = join(expectedDir, 'report.md');
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_file_exists',
+    });
 
     try {
-      await node(
-        makeState({
-          llmOutput: {
-            kind: 'tool_calls',
-            calls: [
-              { id: 'tc-file', name: 'sys_file_exists', args: { path: 'generated/report.md' } },
-            ],
-          },
-        }),
-      );
+      await dispatchSingleToolCall(node, {
+        id: 'tc-file',
+        name: 'sys_file_exists',
+        args: { path: 'generated/report.md' },
+      });
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
@@ -235,37 +272,233 @@ describe('toolDispatchNode', () => {
     });
   });
 
-  it('does not rewrite non-path args that happen to equal a path value', async () => {
+  it('passes canonical /workspace paths as mounted host project paths to native file tools', async () => {
     const workspace = makeTmpDir();
-    const expectedPath = join(realpathSync(workspace), 'notes.txt');
-    const nativeResult: Output = { type: 'tool_result', toolId: 'sys_append_file', data: true };
-    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
-    const ctx: ToolDispatchContext = {
-      agent: makeAgent({ allowedToolIds: ['sys_append_file'] }),
-      mcpManager: makeMcpManager(),
-      nativeToolExecutor: nativeExecutor,
-      pathJail: new PathJail([
-        { label: 'workspace', hostPath: workspace, permission: 'read_write' },
-      ]),
-      approvedToolCallIds: new Set(['tc-append']),
-    };
-    const node = createToolDispatchNode(ctx);
+    const expectedPath = join(realpathSync(workspace), 'generated', 'report.md');
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_write_file',
+      containerPath: '/workspace',
+      approvedToolCallIds: ['tc-write'],
+    });
 
     try {
-      await node(
+      await dispatchSingleToolCall(node, {
+        id: 'tc-write',
+        name: 'sys_write_file',
+        args: { path: '/workspace/generated/report.md', content: 'done' },
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_write_file', {
+      path: expectedPath,
+      content: 'done',
+    });
+  });
+
+  it('blocks project write tools while AGENTS.md onboarding is not approved', async () => {
+    const workspace = makeTmpDir();
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_write_file',
+      containerPath: '/workspace',
+      approvedToolCallIds: ['tc-write-blocked'],
+      canWrite: false,
+    });
+
+    try {
+      const result = await node(
         makeState({
           llmOutput: {
             kind: 'tool_calls',
             calls: [
               {
-                id: 'tc-append',
-                name: 'sys_append_file',
-                args: { path: 'notes.txt', content: 'notes.txt' },
+                id: 'tc-write-blocked',
+                name: 'sys_write_file',
+                args: { path: '/workspace/generated/report.md', content: 'done' },
               },
             ],
           },
         }),
       );
+
+      expect(nativeExecutor).not.toHaveBeenCalled();
+      expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+        error: 'PROJECT_ONBOARDING_REQUIRED',
+        message: expect.stringContaining('AGENTS.md onboarding review is approved'),
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks coding patch tools while AGENTS.md onboarding is not approved', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'coding_apply_patch',
+      data: { ok: true },
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['coding_apply_patch'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvedToolCallIds: new Set(['tc-patch-blocked']),
+      projectAccessPolicy: {
+        canWrite: false,
+        writeBlockReason: 'onboarding_not_approved',
+      },
+    };
+    const node = createToolDispatchNode(ctx);
+    const result = await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [
+            {
+              id: 'tc-patch-blocked',
+              name: 'coding_apply_patch',
+              args: { operations: [] },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+      error: 'PROJECT_ONBOARDING_REQUIRED',
+    });
+  });
+
+  it('allows read-only project inspection before AGENTS.md onboarding is approved', async () => {
+    const workspace = makeTmpDir();
+    const expectedPath = join(realpathSync(workspace), 'generated', 'report.md');
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_file_exists',
+      containerPath: '/workspace',
+      canWrite: false,
+    });
+
+    try {
+      await dispatchSingleToolCall(node, {
+        id: 'tc-read-only',
+        name: 'sys_file_exists',
+        args: { path: '/workspace/generated/report.md' },
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_file_exists', { path: expectedPath });
+  });
+
+  it('passes canonical /workspace paths as mounted host project paths to bash tools', async () => {
+    const workspace = makeTmpDir();
+    const realWorkspace = realpathSync(workspace);
+    const expectedDir = join(realWorkspace, 'generated');
+    const expectedPath = join(expectedDir, 'report.md');
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_bash',
+      containerPath: '/workspace',
+      approvedToolCallIds: ['tc-bash'],
+    });
+
+    try {
+      await dispatchSingleToolCall(node, {
+        id: 'tc-bash',
+        name: 'sys_bash',
+        args: {
+          command: 'mkdir -p /workspace/generated && touch /workspace/generated/report.md',
+        },
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
+      command: `mkdir -p ${expectedDir} && touch ${expectedPath}`,
+    });
+  });
+
+  it('blocks mutating shell commands while AGENTS.md onboarding is not approved', async () => {
+    const workspace = makeTmpDir();
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_bash',
+      containerPath: '/workspace',
+      approvedToolCallIds: ['tc-shell-blocked'],
+      canWrite: false,
+    });
+
+    try {
+      const result = await node(
+        makeState({
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              {
+                id: 'tc-shell-blocked',
+                name: 'sys_bash',
+                args: { command: 'touch /workspace/generated/report.md' },
+              },
+            ],
+          },
+        }),
+      );
+
+      expect(nativeExecutor).not.toHaveBeenCalled();
+      expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+        error: 'PROJECT_ONBOARDING_REQUIRED',
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('allows read-only shell commands while AGENTS.md onboarding is not approved', async () => {
+    const workspace = makeTmpDir();
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_bash',
+      containerPath: '/workspace',
+      approvedToolCallIds: ['tc-shell-read-only'],
+      canWrite: false,
+    });
+
+    try {
+      await dispatchSingleToolCall(node, {
+        id: 'tc-shell-read-only',
+        name: 'sys_bash',
+        args: { command: 'ls /workspace/generated' },
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
+      command: 'ls /workspace/generated',
+    });
+  });
+
+  it('does not rewrite non-path args that happen to equal a path value', async () => {
+    const workspace = makeTmpDir();
+    const expectedPath = join(realpathSync(workspace), 'notes.txt');
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_append_file',
+      approvedToolCallIds: ['tc-append'],
+    });
+
+    try {
+      await dispatchSingleToolCall(node, {
+        id: 'tc-append',
+        name: 'sys_append_file',
+        args: { path: 'notes.txt', content: 'notes.txt' },
+      });
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { Agent, SessionRecord } from '@agent-platform/contracts';
+import type { Agent, ProjectRecord, SessionRecord } from '@agent-platform/contracts';
 import type { UIMessage } from 'ai';
 import {
   FolderOpen,
@@ -31,6 +31,7 @@ import {
   RefreshCw,
   ListCollapse,
   Terminal as TerminalIcon,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,7 +58,7 @@ import {
 } from '@/hooks/use-harness-chat';
 import type { FileNode } from '@/hooks/use-file-system';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
-import { pickDefaultAgent } from '@/lib/default-agent';
+import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { formatFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 import { ApprovalCard } from '@/components/chat/approval-card';
@@ -87,6 +88,53 @@ import {
   type WorkbenchBranchSummary,
 } from '@/lib/code-workbench-branch-summary';
 
+type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
+
+function projectMetadataString(project: ProjectRecord | null, key: string): string | undefined {
+  const value = project?.metadata[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function projectOnboardingState(project: ProjectRecord | null): ProjectOnboardingState {
+  const value = projectMetadataString(project, 'onboardingState');
+  if (
+    value === 'missing' ||
+    value === 'in_progress' ||
+    value === 'approved' ||
+    value === 'needs_review'
+  ) {
+    return value;
+  }
+  return 'missing';
+}
+
+function projectHasRootInstructions(project: ProjectRecord | null): boolean {
+  const files = project?.metadata.instructionFiles;
+  return (
+    Array.isArray(files) &&
+    files.some(
+      (file) =>
+        typeof file === 'object' &&
+        file !== null &&
+        !Array.isArray(file) &&
+        (file as { scope?: unknown }).scope === 'root',
+    )
+  );
+}
+
+function projectOnboardingLabel(state: ProjectOnboardingState): string {
+  switch (state) {
+    case 'approved':
+      return 'Instructions approved';
+    case 'needs_review':
+      return 'Instructions review required';
+    case 'in_progress':
+      return 'Instructions review in progress';
+    case 'missing':
+      return 'Instructions missing';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Small presentational components
 // ---------------------------------------------------------------------------
@@ -104,6 +152,70 @@ function StatusLabel({
     <span data-testid="chat-status-label" className="text-xs text-muted-foreground shrink-0">
       {label}
     </span>
+  );
+}
+
+function ContentActivityBlocks({
+  criticEvents,
+  thinking,
+  toolEvents,
+  approvals,
+  onApprovalDecision,
+  defaultOpenThinking = false,
+  isStreaming = false,
+}: Readonly<{
+  criticEvents?: readonly CriticEvent[];
+  thinking?: string;
+  toolEvents?: readonly ToolTraceEvent[];
+  approvals?: readonly ApprovalCardState[];
+  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
+  defaultOpenThinking?: boolean;
+  isStreaming?: boolean;
+}>) {
+  const hasToolEvents = Boolean(toolEvents?.length);
+
+  return (
+    <>
+      {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
+      {thinking ? <ThinkingBlock content={thinking} defaultOpen={defaultOpenThinking} /> : null}
+      {hasToolEvents ? (
+        <ToolTraceBlock events={toolEvents ?? []} isStreaming={isStreaming} />
+      ) : null}
+      {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
+      {approvals?.map((approval) => (
+        <ApprovalCard
+          key={approval.approvalRequestId}
+          approval={approval}
+          onDecision={onApprovalDecision}
+        />
+      ))}
+    </>
+  );
+}
+
+function getAssistantMarkdownContextFiles(
+  contextFiles: { path: string; name: string }[],
+  activeFile: { path: string; name: string } | null,
+) {
+  if (!activeFile || contextFiles.some((f) => f.path === activeFile.path)) {
+    return [...contextFiles];
+  }
+  return [...contextFiles, { path: activeFile.path, name: activeFile.name }];
+}
+
+function shouldShowEmptyAssistantResponse(input: {
+  messageText: string;
+  thinking?: string;
+  hasToolEvents: boolean;
+  hasApprovals: boolean;
+  criticEvents?: readonly CriticEvent[];
+}) {
+  return (
+    !input.messageText.trim() &&
+    !input.thinking?.trim() &&
+    !input.hasToolEvents &&
+    !input.hasApprovals &&
+    !input.criticEvents?.length
   );
 }
 
@@ -138,59 +250,53 @@ export function AssistantContent({
 }>) {
   const hasToolEvents = Boolean(toolEvents?.length);
   const hasApprovals = Boolean(approvals?.length);
+  const messageText = getMessageText(message);
 
   if (awaiting) {
     return (
       <>
-        {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
-        {thinking ? <ThinkingBlock content={thinking} defaultOpen /> : null}
-        {hasToolEvents ? <ToolTraceBlock events={toolEvents ?? []} isStreaming /> : null}
-        {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
-        {approvals?.map((approval) => (
-          <ApprovalCard
-            key={approval.approvalRequestId}
-            approval={approval}
-            onDecision={onApprovalDecision}
-          />
-        ))}
+        <ContentActivityBlocks
+          criticEvents={criticEvents}
+          thinking={thinking}
+          toolEvents={toolEvents}
+          approvals={approvals}
+          onApprovalDecision={onApprovalDecision}
+          defaultOpenThinking
+          isStreaming
+        />
         <span className="sr-only" aria-busy="true" aria-live="polite">
           Assistant is responding
         </span>
       </>
     );
   }
-  const allFiles =
-    activeFile && !contextFiles.some((f) => f.path === activeFile.path)
-      ? [...contextFiles, { path: activeFile.path, name: activeFile.name }]
-      : [...contextFiles];
+  const allFiles = getAssistantMarkdownContextFiles(contextFiles, activeFile);
   return (
     <>
-      {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
-      {thinking ? <ThinkingBlock content={thinking} /> : null}
-      {hasToolEvents ? <ToolTraceBlock events={toolEvents ?? []} isStreaming={false} /> : null}
-      {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
+      <ContentActivityBlocks
+        criticEvents={criticEvents}
+        thinking={thinking}
+        toolEvents={toolEvents}
+        approvals={approvals}
+        onApprovalDecision={onApprovalDecision}
+      />
       <IDEMarkdown
-        content={getMessageText(message)}
+        content={messageText}
         contextFiles={allFiles}
         onApplyCode={onApplyCode}
         onCreateFile={onCreateFile}
         onShowDiff={onShowDiff}
         getFileReferenceAction={getFileReferenceAction}
       />
-      {approvals?.map((approval) => (
-        <ApprovalCard
-          key={approval.approvalRequestId}
-          approval={approval}
-          onDecision={onApprovalDecision}
-        />
-      ))}
-      {!getMessageText(message).trim() &&
-        !thinking?.trim() &&
-        !hasToolEvents &&
-        !hasApprovals &&
-        (!criticEvents || criticEvents.length === 0) && (
-          <p className="text-xs text-muted-foreground">No assistant response was returned.</p>
-        )}
+      {shouldShowEmptyAssistantResponse({
+        messageText,
+        thinking,
+        hasToolEvents,
+        hasApprovals,
+        criticEvents,
+      }) ? (
+        <p className="text-xs text-muted-foreground">No assistant response was returned.</p>
+      ) : null}
     </>
   );
 }
@@ -381,6 +487,25 @@ function getFolderButtonLabel(
   return 'Open Folder';
 }
 
+function getToggleButtonState(isOpen: boolean, openLabel: string, closedLabel: string) {
+  return {
+    variant: isOpen ? 'secondary' : 'ghost',
+    label: isOpen ? openLabel : closedLabel,
+  } as const;
+}
+
+function getTerminalTitle(canUseProjectTools: boolean, showTerminal: boolean): string {
+  if (!canUseProjectTools) return 'Open a backend project before using the terminal';
+  return showTerminal ? 'Hide terminal' : 'Show terminal';
+}
+
+function getSaveTitle(activeFileIsDirty: boolean, canSaveActiveFile: boolean): string {
+  if (activeFileIsDirty && !canSaveActiveFile) {
+    return 'Approve project instructions before saving changes';
+  }
+  return 'Save file';
+}
+
 function IDEToolbar({
   showExplorer,
   setShowExplorer,
@@ -390,6 +515,7 @@ function IDEToolbar({
   setShowChat,
   activeFilePath,
   activeFileIsDirty,
+  canSaveActiveFile,
   onSave,
   isPathDialogOpen,
   setIsPathDialogOpen,
@@ -402,6 +528,7 @@ function IDEToolbar({
   rootName,
   onRefreshFolder,
   onCloseFolder,
+  canUseProjectTools,
 }: Readonly<{
   showExplorer: boolean;
   setShowExplorer: (v: boolean) => void;
@@ -411,6 +538,7 @@ function IDEToolbar({
   setShowChat: (v: boolean) => void;
   activeFilePath: string | null;
   activeFileIsDirty: boolean;
+  canSaveActiveFile: boolean;
   onSave: () => void;
   isPathDialogOpen: boolean;
   setIsPathDialogOpen: (v: boolean) => void;
@@ -423,30 +551,29 @@ function IDEToolbar({
   rootName: string | null;
   onRefreshFolder: () => void;
   onCloseFolder: () => void;
+  canUseProjectTools: boolean;
 }>) {
-  const explorerVariant = showExplorer ? 'secondary' : 'ghost';
+  const explorerButton = getToggleButtonState(showExplorer, 'Hide', 'Files');
   const explorerTitle = showExplorer ? 'Hide file explorer' : 'Show file explorer';
-  const explorerLabel = showExplorer ? 'Hide' : 'Files';
   const ExplorerIcon = showExplorer ? PanelLeftClose : Folder;
 
-  const terminalVariant = showTerminal ? 'secondary' : 'ghost';
-  const terminalTitle = showTerminal ? 'Hide terminal' : 'Show terminal';
-  const terminalLabel = showTerminal ? 'Hide' : 'Terminal';
+  const terminalButton = getToggleButtonState(showTerminal, 'Hide', 'Terminal');
+  const terminalTitle = getTerminalTitle(canUseProjectTools, showTerminal);
   const TermIcon = showTerminal ? PanelBottomClose : TerminalIcon;
 
-  const chatVariant = showChat ? 'secondary' : 'ghost';
+  const chatButton = getToggleButtonState(showChat, 'Hide', 'AI');
   const chatTitle = showChat ? 'Hide AI assistant' : 'Show AI assistant';
-  const chatLabel = showChat ? 'Hide' : 'AI';
   const ChatIcon = showChat ? PanelRightClose : MessageSquare;
 
   const folderLabel = getFolderButtonLabel(isLoadingFolder, isOpeningFolder, rootName);
   const folderActionDisabled = isLoadingFolder || isOpeningFolder;
+  const saveTitle = getSaveTitle(activeFileIsDirty, canSaveActiveFile);
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
       <div className="flex items-center gap-2">
         <Button
-          variant={explorerVariant}
+          variant={explorerButton.variant}
           size="sm"
           onClick={() => {
             setShowExplorer(!showExplorer);
@@ -455,7 +582,7 @@ function IDEToolbar({
           title={explorerTitle}
         >
           <ExplorerIcon className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{explorerLabel}</span>
+          <span className="hidden sm:inline text-xs">{explorerButton.label}</span>
         </Button>
         <Dialog open={isPathDialogOpen} onOpenChange={setIsPathDialogOpen}>
           <DialogTrigger asChild>
@@ -511,7 +638,8 @@ function IDEToolbar({
           size="sm"
           className="gap-2"
           onClick={onSave}
-          disabled={!activeFileIsDirty}
+          disabled={!canSaveActiveFile}
+          title={saveTitle}
         >
           <Save className="h-4 w-4" />
           Save
@@ -522,19 +650,20 @@ function IDEToolbar({
           {activeFilePath ?? 'No file open'}
         </span>
         <Button
-          variant={terminalVariant}
+          variant={terminalButton.variant}
           size="sm"
           onClick={() => {
             setShowTerminal(!showTerminal);
           }}
           className="gap-2"
           title={terminalTitle}
+          disabled={!canUseProjectTools}
         >
           <TermIcon className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{terminalLabel}</span>
+          <span className="hidden sm:inline text-xs">{terminalButton.label}</span>
         </Button>
         <Button
-          variant={chatVariant}
+          variant={chatButton.variant}
           size="sm"
           onClick={() => {
             setShowChat(!showChat);
@@ -543,7 +672,7 @@ function IDEToolbar({
           title={chatTitle}
         >
           <ChatIcon className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{chatLabel}</span>
+          <span className="hidden sm:inline text-xs">{chatButton.label}</span>
         </Button>
       </div>
     </div>
@@ -1192,6 +1321,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [searchQuery, setSearchQuery] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
+  const [projectPathInput, setProjectPathInput] = useState('/workspace');
+  const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
+  const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
+  const [isOpeningBackendProject, setIsOpeningBackendProject] = useState(false);
+  const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -1208,6 +1342,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [includeActiveFile, setIncludeActiveFile] = useState(true);
   const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
 
+  const workspaceName = activeProject?.name ?? fs.rootName ?? 'No folder open';
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
   const freshContextFiles = useMemo(
     () => getFreshContextFiles(contextFiles, openTabs),
@@ -1216,11 +1351,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const branchSummary = useMemo(
     () =>
       buildWorkbenchBranchSummary({
-        workspaceName: fs.rootName,
+        workspaceName,
         openTabs,
         pendingProposalPath: editProposal?.path,
       }),
-    [editProposal?.path, fs.rootName, openTabs],
+    [editProposal?.path, workspaceName, openTabs],
   );
   const contextDraft = useMemo(
     () =>
@@ -1235,6 +1370,13 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     () => new Set(contextFiles.map((file) => file.path)),
     [contextFiles],
   );
+  const onboardingState = projectOnboardingState(activeProject);
+  const projectWritesApproved = !activeProject || onboardingState === 'approved';
+  const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
+  const canApproveProjectInstructions =
+    Boolean(activeProject) &&
+    onboardingState !== 'approved' &&
+    projectHasRootInstructions(activeProject);
 
   const {
     messages,
@@ -1255,7 +1397,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         const list = await apiGet<Agent[]>(apiPath('agents'));
         const next = list ?? [];
         setAgents(next);
-        const def = pickDefaultAgent(next);
+        const def = pickDefaultAgentForMode(next, 'project');
         if (def) {
           setSelectedAgentId((prev) => prev ?? def.id);
         }
@@ -1266,11 +1408,13 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, []);
 
   useEffect(() => {
-    if (!selectedAgentId) return;
+    if (!selectedAgentId || !activeProject?.id) return;
     void (async () => {
       try {
         const session = await apiPost<SessionRecord>(apiPath('sessions'), {
           agentId: selectedAgentId,
+          mode: 'project',
+          projectId: activeProject.id,
         });
         if (session?.id) {
           setSessionId(session.id);
@@ -1283,7 +1427,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         toast.error(e instanceof ApiRequestError ? e.message : 'Failed to create session');
       }
     })();
-  }, [selectedAgentId]);
+  }, [activeProject?.id, selectedAgentId]);
 
   useEffect(() => {
     if (harnessError) {
@@ -1293,6 +1437,68 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, [harnessError, setHarnessError]);
 
   const isLoading = status === 'streaming';
+
+  const clearProjectContext = useCallback(() => {
+    setOpenTabs([]);
+    setActiveTab(null);
+    setContextFiles([]);
+    setEditProposal(null);
+    setChatInput('');
+    setShowTerminal(false);
+    fs.closeDirectory();
+  }, [fs]);
+
+  const handleOpenBackendProject = useCallback(async () => {
+    const path = projectPathInput.trim();
+    if (!path) return;
+
+    setIsOpeningBackendProject(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(apiPath('projects', 'open'), { path });
+      if (!project) {
+        throw new ApiRequestError('Failed to open backend project', 500);
+      }
+      clearProjectContext();
+      setActiveProject(project);
+      setSessionId(null);
+      toast.success(`Opened ${project.name}`);
+    } catch (error) {
+      setActiveProject(null);
+      setSessionId(null);
+      clearProjectContext();
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : 'Backend cannot inspect that project path';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsOpeningBackendProject(false);
+    }
+  }, [clearProjectContext, projectPathInput]);
+
+  const handleApproveProjectInstructions = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsApprovingProjectInstructions(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'approve'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to approve project instructions', 500);
+      setActiveProject(project);
+      toast.success('Project instructions approved');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to approve project instructions';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsApprovingProjectInstructions(false);
+    }
+  }, [activeProject?.id]);
 
   // --- File operations ---
 
@@ -1362,6 +1568,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
   const handleSave = useCallback(async () => {
     if (!activeTab || !activeFile) return;
+    if (!projectWritesApproved) {
+      toast.error('Approve project instructions before saving changes');
+      return;
+    }
     // Write to filesystem if handle is available
     if (activeFile.handle) {
       const node: FileNode = {
@@ -1386,7 +1596,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setOpenTabs((prev) =>
       prev.map((tab) => (tab.path === activeTab ? { ...tab, isDirty: false } : tab)),
     );
-  }, [activeTab, activeFile, fs]);
+  }, [activeTab, activeFile, fs, projectWritesApproved]);
 
   // --- Context management ---
 
@@ -1639,6 +1849,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         setShowChat={setShowChat}
         activeFilePath={activeFile?.path ?? null}
         activeFileIsDirty={activeFile?.isDirty ?? false}
+        canSaveActiveFile={canSaveActiveFile}
         onSave={handleSave}
         isPathDialogOpen={isPathDialogOpen}
         setIsPathDialogOpen={setIsPathDialogOpen}
@@ -1651,6 +1862,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         rootName={fs.rootName}
         onRefreshFolder={fs.refresh}
         onCloseFolder={fs.closeDirectory}
+        canUseProjectTools={Boolean(activeProject)}
       />
 
       <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -1697,6 +1909,100 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                       </span>
                     )}
                   </div>
+                </div>
+                <div
+                  className="mx-2 mt-2 rounded-md border border-border bg-background px-3 py-2"
+                  aria-label="Project binding"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Project
+                    </span>
+                    {activeProject ? (
+                      <span className="text-xs text-emerald-600">Backend accessible</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Unavailable</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      aria-label="Backend project path"
+                      value={projectPathInput}
+                      onChange={(event) => {
+                        setProjectPathInput(event.target.value);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          handleOpenBackendProject().catch(() => {});
+                        }
+                      }}
+                      className="h-8 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        handleOpenBackendProject().catch(() => {});
+                      }}
+                      disabled={isOpeningBackendProject}
+                    >
+                      {isOpeningBackendProject ? 'Opening...' : 'Open'}
+                    </Button>
+                  </div>
+                  {activeProject && (
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      <div className="truncate text-foreground">{activeProject.name}</div>
+                      <div className="truncate">
+                        Root: {String(activeProject.metadata.backendProjectRoot ?? '')}
+                      </div>
+                      <div className="truncate">
+                        Repo: {String(activeProject.metadata.repositoryRoot ?? '')}
+                      </div>
+                      {activeProject.metadata.activeBranch && (
+                        <div className="truncate">
+                          Branch: {String(activeProject.metadata.activeBranch)}
+                        </div>
+                      )}
+                      <div
+                        className={cn(
+                          'mt-2 flex items-start gap-2 rounded-md border px-2 py-2',
+                          onboardingState === 'approved'
+                            ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700'
+                            : 'border-amber-500/35 bg-amber-500/10 text-foreground',
+                        )}
+                      >
+                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium">
+                            {projectOnboardingLabel(onboardingState)}
+                          </div>
+                          <div className="mt-1 leading-snug text-muted-foreground">
+                            {onboardingState === 'approved'
+                              ? 'Code edits and write tools are available when allowed by policy.'
+                              : 'Initial project instructions are required before code edits, commits, installs, migrations, or destructive commands. Read-only inspection and planning remain available.'}
+                          </div>
+                          {canApproveProjectInstructions && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="mt-2 h-7"
+                              onClick={() => {
+                                handleApproveProjectInstructions().catch(() => {});
+                              }}
+                              disabled={isApprovingProjectInstructions}
+                            >
+                              {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {projectOpenError && (
+                    <p className="mt-2 text-xs text-destructive">{projectOpenError}</p>
+                  )}
                 </div>
                 {fs.needsFolderReconnect && (
                   <div className="mx-2 mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
@@ -1805,7 +2111,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
               <>
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={30} minSize={15} maxSize={60}>
-                  <Terminal explorerFolderOpen={fs.isDirectoryOpen} />
+                  <Terminal sessionId={sessionId} explorerFolderOpen={fs.isDirectoryOpen} />
                 </ResizablePanel>
               </>
             )}
@@ -1828,7 +2134,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 activeFile={activeFile}
                 includeActiveFile={includeActiveFile}
                 pinnedPaths={pinnedContextPaths}
-                workspaceName={fs.rootName ?? 'No folder open'}
+                workspaceName={workspaceName}
                 onToggleIncludeActiveFile={handleToggleIncludeActiveFile}
                 onAddToContext={handleAddToContext}
                 onRemoveFromContext={handleRemoveFromContext}

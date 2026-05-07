@@ -193,6 +193,7 @@ export const sessions = sqliteTable('sessions', {
   agentId: text('agent_id')
     .notNull()
     .references(() => agents.id, { onDelete: 'cascade' }),
+  mode: text('mode').notNull().default('chat'),
   projectId: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
   title: text('title'),
   createdAtMs: integer('created_at_ms', { mode: 'number' }).notNull(),

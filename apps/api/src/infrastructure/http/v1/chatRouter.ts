@@ -30,6 +30,7 @@ import type {
   ApprovalRequest,
   ContextWindow,
   MessageRecord,
+  Output,
   PromptMemoryBundle,
   SensorAgentProfile,
   WorkingMemoryToolSummary,
@@ -38,6 +39,7 @@ import {
   compactText,
   DEFAULT_CONTEXT_WINDOW,
   parseStructuredToolError,
+  type ProjectAccessPolicy,
   SessionResumeBodySchema,
 } from '@agent-platform/contracts';
 import {
@@ -76,10 +78,17 @@ import type { RegisteredPlugin } from '@agent-platform/plugin-session';
 import type { Request, Response, Router } from 'express';
 import { Router as createRouter } from 'express';
 import { randomUUID } from 'node:crypto';
+import { isAbsolute, relative, sep } from 'node:path';
 import { z } from 'zod';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
+import { resolveSessionWorkspace } from '../../projects/projectWorkspaceResolver.js';
+import type { ProjectWorkspaceResolution } from '../../projects/projectWorkspaceResolver.js';
+import {
+  buildProjectInstructionPrompt,
+  parseProjectInstructionFileReferences,
+} from '../../projects/projectInstructions.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
@@ -671,6 +680,64 @@ function resolveSessionProjectPath(db: DrizzleDb, sessionId: string): string | u
   return workingMemory?.activeProject;
 }
 
+function resolveRuntimeWorkspace(
+  db: DrizzleDb,
+  sessionId: string,
+): ProjectWorkspaceResolution | undefined {
+  const session = getSession(db, sessionId);
+  if (!session?.projectId) return undefined;
+  return resolveSessionWorkspace(db, sessionId);
+}
+
+function unavailableProjectToolExecutor(
+  resolution: Extract<ProjectWorkspaceResolution, { ok: false }>,
+): NativeToolExecutor {
+  return async (): Promise<Output> => ({
+    type: 'error',
+    code: resolution.code,
+    message: resolution.message,
+  });
+}
+
+function replaceWorkspacePathFragments(value: string, workspaceRoot: string): string {
+  const direct = value.split(workspaceRoot).join('/workspace');
+  if (sep === '/') return direct;
+  return direct.split(workspaceRoot.split(sep).join('/')).join('/workspace');
+}
+
+function mapProjectWorkspacePaths(value: unknown, workspaceRoot: string): unknown {
+  if (typeof value === 'string') {
+    const rel = relative(workspaceRoot, value);
+    if (rel === '') return '/workspace';
+    if (!rel.startsWith('..') && !isAbsolute(rel)) {
+      return `/workspace/${rel.split(sep).join('/')}`;
+    }
+    return replaceWorkspacePathFragments(value, workspaceRoot);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => mapProjectWorkspacePaths(entry, workspaceRoot));
+  }
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      mapProjectWorkspacePaths(entry, workspaceRoot),
+    ]),
+  );
+}
+
+function projectWorkspaceOutputExecutor(
+  executor: NativeToolExecutor,
+  workspaceResolution: ProjectWorkspaceResolution | undefined,
+): NativeToolExecutor {
+  if (!workspaceResolution?.ok) return executor;
+  return async (toolId, args) =>
+    mapProjectWorkspacePaths(
+      await executor(toolId, args),
+      workspaceResolution.workspaceRoot,
+    ) as Output;
+}
+
 function createRuntimeNativeToolExecutor({
   db,
   agentCtx,
@@ -684,27 +751,40 @@ function createRuntimeNativeToolExecutor({
   sessionId: string;
   options: ChatRouterOptions;
 }): NativeToolExecutor {
-  const defaultRepoPath = resolveSessionProjectPath(db, sessionId);
+  const workspaceResolution = resolveRuntimeWorkspace(db, sessionId);
+  if (workspaceResolution && !workspaceResolution.ok) {
+    return unavailableProjectToolExecutor(workspaceResolution);
+  }
+  const defaultRepoPath = workspaceResolution?.ok
+    ? workspaceResolution.defaultRepoPath
+    : resolveSessionProjectPath(db, sessionId);
+  const workspaceRoot = workspaceResolution?.ok ? workspaceResolution.workspaceRoot : undefined;
   const factoryExecutor = options.systemToolExecutorFactory?.({
     sessionId,
     runId,
     agentId: agentCtx.agent.id,
     defaultRepoPath,
   });
-  if (factoryExecutor) return factoryExecutor;
+  if (factoryExecutor) {
+    return projectWorkspaceOutputExecutor(factoryExecutor, workspaceResolution);
+  }
 
-  return createSystemToolExecutor(
-    options.observabilityStore
-      ? {
-          observability: {
-            store: options.observabilityStore,
-            sessionId,
-            traceId: runId,
-          },
-          memory: { db, sessionId, agentId: agentCtx.agent.id },
-          defaultRepoPath,
-        }
-      : { memory: { db, sessionId, agentId: agentCtx.agent.id }, defaultRepoPath },
+  return projectWorkspaceOutputExecutor(
+    createSystemToolExecutor(
+      options.observabilityStore
+        ? {
+            observability: {
+              store: options.observabilityStore,
+              sessionId,
+              traceId: runId,
+            },
+            memory: { db, sessionId, agentId: agentCtx.agent.id },
+            defaultRepoPath,
+            workspaceRoot,
+          }
+        : { memory: { db, sessionId, agentId: agentCtx.agent.id }, defaultRepoPath, workspaceRoot },
+    ),
+    workspaceResolution,
   );
 }
 
@@ -730,6 +810,11 @@ function createRuntimeToolDispatchNode({
   const resolvedNativeToolExecutor =
     nativeToolExecutor ??
     createRuntimeNativeToolExecutor({ db, agentCtx, runId, sessionId, options });
+  const workspaceResolution = resolveRuntimeWorkspace(db, sessionId);
+  const mounts = workspaceResolution?.ok ? workspaceResolution.mounts : DEFAULT_MOUNTS;
+  const projectAccessPolicy = workspaceResolution?.ok
+    ? workspaceResolution.accessPolicy
+    : undefined;
 
   return createToolDispatchNode({
     agent: agentCtx.agent,
@@ -738,7 +823,7 @@ function createRuntimeToolDispatchNode({
     nativeToolExecutor: resolvedNativeToolExecutor,
     emitter,
     dispatcher: agentCtx.pluginDispatcher,
-    pathJail: new PathJail(DEFAULT_MOUNTS),
+    pathJail: new PathJail(mounts),
     auditLog: createAuditLog(db),
     approvalRequests: {
       create: (request) =>
@@ -749,7 +834,16 @@ function createRuntimeToolDispatchNode({
     },
     approvedToolCallIds,
     skillResolver: (id: string) => getSkill(db, id),
+    projectAccessPolicy,
   });
+}
+
+function projectAccessPolicyForSession(
+  db: DrizzleDb,
+  sessionId: string,
+): ProjectAccessPolicy | undefined {
+  const resolution = resolveRuntimeWorkspace(db, sessionId);
+  return resolution?.ok ? resolution.accessPolicy : undefined;
 }
 
 function buildRuntimeGraph(
@@ -938,7 +1032,17 @@ export async function handleSessionResume(
     ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
     const emitter: OutputEmitter = createNdjsonEmitter(res);
 
-    const messages = buildResumeMessages(db, sessionId, agentCtx.systemPrompt, toolCall);
+    const messages = buildResumeMessages(
+      db,
+      sessionId,
+      withProjectInstructionPrompt(
+        db,
+        sessionId,
+        agentCtx.systemPrompt,
+        JSON.stringify(toolCall.args),
+      ),
+      toolCall,
+    );
     const initialCount = messages.length;
 
     let resumeMessages: ChatMessage[];
@@ -971,6 +1075,7 @@ export async function handleSessionResume(
       const dispatchState = buildInitialState(runId, sessionId, messages, agentCtx, modelCfg, {
         dropped: 0,
         contextTokens: 0,
+        projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
       });
       dispatchState.llmOutput = { kind: 'tool_calls', calls: [toolCall] };
       const dispatchResult = await dispatchNode(dispatchState, {
@@ -995,7 +1100,11 @@ export async function handleSessionResume(
       [...messages, ...resumeMessages],
       agentCtx,
       modelCfg,
-      { dropped: 0, contextTokens: 0 },
+      {
+        dropped: 0,
+        contextTokens: 0,
+        projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
+      },
     );
 
     const finalState: { messages?: ChatMessage[] } = await graph.invoke(resumeState, {
@@ -1094,6 +1203,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           dropped,
           contextTokens,
           memoryBundle,
+          projectAccessPolicy: projectAccessPolicyForSession(db, sessionId),
         });
 
         const finalState: { messages?: ChatMessage[] } = await graph.invoke(initialState, {
@@ -1207,7 +1317,12 @@ function buildConversationMessages(
     const userMsg: ChatMessage = { role: 'user' as const, content: newMessage };
     const counter = createApproximateCounter();
     const effectiveSystemPrompt = withPromptMemoryBundle(
-      withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary),
+      withProjectInstructionPrompt(
+        tx,
+        sessionId,
+        withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary),
+        newMessage,
+      ),
       memoryBundle,
     );
 
@@ -1218,18 +1333,67 @@ function buildConversationMessages(
   });
 }
 
+function projectScopePath(message: string): string | undefined {
+  const file = extractImportantFiles(message).at(0);
+  if (!file) return undefined;
+  return file.startsWith('/workspace/') ? file.slice('/workspace/'.length) : file;
+}
+
+function withProjectInstructionPrompt(
+  db: DrizzleDb,
+  sessionId: string,
+  systemPrompt: string,
+  message: string,
+): string {
+  const session = getSession(db, sessionId);
+  if (!session?.projectId) return systemPrompt;
+  const project = findProject(db, session.projectId);
+  const backendProjectRoot = project?.metadata['backendProjectRoot'];
+  if (!project || typeof backendProjectRoot !== 'string') return systemPrompt;
+  const prompt = buildProjectInstructionPrompt(
+    backendProjectRoot,
+    parseProjectInstructionFileReferences(project.metadata),
+    projectScopePath(message),
+  );
+  return prompt ? `${systemPrompt}\n\n${prompt}` : systemPrompt;
+}
+
+const ONBOARDING_BLOCKED_TOOL_IDS = new Set([
+  'sys_bash',
+  'sys_write_file',
+  'sys_append_file',
+  'sys_copy_file',
+  'sys_create_directory',
+  'sys_download_file',
+  'coding_apply_patch',
+]);
+
+function visibleToolsForProjectPolicy(
+  tools: readonly AgentContext['tools'][number][],
+  projectAccessPolicy?: ProjectAccessPolicy,
+) {
+  if (projectAccessPolicy?.canWrite !== false) return tools;
+  return tools.filter((tool) => !ONBOARDING_BLOCKED_TOOL_IDS.has(tool.id));
+}
+
 function buildInitialState(
   runId: string,
   sessionId: string,
   messages: ChatMessage[],
   agentCtx: AgentContext,
   modelConfig: { provider: string; model: string; apiKey?: string },
-  contextInfo: { dropped: number; contextTokens: number; memoryBundle?: PromptMemoryBundle },
+  contextInfo: {
+    dropped: number;
+    contextTokens: number;
+    memoryBundle?: PromptMemoryBundle;
+    projectAccessPolicy?: ProjectAccessPolicy;
+  },
 ): HarnessStateType {
   const strategy = agentCtx.agent.contextWindow?.strategy ?? 'truncate';
   const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
   const memoryBundle = contextInfo.memoryBundle;
   const sensorProfile = inferSensorAgentProfile(agentCtx);
+  const tools = [...visibleToolsForProjectPolicy(agentCtx.tools, contextInfo.projectAccessPolicy)];
   return {
     trace: [
       {
@@ -1257,7 +1421,7 @@ function buildInitialState(
     halted: false,
     mode: 'react' as const,
     messages,
-    toolDefinitions: contractToolsToDefinitions(agentCtx.tools),
+    toolDefinitions: contractToolsToDefinitions(tools),
     llmOutput: null,
     modelConfig,
     stepCount: 0,

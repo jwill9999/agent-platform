@@ -69,10 +69,17 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Project and Chat modes are named, typed, and documented.
-- [ ] Project metadata can represent a backend-accessible monorepo or single-app repo.
-- [ ] Capability and onboarding states are named and testable.
-- [ ] The write gate is expressible as code: writes require an eligible capability and approved
+The implementation checklist below is necessary but not sufficient to close this ticket in Beads.
+The ticket remains open until the PR feedback loop is complete: the task branch is pushed, a PR is
+opened into `feature/agent-platform-project-workspaces`, GitHub Actions/pipelines are green,
+SonarQube or the documented fallback feedback gate is resolved, and any review-required feedback is
+handled. If any remote gate fails, iterate on this same task branch until it passes before closing
+the Bead.
+
+- [x] Project and Chat modes are named, typed, and documented.
+- [x] Project metadata can represent a backend-accessible monorepo or single-app repo.
+- [x] Capability and onboarding states are named and testable.
+- [x] The write gate is expressible as code: writes require an eligible capability and approved
       onboarding state.
-- [ ] Instruction-file precedence is defined for root and nested `AGENTS.md`.
-- [ ] Follow-on tasks can depend on the model without guessing semantics.
+- [x] Instruction-file precedence is defined for root and nested `AGENTS.md`.
+- [x] Follow-on tasks can depend on the model without guessing semantics.
