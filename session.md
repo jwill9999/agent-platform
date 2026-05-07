@@ -10,6 +10,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Date:** 2026-05-07
 - **Session:** Implemented and locally closed `agent-platform-project-workspaces.1` on `task/agent-platform-project-workspaces.1`: added shared Project/Chat mode contracts, Project workspace binding metadata, capability/onboarding states, write-eligibility helpers, focused contract tests, and architecture documentation. Local build, format, lint, and unit gates passed; broad docs lint remains blocked by ignored `.agent-platform/workspaces/...` Markdown files.
 - **Date:** 2026-05-07
+- **Session:** Opened PR #143 for `agent-platform-project-workspaces.1`, kept the Bead open until remote gates pass, fixed Sourcery review feedback by tightening project-relative path validation and making access policy handling exhaustive, and pushed the review-fix commit for CI rerun.
+- **Date:** 2026-05-07
 - **Session:** Final planning pass added explicit per-task testing strategies to every Project workspace and Project onboarding child spec, including mandatory local gates, focused tests, Playwright UI actions/assertions where applicable, CI/GitHub monitoring, and no-close/no-merge until all gates are green.
 - **Date:** 2026-05-07
 - **Session:** Clarified the definition of done for Project workspace/onboarding work: pushed code is not done by itself. A task is done only when implementation is complete, local build/format/lint/unit and relevant E2E/Playwright checks pass, GitHub Actions/CI pipelines pass, and any review-required feedback is resolved. Failed CI means the task remains open and must be iterated until green.
@@ -346,6 +348,10 @@ Branch state: `task/agent-platform-project-workspaces.1` contains the first Proj
 - Documented Project vs Chat semantics, `/workspace`, capability states, onboarding states, and instruction precedence in `docs/architecture.md`.
 - Marked the task spec checklist complete in `docs/tasks/agent-platform-project-workspaces.1.md`.
 - Root cause for the initial full `pnpm test` failure was sandbox denial of local TCP bind (`listen EPERM 127.0.0.1`) in browser integration setup; rerunning the suite with approved local server binding passed.
+- Opened PR #143 from `task/agent-platform-project-workspaces.1` to `feature/agent-platform-project-workspaces`.
+- Initial remote checks passed: verify, docker, e2e, markdownlint, lychee, GitGuardian, SonarCloud Code Analysis, and Sourcery review.
+- Sourcery still left two actionable code review threads. Fixed them by tightening project-relative path validation, adding a shared access-policy block reason schema, and making access policy logic exhaustive over capability/onboarding states.
+- Pushed review-fix commit `98aeefb` for CI and review rerun.
 
 Verification:
 
@@ -359,6 +365,11 @@ Verification:
 - `pnpm test` with escalation for browser integration local fixture servers
 - `pnpm exec markdownlint-cli2 docs/architecture.md`
 - `pnpm docs:lint` failed only on ignored generated `.agent-platform/workspaces/default/...` Markdown files, not touched tracked docs.
+- `pnpm --filter @agent-platform/contracts run test -- test/project.test.ts` after review fixes
+- `pnpm --filter @agent-platform/contracts run typecheck` after review fixes
+- `pnpm --filter @agent-platform/contracts run lint` after review fixes
+- `pnpm format:check` after review fixes
+- pre-push affected-package `build`, `typecheck`, and `test`
 
 Completion gate:
 
@@ -962,13 +973,13 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-project-workspaces.1`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** `agent-platform-project-workspaces.1` implementation and handoff are committed locally; the erroneous Beads closeout commit was reverted and the Bead is open because remote PR/CI/Sonar/review gates have not run.
+- **Current work:** `agent-platform-project-workspaces.1` implementation and review fixes are pushed to PR #143; the erroneous Beads closeout commit was reverted and the Bead remains open until the rerun of remote CI/Sonar/Sourcery/review gates is green.
 - **Remote sync:** pending push; sandbox DNS/auth previously blocked Beads Dolt auto-push.
 
 ### Beads
 
 - `agent-platform-project-workspaces` is in progress.
-- `agent-platform-project-workspaces.1` is open locally. Local implementation and local gates passed, but the ticket is not done until the task PR is pushed and GitHub Actions/CI, SonarQube or approved fallback feedback, and review feedback are green/resolved.
+- `agent-platform-project-workspaces.1` is open. PR #143 is open; initial remote gates passed, then review fixes were pushed and rerun status must be checked before closing.
 - `agent-platform-project-workspaces.2` is the next child task after `.1` closes: Add Project vs Chat entry paths and default agents.
 - `agent-platform-project-workspaces.3` through `.6` are open and linearly blocked behind earlier tasks.
 - `agent-platform-code-workbench.6` is closed.
@@ -1005,6 +1016,12 @@ Quality gates passed:
   - `pnpm lint`
   - `pnpm test` with escalation for browser integration local fixture servers
   - `pnpm exec markdownlint-cli2 docs/architecture.md`
+- Latest review-fix gates passed:
+  - `pnpm --filter @agent-platform/contracts run test -- test/project.test.ts`
+  - `pnpm --filter @agent-platform/contracts run typecheck`
+  - `pnpm --filter @agent-platform/contracts run lint`
+  - `pnpm format:check`
+  - pre-push affected-package `build`, `typecheck`, and `test`
 - `pnpm docs:lint` still fails on ignored local workspace Markdown under `.agent-platform/workspaces/default/...`; touched tracked docs pass markdownlint directly.
 - Latest full-page browser screenshot handling gates passed:
   - `pnpm --filter @agent-platform/web run typecheck`
@@ -1067,9 +1084,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Keep `agent-platform-project-workspaces.1` open; push `task/agent-platform-project-workspaces.1` and sync Beads/Dolt when network/auth allows.
-2. Open PR `task/agent-platform-project-workspaces.1` -> `feature/agent-platform-project-workspaces` and monitor CI/reviews until green.
-3. After `.1` merges, claim `agent-platform-project-workspaces.2` for Project vs Chat entry paths and default agent selection.
+1. Keep `agent-platform-project-workspaces.1` open until PR #143 rerun checks and review threads are green/resolved.
+2. If PR #143 rerun fails, inspect logs/comments, fix on `task/agent-platform-project-workspaces.1`, push, and repeat.
+3. After PR #143 is green and merged, close `.1` and claim `agent-platform-project-workspaces.2` for Project vs Chat entry paths and default agent selection.
 4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
 5. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
 
