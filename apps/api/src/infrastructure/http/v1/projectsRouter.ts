@@ -5,10 +5,16 @@ import {
   ProjectOnboardingAnswerBodySchema,
   ProjectOnboardingApprovalDecisionSchema,
   ProjectOnboardingAssessmentSchema,
+  ProjectOnboardingRefreshResultSchema,
   ProjectOnboardingReviewBodySchema,
   ProjectOnboardingStateSchema,
   ProjectQuerySchema,
+  ProjectInstructionUpdateCandidateBodySchema,
+  ProjectInstructionUpdateCandidateSchema,
+  ProjectInstructionUpdateDecisionBodySchema,
+  ProjectInstructionUpdateProposalSchema,
   type ProjectOnboardingAssessment,
+  type ProjectInstructionUpdateCandidate,
   type ProjectInstructionFileReference,
   type ProjectRecord,
   ProjectUpdateBodySchema,
@@ -72,6 +78,7 @@ type BackendProjectMetadata = {
   onboardingAssessment?: ReturnType<typeof assessProjectOnboarding>['assessment'];
   onboardingDraft?: ReturnType<typeof parseStoredOnboardingDraft>;
   onboardingDialogue?: ReturnType<typeof parseStoredOnboardingDialogue>;
+  instructionUpdateCandidates?: ProjectInstructionUpdateCandidate[];
 };
 
 const GIT_BINARY = '/usr/bin/git';
@@ -147,6 +154,33 @@ function withAutoApprovalMetadata(db: DrizzleDb, project: ProjectRecord): Projec
       }),
     },
   });
+}
+
+function parseInstructionUpdateCandidates(
+  metadata: Record<string, unknown>,
+): ProjectInstructionUpdateCandidate[] {
+  const parsed = ProjectInstructionUpdateCandidateSchema.array().safeParse(
+    metadata['instructionUpdateCandidates'],
+  );
+  return parsed.success ? parsed.data : [];
+}
+
+function instructionUpdateMarkdown(candidate: ProjectInstructionUpdateCandidate): string {
+  const body = candidate.proposedMarkdown?.trim() || `- ${candidate.summary.trim()}`;
+  return body.endsWith('\n') ? body : `${body}\n`;
+}
+
+function appendInstructionUpdate(
+  fileContent: string,
+  candidate: ProjectInstructionUpdateCandidate,
+) {
+  const update = instructionUpdateMarkdown(candidate);
+  const trimmed = fileContent.trimEnd();
+  if (!trimmed) return `${update}`;
+  if (trimmed.includes(update.trim())) return `${trimmed}\n`;
+  const heading = '## Durable Project Learnings';
+  if (trimmed.includes(heading)) return `${trimmed}\n${update}`;
+  return `${trimmed}\n\n${heading}\n\n${update}`;
 }
 
 function discoverBackendProjectMetadata(
@@ -415,6 +449,178 @@ function assessProjectForOnboarding(db: DrizzleDb, id: string): ProjectRecord {
   return withAutoApprovalMetadata(db, updated);
 }
 
+function refreshProjectOnboarding(db: DrizzleDb, id: string): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const previousState = metadataOnboardingState(project.metadata) ?? 'missing';
+  const previousAssessment = ProjectOnboardingAssessmentSchema.safeParse(
+    project.metadata['onboardingAssessment'],
+  );
+  const refreshed = assessProjectForOnboarding(db, id);
+  const nextAssessment = ProjectOnboardingAssessmentSchema.parse(
+    refreshed.metadata['onboardingAssessment'],
+  );
+  const nextState = metadataOnboardingState(refreshed.metadata) ?? 'missing';
+  const previousAssessmentData = previousAssessment.success ? previousAssessment.data : undefined;
+  const previousProfile = previousAssessmentData?.profile;
+  const preserveProfile =
+    previousProfile &&
+    previousProfile !== 'coding' &&
+    previousProfile !== 'unknown' &&
+    nextAssessment.profile === 'coding';
+  const assessment = preserveProfile
+    ? ProjectOnboardingAssessmentSchema.parse({
+        ...nextAssessment,
+        profile: previousProfile,
+        display: {
+          ...nextAssessment.display,
+          profileLabel: previousAssessmentData?.display.profileLabel,
+        },
+        summary: `${nextAssessment.summary} Previous non-code or mixed Project framing is preserved until the user confirms a change.`,
+      })
+    : nextAssessment;
+  const materialDrift = previousState === 'approved' && nextState === 'needs_review';
+  let updateStatus: 'no_change' | 'proposed_update' | 'material_drift' = 'no_change';
+  if (materialDrift) {
+    updateStatus = 'material_drift';
+  } else if (assessment.recommendedInstructionUpdates.length > 0) {
+    updateStatus = 'proposed_update';
+  }
+  const result = ProjectOnboardingRefreshResultSchema.parse({
+    previousState,
+    nextState,
+    updateStatus,
+    materialDrift,
+    assessment,
+    refreshedAtMs: assessment.assessedAtMs,
+  });
+
+  return updateProject(db, id, {
+    metadata: {
+      ...refreshed.metadata,
+      onboardingAssessment: assessment,
+      onboardingRefresh: result,
+    },
+  });
+}
+
+function collectInstructionUpdateCandidates(
+  db: DrizzleDb,
+  id: string,
+  body: unknown,
+): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const input = parseBody(ProjectInstructionUpdateCandidateBodySchema, body);
+  const nowMs = Date.now();
+  const existing = parseInstructionUpdateCandidates(project.metadata);
+  const candidates = input.candidates.map((candidate, index) =>
+    ProjectInstructionUpdateCandidateSchema.parse({
+      ...candidate,
+      id: `instruction-update-${nowMs}-${index + 1}`,
+      status: 'pending',
+      createdAtMs: nowMs,
+    }),
+  );
+
+  return updateProject(db, id, {
+    metadata: {
+      ...project.metadata,
+      instructionUpdateCandidates: [...existing, ...candidates],
+    },
+  });
+}
+
+function proposeCloseoutInstructionUpdates(db: DrizzleDb, id: string): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const candidates = parseInstructionUpdateCandidates(project.metadata);
+  const proposalCandidates = candidates.filter(
+    (candidate) => candidate.status === 'pending' && candidate.risk !== 'policy_change',
+  );
+  const proposedIds = new Set(proposalCandidates.map((candidate) => candidate.id));
+  const nextCandidates = candidates.map((candidate) =>
+    proposedIds.has(candidate.id) ? { ...candidate, status: 'proposed' as const } : candidate,
+  );
+  const nowMs = Date.now();
+  const proposal = ProjectInstructionUpdateProposalSchema.parse({
+    id: `instruction-closeout-${nowMs}`,
+    status: proposalCandidates.length ? 'ready' : 'empty',
+    candidateIds: proposalCandidates.map((candidate) => candidate.id),
+    summary: proposalCandidates.length
+      ? `${proposalCandidates.length} reviewable Project instruction update(s) are ready.`
+      : 'No low-risk Project instruction updates are ready for closeout.',
+    policy: 'relaxed_reviewable',
+    createdAtMs: nowMs,
+  });
+
+  return updateProject(db, id, {
+    metadata: {
+      ...project.metadata,
+      instructionUpdateCandidates: nextCandidates,
+      instructionUpdateProposal: proposal,
+    },
+  });
+}
+
+function decideInstructionUpdateCandidate(input: {
+  db: DrizzleDb;
+  projectId: string;
+  candidateId: string;
+  decision: 'apply' | 'reject';
+  body: unknown;
+}): ProjectRecord {
+  const project = findProject(input.db, input.projectId);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const decisionBody = parseBody(ProjectInstructionUpdateDecisionBodySchema, input.body);
+  const candidates = parseInstructionUpdateCandidates(project.metadata);
+  const candidate = candidates.find((item) => item.id === input.candidateId);
+  if (!candidate) throw new HttpError(404, 'NOT_FOUND', 'Instruction update candidate not found');
+  if (candidate.status === 'applied' || candidate.status === 'rejected') {
+    throw new HttpError(409, 'INSTRUCTION_UPDATE_DECIDED', 'Instruction update is already decided');
+  }
+
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  if (typeof backendProjectRoot !== 'string') {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project root is not backend accessible');
+  }
+
+  const nowMs = Date.now();
+  if (input.decision === 'apply') {
+    const targetFile = join(backendProjectRoot, candidate.targetPath);
+    const current = readFileSync(targetFile, 'utf8');
+    writeFileSync(targetFile, appendInstructionUpdate(current, candidate), 'utf8');
+  }
+
+  const nextCandidates = candidates.map((item) =>
+    item.id === candidate.id
+      ? {
+          ...item,
+          status: input.decision === 'apply' ? ('applied' as const) : ('rejected' as const),
+          reviewer: decisionBody.reviewer,
+          decidedAtMs: nowMs,
+          ...(decisionBody.comment ? { decisionComment: decisionBody.comment } : {}),
+        }
+      : item,
+  );
+
+  const discovery =
+    input.decision === 'apply'
+      ? discoverProjectInstructions(
+          backendProjectRoot,
+          parseProjectInstructionFileReferences(project.metadata),
+        )
+      : undefined;
+
+  return updateProject(input.db, input.projectId, {
+    metadata: {
+      ...project.metadata,
+      instructionUpdateCandidates: nextCandidates,
+      ...(discovery ? { instructionFiles: discovery.instructionFiles } : {}),
+    },
+  });
+}
+
 function requireProjectAssessment(project: ProjectRecord): ProjectOnboardingAssessment {
   const parsed = ProjectOnboardingAssessmentSchema.safeParse(
     project.metadata['onboardingAssessment'],
@@ -593,6 +799,81 @@ export function createProjectsRouter(db: DrizzleDb): Router {
     asyncHandler(async (req, res) => {
       try {
         res.json({ data: assessProjectForOnboarding(db, requireParam(req.params, 'id')) });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/onboarding/refresh',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({ data: refreshProjectOnboarding(db, requireParam(req.params, 'id')) });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/instruction-updates/candidates',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({
+          data: collectInstructionUpdateCandidates(db, requireParam(req.params, 'id'), req.body),
+        });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/instruction-updates/closeout',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({
+          data: proposeCloseoutInstructionUpdates(db, requireParam(req.params, 'id')),
+        });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/instruction-updates/candidates/:candidateId/apply',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({
+          data: decideInstructionUpdateCandidate({
+            db,
+            projectId: requireParam(req.params, 'id'),
+            candidateId: requireParam(req.params, 'candidateId'),
+            decision: 'apply',
+            body: req.body,
+          }),
+        });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/instruction-updates/candidates/:candidateId/reject',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({
+          data: decideInstructionUpdateCandidate({
+            db,
+            projectId: requireParam(req.params, 'id'),
+            candidateId: requireParam(req.params, 'candidateId'),
+            decision: 'reject',
+            body: req.body,
+          }),
+        });
       } catch (error) {
         mapProjectError(error);
       }

@@ -200,6 +200,88 @@ export type ProjectInstructionUpdateRecommendation = z.infer<
   typeof ProjectInstructionUpdateRecommendationSchema
 >;
 
+export const ProjectInstructionUpdateSourceSchema = z.enum([
+  'agent_observation',
+  'closeout',
+  'refresh',
+  'user_feedback',
+]);
+export type ProjectInstructionUpdateSource = z.infer<typeof ProjectInstructionUpdateSourceSchema>;
+
+export const ProjectInstructionUpdateRiskSchema = z.enum([
+  'low_risk_fact',
+  'needs_review',
+  'policy_change',
+]);
+export type ProjectInstructionUpdateRisk = z.infer<typeof ProjectInstructionUpdateRiskSchema>;
+
+export const ProjectInstructionUpdateStatusSchema = z.enum([
+  'pending',
+  'proposed',
+  'applied',
+  'rejected',
+]);
+export type ProjectInstructionUpdateStatus = z.infer<typeof ProjectInstructionUpdateStatusSchema>;
+
+export const ProjectInstructionUpdateCandidateSchema = z.object({
+  id: z.string().min(1).max(120),
+  targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
+  summary: z.string().min(1).max(1000),
+  rationale: z.string().min(1).max(1000).optional(),
+  proposedMarkdown: z.string().min(1).max(5000).optional(),
+  source: ProjectInstructionUpdateSourceSchema,
+  risk: ProjectInstructionUpdateRiskSchema.default('needs_review'),
+  status: ProjectInstructionUpdateStatusSchema.default('pending'),
+  evidence: z.array(ProjectOnboardingEvidenceFileSchema).default([]),
+  createdAtMs: z.number().int().nonnegative(),
+  decidedAtMs: z.number().int().nonnegative().optional(),
+  reviewer: z.string().min(1).max(200).optional(),
+  decisionComment: z.string().max(2000).optional(),
+});
+export type ProjectInstructionUpdateCandidate = z.infer<
+  typeof ProjectInstructionUpdateCandidateSchema
+>;
+
+export const ProjectInstructionUpdateCandidateInputSchema = z.object({
+  targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
+  summary: z.string().trim().min(1).max(1000),
+  rationale: z.string().trim().min(1).max(1000).optional(),
+  proposedMarkdown: z.string().trim().min(1).max(5000).optional(),
+  source: ProjectInstructionUpdateSourceSchema.default('agent_observation'),
+  risk: ProjectInstructionUpdateRiskSchema.default('needs_review'),
+  evidence: z.array(ProjectOnboardingEvidenceFileSchema).default([]),
+});
+export type ProjectInstructionUpdateCandidateInput = z.infer<
+  typeof ProjectInstructionUpdateCandidateInputSchema
+>;
+
+export const ProjectInstructionUpdateCandidateBodySchema = z.object({
+  candidates: z.array(ProjectInstructionUpdateCandidateInputSchema).min(1).max(20),
+});
+export type ProjectInstructionUpdateCandidateBody = z.infer<
+  typeof ProjectInstructionUpdateCandidateBodySchema
+>;
+
+export const ProjectInstructionUpdateDecisionBodySchema = z.object({
+  reviewer: z.string().trim().min(1).max(200).default('User'),
+  comment: z.string().trim().max(2000).optional(),
+});
+export type ProjectInstructionUpdateDecisionBody = z.infer<
+  typeof ProjectInstructionUpdateDecisionBodySchema
+>;
+
+export const ProjectInstructionUpdateProposalSchema = z.object({
+  id: z.string().min(1).max(120),
+  status: z.enum(['ready', 'empty']),
+  candidateIds: z.array(z.string().min(1).max(120)).default([]),
+  summary: z.string().min(1).max(1000),
+  policy: z.enum(['relaxed_reviewable', 'strict_blocking']).default('relaxed_reviewable'),
+  createdAtMs: z.number().int().nonnegative(),
+});
+export type ProjectInstructionUpdateProposal = z.infer<
+  typeof ProjectInstructionUpdateProposalSchema
+>;
+
 export const ProjectOnboardingDisplayContextSchema = z.object({
   projectName: z.string().min(1).max(200),
   folderLabel: z.string().min(1).max(500).optional(),
@@ -298,6 +380,7 @@ export type ProjectOnboardingApprovalDecision = z.infer<
 export const ProjectOnboardingRefreshResultSchema = z.object({
   previousState: ProjectOnboardingStateSchema,
   nextState: ProjectOnboardingStateSchema,
+  updateStatus: z.enum(['no_change', 'proposed_update', 'material_drift']).default('no_change'),
   materialDrift: z.boolean(),
   assessment: ProjectOnboardingAssessmentSchema,
   refreshedAtMs: z.number().int().nonnegative(),

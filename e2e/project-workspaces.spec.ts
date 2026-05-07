@@ -210,6 +210,66 @@ test.describe('Project workspace E2E', () => {
     );
   });
 
+  test('reviews closeout instruction update candidates and refreshes Project instructions', async ({
+    page,
+    request,
+  }, testInfo) => {
+    const fixture = resetFixtureDir(`closeout-updates-${testInfo.workerIndex}`);
+    writeRepoFixture(fixture.hostPath, { includeInstructions: true });
+
+    let binding = await openProject(page, fixture.containerPath);
+    await expect(binding.getByText('Instructions approved')).toBeVisible();
+
+    const opened = await findProjectByRoot(request, fixture.containerPath);
+    const collected = await request.post(
+      `${apiURL}/v1/projects/${opened.id}/instruction-updates/candidates`,
+      {
+        data: {
+          candidates: [
+            {
+              summary: 'Record the focused E2E command for Project workspace checks.',
+              proposedMarkdown:
+                '- Focused Project workspace E2E: pnpm exec playwright test -c e2e/playwright.config.ts e2e/project-workspaces.spec.ts',
+              source: 'closeout',
+              risk: 'low_risk_fact',
+              evidence: [{ path: 'e2e/project-workspaces.spec.ts', kind: 'test' }],
+            },
+          ],
+        },
+      },
+    );
+    expect(collected.ok(), await collected.text()).toBeTruthy();
+    const proposed = await request.post(
+      `${apiURL}/v1/projects/${opened.id}/instruction-updates/closeout`,
+    );
+    expect(proposed.ok(), await proposed.text()).toBeTruthy();
+
+    binding = await openProject(page, fixture.containerPath);
+    await expect(binding.getByText('Closeout updates')).toBeVisible();
+    await expect(binding.getByText('Record the focused E2E command')).toBeVisible();
+    await binding.getByRole('button', { name: 'Apply' }).click();
+    await expect(binding.getByText('Record the focused E2E command')).toHaveCount(0);
+    expect(readFileSync(join(fixture.hostPath, 'AGENTS.md'), 'utf8')).toContain(
+      'Focused Project workspace E2E: pnpm exec playwright test',
+    );
+
+    writeFileSync(join(fixture.hostPath, 'AGENTS.md'), 'thin instructions\n');
+    await binding.getByRole('button', { name: 'Refresh project assessment' }).first().click();
+    await expect(binding.getByText('Instructions review required')).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const refreshed = await findProjectByRoot(request, fixture.containerPath);
+    expect(refreshed.metadata.onboardingRefresh).toEqual(
+      expect.objectContaining({
+        previousState: 'approved',
+        nextState: 'needs_review',
+        updateStatus: 'material_drift',
+        materialDrift: true,
+      }),
+    );
+  });
+
   test('keeps Chat mode separate from Project code tooling', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: /Open Chat/ }).click();

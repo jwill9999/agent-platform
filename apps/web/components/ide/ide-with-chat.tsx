@@ -6,6 +6,8 @@ import type {
   ProjectOnboardingAssessment,
   ProjectOnboardingDialogue,
   ProjectOnboardingDraft,
+  ProjectInstructionUpdateCandidate,
+  ProjectInstructionUpdateProposal,
   ProjectRecord,
   SessionRecord,
 } from '@agent-platform/contracts';
@@ -13,6 +15,8 @@ import {
   ProjectOnboardingAssessmentSchema,
   ProjectOnboardingDialogueSchema,
   ProjectOnboardingDraftSchema,
+  ProjectInstructionUpdateCandidateSchema,
+  ProjectInstructionUpdateProposalSchema,
 } from '@agent-platform/contracts';
 import type { UIMessage } from 'ai';
 import {
@@ -152,6 +156,24 @@ function projectOnboardingDialogue(
   project: ProjectRecord | null,
 ): ProjectOnboardingDialogue | null {
   const parsed = ProjectOnboardingDialogueSchema.safeParse(project?.metadata.onboardingDialogue);
+  return parsed.success ? parsed.data : null;
+}
+
+function projectInstructionUpdateCandidates(
+  project: ProjectRecord | null,
+): ProjectInstructionUpdateCandidate[] {
+  const parsed = ProjectInstructionUpdateCandidateSchema.array().safeParse(
+    project?.metadata.instructionUpdateCandidates,
+  );
+  return parsed.success ? parsed.data : [];
+}
+
+function projectInstructionUpdateProposal(
+  project: ProjectRecord | null,
+): ProjectInstructionUpdateProposal | null {
+  const parsed = ProjectInstructionUpdateProposalSchema.safeParse(
+    project?.metadata.instructionUpdateProposal,
+  );
   return parsed.success ? parsed.data : null;
 }
 
@@ -414,6 +436,94 @@ export function ProjectOnboardingDraftPanel({
       {draft?.history.length ? (
         <div className="mt-2 text-muted-foreground">{draft.history.length} earlier revision(s)</div>
       ) : null}
+    </div>
+  );
+}
+
+export function ProjectInstructionUpdatesPanel({
+  candidates,
+  proposal,
+  isPreparing,
+  isDeciding,
+  onPrepare,
+  onApply,
+  onReject,
+}: Readonly<{
+  candidates: readonly ProjectInstructionUpdateCandidate[];
+  proposal: ProjectInstructionUpdateProposal | null;
+  isPreparing: boolean;
+  isDeciding: boolean;
+  onPrepare: () => void;
+  onApply: (candidateId: string) => void;
+  onReject: (candidateId: string) => void;
+}>) {
+  const visible = candidates.filter(
+    (candidate) => candidate.status === 'pending' || candidate.status === 'proposed',
+  );
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">Closeout updates</div>
+          <div className="text-muted-foreground">
+            {proposal?.summary ?? `${visible.length} candidate update(s) waiting`}
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-7 shrink-0"
+          onClick={onPrepare}
+          disabled={isPreparing}
+        >
+          {isPreparing ? 'Preparing...' : 'Prepare'}
+        </Button>
+      </div>
+      {visible.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {visible.map((candidate) => (
+            <div key={candidate.id} className="rounded border border-border px-2 py-2">
+              <div className="text-foreground">{candidate.summary}</div>
+              <div className="mt-1 text-muted-foreground">
+                {candidate.risk === 'policy_change'
+                  ? 'Policy change requires explicit review'
+                  : 'Reviewable factual update'}
+              </div>
+              {candidate.proposedMarkdown && (
+                <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-2 text-xs leading-relaxed text-foreground">
+                  {candidate.proposedMarkdown}
+                </pre>
+              )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7"
+                  onClick={() => {
+                    onApply(candidate.id);
+                  }}
+                  disabled={isDeciding || candidate.status !== 'proposed'}
+                >
+                  Apply
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7"
+                  onClick={() => {
+                    onReject(candidate.id);
+                  }}
+                  disabled={isDeciding}
+                >
+                  Reject
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1555,6 +1665,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [isStartingOnboardingDraft, setIsStartingOnboardingDraft] = useState(false);
   const [isSubmittingOnboardingAnswer, setIsSubmittingOnboardingAnswer] = useState(false);
   const [isReviewingOnboardingDraft, setIsReviewingOnboardingDraft] = useState(false);
+  const [isPreparingInstructionUpdates, setIsPreparingInstructionUpdates] = useState(false);
+  const [isDecidingInstructionUpdate, setIsDecidingInstructionUpdate] = useState(false);
   const [onboardingAnswer, setOnboardingAnswer] = useState('');
   const [onboardingReviewComment, setOnboardingReviewComment] = useState('');
 
@@ -1605,6 +1717,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const onboardingAssessment = projectOnboardingAssessment(activeProject);
   const onboardingDraft = projectOnboardingDraft(activeProject);
   const onboardingDialogue = projectOnboardingDialogue(activeProject);
+  const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
+  const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions =
@@ -1781,12 +1895,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setProjectOpenError(null);
     try {
       const project = await apiPost<ProjectRecord>(
-        apiPath('projects', activeProject.id, 'onboarding', 'assess'),
+        apiPath('projects', activeProject.id, 'onboarding', 'refresh'),
         {},
       );
       if (!project) throw new ApiRequestError('Failed to assess project', 500);
       setActiveProject(project);
-      toast.success('Project assessment updated');
+      const refresh = project.metadata.onboardingRefresh as { materialDrift?: unknown } | undefined;
+      toast.success(
+        refresh?.materialDrift ? 'Project instructions need review' : 'Project assessment updated',
+      );
     } catch (error) {
       const message = error instanceof ApiRequestError ? error.message : 'Failed to assess project';
       setProjectOpenError(message);
@@ -1795,6 +1912,60 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       setIsAssessingProject(false);
     }
   }, [activeProject?.id]);
+
+  const handlePrepareInstructionUpdates = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsPreparingInstructionUpdates(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'instruction-updates', 'closeout'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to prepare closeout updates', 500);
+      setActiveProject(project);
+      toast.success('Closeout updates prepared');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to prepare closeout updates';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsPreparingInstructionUpdates(false);
+    }
+  }, [activeProject?.id]);
+
+  const handleInstructionUpdateDecision = useCallback(
+    async (candidateId: string, decision: 'apply' | 'reject') => {
+      if (!activeProject?.id) return;
+      setIsDecidingInstructionUpdate(true);
+      setProjectOpenError(null);
+      try {
+        const project = await apiPost<ProjectRecord>(
+          apiPath(
+            'projects',
+            activeProject.id,
+            'instruction-updates',
+            'candidates',
+            candidateId,
+            decision,
+          ),
+          { reviewer: 'User' },
+        );
+        if (!project) throw new ApiRequestError('Failed to review closeout update', 500);
+        setActiveProject(project);
+        toast.success(decision === 'apply' ? 'Instruction update applied' : 'Update rejected');
+      } catch (error) {
+        const message =
+          error instanceof ApiRequestError ? error.message : 'Failed to review closeout update';
+        setProjectOpenError(message);
+        toast.error(message);
+      } finally {
+        setIsDecidingInstructionUpdate(false);
+      }
+    },
+    [activeProject?.id],
+  );
 
   const handleStartOnboardingDraft = useCallback(async () => {
     if (!activeProject?.id) return;
@@ -2396,6 +2567,23 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           }}
                           onReject={() => {
                             handleReviewOnboardingDraft('reject').catch(() => {});
+                          }}
+                        />
+                      )}
+                      {(instructionUpdateCandidates.length > 0 || instructionUpdateProposal) && (
+                        <ProjectInstructionUpdatesPanel
+                          candidates={instructionUpdateCandidates}
+                          proposal={instructionUpdateProposal}
+                          isPreparing={isPreparingInstructionUpdates}
+                          isDeciding={isDecidingInstructionUpdate}
+                          onPrepare={() => {
+                            handlePrepareInstructionUpdates().catch(() => {});
+                          }}
+                          onApply={(candidateId) => {
+                            handleInstructionUpdateDecision(candidateId, 'apply').catch(() => {});
+                          }}
+                          onReject={(candidateId) => {
+                            handleInstructionUpdateDecision(candidateId, 'reject').catch(() => {});
                           }}
                         />
                       )}

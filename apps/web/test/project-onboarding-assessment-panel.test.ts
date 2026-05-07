@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
+  ProjectInstructionUpdatesPanel,
   ProjectOnboardingAssessmentPanel,
   ProjectOnboardingDraftPanel,
 } from '@/components/ide/ide-with-chat';
@@ -122,5 +123,47 @@ describe('Project onboarding assessment panel', () => {
     expect(html).toContain('1 earlier revision');
     expect(html).not.toContain('/workspace');
     expect(html).not.toContain('Code edits and write tools are available');
+  });
+
+  it('renders closeout instruction update candidates for review', () => {
+    const html = renderToStaticMarkup(
+      createElement(ProjectInstructionUpdatesPanel, {
+        candidates: [
+          {
+            id: 'candidate-1',
+            targetPath: 'AGENTS.md',
+            summary: 'Use focused API tests for router-only changes.',
+            proposedMarkdown:
+              '- Focused API tests: pnpm --filter @agent-platform/api test -- <test-file>',
+            source: 'closeout',
+            risk: 'low_risk_fact',
+            status: 'proposed',
+            evidence: [{ path: 'package.json', kind: 'manifest' }],
+            createdAtMs: 1_778_172_000_000,
+          },
+        ],
+        proposal: {
+          id: 'proposal-1',
+          status: 'ready',
+          candidateIds: ['candidate-1'],
+          summary: '1 reviewable Project instruction update is ready.',
+          policy: 'relaxed_reviewable',
+          createdAtMs: 1_778_172_000_000,
+        },
+        isPreparing: false,
+        isDeciding: false,
+        onPrepare: () => {},
+        onApply: () => {},
+        onReject: () => {},
+      }),
+    );
+
+    expect(html).toContain('Closeout updates');
+    expect(html).toContain('1 reviewable Project instruction update is ready.');
+    expect(html).toContain('Use focused API tests for router-only changes.');
+    expect(html).toContain('Focused API tests: pnpm --filter @agent-platform/api test');
+    expect(html).toContain('Apply');
+    expect(html).toContain('Reject');
+    expect(html).not.toContain('/workspace');
   });
 });

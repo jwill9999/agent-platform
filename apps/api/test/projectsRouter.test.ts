@@ -426,6 +426,156 @@ describe('projectsRouter', () => {
     });
   });
 
+  it('batches closeout instruction updates and applies or rejects reviewable candidates', async () => {
+    const repoDir = path.join(tmpDir, 'repo-with-closeout-updates');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(
+      path.join(repoDir, 'AGENTS.md'),
+      [
+        '# Agent Instructions',
+        '',
+        'Use Beads for task tracking and keep Project work read-only until instructions are approved.',
+        'Run build, typecheck, lint, tests, and docs quality gates before closing a ticket.',
+        'Open a pull request and wait for CI, SonarCloud, GitGuardian, and review comments.',
+      ].join('\n'),
+    );
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Closeout Repo' })
+      .expect(201);
+
+    const collected = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/instruction-updates/candidates`)
+      .send({
+        candidates: [
+          {
+            summary: 'Use pnpm --filter @agent-platform/api test for focused API tests.',
+            proposedMarkdown:
+              '- Focused API tests: pnpm --filter @agent-platform/api test -- <test-file>',
+            source: 'closeout',
+            risk: 'low_risk_fact',
+            evidence: [{ path: 'package.json', kind: 'manifest' }],
+          },
+          {
+            summary: 'Remove user-authored workflow guidance.',
+            source: 'closeout',
+            risk: 'policy_change',
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(collected.body.data.metadata.instructionUpdateCandidates).toHaveLength(2);
+
+    const proposed = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/instruction-updates/closeout`)
+      .send({})
+      .expect(200);
+    const candidates = proposed.body.data.metadata.instructionUpdateCandidates;
+    expect(proposed.body.data.metadata.instructionUpdateProposal).toMatchObject({
+      status: 'ready',
+      policy: 'relaxed_reviewable',
+      candidateIds: [candidates[0].id],
+    });
+    expect(candidates[0]).toMatchObject({ status: 'proposed' });
+    expect(candidates[1]).toMatchObject({ status: 'pending', risk: 'policy_change' });
+
+    const applied = await request(app)
+      .post(
+        `/v1/projects/${openedProject.body.data.id}/instruction-updates/candidates/${candidates[0].id}/apply`,
+      )
+      .send({ reviewer: 'Test reviewer' })
+      .expect(200);
+    expect(applied.body.data.metadata.instructionUpdateCandidates[0]).toMatchObject({
+      status: 'applied',
+      reviewer: 'Test reviewer',
+    });
+    expect(readFileSync(path.join(repoDir, 'AGENTS.md'), 'utf8')).toContain(
+      'Focused API tests: pnpm --filter @agent-platform/api test -- <test-file>',
+    );
+
+    const rejected = await request(app)
+      .post(
+        `/v1/projects/${openedProject.body.data.id}/instruction-updates/candidates/${candidates[1].id}/reject`,
+      )
+      .send({ reviewer: 'Test reviewer', comment: 'Policy changes need a separate review.' })
+      .expect(200);
+    expect(rejected.body.data.metadata.instructionUpdateCandidates[1]).toMatchObject({
+      status: 'rejected',
+      reviewer: 'Test reviewer',
+      decisionComment: 'Policy changes need a separate review.',
+    });
+  });
+
+  it('records refresh and rescan states while preserving mixed Project framing', async () => {
+    const repoDir = path.join(tmpDir, 'repo-refresh-rescan');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(
+      path.join(repoDir, 'AGENTS.md'),
+      [
+        '# Agent Instructions',
+        '',
+        'Use Beads for task tracking and keep Project work read-only until instructions are approved.',
+        'Run build, typecheck, lint, tests, and docs quality gates before closing a ticket.',
+        'Open a pull request and wait for CI, SonarCloud, GitGuardian, and review comments.',
+      ].join('\n'),
+    );
+    writeFileSync(path.join(repoDir, 'README.md'), 'docs\n');
+    writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({ scripts: { test: 'vitest' } }),
+    );
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Refresh Repo' })
+      .expect(201);
+    expect(openedProject.body.data.metadata.onboardingAssessment.profile).toBe('mixed');
+
+    const unchanged = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/refresh`)
+      .send({})
+      .expect(200);
+    expect(unchanged.body.data.metadata.onboardingRefresh).toMatchObject({
+      previousState: 'approved',
+      nextState: 'approved',
+      updateStatus: 'no_change',
+      materialDrift: false,
+    });
+
+    writeFileSync(path.join(repoDir, 'AGENTS.md'), 'thin instructions\n');
+    const drifted = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/refresh`)
+      .send({})
+      .expect(200);
+    expect(drifted.body.data.metadata.onboardingRefresh).toMatchObject({
+      previousState: 'approved',
+      nextState: 'needs_review',
+      updateStatus: 'material_drift',
+      materialDrift: true,
+    });
+    expect(drifted.body.data.metadata.onboardingAssessment.profile).toBe('mixed');
+
+    const missingInstructionsDir = path.join(tmpDir, 'repo-refresh-proposed-update');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', missingInstructionsDir], { stdio: 'ignore' });
+    writeFileSync(path.join(missingInstructionsDir, 'README.md'), 'docs only\n');
+    const missing = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: missingInstructionsDir, name: 'Refresh Proposed Update Repo' })
+      .expect(201);
+    const proposedUpdate = await request(app)
+      .post(`/v1/projects/${missing.body.data.id}/onboarding/refresh`)
+      .send({})
+      .expect(200);
+    expect(proposedUpdate.body.data.metadata.onboardingRefresh).toMatchObject({
+      previousState: 'in_progress',
+      nextState: 'in_progress',
+      updateStatus: 'proposed_update',
+      materialDrift: false,
+    });
+  });
+
   it('keeps backend-inaccessible paths unavailable and does not create project records', async () => {
     const missingPath = path.join(tmpDir, 'missing');
 

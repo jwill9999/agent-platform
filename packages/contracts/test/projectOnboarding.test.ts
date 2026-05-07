@@ -6,6 +6,8 @@ import {
   ProjectOnboardingDraftSchema,
   ProjectOnboardingFixtureStateSchema,
   ProjectOnboardingRefreshResultSchema,
+  ProjectInstructionUpdateCandidateSchema,
+  ProjectInstructionUpdateProposalSchema,
   transitionProjectOnboardingState,
 } from '../src/project.js';
 
@@ -115,6 +117,7 @@ describe('Project onboarding contracts', () => {
     const refresh = ProjectOnboardingRefreshResultSchema.parse({
       previousState: 'approved',
       nextState: 'needs_review',
+      updateStatus: 'material_drift',
       materialDrift: true,
       refreshedAtMs: assessedAtMs,
       assessment: {
@@ -130,8 +133,32 @@ describe('Project onboarding contracts', () => {
       },
     });
     expect(refresh.materialDrift).toBe(true);
+    expect(refresh.updateStatus).toBe('material_drift');
 
     expect(ProjectOnboardingFixtureStateSchema.options).toContain('mixed_non_code_project');
+  });
+
+  it('parses closeout instruction update candidates and proposals', () => {
+    const candidate = ProjectInstructionUpdateCandidateSchema.parse({
+      id: 'candidate-1',
+      summary: 'Use pnpm --filter @agent-platform/web test for focused web tests.',
+      proposedMarkdown: '- Focused web tests: pnpm --filter @agent-platform/web test',
+      source: 'closeout',
+      risk: 'low_risk_fact',
+      status: 'proposed',
+      evidence: [{ path: 'package.json', kind: 'manifest' }],
+      createdAtMs: assessedAtMs,
+    });
+    expect(candidate.targetPath).toBe('AGENTS.md');
+
+    const proposal = ProjectInstructionUpdateProposalSchema.parse({
+      id: 'proposal-1',
+      status: 'ready',
+      candidateIds: [candidate.id],
+      summary: '1 reviewable Project instruction update is ready.',
+      createdAtMs: assessedAtMs,
+    });
+    expect(proposal.policy).toBe('relaxed_reviewable');
   });
 
   it('allows the intended onboarding state transitions', () => {
