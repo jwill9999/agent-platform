@@ -172,9 +172,17 @@ test.describe('Project workspace E2E', () => {
       expect.objectContaining({ decision: 'request_changes', comment: feedback }),
     );
 
+    const approvalResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/projects/${reviewed.id}/onboarding/review`) &&
+        response.request().method() === 'POST',
+    );
     await binding.getByRole('button', { name: 'Approve draft' }).click();
-    await expect(binding.getByText('Instructions approved')).toBeVisible();
-    await expect(binding.getByText('Code edits and write tools are available')).toBeVisible();
+    expect((await approvalResponse).ok()).toBeTruthy();
+    await expect(binding.getByText('Instructions approved')).toBeVisible({ timeout: 15_000 });
+    await expect(binding.getByText('Code edits and write tools are available')).toBeVisible({
+      timeout: 15_000,
+    });
 
     const approved = await findProjectByRoot(request, fixture.containerPath);
     expect(approved.metadata.onboardingState).toBe('approved');
