@@ -37,11 +37,14 @@ test.describe('MVP E2E (compose-backed)', () => {
 
   test('home page chat smoke', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h2', { hasText: 'AI Studio' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Open Chat/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open Project/ })).toBeVisible();
   });
 
   test('sessions move from sidebar panel to header dropdown', async ({ page }) => {
     await page.goto('/');
+    await page.getByRole('button', { name: /Open Chat/ }).click();
 
     await expect(page.getByRole('button', { name: 'Open sessions menu' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Collapse panel' })).toHaveCount(0);
@@ -67,6 +70,25 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.getByRole('menuitem', { name: 'Agents' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'Tools' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'Sessions' })).toBeVisible();
+  });
+
+  test('entry paths select mode-specific surfaces and default agents', async ({ page }) => {
+    await page.goto('/');
+
+    await page.getByRole('button', { name: /Open Chat/ }).click();
+    await expect(page.locator('[aria-label="Active agent"]').first()).toContainText(
+      'Personal assistant',
+    );
+    await expect(page.locator('textarea[placeholder*="Send a message"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Terminal/ })).toHaveCount(0);
+
+    await page.goto('/');
+    await page.getByRole('link', { name: /Open Project/ }).click();
+    await expect(page).toHaveURL(/\/ide$/);
+    await expect(page.locator('[aria-label="Active agent"]').first()).toContainText('Coding');
+    await expect(page.getByRole('button', { name: 'Open Folder' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Terminal/ })).toBeVisible();
   });
 
   test('tool_result panel renders (fixture page)', async ({ page }) => {

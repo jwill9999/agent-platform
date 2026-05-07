@@ -129,13 +129,18 @@ describe('projects repository and associations', () => {
   it('keeps sessions valid without projects and supports nullable project binding', () => {
     const unscoped = createSession(db, { agentId: 'agent-1' });
     expect(unscoped.projectId).toBeNull();
+    expect(unscoped.mode).toBe('chat');
 
     createProject(db, { name: 'Bound Project' }, { id: 'project-1', nowMs: 1000 });
     expect(updateSessionProject(db, unscoped.id, 'project-1')).toBe(true);
     expect(getSession(db, unscoped.id)).toMatchObject({ projectId: 'project-1' });
 
-    const scoped = createSession(db, { agentId: 'agent-1', projectId: 'project-1' });
-    expect(scoped.projectId).toBe('project-1');
+    const scoped = createSession(db, {
+      agentId: 'agent-1',
+      mode: 'project',
+      projectId: 'project-1',
+    });
+    expect(scoped).toMatchObject({ mode: 'project', projectId: 'project-1' });
   });
 
   it('associates working memory and project-scoped memories without changing scope semantics', () => {

@@ -5,6 +5,7 @@ import type {
   AgentCreateBody,
   McpServer,
   McpServerCreateBody,
+  ProjectMode,
   SessionRecord,
   Skill,
   SkillCreateBody,
@@ -323,7 +324,7 @@ export function getSession(db: DrizzleDb, id: string): SessionRecord | undefined
 
 export function createSession(
   db: DrizzleDb,
-  input: { agentId: string; projectId?: string },
+  input: { agentId: string; mode?: ProjectMode; projectId?: string },
 ): SessionRecord {
   const now = Date.now();
   const id = randomUUID();
@@ -334,6 +335,7 @@ export function createSession(
         .values({
           id,
           agentId: input.agentId,
+          mode: input.mode ?? 'chat',
           projectId: input.projectId ?? null,
           createdAtMs: now,
           updatedAtMs: now,
@@ -359,6 +361,7 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
           .values({
             id: record.id,
             agentId: record.agentId,
+            mode: record.mode,
             projectId: record.projectId ?? null,
             title: record.title ?? null,
             createdAtMs: existing?.createdAtMs ?? record.createdAtMs,
@@ -368,6 +371,7 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
             target: schema.sessions.id,
             set: {
               agentId: record.agentId,
+              mode: record.mode,
               projectId: record.projectId ?? null,
               title: record.title ?? null,
               updatedAtMs: record.updatedAtMs,
@@ -382,7 +386,7 @@ export function replaceSession(db: DrizzleDb, record: SessionRecord): void {
 export function updateSessionProject(db: DrizzleDb, id: string, projectId: string | null): boolean {
   const r = db
     .update(schema.sessions)
-    .set({ projectId, updatedAtMs: Date.now() })
+    .set({ projectId, mode: projectId ? 'project' : 'chat', updatedAtMs: Date.now() })
     .where(eq(schema.sessions.id, id))
     .run();
   return r.changes > 0;

@@ -57,7 +57,7 @@ import {
 } from '@/hooks/use-harness-chat';
 import type { FileNode } from '@/hooks/use-file-system';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
-import { pickDefaultAgent } from '@/lib/default-agent';
+import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { formatFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 import { ApprovalCard } from '@/components/chat/approval-card';
@@ -107,6 +107,70 @@ function StatusLabel({
   );
 }
 
+function ContentActivityBlocks({
+  criticEvents,
+  thinking,
+  toolEvents,
+  approvals,
+  onApprovalDecision,
+  defaultOpenThinking = false,
+  isStreaming = false,
+}: Readonly<{
+  criticEvents?: readonly CriticEvent[];
+  thinking?: string;
+  toolEvents?: readonly ToolTraceEvent[];
+  approvals?: readonly ApprovalCardState[];
+  onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
+  defaultOpenThinking?: boolean;
+  isStreaming?: boolean;
+}>) {
+  const hasToolEvents = Boolean(toolEvents?.length);
+
+  return (
+    <>
+      {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
+      {thinking ? <ThinkingBlock content={thinking} defaultOpen={defaultOpenThinking} /> : null}
+      {hasToolEvents ? (
+        <ToolTraceBlock events={toolEvents ?? []} isStreaming={isStreaming} />
+      ) : null}
+      {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
+      {approvals?.map((approval) => (
+        <ApprovalCard
+          key={approval.approvalRequestId}
+          approval={approval}
+          onDecision={onApprovalDecision}
+        />
+      ))}
+    </>
+  );
+}
+
+function getAssistantMarkdownContextFiles(
+  contextFiles: { path: string; name: string }[],
+  activeFile: { path: string; name: string } | null,
+) {
+  if (!activeFile || contextFiles.some((f) => f.path === activeFile.path)) {
+    return [...contextFiles];
+  }
+  return [...contextFiles, { path: activeFile.path, name: activeFile.name }];
+}
+
+function shouldShowEmptyAssistantResponse(input: {
+  messageText: string;
+  thinking?: string;
+  hasToolEvents: boolean;
+  hasApprovals: boolean;
+  criticEvents?: readonly CriticEvent[];
+}) {
+  return (
+    !input.messageText.trim() &&
+    !input.thinking?.trim() &&
+    !input.hasToolEvents &&
+    !input.hasApprovals &&
+    !input.criticEvents?.length
+  );
+}
+
 export function AssistantContent({
   message,
   awaiting,
@@ -138,59 +202,53 @@ export function AssistantContent({
 }>) {
   const hasToolEvents = Boolean(toolEvents?.length);
   const hasApprovals = Boolean(approvals?.length);
+  const messageText = getMessageText(message);
 
   if (awaiting) {
     return (
       <>
-        {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
-        {thinking ? <ThinkingBlock content={thinking} defaultOpen /> : null}
-        {hasToolEvents ? <ToolTraceBlock events={toolEvents ?? []} isStreaming /> : null}
-        {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
-        {approvals?.map((approval) => (
-          <ApprovalCard
-            key={approval.approvalRequestId}
-            approval={approval}
-            onDecision={onApprovalDecision}
-          />
-        ))}
+        <ContentActivityBlocks
+          criticEvents={criticEvents}
+          thinking={thinking}
+          toolEvents={toolEvents}
+          approvals={approvals}
+          onApprovalDecision={onApprovalDecision}
+          defaultOpenThinking
+          isStreaming
+        />
         <span className="sr-only" aria-busy="true" aria-live="polite">
           Assistant is responding
         </span>
       </>
     );
   }
-  const allFiles =
-    activeFile && !contextFiles.some((f) => f.path === activeFile.path)
-      ? [...contextFiles, { path: activeFile.path, name: activeFile.name }]
-      : [...contextFiles];
+  const allFiles = getAssistantMarkdownContextFiles(contextFiles, activeFile);
   return (
     <>
-      {criticEvents && criticEvents.length > 0 ? <CriticBadges events={criticEvents} /> : null}
-      {thinking ? <ThinkingBlock content={thinking} /> : null}
-      {hasToolEvents ? <ToolTraceBlock events={toolEvents ?? []} isStreaming={false} /> : null}
-      {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
+      <ContentActivityBlocks
+        criticEvents={criticEvents}
+        thinking={thinking}
+        toolEvents={toolEvents}
+        approvals={approvals}
+        onApprovalDecision={onApprovalDecision}
+      />
       <IDEMarkdown
-        content={getMessageText(message)}
+        content={messageText}
         contextFiles={allFiles}
         onApplyCode={onApplyCode}
         onCreateFile={onCreateFile}
         onShowDiff={onShowDiff}
         getFileReferenceAction={getFileReferenceAction}
       />
-      {approvals?.map((approval) => (
-        <ApprovalCard
-          key={approval.approvalRequestId}
-          approval={approval}
-          onDecision={onApprovalDecision}
-        />
-      ))}
-      {!getMessageText(message).trim() &&
-        !thinking?.trim() &&
-        !hasToolEvents &&
-        !hasApprovals &&
-        (!criticEvents || criticEvents.length === 0) && (
-          <p className="text-xs text-muted-foreground">No assistant response was returned.</p>
-        )}
+      {shouldShowEmptyAssistantResponse({
+        messageText,
+        thinking,
+        hasToolEvents,
+        hasApprovals,
+        criticEvents,
+      }) ? (
+        <p className="text-xs text-muted-foreground">No assistant response was returned.</p>
+      ) : null}
     </>
   );
 }
@@ -1255,7 +1313,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         const list = await apiGet<Agent[]>(apiPath('agents'));
         const next = list ?? [];
         setAgents(next);
-        const def = pickDefaultAgent(next);
+        const def = pickDefaultAgentForMode(next, 'project');
         if (def) {
           setSelectedAgentId((prev) => prev ?? def.id);
         }
@@ -1271,6 +1329,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       try {
         const session = await apiPost<SessionRecord>(apiPath('sessions'), {
           agentId: selectedAgentId,
+          mode: 'project',
         });
         if (session?.id) {
           setSessionId(session.id);

@@ -65,7 +65,7 @@ describe('migrations', () => {
         }>
       ).map((foreignKey) => foreignKey.table);
 
-    expect(columnsFor('sessions')).toContain('project_id');
+    expect(columnsFor('sessions')).toEqual(expect.arrayContaining(['mode', 'project_id']));
     expect(columnsFor('memories')).toContain('project_id');
     expect(columnsFor('working_memory_artifacts')).toContain('project_id');
     expect(indexesFor('sessions')).toContain('sessions_project_idx');

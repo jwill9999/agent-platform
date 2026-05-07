@@ -87,6 +87,13 @@ describe('REST /v1 (integration)', () => {
       .expect(201);
     const sid = sessionRes.body.data.id as string;
     expect(sessionRes.body.data.agentId).toBe(DEFAULT_AGENT_ID);
+    expect(sessionRes.body.data.mode).toBe('chat');
+
+    const projectSessionRes = await request(app)
+      .post('/v1/sessions')
+      .send({ agentId: DEFAULT_AGENT_ID, mode: 'project' })
+      .expect(201);
+    expect(projectSessionRes.body.data.mode).toBe('project');
 
     await request(app).get(`/v1/sessions/${sid}`).expect(200);
     await request(app).get(`/v1/sessions?agentId=${DEFAULT_AGENT_ID}`).expect(200);
