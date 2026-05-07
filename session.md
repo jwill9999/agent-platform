@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Implemented `agent-platform-project-onboarding.2` on `task/agent-platform-project-onboarding.2`: added read-only Project evidence assessment, persisted structured onboarding assessment metadata, first-load and refresh assessment paths, Project profile/capability/gap/question inference, auto-approval for sufficient existing `AGENTS.md`, drift handling for approved instructions, and a compact user-facing assessment panel in the IDE Project sidebar. Local format/lint/docs/build/unit gates are green; next step is commit, push, PR # into `feature/agent-platform-project-onboarding`, and remote gate/comment monitoring before closing the Bead.
+- **Date:** 2026-05-07
 - **Session:** Closed `agent-platform-project-onboarding.1` after PR #150 passed CI/docs/GitGuardian checks, review-thread inspection found no actionable comments, direct Sonar issue search returned 0 unresolved issues, and Sonar agentic file analysis was unavailable because the organization has not enabled Agentic Analysis. Beads Dolt closeout state was pushed; next ready task is `agent-platform-project-onboarding.2`.
 - **Date:** 2026-05-07
 - **Session:** Started the `agent-platform-project-onboarding` epic from updated `main` on `feature/agent-platform-project-onboarding`, claimed `agent-platform-project-onboarding.1`, implemented typed Project onboarding assessment/draft/approval/refresh contracts plus transition tests, verified local gates, synced Beads, and committed the task implementation on `task/agent-platform-project-onboarding.1`. Next step is pushing the task branch, opening the PR into the onboarding feature branch, and monitoring remote checks/review comments before closing the Bead.
@@ -391,6 +393,35 @@ Completion gate:
 - Local fallback gate passed: formatting, lint, docs lint, build, contract typecheck/tests, full unit test suite, and diff whitespace check.
 - Remote completion gate passed for PR #150: `verify`, `docker`, `e2e`, `markdownlint`, `lychee`, and GitGuardian passed; GitHub review-thread sweep returned no review threads; direct Sonar issue search returned 0 unresolved issues.
 - Sonar agentic file analysis could not run because the SonarCloud organization has not enabled Agentic Analysis. Sourcery skipped due the weekly diff-character rate limit and left no actionable review threads.
+
+### Project onboarding assessment implemented
+
+Branch state: `task/agent-platform-project-onboarding.2` is active from the completed `.1` tip.
+
+- Claimed Bead `agent-platform-project-onboarding.2` and synced Beads Dolt state.
+- Added read-only Project assessment in `apps/api/src/infrastructure/projects/projectAssessment.ts`.
+- Assessment scans bounded filesystem evidence, classifies Project profile/capabilities, infers package commands and subproject scopes, evaluates `AGENTS.md` sufficiency, and produces the structured assessment contract from `.1`.
+- `POST /v1/projects/open` now persists onboarding assessment metadata on first load; `POST /v1/projects/:id/onboarding/assess` refreshes it.
+- Missing or insufficient instructions move to `in_progress`; sufficient existing root `AGENTS.md` can auto-approve; changed approved instructions move back to `needs_review`.
+- Added a user-facing Project assessment panel in the IDE sidebar with summary, gaps, questions, and refresh action, without exposing `/workspace` or backend-accessibility labels in the assessment copy.
+- Marked the `.2` task spec DoD checklist complete.
+
+Verification:
+
+- `pnpm --filter @agent-platform/api run typecheck`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/api exec vitest run test/projectsRouter.test.ts` with elevated local binding
+- `pnpm --filter @agent-platform/web run test -- test/project-onboarding-assessment-panel.test.ts`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/api run build`
+- `pnpm --filter @agent-platform/web run build`
+- `pnpm format:check`
+- `pnpm lint`
+- `pnpm docs:lint`
+- `git diff --check`
+- `pnpm build`
+- `pnpm test` with elevated local server/browser permissions
 
 ### Project workspace epic closeout
 
@@ -1051,8 +1082,8 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-project-onboarding.1`
 - **Current base:** `feature/agent-platform-project-onboarding`, created from updated `main` after PR #149 merged.
-- **Current work:** `agent-platform-project-onboarding.1` is implemented, pushed, PR-gated, and closed in Beads. Prepare `agent-platform-project-onboarding.2` from the `.1` tip.
-- **Remote sync:** Task branch `task/agent-platform-project-onboarding.1` and Beads Dolt state are pushed.
+- **Current work:** `agent-platform-project-onboarding.2` is implemented locally with green local gates. It still needs commit, push, task PR creation, remote checks, review-thread sweep, Sonar verification, and Beads closure.
+- **Remote sync:** Task branch `task/agent-platform-project-onboarding.1` and Beads Dolt state are pushed. Branch `task/agent-platform-project-onboarding.2` is not pushed yet.
 
 ### Beads
 
@@ -1060,7 +1091,7 @@ Quality gates passed:
 - `agent-platform-project-workspaces.1` through `.6` are closed.
 - `agent-platform-project-onboarding` is open and refined to treat Project as a generic folder/work context with coding/file-changing behavior as a profile/capability.
 - `agent-platform-project-onboarding.1` is closed. PR #150 is open and green/non-actionable; it remains unmerged until the end-of-epic integration point.
-- `agent-platform-project-onboarding.2` is ready.
+- `agent-platform-project-onboarding.2` is in progress and claimed.
 - `agent-platform-project-experience` is open as a P1 follow-up epic after onboarding, with child tasks `.1` through `.6` covering Project profiles, left explorer navigation, project-chat-first entry, optional IDE handoff, label cleanup/breadcrumbs, and Playwright navigation E2E.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
@@ -1095,6 +1126,21 @@ Quality gates passed:
   - `git diff --check`
   - `pnpm build`
   - `pnpm test` with elevated permissions for local browser/server integration tests after the sandboxed run hit browser integration hook timeouts
+- Latest `agent-platform-project-onboarding.2` local gates passed:
+  - `pnpm --filter @agent-platform/api run typecheck`
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/api exec vitest run test/projectsRouter.test.ts` with elevated local binding
+  - `pnpm --filter @agent-platform/web run test -- test/project-onboarding-assessment-panel.test.ts`
+  - `pnpm --filter @agent-platform/api run lint`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/api run build`
+  - `pnpm --filter @agent-platform/web run build`
+  - `pnpm format:check`
+  - `pnpm lint`
+  - `pnpm docs:lint`
+  - `git diff --check`
+  - `pnpm build`
+  - `pnpm test` with elevated local server/browser permissions
 - Latest `agent-platform-project-workspaces.3` gates passed:
   - `pnpm format:check`
   - `pnpm build`
@@ -1207,10 +1253,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit and push the `.1` Beads/session closeout bookkeeping.
-2. Create `task/agent-platform-project-onboarding.2` from the `.1` tip and claim `agent-platform-project-onboarding.2`.
-3. Implement project assessment and gap analysis using the contracts from `.1`.
-4. Repeat the task PR gate before closing `.2`: local gates, PR checks, review-thread sweep, direct Sonar issue query, and fallback gate if Sonar agentic analysis remains unavailable.
+1. Commit and push `task/agent-platform-project-onboarding.2`.
+2. Open the task PR into `feature/agent-platform-project-onboarding`.
+3. Monitor GitHub Actions, GitGuardian, Sourcery, SonarCloud, review threads, and comments; fix any failures/comments on the same branch.
+4. Close Bead `agent-platform-project-onboarding.2` only after remote checks and comment sweeps are green/non-actionable, then branch `.3` from the `.2` tip.
 
 ---
 

@@ -1,7 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { Agent, ProjectRecord, SessionRecord } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ProjectOnboardingAssessment,
+  ProjectRecord,
+  SessionRecord,
+} from '@agent-platform/contracts';
+import { ProjectOnboardingAssessmentSchema } from '@agent-platform/contracts';
 import type { UIMessage } from 'ai';
 import {
   FolderOpen,
@@ -122,6 +128,15 @@ function projectHasRootInstructions(project: ProjectRecord | null): boolean {
   );
 }
 
+function projectOnboardingAssessment(
+  project: ProjectRecord | null,
+): ProjectOnboardingAssessment | null {
+  const parsed = ProjectOnboardingAssessmentSchema.safeParse(
+    project?.metadata.onboardingAssessment,
+  );
+  return parsed.success ? parsed.data : null;
+}
+
 function projectOnboardingLabel(state: ProjectOnboardingState): string {
   switch (state) {
     case 'approved':
@@ -190,6 +205,54 @@ function ContentActivityBlocks({
         />
       ))}
     </>
+  );
+}
+
+export function ProjectOnboardingAssessmentPanel({
+  assessment,
+  isRefreshing,
+  onRefresh,
+}: Readonly<{
+  assessment: ProjectOnboardingAssessment;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}>) {
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">
+            {assessment.display.profileLabel ?? 'Project assessment'}
+          </div>
+          <div className="text-muted-foreground">{assessment.display.onboardingLabel}</div>
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0"
+          aria-label="Refresh project assessment"
+          title="Refresh project assessment"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden />
+        </Button>
+      </div>
+      <p className="mt-2 leading-snug">{assessment.summary}</p>
+      {assessment.gaps.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {assessment.gaps.slice(0, 3).map((gap) => (
+            <li key={`${gap.kind}:${gap.message}`} className="leading-snug">
+              {gap.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      {assessment.questions.length > 0 && (
+        <p className="mt-2 leading-snug text-muted-foreground">{assessment.questions[0]?.prompt}</p>
+      )}
+    </div>
   );
 }
 
@@ -1326,6 +1389,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
   const [isOpeningBackendProject, setIsOpeningBackendProject] = useState(false);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
+  const [isAssessingProject, setIsAssessingProject] = useState(false);
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -1371,6 +1435,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [contextFiles],
   );
   const onboardingState = projectOnboardingState(activeProject);
+  const onboardingAssessment = projectOnboardingAssessment(activeProject);
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions =
@@ -1497,6 +1562,27 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       toast.error(message);
     } finally {
       setIsApprovingProjectInstructions(false);
+    }
+  }, [activeProject?.id]);
+
+  const handleAssessProject = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsAssessingProject(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'assess'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to assess project', 500);
+      setActiveProject(project);
+      toast.success('Project assessment updated');
+    } catch (error) {
+      const message = error instanceof ApiRequestError ? error.message : 'Failed to assess project';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsAssessingProject(false);
     }
   }, [activeProject?.id]);
 
@@ -1983,21 +2069,52 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                               : 'Initial project instructions are required before code edits, commits, installs, migrations, or destructive commands. Read-only inspection and planning remain available.'}
                           </div>
                           {canApproveProjectInstructions && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              className="mt-2 h-7"
-                              onClick={() => {
-                                handleApproveProjectInstructions().catch(() => {});
-                              }}
-                              disabled={isApprovingProjectInstructions}
-                            >
-                              {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
-                            </Button>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="h-7"
+                                onClick={() => {
+                                  handleApproveProjectInstructions().catch(() => {});
+                                }}
+                                disabled={isApprovingProjectInstructions}
+                              >
+                                {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                aria-label="Refresh project assessment"
+                                title="Refresh project assessment"
+                                onClick={() => {
+                                  handleAssessProject().catch(() => {});
+                                }}
+                                disabled={isAssessingProject}
+                              >
+                                <RefreshCw
+                                  className={cn(
+                                    'h-3.5 w-3.5',
+                                    isAssessingProject && 'animate-spin',
+                                  )}
+                                  aria-hidden
+                                />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
+                      {onboardingAssessment && (
+                        <ProjectOnboardingAssessmentPanel
+                          assessment={onboardingAssessment}
+                          isRefreshing={isAssessingProject}
+                          onRefresh={() => {
+                            handleAssessProject().catch(() => {});
+                          }}
+                        />
+                      )}
                     </div>
                   )}
                   {projectOpenError && (

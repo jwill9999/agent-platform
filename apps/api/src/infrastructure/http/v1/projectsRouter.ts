@@ -2,7 +2,9 @@ import {
   ProjectCreateBodySchema,
   type ProjectOpenBody,
   ProjectOpenBodySchema,
+  ProjectOnboardingStateSchema,
   ProjectQuerySchema,
+  type ProjectInstructionFileReference,
   type ProjectRecord,
   ProjectUpdateBodySchema,
 } from '@agent-platform/contracts';
@@ -28,6 +30,7 @@ import {
   discoverProjectInstructions,
   parseProjectInstructionFileReferences,
 } from '../../projects/projectInstructions.js';
+import { assessProjectOnboarding } from '../../projects/projectAssessment.js';
 import { parseBody, requireParam } from './routerUtils.js';
 
 function mapProjectError(error: unknown): never {
@@ -52,7 +55,8 @@ type BackendProjectMetadata = {
   capabilityState: 'backend_accessible';
   onboardingState: 'missing' | 'in_progress' | 'needs_review' | 'approved';
   defaultAgentProfile: 'coding';
-  instructionFiles: ReturnType<typeof discoverProjectInstructions>['instructionFiles'];
+  instructionFiles: ProjectInstructionFileReference[];
+  onboardingAssessment?: ReturnType<typeof assessProjectOnboarding>['assessment'];
 };
 
 const GIT_BINARY = '/usr/bin/git';
@@ -67,6 +71,13 @@ function gitValue(cwd: string, args: string[]): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function metadataOnboardingState(
+  metadata: Record<string, unknown>,
+): BackendProjectMetadata['onboardingState'] | undefined {
+  const parsed = ProjectOnboardingStateSchema.safeParse(metadata['onboardingState']);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function discoverBackendProjectMetadata(
@@ -113,6 +124,24 @@ function discoverBackendProjectMetadata(
   };
   if (activeBranch) metadata.activeBranch = activeBranch;
   metadata.activeWorktreeId = headSha ? `${repositoryRoot}:${headSha}` : repositoryRoot;
+  const assessmentResult = assessProjectOnboarding({
+    projectId: '',
+    projectName: basename(projectRoot) || 'Project',
+    projectRoot,
+    repositoryRoot,
+    activeBranch,
+    currentState: metadataOnboardingState(existingMetadata) ?? instructionDiscovery.onboardingState,
+    existingInstructionFiles: parseProjectInstructionFileReferences(existingMetadata),
+  });
+  const approvedAtMs =
+    assessmentResult.nextState === 'approved'
+      ? assessmentResult.assessment.assessedAtMs
+      : undefined;
+  metadata.onboardingState = assessmentResult.nextState;
+  metadata.instructionFiles = assessmentResult.instructionFiles.map((file) =>
+    approvedAtMs && file.scope === 'root' ? { ...file, approvedAtMs } : file,
+  );
+  metadata.onboardingAssessment = assessmentResult.assessment;
   return metadata;
 }
 
@@ -192,6 +221,46 @@ function approveProjectOnboarding(db: DrizzleDb, id: string): ProjectRecord {
   });
 }
 
+function assessProjectForOnboarding(db: DrizzleDb, id: string): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  const repositoryRoot = project.metadata['repositoryRoot'];
+  if (typeof backendProjectRoot !== 'string' || typeof repositoryRoot !== 'string') {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project root is not backend accessible');
+  }
+  const parsedState = ProjectOnboardingStateSchema.safeParse(project.metadata['onboardingState']);
+  const state = parsedState.success ? parsedState.data : 'missing';
+  const activeBranch =
+    typeof project.metadata['activeBranch'] === 'string'
+      ? project.metadata['activeBranch']
+      : undefined;
+  const assessmentResult = assessProjectOnboarding({
+    projectId: project.id,
+    projectName: project.name,
+    projectRoot: backendProjectRoot,
+    repositoryRoot,
+    activeBranch,
+    currentState: state,
+    existingInstructionFiles: parseProjectInstructionFileReferences(project.metadata),
+  });
+  const approvedAtMs =
+    assessmentResult.nextState === 'approved'
+      ? assessmentResult.assessment.assessedAtMs
+      : undefined;
+
+  return updateProject(db, id, {
+    metadata: {
+      ...project.metadata,
+      onboardingState: assessmentResult.nextState,
+      onboardingAssessment: assessmentResult.assessment,
+      instructionFiles: assessmentResult.instructionFiles.map((file) =>
+        approvedAtMs && file.scope === 'root' ? { ...file, approvedAtMs } : file,
+      ),
+    },
+  });
+}
+
 export function createProjectsRouter(db: DrizzleDb): Router {
   const router = Router();
 
@@ -260,6 +329,17 @@ export function createProjectsRouter(db: DrizzleDb): Router {
     asyncHandler(async (req, res) => {
       try {
         res.json({ data: approveProjectOnboarding(db, requireParam(req.params, 'id')) });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/onboarding/assess',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({ data: assessProjectForOnboarding(db, requireParam(req.params, 'id')) });
       } catch (error) {
         mapProjectError(error);
       }

@@ -95,8 +95,14 @@ describe('projectsRouter', () => {
         repositoryRoot: repoRealPath,
         activeBranch: 'main',
         capabilityState: 'backend_accessible',
-        onboardingState: 'missing',
+        onboardingState: 'in_progress',
         defaultAgentProfile: 'coding',
+        onboardingAssessment: expect.objectContaining({
+          status: 'in_progress',
+          profile: expect.any(String),
+          gaps: expect.arrayContaining([expect.objectContaining({ kind: 'missing_instructions' })]),
+          display: expect.not.objectContaining({ relativePath: '/workspace' }),
+        }),
       },
     });
 
@@ -134,7 +140,12 @@ describe('projectsRouter', () => {
       .expect(201);
 
     expect(openedProject.body.data.metadata).toMatchObject({
-      onboardingState: 'needs_review',
+      onboardingState: 'in_progress',
+      onboardingAssessment: expect.objectContaining({
+        status: 'in_progress',
+        gaps: expect.arrayContaining([expect.objectContaining({ kind: 'stale_instructions' })]),
+        questions: expect.any(Array),
+      }),
       instructionFiles: expect.arrayContaining([
         expect.objectContaining({ scope: 'root', path: 'AGENTS.md' }),
         expect.objectContaining({
@@ -185,14 +196,65 @@ describe('projectsRouter', () => {
       .expect(201);
 
     expect(openedProject.body.data.metadata).toMatchObject({
-      onboardingState: 'missing',
+      onboardingState: 'in_progress',
       instructionFiles: [],
+      onboardingAssessment: expect.objectContaining({
+        status: 'in_progress',
+        gaps: expect.arrayContaining([expect.objectContaining({ kind: 'missing_instructions' })]),
+      }),
     });
 
     await request(app)
       .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
       .send({})
       .expect(409);
+  });
+
+  it('auto-approves sufficient existing AGENTS.md instructions during assessment', async () => {
+    const repoDir = path.join(tmpDir, 'repo-with-sufficient-agents');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(
+      path.join(repoDir, 'AGENTS.md'),
+      [
+        '# Agent Instructions',
+        '',
+        'Use Beads for task tracking and keep Project work read-only until instructions are approved.',
+        'Run build, typecheck, lint, tests, and docs quality gates before closing a ticket.',
+        'Open a pull request and wait for CI, SonarCloud, GitGuardian, and review comments.',
+      ].join('\n'),
+    );
+    writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'sufficient-project',
+        scripts: { build: 'tsc', test: 'vitest', lint: 'eslint .' },
+      }),
+    );
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Sufficient Repo' })
+      .expect(201);
+
+    expect(openedProject.body.data.metadata).toMatchObject({
+      onboardingState: 'approved',
+      onboardingAssessment: expect.objectContaining({
+        status: 'approved',
+        profile: 'coding',
+        commands: expect.arrayContaining([
+          expect.objectContaining({ kind: 'build' }),
+          expect.objectContaining({ kind: 'test' }),
+          expect.objectContaining({ kind: 'lint' }),
+        ]),
+      }),
+      instructionFiles: expect.arrayContaining([
+        expect.objectContaining({
+          scope: 'root',
+          path: 'AGENTS.md',
+          approvedAtMs: expect.any(Number),
+        }),
+      ]),
+    });
   });
 
   it('keeps backend-inaccessible paths unavailable and does not create project records', async () => {

@@ -61,10 +61,10 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] First load can run read-only Project assessment.
-- [ ] Assessment inspects Project evidence without writes or destructive commands.
-- [ ] Assessment classifies the Project profile/capabilities without assuming every Project is code.
-- [ ] Assessment returns and persists structured status, evidence, gaps, questions, and recommended
+- [x] First load can run read-only Project assessment.
+- [x] Assessment inspects Project evidence without writes or destructive commands.
+- [x] Assessment classifies the Project profile/capabilities without assuming every Project is code.
+- [x] Assessment returns and persists structured status, evidence, gaps, questions, and recommended
       updates.
-- [ ] Sufficient existing `AGENTS.md` can move onboarding to approved.
-- [ ] Missing/insufficient `AGENTS.md` moves onboarding to in-progress with visible gaps/questions.
+- [x] Sufficient existing `AGENTS.md` can move onboarding to approved.
+- [x] Missing/insufficient `AGENTS.md` moves onboarding to in-progress with visible gaps/questions.
