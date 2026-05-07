@@ -12,7 +12,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Date:** 2026-05-07
 - **Session:** Opened PR #143 for `agent-platform-project-workspaces.1`, kept the Bead open until remote gates pass, fixed Sourcery review feedback by tightening project-relative path validation and making access policy handling exhaustive, and pushed the review-fix commit for CI rerun.
 - **Date:** 2026-05-07
-- **Session:** PR #143 rerun is green across GitHub Actions, SonarCloud, Sourcery, GitGuardian, markdownlint, and lychee. Sourcery review threads are resolved/outdated after the review-fix commit. The Bead remains open pending owner merge/closeout decision.
+- **Session:** PR #143 rerun is green across GitHub Actions, SonarCloud, Sourcery, GitGuardian, markdownlint, and lychee. Sourcery review threads are resolved/outdated after the review-fix commit. Closed `agent-platform-project-workspaces.1` in Beads under the agreed PR-green definition of done.
 - **Date:** 2026-05-07
 - **Session:** Final planning pass added explicit per-task testing strategies to every Project workspace and Project onboarding child spec, including mandatory local gates, focused tests, Playwright UI actions/assertions where applicable, CI/GitHub monitoring, and no-close/no-merge until all gates are green.
 - **Date:** 2026-05-07
@@ -979,13 +979,13 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-project-workspaces.1`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** `agent-platform-project-workspaces.1` implementation and review fixes are pushed to PR #143. Remote CI/Sonar/Sourcery/review gates are green. The Bead remains open pending owner merge/closeout decision.
+- **Current work:** `agent-platform-project-workspaces.1` implementation and review fixes are pushed to PR #143. Remote CI/Sonar/Sourcery/review gates are green. The Bead is closed.
 - **Remote sync:** pending push; sandbox DNS/auth previously blocked Beads Dolt auto-push.
 
 ### Beads
 
 - `agent-platform-project-workspaces` is in progress.
-- `agent-platform-project-workspaces.1` is open. PR #143 is open and green; review threads are resolved/outdated. Close only after the agreed merge/closeout point.
+- `agent-platform-project-workspaces.1` is closed. PR #143 is open and green; review threads are resolved/outdated. The PR remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.2` is the next child task after `.1` closes: Add Project vs Chat entry paths and default agents.
 - `agent-platform-project-workspaces.3` through `.6` are open and linearly blocked behind earlier tasks.
 - `agent-platform-code-workbench.6` is closed.
@@ -1099,9 +1099,9 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Merge PR #143 into `feature/agent-platform-project-workspaces` when ready.
-2. Close `agent-platform-project-workspaces.1` after the agreed merge/closeout point.
-3. Claim `agent-platform-project-workspaces.2` for Project vs Chat entry paths and default agent selection.
+1. Leave PR #143 unmerged until the end-of-epic integration point.
+2. Claim `agent-platform-project-workspaces.2` for Project vs Chat entry paths and default agent selection.
+3. For each task, open the PR, monitor CI/Sonar/Sourcery/review comments, iterate until green/resolved, then close the Bead without merging the PR yet.
 4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
 5. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
 
