@@ -50,6 +50,10 @@ export type ToolDispatchContext = {
   approvedToolCallIds?: ReadonlySet<string>;
   /** Resolves a skill by ID for lazy loading (sys_get_skill_detail). */
   skillResolver?: (skillId: string) => Skill | undefined;
+  projectAccessPolicy?: {
+    canWrite: boolean;
+    writeBlockReason?: string;
+  };
 };
 
 export type ApprovalRequestCreateInput = {
@@ -85,6 +89,17 @@ const TOOL_PATH_OPERATIONS: Record<string, 'read' | 'write'> = {
   sys_code_search: 'read',
   sys_find_related_tests: 'read',
 };
+
+const WRITE_TOOL_IDS = new Set(
+  Object.entries(TOOL_PATH_OPERATIONS)
+    .filter(([, operation]) => operation === 'write')
+    .map(([toolId]) => toolId),
+);
+WRITE_TOOL_IDS.add(CODING_APPLY_PATCH_ID);
+
+const READ_ONLY_SHELL_PATTERN =
+  /^\s*(?:pwd|ls(?:\s|$)|find(?:\s|$)|rg(?:\s|$)|grep(?:\s|$)|cat(?:\s|$)|head(?:\s|$)|tail(?:\s|$)|sed\s+-n(?:\s|$)|git\s+(?:status|diff|log|branch|show|rev-parse)(?:\s|$))/;
+const SHELL_MUTATION_OR_CHAIN_PATTERN = /(?:^|[^\\])(?:[;&|<>]|\$\(|`)/;
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -264,6 +279,19 @@ async function dispatchSingleTool(
     return { output, ok: false };
   }
 
+  const onboardingBlockReason = onboardingWriteBlockReason(call, ctx);
+  if (onboardingBlockReason) {
+    const output = buildProjectOnboardingBlockedOutput(call);
+    ctx.auditLog?.logDenied(
+      call.name,
+      call.args,
+      ctx.agent.id,
+      '',
+      `Project onboarding blocks writes: ${onboardingBlockReason}`,
+    );
+    return { output, ok: false };
+  }
+
   // PathJail: enforce file-path constraints for system tools
   let safeCall = call;
   if (isSystemTool(call.name)) {
@@ -343,6 +371,28 @@ function browserUrlApprovalReason(call: ToolCallIntent): string | undefined {
   const decision = evaluateBrowserUrlPolicy(url);
   if (decision.state !== 'approval_required') return undefined;
   return decision.reasons.at(0) ?? 'Browser URL policy requires human approval.';
+}
+
+function onboardingWriteBlockReason(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+): string | undefined {
+  if (ctx.projectAccessPolicy?.canWrite !== false) return undefined;
+  if (WRITE_TOOL_IDS.has(call.name)) return ctx.projectAccessPolicy.writeBlockReason;
+  if (call.name !== 'sys_bash') return undefined;
+  const command = typeof call.args.command === 'string' ? call.args.command : '';
+  if (READ_ONLY_SHELL_PATTERN.test(command) && !SHELL_MUTATION_OR_CHAIN_PATTERN.test(command)) {
+    return undefined;
+  }
+  return ctx.projectAccessPolicy.writeBlockReason;
+}
+
+function buildProjectOnboardingBlockedOutput(call: ToolCallIntent): Output {
+  return {
+    type: 'error',
+    code: 'PROJECT_ONBOARDING_REQUIRED',
+    message: `Tool "${call.name}" is blocked until the Project AGENTS.md onboarding review is approved. Read-only inspection is still available.`,
+  };
 }
 
 function markBrowserUrlApproved(call: ToolCallIntent): ToolCallIntent {
@@ -822,6 +872,26 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           ctx.agent.id,
           state.sessionId ?? '',
           'Tool not in agent allowlist',
+        );
+        toolMessages.push({
+          role: 'tool',
+          toolCallId: call.id,
+          toolName: call.name,
+          content: outputToContent(call.name, output),
+        });
+        traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        continue;
+      }
+
+      const onboardingBlockReason = onboardingWriteBlockReason(call, ctx);
+      if (onboardingBlockReason) {
+        const output = buildProjectOnboardingBlockedOutput(call);
+        ctx.auditLog?.logDenied(
+          call.name,
+          call.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          onboardingBlockReason,
         );
         toolMessages.push({
           role: 'tool',

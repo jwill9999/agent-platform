@@ -1272,3 +1272,11 @@ Tracked in Beads: `agent-platform-lt6`
 - Direction: move beyond DB-backed skill prompt records toward governed skill packages that may include instructions, tool dependencies, scripts, references, assets, examples, tests, and policy metadata.
 - Product goal: users describe the desired capability in natural language, then an agent collaborates with them to design, scaffold, validate, and activate the skill under harness security and approval constraints.
 - Key constraint: skill-owned scripts/functions must not bypass sandboxing, path jail, approval, observability, or capability assignment controls.
+
+## 2026-05-07 Project Workspace Onboarding Gate
+
+- Task `agent-platform-project-workspaces.5` adds AGENTS.md discovery, approval metadata, prompt context injection, and write-tool gating for Project-bound sessions.
+- Root `AGENTS.md` is required before Project writes unlock; changed instruction file hashes move onboarding back to `needs_review`.
+- Read-only inspection remains available before approval; write tools, mutating shell, and patch tools are hidden from the model and denied if invoked.
+- Verification completed locally: format, typecheck, lint, build, full unit tests, docs lint, Docker rebuild/seed, and Playwright e2e all pass.
+- SonarQube CLI authentication works, but file-level `sonar verify` returns SonarCloud `403` because Agentic Analysis is not activated for the organization; PR SonarCloud remains the required remote quality gate.

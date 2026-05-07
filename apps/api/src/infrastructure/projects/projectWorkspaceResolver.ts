@@ -1,6 +1,16 @@
 import { realpathSync } from 'node:fs';
 import { relative, isAbsolute } from 'node:path';
 
+import {
+  getProjectAccessPolicy,
+  ProjectCapabilityStateSchema,
+  ProjectInstructionFileReferenceSchema,
+  ProjectOnboardingStateSchema,
+  type ProjectAccessPolicy,
+  type ProjectCapabilityState,
+  type ProjectInstructionFileReference,
+  type ProjectOnboardingState,
+} from '@agent-platform/contracts';
 import { findProject, getSession, type DrizzleDb } from '@agent-platform/db';
 import type { Mount } from '@agent-platform/harness';
 
@@ -17,6 +27,9 @@ export type ProjectWorkspaceResolution =
       repositoryRoot: string;
       defaultRepoPath: string;
       mounts: Mount[];
+      accessPolicy: ProjectAccessPolicy;
+      onboardingState: ProjectOnboardingState;
+      instructionFiles: ProjectInstructionFileReference[];
     }
   | {
       ok: false;
@@ -27,6 +40,29 @@ export type ProjectWorkspaceResolution =
 function metadataString(metadata: Record<string, unknown>, key: string): string | undefined {
   const value = metadata[key];
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function metadataInstructionFiles(
+  metadata: Record<string, unknown>,
+): ProjectInstructionFileReference[] {
+  const value = metadata['instructionFiles'];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const parsed = ProjectInstructionFileReferenceSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+function metadataCapabilityState(
+  metadata: Record<string, unknown>,
+): ProjectCapabilityState | undefined {
+  const parsed = ProjectCapabilityStateSchema.safeParse(metadata['capabilityState']);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function metadataOnboardingState(metadata: Record<string, unknown>): ProjectOnboardingState {
+  const parsed = ProjectOnboardingStateSchema.safeParse(metadata['onboardingState']);
+  return parsed.success ? parsed.data : 'missing';
 }
 
 function isWithin(root: string, candidate: string): boolean {
@@ -63,7 +99,7 @@ export function resolveSessionWorkspace(
     };
   }
 
-  const capabilityState = metadataString(project.metadata, 'capabilityState');
+  const capabilityState = metadataCapabilityState(project.metadata);
   const backendProjectRoot = metadataString(project.metadata, 'backendProjectRoot');
   const metadataRepositoryRoot = metadataString(project.metadata, 'repositoryRoot');
   if (capabilityState !== 'backend_accessible' || !backendProjectRoot) {
@@ -73,6 +109,7 @@ export function resolveSessionWorkspace(
       message: 'The bound Project is not available to the backend.',
     };
   }
+  const onboardingState = metadataOnboardingState(project.metadata);
 
   let workspaceRoot: string;
   try {
@@ -102,6 +139,9 @@ export function resolveSessionWorkspace(
     workspaceRoot,
     repositoryRoot,
     defaultRepoPath: repositoryRoot,
+    accessPolicy: getProjectAccessPolicy({ capabilityState, onboardingState }),
+    onboardingState,
+    instructionFiles: metadataInstructionFiles(project.metadata),
     mounts: [
       {
         label: 'workspace',

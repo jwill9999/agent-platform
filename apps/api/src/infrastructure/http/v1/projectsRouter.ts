@@ -3,6 +3,7 @@ import {
   ProjectOpenBodySchema,
   ProjectQuerySchema,
   ProjectUpdateBodySchema,
+  ProjectInstructionFileReferenceSchema,
   type ProjectOpenBody,
   type ProjectRecord,
 } from '@agent-platform/contracts';
@@ -24,6 +25,7 @@ import { basename, isAbsolute } from 'node:path';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
+import { discoverProjectInstructions } from '../../projects/projectInstructions.js';
 import { parseBody, requireParam } from './routerUtils.js';
 
 function mapProjectError(error: unknown): never {
@@ -46,8 +48,9 @@ type BackendProjectMetadata = {
   activeWorktreeId?: string;
   projectRoot: '/workspace';
   capabilityState: 'backend_accessible';
-  onboardingState: 'missing';
+  onboardingState: 'missing' | 'in_progress' | 'needs_review' | 'approved';
   defaultAgentProfile: 'coding';
+  instructionFiles: ReturnType<typeof discoverProjectInstructions>['instructionFiles'];
 };
 
 const GIT_BINARY = '/usr/bin/git';
@@ -64,7 +67,19 @@ function gitValue(cwd: string, args: string[]): string | undefined {
   }
 }
 
-function discoverBackendProjectMetadata(rawPath: string): BackendProjectMetadata {
+function existingInstructionFiles(metadata: Record<string, unknown>) {
+  const value = metadata['instructionFiles'];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const parsed = ProjectInstructionFileReferenceSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+function discoverBackendProjectMetadata(
+  rawPath: string,
+  existingMetadata: Record<string, unknown> = {},
+): BackendProjectMetadata {
   if (!isAbsolute(rawPath)) {
     throw new HttpError(422, 'PROJECT_UNAVAILABLE', 'Project path must be absolute', {
       path: rawPath,
@@ -89,14 +104,19 @@ function discoverBackendProjectMetadata(rawPath: string): BackendProjectMetadata
   const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']) ?? projectRoot;
   const activeBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
   const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD']);
+  const instructionDiscovery = discoverProjectInstructions(
+    projectRoot,
+    existingInstructionFiles(existingMetadata),
+  );
 
   const metadata: BackendProjectMetadata = {
     backendProjectRoot: projectRoot,
     repositoryRoot,
     projectRoot: '/workspace',
     capabilityState: 'backend_accessible',
-    onboardingState: 'missing',
+    onboardingState: instructionDiscovery.onboardingState,
     defaultAgentProfile: 'coding',
+    instructionFiles: instructionDiscovery.instructionFiles,
   };
   if (activeBranch) metadata.activeBranch = activeBranch;
   metadata.activeWorktreeId = headSha ? `${repositoryRoot}:${headSha}` : repositoryRoot;
@@ -120,8 +140,11 @@ function openBackendProject(
   project: ProjectRecord;
   created: boolean;
 } {
-  const metadata = discoverBackendProjectMetadata(input.path);
-  const existing = findProjectByWorkspaceKey(db, metadata.backendProjectRoot);
+  const initialMetadata = discoverBackendProjectMetadata(input.path);
+  const existing = findProjectByWorkspaceKey(db, initialMetadata.backendProjectRoot);
+  const metadata = existing
+    ? discoverBackendProjectMetadata(input.path, existing.metadata)
+    : initialMetadata;
   const name = projectNameFor(input, metadata.backendProjectRoot);
 
   if (existing) {
@@ -146,6 +169,34 @@ function openBackendProject(
     }),
     created: true,
   };
+}
+
+function approveProjectOnboarding(db: DrizzleDb, id: string): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  if (typeof backendProjectRoot !== 'string') {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project root is not backend accessible');
+  }
+  const discovery = discoverProjectInstructions(
+    backendProjectRoot,
+    existingInstructionFiles(project.metadata),
+  );
+  if (!discovery.instructionFiles.some((file) => file.scope === 'root')) {
+    throw new HttpError(
+      409,
+      'PROJECT_INSTRUCTIONS_MISSING',
+      'Root AGENTS.md is required before approval',
+    );
+  }
+  const approvedAtMs = Date.now();
+  return updateProject(db, id, {
+    metadata: {
+      ...project.metadata,
+      onboardingState: 'approved',
+      instructionFiles: discovery.instructionFiles.map((file) => ({ ...file, approvedAtMs })),
+    },
+  });
 }
 
 export function createProjectsRouter(db: DrizzleDb): Router {
@@ -205,6 +256,17 @@ export function createProjectsRouter(db: DrizzleDb): Router {
           parseBody(ProjectUpdateBodySchema, req.body),
         );
         res.json({ data: project });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/onboarding/approve',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({ data: approveProjectOnboarding(db, requireParam(req.params, 'id')) });
       } catch (error) {
         mapProjectError(error);
       }

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -119,6 +119,80 @@ describe('projectsRouter', () => {
       mode: 'project',
       projectId: openedProject.body.data.id,
     });
+  });
+
+  it('tracks AGENTS.md onboarding state and approval metadata', async () => {
+    const repoDir = path.join(tmpDir, 'repo-with-agents');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    mkdirSync(path.join(repoDir, 'apps', 'web'), { recursive: true });
+    writeFileSync(path.join(repoDir, 'AGENTS.md'), 'root instructions\n');
+    writeFileSync(path.join(repoDir, 'apps', 'web', 'AGENTS.md'), 'web instructions\n');
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Repo With Agents' })
+      .expect(201);
+
+    expect(openedProject.body.data.metadata).toMatchObject({
+      onboardingState: 'needs_review',
+      instructionFiles: expect.arrayContaining([
+        expect.objectContaining({ scope: 'root', path: 'AGENTS.md' }),
+        expect.objectContaining({
+          scope: 'nested',
+          path: 'apps/web/AGENTS.md',
+          appliesToPath: 'apps/web',
+        }),
+      ]),
+    });
+
+    const approved = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
+      .send({})
+      .expect(200);
+
+    expect(approved.body.data.metadata).toMatchObject({
+      onboardingState: 'approved',
+      instructionFiles: expect.arrayContaining([
+        expect.objectContaining({
+          scope: 'root',
+          path: 'AGENTS.md',
+          approvedAtMs: expect.any(Number),
+        }),
+      ]),
+    });
+
+    const unchanged = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Repo With Agents' })
+      .expect(200);
+    expect(unchanged.body.data.metadata.onboardingState).toBe('approved');
+
+    writeFileSync(path.join(repoDir, 'AGENTS.md'), 'updated root instructions\n');
+    const changed = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Repo With Agents' })
+      .expect(200);
+    expect(changed.body.data.metadata.onboardingState).toBe('needs_review');
+  });
+
+  it('refuses AGENTS.md approval when the root instruction file is missing', async () => {
+    const repoDir = path.join(tmpDir, 'repo-without-agents');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Repo Without Agents' })
+      .expect(201);
+
+    expect(openedProject.body.data.metadata).toMatchObject({
+      onboardingState: 'missing',
+      instructionFiles: [],
+    });
+
+    await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
+      .send({})
+      .expect(409);
   });
 
   it('keeps backend-inaccessible paths unavailable and does not create project records', async () => {

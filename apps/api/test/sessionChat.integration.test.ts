@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -134,6 +134,8 @@ function createChatProject(
     backendProjectRoot: string;
     repositoryRoot: string;
     capabilityState: 'backend_accessible' | 'unavailable';
+    onboardingState?: 'missing' | 'approved' | 'needs_review' | 'in_progress';
+    instructionFiles?: unknown[];
   },
 ) {
   return createProject(db, {
@@ -144,8 +146,9 @@ function createChatProject(
       repositoryRoot: options.repositoryRoot,
       projectRoot: '/workspace',
       capabilityState: options.capabilityState,
-      onboardingState: 'missing',
+      onboardingState: options.onboardingState ?? 'missing',
       defaultAgentProfile: 'coding',
+      instructionFiles: options.instructionFiles ?? [],
     },
   });
 }
@@ -690,6 +693,7 @@ describe('POST /v1/chat (session-aware)', () => {
         backendProjectRoot: projectRoot,
         repositoryRoot: projectRoot,
         capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
       });
       mockProjectWrite('tc-project-write', 'written in project root');
       const res = await request(app)
@@ -703,6 +707,84 @@ describe('POST /v1/chat (session-aware)', () => {
       const projectFile = path.join(projectRoot, 'project-note.txt');
       expect(existsSync(projectFile)).toBe(true);
       expect(readFileSync(projectFile, 'utf8')).toBe('written in project root');
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('blocks Project writes before AGENTS.md onboarding is approved', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const projectRoot = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-project-chat-root-'));
+      dirs.push(projectRoot);
+      const sessionId = await createProjectSession(app, db, {
+        name: 'Needs Review Project',
+        workspaceKey: projectRoot,
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'backend_accessible',
+        onboardingState: 'needs_review',
+      });
+      mockProjectWrite('tc-project-write-blocked', 'should not write');
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Write the project note' })
+        .expect(200);
+
+      expect(res.text).not.toContain('tool_result');
+      expect(existsSync(path.join(projectRoot, 'project-note.txt'))).toBe(false);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('adds root and nearest nested AGENTS.md files to the Project chat prompt', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const projectRoot = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-project-chat-root-'));
+      dirs.push(projectRoot);
+      mkdirSync(path.join(projectRoot, 'apps', 'web'), { recursive: true });
+      writeFileSync(path.join(projectRoot, 'AGENTS.md'), 'root rule\n');
+      writeFileSync(path.join(projectRoot, 'apps', 'web', 'AGENTS.md'), 'web rule\n');
+      const sessionId = await createProjectSession(app, db, {
+        name: 'Instruction Project',
+        workspaceKey: projectRoot,
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
+        instructionFiles: [
+          { scope: 'root', path: 'AGENTS.md', approvedAtMs: 123 },
+          {
+            scope: 'nested',
+            path: 'apps/web/AGENTS.md',
+            appliesToPath: 'apps/web',
+            approvedAtMs: 123,
+          },
+        ],
+      });
+
+      mockToolCalls.mockReturnValueOnce('Read the instructions');
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Inspect apps/web/page.tsx' })
+        .expect(200);
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; content: string }>;
+      };
+      const systemPrompt = state.messages?.[0]?.content ?? '';
+      expect(systemPrompt).toContain('--- AGENTS.md ---');
+      expect(systemPrompt).toContain('root rule');
+      expect(systemPrompt).toContain('--- apps/web/AGENTS.md ---');
+      expect(systemPrompt).toContain('web rule');
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

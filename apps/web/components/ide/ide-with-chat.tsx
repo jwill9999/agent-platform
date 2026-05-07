@@ -31,6 +31,7 @@ import {
   RefreshCw,
   ListCollapse,
   Terminal as TerminalIcon,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -86,6 +87,53 @@ import {
   buildWorkbenchBranchSummary,
   type WorkbenchBranchSummary,
 } from '@/lib/code-workbench-branch-summary';
+
+type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
+
+function projectMetadataString(project: ProjectRecord | null, key: string): string | undefined {
+  const value = project?.metadata[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function projectOnboardingState(project: ProjectRecord | null): ProjectOnboardingState {
+  const value = projectMetadataString(project, 'onboardingState');
+  if (
+    value === 'missing' ||
+    value === 'in_progress' ||
+    value === 'approved' ||
+    value === 'needs_review'
+  ) {
+    return value;
+  }
+  return 'missing';
+}
+
+function projectHasRootInstructions(project: ProjectRecord | null): boolean {
+  const files = project?.metadata.instructionFiles;
+  return (
+    Array.isArray(files) &&
+    files.some(
+      (file) =>
+        typeof file === 'object' &&
+        file !== null &&
+        !Array.isArray(file) &&
+        (file as { scope?: unknown }).scope === 'root',
+    )
+  );
+}
+
+function projectOnboardingLabel(state: ProjectOnboardingState): string {
+  switch (state) {
+    case 'approved':
+      return 'Instructions approved';
+    case 'needs_review':
+      return 'Instructions review required';
+    case 'in_progress':
+      return 'Instructions review in progress';
+    case 'missing':
+      return 'Instructions missing';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Small presentational components
@@ -448,6 +496,7 @@ function IDEToolbar({
   setShowChat,
   activeFilePath,
   activeFileIsDirty,
+  canSaveActiveFile,
   onSave,
   isPathDialogOpen,
   setIsPathDialogOpen,
@@ -470,6 +519,7 @@ function IDEToolbar({
   setShowChat: (v: boolean) => void;
   activeFilePath: string | null;
   activeFileIsDirty: boolean;
+  canSaveActiveFile: boolean;
   onSave: () => void;
   isPathDialogOpen: boolean;
   setIsPathDialogOpen: (v: boolean) => void;
@@ -574,7 +624,12 @@ function IDEToolbar({
           size="sm"
           className="gap-2"
           onClick={onSave}
-          disabled={!activeFileIsDirty}
+          disabled={!canSaveActiveFile}
+          title={
+            activeFileIsDirty && !canSaveActiveFile
+              ? 'Approve project instructions before saving changes'
+              : 'Save file'
+          }
         >
           <Save className="h-4 w-4" />
           Save
@@ -1260,6 +1315,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
   const [isOpeningBackendProject, setIsOpeningBackendProject] = useState(false);
+  const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -1304,6 +1360,13 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     () => new Set(contextFiles.map((file) => file.path)),
     [contextFiles],
   );
+  const onboardingState = projectOnboardingState(activeProject);
+  const projectWritesApproved = !activeProject || onboardingState === 'approved';
+  const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
+  const canApproveProjectInstructions =
+    Boolean(activeProject) &&
+    onboardingState !== 'approved' &&
+    projectHasRootInstructions(activeProject);
 
   const {
     messages,
@@ -1405,6 +1468,28 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     }
   }, [clearProjectContext, projectPathInput]);
 
+  const handleApproveProjectInstructions = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsApprovingProjectInstructions(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'approve'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to approve project instructions', 500);
+      setActiveProject(project);
+      toast.success('Project instructions approved');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to approve project instructions';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsApprovingProjectInstructions(false);
+    }
+  }, [activeProject?.id]);
+
   // --- File operations ---
 
   const findFileByPath = useCallback(
@@ -1473,6 +1558,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
   const handleSave = useCallback(async () => {
     if (!activeTab || !activeFile) return;
+    if (!projectWritesApproved) {
+      toast.error('Approve project instructions before saving changes');
+      return;
+    }
     // Write to filesystem if handle is available
     if (activeFile.handle) {
       const node: FileNode = {
@@ -1497,7 +1586,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setOpenTabs((prev) =>
       prev.map((tab) => (tab.path === activeTab ? { ...tab, isDirty: false } : tab)),
     );
-  }, [activeTab, activeFile, fs]);
+  }, [activeTab, activeFile, fs, projectWritesApproved]);
 
   // --- Context management ---
 
@@ -1750,6 +1839,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         setShowChat={setShowChat}
         activeFilePath={activeFile?.path ?? null}
         activeFileIsDirty={activeFile?.isDirty ?? false}
+        canSaveActiveFile={canSaveActiveFile}
         onSave={handleSave}
         isPathDialogOpen={isPathDialogOpen}
         setIsPathDialogOpen={setIsPathDialogOpen}
@@ -1864,6 +1954,40 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           Branch: {String(activeProject.metadata.activeBranch)}
                         </div>
                       )}
+                      <div
+                        className={cn(
+                          'mt-2 flex items-start gap-2 rounded-md border px-2 py-2',
+                          onboardingState === 'approved'
+                            ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700'
+                            : 'border-amber-500/35 bg-amber-500/10 text-foreground',
+                        )}
+                      >
+                        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium">
+                            {projectOnboardingLabel(onboardingState)}
+                          </div>
+                          <div className="mt-1 leading-snug text-muted-foreground">
+                            {onboardingState === 'approved'
+                              ? 'Code edits and write tools are available when allowed by policy.'
+                              : 'Initial project instructions are required before code edits, commits, installs, migrations, or destructive commands. Read-only inspection and planning remain available.'}
+                          </div>
+                          {canApproveProjectInstructions && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              className="mt-2 h-7"
+                              onClick={() => {
+                                handleApproveProjectInstructions().catch(() => {});
+                              }}
+                              disabled={isApprovingProjectInstructions}
+                            >
+                              {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                   {projectOpenError && (

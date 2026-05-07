@@ -95,6 +95,7 @@ function makeWorkspaceDispatchContext(options: {
   toolId: string;
   containerPath?: string;
   approvedToolCallIds?: string[];
+  canWrite?: boolean;
 }) {
   const nativeResult: Output = { type: 'tool_result', toolId: options.toolId, data: true };
   const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue(nativeResult);
@@ -111,6 +112,13 @@ function makeWorkspaceDispatchContext(options: {
       },
     ]),
     approvedToolCallIds: new Set(options.approvedToolCallIds ?? []),
+    projectAccessPolicy:
+      options.canWrite === undefined
+        ? undefined
+        : {
+            canWrite: options.canWrite,
+            writeBlockReason: options.canWrite ? undefined : 'onboarding_not_approved',
+          },
   };
   return { nativeExecutor, node: createToolDispatchNode(ctx) };
 }
@@ -290,6 +298,103 @@ describe('toolDispatchNode', () => {
     });
   });
 
+  it('blocks project write tools while AGENTS.md onboarding is not approved', async () => {
+    const workspace = makeTmpDir();
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_write_file',
+      containerPath: '/workspace',
+      approvedToolCallIds: ['tc-write-blocked'],
+      canWrite: false,
+    });
+
+    try {
+      const result = await node(
+        makeState({
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              {
+                id: 'tc-write-blocked',
+                name: 'sys_write_file',
+                args: { path: '/workspace/generated/report.md', content: 'done' },
+              },
+            ],
+          },
+        }),
+      );
+
+      expect(nativeExecutor).not.toHaveBeenCalled();
+      expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+        error: 'PROJECT_ONBOARDING_REQUIRED',
+        message: expect.stringContaining('AGENTS.md onboarding review is approved'),
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks coding patch tools while AGENTS.md onboarding is not approved', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'coding_apply_patch',
+      data: { ok: true },
+    });
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['coding_apply_patch'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvedToolCallIds: new Set(['tc-patch-blocked']),
+      projectAccessPolicy: {
+        canWrite: false,
+        writeBlockReason: 'onboarding_not_approved',
+      },
+    };
+    const node = createToolDispatchNode(ctx);
+    const result = await node(
+      makeState({
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [
+            {
+              id: 'tc-patch-blocked',
+              name: 'coding_apply_patch',
+              args: { operations: [] },
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+      error: 'PROJECT_ONBOARDING_REQUIRED',
+    });
+  });
+
+  it('allows read-only project inspection before AGENTS.md onboarding is approved', async () => {
+    const workspace = makeTmpDir();
+    const expectedPath = join(realpathSync(workspace), 'generated', 'report.md');
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_file_exists',
+      containerPath: '/workspace',
+      canWrite: false,
+    });
+
+    try {
+      await dispatchSingleToolCall(node, {
+        id: 'tc-read-only',
+        name: 'sys_file_exists',
+        args: { path: '/workspace/generated/report.md' },
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_file_exists', { path: expectedPath });
+  });
+
   it('passes canonical /workspace paths as mounted host project paths to bash tools', async () => {
     const workspace = makeTmpDir();
     const realWorkspace = realpathSync(workspace);
@@ -316,6 +421,66 @@ describe('toolDispatchNode', () => {
 
     expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
       command: `mkdir -p ${expectedDir} && touch ${expectedPath}`,
+    });
+  });
+
+  it('blocks mutating shell commands while AGENTS.md onboarding is not approved', async () => {
+    const workspace = makeTmpDir();
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_bash',
+      containerPath: '/workspace',
+      approvedToolCallIds: ['tc-shell-blocked'],
+      canWrite: false,
+    });
+
+    try {
+      const result = await node(
+        makeState({
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              {
+                id: 'tc-shell-blocked',
+                name: 'sys_bash',
+                args: { command: 'touch /workspace/generated/report.md' },
+              },
+            ],
+          },
+        }),
+      );
+
+      expect(nativeExecutor).not.toHaveBeenCalled();
+      expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+        error: 'PROJECT_ONBOARDING_REQUIRED',
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('allows read-only shell commands while AGENTS.md onboarding is not approved', async () => {
+    const workspace = makeTmpDir();
+    const { nativeExecutor, node } = makeWorkspaceDispatchContext({
+      workspace,
+      toolId: 'sys_bash',
+      containerPath: '/workspace',
+      approvedToolCallIds: ['tc-shell-read-only'],
+      canWrite: false,
+    });
+
+    try {
+      await dispatchSingleToolCall(node, {
+        id: 'tc-shell-read-only',
+        name: 'sys_bash',
+        args: { command: 'ls /workspace/generated' },
+      });
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+
+    expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
+      command: 'ls /workspace/generated',
     });
   });
 

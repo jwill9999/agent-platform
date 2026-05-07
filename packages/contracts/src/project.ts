@@ -56,9 +56,26 @@ const ProjectSlugSchema = z
   .max(120)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
-const ProjectMetadataSchema = z.record(
-  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]),
+type ProjectMetadataValue =
+  | string
+  | number
+  | boolean
+  | null
+  | ProjectMetadataValue[]
+  | { [key: string]: ProjectMetadataValue };
+
+const ProjectMetadataValueSchema: z.ZodType<ProjectMetadataValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(ProjectMetadataValueSchema),
+    z.record(z.string(), ProjectMetadataValueSchema),
+  ]),
 );
+
+const ProjectMetadataSchema = z.record(ProjectMetadataValueSchema);
 
 export const ProjectSubprojectScopeSchema = z.object({
   path: RelativeProjectPathSchema,

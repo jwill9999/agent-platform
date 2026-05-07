@@ -64,6 +64,11 @@ describe('resolveSessionWorkspace', () => {
       workspaceRoot: projectRoot,
       repositoryRoot: projectRoot,
       defaultRepoPath: projectRoot,
+      accessPolicy: {
+        canInspect: true,
+        canWrite: false,
+        writeBlockReason: 'onboarding_not_approved',
+      },
       mounts: [
         {
           label: 'workspace',
@@ -72,6 +77,35 @@ describe('resolveSessionWorkspace', () => {
           permission: 'read_write',
         },
       ],
+    });
+  });
+
+  it('unlocks writes when Project onboarding is approved', () => {
+    const projectRoot = realpathSync(mkdtempSync(join(tmpRoot, 'project-')));
+    const project = createProject(opened.db, {
+      name: 'Approved Backend Project',
+      workspaceKey: projectRoot,
+      metadata: {
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        projectRoot: '/workspace',
+        capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
+        defaultAgentProfile: 'coding',
+      },
+    });
+    const session = createSession(opened.db, {
+      agentId: 'agent-1',
+      mode: 'project',
+      projectId: project.id,
+    });
+
+    expect(resolveSessionWorkspace(opened.db, session.id)).toMatchObject({
+      ok: true,
+      accessPolicy: {
+        canInspect: true,
+        canWrite: true,
+      },
     });
   });
 
