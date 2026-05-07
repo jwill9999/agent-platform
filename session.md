@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
-- **Session:** Implemented `agent-platform-project-workspaces.1` on `task/agent-platform-project-workspaces.1`: added shared Project/Chat mode contracts, Project workspace binding metadata, capability/onboarding states, write-eligibility helpers, focused contract tests, and architecture documentation. Local build, format, lint, and unit gates passed; broad docs lint remains blocked by ignored `.agent-platform/workspaces/...` Markdown files.
+- **Session:** Implemented and locally closed `agent-platform-project-workspaces.1` on `task/agent-platform-project-workspaces.1`: added shared Project/Chat mode contracts, Project workspace binding metadata, capability/onboarding states, write-eligibility helpers, focused contract tests, and architecture documentation. Local build, format, lint, and unit gates passed; broad docs lint remains blocked by ignored `.agent-platform/workspaces/...` Markdown files.
 - **Date:** 2026-05-07
 - **Session:** Final planning pass added explicit per-task testing strategies to every Project workspace and Project onboarding child spec, including mandatory local gates, focused tests, Playwright UI actions/assertions where applicable, CI/GitHub monitoring, and no-close/no-merge until all gates are green.
 - **Date:** 2026-05-07
@@ -962,13 +962,13 @@ Quality gates passed:
 
 - **Current branch:** `task/agent-platform-project-workspaces.1`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** `agent-platform-project-workspaces.1` implementation is committed locally as `907ffe7`.
-- **Remote sync:** pending push after this session handoff update is committed; sandbox DNS/auth previously blocked Beads Dolt auto-push.
+- **Current work:** `agent-platform-project-workspaces.1` implementation, handoff, and Beads closeout are committed locally through `aba076b`.
+- **Remote sync:** pending push; sandbox DNS/auth previously blocked Beads Dolt auto-push.
 
 ### Beads
 
 - `agent-platform-project-workspaces` is in progress.
-- `agent-platform-project-workspaces.1` is in progress locally and implementation is complete; close after the handoff commit/push succeeds.
+- `agent-platform-project-workspaces.1` is closed locally.
 - `agent-platform-project-workspaces.2` is the next child task after `.1` closes: Add Project vs Chat entry paths and default agents.
 - `agent-platform-project-workspaces.3` through `.6` are open and linearly blocked behind earlier tasks.
 - `agent-platform-code-workbench.6` is closed.
@@ -1067,7 +1067,7 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit this `session.md` handoff update, close `agent-platform-project-workspaces.1`, push the task branch, and sync Beads/Dolt when network/auth allows.
+1. Push `task/agent-platform-project-workspaces.1` and sync Beads/Dolt when network/auth allows.
 2. Open PR `task/agent-platform-project-workspaces.1` -> `feature/agent-platform-project-workspaces` and monitor CI/reviews until green.
 3. After `.1` merges, claim `agent-platform-project-workspaces.2` for Project vs Chat entry paths and default agent selection.
 4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
