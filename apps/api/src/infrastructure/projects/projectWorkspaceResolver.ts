@@ -4,7 +4,6 @@ import { relative, isAbsolute } from 'node:path';
 import {
   getProjectAccessPolicy,
   ProjectCapabilityStateSchema,
-  ProjectInstructionFileReferenceSchema,
   ProjectOnboardingStateSchema,
   type ProjectAccessPolicy,
   type ProjectCapabilityState,
@@ -13,6 +12,8 @@ import {
 } from '@agent-platform/contracts';
 import { findProject, getSession, type DrizzleDb } from '@agent-platform/db';
 import type { Mount } from '@agent-platform/harness';
+
+import { parseProjectInstructionFileReferences } from './projectInstructions.js';
 
 type WorkspaceResolutionErrorCode =
   | 'SESSION_NOT_FOUND'
@@ -40,17 +41,6 @@ export type ProjectWorkspaceResolution =
 function metadataString(metadata: Record<string, unknown>, key: string): string | undefined {
   const value = metadata[key];
   return typeof value === 'string' && value.trim() ? value : undefined;
-}
-
-function metadataInstructionFiles(
-  metadata: Record<string, unknown>,
-): ProjectInstructionFileReference[] {
-  const value = metadata['instructionFiles'];
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    const parsed = ProjectInstructionFileReferenceSchema.safeParse(entry);
-    return parsed.success ? [parsed.data] : [];
-  });
 }
 
 function metadataCapabilityState(
@@ -141,7 +131,7 @@ export function resolveSessionWorkspace(
     defaultRepoPath: repositoryRoot,
     accessPolicy: getProjectAccessPolicy({ capabilityState, onboardingState }),
     onboardingState,
-    instructionFiles: metadataInstructionFiles(project.metadata),
+    instructionFiles: parseProjectInstructionFileReferences(project.metadata),
     mounts: [
       {
         label: 'workspace',

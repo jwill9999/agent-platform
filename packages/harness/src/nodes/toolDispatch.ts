@@ -97,8 +97,17 @@ const WRITE_TOOL_IDS = new Set(
 );
 WRITE_TOOL_IDS.add(CODING_APPLY_PATCH_ID);
 
-const READ_ONLY_SHELL_PATTERN =
-  /^\s*(?:pwd|ls(?:\s|$)|find(?:\s|$)|rg(?:\s|$)|grep(?:\s|$)|cat(?:\s|$)|head(?:\s|$)|tail(?:\s|$)|sed\s+-n(?:\s|$)|git\s+(?:status|diff|log|branch|show|rev-parse)(?:\s|$))/;
+const READ_ONLY_SHELL_COMMANDS = new Set([
+  'pwd',
+  'ls',
+  'find',
+  'rg',
+  'grep',
+  'cat',
+  'head',
+  'tail',
+]);
+const READ_ONLY_GIT_SUBCOMMANDS = new Set(['status', 'diff', 'log', 'branch', 'show', 'rev-parse']);
 const SHELL_MUTATION_OR_CHAIN_PATTERN = /(?:^|[^\\])(?:[;&|<>]|\$\(|`)/;
 
 // ---------------------------------------------------------------------------
@@ -362,6 +371,20 @@ function stringArgValue(args: Record<string, unknown>, key: string): string | un
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+function firstShellWords(command: string): string[] {
+  return command.trim().split(/\s+/).filter(Boolean);
+}
+
+function isReadOnlyShellCommand(command: string): boolean {
+  if (SHELL_MUTATION_OR_CHAIN_PATTERN.test(command)) return false;
+  const [commandName, subcommand] = firstShellWords(command);
+  if (!commandName) return false;
+  if (commandName === 'sed') return subcommand === '-n';
+  if (commandName === 'git')
+    return Boolean(subcommand && READ_ONLY_GIT_SUBCOMMANDS.has(subcommand));
+  return READ_ONLY_SHELL_COMMANDS.has(commandName);
+}
+
 function browserUrlApprovalReason(call: ToolCallIntent): string | undefined {
   if (call.name !== BROWSER_TOOL_IDS.start && call.name !== BROWSER_TOOL_IDS.navigate) {
     return undefined;
@@ -381,9 +404,7 @@ function onboardingWriteBlockReason(
   if (WRITE_TOOL_IDS.has(call.name)) return ctx.projectAccessPolicy.writeBlockReason;
   if (call.name !== 'sys_bash') return undefined;
   const command = typeof call.args.command === 'string' ? call.args.command : '';
-  if (READ_ONLY_SHELL_PATTERN.test(command) && !SHELL_MUTATION_OR_CHAIN_PATTERN.test(command)) {
-    return undefined;
-  }
+  if (isReadOnlyShellCommand(command)) return undefined;
   return ctx.projectAccessPolicy.writeBlockReason;
 }
 

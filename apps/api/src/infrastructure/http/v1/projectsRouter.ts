@@ -1,11 +1,10 @@
 import {
   ProjectCreateBodySchema,
+  type ProjectOpenBody,
   ProjectOpenBodySchema,
   ProjectQuerySchema,
-  ProjectUpdateBodySchema,
-  ProjectInstructionFileReferenceSchema,
-  type ProjectOpenBody,
   type ProjectRecord,
+  ProjectUpdateBodySchema,
 } from '@agent-platform/contracts';
 import {
   archiveProject,
@@ -25,7 +24,10 @@ import { basename, isAbsolute } from 'node:path';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
-import { discoverProjectInstructions } from '../../projects/projectInstructions.js';
+import {
+  discoverProjectInstructions,
+  parseProjectInstructionFileReferences,
+} from '../../projects/projectInstructions.js';
 import { parseBody, requireParam } from './routerUtils.js';
 
 function mapProjectError(error: unknown): never {
@@ -67,15 +69,6 @@ function gitValue(cwd: string, args: string[]): string | undefined {
   }
 }
 
-function existingInstructionFiles(metadata: Record<string, unknown>) {
-  const value = metadata['instructionFiles'];
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    const parsed = ProjectInstructionFileReferenceSchema.safeParse(entry);
-    return parsed.success ? [parsed.data] : [];
-  });
-}
-
 function discoverBackendProjectMetadata(
   rawPath: string,
   existingMetadata: Record<string, unknown> = {},
@@ -106,7 +99,7 @@ function discoverBackendProjectMetadata(
   const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD']);
   const instructionDiscovery = discoverProjectInstructions(
     projectRoot,
-    existingInstructionFiles(existingMetadata),
+    parseProjectInstructionFileReferences(existingMetadata),
   );
 
   const metadata: BackendProjectMetadata = {
@@ -180,7 +173,7 @@ function approveProjectOnboarding(db: DrizzleDb, id: string): ProjectRecord {
   }
   const discovery = discoverProjectInstructions(
     backendProjectRoot,
-    existingInstructionFiles(project.metadata),
+    parseProjectInstructionFileReferences(project.metadata),
   );
   if (!discovery.instructionFiles.some((file) => file.scope === 'root')) {
     throw new HttpError(

@@ -6,6 +6,7 @@ import type {
   ProjectInstructionFileReference,
   ProjectOnboardingState,
 } from '@agent-platform/contracts';
+import { ProjectInstructionFileReferenceSchema } from '@agent-platform/contracts';
 
 const INSTRUCTION_FILE = 'AGENTS.md';
 const SKIPPED_DIRS = new Set(['.git', 'node_modules', 'dist', 'build', '.next', 'coverage']);
@@ -67,6 +68,17 @@ function isReferenceApproved(
   );
 }
 
+export function parseProjectInstructionFileReferences(
+  metadata: Record<string, unknown>,
+): ProjectInstructionFileReference[] {
+  const value = metadata['instructionFiles'];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const parsed = ProjectInstructionFileReferenceSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
 export function discoverProjectInstructions(
   root: string,
   existing: readonly ProjectInstructionFileReference[] = [],
@@ -78,20 +90,19 @@ export function discoverProjectInstructions(
 
   const nestedFiles: string[] = [];
   discoverNestedInstructionFiles(root, root, nestedFiles);
+  const rootRef = readInstructionReference(root, rootFile, 'root');
   const discovered = [
-    readInstructionReference(root, rootFile, 'root'),
+    rootRef,
     ...nestedFiles.map((filePath) => readInstructionReference(root, filePath, 'nested')),
   ];
   const instructionFiles = discovered.map((file) => {
     const approved = existing.find((candidate) => candidate.path === file.path);
-    return isReferenceApproved(file, approved)
-      ? { ...file, approvedAtMs: approved!.approvedAtMs }
-      : file;
+    if (!approved?.approvedAtMs || !isReferenceApproved(file, approved)) return file;
+    return { ...file, approvedAtMs: approved.approvedAtMs };
   });
-  const rootRef = instructionFiles.find((file) => file.scope === 'root');
   const rootApproved = isReferenceApproved(
-    discovered[0]!,
-    existing.find((candidate) => candidate.path === rootRef?.path),
+    rootRef,
+    existing.find((candidate) => candidate.path === rootRef.path),
   );
   return {
     onboardingState: rootApproved ? 'approved' : 'needs_review',
@@ -104,12 +115,15 @@ function nearestNestedInstruction(
   scopePath: string | undefined,
 ): ProjectInstructionFileReference | undefined {
   if (!scopePath) return undefined;
-  return instructionFiles
-    .filter((file) => file.scope === 'nested' && file.appliesToPath)
+  const scopedInstructions = instructionFiles.filter(
+    (file): file is ProjectInstructionFileReference & { appliesToPath: string } =>
+      file.scope === 'nested' && typeof file.appliesToPath === 'string',
+  );
+  return scopedInstructions
     .filter(
       (file) => scopePath === file.appliesToPath || scopePath.startsWith(`${file.appliesToPath}/`),
     )
-    .sort((a, b) => b.appliesToPath!.length - a.appliesToPath!.length)
+    .sort((a, b) => b.appliesToPath.length - a.appliesToPath.length)
     .at(0);
 }
 

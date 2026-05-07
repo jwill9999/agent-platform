@@ -487,6 +487,25 @@ function getFolderButtonLabel(
   return 'Open Folder';
 }
 
+function getToggleButtonState(isOpen: boolean, openLabel: string, closedLabel: string) {
+  return {
+    variant: isOpen ? 'secondary' : 'ghost',
+    label: isOpen ? openLabel : closedLabel,
+  } as const;
+}
+
+function getTerminalTitle(canUseProjectTools: boolean, showTerminal: boolean): string {
+  if (!canUseProjectTools) return 'Open a backend project before using the terminal';
+  return showTerminal ? 'Hide terminal' : 'Show terminal';
+}
+
+function getSaveTitle(activeFileIsDirty: boolean, canSaveActiveFile: boolean): string {
+  if (activeFileIsDirty && !canSaveActiveFile) {
+    return 'Approve project instructions before saving changes';
+  }
+  return 'Save file';
+}
+
 function IDEToolbar({
   showExplorer,
   setShowExplorer,
@@ -534,32 +553,27 @@ function IDEToolbar({
   onCloseFolder: () => void;
   canUseProjectTools: boolean;
 }>) {
-  const explorerVariant = showExplorer ? 'secondary' : 'ghost';
+  const explorerButton = getToggleButtonState(showExplorer, 'Hide', 'Files');
   const explorerTitle = showExplorer ? 'Hide file explorer' : 'Show file explorer';
-  const explorerLabel = showExplorer ? 'Hide' : 'Files';
   const ExplorerIcon = showExplorer ? PanelLeftClose : Folder;
 
-  const terminalVariant = showTerminal ? 'secondary' : 'ghost';
-  let terminalTitle = 'Open a backend project before using the terminal';
-  if (canUseProjectTools) {
-    terminalTitle = showTerminal ? 'Hide terminal' : 'Show terminal';
-  }
-  const terminalLabel = showTerminal ? 'Hide' : 'Terminal';
+  const terminalButton = getToggleButtonState(showTerminal, 'Hide', 'Terminal');
+  const terminalTitle = getTerminalTitle(canUseProjectTools, showTerminal);
   const TermIcon = showTerminal ? PanelBottomClose : TerminalIcon;
 
-  const chatVariant = showChat ? 'secondary' : 'ghost';
+  const chatButton = getToggleButtonState(showChat, 'Hide', 'AI');
   const chatTitle = showChat ? 'Hide AI assistant' : 'Show AI assistant';
-  const chatLabel = showChat ? 'Hide' : 'AI';
   const ChatIcon = showChat ? PanelRightClose : MessageSquare;
 
   const folderLabel = getFolderButtonLabel(isLoadingFolder, isOpeningFolder, rootName);
   const folderActionDisabled = isLoadingFolder || isOpeningFolder;
+  const saveTitle = getSaveTitle(activeFileIsDirty, canSaveActiveFile);
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
       <div className="flex items-center gap-2">
         <Button
-          variant={explorerVariant}
+          variant={explorerButton.variant}
           size="sm"
           onClick={() => {
             setShowExplorer(!showExplorer);
@@ -568,7 +582,7 @@ function IDEToolbar({
           title={explorerTitle}
         >
           <ExplorerIcon className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{explorerLabel}</span>
+          <span className="hidden sm:inline text-xs">{explorerButton.label}</span>
         </Button>
         <Dialog open={isPathDialogOpen} onOpenChange={setIsPathDialogOpen}>
           <DialogTrigger asChild>
@@ -625,11 +639,7 @@ function IDEToolbar({
           className="gap-2"
           onClick={onSave}
           disabled={!canSaveActiveFile}
-          title={
-            activeFileIsDirty && !canSaveActiveFile
-              ? 'Approve project instructions before saving changes'
-              : 'Save file'
-          }
+          title={saveTitle}
         >
           <Save className="h-4 w-4" />
           Save
@@ -640,7 +650,7 @@ function IDEToolbar({
           {activeFilePath ?? 'No file open'}
         </span>
         <Button
-          variant={terminalVariant}
+          variant={terminalButton.variant}
           size="sm"
           onClick={() => {
             setShowTerminal(!showTerminal);
@@ -650,10 +660,10 @@ function IDEToolbar({
           disabled={!canUseProjectTools}
         >
           <TermIcon className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{terminalLabel}</span>
+          <span className="hidden sm:inline text-xs">{terminalButton.label}</span>
         </Button>
         <Button
-          variant={chatVariant}
+          variant={chatButton.variant}
           size="sm"
           onClick={() => {
             setShowChat(!showChat);
@@ -662,7 +672,7 @@ function IDEToolbar({
           title={chatTitle}
         >
           <ChatIcon className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs">{chatLabel}</span>
+          <span className="hidden sm:inline text-xs">{chatButton.label}</span>
         </Button>
       </div>
     </div>

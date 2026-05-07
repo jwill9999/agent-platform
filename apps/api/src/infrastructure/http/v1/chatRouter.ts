@@ -39,9 +39,8 @@ import {
   compactText,
   DEFAULT_CONTEXT_WINDOW,
   parseStructuredToolError,
-  SessionResumeBodySchema,
   type ProjectAccessPolicy,
-  ProjectInstructionFileReferenceSchema,
+  SessionResumeBodySchema,
 } from '@agent-platform/contracts';
 import {
   type AgentContext,
@@ -86,7 +85,10 @@ import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
 import { resolveSessionWorkspace } from '../../projects/projectWorkspaceResolver.js';
 import type { ProjectWorkspaceResolution } from '../../projects/projectWorkspaceResolver.js';
-import { buildProjectInstructionPrompt } from '../../projects/projectInstructions.js';
+import {
+  buildProjectInstructionPrompt,
+  parseProjectInstructionFileReferences,
+} from '../../projects/projectInstructions.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
@@ -1331,15 +1333,6 @@ function buildConversationMessages(
   });
 }
 
-function parseInstructionFiles(metadata: Record<string, unknown>) {
-  const value = metadata['instructionFiles'];
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    const parsed = ProjectInstructionFileReferenceSchema.safeParse(entry);
-    return parsed.success ? [parsed.data] : [];
-  });
-}
-
 function projectScopePath(message: string): string | undefined {
   const file = extractImportantFiles(message).at(0);
   if (!file) return undefined;
@@ -1359,7 +1352,7 @@ function withProjectInstructionPrompt(
   if (!project || typeof backendProjectRoot !== 'string') return systemPrompt;
   const prompt = buildProjectInstructionPrompt(
     backendProjectRoot,
-    parseInstructionFiles(project.metadata),
+    parseProjectInstructionFileReferences(project.metadata),
     projectScopePath(message),
   );
   return prompt ? `${systemPrompt}\n\n${prompt}` : systemPrompt;
