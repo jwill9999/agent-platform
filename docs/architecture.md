@@ -154,6 +154,13 @@ Instruction precedence is root-first. Root `AGENTS.md` applies to the whole repo
 nested `AGENTS.md` may refine the root instructions for an active subproject scope, but it does not
 replace the root safety guidance.
 
+The current Epic 1 onboarding gate is intentionally minimal. Opening a backend-accessible Project
+discovers root and nested `AGENTS.md` files, stores instruction metadata on the Project, and shows a
+review/approval state in the Project panel. Until the root instructions are approved, Project
+sessions may inspect and plan but write tools, file edits, commits, installs, migrations, and
+destructive shell actions remain blocked. The full assessment, drafting, refresh, and lifecycle
+behavior is tracked separately in the Project onboarding epic.
+
 ## Browser Automation Contracts
 
 Browser automation is modeled as a platform-owned tool pack rather than a direct dependency on an MCP browser server. Shared contracts in `packages/contracts` define browser sessions, page state, action requests/results, policy decisions, and bounded evidence artifacts. Playwright is the intended first internal runtime, while MCP/browser providers can be added later as adapters.

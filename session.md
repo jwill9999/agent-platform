@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Closed `agent-platform-project-workspaces.5` after PR #147 passed GitHub Actions (`verify`, `docker`, `e2e`), docs checks, GitGuardian, and SonarCloud with 0 unresolved issues and no review threads. Claimed `agent-platform-project-workspaces.6` on `task/agent-platform-project-workspaces.6`, added deterministic Project workspace Playwright coverage for Chat/Project separation plus missing/review/approved `AGENTS.md` states, and updated architecture/development docs for the minimal Project onboarding gate. Focused Playwright, format, docs lint, and diff checks pass; remaining before close: full local gates, push PR, and remote checks/comments.
+- **Date:** 2026-05-07
 - **Session:** Continued `agent-platform-project-workspaces.5` on `task/agent-platform-project-workspaces.5`: PR #147 is open against `feature/agent-platform-project-workspaces`; fixed SonarCloud maintainability/duplication findings, hardened the browser integration test after Actions `verify` exposed hosted-runner startup latency, and moved remaining Sonar-flagged test helpers to outer scope. Bead remains open until PR #147 reruns green with no unresolved comments/issues.
 - **Date:** 2026-05-07
 - **Session:** Claimed `agent-platform-project-workspaces.4` on new branch `task/agent-platform-project-workspaces.4` from the completed `.3` tip. Scope: resolve canonical `/workspace` to the active Project backend root and route file, terminal, Git, test, Docker, and sensor tools through the Project boundary with wrong-root regression coverage.
