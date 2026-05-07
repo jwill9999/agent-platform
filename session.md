@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Claimed `agent-platform-project-workspaces.3` on new branch `task/agent-platform-project-workspaces.3` from the completed `.2` tip. Scope: bind Project sessions to backend-accessible working trees, persist root/repo/branch/capability/onboarding state, and keep inaccessible paths unavailable.
+- **Date:** 2026-05-07
 - **Session:** Completed and closed `agent-platform-project-workspaces.2` on `task/agent-platform-project-workspaces.2`: PR #144 to `feature/agent-platform-project-workspaces` is open, all local gates and PR checks passed, SonarCloud reports 0 new issues after the `String.raw` cleanup, and review-thread inspection found no unresolved actionable comments. Next task is `agent-platform-project-workspaces.3` from this branch tip.
 - **Date:** 2026-05-07
 - **Session:** Implemented and locally closed `agent-platform-project-workspaces.1` on `task/agent-platform-project-workspaces.1`: added shared Project/Chat mode contracts, Project workspace binding metadata, capability/onboarding states, write-eligibility helpers, focused contract tests, and architecture documentation. Local build, format, lint, and unit gates passed; broad docs lint remains blocked by ignored `.agent-platform/workspaces/...` Markdown files.
