@@ -117,6 +117,7 @@ function mockToolCallStream(toolName: string, args: Record<string, unknown>) {
 }
 
 type TestDb = ReturnType<typeof openDatabase>['db'];
+type MockChatApp = Awaited<ReturnType<typeof createSeededApp>>;
 type ChatEvent = {
   type: string;
   approvalRequestId?: string;
@@ -179,6 +180,27 @@ function mockProjectWrite(id: string, content: string) {
       },
     ])
     .mockReturnValueOnce('Project file written');
+}
+
+function createProjectRoot(dirs: string[]): string {
+  const projectRoot = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-project-chat-root-'));
+  dirs.push(projectRoot);
+  return projectRoot;
+}
+
+async function withMockChatApp(
+  dirs: string[],
+  callback: (ctx: MockChatApp) => Promise<void>,
+): Promise<void> {
+  const envSnap = snapshotChatEnv();
+  const ctx = await createSeededApp(dirs, { mockLlm: true });
+  try {
+    process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+    await callback(ctx);
+  } finally {
+    restoreChatEnv(envSnap);
+    closeDatabase(ctx.sqlite);
+  }
 }
 
 function parseNdjsonEvents(text: string): ChatEvent[] {
@@ -681,12 +703,8 @@ describe('POST /v1/chat (session-aware)', () => {
   });
 
   it('writes canonical /workspace files inside the bound Project root', async () => {
-    const envSnap = snapshotChatEnv();
-    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
-    try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
-      const projectRoot = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-project-chat-root-'));
-      dirs.push(projectRoot);
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
       const sessionId = await createProjectSession(app, db, {
         name: 'Writable Project',
         workspaceKey: projectRoot,
@@ -707,19 +725,12 @@ describe('POST /v1/chat (session-aware)', () => {
       const projectFile = path.join(projectRoot, 'project-note.txt');
       expect(existsSync(projectFile)).toBe(true);
       expect(readFileSync(projectFile, 'utf8')).toBe('written in project root');
-    } finally {
-      restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
-    }
+    });
   });
 
   it('blocks Project writes before AGENTS.md onboarding is approved', async () => {
-    const envSnap = snapshotChatEnv();
-    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
-    try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
-      const projectRoot = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-project-chat-root-'));
-      dirs.push(projectRoot);
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
       const sessionId = await createProjectSession(app, db, {
         name: 'Needs Review Project',
         workspaceKey: projectRoot,
@@ -737,19 +748,12 @@ describe('POST /v1/chat (session-aware)', () => {
 
       expect(res.text).not.toContain('tool_result');
       expect(existsSync(path.join(projectRoot, 'project-note.txt'))).toBe(false);
-    } finally {
-      restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
-    }
+    });
   });
 
   it('adds root and nearest nested AGENTS.md files to the Project chat prompt', async () => {
-    const envSnap = snapshotChatEnv();
-    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
-    try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
-      const projectRoot = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-project-chat-root-'));
-      dirs.push(projectRoot);
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
       mkdirSync(path.join(projectRoot, 'apps', 'web'), { recursive: true });
       writeFileSync(path.join(projectRoot, 'AGENTS.md'), 'root rule\n');
       writeFileSync(path.join(projectRoot, 'apps', 'web', 'AGENTS.md'), 'web rule\n');
@@ -785,17 +789,11 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(systemPrompt).toContain('root rule');
       expect(systemPrompt).toContain('--- apps/web/AGENTS.md ---');
       expect(systemPrompt).toContain('web rule');
-    } finally {
-      restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
-    }
+    });
   });
 
   it('rejects canonical /workspace writes when the bound Project is unavailable', async () => {
-    const envSnap = snapshotChatEnv();
-    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
-    try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+    await withMockChatApp(dirs, async ({ app, db }) => {
       const sessionId = await createProjectSession(app, db, {
         name: 'Unavailable Project',
         backendProjectRoot: '/missing/project',
@@ -810,10 +808,7 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(200);
 
       expect(res.text).toContain('PROJECT_UNAVAILABLE');
-    } finally {
-      restoreChatEnv(envSnap);
-      closeDatabase(sqlite);
-    }
+    });
   });
 
   it('uses the first saved model config as the platform default when an agent has no override', async () => {

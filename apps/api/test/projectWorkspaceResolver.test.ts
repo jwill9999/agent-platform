@@ -13,6 +13,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { resolveSessionWorkspace } from '../src/infrastructure/projects/projectWorkspaceResolver.js';
 
+type TestDb = ReturnType<typeof openDatabase>['db'];
+type TestOnboardingState = 'missing' | 'approved' | 'needs_review' | 'in_progress';
+
 describe('resolveSessionWorkspace', () => {
   let tmpRoot: string;
   let opened: ReturnType<typeof openDatabase>;
@@ -39,24 +42,58 @@ describe('resolveSessionWorkspace', () => {
     rmSync(tmpRoot, { recursive: true, force: true });
   });
 
-  it('returns Project root mounts and repository defaults for project sessions', () => {
-    const projectRoot = realpathSync(mkdtempSync(join(tmpRoot, 'project-')));
+  function createBackendProjectSession(options: {
+    name: string;
+    projectRoot: string;
+    onboardingState?: TestOnboardingState;
+  }) {
     const project = createProject(opened.db, {
-      name: 'Backend Project',
-      workspaceKey: projectRoot,
+      name: options.name,
+      workspaceKey: options.projectRoot,
+      metadata: backendProjectMetadata(options.projectRoot, options.onboardingState ?? 'missing'),
+    });
+    return createSession(opened.db, {
+      agentId: 'agent-1',
+      mode: 'project',
+      projectId: project.id,
+    });
+  }
+
+  function backendProjectMetadata(projectRoot: string, onboardingState: TestOnboardingState) {
+    return {
+      backendProjectRoot: projectRoot,
+      repositoryRoot: projectRoot,
+      projectRoot: '/workspace',
+      capabilityState: 'backend_accessible',
+      onboardingState,
+      defaultAgentProfile: 'coding',
+    };
+  }
+
+  function unavailableProjectSession(db: TestDb) {
+    const project = createProject(db, {
+      name: 'Unavailable Project',
       metadata: {
-        backendProjectRoot: projectRoot,
-        repositoryRoot: projectRoot,
+        backendProjectRoot: '/missing/project',
+        repositoryRoot: '/missing/project',
         projectRoot: '/workspace',
-        capabilityState: 'backend_accessible',
+        capabilityState: 'unavailable',
         onboardingState: 'missing',
         defaultAgentProfile: 'coding',
       },
     });
-    const session = createSession(opened.db, {
+    return createSession(db, {
       agentId: 'agent-1',
       mode: 'project',
       projectId: project.id,
+    });
+  }
+
+  it('returns Project root mounts and repository defaults for project sessions', () => {
+    const projectRoot = realpathSync(mkdtempSync(join(tmpRoot, 'project-')));
+    const session = createBackendProjectSession({
+      name: 'Backend Project',
+      projectRoot,
     });
 
     expect(resolveSessionWorkspace(opened.db, session.id)).toMatchObject({
@@ -82,22 +119,10 @@ describe('resolveSessionWorkspace', () => {
 
   it('unlocks writes when Project onboarding is approved', () => {
     const projectRoot = realpathSync(mkdtempSync(join(tmpRoot, 'project-')));
-    const project = createProject(opened.db, {
+    const session = createBackendProjectSession({
       name: 'Approved Backend Project',
-      workspaceKey: projectRoot,
-      metadata: {
-        backendProjectRoot: projectRoot,
-        repositoryRoot: projectRoot,
-        projectRoot: '/workspace',
-        capabilityState: 'backend_accessible',
-        onboardingState: 'approved',
-        defaultAgentProfile: 'coding',
-      },
-    });
-    const session = createSession(opened.db, {
-      agentId: 'agent-1',
-      mode: 'project',
-      projectId: project.id,
+      projectRoot,
+      onboardingState: 'approved',
     });
 
     expect(resolveSessionWorkspace(opened.db, session.id)).toMatchObject({
@@ -119,22 +144,7 @@ describe('resolveSessionWorkspace', () => {
   });
 
   it('distinguishes unavailable Project metadata', () => {
-    const project = createProject(opened.db, {
-      name: 'Unavailable Project',
-      metadata: {
-        backendProjectRoot: '/missing/project',
-        repositoryRoot: '/missing/project',
-        projectRoot: '/workspace',
-        capabilityState: 'unavailable',
-        onboardingState: 'missing',
-        defaultAgentProfile: 'coding',
-      },
-    });
-    const session = createSession(opened.db, {
-      agentId: 'agent-1',
-      mode: 'project',
-      projectId: project.id,
-    });
+    const session = unavailableProjectSession(opened.db);
 
     expect(resolveSessionWorkspace(opened.db, session.id)).toMatchObject({
       ok: false,
