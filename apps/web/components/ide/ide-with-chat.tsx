@@ -4,10 +4,16 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type {
   Agent,
   ProjectOnboardingAssessment,
+  ProjectOnboardingDialogue,
+  ProjectOnboardingDraft,
   ProjectRecord,
   SessionRecord,
 } from '@agent-platform/contracts';
-import { ProjectOnboardingAssessmentSchema } from '@agent-platform/contracts';
+import {
+  ProjectOnboardingAssessmentSchema,
+  ProjectOnboardingDialogueSchema,
+  ProjectOnboardingDraftSchema,
+} from '@agent-platform/contracts';
 import type { UIMessage } from 'ai';
 import {
   FolderOpen,
@@ -137,6 +143,18 @@ function projectOnboardingAssessment(
   return parsed.success ? parsed.data : null;
 }
 
+function projectOnboardingDraft(project: ProjectRecord | null): ProjectOnboardingDraft | null {
+  const parsed = ProjectOnboardingDraftSchema.safeParse(project?.metadata.onboardingDraft);
+  return parsed.success ? parsed.data : null;
+}
+
+function projectOnboardingDialogue(
+  project: ProjectRecord | null,
+): ProjectOnboardingDialogue | null {
+  const parsed = ProjectOnboardingDialogueSchema.safeParse(project?.metadata.onboardingDialogue);
+  return parsed.success ? parsed.data : null;
+}
+
 function projectOnboardingLabel(state: ProjectOnboardingState): string {
   switch (state) {
     case 'approved':
@@ -252,6 +270,94 @@ export function ProjectOnboardingAssessmentPanel({
       {assessment.questions.length > 0 && (
         <p className="mt-2 leading-snug text-muted-foreground">{assessment.questions[0]?.prompt}</p>
       )}
+    </div>
+  );
+}
+
+function activeOnboardingQuestion(dialogue: ProjectOnboardingDialogue | null): string | null {
+  if (!dialogue?.activeQuestionId) return null;
+  const turn = [...dialogue.turns]
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.role === 'assistant' && candidate.questionId === dialogue.activeQuestionId,
+    );
+  return turn?.content ?? null;
+}
+
+export function ProjectOnboardingDraftPanel({
+  draft,
+  dialogue,
+  answer,
+  isStarting,
+  isSubmitting,
+  onStart,
+  onAnswerChange,
+  onSubmitAnswer,
+}: Readonly<{
+  draft: ProjectOnboardingDraft | null;
+  dialogue: ProjectOnboardingDialogue | null;
+  answer: string;
+  isStarting: boolean;
+  isSubmitting: boolean;
+  onStart: () => void;
+  onAnswerChange: (value: string) => void;
+  onSubmitAnswer: () => void;
+}>) {
+  const question = activeOnboardingQuestion(dialogue);
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">Onboarding draft</div>
+          <div className="text-muted-foreground">
+            {draft ? `Revision ${draft.revision}` : 'Not started'}
+          </div>
+        </div>
+        {!draft && (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-7 shrink-0"
+            onClick={onStart}
+            disabled={isStarting}
+          >
+            {isStarting ? 'Starting...' : 'Start'}
+          </Button>
+        )}
+      </div>
+      {question && (
+        <form
+          className="mt-2 space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmitAnswer();
+          }}
+        >
+          <p className="leading-snug text-foreground">{question}</p>
+          <Textarea
+            aria-label="Onboarding answer"
+            value={answer}
+            onChange={(event) => {
+              onAnswerChange(event.target.value);
+            }}
+            className="min-h-20 text-sm"
+            placeholder="Answer this question for the Project instructions"
+          />
+          <Button type="submit" size="sm" className="h-7" disabled={!answer.trim() || isSubmitting}>
+            {isSubmitting ? 'Saving...' : 'Send answer'}
+          </Button>
+        </form>
+      )}
+      {draft && (
+        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-2 text-xs leading-relaxed text-foreground">
+          {draft.markdown}
+        </pre>
+      )}
+      {draft?.history.length ? (
+        <div className="mt-2 text-muted-foreground">{draft.history.length} earlier revision(s)</div>
+      ) : null}
     </div>
   );
 }
@@ -558,7 +664,7 @@ function getToggleButtonState(isOpen: boolean, openLabel: string, closedLabel: s
 }
 
 function getTerminalTitle(canUseProjectTools: boolean, showTerminal: boolean): string {
-  if (!canUseProjectTools) return 'Open a backend project before using the terminal';
+  if (!canUseProjectTools) return 'Open a Project before using the terminal';
   return showTerminal ? 'Hide terminal' : 'Show terminal';
 }
 
@@ -1384,12 +1490,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [searchQuery, setSearchQuery] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
-  const [projectPathInput, setProjectPathInput] = useState('/workspace');
+  const [projectPathInput, setProjectPathInput] = useState('');
   const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
   const [isOpeningBackendProject, setIsOpeningBackendProject] = useState(false);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
   const [isAssessingProject, setIsAssessingProject] = useState(false);
+  const [isStartingOnboardingDraft, setIsStartingOnboardingDraft] = useState(false);
+  const [isSubmittingOnboardingAnswer, setIsSubmittingOnboardingAnswer] = useState(false);
+  const [onboardingAnswer, setOnboardingAnswer] = useState('');
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -1436,6 +1545,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   );
   const onboardingState = projectOnboardingState(activeProject);
   const onboardingAssessment = projectOnboardingAssessment(activeProject);
+  const onboardingDraft = projectOnboardingDraft(activeProject);
+  const onboardingDialogue = projectOnboardingDialogue(activeProject);
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions =
@@ -1509,6 +1620,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setContextFiles([]);
     setEditProposal(null);
     setChatInput('');
+    setOnboardingAnswer('');
     setShowTerminal(false);
     fs.closeDirectory();
   }, [fs]);
@@ -1522,7 +1634,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     try {
       const project = await apiPost<ProjectRecord>(apiPath('projects', 'open'), { path });
       if (!project) {
-        throw new ApiRequestError('Failed to open backend project', 500);
+        throw new ApiRequestError('Failed to open Project', 500);
       }
       clearProjectContext();
       setActiveProject(project);
@@ -1533,9 +1645,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       setSessionId(null);
       clearProjectContext();
       const message =
-        error instanceof ApiRequestError
+        error instanceof ApiRequestError && error.code !== 'PROJECT_UNAVAILABLE'
           ? error.message
-          : 'Backend cannot inspect that project path';
+          : 'That Project folder could not be opened';
       setProjectOpenError(message);
       toast.error(message);
     } finally {
@@ -1585,6 +1697,54 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       setIsAssessingProject(false);
     }
   }, [activeProject?.id]);
+
+  const handleStartOnboardingDraft = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsStartingOnboardingDraft(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'draft'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to start onboarding draft', 500);
+      setActiveProject(project);
+      toast.success('Onboarding draft started');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to start onboarding draft';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsStartingOnboardingDraft(false);
+    }
+  }, [activeProject?.id]);
+
+  const handleSubmitOnboardingAnswer = useCallback(async () => {
+    if (!activeProject?.id || !onboardingAnswer.trim()) return;
+    setIsSubmittingOnboardingAnswer(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'answer'),
+        {
+          questionId: onboardingDialogue?.activeQuestionId,
+          answer: onboardingAnswer.trim(),
+        },
+      );
+      if (!project) throw new ApiRequestError('Failed to save onboarding answer', 500);
+      setActiveProject(project);
+      setOnboardingAnswer('');
+      toast.success('Onboarding draft updated');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to save onboarding answer';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsSubmittingOnboardingAnswer(false);
+    }
+  }, [activeProject?.id, onboardingAnswer, onboardingDialogue?.activeQuestionId]);
 
   // --- File operations ---
 
@@ -2005,15 +2165,16 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                       Project
                     </span>
                     {activeProject ? (
-                      <span className="text-xs text-emerald-600">Backend accessible</span>
+                      <span className="text-xs text-emerald-600">Available</span>
                     ) : (
                       <span className="text-xs text-muted-foreground">Unavailable</span>
                     )}
                   </div>
                   <div className="flex gap-2">
                     <Input
-                      aria-label="Backend project path"
+                      aria-label="Project folder path"
                       value={projectPathInput}
+                      placeholder="Folder path"
                       onChange={(event) => {
                         setProjectPathInput(event.target.value);
                       }}
@@ -2040,10 +2201,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                       <div className="truncate text-foreground">{activeProject.name}</div>
                       <div className="truncate">
-                        Root: {String(activeProject.metadata.backendProjectRoot ?? '')}
-                      </div>
-                      <div className="truncate">
-                        Repo: {String(activeProject.metadata.repositoryRoot ?? '')}
+                        Folder: {onboardingAssessment?.display.folderLabel ?? activeProject.name}
                       </div>
                       {activeProject.metadata.activeBranch && (
                         <div className="truncate">
@@ -2112,6 +2270,22 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           isRefreshing={isAssessingProject}
                           onRefresh={() => {
                             handleAssessProject().catch(() => {});
+                          }}
+                        />
+                      )}
+                      {onboardingState !== 'approved' && onboardingAssessment && (
+                        <ProjectOnboardingDraftPanel
+                          draft={onboardingDraft}
+                          dialogue={onboardingDialogue}
+                          answer={onboardingAnswer}
+                          isStarting={isStartingOnboardingDraft}
+                          isSubmitting={isSubmittingOnboardingAnswer}
+                          onStart={() => {
+                            handleStartOnboardingDraft().catch(() => {});
+                          }}
+                          onAnswerChange={setOnboardingAnswer}
+                          onSubmitAnswer={() => {
+                            handleSubmitOnboardingAnswer().catch(() => {});
                           }}
                         />
                       )}

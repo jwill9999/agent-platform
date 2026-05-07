@@ -3,7 +3,10 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { ProjectOnboardingAssessmentPanel } from '@/components/ide/ide-with-chat';
+import {
+  ProjectOnboardingAssessmentPanel,
+  ProjectOnboardingDraftPanel,
+} from '@/components/ide/ide-with-chat';
 
 beforeAll(() => {
   vi.stubGlobal('React', React);
@@ -57,5 +60,60 @@ describe('Project onboarding assessment panel', () => {
     expect(html).toContain('Should I draft updated root Project instructions?');
     expect(html).not.toContain('/workspace');
     expect(html).not.toContain('backend');
+  });
+
+  it('renders onboarding draft questions, answers, and revision state', () => {
+    const html = renderToStaticMarkup(
+      createElement(ProjectOnboardingDraftPanel, {
+        draft: {
+          id: 'draft-project-1',
+          projectId: 'project-1',
+          targetPath: 'AGENTS.md',
+          markdown:
+            '# Agent Instructions\n\n## User Workflow Notes\n\n- This Project mixes code and docs.',
+          revision: 2,
+          history: [
+            {
+              revision: 1,
+              markdown: '# Agent Instructions\n',
+              summary: 'Initial draft.',
+              createdAtMs: 1_778_172_000_000,
+            },
+          ],
+          createdAtMs: 1_778_172_000_000,
+          updatedAtMs: 1_778_172_001_000,
+        },
+        dialogue: {
+          status: 'asking',
+          activeQuestionId: 'project-intended-workflow',
+          answeredQuestionIds: [],
+          turns: [
+            {
+              id: 'assistant-1',
+              role: 'assistant',
+              content:
+                'What kind of work should this Project support: code changes, docs/content, research, automation, or a mix?',
+              questionId: 'project-intended-workflow',
+              createdAtMs: 1_778_172_000_000,
+            },
+          ],
+          updatedAtMs: 1_778_172_000_000,
+        },
+        answer: '',
+        isStarting: false,
+        isSubmitting: false,
+        onStart: () => {},
+        onAnswerChange: () => {},
+        onSubmitAnswer: () => {},
+      }),
+    );
+
+    expect(html).toContain('Onboarding draft');
+    expect(html).toContain('Revision 2');
+    expect(html).toContain('What kind of work should this Project support');
+    expect(html).toContain('This Project mixes code and docs.');
+    expect(html).toContain('1 earlier revision');
+    expect(html).not.toContain('/workspace');
+    expect(html).not.toContain('Code edits and write tools are available');
   });
 });

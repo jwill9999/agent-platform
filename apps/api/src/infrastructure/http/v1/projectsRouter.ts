@@ -2,8 +2,11 @@ import {
   ProjectCreateBodySchema,
   type ProjectOpenBody,
   ProjectOpenBodySchema,
+  ProjectOnboardingAnswerBodySchema,
+  ProjectOnboardingAssessmentSchema,
   ProjectOnboardingStateSchema,
   ProjectQuerySchema,
+  type ProjectOnboardingAssessment,
   type ProjectInstructionFileReference,
   type ProjectRecord,
   ProjectUpdateBodySchema,
@@ -31,6 +34,13 @@ import {
   parseProjectInstructionFileReferences,
 } from '../../projects/projectInstructions.js';
 import { assessProjectOnboarding } from '../../projects/projectAssessment.js';
+import {
+  buildOnboardingDraft,
+  createInitialOnboardingDialogue,
+  parseStoredOnboardingDialogue,
+  parseStoredOnboardingDraft,
+  recordOnboardingAnswer,
+} from '../../projects/projectOnboardingDraft.js';
 import { parseBody, requireParam } from './routerUtils.js';
 
 function mapProjectError(error: unknown): never {
@@ -57,6 +67,8 @@ type BackendProjectMetadata = {
   defaultAgentProfile: 'coding';
   instructionFiles: ProjectInstructionFileReference[];
   onboardingAssessment?: ReturnType<typeof assessProjectOnboarding>['assessment'];
+  onboardingDraft?: ReturnType<typeof parseStoredOnboardingDraft>;
+  onboardingDialogue?: ReturnType<typeof parseStoredOnboardingDialogue>;
 };
 
 const GIT_BINARY = '/usr/bin/git';
@@ -261,6 +273,92 @@ function assessProjectForOnboarding(db: DrizzleDb, id: string): ProjectRecord {
   });
 }
 
+function requireProjectAssessment(project: ProjectRecord): ProjectOnboardingAssessment {
+  const parsed = ProjectOnboardingAssessmentSchema.safeParse(
+    project.metadata['onboardingAssessment'],
+  );
+  if (!parsed.success) {
+    throw new HttpError(
+      409,
+      'PROJECT_ASSESSMENT_REQUIRED',
+      'Project assessment is required before drafting instructions',
+    );
+  }
+  return parsed.data;
+}
+
+function startProjectOnboardingDraft(db: DrizzleDb, id: string): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const assessment = requireProjectAssessment(project);
+  const existingDraft = parseStoredOnboardingDraft(project.metadata);
+  const existingDialogue = parseStoredOnboardingDialogue(project.metadata);
+  if (existingDraft && existingDialogue) return project;
+
+  const nowMs = Date.now();
+  const dialogue = existingDialogue ?? createInitialOnboardingDialogue(assessment, nowMs);
+  const draft = buildOnboardingDraft({
+    project,
+    assessment,
+    previousDraft: existingDraft,
+    dialogue,
+    nowMs,
+  });
+
+  return updateProject(db, id, {
+    metadata: {
+      ...project.metadata,
+      onboardingState:
+        project.metadata['onboardingState'] === 'approved' ? 'needs_review' : 'in_progress',
+      onboardingDraft: draft,
+      onboardingDialogue: dialogue,
+    },
+  });
+}
+
+function answerProjectOnboardingQuestion(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const assessment = requireProjectAssessment(project);
+  const input = parseBody(ProjectOnboardingAnswerBodySchema, body);
+  const nowMs = Date.now();
+  const previousDraft = parseStoredOnboardingDraft(project.metadata);
+  const previousDialogue =
+    parseStoredOnboardingDialogue(project.metadata) ??
+    createInitialOnboardingDialogue(assessment, nowMs);
+  if (!input.questionId && !previousDialogue.activeQuestionId) {
+    throw new HttpError(
+      409,
+      'PROJECT_ONBOARDING_NO_ACTIVE_QUESTION',
+      'There is no active onboarding question to answer',
+    );
+  }
+  const dialogue = recordOnboardingAnswer({
+    assessment,
+    dialogue: previousDialogue,
+    questionId: input.questionId,
+    answer: input.answer,
+    nowMs,
+  });
+  const draft = buildOnboardingDraft({
+    project,
+    assessment,
+    previousDraft,
+    dialogue,
+    nowMs,
+  });
+
+  return updateProject(db, id, {
+    metadata: {
+      ...project.metadata,
+      onboardingState:
+        project.metadata['onboardingState'] === 'approved' ? 'needs_review' : 'in_progress',
+      onboardingDraft: draft,
+      onboardingDialogue: dialogue,
+    },
+  });
+}
+
 export function createProjectsRouter(db: DrizzleDb): Router {
   const router = Router();
 
@@ -340,6 +438,30 @@ export function createProjectsRouter(db: DrizzleDb): Router {
     asyncHandler(async (req, res) => {
       try {
         res.json({ data: assessProjectForOnboarding(db, requireParam(req.params, 'id')) });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/onboarding/draft',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({ data: startProjectOnboardingDraft(db, requireParam(req.params, 'id')) });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/onboarding/answer',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({
+          data: answerProjectOnboardingQuestion(db, requireParam(req.params, 'id'), req.body),
+        });
       } catch (error) {
         mapProjectError(error);
       }

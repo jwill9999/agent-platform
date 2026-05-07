@@ -4,6 +4,7 @@ import { join, relative, resolve, sep } from 'node:path';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 const apiURL = process.env.API_URL ?? 'http://127.0.0.1:3000';
+const suiteRunId = `${Date.now()}-${process.pid}`;
 
 type ProjectRecord = {
   id: string;
@@ -27,7 +28,7 @@ function toContainerWorkspacePath(hostPath: string): string {
 }
 
 function resetFixtureDir(name: string): { hostPath: string; containerPath: string } {
-  const hostPath = join(workspaceHostPath(), 'e2e-project-workspaces', name);
+  const hostPath = join(workspaceHostPath(), 'e2e-project-workspaces', `${suiteRunId}-${name}`);
   rmSync(hostPath, { recursive: true, force: true });
   mkdirSync(hostPath, { recursive: true });
   return { hostPath, containerPath: toContainerWorkspacePath(hostPath) };
@@ -53,10 +54,12 @@ async function openProject(page: Page, containerPath: string) {
   await page.goto('/ide');
   const binding = page.getByLabel('Project binding');
   await expect(binding).toBeVisible();
-  await page.getByLabel('Backend project path').fill(containerPath);
+  await page.getByLabel('Project folder path').fill(containerPath);
   await binding.getByRole('button', { name: 'Open', exact: true }).click();
-  await expect(binding.getByText('Backend accessible')).toBeVisible();
-  await expect(binding.getByText(`Root: ${containerPath}`)).toBeVisible();
+  await expect(binding.getByText('Available')).toBeVisible();
+  await expect(
+    binding.getByText(`Folder: ${containerPath.split('/').pop() ?? 'workspace'}`),
+  ).toBeVisible();
   return binding;
 }
 
@@ -144,6 +147,27 @@ test.describe('Project workspace E2E', () => {
     const opened = await findProjectByRoot(request, fixture.containerPath);
     expect(opened.metadata.onboardingState).toBe('in_progress');
     expect(opened.metadata.instructionFiles).toEqual([]);
+
+    await binding.getByRole('button', { name: 'Start' }).click();
+    await expect(binding.getByText('Revision 1')).toBeVisible();
+    await expect(binding.getByText('# Agent Instructions')).toBeVisible();
+    await expect(page.getByLabel('Onboarding answer')).toBeVisible();
+
+    const answer = 'This project supports code changes and documentation updates.';
+    await page.getByLabel('Onboarding answer').fill(answer);
+    await binding.getByRole('button', { name: 'Send answer' }).click();
+    await expect(binding.getByText('Revision 2')).toBeVisible();
+    await expect(binding.getByText(answer)).toBeVisible();
+    await expect(binding.getByText('Code edits and write tools are available')).toHaveCount(0);
+
+    const revised = await findProjectByRoot(request, fixture.containerPath);
+    expect(revised.metadata.onboardingState).toBe('in_progress');
+    expect(revised.metadata.onboardingDraft).toEqual(
+      expect.objectContaining({
+        revision: 2,
+        markdown: expect.stringContaining(answer),
+      }),
+    );
   });
 
   test('keeps Chat mode separate from Project code tooling', async ({ page }) => {

@@ -232,10 +232,47 @@ export const ProjectOnboardingDraftSchema = z.object({
   targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
   markdown: z.string().min(1).max(50000),
   revision: z.number().int().positive(),
+  history: z
+    .array(
+      z.object({
+        revision: z.number().int().positive(),
+        markdown: z.string().min(1).max(50000),
+        summary: z.string().min(1).max(1000),
+        createdAtMs: z.number().int().nonnegative(),
+      }),
+    )
+    .default([]),
   createdAtMs: z.number().int().nonnegative(),
   updatedAtMs: z.number().int().nonnegative(),
 });
 export type ProjectOnboardingDraft = z.infer<typeof ProjectOnboardingDraftSchema>;
+
+export const ProjectOnboardingDialogueRoleSchema = z.enum(['assistant', 'user']);
+export type ProjectOnboardingDialogueRole = z.infer<typeof ProjectOnboardingDialogueRoleSchema>;
+
+export const ProjectOnboardingDialogueTurnSchema = z.object({
+  id: z.string().min(1).max(120),
+  role: ProjectOnboardingDialogueRoleSchema,
+  content: z.string().min(1).max(5000),
+  questionId: z.string().min(1).max(120).optional(),
+  createdAtMs: z.number().int().nonnegative(),
+});
+export type ProjectOnboardingDialogueTurn = z.infer<typeof ProjectOnboardingDialogueTurnSchema>;
+
+export const ProjectOnboardingDialogueSchema = z.object({
+  status: z.enum(['idle', 'asking', 'draft_ready']),
+  activeQuestionId: z.string().min(1).max(120).optional(),
+  answeredQuestionIds: z.array(z.string().min(1).max(120)).default([]),
+  turns: z.array(ProjectOnboardingDialogueTurnSchema).default([]),
+  updatedAtMs: z.number().int().nonnegative(),
+});
+export type ProjectOnboardingDialogue = z.infer<typeof ProjectOnboardingDialogueSchema>;
+
+export const ProjectOnboardingAnswerBodySchema = z.object({
+  questionId: z.string().min(1).max(120).optional(),
+  answer: z.string().trim().min(1).max(5000),
+});
+export type ProjectOnboardingAnswerBody = z.infer<typeof ProjectOnboardingAnswerBodySchema>;
 
 export const ProjectOnboardingApprovalDecisionSchema = z.object({
   decision: z.enum(['approve', 'reject', 'request_changes']),

@@ -210,6 +210,80 @@ describe('projectsRouter', () => {
       .expect(409);
   });
 
+  it('stores onboarding dialogue answers and revises a draft without approving writes', async () => {
+    const repoDir = path.join(tmpDir, 'repo-needing-dialogue');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'dialogue-project',
+        scripts: { build: 'tsc', test: 'vitest', lint: 'eslint .' },
+      }),
+    );
+    writeFileSync(path.join(repoDir, 'README.md'), 'mixed project\n');
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Dialogue Project' })
+      .expect(201);
+
+    const started = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/draft`)
+      .send({})
+      .expect(200);
+
+    expect(started.body.data.metadata).toMatchObject({
+      onboardingState: 'in_progress',
+      onboardingDialogue: expect.objectContaining({
+        status: 'asking',
+        activeQuestionId: expect.any(String),
+        turns: [expect.objectContaining({ role: 'assistant' })],
+      }),
+      onboardingDraft: expect.objectContaining({
+        targetPath: 'AGENTS.md',
+        revision: 1,
+        markdown: expect.stringContaining('# Agent Instructions'),
+      }),
+    });
+    expect(started.body.data.metadata.onboardingDraft.markdown).toContain('Dialogue Project');
+    expect(started.body.data.metadata.onboardingDraft.markdown).toContain('pnpm test');
+
+    const answered = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/answer`)
+      .send({
+        questionId: started.body.data.metadata.onboardingDialogue.activeQuestionId,
+        answer: 'This project mixes code changes and documentation updates.',
+      })
+      .expect(200);
+
+    expect(answered.body.data.metadata).toMatchObject({
+      onboardingState: 'in_progress',
+      onboardingDialogue: expect.objectContaining({
+        answeredQuestionIds: expect.arrayContaining([
+          started.body.data.metadata.onboardingDialogue.activeQuestionId,
+        ]),
+        turns: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'user',
+            content: 'This project mixes code changes and documentation updates.',
+          }),
+        ]),
+      }),
+      onboardingDraft: expect.objectContaining({
+        revision: 2,
+        history: [expect.objectContaining({ revision: 1 })],
+        markdown: expect.stringContaining(
+          'This project mixes code changes and documentation updates.',
+        ),
+      }),
+    });
+
+    await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
+      .send({})
+      .expect(409);
+  });
+
   it('opens a plain folder without git metadata and omits unknown branch display data', async () => {
     const folderDir = path.join(tmpDir, 'plain-folder');
     mkdirSync(folderDir, { recursive: true });
