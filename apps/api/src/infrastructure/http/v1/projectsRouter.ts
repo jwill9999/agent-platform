@@ -3,7 +3,9 @@ import {
   type ProjectOpenBody,
   ProjectOpenBodySchema,
   ProjectOnboardingAnswerBodySchema,
+  ProjectOnboardingApprovalDecisionSchema,
   ProjectOnboardingAssessmentSchema,
+  ProjectOnboardingReviewBodySchema,
   ProjectOnboardingStateSchema,
   ProjectQuerySchema,
   type ProjectOnboardingAssessment,
@@ -24,8 +26,9 @@ import {
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
 import { execFileSync } from 'node:child_process';
-import { readdirSync, realpathSync, statSync } from 'node:fs';
-import { basename, isAbsolute } from 'node:path';
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { basename, isAbsolute, join } from 'node:path';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
@@ -90,6 +93,60 @@ function metadataOnboardingState(
 ): BackendProjectMetadata['onboardingState'] | undefined {
   const parsed = ProjectOnboardingStateSchema.safeParse(metadata['onboardingState']);
   return parsed.success ? parsed.data : undefined;
+}
+
+function sha256(content: string): string {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+function buildOnboardingApproval(input: {
+  projectId: string;
+  targetPath: string;
+  contentHash: string;
+  reviewer: string;
+  source: 'auto_assessment' | 'manual_review';
+  decidedAtMs: number;
+  comment?: string;
+}) {
+  const candidate = {
+    decision: 'approve',
+    projectId: input.projectId,
+    targetPath: input.targetPath,
+    contentHash: input.contentHash,
+    reviewer: input.reviewer,
+    source: input.source,
+    decidedAtMs: input.decidedAtMs,
+    ...(input.comment ? { comment: input.comment } : {}),
+  };
+  return ProjectOnboardingApprovalDecisionSchema.parse(candidate);
+}
+
+function rootInstructionReference(files: readonly ProjectInstructionFileReference[]) {
+  return files.find((file) => file.scope === 'root' && file.path === 'AGENTS.md');
+}
+
+function withAutoApprovalMetadata(db: DrizzleDb, project: ProjectRecord): ProjectRecord {
+  if (
+    project.metadata['onboardingState'] !== 'approved' ||
+    project.metadata['onboardingApproval']
+  ) {
+    return project;
+  }
+  const rootRef = rootInstructionReference(parseProjectInstructionFileReferences(project.metadata));
+  if (!rootRef?.contentHash) return project;
+  return updateProject(db, project.id, {
+    metadata: {
+      ...project.metadata,
+      onboardingApproval: buildOnboardingApproval({
+        projectId: project.id,
+        targetPath: rootRef.path,
+        contentHash: rootRef.contentHash,
+        reviewer: 'Project assessment',
+        source: 'auto_assessment',
+        decidedAtMs: rootRef.approvedAtMs ?? Date.now(),
+      }),
+    },
+  });
 }
 
 function discoverBackendProjectMetadata(
@@ -182,53 +239,137 @@ function openBackendProject(
   const name = projectNameFor(input, metadata.backendProjectRoot);
 
   if (existing) {
+    const updated = updateProject(db, existing.id, {
+      name,
+      slug: input.slug,
+      workspaceKey: metadata.backendProjectRoot,
+      metadata: { ...existing.metadata, ...metadata },
+      archivedAtMs: null,
+    });
     return {
-      project: updateProject(db, existing.id, {
-        name,
-        slug: input.slug,
-        workspaceKey: metadata.backendProjectRoot,
-        metadata: { ...existing.metadata, ...metadata },
-        archivedAtMs: null,
-      }),
+      project: withAutoApprovalMetadata(db, updated),
       created: false,
     };
   }
 
+  const created = createProject(db, {
+    name,
+    slug: input.slug,
+    workspaceKey: metadata.backendProjectRoot,
+    metadata,
+  });
   return {
-    project: createProject(db, {
-      name,
-      slug: input.slug,
-      workspaceKey: metadata.backendProjectRoot,
-      metadata,
-    }),
+    project: withAutoApprovalMetadata(db, created),
     created: true,
   };
 }
 
-function approveProjectOnboarding(db: DrizzleDb, id: string): ProjectRecord {
+function approveProjectOnboarding(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
   const project = findProject(db, id);
   if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const input = parseBody(ProjectOnboardingReviewBodySchema, body);
+  if (input.decision !== 'approve') return reviewProjectOnboarding(db, id, body);
   const backendProjectRoot = project.metadata['backendProjectRoot'];
   if (typeof backendProjectRoot !== 'string') {
     throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project root is not backend accessible');
+  }
+  const draft = parseStoredOnboardingDraft(project.metadata);
+  const targetPath = draft?.targetPath ?? 'AGENTS.md';
+  const targetFile = join(backendProjectRoot, targetPath);
+  if (draft) {
+    writeFileSync(targetFile, draft.markdown, 'utf8');
   }
   const discovery = discoverProjectInstructions(
     backendProjectRoot,
     parseProjectInstructionFileReferences(project.metadata),
   );
-  if (!discovery.instructionFiles.some((file) => file.scope === 'root')) {
+  const rootRef = rootInstructionReference(discovery.instructionFiles);
+  if (!rootRef) {
     throw new HttpError(
       409,
       'PROJECT_INSTRUCTIONS_MISSING',
       'Root AGENTS.md is required before approval',
     );
   }
+  if (!draft) {
+    const assessment = requireProjectAssessment(project);
+    if (assessment.status !== 'approved') {
+      throw new HttpError(
+        409,
+        'PROJECT_INSTRUCTIONS_REVIEW_REQUIRED',
+        'Project instructions need a draft review before approval',
+      );
+    }
+  }
   const approvedAtMs = Date.now();
+  const contentHash = rootRef.contentHash ?? sha256(readFileSync(targetFile, 'utf8'));
   return updateProject(db, id, {
     metadata: {
       ...project.metadata,
       onboardingState: 'approved',
       instructionFiles: discovery.instructionFiles.map((file) => ({ ...file, approvedAtMs })),
+      onboardingApproval: buildOnboardingApproval({
+        projectId: project.id,
+        targetPath,
+        contentHash,
+        reviewer: input.reviewer,
+        source: 'manual_review',
+        decidedAtMs: approvedAtMs,
+        comment: input.comment,
+      }),
+    },
+  });
+}
+
+function reviewProjectOnboarding(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const input = parseBody(ProjectOnboardingReviewBodySchema, body);
+  if (input.decision === 'approve') return approveProjectOnboarding(db, id, input);
+
+  const nowMs = Date.now();
+  const previousDialogue = parseStoredOnboardingDialogue(project.metadata);
+  const feedback = input.comment?.trim() || 'Project instruction changes requested.';
+  const feedbackTurn = {
+    id: `review-${nowMs}`,
+    role: 'user' as const,
+    content: feedback,
+    questionId: 'review-feedback',
+    createdAtMs: nowMs,
+  };
+  const dialogue = previousDialogue
+    ? {
+        ...previousDialogue,
+        status: 'asking' as const,
+        ...(previousDialogue.activeQuestionId
+          ? { activeQuestionId: previousDialogue.activeQuestionId }
+          : {}),
+        turns: [...previousDialogue.turns, feedbackTurn],
+        updatedAtMs: nowMs,
+      }
+    : {
+        status: 'asking' as const,
+        answeredQuestionIds: [],
+        turns: [feedbackTurn],
+        updatedAtMs: nowMs,
+      };
+
+  const review = ProjectOnboardingApprovalDecisionSchema.parse({
+    decision: input.decision,
+    projectId: project.id,
+    targetPath: parseStoredOnboardingDraft(project.metadata)?.targetPath ?? 'AGENTS.md',
+    reviewer: input.reviewer,
+    source: 'manual_review',
+    decidedAtMs: nowMs,
+    ...(input.comment ? { comment: input.comment } : {}),
+  });
+
+  return updateProject(db, id, {
+    metadata: {
+      ...project.metadata,
+      onboardingState: 'in_progress',
+      onboardingDialogue: dialogue,
+      onboardingReview: review,
     },
   });
 }
@@ -261,7 +402,7 @@ function assessProjectForOnboarding(db: DrizzleDb, id: string): ProjectRecord {
       ? assessmentResult.assessment.assessedAtMs
       : undefined;
 
-  return updateProject(db, id, {
+  const updated = updateProject(db, id, {
     metadata: {
       ...project.metadata,
       onboardingState: assessmentResult.nextState,
@@ -271,6 +412,7 @@ function assessProjectForOnboarding(db: DrizzleDb, id: string): ProjectRecord {
       ),
     },
   });
+  return withAutoApprovalMetadata(db, updated);
 }
 
 function requireProjectAssessment(project: ProjectRecord): ProjectOnboardingAssessment {
@@ -426,7 +568,20 @@ export function createProjectsRouter(db: DrizzleDb): Router {
     '/:id/onboarding/approve',
     asyncHandler(async (req, res) => {
       try {
-        res.json({ data: approveProjectOnboarding(db, requireParam(req.params, 'id')) });
+        res.json({
+          data: approveProjectOnboarding(db, requireParam(req.params, 'id'), req.body),
+        });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/onboarding/review',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({ data: reviewProjectOnboarding(db, requireParam(req.params, 'id'), req.body) });
       } catch (error) {
         mapProjectError(error);
       }

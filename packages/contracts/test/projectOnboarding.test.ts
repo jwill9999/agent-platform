@@ -107,6 +107,7 @@ describe('Project onboarding contracts', () => {
       decision: 'approve',
       projectId: 'project-1',
       reviewer: 'owner',
+      source: 'manual_review',
       decidedAtMs: assessedAtMs,
     });
     expect(approval.targetPath).toBe('AGENTS.md');

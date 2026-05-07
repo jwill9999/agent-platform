@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
@@ -45,8 +45,20 @@ function writeRepoFixture(root: string, options: { includeInstructions: boolean 
   writeFileSync(join(root, 'apps', 'web', 'page.tsx'), 'export default function Page() {}\n');
   writeFileSync(join(root, 'packages', 'api', 'index.ts'), 'export const api = true;\n');
   if (options.includeInstructions) {
-    writeFileSync(join(root, 'AGENTS.md'), 'Root project instructions\n');
-    writeFileSync(join(root, 'apps', 'web', 'AGENTS.md'), 'Web app instructions\n');
+    writeFileSync(
+      join(root, 'AGENTS.md'),
+      [
+        '# Agent Instructions',
+        '',
+        'Use Beads for task tracking and keep Project work read-only until instructions are approved.',
+        'Run build, typecheck, lint, tests, and docs quality gates before closing a ticket.',
+        'Open a pull request and wait for CI, SonarCloud, GitGuardian, and review comments.',
+      ].join('\n'),
+    );
+    writeFileSync(
+      join(root, 'apps', 'web', 'AGENTS.md'),
+      'Use the root instructions and run web lint/tests before closing changes.\n',
+    );
   }
 }
 
@@ -81,7 +93,7 @@ async function findProjectByRoot(
 }
 
 test.describe('Project workspace E2E', () => {
-  test('opens a Project with AGENTS.md, shows the review gate, and approves it', async ({
+  test('opens a Project with sufficient AGENTS.md and auto-approves it', async ({
     page,
     request,
   }, testInfo) => {
@@ -89,32 +101,20 @@ test.describe('Project workspace E2E', () => {
     writeRepoFixture(fixture.hostPath, { includeInstructions: true });
 
     const binding = await openProject(page, fixture.containerPath);
-    await expect(binding.getByText('Instructions review in progress')).toBeVisible();
-    await expect(
-      binding.getByText(/Read-only inspection and planning remain available/),
-    ).toBeVisible();
-    await expect(binding.getByRole('button', { name: 'Approve' })).toBeVisible();
-
-    const opened = await findProjectByRoot(request, fixture.containerPath);
-    expect(opened.metadata.onboardingState).toBe('in_progress');
-    expect(opened.metadata.instructionFiles).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ scope: 'root', path: 'AGENTS.md' }),
-        expect.objectContaining({
-          scope: 'nested',
-          path: 'apps/web/AGENTS.md',
-          appliesToPath: 'apps/web',
-        }),
-      ]),
-    );
-
-    await binding.getByRole('button', { name: 'Approve' }).click();
     await expect(binding.getByText('Instructions approved')).toBeVisible();
     await expect(binding.getByText('Code edits and write tools are available')).toBeVisible();
+    await expect(binding.getByRole('button', { name: 'Approve' })).toHaveCount(0);
 
-    const approved = await findProjectByRoot(request, fixture.containerPath);
-    expect(approved.metadata.onboardingState).toBe('approved');
-    expect(approved.metadata.instructionFiles).toEqual(
+    const opened = await findProjectByRoot(request, fixture.containerPath);
+    expect(opened.metadata.onboardingState).toBe('approved');
+    expect(opened.metadata.onboardingApproval).toEqual(
+      expect.objectContaining({
+        source: 'auto_assessment',
+        targetPath: 'AGENTS.md',
+        contentHash: expect.any(String),
+      }),
+    );
+    expect(opened.metadata.instructionFiles).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           scope: 'root',
@@ -124,13 +124,13 @@ test.describe('Project workspace E2E', () => {
         expect.objectContaining({
           scope: 'nested',
           path: 'apps/web/AGENTS.md',
-          approvedAtMs: expect.any(Number),
+          appliesToPath: 'apps/web',
         }),
       ]),
     );
   });
 
-  test('opens a Project without AGENTS.md as read-only and refuses approval', async ({
+  test('reviews a drafted AGENTS.md before unlocking Project writes', async ({
     page,
     request,
   }, testInfo) => {
@@ -160,13 +160,39 @@ test.describe('Project workspace E2E', () => {
     await expect(binding.getByText(answer)).toBeVisible();
     await expect(binding.getByText('Code edits and write tools are available')).toHaveCount(0);
 
-    const revised = await findProjectByRoot(request, fixture.containerPath);
-    expect(revised.metadata.onboardingState).toBe('in_progress');
-    expect(revised.metadata.onboardingDraft).toEqual(
+    const feedback = 'Clarify that documentation updates are in scope.';
+    await page.getByLabel('Review feedback').fill(feedback);
+    await binding.getByRole('button', { name: 'Request changes' }).click();
+    await expect(binding.getByText('Instructions review in progress')).toBeVisible();
+    await expect(binding.getByText('Code edits and write tools are available')).toHaveCount(0);
+
+    const reviewed = await findProjectByRoot(request, fixture.containerPath);
+    expect(reviewed.metadata.onboardingState).toBe('in_progress');
+    expect(reviewed.metadata.onboardingReview).toEqual(
+      expect.objectContaining({ decision: 'request_changes', comment: feedback }),
+    );
+
+    await binding.getByRole('button', { name: 'Approve draft' }).click();
+    await expect(binding.getByText('Instructions approved')).toBeVisible();
+    await expect(binding.getByText('Code edits and write tools are available')).toBeVisible();
+
+    const approved = await findProjectByRoot(request, fixture.containerPath);
+    expect(approved.metadata.onboardingState).toBe('approved');
+    expect(approved.metadata.onboardingDraft).toEqual(
       expect.objectContaining({
         revision: 2,
         markdown: expect.stringContaining(answer),
       }),
+    );
+    expect(approved.metadata.onboardingApproval).toEqual(
+      expect.objectContaining({
+        source: 'manual_review',
+        targetPath: 'AGENTS.md',
+        contentHash: expect.any(String),
+      }),
+    );
+    expect(readFileSync(join(fixture.hostPath, 'AGENTS.md'), 'utf8')).toBe(
+      (approved.metadata.onboardingDraft as { markdown: string }).markdown,
     );
   });
 

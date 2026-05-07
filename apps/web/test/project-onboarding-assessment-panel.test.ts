@@ -102,9 +102,15 @@ describe('Project onboarding assessment panel', () => {
         answer: '',
         isStarting: false,
         isSubmitting: false,
+        isReviewing: false,
+        reviewComment: '',
         onStart: () => {},
         onAnswerChange: () => {},
         onSubmitAnswer: () => {},
+        onReviewCommentChange: () => {},
+        onApprove: () => {},
+        onRequestChanges: () => {},
+        onReject: () => {},
       }),
     );
 
@@ -112,6 +118,7 @@ describe('Project onboarding assessment panel', () => {
     expect(html).toContain('Revision 2');
     expect(html).toContain('What kind of work should this Project support');
     expect(html).toContain('This Project mixes code and docs.');
+    expect(html).toContain('Approve draft');
     expect(html).toContain('1 earlier revision');
     expect(html).not.toContain('/workspace');
     expect(html).not.toContain('Code edits and write tools are available');

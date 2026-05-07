@@ -274,12 +274,20 @@ export const ProjectOnboardingAnswerBodySchema = z.object({
 });
 export type ProjectOnboardingAnswerBody = z.infer<typeof ProjectOnboardingAnswerBodySchema>;
 
+export const ProjectOnboardingReviewBodySchema = z.object({
+  decision: z.enum(['approve', 'reject', 'request_changes']).default('approve'),
+  reviewer: z.string().trim().min(1).max(200).default('User'),
+  comment: z.string().trim().max(2000).optional(),
+});
+export type ProjectOnboardingReviewBody = z.infer<typeof ProjectOnboardingReviewBodySchema>;
+
 export const ProjectOnboardingApprovalDecisionSchema = z.object({
   decision: z.enum(['approve', 'reject', 'request_changes']),
   projectId: z.string().min(1),
   targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
   contentHash: z.string().min(1).max(200).optional(),
   reviewer: z.string().min(1).max(200),
+  source: z.enum(['auto_assessment', 'manual_review']),
   decidedAtMs: z.number().int().nonnegative(),
   comment: z.string().max(2000).optional(),
 });

@@ -59,9 +59,9 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Existing sufficient `AGENTS.md` can auto-approve with visible evidence.
-- [ ] Drafted `AGENTS.md` requires user review/approval before writes unlock.
-- [ ] Approval metadata is persisted.
-- [ ] Reject/request-changes keeps onboarding in progress.
-- [ ] Approved onboarding unlocks normal Project code-agent writes and keeps all Epic 1 tool scoping.
-- [ ] Approval UI avoids runtime/backend implementation labels in primary user-facing copy.
+- [x] Existing sufficient `AGENTS.md` can auto-approve with visible evidence.
+- [x] Drafted `AGENTS.md` requires user review/approval before writes unlock.
+- [x] Approval metadata is persisted.
+- [x] Reject/request-changes keeps onboarding in progress.
+- [x] Approved onboarding unlocks normal Project code-agent writes and keeps all Epic 1 tool scoping.
+- [x] Approval UI avoids runtime/backend implementation labels in primary user-facing copy.

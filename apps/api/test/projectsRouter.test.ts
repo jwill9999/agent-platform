@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -156,13 +156,34 @@ describe('projectsRouter', () => {
       ]),
     });
 
-    const approved = await request(app)
+    await request(app)
       .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
+      .send({})
+      .expect(409);
+
+    writeFileSync(
+      path.join(repoDir, 'AGENTS.md'),
+      [
+        '# Agent Instructions',
+        '',
+        'Use Beads for task tracking and keep Project work read-only until instructions are approved.',
+        'Run build, typecheck, lint, tests, and docs quality gates before closing a ticket.',
+        'Open a pull request and wait for CI, SonarCloud, GitGuardian, and review comments.',
+      ].join('\n'),
+    );
+    const reassessed = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/assess`)
       .send({})
       .expect(200);
 
-    expect(approved.body.data.metadata).toMatchObject({
+    expect(reassessed.body.data.metadata).toMatchObject({
       onboardingState: 'approved',
+      onboardingApproval: expect.objectContaining({
+        projectId: openedProject.body.data.id,
+        targetPath: 'AGENTS.md',
+        contentHash: expect.any(String),
+        source: 'auto_assessment',
+      }),
       instructionFiles: expect.arrayContaining([
         expect.objectContaining({
           scope: 'root',
@@ -210,7 +231,7 @@ describe('projectsRouter', () => {
       .expect(409);
   });
 
-  it('stores onboarding dialogue answers and revises a draft without approving writes', async () => {
+  it('stores onboarding dialogue answers, reviews feedback, and finalizes an approved draft', async () => {
     const repoDir = path.join(tmpDir, 'repo-needing-dialogue');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
     writeFileSync(
@@ -278,10 +299,57 @@ describe('projectsRouter', () => {
       }),
     });
 
-    await request(app)
+    const requestedChanges = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/review`)
+      .send({
+        decision: 'request_changes',
+        reviewer: 'Test reviewer',
+        comment: 'Clarify that documentation updates are in scope.',
+      })
+      .expect(200);
+
+    expect(requestedChanges.body.data.metadata).toMatchObject({
+      onboardingState: 'in_progress',
+      onboardingReview: expect.objectContaining({
+        decision: 'request_changes',
+        reviewer: 'Test reviewer',
+      }),
+      onboardingDialogue: expect.objectContaining({
+        turns: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'user',
+            content: 'Clarify that documentation updates are in scope.',
+          }),
+        ]),
+      }),
+    });
+
+    const approved = await request(app)
       .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
-      .send({})
-      .expect(409);
+      .send({ reviewer: 'Test reviewer', comment: 'Draft looks ready.' })
+      .expect(200);
+
+    expect(readFileSync(path.join(repoDir, 'AGENTS.md'), 'utf8')).toBe(
+      approved.body.data.metadata.onboardingDraft.markdown,
+    );
+    expect(approved.body.data.metadata).toMatchObject({
+      onboardingState: 'approved',
+      onboardingApproval: expect.objectContaining({
+        projectId: openedProject.body.data.id,
+        targetPath: 'AGENTS.md',
+        contentHash: expect.any(String),
+        reviewer: 'Test reviewer',
+        source: 'manual_review',
+        comment: 'Draft looks ready.',
+      }),
+      instructionFiles: expect.arrayContaining([
+        expect.objectContaining({
+          scope: 'root',
+          path: 'AGENTS.md',
+          approvedAtMs: expect.any(Number),
+        }),
+      ]),
+    });
   });
 
   it('opens a plain folder without git metadata and omits unknown branch display data', async () => {
@@ -349,6 +417,12 @@ describe('projectsRouter', () => {
           approvedAtMs: expect.any(Number),
         }),
       ]),
+      onboardingApproval: expect.objectContaining({
+        projectId: openedProject.body.data.id,
+        targetPath: 'AGENTS.md',
+        contentHash: expect.any(String),
+        source: 'auto_assessment',
+      }),
     });
   });
 

@@ -291,18 +291,30 @@ export function ProjectOnboardingDraftPanel({
   answer,
   isStarting,
   isSubmitting,
+  isReviewing,
+  reviewComment,
   onStart,
   onAnswerChange,
   onSubmitAnswer,
+  onReviewCommentChange,
+  onApprove,
+  onRequestChanges,
+  onReject,
 }: Readonly<{
   draft: ProjectOnboardingDraft | null;
   dialogue: ProjectOnboardingDialogue | null;
   answer: string;
   isStarting: boolean;
   isSubmitting: boolean;
+  isReviewing: boolean;
+  reviewComment: string;
   onStart: () => void;
   onAnswerChange: (value: string) => void;
   onSubmitAnswer: () => void;
+  onReviewCommentChange: (value: string) => void;
+  onApprove: () => void;
+  onRequestChanges: () => void;
+  onReject: () => void;
 }>) {
   const question = activeOnboardingQuestion(dialogue);
   return (
@@ -354,6 +366,50 @@ export function ProjectOnboardingDraftPanel({
         <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-2 text-xs leading-relaxed text-foreground">
           {draft.markdown}
         </pre>
+      )}
+      {draft && (
+        <div className="mt-2 space-y-2">
+          <Textarea
+            aria-label="Review feedback"
+            value={reviewComment}
+            onChange={(event) => {
+              onReviewCommentChange(event.target.value);
+            }}
+            className="min-h-16 text-sm"
+            placeholder="Optional feedback before requesting changes"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="h-7"
+              onClick={onApprove}
+              disabled={isReviewing}
+            >
+              {isReviewing ? 'Reviewing...' : 'Approve draft'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7"
+              onClick={onRequestChanges}
+              disabled={!reviewComment.trim() || isReviewing}
+            >
+              Request changes
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7"
+              onClick={onReject}
+              disabled={!reviewComment.trim() || isReviewing}
+            >
+              Reject
+            </Button>
+          </div>
+        </div>
       )}
       {draft?.history.length ? (
         <div className="mt-2 text-muted-foreground">{draft.history.length} earlier revision(s)</div>
@@ -1498,7 +1554,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [isAssessingProject, setIsAssessingProject] = useState(false);
   const [isStartingOnboardingDraft, setIsStartingOnboardingDraft] = useState(false);
   const [isSubmittingOnboardingAnswer, setIsSubmittingOnboardingAnswer] = useState(false);
+  const [isReviewingOnboardingDraft, setIsReviewingOnboardingDraft] = useState(false);
   const [onboardingAnswer, setOnboardingAnswer] = useState('');
+  const [onboardingReviewComment, setOnboardingReviewComment] = useState('');
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -1552,6 +1610,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const canApproveProjectInstructions =
     Boolean(activeProject) &&
     onboardingState !== 'approved' &&
+    onboardingAssessment?.status === 'approved' &&
     projectHasRootInstructions(activeProject);
 
   const {
@@ -1621,6 +1680,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setEditProposal(null);
     setChatInput('');
     setOnboardingAnswer('');
+    setOnboardingReviewComment('');
     setShowTerminal(false);
     fs.closeDirectory();
   }, [fs]);
@@ -1662,7 +1722,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     try {
       const project = await apiPost<ProjectRecord>(
         apiPath('projects', activeProject.id, 'onboarding', 'approve'),
-        {},
+        { reviewer: 'User' },
       );
       if (!project) throw new ApiRequestError('Failed to approve project instructions', 500);
       setActiveProject(project);
@@ -1676,6 +1736,44 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       setIsApprovingProjectInstructions(false);
     }
   }, [activeProject?.id]);
+
+  const handleReviewOnboardingDraft = useCallback(
+    async (decision: 'approve' | 'reject' | 'request_changes') => {
+      if (!activeProject?.id) return;
+      const comment = onboardingReviewComment.trim();
+      if (decision !== 'approve' && !comment) return;
+      setIsReviewingOnboardingDraft(true);
+      setProjectOpenError(null);
+      try {
+        const project = await apiPost<ProjectRecord>(
+          apiPath('projects', activeProject.id, 'onboarding', 'review'),
+          {
+            decision,
+            reviewer: 'User',
+            ...(comment ? { comment } : {}),
+          },
+        );
+        if (!project) throw new ApiRequestError('Failed to review project instructions', 500);
+        setActiveProject(project);
+        setOnboardingReviewComment('');
+        toast.success(
+          decision === 'approve'
+            ? 'Project instructions approved'
+            : 'Project instruction feedback saved',
+        );
+      } catch (error) {
+        const message =
+          error instanceof ApiRequestError
+            ? error.message
+            : 'Failed to review project instructions';
+        setProjectOpenError(message);
+        toast.error(message);
+      } finally {
+        setIsReviewingOnboardingDraft(false);
+      }
+    },
+    [activeProject?.id, onboardingReviewComment],
+  );
 
   const handleAssessProject = useCallback(async () => {
     if (!activeProject?.id) return;
@@ -2280,12 +2378,24 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           answer={onboardingAnswer}
                           isStarting={isStartingOnboardingDraft}
                           isSubmitting={isSubmittingOnboardingAnswer}
+                          isReviewing={isReviewingOnboardingDraft}
+                          reviewComment={onboardingReviewComment}
                           onStart={() => {
                             handleStartOnboardingDraft().catch(() => {});
                           }}
                           onAnswerChange={setOnboardingAnswer}
                           onSubmitAnswer={() => {
                             handleSubmitOnboardingAnswer().catch(() => {});
+                          }}
+                          onReviewCommentChange={setOnboardingReviewComment}
+                          onApprove={() => {
+                            handleReviewOnboardingDraft('approve').catch(() => {});
+                          }}
+                          onRequestChanges={() => {
+                            handleReviewOnboardingDraft('request_changes').catch(() => {});
+                          }}
+                          onReject={() => {
+                            handleReviewOnboardingDraft('reject').catch(() => {});
                           }}
                         />
                       )}
