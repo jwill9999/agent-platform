@@ -17,6 +17,7 @@ revise a proposed `AGENTS.md` until the project context is clear enough to appro
 - The draft must be human-readable Markdown.
 - The draft must cover, when applicable:
   - project structure.
+  - Project profile or purpose when it is not purely a code repository.
   - monorepo apps/packages/services.
   - architecture overview.
   - run/build/test/lint commands.
@@ -24,6 +25,8 @@ revise a proposed `AGENTS.md` until the project context is clear enough to appro
   - environment variables and secrets cautions.
   - coding conventions.
   - agent safety rules and known pitfalls.
+- For non-code or mixed Projects, the dialogue should ask about the user's intended workflow before
+  assuming coding-specific commands or conventions.
 - The agent must ask rather than presume when active subproject scope is ambiguous.
 - The dialogue must not unlock code writes until approval happens in task `.4`.
 
@@ -63,6 +66,7 @@ Keep Beads dependencies aligned with this table.
 
 - [ ] Missing/insufficient instructions start a collaborative onboarding Q&A flow.
 - [ ] The agent asks focused questions instead of guessing critical project facts.
+- [ ] The agent asks about intended Project use when the folder is non-code, mixed, or ambiguous.
 - [ ] User answers can revise a human-readable `AGENTS.md` draft.
 - [ ] Draft state is persisted and visible for review.
 - [ ] Code writes remain blocked throughout onboarding dialogue.

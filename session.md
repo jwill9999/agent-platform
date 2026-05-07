@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Refined `agent-platform-project-onboarding` and all six child specs so Project is treated as a generic folder/work context with coding as a profile/capability, not the definition of Project. Created follow-up epic `agent-platform-project-experience` with six child tasks for Project profiles, left explorer navigation, project-chat-first entry, optional IDE handoff, user-facing labels/breadcrumbs, and Playwright navigation E2E. Beads dependencies chain the Project experience epic after onboarding.
+- **Date:** 2026-05-07
 - **Session:** Completed cleanup for `agent-platform-project-workspaces.6`: PR #148 is open against `feature/agent-platform-project-workspaces`, all GitHub Actions/docs checks/GitGuardian/SonarCloud gates passed, SonarCloud reports 0 unresolved issues and quality gate OK, review-thread sweep found no actionable comments, Sourcery was skipped only due weekly rate limit, and Beads closed both `.6` and the parent `agent-platform-project-workspaces` epic. Beads Dolt state was pushed; remaining cleanup is pushing the final session/Beads bookkeeping commits.
 - **Date:** 2026-05-07
 - **Session:** Closed `agent-platform-project-workspaces.5` after PR #147 passed GitHub Actions (`verify`, `docker`, `e2e`), docs checks, GitGuardian, and SonarCloud with 0 unresolved issues and no review threads. Claimed `agent-platform-project-workspaces.6` on `task/agent-platform-project-workspaces.6`, added deterministic Project workspace Playwright coverage for Chat/Project separation plus missing/review/approved `AGENTS.md` states, and updated architecture/development docs for the minimal Project onboarding gate. Local gates pass: build, format, lint, docs lint, unit tests, diff check, focused Playwright, and full Docker E2E; remaining before close: push PR and remote checks/comments.
@@ -1012,10 +1014,10 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-project-workspaces.6`
+- **Current branch:** `feature/agent-platform-project-workspaces`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** Project workspace epic implementation is complete. PRs #143 through #148 are open against the feature branch and green/non-actionable; they remain unmerged until the end-of-epic integration point.
-- **Remote sync:** Branch has the final Beads/session bookkeeping commits to push after cleanup. Task PRs remain unmerged until owner-approved epic integration.
+- **Current work:** Project workspace implementation is merged into the feature branch. PR #149 is the feature-to-main integration PR; it was green before the latest planning/spec updates and should rerun after push.
+- **Remote sync:** Push the latest onboarding/project-experience planning commit to refresh PR #149.
 
 ### Beads
 
@@ -1026,7 +1028,8 @@ Quality gates passed:
 - `agent-platform-project-workspaces.4` is closed. PR #146 is open and green; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.5` is closed. PR #147 is open and green/non-actionable; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.6` is closed. PR #148 is open and green/non-actionable; it remains unmerged until the end-of-epic integration point.
-- `agent-platform-project-onboarding.1` is now ready and blocks the next P1 onboarding epic.
+- `agent-platform-project-onboarding` is open and refined to treat Project as a generic folder/work context with coding/file-changing behavior as a profile/capability. `agent-platform-project-onboarding.1` is ready.
+- `agent-platform-project-experience` is open as a P1 follow-up epic after onboarding, with child tasks `.1` through `.6` covering Project profiles, left explorer navigation, project-chat-first entry, optional IDE handoff, label cleanup/breadcrumbs, and Playwright navigation E2E.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
 - `agent-platform-browser-tools` is closed locally.
@@ -1163,10 +1166,10 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Push the final Beads/session cleanup commits on `task/agent-platform-project-workspaces.6`.
-2. Discuss the completed `agent-platform-project-workspaces` epic with the owner and wait for manual/HITL closeout direction before merging.
-3. Keep PRs #143 through #148 open and unmerged until the owner approves the single end-of-epic integration.
-4. After owner discussion/manual testing, either prepare the single epic integration path or start `agent-platform-project-onboarding.1` under the same per-ticket PR/check/comment loop.
+1. Commit and push the onboarding/project-experience planning updates to `feature/agent-platform-project-workspaces`.
+2. Monitor PR #149 after the push; merge feature to `main` only after checks/comments are green and owner approves.
+3. After `main` is updated, start `feature/agent-platform-project-onboarding` from `main` and claim `agent-platform-project-onboarding.1`.
+4. Keep `agent-platform-project-experience` ready as the follow-up epic after onboarding completes.
 
 ---
 

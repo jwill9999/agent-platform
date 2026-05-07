@@ -7,15 +7,21 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Objective
 
-Complete the Project onboarding experience so a newly opened code Project can be assessed,
-understood, documented in `AGENTS.md`, approved, and then used safely by the coding agent without
-requiring manual tester judgment outside the product.
+Complete the Project onboarding experience so a newly opened Project with a coding-capable profile
+can be assessed, understood, documented in `AGENTS.md`, approved, and then used safely by the coding
+agent without requiring manual tester judgment outside the product.
 
 Epic 1 (`agent-platform-project-workspaces`) provides the Project runtime foundation and safety gate.
 This epic makes the onboarding experience complete end to end.
 
 ## Product Decisions
 
+- Project is a generic folder/work context, not necessarily a code repository. This epic implements
+  the `AGENTS.md` lifecycle for Projects where coding or file-changing work is enabled.
+- The coding agent is a Project profile/tooling choice, not the definition of a Project.
+- Onboarding UI must avoid implementation labels such as `/workspace`, `backend accessible`, backend
+  root, or repository root in normal user-facing copy. Show Project name, folder/relevant relative
+  path, onboarding state, and branch/status only where useful.
 - The agent takes initiative during Project onboarding.
 - On first Project load, the agent reads existing `AGENTS.md` and performs read-only working-tree
   traversal.
@@ -31,6 +37,9 @@ This epic makes the onboarding experience complete end to end.
   the user, and not blocking unless a stricter approval mode is enabled later.
 - Playwright should act as a human tester by opening Projects, reading prompts, approving/rejecting
   onboarding actions, and validating UI and filesystem outcomes.
+- A follow-up epic, `agent-platform-project-experience`, will implement the broader Project
+  navigation model: chat-first Project entry, recent/reopen Projects, left explorer organization,
+  optional IDE handoff, breadcrumbs, and generic Project profiles beyond coding.
 
 ## Epic 2 Scope
 
@@ -48,6 +57,8 @@ In scope:
 
 Out of scope:
 
+- Broad Project navigation redesign, recent/reopen Project explorer UI, breadcrumbs, and
+  project-chat-first routing. These belong to `agent-platform-project-experience`.
 - Multi-agent reviewer orchestration for onboarding output.
 - Scheduled autonomous instruction drift jobs.
 - Hosted remote checkout management.
@@ -116,6 +127,8 @@ passes, and CI/CD pipelines are green.
 - [ ] Each child task has a Beads issue, spec file, dependency edge, and Definition of Done.
 - [ ] First Project load performs read-only assessment of the working tree and existing
       `AGENTS.md`.
+- [ ] User-facing onboarding labels describe the Project and instruction state without exposing
+      `/workspace`, backend accessibility, backend root, or repository root as primary copy.
 - [ ] Assessment returns structured visible evidence, gaps, questions, and recommendations.
 - [ ] Existing sufficient `AGENTS.md` can auto-approve onboarding with visible reasoning.
 - [ ] Missing or insufficient `AGENTS.md` starts collaborative onboarding dialogue.

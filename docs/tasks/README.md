@@ -85,6 +85,7 @@ Spec: docs/tasks/<issue-id>.md
 | Code workbench           | `agent-platform-code-workbench`           | `agent-platform-code-workbench.{1-7}.md`                                         |
 | Project workspaces       | `agent-platform-project-workspaces`       | `agent-platform-project-workspaces.{1-6}.md`                                     |
 | Project onboarding       | `agent-platform-project-onboarding`       | `agent-platform-project-onboarding.{1-6}.md`                                     |
+| Project experience       | `agent-platform-project-experience`       | `agent-platform-project-experience.{1-6}.md`                                     |
 | Research tools           | `agent-platform-research-tools`           | child specs pending                                                              |
 | Memory management        | `agent-platform-memory`                   | child specs pending                                                              |
 | Scheduler                | `agent-platform-scheduler`                | child specs pending                                                              |

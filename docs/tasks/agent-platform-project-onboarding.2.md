@@ -12,6 +12,9 @@ onboarding can be approved or needs collaborative follow-up.
 ## Requirements
 
 - Assessment must only use read-only tools.
+- Assessment must treat Project as a generic folder/work context and classify whether the current
+  Project is coding, docs/content, research, automation, mixed, or unknown when enough evidence is
+  available.
 - Assessment must read root `AGENTS.md` when present.
 - Assessment must inspect enough project structure to infer shape: key config files, package/workspace
   manifests, Docker/compose files, build/test scripts, docs, and nested `AGENTS.md` files.
@@ -22,6 +25,8 @@ onboarding can be approved or needs collaborative follow-up.
   return questions/recommended updates.
 - Assessment reasoning must be visible enough for the user to understand why approval was or was not
   granted.
+- Assessment UI must use user-facing Project labels and must not show `/workspace` or backend
+  accessibility as the main explanation.
 
 ## Implementation Plan
 
@@ -58,6 +63,7 @@ Keep Beads dependencies aligned with this table.
 
 - [ ] First load can run read-only Project assessment.
 - [ ] Assessment inspects Project evidence without writes or destructive commands.
+- [ ] Assessment classifies the Project profile/capabilities without assuming every Project is code.
 - [ ] Assessment returns and persists structured status, evidence, gaps, questions, and recommended
       updates.
 - [ ] Sufficient existing `AGENTS.md` can move onboarding to approved.

@@ -20,6 +20,8 @@ safe.
   - insufficient/stale `AGENTS.md`.
   - monorepo with nested `AGENTS.md`.
   - ambiguous subproject request.
+  - mixed or non-code Project folder where the user must clarify intended workflow before
+    coding-specific assumptions are made.
 - E2E coverage must prove:
   - auto-approval for sufficient existing instructions.
   - missing instructions start onboarding dialogue.
@@ -31,6 +33,7 @@ safe.
   - closeout update candidates can be reviewed/applied/rejected.
   - refresh/rescan detects no-change and material-drift states.
   - Chat mode remains independent from Project onboarding.
+  - onboarding UI uses user-facing Project labels rather than `/workspace` or backend accessibility.
 - Test output must be deterministic enough for CI.
 
 ## Implementation Plan
@@ -76,4 +79,6 @@ Keep Beads dependencies aligned with this table.
 - [ ] Playwright acts through the UI and verifies visible outputs plus filesystem results.
 - [ ] Tests prove writes are blocked before approval and allowed after approval.
 - [ ] Tests prove `AGENTS.md` can be drafted, reviewed, approved, refreshed, and updated.
+- [ ] Tests prove onboarding handles mixed/non-code Project folders without forcing coding-only
+      language.
 - [ ] Combined Epics 1 and 2 are ready for a full end-to-end Playwright run.

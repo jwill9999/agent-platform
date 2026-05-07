@@ -13,6 +13,8 @@ task/session closeout and by allowing users to explicitly refresh or rescan Proj
 - During work, the agent can collect candidate durable facts without interrupting the task loop.
 - Candidate facts may include corrected run commands, discovered setup steps, architecture changes,
   project conventions, generated-file cautions, or repeated pitfalls.
+- Candidate facts may also include non-code Project workflow facts, such as document conventions,
+  research sources, automation schedules, generated artifact locations, or recurring task intent.
 - Rolling writes to `AGENTS.md` should be avoided during active implementation.
 - At task/session closeout, the agent should review candidates and propose low-risk factual updates.
 - Later updates are reviewable but do not block ongoing work by default.
@@ -21,6 +23,8 @@ task/session closeout and by allowing users to explicitly refresh or rescan Proj
   diverge from the working tree.
 - Broad policy changes, speculative conclusions, and removal of user-authored guidance require
   explicit review.
+- Refresh/rescan must preserve the Project profile/capability framing and must not convert a
+  non-code or mixed Project into a coding-only Project without user confirmation.
 
 ## Implementation Plan
 
@@ -60,4 +64,5 @@ Keep Beads dependencies aligned with this table.
 - [ ] Closeout can propose reviewable `AGENTS.md` updates.
 - [ ] Users can apply or reject update candidates.
 - [ ] Refresh/rescan can reassess instructions and flag material drift.
+- [ ] Refresh/rescan preserves non-code or mixed Project intent unless the user confirms a change.
 - [ ] Later updates are reviewable by default and blocking only when policy requires it.

@@ -16,9 +16,13 @@ instructions only when assessment concludes they are sufficient and consistent.
 - Draft approval should write or finalize root `AGENTS.md` in the Project working tree.
 - Reject/request-changes must keep onboarding in progress and preserve user feedback.
 - Approved onboarding must unlock normal code-agent write behavior from Epic 1.
+- Approval must be scoped to the Project's enabled profile/capabilities; coding write unlock applies
+  only when coding/file-changing work is enabled for that Project.
 - Approval metadata must include Project id, instruction file path, content hash or version,
   approver/source, and timestamp.
 - The review flow must make it clear that initial instructions are required before code writes.
+- Review copy must describe the Project and instruction state in user language and avoid runtime
+  details such as `/workspace` or backend accessibility in primary labels.
 
 ## Implementation Plan
 
@@ -60,3 +64,4 @@ Keep Beads dependencies aligned with this table.
 - [ ] Approval metadata is persisted.
 - [ ] Reject/request-changes keeps onboarding in progress.
 - [ ] Approved onboarding unlocks normal Project code-agent writes and keeps all Epic 1 tool scoping.
+- [ ] Approval UI avoids runtime/backend implementation labels in primary user-facing copy.

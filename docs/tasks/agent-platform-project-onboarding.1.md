@@ -12,6 +12,7 @@ instructions, review, approval, and refresh/rescan.
 
 - Define structured assessment output:
   - status: `approved`, `in_progress`, or `needs_review`.
+  - Project profile/capability context, including whether coding/file-changing work is enabled.
   - summary of inferred Project shape.
   - evidence files/config/docs inspected.
   - detected apps/packages/services/subproject scopes.
@@ -27,6 +28,9 @@ instructions, review, approval, and refresh/rescan.
 - Define persistence for assessment results, draft content, approvals, reviewer identity/time, and
   refresh history.
 - Define which assessment outputs are shown to the user and which are retained for audit/debug.
+- Define user-facing display fields separately from runtime metadata so normal UI can show Project
+  name, folder/relevant relative path, and onboarding state without exposing `/workspace`, backend
+  accessibility, backend root, or repository root as primary copy.
 - Define deterministic fixture states for Playwright tests.
 
 ## Implementation Plan
@@ -66,4 +70,5 @@ Keep Beads dependencies aligned with this table.
 - [ ] Assessment, draft, approval, and refresh contracts are explicit and typed.
 - [ ] Onboarding state transitions are testable and reject invalid jumps.
 - [ ] Assessment evidence and user-visible summaries are represented separately.
+- [ ] User-visible Project/onboarding labels are separated from runtime/backend metadata.
 - [ ] Playwright fixture states are defined for later E2E tasks.
