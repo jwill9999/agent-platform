@@ -101,7 +101,7 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(projectBinding.getByText('Unavailable')).toBeVisible();
     await page.getByLabel('Project folder path').fill('/workspace');
     await projectBinding.getByRole('button', { name: 'Open', exact: true }).click();
-    await expect(projectBinding.getByText('Available')).toBeVisible();
+    await expect(projectBinding.getByText('Available', { exact: true })).toBeVisible();
     await expect(projectBinding.getByText('Folder: workspace')).toBeVisible();
 
     await page.getByLabel('Project folder path').fill('/definitely-not-mounted-agent-platform');

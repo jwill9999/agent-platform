@@ -56,7 +56,7 @@ async function openProject(page: Page, containerPath: string) {
   await expect(binding).toBeVisible();
   await page.getByLabel('Project folder path').fill(containerPath);
   await binding.getByRole('button', { name: 'Open', exact: true }).click();
-  await expect(binding.getByText('Available')).toBeVisible();
+  await expect(binding.getByText('Available', { exact: true })).toBeVisible();
   await expect(
     binding.getByText(`Folder: ${containerPath.split('/').pop() ?? 'workspace'}`),
   ).toBeVisible();
