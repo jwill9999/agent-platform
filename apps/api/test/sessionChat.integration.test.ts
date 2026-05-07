@@ -126,6 +126,58 @@ type ChatEvent = {
   message?: string;
 };
 
+function createChatProject(
+  db: TestDb,
+  options: {
+    name: string;
+    workspaceKey?: string;
+    backendProjectRoot: string;
+    repositoryRoot: string;
+    capabilityState: 'backend_accessible' | 'unavailable';
+  },
+) {
+  return createProject(db, {
+    name: options.name,
+    workspaceKey: options.workspaceKey,
+    metadata: {
+      backendProjectRoot: options.backendProjectRoot,
+      repositoryRoot: options.repositoryRoot,
+      projectRoot: '/workspace',
+      capabilityState: options.capabilityState,
+      onboardingState: 'missing',
+      defaultAgentProfile: 'coding',
+    },
+  });
+}
+
+async function createProjectSession(
+  app: Application,
+  db: TestDb,
+  options: Parameters<typeof createChatProject>[1],
+): Promise<string> {
+  const project = createChatProject(db, options);
+  const sessionRes = await request(app)
+    .post('/v1/sessions')
+    .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: project.id })
+    .expect(201);
+  return sessionRes.body.data.id as string;
+}
+
+function mockProjectWrite(id: string, content: string) {
+  mockToolCalls
+    .mockReturnValueOnce([
+      {
+        id,
+        name: 'sys_write_file',
+        args: {
+          path: '/workspace/project-note.txt',
+          content,
+        },
+      },
+    ])
+    .mockReturnValueOnce('Project file written');
+}
+
 function parseNdjsonEvents(text: string): ChatEvent[] {
   return String(text)
     .trim()
@@ -632,36 +684,14 @@ describe('POST /v1/chat (session-aware)', () => {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
       const projectRoot = mkdtempSync(path.join(os.tmpdir(), 'agent-platform-project-chat-root-'));
       dirs.push(projectRoot);
-      const project = createProject(db, {
+      const sessionId = await createProjectSession(app, db, {
         name: 'Writable Project',
         workspaceKey: projectRoot,
-        metadata: {
-          backendProjectRoot: projectRoot,
-          repositoryRoot: projectRoot,
-          projectRoot: '/workspace',
-          capabilityState: 'backend_accessible',
-          onboardingState: 'missing',
-          defaultAgentProfile: 'coding',
-        },
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'backend_accessible',
       });
-
-      const sessionRes = await request(app)
-        .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: project.id })
-        .expect(201);
-      const sessionId = sessionRes.body.data.id as string;
-      mockToolCalls
-        .mockReturnValueOnce([
-          {
-            id: 'tc-project-write',
-            name: 'sys_write_file',
-            args: {
-              path: '/workspace/project-note.txt',
-              content: 'written in project root',
-            },
-          },
-        ])
-        .mockReturnValueOnce('Project file written');
+      mockProjectWrite('tc-project-write', 'written in project root');
       const res = await request(app)
         .post('/v1/chat')
         .send({ sessionId, message: 'Write the project note' })
@@ -684,36 +714,14 @@ describe('POST /v1/chat (session-aware)', () => {
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
       process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
-      const project = createProject(db, {
+      const sessionId = await createProjectSession(app, db, {
         name: 'Unavailable Project',
-        metadata: {
-          backendProjectRoot: '/missing/project',
-          repositoryRoot: '/missing/project',
-          projectRoot: '/workspace',
-          capabilityState: 'unavailable',
-          onboardingState: 'missing',
-          defaultAgentProfile: 'coding',
-        },
+        backendProjectRoot: '/missing/project',
+        repositoryRoot: '/missing/project',
+        capabilityState: 'unavailable',
       });
 
-      const sessionRes = await request(app)
-        .post('/v1/sessions')
-        .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: project.id })
-        .expect(201);
-      const sessionId = sessionRes.body.data.id as string;
-
-      mockToolCalls
-        .mockReturnValueOnce([
-          {
-            id: 'tc-project-write-unavailable',
-            name: 'sys_write_file',
-            args: {
-              path: '/workspace/project-note.txt',
-              content: 'should not write',
-            },
-          },
-        ])
-        .mockReturnValueOnce('Project file written');
+      mockProjectWrite('tc-project-write-unavailable', 'should not write');
       const res = await request(app)
         .post('/v1/chat')
         .send({ sessionId, message: 'Write the project note' })
