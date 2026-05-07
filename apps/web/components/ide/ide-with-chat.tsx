@@ -490,11 +490,10 @@ function IDEToolbar({
   const ExplorerIcon = showExplorer ? PanelLeftClose : Folder;
 
   const terminalVariant = showTerminal ? 'secondary' : 'ghost';
-  const terminalTitle = canUseProjectTools
-    ? showTerminal
-      ? 'Hide terminal'
-      : 'Show terminal'
-    : 'Open a backend project before using the terminal';
+  let terminalTitle = 'Open a backend project before using the terminal';
+  if (canUseProjectTools) {
+    terminalTitle = showTerminal ? 'Hide terminal' : 'Show terminal';
+  }
   const terminalLabel = showTerminal ? 'Hide' : 'Terminal';
   const TermIcon = showTerminal ? PanelBottomClose : TerminalIcon;
 

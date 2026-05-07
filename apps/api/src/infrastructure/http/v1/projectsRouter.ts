@@ -50,9 +50,11 @@ type BackendProjectMetadata = {
   defaultAgentProfile: 'coding';
 };
 
+const GIT_BINARY = '/usr/bin/git';
+
 function gitValue(cwd: string, args: string[]): string | undefined {
   try {
-    const output = execFileSync('git', ['-C', cwd, ...args], {
+    const output = execFileSync(GIT_BINARY, ['-C', cwd, ...args], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();

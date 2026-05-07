@@ -12,6 +12,8 @@ import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 import { createProjectsRouter } from '../src/infrastructure/http/v1/projectsRouter.js';
 import { createSessionsRouter } from '../src/infrastructure/http/v1/sessionsRouter.js';
 
+const GIT_BINARY = '/usr/bin/git';
+
 function buildTestApp(db: ReturnType<typeof openDatabase>['db']) {
   const app = express();
   app.use(express.json());
@@ -76,7 +78,7 @@ describe('projectsRouter', () => {
 
   it('opens a backend-accessible project, persists repository metadata, and binds project sessions', async () => {
     const repoDir = path.join(tmpDir, 'repo');
-    execFileSync('git', ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
     writeFileSync(path.join(repoDir, 'README.md'), 'project\n');
     const repoRealPath = realpathSync(repoDir);
 
