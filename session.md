@@ -8,6 +8,8 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-07
+- **Session:** Claimed `agent-platform-project-workspaces.4` on new branch `task/agent-platform-project-workspaces.4` from the completed `.3` tip. Scope: resolve canonical `/workspace` to the active Project backend root and route file, terminal, Git, test, Docker, and sensor tools through the Project boundary with wrong-root regression coverage.
+- **Date:** 2026-05-07
 - **Session:** Completed and closed `agent-platform-project-workspaces.3` on `task/agent-platform-project-workspaces.3`: PR #145 is open against `feature/agent-platform-project-workspaces`, all local gates and PR checks passed, SonarCloud reports 0 new issues/hotspots after the Git PATH and nested-ternary cleanup, and review-thread inspection found no actionable comments. Next task is `agent-platform-project-workspaces.4` from this branch tip.
 - **Date:** 2026-05-07
 - **Session:** Implemented `agent-platform-project-workspaces.3` on `task/agent-platform-project-workspaces.3`: added backend Project open validation through `/v1/projects/open`, persisted backend root/repository/branch/capability/onboarding/default-agent metadata, bound Project sessions to the selected Project id, added the IDE backend Project binding panel with unavailable state and stale-context clearing, and covered valid `/workspace` plus inaccessible paths in API/contract/Playwright tests. Local format, build, lint, unit, focused API/contract, web typecheck, and targeted Playwright gates passed; next step is commit, push, PR, and remote CI/Sonar/Sourcery/comment monitoring before closing the Bead.
@@ -1022,9 +1024,9 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-project-workspaces.3`
+- **Current branch:** `task/agent-platform-project-workspaces.4`
 - **Current base:** `feature/agent-platform-project-workspaces`.
-- **Current work:** `agent-platform-project-workspaces.3` is implemented, pushed, open as PR #145, remotely green, and closed in Beads.
+- **Current work:** `agent-platform-project-workspaces.4` is claimed and ready for implementation discovery.
 - **Remote sync:** Git branch and Beads/Dolt state are pushed. Task PRs remain unmerged until the end-of-epic integration point.
 
 ### Beads
@@ -1033,7 +1035,7 @@ Quality gates passed:
 - `agent-platform-project-workspaces.1` is closed. PR #143 is open and green; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.2` is closed. PR #144 is open and green; it remains unmerged until the end-of-epic integration point.
 - `agent-platform-project-workspaces.3` is closed. PR #145 is open and green; it remains unmerged until the end-of-epic integration point.
-- `agent-platform-project-workspaces.4` is the next ready child task: Resolve `/workspace` and scope runtime tools.
+- `agent-platform-project-workspaces.4` is in progress: Resolve `/workspace` and scope runtime tools.
 - `agent-platform-project-workspaces.5` and `.6` remain linearly blocked behind earlier tasks.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
@@ -1172,7 +1174,7 @@ Quality gates passed:
 ## Next (priority order)
 
 1. Leave PRs #143, #144, and #145 unmerged until the end-of-epic integration point.
-2. Claim `agent-platform-project-workspaces.4` to resolve `/workspace` to the active Project root and scope runtime tools through the Project boundary.
+2. Implement `agent-platform-project-workspaces.4`: resolver first, then PathJail/tool dispatch integration and wrong-root regression coverage.
 3. For each task, open the PR, monitor CI/Sonar/Sourcery/review comments, iterate until green/resolved, then close the Bead without merging the PR yet.
 4. Keep `agent-platform-code-workbench.7` deferred until the workspace-binding behavior is stable enough to document accurately.
 5. Keep live branch discovery, remote checks, GitHub/CodeQL/SonarQube/review import, and provider auth in `agent-platform-branch-feedback-status`.
