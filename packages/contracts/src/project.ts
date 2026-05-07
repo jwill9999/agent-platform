@@ -24,13 +24,31 @@ export type ProjectOnboardingState = z.infer<typeof ProjectOnboardingStateSchema
 export const ProjectInstructionFileScopeSchema = z.enum(['root', 'nested']);
 export type ProjectInstructionFileScope = z.infer<typeof ProjectInstructionFileScopeSchema>;
 
+export const ProjectAccessPolicyBlockReasonSchema = z.enum([
+  'capability_unavailable',
+  'readonly_capability',
+  'onboarding_not_approved',
+]);
+export type ProjectAccessPolicyBlockReason = z.infer<typeof ProjectAccessPolicyBlockReasonSchema>;
+
 const RelativeProjectPathSchema = z
   .string()
   .min(1)
   .max(1000)
-  .refine((value) => !value.startsWith('/') && !value.split('/').includes('..'), {
-    message: 'Path must be project-relative and must not contain parent traversal',
-  });
+  .refine(
+    (value) => {
+      if (value.trim() !== value) return false;
+      if (/[\\\s]/.test(value)) return false;
+      if (value.startsWith('/')) return false;
+
+      const segments = value.split('/');
+      return !segments.some((segment) => segment.length === 0 || segment === '..');
+    },
+    {
+      message:
+        'Path must be project-relative and contain no whitespace, backslashes, empty segments, or parent traversal',
+    },
+  );
 
 const ProjectSlugSchema = z
   .string()
@@ -75,9 +93,7 @@ export type ProjectWorkspaceBinding = z.infer<typeof ProjectWorkspaceBindingSche
 export const ProjectAccessPolicySchema = z.object({
   canInspect: z.boolean(),
   canWrite: z.boolean(),
-  writeBlockReason: z
-    .enum(['capability_unavailable', 'readonly_capability', 'onboarding_not_approved'])
-    .optional(),
+  writeBlockReason: ProjectAccessPolicyBlockReasonSchema.optional(),
 });
 export type ProjectAccessPolicy = z.infer<typeof ProjectAccessPolicySchema>;
 
@@ -121,39 +137,49 @@ export function getDefaultAgentProfileForMode(mode: ProjectMode): ProjectDefault
   return mode === 'project' ? 'coding' : 'personal_assistant';
 }
 
+function assertNever(value: never): never {
+  throw new Error(`Unhandled Project state: ${String(value)}`);
+}
+
 export function getProjectAccessPolicy(input: {
   capabilityState: ProjectCapabilityState;
   onboardingState: ProjectOnboardingState;
 }): ProjectAccessPolicy {
-  if (input.capabilityState === 'unavailable') {
-    return {
-      canInspect: false,
-      canWrite: false,
-      writeBlockReason: 'capability_unavailable',
-    };
+  switch (input.capabilityState) {
+    case 'unavailable':
+      return {
+        canInspect: false,
+        canWrite: false,
+        writeBlockReason: 'capability_unavailable',
+      };
+    case 'readonly':
+      return {
+        canInspect: true,
+        canWrite: false,
+        writeBlockReason: 'readonly_capability',
+      };
+    case 'backend_accessible':
+      switch (input.onboardingState) {
+        case 'approved':
+          return {
+            canInspect: true,
+            canWrite: true,
+            writeBlockReason: undefined,
+          };
+        case 'missing':
+        case 'in_progress':
+        case 'needs_review':
+          return {
+            canInspect: true,
+            canWrite: false,
+            writeBlockReason: 'onboarding_not_approved',
+          };
+        default:
+          return assertNever(input.onboardingState);
+      }
+    default:
+      return assertNever(input.capabilityState);
   }
-
-  if (input.capabilityState === 'readonly') {
-    return {
-      canInspect: true,
-      canWrite: false,
-      writeBlockReason: 'readonly_capability',
-    };
-  }
-
-  if (input.onboardingState !== 'approved') {
-    return {
-      canInspect: true,
-      canWrite: false,
-      writeBlockReason: 'onboarding_not_approved',
-    };
-  }
-
-  return {
-    canInspect: true,
-    canWrite: true,
-    writeBlockReason: undefined,
-  };
 }
 
 export type ProjectRecord = z.infer<typeof ProjectRecordSchema>;

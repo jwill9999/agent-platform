@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ProjectModeSchema,
   ProjectWorkspaceBindingSchema,
+  ProjectCapabilityStateSchema,
+  ProjectOnboardingStateSchema,
   getDefaultAgentProfileForMode,
   getProjectAccessPolicy,
 } from '../src/project.js';
@@ -48,6 +50,43 @@ describe('Project mode and workspace binding contracts', () => {
     expect(binding.instructionFiles.map((file) => file.scope)).toEqual(['root', 'nested']);
   });
 
+  it('rejects unsafe or ambiguous project-relative instruction and subproject paths', () => {
+    const baseBinding = {
+      projectId: 'project-1',
+      displayName: 'Agent Platform',
+      projectRoot: '/workspace',
+      repositoryRoot: '/workspace',
+      capabilityState: 'backend_accessible',
+      onboardingState: 'approved',
+      defaultAgentProfile: 'coding',
+    };
+
+    for (const path of [
+      '/apps/web',
+      '../apps/web',
+      'apps/../web',
+      'apps//web',
+      'apps\\web',
+      ' apps/web',
+      'apps/web ',
+      'apps web',
+    ]) {
+      expect(() =>
+        ProjectWorkspaceBindingSchema.parse({
+          ...baseBinding,
+          subprojectScope: { path },
+        }),
+      ).toThrow();
+
+      expect(() =>
+        ProjectWorkspaceBindingSchema.parse({
+          ...baseBinding,
+          instructionFiles: [{ scope: 'nested', path }],
+        }),
+      ).toThrow();
+    }
+  });
+
   it('allows reads from backend-accessible or readonly projects but never unavailable projects', () => {
     expect(
       getProjectAccessPolicy({
@@ -89,5 +128,22 @@ describe('Project mode and workspace binding contracts', () => {
         onboardingState: 'needs_review',
       }).writeBlockReason,
     ).toBe('onboarding_not_approved');
+  });
+
+  it('maps every capability and onboarding state to an explicit access policy', () => {
+    const policies = ProjectCapabilityStateSchema.options.flatMap((capabilityState) =>
+      ProjectOnboardingStateSchema.options.map((onboardingState) =>
+        getProjectAccessPolicy({ capabilityState, onboardingState }),
+      ),
+    );
+
+    expect(policies).toHaveLength(
+      ProjectCapabilityStateSchema.options.length * ProjectOnboardingStateSchema.options.length,
+    );
+    expect(policies.every((policy) => typeof policy.canInspect === 'boolean')).toBe(true);
+    expect(policies.every((policy) => typeof policy.canWrite === 'boolean')).toBe(true);
+    expect(
+      policies.every((policy) => policy.canWrite || policy.writeBlockReason !== undefined),
+    ).toBe(true);
   });
 });
