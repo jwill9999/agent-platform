@@ -1,7 +1,23 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { Agent, ProjectRecord, SessionRecord } from '@agent-platform/contracts';
+import type {
+  Agent,
+  ProjectOnboardingAssessment,
+  ProjectOnboardingDialogue,
+  ProjectOnboardingDraft,
+  ProjectInstructionUpdateCandidate,
+  ProjectInstructionUpdateProposal,
+  ProjectRecord,
+  SessionRecord,
+} from '@agent-platform/contracts';
+import {
+  ProjectOnboardingAssessmentSchema,
+  ProjectOnboardingDialogueSchema,
+  ProjectOnboardingDraftSchema,
+  ProjectInstructionUpdateCandidateSchema,
+  ProjectInstructionUpdateProposalSchema,
+} from '@agent-platform/contracts';
 import type { UIMessage } from 'ai';
 import {
   FolderOpen,
@@ -122,6 +138,62 @@ function projectHasRootInstructions(project: ProjectRecord | null): boolean {
   );
 }
 
+function canManuallyApproveProjectInstructions(input: {
+  project: ProjectRecord | null;
+  onboardingState: ProjectOnboardingState;
+  onboardingAssessment: ProjectOnboardingAssessment | null;
+}): boolean {
+  if (!input.project || input.onboardingState === 'approved') return false;
+  if (input.onboardingAssessment?.status !== 'approved') return false;
+  return projectHasRootInstructions(input.project);
+}
+
+function hasInstructionUpdateReview(
+  candidates: readonly ProjectInstructionUpdateCandidate[],
+  proposal: ProjectInstructionUpdateProposal | null,
+): boolean {
+  return candidates.length > 0 || proposal !== null;
+}
+
+function projectOnboardingAssessment(
+  project: ProjectRecord | null,
+): ProjectOnboardingAssessment | null {
+  const parsed = ProjectOnboardingAssessmentSchema.safeParse(
+    project?.metadata.onboardingAssessment,
+  );
+  return parsed.success ? parsed.data : null;
+}
+
+function projectOnboardingDraft(project: ProjectRecord | null): ProjectOnboardingDraft | null {
+  const parsed = ProjectOnboardingDraftSchema.safeParse(project?.metadata.onboardingDraft);
+  return parsed.success ? parsed.data : null;
+}
+
+function projectOnboardingDialogue(
+  project: ProjectRecord | null,
+): ProjectOnboardingDialogue | null {
+  const parsed = ProjectOnboardingDialogueSchema.safeParse(project?.metadata.onboardingDialogue);
+  return parsed.success ? parsed.data : null;
+}
+
+function projectInstructionUpdateCandidates(
+  project: ProjectRecord | null,
+): ProjectInstructionUpdateCandidate[] {
+  const parsed = ProjectInstructionUpdateCandidateSchema.array().safeParse(
+    project?.metadata.instructionUpdateCandidates,
+  );
+  return parsed.success ? parsed.data : [];
+}
+
+function projectInstructionUpdateProposal(
+  project: ProjectRecord | null,
+): ProjectInstructionUpdateProposal | null {
+  const parsed = ProjectInstructionUpdateProposalSchema.safeParse(
+    project?.metadata.instructionUpdateProposal,
+  );
+  return parsed.success ? parsed.data : null;
+}
+
 function projectOnboardingLabel(state: ProjectOnboardingState): string {
   switch (state) {
     case 'approved':
@@ -190,6 +262,286 @@ function ContentActivityBlocks({
         />
       ))}
     </>
+  );
+}
+
+export function ProjectOnboardingAssessmentPanel({
+  assessment,
+  isRefreshing,
+  onRefresh,
+}: Readonly<{
+  assessment: ProjectOnboardingAssessment;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}>) {
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">
+            {assessment.display.profileLabel ?? 'Project assessment'}
+          </div>
+          <div className="text-muted-foreground">{assessment.display.onboardingLabel}</div>
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0"
+          aria-label="Refresh project assessment"
+          title="Refresh project assessment"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden />
+        </Button>
+      </div>
+      <p className="mt-2 leading-snug">{assessment.summary}</p>
+      {assessment.gaps.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {assessment.gaps.slice(0, 3).map((gap) => (
+            <li key={`${gap.kind}:${gap.message}`} className="leading-snug">
+              {gap.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      {assessment.questions.length > 0 && (
+        <p className="mt-2 leading-snug text-muted-foreground">{assessment.questions[0]?.prompt}</p>
+      )}
+    </div>
+  );
+}
+
+function activeOnboardingQuestion(dialogue: ProjectOnboardingDialogue | null): string | null {
+  if (!dialogue?.activeQuestionId) return null;
+  const turn = [...dialogue.turns]
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.role === 'assistant' && candidate.questionId === dialogue.activeQuestionId,
+    );
+  return turn?.content ?? null;
+}
+
+export function ProjectOnboardingDraftPanel({
+  draft,
+  dialogue,
+  answer,
+  isStarting,
+  isSubmitting,
+  isReviewing,
+  reviewComment,
+  onStart,
+  onAnswerChange,
+  onSubmitAnswer,
+  onReviewCommentChange,
+  onApprove,
+  onRequestChanges,
+  onReject,
+}: Readonly<{
+  draft: ProjectOnboardingDraft | null;
+  dialogue: ProjectOnboardingDialogue | null;
+  answer: string;
+  isStarting: boolean;
+  isSubmitting: boolean;
+  isReviewing: boolean;
+  reviewComment: string;
+  onStart: () => void;
+  onAnswerChange: (value: string) => void;
+  onSubmitAnswer: () => void;
+  onReviewCommentChange: (value: string) => void;
+  onApprove: () => void;
+  onRequestChanges: () => void;
+  onReject: () => void;
+}>) {
+  const question = activeOnboardingQuestion(dialogue);
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">Onboarding draft</div>
+          <div className="text-muted-foreground">
+            {draft ? `Revision ${draft.revision}` : 'Not started'}
+          </div>
+        </div>
+        {!draft && (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-7 shrink-0"
+            onClick={onStart}
+            disabled={isStarting}
+          >
+            {isStarting ? 'Starting...' : 'Start'}
+          </Button>
+        )}
+      </div>
+      {question && (
+        <form
+          className="mt-2 space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmitAnswer();
+          }}
+        >
+          <p className="leading-snug text-foreground">{question}</p>
+          <Textarea
+            aria-label="Onboarding answer"
+            value={answer}
+            onChange={(event) => {
+              onAnswerChange(event.target.value);
+            }}
+            className="min-h-20 text-sm"
+            placeholder="Answer this question for the Project instructions"
+          />
+          <Button type="submit" size="sm" className="h-7" disabled={!answer.trim() || isSubmitting}>
+            {isSubmitting ? 'Saving...' : 'Send answer'}
+          </Button>
+        </form>
+      )}
+      {draft && (
+        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-2 text-xs leading-relaxed text-foreground">
+          {draft.markdown}
+        </pre>
+      )}
+      {draft && (
+        <div className="mt-2 space-y-2">
+          <Textarea
+            aria-label="Review feedback"
+            value={reviewComment}
+            onChange={(event) => {
+              onReviewCommentChange(event.target.value);
+            }}
+            className="min-h-16 text-sm"
+            placeholder="Optional feedback before requesting changes"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="h-7"
+              onClick={onApprove}
+              disabled={isReviewing}
+            >
+              {isReviewing ? 'Reviewing...' : 'Approve draft'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7"
+              onClick={onRequestChanges}
+              disabled={!reviewComment.trim() || isReviewing}
+            >
+              Request changes
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7"
+              onClick={onReject}
+              disabled={!reviewComment.trim() || isReviewing}
+            >
+              Reject
+            </Button>
+          </div>
+        </div>
+      )}
+      {draft?.history.length ? (
+        <div className="mt-2 text-muted-foreground">{draft.history.length} earlier revision(s)</div>
+      ) : null}
+    </div>
+  );
+}
+
+export function ProjectInstructionUpdatesPanel({
+  candidates,
+  proposal,
+  isPreparing,
+  isDeciding,
+  onPrepare,
+  onApply,
+  onReject,
+}: Readonly<{
+  candidates: readonly ProjectInstructionUpdateCandidate[];
+  proposal: ProjectInstructionUpdateProposal | null;
+  isPreparing: boolean;
+  isDeciding: boolean;
+  onPrepare: () => void;
+  onApply: (candidateId: string) => void;
+  onReject: (candidateId: string) => void;
+}>) {
+  const visible = candidates.filter(
+    (candidate) => candidate.status === 'pending' || candidate.status === 'proposed',
+  );
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">Closeout updates</div>
+          <div className="text-muted-foreground">
+            {proposal?.summary ?? `${visible.length} candidate update(s) waiting`}
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-7 shrink-0"
+          onClick={onPrepare}
+          disabled={isPreparing}
+        >
+          {isPreparing ? 'Preparing...' : 'Prepare'}
+        </Button>
+      </div>
+      {visible.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {visible.map((candidate) => (
+            <div key={candidate.id} className="rounded border border-border px-2 py-2">
+              <div className="text-foreground">{candidate.summary}</div>
+              <div className="mt-1 text-muted-foreground">
+                {candidate.risk === 'policy_change'
+                  ? 'Policy change requires explicit review'
+                  : 'Reviewable factual update'}
+              </div>
+              {candidate.proposedMarkdown && (
+                <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-2 text-xs leading-relaxed text-foreground">
+                  {candidate.proposedMarkdown}
+                </pre>
+              )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7"
+                  onClick={() => {
+                    onApply(candidate.id);
+                  }}
+                  disabled={isDeciding || candidate.status !== 'proposed'}
+                >
+                  Apply
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7"
+                  onClick={() => {
+                    onReject(candidate.id);
+                  }}
+                  disabled={isDeciding}
+                >
+                  Reject
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -495,7 +847,7 @@ function getToggleButtonState(isOpen: boolean, openLabel: string, closedLabel: s
 }
 
 function getTerminalTitle(canUseProjectTools: boolean, showTerminal: boolean): string {
-  if (!canUseProjectTools) return 'Open a backend project before using the terminal';
+  if (!canUseProjectTools) return 'Open a Project before using the terminal';
   return showTerminal ? 'Hide terminal' : 'Show terminal';
 }
 
@@ -1321,11 +1673,19 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [searchQuery, setSearchQuery] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
-  const [projectPathInput, setProjectPathInput] = useState('/workspace');
+  const [projectPathInput, setProjectPathInput] = useState('');
   const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
   const [isOpeningBackendProject, setIsOpeningBackendProject] = useState(false);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
+  const [isAssessingProject, setIsAssessingProject] = useState(false);
+  const [isStartingOnboardingDraft, setIsStartingOnboardingDraft] = useState(false);
+  const [isSubmittingOnboardingAnswer, setIsSubmittingOnboardingAnswer] = useState(false);
+  const [isReviewingOnboardingDraft, setIsReviewingOnboardingDraft] = useState(false);
+  const [isPreparingInstructionUpdates, setIsPreparingInstructionUpdates] = useState(false);
+  const [isDecidingInstructionUpdate, setIsDecidingInstructionUpdate] = useState(false);
+  const [onboardingAnswer, setOnboardingAnswer] = useState('');
+  const [onboardingReviewComment, setOnboardingReviewComment] = useState('');
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -1371,12 +1731,22 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [contextFiles],
   );
   const onboardingState = projectOnboardingState(activeProject);
+  const onboardingAssessment = projectOnboardingAssessment(activeProject);
+  const onboardingDraft = projectOnboardingDraft(activeProject);
+  const onboardingDialogue = projectOnboardingDialogue(activeProject);
+  const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
+  const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
-  const canApproveProjectInstructions =
-    Boolean(activeProject) &&
-    onboardingState !== 'approved' &&
-    projectHasRootInstructions(activeProject);
+  const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
+    project: activeProject,
+    onboardingState,
+    onboardingAssessment,
+  });
+  const showInstructionUpdatesPanel = hasInstructionUpdateReview(
+    instructionUpdateCandidates,
+    instructionUpdateProposal,
+  );
 
   const {
     messages,
@@ -1444,6 +1814,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setContextFiles([]);
     setEditProposal(null);
     setChatInput('');
+    setOnboardingAnswer('');
+    setOnboardingReviewComment('');
     setShowTerminal(false);
     fs.closeDirectory();
   }, [fs]);
@@ -1457,7 +1829,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     try {
       const project = await apiPost<ProjectRecord>(apiPath('projects', 'open'), { path });
       if (!project) {
-        throw new ApiRequestError('Failed to open backend project', 500);
+        throw new ApiRequestError('Failed to open Project', 500);
       }
       clearProjectContext();
       setActiveProject(project);
@@ -1468,9 +1840,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       setSessionId(null);
       clearProjectContext();
       const message =
-        error instanceof ApiRequestError
+        error instanceof ApiRequestError && error.code !== 'PROJECT_UNAVAILABLE'
           ? error.message
-          : 'Backend cannot inspect that project path';
+          : 'That Project folder could not be opened';
       setProjectOpenError(message);
       toast.error(message);
     } finally {
@@ -1485,7 +1857,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     try {
       const project = await apiPost<ProjectRecord>(
         apiPath('projects', activeProject.id, 'onboarding', 'approve'),
-        {},
+        { reviewer: 'User' },
       );
       if (!project) throw new ApiRequestError('Failed to approve project instructions', 500);
       setActiveProject(project);
@@ -1499,6 +1871,170 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       setIsApprovingProjectInstructions(false);
     }
   }, [activeProject?.id]);
+
+  const handleReviewOnboardingDraft = useCallback(
+    async (decision: 'approve' | 'reject' | 'request_changes') => {
+      if (!activeProject?.id) return;
+      const comment = onboardingReviewComment.trim();
+      if (decision !== 'approve' && !comment) return;
+      setIsReviewingOnboardingDraft(true);
+      setProjectOpenError(null);
+      try {
+        const project = await apiPost<ProjectRecord>(
+          apiPath('projects', activeProject.id, 'onboarding', 'review'),
+          {
+            decision,
+            reviewer: 'User',
+            ...(comment ? { comment } : {}),
+          },
+        );
+        if (!project) throw new ApiRequestError('Failed to review project instructions', 500);
+        setActiveProject(project);
+        setOnboardingReviewComment('');
+        toast.success(
+          decision === 'approve'
+            ? 'Project instructions approved'
+            : 'Project instruction feedback saved',
+        );
+      } catch (error) {
+        const message =
+          error instanceof ApiRequestError
+            ? error.message
+            : 'Failed to review project instructions';
+        setProjectOpenError(message);
+        toast.error(message);
+      } finally {
+        setIsReviewingOnboardingDraft(false);
+      }
+    },
+    [activeProject?.id, onboardingReviewComment],
+  );
+
+  const handleAssessProject = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsAssessingProject(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'refresh'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to assess project', 500);
+      setActiveProject(project);
+      const refresh = project.metadata.onboardingRefresh as { materialDrift?: unknown } | undefined;
+      toast.success(
+        refresh?.materialDrift ? 'Project instructions need review' : 'Project assessment updated',
+      );
+    } catch (error) {
+      const message = error instanceof ApiRequestError ? error.message : 'Failed to assess project';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsAssessingProject(false);
+    }
+  }, [activeProject?.id]);
+
+  const handlePrepareInstructionUpdates = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsPreparingInstructionUpdates(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'instruction-updates', 'closeout'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to prepare closeout updates', 500);
+      setActiveProject(project);
+      toast.success('Closeout updates prepared');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to prepare closeout updates';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsPreparingInstructionUpdates(false);
+    }
+  }, [activeProject?.id]);
+
+  const handleInstructionUpdateDecision = useCallback(
+    async (candidateId: string, decision: 'apply' | 'reject') => {
+      if (!activeProject?.id) return;
+      setIsDecidingInstructionUpdate(true);
+      setProjectOpenError(null);
+      try {
+        const project = await apiPost<ProjectRecord>(
+          apiPath(
+            'projects',
+            activeProject.id,
+            'instruction-updates',
+            'candidates',
+            candidateId,
+            decision,
+          ),
+          { reviewer: 'User' },
+        );
+        if (!project) throw new ApiRequestError('Failed to review closeout update', 500);
+        setActiveProject(project);
+        toast.success(decision === 'apply' ? 'Instruction update applied' : 'Update rejected');
+      } catch (error) {
+        const message =
+          error instanceof ApiRequestError ? error.message : 'Failed to review closeout update';
+        setProjectOpenError(message);
+        toast.error(message);
+      } finally {
+        setIsDecidingInstructionUpdate(false);
+      }
+    },
+    [activeProject?.id],
+  );
+
+  const handleStartOnboardingDraft = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsStartingOnboardingDraft(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'draft'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to start onboarding draft', 500);
+      setActiveProject(project);
+      toast.success('Onboarding draft started');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to start onboarding draft';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsStartingOnboardingDraft(false);
+    }
+  }, [activeProject?.id]);
+
+  const handleSubmitOnboardingAnswer = useCallback(async () => {
+    if (!activeProject?.id || !onboardingAnswer.trim()) return;
+    setIsSubmittingOnboardingAnswer(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'answer'),
+        {
+          questionId: onboardingDialogue?.activeQuestionId,
+          answer: onboardingAnswer.trim(),
+        },
+      );
+      if (!project) throw new ApiRequestError('Failed to save onboarding answer', 500);
+      setActiveProject(project);
+      setOnboardingAnswer('');
+      toast.success('Onboarding draft updated');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to save onboarding answer';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsSubmittingOnboardingAnswer(false);
+    }
+  }, [activeProject?.id, onboardingAnswer, onboardingDialogue?.activeQuestionId]);
 
   // --- File operations ---
 
@@ -1919,15 +2455,16 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                       Project
                     </span>
                     {activeProject ? (
-                      <span className="text-xs text-emerald-600">Backend accessible</span>
+                      <span className="text-xs text-emerald-600">Available</span>
                     ) : (
                       <span className="text-xs text-muted-foreground">Unavailable</span>
                     )}
                   </div>
                   <div className="flex gap-2">
                     <Input
-                      aria-label="Backend project path"
+                      aria-label="Project folder path"
                       value={projectPathInput}
+                      placeholder="Folder path"
                       onChange={(event) => {
                         setProjectPathInput(event.target.value);
                       }}
@@ -1954,10 +2491,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                       <div className="truncate text-foreground">{activeProject.name}</div>
                       <div className="truncate">
-                        Root: {String(activeProject.metadata.backendProjectRoot ?? '')}
-                      </div>
-                      <div className="truncate">
-                        Repo: {String(activeProject.metadata.repositoryRoot ?? '')}
+                        Folder: {onboardingAssessment?.display.folderLabel ?? activeProject.name}
                       </div>
                       {activeProject.metadata.activeBranch && (
                         <div className="truncate">
@@ -1983,21 +2517,97 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                               : 'Initial project instructions are required before code edits, commits, installs, migrations, or destructive commands. Read-only inspection and planning remain available.'}
                           </div>
                           {canApproveProjectInstructions && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              className="mt-2 h-7"
-                              onClick={() => {
-                                handleApproveProjectInstructions().catch(() => {});
-                              }}
-                              disabled={isApprovingProjectInstructions}
-                            >
-                              {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
-                            </Button>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="h-7"
+                                onClick={() => {
+                                  handleApproveProjectInstructions().catch(() => {});
+                                }}
+                                disabled={isApprovingProjectInstructions}
+                              >
+                                {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                aria-label="Refresh project assessment"
+                                title="Refresh project assessment"
+                                onClick={() => {
+                                  handleAssessProject().catch(() => {});
+                                }}
+                                disabled={isAssessingProject}
+                              >
+                                <RefreshCw
+                                  className={cn(
+                                    'h-3.5 w-3.5',
+                                    isAssessingProject && 'animate-spin',
+                                  )}
+                                  aria-hidden
+                                />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
+                      {onboardingAssessment && (
+                        <ProjectOnboardingAssessmentPanel
+                          assessment={onboardingAssessment}
+                          isRefreshing={isAssessingProject}
+                          onRefresh={() => {
+                            handleAssessProject().catch(() => {});
+                          }}
+                        />
+                      )}
+                      {onboardingState !== 'approved' && onboardingAssessment && (
+                        <ProjectOnboardingDraftPanel
+                          draft={onboardingDraft}
+                          dialogue={onboardingDialogue}
+                          answer={onboardingAnswer}
+                          isStarting={isStartingOnboardingDraft}
+                          isSubmitting={isSubmittingOnboardingAnswer}
+                          isReviewing={isReviewingOnboardingDraft}
+                          reviewComment={onboardingReviewComment}
+                          onStart={() => {
+                            handleStartOnboardingDraft().catch(() => {});
+                          }}
+                          onAnswerChange={setOnboardingAnswer}
+                          onSubmitAnswer={() => {
+                            handleSubmitOnboardingAnswer().catch(() => {});
+                          }}
+                          onReviewCommentChange={setOnboardingReviewComment}
+                          onApprove={() => {
+                            handleReviewOnboardingDraft('approve').catch(() => {});
+                          }}
+                          onRequestChanges={() => {
+                            handleReviewOnboardingDraft('request_changes').catch(() => {});
+                          }}
+                          onReject={() => {
+                            handleReviewOnboardingDraft('reject').catch(() => {});
+                          }}
+                        />
+                      )}
+                      {showInstructionUpdatesPanel && (
+                        <ProjectInstructionUpdatesPanel
+                          candidates={instructionUpdateCandidates}
+                          proposal={instructionUpdateProposal}
+                          isPreparing={isPreparingInstructionUpdates}
+                          isDeciding={isDecidingInstructionUpdate}
+                          onPrepare={() => {
+                            handlePrepareInstructionUpdates().catch(() => {});
+                          }}
+                          onApply={(candidateId) => {
+                            handleInstructionUpdateDecision(candidateId, 'apply').catch(() => {});
+                          }}
+                          onReject={(candidateId) => {
+                            handleInstructionUpdateDecision(candidateId, 'reject').catch(() => {});
+                          }}
+                        />
+                      )}
                     </div>
                   )}
                   {projectOpenError && (

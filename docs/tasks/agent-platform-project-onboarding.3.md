@@ -64,9 +64,9 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Missing/insufficient instructions start a collaborative onboarding Q&A flow.
-- [ ] The agent asks focused questions instead of guessing critical project facts.
-- [ ] The agent asks about intended Project use when the folder is non-code, mixed, or ambiguous.
-- [ ] User answers can revise a human-readable `AGENTS.md` draft.
-- [ ] Draft state is persisted and visible for review.
-- [ ] Code writes remain blocked throughout onboarding dialogue.
+- [x] Missing/insufficient instructions start a collaborative onboarding Q&A flow.
+- [x] The agent asks focused questions instead of guessing critical project facts.
+- [x] The agent asks about intended Project use when the folder is non-code, mixed, or ambiguous.
+- [x] User answers can revise a human-readable `AGENTS.md` draft.
+- [x] Draft state is persisted and visible for review.
+- [x] Code writes remain blocked throughout onboarding dialogue.

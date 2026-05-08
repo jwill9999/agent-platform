@@ -74,11 +74,11 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Playwright covers sufficient, missing, insufficient, nested, and ambiguous Project instruction
+- [x] Playwright covers sufficient, missing, insufficient, nested, and ambiguous Project instruction
       states.
-- [ ] Playwright acts through the UI and verifies visible outputs plus filesystem results.
-- [ ] Tests prove writes are blocked before approval and allowed after approval.
-- [ ] Tests prove `AGENTS.md` can be drafted, reviewed, approved, refreshed, and updated.
-- [ ] Tests prove onboarding handles mixed/non-code Project folders without forcing coding-only
+- [x] Playwright acts through the UI and verifies visible outputs plus filesystem results.
+- [x] Tests prove writes are blocked before approval and allowed after approval.
+- [x] Tests prove `AGENTS.md` can be drafted, reviewed, approved, refreshed, and updated.
+- [x] Tests prove onboarding handles mixed/non-code Project folders without forcing coding-only
       language.
-- [ ] Combined Epics 1 and 2 are ready for a full end-to-end Playwright run.
+- [x] Combined Epics 1 and 2 are ready for a full end-to-end Playwright run.
