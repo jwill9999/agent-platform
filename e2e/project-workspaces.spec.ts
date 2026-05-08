@@ -35,6 +35,11 @@ function resetFixtureDir(name: string): { hostPath: string; containerPath: strin
   return { hostPath, containerPath: toContainerWorkspacePath(hostPath) };
 }
 
+function writeFixtureFile(path: string, content: string) {
+  writeFileSync(path, content.endsWith('\n') ? content : `${content}\n`, 'utf8');
+  chmodSync(path, 0o666);
+}
+
 function writeRepoFixture(root: string, options: { includeInstructions: boolean }) {
   mkdirSync(join(root, 'apps', 'web'), { recursive: true });
   mkdirSync(join(root, 'packages', 'api'), { recursive: true });
@@ -44,7 +49,32 @@ function writeRepoFixture(root: string, options: { includeInstructions: boolean 
   chmodSync(join(root, 'packages', 'api'), 0o777);
   writeFileSync(
     join(root, 'package.json'),
-    JSON.stringify({ name: 'e2e-monorepo', private: true, workspaces: ['apps/*', 'packages/*'] }),
+    JSON.stringify({
+      name: 'e2e-monorepo',
+      private: true,
+      workspaces: ['apps/*', 'packages/*'],
+      scripts: {
+        build: 'pnpm -r build',
+        lint: 'pnpm -r lint',
+        test: 'pnpm -r test',
+      },
+    }),
+  );
+  writeFileSync(
+    join(root, 'apps', 'web', 'package.json'),
+    JSON.stringify({
+      name: '@e2e/web',
+      private: true,
+      scripts: { build: 'next build', lint: 'eslint .', test: 'vitest run' },
+    }),
+  );
+  writeFileSync(
+    join(root, 'packages', 'api', 'package.json'),
+    JSON.stringify({
+      name: '@e2e/api',
+      private: true,
+      scripts: { build: 'tsc -p tsconfig.json', lint: 'eslint .', test: 'vitest run' },
+    }),
   );
   writeFileSync(join(root, 'README.md'), '# E2E Project\n');
   writeFileSync(join(root, 'apps', 'web', 'page.tsx'), 'export default function Page() {}\n');
@@ -52,7 +82,7 @@ function writeRepoFixture(root: string, options: { includeInstructions: boolean 
   if (options.includeInstructions) {
     const rootInstructionsPath = join(root, 'AGENTS.md');
     const webInstructionsPath = join(root, 'apps', 'web', 'AGENTS.md');
-    writeFileSync(
+    writeFixtureFile(
       rootInstructionsPath,
       [
         '# Agent Instructions',
@@ -62,13 +92,29 @@ function writeRepoFixture(root: string, options: { includeInstructions: boolean 
         'Open a pull request and wait for CI, SonarCloud, GitGuardian, and review comments.',
       ].join('\n'),
     );
-    chmodSync(rootInstructionsPath, 0o666);
-    writeFileSync(
+    writeFixtureFile(
       webInstructionsPath,
       'Use the root instructions and run web lint/tests before closing changes.\n',
     );
-    chmodSync(webInstructionsPath, 0o666);
   }
+}
+
+function writeDocsFixture(root: string) {
+  mkdirSync(join(root, 'research'), { recursive: true });
+  chmodSync(join(root, 'research'), 0o777);
+  writeFileSync(join(root, 'README.md'), '# Research Workspace\n');
+  writeFileSync(join(root, 'research', 'brief.md'), '# Brief\n\nCollect source notes.\n');
+  writeFixtureFile(
+    join(root, 'AGENTS.md'),
+    [
+      '# Agent Instructions',
+      '',
+      'This Project is a docs and research folder, not a coding-only repository.',
+      'Use Beads for task tracking when work is ticketed and keep changes read-only until approved.',
+      'Run document review, link checks, and relevant quality checks before closing a ticket.',
+      'Open a pull request when files change and wait for CI, SonarCloud, GitGuardian, and comments.',
+    ].join('\n'),
+  );
 }
 
 async function openProject(page: Page, containerPath: string) {
@@ -102,6 +148,8 @@ async function findProjectByRoot(
 }
 
 test.describe('Project workspace E2E', () => {
+  test.describe.configure({ mode: 'serial' });
+
   test('opens a Project with sufficient AGENTS.md and auto-approves it', async ({
     page,
     request,
@@ -136,6 +184,59 @@ test.describe('Project workspace E2E', () => {
           appliesToPath: 'apps/web',
         }),
       ]),
+    );
+    expect(opened.metadata.onboardingAssessment).toEqual(
+      expect.objectContaining({
+        profile: 'mixed',
+        subprojectScopes: expect.arrayContaining([
+          expect.objectContaining({ path: 'apps/web', packageName: '@e2e/web' }),
+          expect.objectContaining({ path: 'packages/api', packageName: '@e2e/api' }),
+        ]),
+      }),
+    );
+
+    await binding.getByRole('button', { name: 'Refresh project assessment' }).click();
+    await expect(binding.getByText('Instructions approved')).toBeVisible({ timeout: 15_000 });
+    const refreshed = await findProjectByRoot(request, fixture.containerPath);
+    expect(refreshed.metadata.onboardingRefresh).toEqual(
+      expect.objectContaining({
+        previousState: 'approved',
+        nextState: 'approved',
+        updateStatus: 'no_change',
+        materialDrift: false,
+      }),
+    );
+  });
+
+  test('requires review for insufficient Project instructions', async ({
+    page,
+    request,
+  }, testInfo) => {
+    const fixture = resetFixtureDir(`stale-agents-${testInfo.workerIndex}`);
+    writeRepoFixture(fixture.hostPath, { includeInstructions: false });
+    writeFixtureFile(join(fixture.hostPath, 'AGENTS.md'), 'thin instructions\n');
+
+    const binding = await openProject(page, fixture.containerPath);
+    await expect(binding.getByText('Instructions review in progress')).toBeVisible();
+    await expect(
+      binding.getByRole('listitem').filter({
+        hasText: 'The root instructions need clearer project workflow',
+      }),
+    ).toBeVisible();
+    await expect(binding.getByText('Code edits and write tools are available')).toHaveCount(0);
+
+    const opened = await findProjectByRoot(request, fixture.containerPath);
+    expect(opened.metadata.onboardingState).toBe('in_progress');
+    expect(opened.metadata.onboardingAssessment).toEqual(
+      expect.objectContaining({
+        status: 'in_progress',
+        gaps: expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'stale_instructions',
+            severity: 'warning',
+          }),
+        ]),
+      }),
     );
   });
 
@@ -238,6 +339,15 @@ test.describe('Project workspace E2E', () => {
               risk: 'low_risk_fact',
               evidence: [{ path: 'e2e/project-workspaces.spec.ts', kind: 'test' }],
             },
+            {
+              summary: 'Reject the outdated Project note.',
+              proposedMarkdown: '- Outdated Project note that should not be persisted.',
+              source: 'closeout',
+              risk: 'low_risk_fact',
+              evidence: [
+                { path: 'docs/tasks/agent-platform-project-onboarding.6.md', kind: 'docs' },
+              ],
+            },
           ],
         },
       },
@@ -251,18 +361,32 @@ test.describe('Project workspace E2E', () => {
     binding = await openProject(page, fixture.containerPath);
     await expect(binding.getByText('Closeout updates')).toBeVisible();
     await expect(binding.getByText('Record the focused E2E command')).toBeVisible();
+    await expect(binding.getByText('Reject the outdated Project note')).toBeVisible();
     const applyResponse = page.waitForResponse(
       (response) =>
         response.url().includes(`/projects/${opened.id}/instruction-updates/candidates/`) &&
         response.url().endsWith('/apply') &&
         response.request().method() === 'POST',
     );
-    await binding.getByRole('button', { name: 'Apply' }).click();
+    await binding.getByRole('button', { name: 'Apply' }).first().click();
     const applied = await applyResponse;
     expect(applied.ok(), await applied.text()).toBeTruthy();
     await expect(binding.getByText('Record the focused E2E command')).toHaveCount(0);
+    const rejectResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/projects/${opened.id}/instruction-updates/candidates/`) &&
+        response.url().endsWith('/reject') &&
+        response.request().method() === 'POST',
+    );
+    await binding.getByRole('button', { name: 'Reject' }).click();
+    const rejected = await rejectResponse;
+    expect(rejected.ok(), await rejected.text()).toBeTruthy();
+    await expect(binding.getByText('Reject the outdated Project note')).toHaveCount(0);
     expect(readFileSync(join(fixture.hostPath, 'AGENTS.md'), 'utf8')).toContain(
       'Focused Project workspace E2E: pnpm exec playwright test',
+    );
+    expect(readFileSync(join(fixture.hostPath, 'AGENTS.md'), 'utf8')).not.toContain(
+      'Outdated Project note',
     );
 
     writeFileSync(join(fixture.hostPath, 'AGENTS.md'), 'thin instructions\n');
@@ -278,6 +402,28 @@ test.describe('Project workspace E2E', () => {
         nextState: 'needs_review',
         updateStatus: 'material_drift',
         materialDrift: true,
+      }),
+    );
+  });
+
+  test('handles mixed and non-code Project folders without coding-only framing', async ({
+    page,
+    request,
+  }, testInfo) => {
+    const fixture = resetFixtureDir(`docs-project-${testInfo.workerIndex}`);
+    writeDocsFixture(fixture.hostPath);
+
+    const binding = await openProject(page, fixture.containerPath);
+    await expect(binding.getByText('Instructions approved')).toBeVisible();
+    await expect(binding.getByText('Docs Content', { exact: true })).toBeVisible();
+    await expect(binding.getByText(/Detected docs content Project/)).toBeVisible();
+    await expect(binding.getByText(/coding-only/)).toHaveCount(0);
+
+    const opened = await findProjectByRoot(request, fixture.containerPath);
+    expect(opened.metadata.onboardingAssessment).toEqual(
+      expect.objectContaining({
+        profile: 'docs_content',
+        capabilities: expect.arrayContaining(['docs_research']),
       }),
     );
   });
