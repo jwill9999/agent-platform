@@ -50,8 +50,10 @@ function writeRepoFixture(root: string, options: { includeInstructions: boolean 
   writeFileSync(join(root, 'apps', 'web', 'page.tsx'), 'export default function Page() {}\n');
   writeFileSync(join(root, 'packages', 'api', 'index.ts'), 'export const api = true;\n');
   if (options.includeInstructions) {
+    const rootInstructionsPath = join(root, 'AGENTS.md');
+    const webInstructionsPath = join(root, 'apps', 'web', 'AGENTS.md');
     writeFileSync(
-      join(root, 'AGENTS.md'),
+      rootInstructionsPath,
       [
         '# Agent Instructions',
         '',
@@ -60,10 +62,12 @@ function writeRepoFixture(root: string, options: { includeInstructions: boolean 
         'Open a pull request and wait for CI, SonarCloud, GitGuardian, and review comments.',
       ].join('\n'),
     );
+    chmodSync(rootInstructionsPath, 0o666);
     writeFileSync(
-      join(root, 'apps', 'web', 'AGENTS.md'),
+      webInstructionsPath,
       'Use the root instructions and run web lint/tests before closing changes.\n',
     );
+    chmodSync(webInstructionsPath, 0o666);
   }
 }
 
@@ -247,7 +251,15 @@ test.describe('Project workspace E2E', () => {
     binding = await openProject(page, fixture.containerPath);
     await expect(binding.getByText('Closeout updates')).toBeVisible();
     await expect(binding.getByText('Record the focused E2E command')).toBeVisible();
+    const applyResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/projects/${opened.id}/instruction-updates/candidates/`) &&
+        response.url().endsWith('/apply') &&
+        response.request().method() === 'POST',
+    );
     await binding.getByRole('button', { name: 'Apply' }).click();
+    const applied = await applyResponse;
+    expect(applied.ok(), await applied.text()).toBeTruthy();
     await expect(binding.getByText('Record the focused E2E command')).toHaveCount(0);
     expect(readFileSync(join(fixture.hostPath, 'AGENTS.md'), 'utf8')).toContain(
       'Focused Project workspace E2E: pnpm exec playwright test',
