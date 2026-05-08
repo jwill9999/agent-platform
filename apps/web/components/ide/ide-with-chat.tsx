@@ -138,6 +138,23 @@ function projectHasRootInstructions(project: ProjectRecord | null): boolean {
   );
 }
 
+function canManuallyApproveProjectInstructions(input: {
+  project: ProjectRecord | null;
+  onboardingState: ProjectOnboardingState;
+  onboardingAssessment: ProjectOnboardingAssessment | null;
+}): boolean {
+  if (!input.project || input.onboardingState === 'approved') return false;
+  if (input.onboardingAssessment?.status !== 'approved') return false;
+  return projectHasRootInstructions(input.project);
+}
+
+function hasInstructionUpdateReview(
+  candidates: readonly ProjectInstructionUpdateCandidate[],
+  proposal: ProjectInstructionUpdateProposal | null,
+): boolean {
+  return candidates.length > 0 || proposal !== null;
+}
+
 function projectOnboardingAssessment(
   project: ProjectRecord | null,
 ): ProjectOnboardingAssessment | null {
@@ -1721,11 +1738,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
-  const canApproveProjectInstructions =
-    Boolean(activeProject) &&
-    onboardingState !== 'approved' &&
-    onboardingAssessment?.status === 'approved' &&
-    projectHasRootInstructions(activeProject);
+  const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
+    project: activeProject,
+    onboardingState,
+    onboardingAssessment,
+  });
+  const showInstructionUpdatesPanel = hasInstructionUpdateReview(
+    instructionUpdateCandidates,
+    instructionUpdateProposal,
+  );
 
   const {
     messages,
@@ -2570,7 +2591,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           }}
                         />
                       )}
-                      {(instructionUpdateCandidates.length > 0 || instructionUpdateProposal) && (
+                      {showInstructionUpdatesPanel && (
                         <ProjectInstructionUpdatesPanel
                           candidates={instructionUpdateCandidates}
                           proposal={instructionUpdateProposal}
