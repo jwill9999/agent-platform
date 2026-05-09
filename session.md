@@ -8,7 +8,7 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-09
-- **Session:** Implemented and closed `agent-platform-project-onboarding.7` on `task/agent-platform-project-onboarding.7`: consolidated the normal IDE Project entry to a single `Open Project` picker path, moved backend path entry behind a secondary `Use folder path` disclosure, replaced internal onboarding/backend state copy with user-actionable Project setup language, and kept IDE chat usable after a browser-picked folder so users can ask the agent to assess the Project. PR #156 to `feature/agent-platform-project-onboarding` is green across verify, docker, e2e, docs, GitGuardian, Sourcery, and SonarCloud; PR-specific Sonar reports 0 open/confirmed issues and review-thread sweep found none. Sourcery high-level feedback was addressed so picker cancel no longer drops an existing backend Project and Project binding state uses typed helper components. Local gates passed: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, elevated `pnpm test`, focused Project Playwright, full elevated `pnpm run test:e2e`, and Sonar branch issue listing returned 0 issues. Sonar Agentic Analysis remains unavailable because the organization has not enabled it. The parent onboarding epic was reopened and should remain open for human manual-test closeout.
+- **Session:** Follow-up manual-test cleanup on `task/agent-platform-project-onboarding.7`: sanitized provider/API-key chat failures into user-facing agent connection copy, added an `Agent unavailable` Project card state after failed assessment attempts, collapsed branch/provider diagnostics out of the normal IDE panel, and removed path-first empty-editor wording. Local gates passed: focused web tests, `pnpm typecheck`, `pnpm format:check`, `pnpm lint`, `pnpm build`, elevated `pnpm test`, full elevated `pnpm run test:e2e`, and PR #156 Sonar issue query returned 0 open/confirmed issues. Commit `bda8f07` is local and still needs this session handoff commit, push, refreshed PR checks/comments, and Beads re-close before the task is done again.
 - **Date:** 2026-05-08
 - **Session:** Closed `agent-platform-project-onboarding.6` after PR #155 to `feature/agent-platform-project-onboarding` passed GitHub Actions (`verify`, `docker`, `e2e`), docs checks, GitGuardian, and SonarCloud with 0 new issues/hotspots. Expanded `e2e/project-workspaces.spec.ts` to cover sufficient/missing/insufficient/nested/ambiguous onboarding states, no-change/material-drift refresh, closeout apply/reject, docs/non-code Project framing, and deterministic fixture markdown newlines; updated the task DoD checklist. Local gates passed: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, elevated `pnpm test`, `pnpm docs:lint`, focused Project workspace Playwright, full elevated `pnpm run test:e2e`, and Sonar branch issue listing returned 0 issues. Sonar Agentic Analysis remains unavailable because the org has not enabled it. Sourcery was skipped due weekly rate limit and posted no actionable review thread. The parent onboarding epic was reopened after Beads auto-closed it, so it remains open for human manual-test closeout.
 - **Date:** 2026-05-07
@@ -1109,19 +1109,18 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-project-onboarding.5`
-- **Current base:** chained from `task/agent-platform-project-onboarding.4`; target PR base is `feature/agent-platform-project-onboarding`.
-- **Current work:** `.5` implementation is committed locally. It still needs session handoff commit, push, task PR creation into the feature branch, remote checks, review-thread/comment sweep, SonarCloud gate, and Beads closure.
-- **Remote sync:** Branch `task/agent-platform-project-onboarding.5` exists on origin but is behind the local `.5` commits until the final push.
+- **Current branch:** `task/agent-platform-project-onboarding.7`
+- **Current base:** chained from the completed onboarding task tips; PR target is `feature/agent-platform-project-onboarding`.
+- **Current work:** PR #156 exists and was previously green. Manual-test follow-up commit `bda8f07` fixes user-facing agent failure copy/state and hides normal-view diagnostics; `session.md` is being updated before pushing.
+- **Remote sync:** Branch exists on origin but is behind the local follow-up commits until the final push.
 
 ### Beads
 
 - `agent-platform-project-workspaces` is closed in Beads.
 - `agent-platform-project-workspaces.1` through `.6` are closed.
 - `agent-platform-project-onboarding` is open and refined to treat Project as a generic folder/work context with coding/file-changing behavior as a profile/capability.
-- `agent-platform-project-onboarding.1` through `.4` are closed. Their task PRs remain unmerged until the end-of-epic integration point.
-- `agent-platform-project-onboarding.5` is in progress and claimed. Local implementation and gates are complete; remote PR verification is still pending.
-- `agent-platform-project-onboarding.6` is next after `.5` closes.
+- `agent-platform-project-onboarding.1` through `.6` are closed.
+- `agent-platform-project-onboarding.7` was reopened for manual-test cleanup. Local implementation and gates are complete; push, refreshed PR verification, review/comment sweep, SonarCloud gate, and Beads re-close are still pending.
 - `agent-platform-project-experience` is open as a P1 follow-up epic after onboarding, with child tasks `.1` through `.6` covering Project profiles, left explorer navigation, project-chat-first entry, optional IDE handoff, label cleanup/breadcrumbs, and Playwright navigation E2E.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
@@ -1147,16 +1146,15 @@ Quality gates passed:
 
 ### Quality
 
-- Latest `agent-platform-project-onboarding.5` local gates passed:
-  - `pnpm build`
+- Latest `agent-platform-project-onboarding.7` follow-up local gates passed:
+  - `pnpm --filter @agent-platform/web test -- test/use-harness-chat.test.ts test/code-workbench-branch-summary.test.ts`
   - `pnpm typecheck`
   - `pnpm format:check`
   - `pnpm lint`
-  - `pnpm test` with elevated local port binding
-  - `docker compose up -d --build api web`
-  - `docker compose exec -T --env E2E_SEED=1 api node packages/db/dist/seed/run.js`
-  - `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e` (22 passed)
-  - SonarQube CLI touched-file filter: 0 open Blocker/Critical issues on `packages/contracts/src/project.ts`, `apps/api/src/infrastructure/http/v1/projectsRouter.ts`, and `apps/web/components/ide/ide-with-chat.tsx`; Sonar Agentic Analysis unavailable because the org has not enabled it.
+  - `pnpm build`
+  - elevated `pnpm test`
+  - full elevated `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e` (25 passed)
+  - PR #156 Sonar issue query: 0 open/confirmed issues. Sonar Agentic Analysis remains unavailable because the org has not enabled it.
 - Latest `agent-platform-project-onboarding.1` local gates passed:
   - `pnpm --filter @agent-platform/contracts run test -- test/projectOnboarding.test.ts test/project.test.ts`
   - `pnpm --filter @agent-platform/contracts run typecheck`
@@ -1293,11 +1291,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit this `session.md` handoff update on `task/agent-platform-project-onboarding.5`.
-2. Push `task/agent-platform-project-onboarding.5`.
-3. Open the `.5` task PR into `feature/agent-platform-project-onboarding`.
-4. Monitor GitHub Actions, GitGuardian, Sourcery, SonarCloud, review threads, and comments; fix any failures/comments on the same branch.
-5. Close Bead `agent-platform-project-onboarding.5` only after remote checks and comment sweeps are green/non-actionable, then branch `.6` from the `.5` tip.
+1. Commit this `session.md` handoff update on `task/agent-platform-project-onboarding.7`.
+2. Push `task/agent-platform-project-onboarding.7` to refresh PR #156.
+3. Monitor GitHub Actions, GitGuardian, Sourcery, SonarCloud, review threads, and comments; fix any failures/comments on the same branch.
+4. Re-close Bead `agent-platform-project-onboarding.7` only after refreshed PR checks and comment sweeps are green/non-actionable.
+5. Keep parent epic `agent-platform-project-onboarding` open for the owner’s manual-test closeout and end-of-epic merge decision.
 
 ---
 
