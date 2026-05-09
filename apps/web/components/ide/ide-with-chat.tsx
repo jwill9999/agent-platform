@@ -76,7 +76,7 @@ import {
 import type { FileNode } from '@/hooks/use-file-system';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
-import { formatFileContext } from '@/lib/file-context';
+import { formatBrowserProjectContext, formatFileContext } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 import { ApprovalCard } from '@/components/chat/approval-card';
 import { CriticBadges } from '@/components/chat/critic-badges';
@@ -2384,11 +2384,13 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     const userLine = chatInput.trim();
     if (!userLine || !sessionId) return;
     setAgentRunError(null);
-    const prefix = formatFileContext(contextDraft.sanitisedFiles);
+    const projectContext = activeProject ? '' : formatBrowserProjectContext(fs.rootName, fileTree);
+    const fileContext = formatFileContext(contextDraft.sanitisedFiles);
+    const prefix = [projectContext, fileContext].filter(Boolean).join('\n');
     const messageForApi = prefix ? `${prefix}\n${userLine}` : userLine;
     sendMessage(messageForApi, userLine).catch(() => {});
     setChatInput('');
-  }, [chatInput, sessionId, contextDraft, sendMessage]);
+  }, [activeProject, chatInput, contextDraft, fileTree, fs.rootName, sessionId, sendMessage]);
 
   // --- Keyboard shortcuts ---
 

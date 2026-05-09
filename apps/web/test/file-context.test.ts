@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatBrowserProjectContext,
   sanitiseFileContext,
   formatFileContext,
   MAX_FILE_COUNT,
@@ -150,5 +151,35 @@ describe('formatFileContext', () => {
     expect(output).toContain('--- /b.py ---');
     expect(output).toContain('```typescript');
     expect(output).toContain('```python');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatBrowserProjectContext
+// ---------------------------------------------------------------------------
+
+describe('formatBrowserProjectContext', () => {
+  it('returns empty context when no browser Project is selected', () => {
+    expect(formatBrowserProjectContext(null, [])).toBe('');
+  });
+
+  it('summarises browser-selected Project folders without exposing runtime paths', () => {
+    const output = formatBrowserProjectContext('picked-project', [
+      {
+        name: 'src',
+        path: '/src',
+        type: 'directory',
+        children: [{ name: 'index.ts', path: '/src/index.ts', type: 'file' }],
+      },
+      { name: 'README.md', path: '/README.md', type: 'file' },
+    ]);
+
+    expect(output).toContain('<project_context>');
+    expect(output).toContain('Selected Project: picked-project');
+    expect(output).toContain('- /src/');
+    expect(output).toContain('  - /src/index.ts');
+    expect(output).toContain('- /README.md');
+    expect(output).toContain('Do not inspect or cite backend/container fallback paths');
+    expect(output).not.toContain('/workspace');
   });
 });

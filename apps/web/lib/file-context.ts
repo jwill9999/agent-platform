@@ -139,6 +139,13 @@ export interface SanitisedFile {
   language: string;
 }
 
+export interface ProjectContextNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: readonly ProjectContextNode[];
+}
+
 export interface SanitiseResult {
   files: SanitisedFile[];
   warnings: string[];
@@ -364,6 +371,55 @@ export function formatFileContext(files: SanitisedFile[]): string {
     '',
     ...blocks,
     '</file_context>',
+    '',
+  ].join('\n');
+}
+
+function summariseProjectTree(
+  nodes: readonly ProjectContextNode[],
+  options: { maxEntries: number; depth: number },
+): string[] {
+  const lines: string[] = [];
+
+  function visit(items: readonly ProjectContextNode[], depth: number): void {
+    if (lines.length >= options.maxEntries || depth > options.depth) return;
+    for (const node of items) {
+      if (lines.length >= options.maxEntries) return;
+      const indent = '  '.repeat(depth);
+      lines.push(`${indent}- ${node.path}${node.type === 'directory' ? '/' : ''}`);
+      if (node.type === 'directory' && node.children && depth < options.depth) {
+        visit(node.children, depth + 1);
+      }
+    }
+  }
+
+  visit(nodes, 0);
+  if (lines.length >= options.maxEntries) {
+    lines.push(`- Additional entries omitted after ${options.maxEntries} items.`);
+  }
+  return lines;
+}
+
+export function formatBrowserProjectContext(
+  rootName: string | null,
+  fileTree: readonly ProjectContextNode[],
+): string {
+  if (!rootName) return '';
+
+  const treeLines = summariseProjectTree(fileTree, { maxEntries: 80, depth: 3 });
+  return [
+    '<project_context>',
+    `Selected Project: ${rootName}`,
+    'This Project was opened through the browser folder picker.',
+    'Use the selected folder name, file tree, and attached file context when assessing this Project.',
+    'Do not inspect or cite backend/container fallback paths to decide which Project the user means.',
+    'If the file tree and attached files are not enough for a useful assessment, ask the user to open or pin the relevant files instead of asking for an internal runtime path.',
+    '',
+    'Visible Project file tree:',
+    ...(treeLines.length > 0
+      ? treeLines
+      : ['- No files are currently visible in the selected folder.']),
+    '</project_context>',
     '',
   ].join('\n');
 }
