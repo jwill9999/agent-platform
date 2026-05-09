@@ -105,6 +105,26 @@ import {
 } from '@/lib/code-workbench-branch-summary';
 
 type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
+type ProjectBindingStatus = 'open' | 'folder-selected' | 'not-open';
+
+function getProjectBindingStatus(
+  project: ProjectRecord | null,
+  rootName: string | null,
+): ProjectBindingStatus {
+  if (project) return 'open';
+  if (rootName) return 'folder-selected';
+  return 'not-open';
+}
+
+function ProjectBindingStatusBadge({ status }: Readonly<{ status: ProjectBindingStatus }>) {
+  if (status === 'open') {
+    return <span className="text-xs text-emerald-600">Open</span>;
+  }
+  if (status === 'folder-selected') {
+    return <span className="text-xs text-sky-600">Folder selected</span>;
+  }
+  return <span className="text-xs text-muted-foreground">Not open</span>;
+}
 
 function projectMetadataString(project: ProjectRecord | null, key: string): string | undefined {
   const value = project?.metadata[key];
@@ -1741,11 +1761,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const onboardingDialogue = projectOnboardingDialogue(activeProject);
   const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
   const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
-  const projectBindingStatus = activeProject
-    ? 'Open'
-    : fs.rootName
-      ? 'Folder selected'
-      : 'Not open';
+  const projectBindingStatus = getProjectBindingStatus(activeProject, fs.rootName);
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
@@ -1834,7 +1850,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const handleOpenBackendProject = useCallback(async () => {
     const path = projectPathInput.trim();
     if (!path) {
-      setActiveProject(null);
       setProjectOpenError(null);
       await fs.openDirectory();
       return;
@@ -2469,13 +2484,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Project
                     </span>
-                    {projectBindingStatus === 'Open' ? (
-                      <span className="text-xs text-emerald-600">Open</span>
-                    ) : projectBindingStatus === 'Folder selected' ? (
-                      <span className="text-xs text-sky-600">Folder selected</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Not open</span>
-                    )}
+                    <ProjectBindingStatusBadge status={projectBindingStatus} />
                   </div>
                   {!fs.rootName && !activeProject && (
                     <Button
