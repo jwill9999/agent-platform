@@ -55,10 +55,13 @@ describe('Project onboarding assessment panel', () => {
       }),
     );
 
-    expect(html).toContain('Mixed Project');
-    expect(html).toContain('Needs onboarding');
-    expect(html).toContain('The root instructions need clearer project workflow rules.');
-    expect(html).toContain('Should I draft updated root Project instructions?');
+    expect(html).toContain('Project setup');
+    expect(html).toContain('Review required before edits');
+    expect(html).toContain('Continue in the setup draft below.');
+    expect(html).not.toContain('Mixed Project');
+    expect(html).not.toContain('Needs onboarding');
+    expect(html).not.toContain('The root instructions need clearer project workflow rules.');
+    expect(html).not.toContain('Should I draft updated root Project instructions?');
     expect(html).not.toContain('/workspace');
     expect(html).not.toContain('backend');
   });

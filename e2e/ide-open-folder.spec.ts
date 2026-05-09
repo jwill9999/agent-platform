@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * Exercises the IDE page and "Open Folder" (File System Access API).
- * Native directory pickers are not fully automatable; we capture UI/console signals.
+ * Exercises the IDE Project entry surface. The normal user-facing folder entry is the Project
+ * binding panel; browser-only folder picker controls are intentionally hidden from this flow.
  */
 test.describe('IDE open folder', () => {
-  test('loads /ide and records Open Folder interaction', async ({ page }) => {
+  test('loads /ide with one Project opening path', async ({ page }) => {
     const consoleMessages: string[] = [];
     const pageErrors: string[] = [];
 
@@ -18,9 +18,13 @@ test.describe('IDE open folder', () => {
 
     await page.goto('/ide?fsDebug=1', { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('button', { name: /Open Folder/i }).first()).toBeVisible({
+    await expect(page.getByLabel('Project binding')).toBeVisible({
       timeout: 15_000,
     });
+    await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
+    await expect(page.getByText('Use folder path')).toBeVisible();
+    await expect(page.getByLabel('Project folder path')).toBeHidden();
+    await expect(page.getByRole('button', { name: /Open Folder/i })).toHaveCount(0);
 
     // Snapshot: FS API available in this browser context
     const fsProbe = await page.evaluate(() => ({
@@ -33,14 +37,12 @@ test.describe('IDE open folder', () => {
     const fsDebugLines = consoleMessages.filter((m) => m.includes('[fs]'));
     expect(fsDebugLines.some((m) => /restore:/.test(m))).toBeTruthy();
 
-    // Click first "Open Folder" (toolbar or explorer empty state)
-    await page
-      .getByRole('button', { name: /Open Folder/i })
-      .first()
-      .click();
+    await page.getByRole('button', { name: 'Open Project' }).click();
 
     // Allow any microtasks / error state to settle (picker may reject in automation)
     await page.waitForTimeout(1500);
+
+    expect(consoleMessages.some((m) => m.includes('[fs] picker:'))).toBeTruthy();
 
     const explorerPanel = page.locator('text=Explorer').first();
     await expect(explorerPanel).toBeVisible();
@@ -72,27 +74,19 @@ test.describe('IDE open folder', () => {
     });
   });
 
-  test('Open Folder click immediately after domcontentloaded (may race isSupported)', async ({
-    page,
-  }) => {
+  test('Project open controls are stable immediately after domcontentloaded', async ({ page }) => {
     const consoleMessages: string[] = [];
     page.on('console', (msg) => {
       consoleMessages.push(`[${msg.type()}] ${msg.text()}`);
     });
 
     await page.goto('/ide', { waitUntil: 'domcontentloaded' });
-    await page
-      .getByRole('button', { name: /Open Folder/i })
-      .first()
-      .click({ force: true });
+    await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
+    await expect(page.getByText('Use folder path')).toBeVisible();
+    await expect(page.getByLabel('Project folder path')).toBeHidden();
+    await expect(page.getByRole('button', { name: /Open Folder/i })).toHaveCount(0);
 
-    await page.waitForTimeout(800);
-
-    const destructiveError = page.locator('.text-destructive');
-    const errorVisible = await destructiveError.isVisible().catch(() => false);
-    const errorText = errorVisible ? await destructiveError.textContent() : null;
-
-    console.log('[ide-open-folder fast] explorer error visible:', errorVisible, 'text:', errorText);
+    console.log('[ide-open-folder fast] console lines:', consoleMessages.slice(-15).join('\n'));
 
     test.info().attach('console-fast', {
       body: consoleMessages.join('\n'),
@@ -113,6 +107,37 @@ test.describe('IDE open folder', () => {
       body: fsLines.join('\n') || '(none)',
       contentType: 'text/plain',
     });
+  });
+
+  test('selected browser folder is reflected in the Project card', async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(globalThis.window, 'showDirectoryPicker', {
+        configurable: true,
+        value: async () => ({
+          kind: 'directory',
+          name: 'picked-project',
+          async *entries() {
+            yield [
+              'README.md',
+              {
+                kind: 'file',
+                name: 'README.md',
+              },
+            ];
+          },
+        }),
+      });
+    });
+
+    await page.goto('/ide', { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Open Project' }).click();
+
+    const binding = page.getByLabel('Project binding');
+    await expect(binding.getByText('Folder selected')).toBeVisible();
+    await expect(page.getByText('picked-project').first()).toBeVisible();
+    await expect(page.getByText('README.md')).toBeVisible();
+    await page.getByPlaceholder('Ask about your code...').fill('Can you assess my project?');
+    await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled();
   });
 
   test('/IDE uppercase returns 404 (route is /ide)', async ({ page }) => {

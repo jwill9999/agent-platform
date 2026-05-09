@@ -341,7 +341,7 @@ export function Terminal({ className, sessionId, explorerFolderOpen }: Readonly<
           </div>
           <p className="text-[10px] leading-snug text-[#858585]">
             {showExplorerHint
-              ? 'Browsers do not expose the folder path from Open Folder. Paste the same absolute path here so the shell matches the Explorer, or leave empty to use your home directory.'
+              ? 'Use the same Project folder path when the shell should start from the open Project, or leave empty to use your home directory.'
               : 'Leave empty to use your home directory on the API machine (or set TERMINAL_CWD on the server).'}
           </p>
         </div>

@@ -87,8 +87,10 @@ test.describe('MVP E2E (compose-backed)', () => {
     await page.getByRole('link', { name: /Open Project/ }).click();
     await expect(page).toHaveURL(/\/ide$/);
     await expect(page.locator('[aria-label="Active agent"]').first()).toContainText('Coding');
-    await expect(page.getByLabel('Project folder path')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Open Folder' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
+    await expect(page.getByText('Use folder path')).toBeVisible();
+    await expect(page.getByLabel('Project folder path')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Terminal/ })).toBeVisible();
   });
 
@@ -98,16 +100,18 @@ test.describe('MVP E2E (compose-backed)', () => {
     await page.goto('/ide');
     const projectBinding = page.getByLabel('Project binding');
 
-    await expect(projectBinding.getByText('Unavailable')).toBeVisible();
+    await expect(projectBinding.getByText('Not open')).toBeVisible();
+
+    await projectBinding.getByText('Use folder path').click();
     await page.getByLabel('Project folder path').fill('/workspace');
-    await projectBinding.getByRole('button', { name: 'Open', exact: true }).click();
-    await expect(projectBinding.getByText('Available', { exact: true })).toBeVisible();
+    await projectBinding.getByRole('button', { name: 'Open Path' }).click();
+    await expect(projectBinding.getByText('Open', { exact: true })).toBeVisible();
     await expect(projectBinding.getByText('Folder: workspace')).toBeVisible();
 
     await page.getByLabel('Project folder path').fill('/definitely-not-mounted-agent-platform');
-    await projectBinding.getByRole('button', { name: 'Open', exact: true }).click();
+    await projectBinding.getByRole('button', { name: 'Open Path' }).click();
     await expect(projectBinding.getByText('That Project folder could not be opened')).toBeVisible();
-    await expect(projectBinding.getByText('Unavailable')).toBeVisible();
+    await expect(projectBinding.getByText('Not open')).toBeVisible();
   });
 
   test('tool_result panel renders (fixture page)', async ({ page }) => {

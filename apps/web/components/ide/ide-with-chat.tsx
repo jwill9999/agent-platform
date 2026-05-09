@@ -197,14 +197,19 @@ function projectInstructionUpdateProposal(
 function projectOnboardingLabel(state: ProjectOnboardingState): string {
   switch (state) {
     case 'approved':
-      return 'Instructions approved';
+      return 'Project ready';
     case 'needs_review':
-      return 'Instructions review required';
     case 'in_progress':
-      return 'Instructions review in progress';
     case 'missing':
-      return 'Instructions missing';
+      return 'Project setup needs review';
   }
+}
+
+function projectOnboardingDescription(state: ProjectOnboardingState): string {
+  if (state === 'approved') {
+    return 'File edits are enabled for this Project.';
+  }
+  return 'Before file edits are enabled, review the Project instructions with the agent.';
 }
 
 // ---------------------------------------------------------------------------
@@ -278,10 +283,12 @@ export function ProjectOnboardingAssessmentPanel({
     <div className="rounded-md border border-border bg-background px-2 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-medium text-foreground">
-            {assessment.display.profileLabel ?? 'Project assessment'}
+          <div className="truncate font-medium text-foreground">Project setup</div>
+          <div className="text-muted-foreground">
+            {assessment.status === 'approved'
+              ? 'Ready for file work'
+              : 'Review required before edits'}
           </div>
-          <div className="text-muted-foreground">{assessment.display.onboardingLabel}</div>
         </div>
         <Button
           type="button"
@@ -296,18 +303,15 @@ export function ProjectOnboardingAssessmentPanel({
           <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden />
         </Button>
       </div>
-      <p className="mt-2 leading-snug">{assessment.summary}</p>
-      {assessment.gaps.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {assessment.gaps.slice(0, 3).map((gap) => (
-            <li key={`${gap.kind}:${gap.message}`} className="leading-snug">
-              {gap.message}
-            </li>
-          ))}
-        </ul>
-      )}
-      {assessment.questions.length > 0 && (
-        <p className="mt-2 leading-snug text-muted-foreground">{assessment.questions[0]?.prompt}</p>
+      <p className="mt-2 leading-snug">
+        {assessment.status === 'approved'
+          ? 'The agent can use this Project for approved file changes.'
+          : 'The agent needs you to review or create Project instructions before it can edit files.'}
+      </p>
+      {assessment.questions.length > 0 && assessment.status !== 'approved' && (
+        <p className="mt-2 leading-snug text-muted-foreground">
+          Continue in the setup draft below.
+        </p>
       )}
     </div>
   );
@@ -374,7 +378,7 @@ export function ProjectOnboardingDraftPanel({
             onClick={onStart}
             disabled={isStarting}
           >
-            {isStarting ? 'Starting...' : 'Start'}
+            {isStarting ? 'Starting...' : 'Review setup'}
           </Button>
         )}
       </div>
@@ -836,7 +840,7 @@ function getFolderButtonLabel(
   if (isOpeningDirectory) return 'Opening...';
   if (isLoading) return 'Loading...';
   if (rootName) return `Close ${rootName}`;
-  return 'Open Folder';
+  return 'Project not open';
 }
 
 function getToggleButtonState(isOpen: boolean, openLabel: string, closedLabel: string) {
@@ -874,7 +878,6 @@ function IDEToolbar({
   pathInput,
   setPathInput,
   onLoadFromPath,
-  onOpenFolder,
   isLoadingFolder,
   isOpeningFolder,
   rootName,
@@ -897,7 +900,6 @@ function IDEToolbar({
   pathInput: string;
   setPathInput: (v: string) => void;
   onLoadFromPath: () => void;
-  onOpenFolder: () => void;
   isLoadingFolder: boolean;
   isOpeningFolder: boolean;
   rootName: string | null;
@@ -964,16 +966,18 @@ function IDEToolbar({
             </div>
           </DialogContent>
         </Dialog>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={rootName ? onCloseFolder : onOpenFolder}
-          disabled={folderActionDisabled}
-        >
-          <FolderOpen className="h-4 w-4" />
-          {folderLabel}
-        </Button>
+        {rootName && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={onCloseFolder}
+            disabled={folderActionDisabled}
+          >
+            <FolderOpen className="h-4 w-4" />
+            {folderLabel}
+          </Button>
+        )}
         {rootName && (
           <Button
             variant="ghost"
@@ -1395,6 +1399,7 @@ function ChatPanel({
           />
           <Button
             size="icon"
+            aria-label="Send message"
             onClick={onSendMessage}
             disabled={!chatInput.trim() || isLoading || !sessionReady}
             className="flex-shrink-0"
@@ -1736,6 +1741,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const onboardingDialogue = projectOnboardingDialogue(activeProject);
   const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
   const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
+  const projectBindingStatus = activeProject
+    ? 'Open'
+    : fs.rootName
+      ? 'Folder selected'
+      : 'Not open';
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
@@ -1778,14 +1788,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, []);
 
   useEffect(() => {
-    if (!selectedAgentId || !activeProject?.id) return;
+    if (!selectedAgentId) return;
     void (async () => {
       try {
-        const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+        const body: { agentId: string; mode: 'project'; projectId?: string } = {
           agentId: selectedAgentId,
           mode: 'project',
-          projectId: activeProject.id,
-        });
+        };
+        if (activeProject?.id) body.projectId = activeProject.id;
+        const session = await apiPost<SessionRecord>(apiPath('sessions'), body);
         if (session?.id) {
           setSessionId(session.id);
         } else {
@@ -1822,7 +1833,12 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
   const handleOpenBackendProject = useCallback(async () => {
     const path = projectPathInput.trim();
-    if (!path) return;
+    if (!path) {
+      setActiveProject(null);
+      setProjectOpenError(null);
+      await fs.openDirectory();
+      return;
+    }
 
     setIsOpeningBackendProject(true);
     setProjectOpenError(null);
@@ -1848,7 +1864,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     } finally {
       setIsOpeningBackendProject(false);
     }
-  }, [clearProjectContext, projectPathInput]);
+  }, [clearProjectContext, fs, projectPathInput]);
 
   const handleApproveProjectInstructions = useCallback(async () => {
     if (!activeProject?.id) return;
@@ -2392,7 +2408,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         pathInput={pathInput}
         setPathInput={setPathInput}
         onLoadFromPath={handleLoadFromPath}
-        onOpenFolder={fs.openDirectory}
         isLoadingFolder={fs.isLoading}
         isOpeningFolder={fs.isOpeningDirectory}
         rootName={fs.rootName}
@@ -2454,39 +2469,31 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Project
                     </span>
-                    {activeProject ? (
-                      <span className="text-xs text-emerald-600">Available</span>
+                    {projectBindingStatus === 'Open' ? (
+                      <span className="text-xs text-emerald-600">Open</span>
+                    ) : projectBindingStatus === 'Folder selected' ? (
+                      <span className="text-xs text-sky-600">Folder selected</span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Unavailable</span>
+                      <span className="text-xs text-muted-foreground">Not open</span>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      aria-label="Project folder path"
-                      value={projectPathInput}
-                      placeholder="Folder path"
-                      onChange={(event) => {
-                        setProjectPathInput(event.target.value);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          handleOpenBackendProject().catch(() => {});
-                        }
-                      }}
-                      className="h-8 text-xs"
-                    />
+                  {!fs.rootName && !activeProject && (
                     <Button
                       type="button"
                       size="sm"
                       variant="secondary"
+                      className="w-full gap-2"
                       onClick={() => {
                         handleOpenBackendProject().catch(() => {});
                       }}
-                      disabled={isOpeningBackendProject}
+                      disabled={isOpeningBackendProject || fs.isOpeningDirectory}
                     >
-                      {isOpeningBackendProject ? 'Opening...' : 'Open'}
+                      <FolderOpen className="h-4 w-4" />
+                      {isOpeningBackendProject || fs.isOpeningDirectory
+                        ? 'Opening...'
+                        : 'Open Project'}
                     </Button>
-                  </div>
+                  )}
                   {activeProject && (
                     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                       <div className="truncate text-foreground">{activeProject.name}</div>
@@ -2512,9 +2519,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                             {projectOnboardingLabel(onboardingState)}
                           </div>
                           <div className="mt-1 leading-snug text-muted-foreground">
-                            {onboardingState === 'approved'
-                              ? 'Code edits and write tools are available when allowed by policy.'
-                              : 'Initial project instructions are required before code edits, commits, installs, migrations, or destructive commands. Read-only inspection and planning remain available.'}
+                            {projectOnboardingDescription(onboardingState)}
                           </div>
                           {canApproveProjectInstructions && (
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -2528,7 +2533,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                                 }}
                                 disabled={isApprovingProjectInstructions}
                               >
-                                {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
+                                {isApprovingProjectInstructions ? 'Approving...' : 'Approve setup'}
                               </Button>
                               <Button
                                 type="button"
@@ -2610,8 +2615,68 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                       )}
                     </div>
                   )}
+                  {!activeProject && fs.rootName && (
+                    <div className="rounded-md border border-sky-500/35 bg-sky-500/10 px-2 py-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 truncate font-medium text-foreground">
+                          {fs.rootName}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 shrink-0"
+                          onClick={() => {
+                            handleOpenBackendProject().catch(() => {});
+                          }}
+                          disabled={fs.isOpeningDirectory}
+                        >
+                          Change Folder
+                        </Button>
+                      </div>
+                      <div className="mt-1 leading-snug text-muted-foreground">
+                        Next: ask the agent to assess this project.
+                      </div>
+                    </div>
+                  )}
+                  <details className="mt-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer select-none">Use folder path</summary>
+                    <div className="mt-2 flex gap-2">
+                      <Input
+                        aria-label="Project folder path"
+                        aria-invalid={projectOpenError ? true : undefined}
+                        aria-describedby={projectOpenError ? 'project-open-error' : undefined}
+                        value={projectPathInput}
+                        placeholder="Project folder path"
+                        onChange={(event) => {
+                          setProjectPathInput(event.target.value);
+                          if (projectOpenError) setProjectOpenError(null);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            handleOpenBackendProject().catch(() => {});
+                          }
+                        }}
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="shrink-0"
+                        onClick={() => {
+                          handleOpenBackendProject().catch(() => {});
+                        }}
+                        disabled={isOpeningBackendProject}
+                      >
+                        {isOpeningBackendProject ? 'Opening...' : 'Open Path'}
+                      </Button>
+                    </div>
+                  </details>
                   {projectOpenError && (
-                    <p className="mt-2 text-xs text-destructive">{projectOpenError}</p>
+                    <p id="project-open-error" className="mt-2 text-xs text-destructive">
+                      {projectOpenError}
+                    </p>
                   )}
                 </div>
                 {fs.needsFolderReconnect && (
@@ -2646,16 +2711,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
                           <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
                           <p className="text-sm text-muted-foreground">No folder open</p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={fs.openDirectory}
-                            disabled={fs.isOpeningDirectory}
-                          >
-                            <FolderOpen className="h-4 w-4" />
-                            {fs.isOpeningDirectory ? 'Opening...' : 'Open Folder'}
-                          </Button>
+                          <p className="max-w-56 text-xs leading-snug text-muted-foreground">
+                            Open a Project above to validate the folder and start setup.
+                          </p>
                         </div>
                       )}
                     {filteredFileTree.length === 0 &&

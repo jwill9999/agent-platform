@@ -20,14 +20,17 @@ This epic makes the onboarding experience complete end to end.
   the `AGENTS.md` lifecycle for Projects where coding or file-changing work is enabled.
 - The coding agent is a Project profile/tooling choice, not the definition of a Project.
 - Onboarding UI must avoid implementation labels such as `/workspace`, `backend accessible`, backend
-  root, or repository root in normal user-facing copy. Show Project name, folder/relevant relative
-  path, onboarding state, and branch/status only where useful.
+  root, repository root, raw assessment status, hashes, and internal transition state in normal
+  user-facing copy. Show Project name, folder/relevant relative path, and user-actionable setup state
+  only where useful.
 - The agent takes initiative during Project onboarding.
 - On first Project load, the agent reads existing `AGENTS.md` and performs read-only working-tree
   traversal.
 - The assessment is LLM-led rather than a rigid checklist, but it must return structured evidence:
-  summary, files inspected, inferred structure, gaps, questions, and recommended updates.
-- If `AGENTS.md` is sufficient and consistent, onboarding can auto-approve with visible reasoning.
+  summary, files inspected, inferred structure, gaps, questions, and recommended updates. Detailed
+  evidence belongs in metadata, logs, and agent observability unless the user needs a specific action.
+- If `AGENTS.md` is sufficient and consistent, onboarding can auto-approve with clear user-facing
+  confirmation while retaining detailed reasoning for audit/debug.
 - If `AGENTS.md` is missing, vague, stale, or contradicted by the tree, onboarding becomes
   collaborative.
 - Collaborative onboarding follows a Q&A loop: the agent asks focused questions, the user responds,
@@ -54,6 +57,8 @@ In scope:
 - Closeout update candidates for durable facts learned during work.
 - User-triggered refresh/rescan of Project instructions.
 - Playwright E2E that verifies the full onboarding lifecycle through the UI.
+- Cleanup of normal UI entry points so users have one primary Project-opening path and internal state
+  remains in metadata/observability.
 
 Out of scope:
 
@@ -121,6 +126,7 @@ passes, and CI/CD pipelines are green.
 | `agent-platform-project-onboarding.4` | Add `AGENTS.md` review, approval, and auto-approval flows    |
 | `agent-platform-project-onboarding.5` | Add closeout update candidates and refresh/rescan action     |
 | `agent-platform-project-onboarding.6` | Verify full onboarding lifecycle with Playwright E2E         |
+| `agent-platform-project-onboarding.7` | Clean onboarding entry and user-facing state                 |
 
 ## Epic Definition Of Done
 
@@ -129,8 +135,11 @@ passes, and CI/CD pipelines are green.
       `AGENTS.md`.
 - [ ] User-facing onboarding labels describe the Project and instruction state without exposing
       `/workspace`, backend accessibility, backend root, or repository root as primary copy.
-- [ ] Assessment returns structured visible evidence, gaps, questions, and recommendations.
-- [ ] Existing sufficient `AGENTS.md` can auto-approve onboarding with visible reasoning.
+- [ ] Assessment returns structured evidence, gaps, questions, and recommendations for metadata,
+      audit, and observability.
+- [ ] Normal UI surfaces user-actionable onboarding copy without raw internal assessment state.
+- [ ] Existing sufficient `AGENTS.md` can auto-approve onboarding with clear user-facing
+      confirmation.
 - [ ] Missing or insufficient `AGENTS.md` starts collaborative onboarding dialogue.
 - [ ] The agent can draft and revise a human-readable `AGENTS.md`.
 - [ ] User approval of initial onboarding is required before code writes.
@@ -140,6 +149,8 @@ passes, and CI/CD pipelines are green.
 - [ ] Playwright E2E covers sufficient existing instructions, missing instructions, insufficient
       instructions, collaborative Q&A, approval, rejected/revised drafts, approved code write, closeout
       update candidates, and refresh/rescan.
+- [ ] Normal UI presents one primary Project-opening path and no separate browser-only folder picker
+      CTA.
 - [ ] The combined Epics 1 and 2 feature is ready for an end-to-end Playwright run without relying on
       manual human validation.
 - [ ] Every Epic 2 task is closed only after implementation is complete, local gates pass,

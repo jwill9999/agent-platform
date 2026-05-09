@@ -121,9 +121,10 @@ async function openProject(page: Page, containerPath: string) {
   await page.goto('/ide');
   const binding = page.getByLabel('Project binding');
   await expect(binding).toBeVisible();
+  await binding.getByText('Use folder path').click();
   await page.getByLabel('Project folder path').fill(containerPath);
-  await binding.getByRole('button', { name: 'Open', exact: true }).click();
-  await expect(binding.getByText('Available', { exact: true })).toBeVisible();
+  await binding.getByRole('button', { name: 'Open Path' }).click();
+  await expect(binding.getByText('Open', { exact: true })).toBeVisible();
   await expect(
     binding.getByText(`Folder: ${containerPath.split('/').pop() ?? 'workspace'}`),
   ).toBeVisible();
@@ -158,9 +159,9 @@ test.describe('Project workspace E2E', () => {
     writeRepoFixture(fixture.hostPath, { includeInstructions: true });
 
     const binding = await openProject(page, fixture.containerPath);
-    await expect(binding.getByText('Instructions approved')).toBeVisible();
-    await expect(binding.getByText('Code edits and write tools are available')).toBeVisible();
-    await expect(binding.getByRole('button', { name: 'Approve' })).toHaveCount(0);
+    await expect(binding.getByText('Project ready')).toBeVisible();
+    await expect(binding.getByText('File edits are enabled for this Project')).toBeVisible();
+    await expect(binding.getByRole('button', { name: 'Approve setup' })).toHaveCount(0);
 
     const opened = await findProjectByRoot(request, fixture.containerPath);
     expect(opened.metadata.onboardingState).toBe('approved');
@@ -196,7 +197,7 @@ test.describe('Project workspace E2E', () => {
     );
 
     await binding.getByRole('button', { name: 'Refresh project assessment' }).click();
-    await expect(binding.getByText('Instructions approved')).toBeVisible({ timeout: 15_000 });
+    await expect(binding.getByText('Project ready')).toBeVisible({ timeout: 15_000 });
     const refreshed = await findProjectByRoot(request, fixture.containerPath);
     expect(refreshed.metadata.onboardingRefresh).toEqual(
       expect.objectContaining({
@@ -217,13 +218,10 @@ test.describe('Project workspace E2E', () => {
     writeFixtureFile(join(fixture.hostPath, 'AGENTS.md'), 'thin instructions\n');
 
     const binding = await openProject(page, fixture.containerPath);
-    await expect(binding.getByText('Instructions review in progress')).toBeVisible();
-    await expect(
-      binding.getByRole('listitem').filter({
-        hasText: 'The root instructions need clearer project workflow',
-      }),
-    ).toBeVisible();
-    await expect(binding.getByText('Code edits and write tools are available')).toHaveCount(0);
+    await expect(binding.getByText('Project setup needs review')).toBeVisible();
+    await expect(binding.getByText('Review required before edits')).toBeVisible();
+    await expect(binding.getByText('The root instructions need clearer')).toHaveCount(0);
+    await expect(binding.getByText('File edits are enabled for this Project')).toHaveCount(0);
 
     const opened = await findProjectByRoot(request, fixture.containerPath);
     expect(opened.metadata.onboardingState).toBe('in_progress');
@@ -248,17 +246,15 @@ test.describe('Project workspace E2E', () => {
     writeRepoFixture(fixture.hostPath, { includeInstructions: false });
 
     const binding = await openProject(page, fixture.containerPath);
-    await expect(binding.getByText('Instructions review in progress')).toBeVisible();
-    await expect(
-      binding.getByText(/Read-only inspection and planning remain available/),
-    ).toBeVisible();
-    await expect(binding.getByRole('button', { name: 'Approve' })).toHaveCount(0);
+    await expect(binding.getByText('Project setup needs review')).toBeVisible();
+    await expect(binding.getByText(/review the Project instructions/)).toBeVisible();
+    await expect(binding.getByRole('button', { name: 'Approve setup' })).toHaveCount(0);
 
     const opened = await findProjectByRoot(request, fixture.containerPath);
     expect(opened.metadata.onboardingState).toBe('in_progress');
     expect(opened.metadata.instructionFiles).toEqual([]);
 
-    await binding.getByRole('button', { name: 'Start' }).click();
+    await binding.getByRole('button', { name: 'Review setup' }).click();
     await expect(binding.getByText('Revision 1')).toBeVisible();
     await expect(binding.getByText('# Agent Instructions')).toBeVisible();
     await expect(page.getByLabel('Onboarding answer')).toBeVisible();
@@ -268,13 +264,13 @@ test.describe('Project workspace E2E', () => {
     await binding.getByRole('button', { name: 'Send answer' }).click();
     await expect(binding.getByText('Revision 2')).toBeVisible();
     await expect(binding.getByText(answer)).toBeVisible();
-    await expect(binding.getByText('Code edits and write tools are available')).toHaveCount(0);
+    await expect(binding.getByText('File edits are enabled for this Project')).toHaveCount(0);
 
     const feedback = 'Clarify that documentation updates are in scope.';
     await page.getByLabel('Review feedback').fill(feedback);
     await binding.getByRole('button', { name: 'Request changes' }).click();
-    await expect(binding.getByText('Instructions review in progress')).toBeVisible();
-    await expect(binding.getByText('Code edits and write tools are available')).toHaveCount(0);
+    await expect(binding.getByText('Project setup needs review')).toBeVisible();
+    await expect(binding.getByText('File edits are enabled for this Project')).toHaveCount(0);
 
     const reviewed = await findProjectByRoot(request, fixture.containerPath);
     expect(reviewed.metadata.onboardingState).toBe('in_progress');
@@ -290,8 +286,8 @@ test.describe('Project workspace E2E', () => {
     await binding.getByRole('button', { name: 'Approve draft' }).click();
     const response = await approvalResponse;
     expect(response.ok(), await response.text()).toBeTruthy();
-    await expect(binding.getByText('Instructions approved')).toBeVisible({ timeout: 15_000 });
-    await expect(binding.getByText('Code edits and write tools are available')).toBeVisible({
+    await expect(binding.getByText('Project ready')).toBeVisible({ timeout: 15_000 });
+    await expect(binding.getByText('File edits are enabled for this Project')).toBeVisible({
       timeout: 15_000,
     });
 
@@ -323,7 +319,7 @@ test.describe('Project workspace E2E', () => {
     writeRepoFixture(fixture.hostPath, { includeInstructions: true });
 
     let binding = await openProject(page, fixture.containerPath);
-    await expect(binding.getByText('Instructions approved')).toBeVisible();
+    await expect(binding.getByText('Project ready')).toBeVisible();
 
     const opened = await findProjectByRoot(request, fixture.containerPath);
     const collected = await request.post(
@@ -391,7 +387,7 @@ test.describe('Project workspace E2E', () => {
 
     writeFileSync(join(fixture.hostPath, 'AGENTS.md'), 'thin instructions\n');
     await binding.getByRole('button', { name: 'Refresh project assessment' }).first().click();
-    await expect(binding.getByText('Instructions review required')).toBeVisible({
+    await expect(binding.getByText('Project setup needs review')).toBeVisible({
       timeout: 15_000,
     });
 
@@ -414,9 +410,9 @@ test.describe('Project workspace E2E', () => {
     writeDocsFixture(fixture.hostPath);
 
     const binding = await openProject(page, fixture.containerPath);
-    await expect(binding.getByText('Instructions approved')).toBeVisible();
-    await expect(binding.getByText('Docs Content', { exact: true })).toBeVisible();
-    await expect(binding.getByText(/Detected docs content Project/)).toBeVisible();
+    await expect(binding.getByText('Project ready')).toBeVisible();
+    await expect(binding.getByText('Project setup')).toBeVisible();
+    await expect(binding.getByText(/Detected docs content Project/)).toHaveCount(0);
     await expect(binding.getByText(/coding-only/)).toHaveCount(0);
 
     const opened = await findProjectByRoot(request, fixture.containerPath);
