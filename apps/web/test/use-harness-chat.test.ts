@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AGENT_CONNECTION_ERROR_MESSAGE,
   hasBlockingApprovalEvents,
   mergeApprovalEvent,
   renderStreamEvent,
@@ -105,7 +106,7 @@ describe('harness chat stream parser', () => {
     });
   });
 
-  it('redacts API keys from streamed error messages', () => {
+  it('renders provider API key failures as user-facing connection errors', () => {
     const openAiKey = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
     const result = renderStreamEvent({
       type: 'error',
@@ -113,11 +114,11 @@ describe('harness chat stream parser', () => {
     });
 
     expect(result).toEqual({
-      error: 'Incorrect API key provided: [REDACTED:CREDENTIAL]',
+      error: AGENT_CONNECTION_ERROR_MESSAGE,
     });
   });
 
-  it('redacts masked API keys from streamed error messages', () => {
+  it('renders masked provider API key failures as user-facing connection errors', () => {
     const masked = ['sk-proj-', '*'.repeat(32), 'abcd'].join('');
     const result = renderStreamEvent({
       type: 'error',
@@ -125,11 +126,11 @@ describe('harness chat stream parser', () => {
     });
 
     expect(result).toEqual({
-      error: 'Incorrect API key provided: [REDACTED:CREDENTIAL]',
+      error: AGENT_CONNECTION_ERROR_MESSAGE,
     });
   });
 
-  it('renders model auth failures as global errors without raw credentials', () => {
+  it('renders model auth failures as user-facing connection errors', () => {
     const result = renderStreamEvent({
       type: 'error',
       code: 'MODEL_AUTH_FAILED',
@@ -138,8 +139,7 @@ describe('harness chat stream parser', () => {
     });
 
     expect(result).toEqual({
-      error:
-        'The model provider rejected the configured API key. Check the selected model config or server environment key.',
+      error: AGENT_CONNECTION_ERROR_MESSAGE,
     });
   });
 

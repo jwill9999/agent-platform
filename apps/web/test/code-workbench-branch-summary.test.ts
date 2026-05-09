@@ -11,7 +11,7 @@ describe('code workbench branch summary', () => {
       }),
     ).toMatchObject({
       workspaceName: 'agent-platform',
-      branchLabel: 'Branch not connected',
+      branchLabel: 'Project checks',
       stateLabel: 'Clean',
       changedFiles: [],
     });

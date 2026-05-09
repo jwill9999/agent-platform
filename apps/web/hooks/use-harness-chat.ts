@@ -20,6 +20,9 @@ const CREDENTIAL_PATTERNS: readonly RegExp[] = [
   /Bearer\s+[A-Za-z0-9_\-.~+/]{20,}/g,
 ];
 
+export const AGENT_CONNECTION_ERROR_MESSAGE =
+  'The agent could not start. Check your AI connection or ask an admin to review the model settings.';
+
 function redactDisplayText(text: string): string {
   return CREDENTIAL_PATTERNS.reduce(
     (current, pattern) => current.replace(pattern, '[REDACTED:CREDENTIAL]'),
@@ -165,10 +168,27 @@ function isRecoverableToolErrorCode(code: unknown): code is string {
   );
 }
 
+function isProviderAuthError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('incorrect api key') ||
+    lower.includes('invalid api key') ||
+    lower.includes('authentication') ||
+    lower.includes('unauthorized')
+  );
+}
+
+function toUserFacingError(code: unknown, message: string): string {
+  if (code === 'MODEL_AUTH_FAILED' || isProviderAuthError(message)) {
+    return AGENT_CONNECTION_ERROR_MESSAGE;
+  }
+  return redactDisplayText(message);
+}
+
 function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.message !== 'string') return null;
   const { code } = o;
-  const message = redactDisplayText(o.message);
+  const message = toUserFacingError(code, o.message);
   if (code === 'CRITIC_CAP_REACHED') {
     return { critic: { kind: 'cap_reached', reasons: message } };
   }
@@ -198,6 +218,11 @@ type StreamAssistantResult = {
   text: string;
   errorMessage: string | null;
 };
+
+function formatAssistantFailure(errorMessage: string): string {
+  if (errorMessage === AGENT_CONNECTION_ERROR_MESSAGE) return errorMessage;
+  return `The agent run failed before returning a response.\n\n${errorMessage}`;
+}
 
 function renderThinkingEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.content !== 'string') return null;
@@ -600,7 +625,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         const finalText =
           result.text.trim() || !result.errorMessage
             ? result.text
-            : `The agent run failed before returning a response.\n\n${result.errorMessage}`;
+            : formatAssistantFailure(result.errorMessage);
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
         updateAssistantMessage(assistantId, finalText);
@@ -687,7 +712,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           accumulated =
             result.text.trim() || !result.errorMessage
               ? result.text
-              : `The agent run failed before returning a response.\n\n${result.errorMessage}`;
+              : formatAssistantFailure(result.errorMessage);
         }
 
         updateAssistantMessage(assistantId, accumulated);

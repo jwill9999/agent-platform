@@ -67,6 +67,7 @@ import { IDEMarkdown } from '@/components/ide/ide-markdown';
 import { Terminal } from '@/components/ide/terminal';
 import { useFileSystem } from '@/hooks/use-file-system';
 import {
+  AGENT_CONNECTION_ERROR_MESSAGE,
   useHarnessChat,
   type ApprovalCardState,
   type ApprovalDecision,
@@ -105,13 +106,15 @@ import {
 } from '@/lib/code-workbench-branch-summary';
 
 type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
-type ProjectBindingStatus = 'open' | 'folder-selected' | 'not-open';
+type ProjectBindingStatus = 'open' | 'folder-selected' | 'agent-unavailable' | 'not-open';
 
 function getProjectBindingStatus(
   project: ProjectRecord | null,
   rootName: string | null,
+  agentUnavailable: boolean,
 ): ProjectBindingStatus {
   if (project) return 'open';
+  if (rootName && agentUnavailable) return 'agent-unavailable';
   if (rootName) return 'folder-selected';
   return 'not-open';
 }
@@ -122,6 +125,9 @@ function ProjectBindingStatusBadge({ status }: Readonly<{ status: ProjectBinding
   }
   if (status === 'folder-selected') {
     return <span className="text-xs text-sky-600">Folder selected</span>;
+  }
+  if (status === 'agent-unavailable') {
+    return <span className="text-xs text-amber-600">Agent unavailable</span>;
   }
   return <span className="text-xs text-muted-foreground">Not open</span>;
 }
@@ -1127,7 +1133,7 @@ function EditorPanel({
         <div className="text-center">
           <Code2 className="h-16 w-16 mx-auto mb-4 opacity-20" />
           <p className="text-lg font-medium mb-2">No file open</p>
-          <p className="text-sm mb-4">Select a file from the explorer or open a file by path</p>
+          <p className="text-sm mb-4">Select a file from the explorer or use Open File</p>
           <Button variant="outline" onClick={onOpenPathDialog} className="gap-2">
             <FileText className="h-4 w-4" />
             Open File
@@ -1466,14 +1472,19 @@ function WorkbenchBranchPanel({ summary }: Readonly<{ summary: WorkbenchBranchSu
         </div>
       )}
 
-      <div className="mt-2 space-y-1">
-        {summary.providers.map((provider) => (
-          <div key={provider.label} className="text-[11px] leading-snug text-muted-foreground">
-            <span className="font-medium text-foreground">{provider.label} unavailable:</span>{' '}
-            {provider.description}
+      {summary.providers.length > 0 && (
+        <details className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          <summary className="cursor-pointer select-none">Project diagnostics</summary>
+          <div className="mt-1 space-y-1">
+            {summary.providers.map((provider) => (
+              <div key={provider.label}>
+                <span className="font-medium text-foreground">{provider.label}:</span>{' '}
+                {provider.description}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -1726,6 +1737,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [contextFiles, setContextFiles] = useState<OpenTab[]>([]);
   const [includeActiveFile, setIncludeActiveFile] = useState(true);
   const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
+  const [agentRunError, setAgentRunError] = useState<string | null>(null);
 
   const workspaceName = activeProject?.name ?? fs.rootName ?? 'No folder open';
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
@@ -1761,7 +1773,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const onboardingDialogue = projectOnboardingDialogue(activeProject);
   const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
   const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
-  const projectBindingStatus = getProjectBindingStatus(activeProject, fs.rootName);
+  const projectBindingStatus = getProjectBindingStatus(
+    activeProject,
+    fs.rootName,
+    agentRunError === AGENT_CONNECTION_ERROR_MESSAGE,
+  );
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
@@ -1828,10 +1844,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
   useEffect(() => {
     if (harnessError) {
+      setAgentRunError(harnessError);
       toast.error(harnessError);
       setHarnessError(null);
     }
   }, [harnessError, setHarnessError]);
+
+  useEffect(() => {
+    setAgentRunError(null);
+  }, [activeProject?.id, fs.rootName]);
 
   const isLoading = status === 'streaming';
 
@@ -2362,6 +2383,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const handleSendMessage = useCallback(() => {
     const userLine = chatInput.trim();
     if (!userLine || !sessionId) return;
+    setAgentRunError(null);
     const prefix = formatFileContext(contextDraft.sanitisedFiles);
     const messageForApi = prefix ? `${prefix}\n${userLine}` : userLine;
     sendMessage(messageForApi, userLine).catch(() => {});
@@ -2644,7 +2666,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         </Button>
                       </div>
                       <div className="mt-1 leading-snug text-muted-foreground">
-                        Next: ask the agent to assess this project.
+                        {agentRunError === AGENT_CONNECTION_ERROR_MESSAGE
+                          ? 'Project assessment could not start. Check your AI connection, then try again.'
+                          : 'Next: ask the agent to assess this project.'}
                       </div>
                     </div>
                   )}

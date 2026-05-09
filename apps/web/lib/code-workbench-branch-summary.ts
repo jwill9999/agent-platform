@@ -30,12 +30,12 @@ const UNAVAILABLE_PROVIDERS: WorkbenchBranchProviderState[] = [
   {
     label: 'Git branch',
     status: 'unavailable',
-    description: 'Repository and branch discovery is not connected in this workbench yet.',
+    description: 'Repository and branch details are not connected in this workbench yet.',
   },
   {
     label: 'Remote checks',
     status: 'unavailable',
-    description: 'GitHub, CodeQL, SonarQube, and review feedback belong to branch feedback status.',
+    description: 'Review and pipeline status will appear here when branch feedback is connected.',
   },
 ];
 
@@ -74,7 +74,7 @@ export function buildWorkbenchBranchSummary({
 
   return {
     workspaceName: workspaceName ?? 'No folder open',
-    branchLabel: 'Branch not connected',
+    branchLabel: 'Project checks',
     stateLabel,
     changedFiles: files,
     providers: UNAVAILABLE_PROVIDERS,
