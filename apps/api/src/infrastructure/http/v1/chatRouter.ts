@@ -1294,6 +1294,8 @@ async function handleSlashCommandMessage(
   message: string,
   res: Response,
 ): Promise<boolean> {
+  if (!message.trimStart().startsWith('/')) return false;
+
   const release = await sessionLock.acquire(session.id);
   try {
     const slashCommand = runSlashCommand(
@@ -1306,10 +1308,10 @@ async function handleSlashCommandMessage(
       options.slashCommands,
     );
     if (slashCommand.kind === 'handled') {
+      persistSlashCommandMessages(db, session.id, message, slashCommand.message);
       prepareNdjsonResponse(res);
       const emitter: OutputEmitter = createNdjsonEmitter(res);
       await emitter.emit({ type: 'text', content: slashCommand.message });
-      persistSlashCommandMessages(db, session.id, message, slashCommand.message);
       if (!res.writableEnded) res.end();
       return true;
     }
