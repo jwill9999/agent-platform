@@ -2,17 +2,28 @@ import { app, BrowserWindow } from 'electron';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  getRepoRootFromMainDir,
+  getStandaloneRendererPaths,
+  resolveDesktopDevServerUrl,
+  resolveDesktopRendererMode,
+  startStandaloneRenderer,
+  type DesktopRendererMode,
+  type StandaloneRendererHandle,
+} from './rendererServer.js';
 import { buildBootstrapHtml, createWindowOptions, getPreloadPath } from './windowConfig.js';
 
 const smokeMode = process.argv.includes('--smoke');
 let mainWindow: BrowserWindow | undefined;
+let standaloneRenderer: StandaloneRendererHandle | undefined;
 
 export async function createMainWindow(): Promise<BrowserWindow> {
   const mainDir = dirname(fileURLToPath(import.meta.url));
   const window = new BrowserWindow(createWindowOptions(getPreloadPath(mainDir)));
+  const rendererMode = resolveDesktopRendererMode(process.env);
 
   mainWindow = window;
-  await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(buildBootstrapHtml())}`);
+  await window.loadURL(await resolveRendererUrl(mainDir, rendererMode));
 
   if (process.env.AGENT_PLATFORM_DESKTOP_DEVTOOLS === '1') {
     window.webContents.openDevTools({ mode: 'detach' });
@@ -24,6 +35,27 @@ export async function createMainWindow(): Promise<BrowserWindow> {
   }
 
   return window;
+}
+
+async function resolveRendererUrl(
+  mainDir: string,
+  rendererMode: DesktopRendererMode,
+): Promise<string> {
+  if (rendererMode === 'dev-server') {
+    return resolveDesktopDevServerUrl(process.env);
+  }
+
+  if (rendererMode === 'standalone') {
+    const repoRoot = getRepoRootFromMainDir(mainDir);
+    standaloneRenderer = await startStandaloneRenderer({
+      electronPath: process.execPath,
+      paths: getStandaloneRendererPaths(repoRoot),
+    });
+
+    return standaloneRenderer.url;
+  }
+
+  return `data:text/html;charset=utf-8,${encodeURIComponent(buildBootstrapHtml())}`;
 }
 
 function focusMainWindow(): void {
@@ -54,10 +86,18 @@ app.on('window-all-closed', () => {
   }
 });
 
-void app
-  .whenReady()
-  .then(bootstrap)
-  .catch((error: unknown) => {
+app.on('before-quit', () => {
+  standaloneRenderer?.stop().catch((error: unknown) => {
+    console.error('Failed to stop Agent Platform standalone renderer.', error);
+  });
+  standaloneRenderer = undefined;
+});
+
+app.on('ready', async () => {
+  try {
+    await bootstrap();
+  } catch (error: unknown) {
     console.error('Failed to start Agent Platform desktop shell.', error);
     app.quit();
-  });
+  }
+});

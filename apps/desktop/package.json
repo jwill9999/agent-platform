@@ -6,9 +6,13 @@
   "main": "dist/main/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:renderer": "pnpm --filter @agent-platform/web build",
     "lint": "eslint . --max-warnings 0",
     "smoke": "pnpm run build && electron . --smoke",
+    "smoke:renderer": "pnpm run build:renderer && pnpm run build && AGENT_PLATFORM_DESKTOP_RENDERER=standalone electron . --smoke",
     "start": "pnpm run build && electron .",
+    "start:dev-renderer": "pnpm run build && AGENT_PLATFORM_DESKTOP_RENDERER=dev-server electron .",
+    "start:renderer": "pnpm run build:renderer && pnpm run build && AGENT_PLATFORM_DESKTOP_RENDERER=standalone electron .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

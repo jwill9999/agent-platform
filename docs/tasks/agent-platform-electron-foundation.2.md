@@ -20,13 +20,21 @@ This task should preserve the existing web app as the product UI source while ad
 4. Add renderer load failure diagnostics that are useful to developers but not exposed as product implementation noise.
 5. Document any limitations discovered for Next.js static/export/runtime loading.
 
+## Implementation notes
+
+- The web app is a Next.js standalone build, not a pure static export. The desktop runtime therefore loads a local loopback Next standalone server instead of `file://` assets.
+- Standalone desktop renderer mode uses Electron's own binary as Node via `ELECTRON_RUN_AS_NODE=1`, starts `apps/web/.next/standalone/apps/web/server.js`, copies `.next/static` and `public` assets into the standalone tree, and then loads `http://127.0.0.1:<port>`.
+- `AGENT_PLATFORM_DESKTOP_RENDERER=standalone` is the production-like acceptance path for this task.
+- `AGENT_PLATFORM_DESKTOP_RENDERER=dev-server` remains available for local development and loads `AGENT_PLATFORM_DESKTOP_DEV_SERVER_URL` or `http://127.0.0.1:3001`.
+- The bootstrap data URL remains the safe fallback while later tasks wire backend supervision and native Project access.
+
 ## Definition of done
 
-- [ ] Electron can load the built renderer locally.
-- [ ] Desktop production mode does not require the normal web dev server.
-- [ ] Development mode remains usable.
-- [ ] Any renderer build constraints are documented.
-- [ ] Relevant desktop/web tests and root gates pass.
+- [x] Electron can load the built renderer locally.
+- [x] Desktop production mode does not require the normal web dev server.
+- [x] Development mode remains usable.
+- [x] Any renderer build constraints are documented.
+- [x] Relevant desktop/web tests and root gates pass.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Test strategy
@@ -34,3 +42,4 @@ This task should preserve the existing web app as the product UI source while ad
 - Desktop build and smoke launch.
 - Web build/typecheck.
 - Focused test or script proving the renderer entry is reachable.
+- `pnpm --filter @agent-platform/desktop smoke:renderer` is the production-like desktop smoke path for this task.

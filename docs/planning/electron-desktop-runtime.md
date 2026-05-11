@@ -307,7 +307,7 @@ This is for contributors and CI support, not normal users.
 
 Must use:
 
-- built renderer,
+- built renderer, currently loaded through the Next.js standalone server on a local loopback port rather than the normal web dev server,
 - built local backend,
 - Electron shell,
 - OS app data,
