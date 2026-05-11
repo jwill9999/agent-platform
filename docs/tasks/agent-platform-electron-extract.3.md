@@ -79,12 +79,12 @@ Manual verification should confirm the web UI no longer presents manual path ent
 - [x] Beads parent is `agent-platform-electron-extract`.
 - [x] Beads dependencies match this spec.
 - [x] Required local gates pass.
-- [ ] PR checks and review comments are resolved before closure.
+- [x] PR checks and review comments are resolved before closure.
 
 ## Sign-off
 
 - [x] Task branch created from the correct parent before implementation work.
 - [x] Relevant unit/component/E2E tests executed and passing or intentionally removed with rationale.
 - [x] `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm docs:lint` executed and passing.
-- [ ] PR/check/review requirements satisfied if this task is merged through a PR.
-- [ ] `bd close agent-platform-electron-extract.3 --reason "Browser-only Project opening parked"`
+- [x] PR/check/review requirements satisfied if this task is merged through a PR.
+- [x] `bd close agent-platform-electron-extract.3 --reason "Browser-only Project opening parked"`
