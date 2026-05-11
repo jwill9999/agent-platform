@@ -11,6 +11,17 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 - **Session:** Added PR #164 from `task/promptfoo-pr-main-actions` to `main` to make Promptfoo Code Scan run automatically for pull requests targeting `main`, including commit pushes via `synchronize` and reopened PRs. Kept `promptfoo/code-scan-action@v0` because the PR proved `@v1` is not currently published/resolvable.
 - **Validation:** Local workflow checks passed: `pnpm exec prettier --check .github/workflows/promptfoo-code-scan.yml` and `git diff --check`. PR #164 passed Promptfoo `security-scan`, CI `verify`/`docker`/`e2e`, CodeQL, SonarCloud, GitGuardian, and Sourcery. Promptfoo output for the successful run was JSON with `success: true`, `severity: none`, and the finding `No LLM security vulnerabilities were found in this PR.`
 - **Current state:** `agent-platform-promptfoo-pr-main-actions` is closed in Beads. PR #164 is green and ready for owner merge to `main`. `output/` remains generated/untracked and should not be committed.
+- **Date:** 2026-05-11
+- **Session:** Paused implementation after manual testing exposed a core architecture blocker in the Project opener/onboarding flow. Slash command infrastructure from `agent-platform-project-onboarding.8` is useful and largely implemented locally (`/help`, `/init`, parser/registry/runner boundaries, `/v1/chat` dispatch before model execution, shared onboarding workflow, IDE slash-message preservation, and focused tests), but the attempted browser/Docker Project opening model is not product-correct: a browser folder picker can show files to the renderer but cannot provide a backend-usable arbitrary host path, while a Docker backend can only inspect mounted paths. Requiring users to type absolute paths is not acceptable, and browser-only folder access creates false "Project open" states where `/init` lacks backend Project context. Implementation work is stopped until the desktop runtime redesign is agreed.
+- **Today’s outputs:** Added accepted architecture record [ADR-0002](docs/adr/0002-electron-desktop-runtime.md) and high-level spec [docs/planning/electron-desktop-runtime.md](docs/planning/electron-desktop-runtime.md). Updated [docs/adr/README.md](docs/adr/README.md) and [decisions.md](decisions.md). The spec captures the direction: Electron desktop runtime, macOS-first, local host backend supervised by Electron, React renderer reused inside Electron, SQLite under OS app data, secrets in secure storage or encrypted fallback, cloud model providers for inference, Docker retained for development/CI/optional sandboxing only, and production-like Electron E2E required for desktop completion. It also lists research areas: command sandboxing, Electron hardening, backend packaging/supervision, SQLite native packaging, secure secret storage, app data deletion/uninstall lifecycle, macOS release pipeline, Electron E2E, and web-only mode.
+- **Validation:** Documentation lint passed after the ADR/spec/decision updates: `pnpm docs:lint`. Earlier local implementation gates for the slash-command work had passed in focused form, but the current feature branch should not be considered done because the Project opener contract is now known to be architecturally wrong.
+- **Important working-tree note:** There are still local code/test edits from the attempted `agent-platform-project-onboarding.8` single-opener fix (`apps/web/components/ide/ide-with-chat.tsx`, `apps/web/hooks/use-file-system.ts`, E2E specs, and `apps/web/test/ide-chat-message.test.ts`). Do not merge or close the Bead from those changes without tomorrow’s retrospective decision. Treat them as reference/extract candidates, not a completed product path.
+- **Decisions now accepted:** ADR-0002 is the working desktop architecture: Electron, macOS-first, local host backend supervised by Electron, SQLite in OS app data, Docker retained for development/CI/optional sandboxing, and cloud model providers for inference. The current Project onboarding branch should not be merged wholesale; park it as reference and extract only architecture-neutral pieces. Desktop app data must have a supported deletion flow that removes local app data and credentials without deleting user Project folders by default.
+- **Next planning steps:** Review the proposed [Electron redesign epic roadmap](docs/planning/electron-epic-roadmap.md), then decide whether to accept or reorder the epics before creating Beads issues/specs. The roadmap currently proposes: park/extract current onboarding work, Electron runtime foundation, desktop security/data/lifecycle, native Project access/session binding, command runner/sandbox policy, desktop Project onboarding and `/init`, desktop Project experience, then macOS packaging/release readiness. Priority research tasks remain command sandboxing, backend supervision/packaging, app data/SQLite, secure storage, data deletion/uninstall lifecycle, Electron E2E, and web-only fallback posture.
+- **Date:** 2026-05-09
+- **Session:** Reopened and re-closed `agent-platform-project-onboarding.7` after manual testing showed browser-picked Project assessment falling back to internal runtime paths. Added hidden browser Project context to IDE chat messages for non-backend-bound folders: selected folder name, bounded file-tree summary, and guidance not to infer from backend/container paths. Local gates passed: focused `file-context` test, web typecheck/lint/build, `pnpm format:check`, root `pnpm typecheck`, root `pnpm lint`, elevated `pnpm test`, full elevated `pnpm run test:e2e` after `make restart` restored stopped services without wiping the SQLite volume, `git diff --check`, and PR #156 Sonar issue query returned 0 open/confirmed issues. PR #156 refreshed green across verify, docker, e2e, markdownlint, lychee, GitGuardian, and SonarCloud; review-thread sweep found none. `agent-platform-project-onboarding.7` is closed again. Parent epic remains open for owner manual-test closeout; AGENTS.md creation remains explicit review/approval, not an automatic chat side effect.
+- **Date:** 2026-05-09
+- **Session:** Follow-up manual-test cleanup on `task/agent-platform-project-onboarding.7`: sanitized provider/API-key chat failures into user-facing agent connection copy, added an `Agent unavailable` Project card state after failed assessment attempts, collapsed branch/provider diagnostics out of the normal IDE panel, and removed path-first empty-editor wording. Local gates passed: focused web tests, `pnpm typecheck`, `pnpm format:check`, `pnpm lint`, `pnpm build`, elevated `pnpm test`, full elevated `pnpm run test:e2e`, and pre-push web build/typecheck/tests. PR #156 refreshed green across verify, docker, e2e, markdownlint, lychee, GitGuardian, Sourcery, and SonarCloud; PR Sonar issue query returned 0 open/confirmed issues and review-thread sweep found none. `agent-platform-project-onboarding.7` is closed again; parent epic remains open for owner manual-test closeout and merge decision.
 - **Date:** 2026-05-08
 - **Session:** Closed `agent-platform-project-onboarding.6` after PR #155 to `feature/agent-platform-project-onboarding` passed GitHub Actions (`verify`, `docker`, `e2e`), docs checks, GitGuardian, and SonarCloud with 0 new issues/hotspots. Expanded `e2e/project-workspaces.spec.ts` to cover sufficient/missing/insufficient/nested/ambiguous onboarding states, no-change/material-drift refresh, closeout apply/reject, docs/non-code Project framing, and deterministic fixture markdown newlines; updated the task DoD checklist. Local gates passed: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, elevated `pnpm test`, `pnpm docs:lint`, focused Project workspace Playwright, full elevated `pnpm run test:e2e`, and Sonar branch issue listing returned 0 issues. Sonar Agentic Analysis remains unavailable because the org has not enabled it. Sourcery was skipped due weekly rate limit and posted no actionable review thread. The parent onboarding epic was reopened after Beads auto-closed it, so it remains open for human manual-test closeout.
 - **Date:** 2026-05-07
@@ -1111,19 +1122,18 @@ Quality gates passed:
 
 ### Git
 
-- **Current branch:** `task/agent-platform-project-onboarding.5`
-- **Current base:** chained from `task/agent-platform-project-onboarding.4`; target PR base is `feature/agent-platform-project-onboarding`.
-- **Current work:** `.5` implementation is committed locally. It still needs session handoff commit, push, task PR creation into the feature branch, remote checks, review-thread/comment sweep, SonarCloud gate, and Beads closure.
-- **Remote sync:** Branch `task/agent-platform-project-onboarding.5` exists on origin but is behind the local `.5` commits until the final push.
+- **Current branch:** `task/agent-platform-project-onboarding.7`
+- **Current base:** chained from the completed onboarding task tips; PR target is `feature/agent-platform-project-onboarding`.
+- **Current work:** PR #156 is refreshed green after the browser-picked Project assessment context follow-up.
+- **Remote sync:** Branch is pushed to origin; only final Beads/session bookkeeping may need a final Git push if modified. `output/` remains an unrelated untracked artifact.
 
 ### Beads
 
 - `agent-platform-project-workspaces` is closed in Beads.
 - `agent-platform-project-workspaces.1` through `.6` are closed.
 - `agent-platform-project-onboarding` is open and refined to treat Project as a generic folder/work context with coding/file-changing behavior as a profile/capability.
-- `agent-platform-project-onboarding.1` through `.4` are closed. Their task PRs remain unmerged until the end-of-epic integration point.
-- `agent-platform-project-onboarding.5` is in progress and claimed. Local implementation and gates are complete; remote PR verification is still pending.
-- `agent-platform-project-onboarding.6` is next after `.5` closes.
+- `agent-platform-project-onboarding.1` through `.6` are closed.
+- `agent-platform-project-onboarding.7` is closed after browser-picked Project assessment context cleanup and refreshed PR verification.
 - `agent-platform-project-experience` is open as a P1 follow-up epic after onboarding, with child tasks `.1` through `.6` covering Project profiles, left explorer navigation, project-chat-first entry, optional IDE handoff, label cleanup/breadcrumbs, and Playwright navigation E2E.
 - `agent-platform-code-workbench.6` is closed.
 - `agent-platform-code-workbench.7` is deliberately deferred until 2026-05-20.
@@ -1149,16 +1159,30 @@ Quality gates passed:
 
 ### Quality
 
-- Latest `agent-platform-project-onboarding.5` local gates passed:
-  - `pnpm build`
+- Latest `agent-platform-project-onboarding.7` follow-up local gates passed:
+  - `pnpm --filter @agent-platform/web test -- test/file-context.test.ts`
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run build`
+  - `pnpm format:check`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - elevated `pnpm test`
+  - full elevated `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e` (25 passed) after `make restart` restored stopped services without resetting data
+  - `git diff --check`
+  - PR #156 Sonar issue query: 0 open/confirmed issues
+  - PR #156 refreshed checks: verify, docker, e2e, markdownlint, lychee, GitGuardian, and SonarCloud all passed; review-thread sweep found none
+- Previous `agent-platform-project-onboarding.7` follow-up local gates passed:
+  - `pnpm --filter @agent-platform/web test -- test/use-harness-chat.test.ts test/code-workbench-branch-summary.test.ts`
   - `pnpm typecheck`
   - `pnpm format:check`
   - `pnpm lint`
-  - `pnpm test` with elevated local port binding
-  - `docker compose up -d --build api web`
-  - `docker compose exec -T --env E2E_SEED=1 api node packages/db/dist/seed/run.js`
-  - `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e` (22 passed)
-  - SonarQube CLI touched-file filter: 0 open Blocker/Critical issues on `packages/contracts/src/project.ts`, `apps/api/src/infrastructure/http/v1/projectsRouter.ts`, and `apps/web/components/ide/ide-with-chat.tsx`; Sonar Agentic Analysis unavailable because the org has not enabled it.
+  - `pnpm build`
+  - elevated `pnpm test`
+  - full elevated `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm run test:e2e` (25 passed)
+  - pre-push web build/typecheck/tests
+  - PR #156 refreshed checks: verify, docker, e2e, markdownlint, lychee, GitGuardian, Sourcery, and SonarCloud all passed
+  - PR #156 Sonar issue query: 0 open/confirmed issues; review-thread sweep found none. Sonar Agentic Analysis remains unavailable because the org has not enabled it.
 - Latest `agent-platform-project-onboarding.1` local gates passed:
   - `pnpm --filter @agent-platform/contracts run test -- test/projectOnboarding.test.ts test/project.test.ts`
   - `pnpm --filter @agent-platform/contracts run typecheck`
@@ -1295,11 +1319,11 @@ Quality gates passed:
 
 ## Next (priority order)
 
-1. Commit this `session.md` handoff update on `task/agent-platform-project-onboarding.5`.
-2. Push `task/agent-platform-project-onboarding.5`.
-3. Open the `.5` task PR into `feature/agent-platform-project-onboarding`.
-4. Monitor GitHub Actions, GitGuardian, Sourcery, SonarCloud, review threads, and comments; fix any failures/comments on the same branch.
-5. Close Bead `agent-platform-project-onboarding.5` only after remote checks and comment sweeps are green/non-actionable, then branch `.6` from the `.5` tip.
+1. Commit and push the final Beads/session bookkeeping for the `.7` re-close if not already pushed.
+2. Owner manually tests PR #156 / `task/agent-platform-project-onboarding.7`.
+3. If manual testing finds more issues, patch them on the same branch/PR and rerun local + PR gates.
+4. If manual testing passes, decide whether to merge the onboarding task chain into `feature/agent-platform-project-onboarding`.
+5. Keep parent epic `agent-platform-project-onboarding` open until owner manual-test closeout and end-of-epic merge decision.
 
 ---
 
