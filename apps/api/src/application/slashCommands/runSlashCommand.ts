@@ -7,12 +7,10 @@ export type RunSlashCommandOptions = {
   registry?: SlashCommandRegistry;
 };
 
-export type RunSlashCommandContext = Omit<SlashCommandContext, 'commands'> & {
-  commands?: SlashCommandRegistry;
-};
+export type RunSlashCommandContext = Omit<SlashCommandContext, 'commands'>;
 
 const defaultParser = new DefaultSlashCommandParser();
-const defaultRegistry = createBuiltinSlashCommandRegistry();
+const builtinRegistry = createBuiltinSlashCommandRegistry();
 
 export function runSlashCommand(
   message: string,
@@ -20,7 +18,7 @@ export function runSlashCommand(
   options: RunSlashCommandOptions = {},
 ): RunSlashCommandResult {
   const parser = options.parser ?? defaultParser;
-  const registry = options.registry ?? context.commands ?? defaultRegistry;
+  const registry = options.registry ?? builtinRegistry;
   const parsed = parser.parse(message);
   if (parsed.kind === 'not_command') return { kind: 'not_command' };
 
