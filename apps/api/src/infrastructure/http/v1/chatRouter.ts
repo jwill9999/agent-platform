@@ -89,10 +89,10 @@ import {
   buildProjectInstructionPrompt,
   parseProjectInstructionFileReferences,
 } from '../../projects/projectInstructions.js';
+import { startProjectOnboardingDraft } from '../../projects/projectOnboardingWorkflow.js';
 import { runSlashCommand } from '../../../application/slashCommands/runSlashCommand.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
-import { startProjectOnboardingDraft } from './projectsRouter.js';
 
 // ---------------------------------------------------------------------------
 // Request schemas
