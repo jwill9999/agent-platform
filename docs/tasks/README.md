@@ -86,6 +86,14 @@ Spec: docs/tasks/<issue-id>.md
 | Project workspaces       | `agent-platform-project-workspaces`       | `agent-platform-project-workspaces.{1-6}.md`                                     |
 | Project onboarding       | `agent-platform-project-onboarding`       | `agent-platform-project-onboarding.{1-6}.md`                                     |
 | Project experience       | `agent-platform-project-experience`       | `agent-platform-project-experience.{1-6}.md`                                     |
+| Electron extract         | `agent-platform-electron-extract`         | `agent-platform-electron-extract.{1-4}.md`                                       |
+| Electron foundation      | `agent-platform-electron-foundation`      | child specs pending                                                              |
+| Electron security/data   | `agent-platform-electron-security`        | child specs pending                                                              |
+| Electron Project access  | `agent-platform-electron-project-access`  | child specs pending                                                              |
+| Electron command sandbox | `agent-platform-electron-command-sandbox` | child specs pending                                                              |
+| Electron onboarding      | `agent-platform-electron-onboarding`      | child specs pending                                                              |
+| Electron experience      | `agent-platform-electron-experience`      | child specs pending                                                              |
+| Electron release         | `agent-platform-electron-release`         | child specs pending                                                              |
 | Research tools           | `agent-platform-research-tools`           | child specs pending                                                              |
 | Memory management        | `agent-platform-memory`                   | child specs pending                                                              |
 | Scheduler                | `agent-platform-scheduler`                | child specs pending                                                              |
