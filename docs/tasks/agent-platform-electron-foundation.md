@@ -17,19 +17,24 @@ Create the macOS-first Electron runtime foundation and prove the app can launch 
 - Resolve app data paths through OS conventions.
 - Preserve the existing Docker developer workflow.
 
-## Proposed Task Chain
+## Task Chain
 
-1. Scaffold the Electron desktop app.
-2. Build/load the renderer for desktop runtime.
-3. Implement a backend supervisor spike.
-4. Add app data/runtime config resolution.
-5. Document desktop versus Docker development workflows.
+1. `agent-platform-electron-foundation.1` — Scaffold the Electron desktop app.
+2. `agent-platform-electron-foundation.2` — Build/load the renderer for desktop runtime.
+3. `agent-platform-electron-foundation.3` — Implement the backend supervisor spike.
+4. `agent-platform-electron-foundation.4` — Add app data/runtime config resolution.
+5. `agent-platform-electron-foundation.5` — Document desktop versus Docker development workflows.
 
 ## Dependencies
 
-| Upstream                          | Downstream                         |
-| --------------------------------- | ---------------------------------- |
-| `agent-platform-electron-extract` | `agent-platform-electron-security` |
+| Upstream                               | Downstream                             |
+| -------------------------------------- | -------------------------------------- |
+| `agent-platform-electron-extract`      | `agent-platform-electron-foundation.1` |
+| `agent-platform-electron-foundation.1` | `agent-platform-electron-foundation.2` |
+| `agent-platform-electron-foundation.2` | `agent-platform-electron-foundation.3` |
+| `agent-platform-electron-foundation.3` | `agent-platform-electron-foundation.4` |
+| `agent-platform-electron-foundation.4` | `agent-platform-electron-foundation.5` |
+| `agent-platform-electron-foundation.5` | `agent-platform-electron-security`     |
 
 ## Testing Strategy
 
@@ -45,3 +50,4 @@ Create the macOS-first Electron runtime foundation and prove the app can launch 
 - Local backend starts, reports readiness, logs to a known location, and stops on app quit.
 - App data path can be resolved for SQLite/config/logs.
 - Docker dev workflow remains usable and documented.
+- All child tasks are closed through PR/check/review gates before the epic closes.

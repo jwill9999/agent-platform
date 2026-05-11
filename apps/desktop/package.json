@@ -1,0 +1,21 @@
+{
+  "name": "@agent-platform/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint . --max-warnings 0",
+    "smoke": "pnpm run build && electron . --smoke",
+    "start": "pnpm run build && electron .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "electron": "^42.0.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}
