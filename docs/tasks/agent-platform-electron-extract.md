@@ -44,8 +44,14 @@ The current branch contains useful slash command and onboarding infrastructure, 
 
 ## Definition Of Done
 
-- No browser-only/manual-path Project opener is merged as the desktop Product path.
-- Extracted work has focused automated tests.
-- Existing Project onboarding/experience specs clearly depend on Electron Project access.
-- Parked work is documented.
-- Local gates pass and any PR checks/reviews are green before closing the epic.
+- [x] No browser-only/manual-path Project opener is merged as the desktop Product path.
+- [x] Extracted work has focused automated tests.
+- [x] Existing Project onboarding/experience specs clearly depend on Electron Project access.
+- [x] Parked work is documented.
+- [x] Local gates pass and any PR checks/reviews are green before closing the epic.
+
+## Closeout
+
+- [x] Child tasks `agent-platform-electron-extract.1` through `.4` are closed.
+- [x] PR #161 is green across CI verify/docker/e2e, docs-ci markdownlint/lychee, GitGuardian, SonarCloud, Sourcery, and review-thread sweep.
+- [x] `agent-platform-electron-foundation` is unblocked for the next epic.
