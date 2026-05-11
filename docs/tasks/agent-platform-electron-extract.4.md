@@ -92,13 +92,13 @@ If code changed in earlier extraction tasks and this is the segment tip, run the
 - [x] Beads parent is `agent-platform-electron-extract`.
 - [x] Beads dependencies match this spec.
 - [x] Required docs and local gates pass.
-- [ ] Segment PR checks and review comments are resolved before closure.
-- [ ] Parent epic `agent-platform-electron-extract` is ready to close only after all child tasks are closed and the segment has passed its PR/check gate.
+- [x] Segment PR checks and review comments are resolved before closure.
+- [x] Parent epic `agent-platform-electron-extract` is ready to close only after all child tasks are closed and the segment has passed its PR/check gate.
 
 ## Sign-off
 
 - [x] Task branch created from the correct parent before implementation work.
 - [x] `pnpm docs:lint` executed and passing.
 - [x] Full segment gates executed and passing if this task is the segment tip.
-- [ ] PR merged `task/agent-platform-electron-extract.4` to the agreed feature branch, or explicitly marked N/A with rationale.
-- [ ] `bd close agent-platform-electron-extract.4 --reason "Onboarding and experience specs re-scoped"`
+- [x] PR opened and verified green from `task/agent-platform-electron-extract.4` to `feature/agent-platform-project-onboarding`; merge deferred until the epic merge point by project process.
+- [x] `bd close agent-platform-electron-extract.4 --reason "Onboarding and experience specs re-scoped"`
