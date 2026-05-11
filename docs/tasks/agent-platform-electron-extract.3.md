@@ -69,22 +69,22 @@ Manual verification should confirm the web UI no longer presents manual path ent
 
 ## Definition of done
 
-- [ ] Manual absolute path entry is not presented as the normal Project-opening flow.
-- [ ] Browser folder handles are not treated as sufficient backend Project binding.
-- [ ] Duplicate/conflicting Project-opening CTAs are removed or clearly disabled.
-- [ ] User-facing copy no longer exposes internal state such as `/workspace`, backend accessibility, hashes, or assessment internals.
-- [ ] Tests do not lock in the rejected browser-only Project-opening path.
-- [ ] Any parked code or temporary behavior is documented.
-- [ ] Beads issue description points to this spec.
-- [ ] Beads parent is `agent-platform-electron-extract`.
-- [ ] Beads dependencies match this spec.
-- [ ] Required local gates pass.
+- [x] Manual absolute path entry is not presented as the normal Project-opening flow.
+- [x] Browser folder handles are not treated as sufficient backend Project binding.
+- [x] Duplicate/conflicting Project-opening CTAs are removed or clearly disabled.
+- [x] User-facing copy no longer exposes internal state such as `/workspace`, backend accessibility, hashes, or assessment internals.
+- [x] Tests do not lock in the rejected browser-only Project-opening path.
+- [x] Any parked code or temporary behavior is documented.
+- [x] Beads issue description points to this spec.
+- [x] Beads parent is `agent-platform-electron-extract`.
+- [x] Beads dependencies match this spec.
+- [x] Required local gates pass.
 - [ ] PR checks and review comments are resolved before closure.
 
 ## Sign-off
 
-- [ ] Task branch created from the correct parent before implementation work.
-- [ ] Relevant unit/component/E2E tests executed and passing or intentionally removed with rationale.
-- [ ] `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm docs:lint` executed and passing.
+- [x] Task branch created from the correct parent before implementation work.
+- [x] Relevant unit/component/E2E tests executed and passing or intentionally removed with rationale.
+- [x] `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm docs:lint` executed and passing.
 - [ ] PR/check/review requirements satisfied if this task is merged through a PR.
 - [ ] `bd close agent-platform-electron-extract.3 --reason "Browser-only Project opening parked"`

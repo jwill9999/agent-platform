@@ -839,17 +839,6 @@ function FileTreeNode({
 // Toolbar
 // ---------------------------------------------------------------------------
 
-function getFolderButtonLabel(
-  isLoading: boolean,
-  isOpeningDirectory: boolean,
-  rootName: string | null,
-): string {
-  if (isOpeningDirectory) return 'Opening...';
-  if (isLoading) return 'Loading...';
-  if (rootName) return `Close ${rootName}`;
-  return 'Open Folder';
-}
-
 function getToggleButtonState(isOpen: boolean, openLabel: string, closedLabel: string) {
   return {
     variant: isOpen ? 'secondary' : 'ghost',
@@ -885,12 +874,6 @@ function IDEToolbar({
   pathInput,
   setPathInput,
   onLoadFromPath,
-  onOpenFolder,
-  isLoadingFolder,
-  isOpeningFolder,
-  rootName,
-  onRefreshFolder,
-  onCloseFolder,
   canUseProjectTools,
 }: Readonly<{
   showExplorer: boolean;
@@ -908,12 +891,6 @@ function IDEToolbar({
   pathInput: string;
   setPathInput: (v: string) => void;
   onLoadFromPath: () => void;
-  onOpenFolder: () => void;
-  isLoadingFolder: boolean;
-  isOpeningFolder: boolean;
-  rootName: string | null;
-  onRefreshFolder: () => void;
-  onCloseFolder: () => void;
   canUseProjectTools: boolean;
 }>) {
   const explorerButton = getToggleButtonState(showExplorer, 'Hide', 'Files');
@@ -928,8 +905,6 @@ function IDEToolbar({
   const chatTitle = showChat ? 'Hide AI assistant' : 'Show AI assistant';
   const ChatIcon = showChat ? PanelRightClose : MessageSquare;
 
-  const folderLabel = getFolderButtonLabel(isLoadingFolder, isOpeningFolder, rootName);
-  const folderActionDisabled = isLoadingFolder || isOpeningFolder;
   const saveTitle = getSaveTitle(activeFileIsDirty, canSaveActiveFile);
 
   return (
@@ -975,27 +950,6 @@ function IDEToolbar({
             </div>
           </DialogContent>
         </Dialog>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={rootName ? onCloseFolder : onOpenFolder}
-          disabled={folderActionDisabled}
-        >
-          <FolderOpen className="h-4 w-4" />
-          {folderLabel}
-        </Button>
-        {rootName && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRefreshFolder}
-            disabled={folderActionDisabled}
-            title="Refresh file tree"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        )}
         <Button
           variant="outline"
           size="sm"
@@ -1673,8 +1627,8 @@ export interface IDEWithChatProps {
 }
 
 export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatProps>) {
-  // File System Access API
-  const fs = useFileSystem();
+  // Browser File System Access is parked for the product IDE until Electron provides native Project access.
+  const fs = useFileSystem({ enabled: false });
 
   // Use FS API tree when a directory is open, otherwise fall back to props or empty
   const fileTree = fs.isDirectoryOpen ? fs.fileTree : (initialFileTree ?? []);
@@ -1684,10 +1638,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [searchQuery, setSearchQuery] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
-  const [projectPathInput, setProjectPathInput] = useState('');
   const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
-  const [isOpeningBackendProject, setIsOpeningBackendProject] = useState(false);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
   const [isAssessingProject, setIsAssessingProject] = useState(false);
   const [isStartingOnboardingDraft, setIsStartingOnboardingDraft] = useState(false);
@@ -1818,48 +1770,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, [harnessError, setHarnessError]);
 
   const isLoading = status === 'streaming';
-
-  const clearProjectContext = useCallback(() => {
-    setOpenTabs([]);
-    setActiveTab(null);
-    setContextFiles([]);
-    setEditProposal(null);
-    setChatInput('');
-    setOnboardingAnswer('');
-    setOnboardingReviewComment('');
-    setShowTerminal(false);
-    fs.closeDirectory();
-  }, [fs]);
-
-  const handleOpenBackendProject = useCallback(async () => {
-    const path = projectPathInput.trim();
-    if (!path) return;
-
-    setIsOpeningBackendProject(true);
-    setProjectOpenError(null);
-    try {
-      const project = await apiPost<ProjectRecord>(apiPath('projects', 'open'), { path });
-      if (!project) {
-        throw new ApiRequestError('Failed to open Project', 500);
-      }
-      clearProjectContext();
-      setActiveProject(project);
-      setSessionId(null);
-      toast.success(`Opened ${project.name}`);
-    } catch (error) {
-      setActiveProject(null);
-      setSessionId(null);
-      clearProjectContext();
-      const message =
-        error instanceof ApiRequestError && error.code !== 'PROJECT_UNAVAILABLE'
-          ? error.message
-          : 'That Project folder could not be opened';
-      setProjectOpenError(message);
-      toast.error(message);
-    } finally {
-      setIsOpeningBackendProject(false);
-    }
-  }, [clearProjectContext, projectPathInput]);
 
   const handleApproveProjectInstructions = useCallback(async () => {
     if (!activeProject?.id) return;
@@ -2405,12 +2315,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         pathInput={pathInput}
         setPathInput={setPathInput}
         onLoadFromPath={handleLoadFromPath}
-        onOpenFolder={fs.openDirectory}
-        isLoadingFolder={fs.isLoading}
-        isOpeningFolder={fs.isOpeningDirectory}
-        rootName={fs.rootName}
-        onRefreshFolder={fs.refresh}
-        onCloseFolder={fs.closeDirectory}
         canUseProjectTools={Boolean(activeProject)}
       />
 
@@ -2470,36 +2374,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     {activeProject ? (
                       <span className="text-xs text-emerald-600">Available</span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Unavailable</span>
+                      <span className="text-xs text-muted-foreground">Desktop required</span>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      aria-label="Project folder path"
-                      value={projectPathInput}
-                      placeholder="Folder path"
-                      onChange={(event) => {
-                        setProjectPathInput(event.target.value);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          handleOpenBackendProject().catch(() => {});
-                        }
-                      }}
-                      className="h-8 text-xs"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        handleOpenBackendProject().catch(() => {});
-                      }}
-                      disabled={isOpeningBackendProject}
-                    >
-                      {isOpeningBackendProject ? 'Opening...' : 'Open'}
-                    </Button>
-                  </div>
+                  {!activeProject && (
+                    <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-xs leading-snug text-muted-foreground">
+                      Project opening is parked in the web preview. The desktop app will use your
+                      system folder picker so the agent can work with the selected folder.
+                    </div>
+                  )}
                   {activeProject && (
                     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                       <div className="truncate text-foreground">{activeProject.name}</div>
@@ -2659,16 +2542,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
                           <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
                           <p className="text-sm text-muted-foreground">No folder open</p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={fs.openDirectory}
-                            disabled={fs.isOpeningDirectory}
-                          >
-                            <FolderOpen className="h-4 w-4" />
-                            {fs.isOpeningDirectory ? 'Opening...' : 'Open Folder'}
-                          </Button>
+                          <p className="max-w-44 text-xs leading-snug text-muted-foreground">
+                            Project folders will open from the desktop app.
+                          </p>
                         </div>
                       )}
                     {filteredFileTree.length === 0 &&
