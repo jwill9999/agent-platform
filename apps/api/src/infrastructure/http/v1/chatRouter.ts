@@ -1156,21 +1156,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
       const session = getSession(db, sessionId);
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
-      const slashCommand = runSlashCommand(
-        message,
-        {
-          session,
-          project: session.projectId ? findProject(db, session.projectId) : undefined,
-          startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
-        },
-        options.slashCommands,
-      );
-      if (slashCommand.kind === 'handled') {
-        prepareNdjsonResponse(res);
-        const emitter: OutputEmitter = createNdjsonEmitter(res);
-        await emitter.emit({ type: 'text', content: slashCommand.message });
-        persistSlashCommandMessages(db, sessionId, message, slashCommand.message);
-        if (!res.writableEnded) res.end();
+      if (await handleSlashCommandMessage(db, options, sessionLock, sessionId, message, res)) {
         return;
       }
 
@@ -1297,6 +1283,41 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
   );
 
   return router;
+}
+
+async function handleSlashCommandMessage(
+  db: DrizzleDb,
+  options: ChatRouterOptions,
+  sessionLock: SessionLock,
+  sessionId: string,
+  message: string,
+  res: Response,
+): Promise<boolean> {
+  const release = await sessionLock.acquire(sessionId);
+  try {
+    const session = getSession(db, sessionId);
+    if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
+    const slashCommand = runSlashCommand(
+      message,
+      {
+        session,
+        project: session.projectId ? findProject(db, session.projectId) : undefined,
+        startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
+      },
+      options.slashCommands,
+    );
+    if (slashCommand.kind === 'handled') {
+      prepareNdjsonResponse(res);
+      const emitter: OutputEmitter = createNdjsonEmitter(res);
+      await emitter.emit({ type: 'text', content: slashCommand.message });
+      persistSlashCommandMessages(db, sessionId, message, slashCommand.message);
+      if (!res.writableEnded) res.end();
+      return true;
+    }
+    return false;
+  } finally {
+    release();
+  }
 }
 
 function persistSlashCommandMessages(

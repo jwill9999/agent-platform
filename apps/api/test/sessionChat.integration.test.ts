@@ -19,6 +19,7 @@ import type { Application } from 'express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { restoreChatEnv, snapshotChatEnv } from './support/chatEnv.js';
+import type { SessionLock } from '../src/infrastructure/http/sessionLock.js';
 
 const mockStreamText = vi.hoisted(() => vi.fn());
 const mockGenerateText = vi.hoisted(() => vi.fn());
@@ -53,6 +54,7 @@ async function createSeededApp(
   options: {
     mockLlm?: boolean;
     disableEvaluatorNodes?: boolean;
+    sessionLock?: SessionLock;
     systemToolExecutorFactory?: () => NativeToolExecutor;
   } = {},
 ): Promise<{
@@ -93,6 +95,7 @@ async function createSeededApp(
               chat: {
                 llmReasonNode,
                 disableEvaluatorNodes: options.disableEvaluatorNodes ?? true,
+                sessionLock: options.sessionLock,
                 systemToolExecutorFactory: options.systemToolExecutorFactory,
               },
             },
@@ -209,6 +212,10 @@ function parseNdjsonEvents(text: string): ChatEvent[] {
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as ChatEvent);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function createDefaultSession(app: Application): Promise<string> {
@@ -358,6 +365,53 @@ describe('POST /v1/chat (session-aware)', () => {
         'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
       );
     });
+  });
+
+  it('serialises slash command handling behind the session lock', async () => {
+    const envSnap = snapshotChatEnv();
+    let releaseGate: (() => void) | undefined;
+    let completed = false;
+    const lock: SessionLock = {
+      activeCount: 0,
+      acquire: vi.fn(async () => {
+        await new Promise<void>((resolve) => {
+          releaseGate = resolve;
+        });
+        return vi.fn();
+      }),
+    };
+    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true, sessionLock: lock });
+
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      const sessionId = await createDefaultSession(app);
+      const response = request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: '/help' })
+        .then((res) => {
+          completed = true;
+          return res;
+        });
+
+      await delay(20);
+      expect(lock.acquire).toHaveBeenCalledWith(sessionId);
+      expect(completed).toBe(false);
+
+      releaseGate?.();
+      const res = await response;
+      expect(res.status).toBe(200);
+      expect(parseNdjsonEvents(res.text)).toEqual([
+        {
+          type: 'text',
+          content:
+            'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
+        },
+      ]);
+      expect(mockToolCalls).not.toHaveBeenCalled();
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
   });
 
   it('starts Project onboarding draft with /init without writing AGENTS.md', async () => {
