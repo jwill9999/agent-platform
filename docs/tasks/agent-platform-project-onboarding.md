@@ -59,6 +59,8 @@ In scope:
 - Playwright E2E that verifies the full onboarding lifecycle through the UI.
 - Cleanup of normal UI entry points so users have one primary Project-opening path and internal state
   remains in metadata/observability.
+- First-class slash-command handling for onboarding, with `/init` implemented through a reusable
+  command-dispatch path rather than fuzzy model interpretation.
 
 Out of scope:
 
@@ -127,6 +129,7 @@ passes, and CI/CD pipelines are green.
 | `agent-platform-project-onboarding.5` | Add closeout update candidates and refresh/rescan action     |
 | `agent-platform-project-onboarding.6` | Verify full onboarding lifecycle with Playwright E2E         |
 | `agent-platform-project-onboarding.7` | Clean onboarding entry and user-facing state                 |
+| `agent-platform-project-onboarding.8` | Add extensible slash commands and `/init` onboarding         |
 
 ## Epic Definition Of Done
 
@@ -151,6 +154,8 @@ passes, and CI/CD pipelines are green.
       update candidates, and refresh/rescan.
 - [ ] Normal UI presents one primary Project-opening path and no separate browser-only folder picker
       CTA.
+- [ ] `/init` is available as a first-class slash command that starts or resumes Project onboarding
+      through a reusable command-dispatch mechanism.
 - [ ] The combined Epics 1 and 2 feature is ready for an end-to-end Playwright run without relying on
       manual human validation.
 - [ ] Every Epic 2 task is closed only after implementation is complete, local gates pass,
