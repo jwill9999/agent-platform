@@ -87,27 +87,24 @@ test.describe('MVP E2E (compose-backed)', () => {
     await page.getByRole('link', { name: /Open Project/ }).click();
     await expect(page).toHaveURL(/\/ide$/);
     await expect(page.locator('[aria-label="Active agent"]').first()).toContainText('Coding');
-    await expect(page.getByLabel('Project folder path')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Open Folder' }).first()).toBeVisible();
+    await expect(page.getByLabel('Project folder path')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
+    await expect(page.getByText('Project opening is parked in the web preview.')).toBeVisible();
     await expect(page.getByRole('button', { name: /Terminal/ })).toBeVisible();
   });
 
-  test('Project path binding distinguishes backend-accessible and unavailable roots', async ({
+  test('IDE does not present manual Project path binding as the product opener', async ({
     page,
   }) => {
     await page.goto('/ide');
     const projectBinding = page.getByLabel('Project binding');
 
-    await expect(projectBinding.getByText('Unavailable')).toBeVisible();
-    await page.getByLabel('Project folder path').fill('/workspace');
-    await projectBinding.getByRole('button', { name: 'Open', exact: true }).click();
-    await expect(projectBinding.getByText('Available', { exact: true })).toBeVisible();
-    await expect(projectBinding.getByText('Folder: workspace')).toBeVisible();
-
-    await page.getByLabel('Project folder path').fill('/definitely-not-mounted-agent-platform');
-    await projectBinding.getByRole('button', { name: 'Open', exact: true }).click();
-    await expect(projectBinding.getByText('That Project folder could not be opened')).toBeVisible();
-    await expect(projectBinding.getByText('Unavailable')).toBeVisible();
+    await expect(projectBinding.getByText('Desktop required')).toBeVisible();
+    await expect(page.getByLabel('Project folder path')).toHaveCount(0);
+    await expect(projectBinding.getByRole('button', { name: 'Open', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
+    await expect(projectBinding).not.toContainText('/workspace');
+    await expect(projectBinding).not.toContainText('backend accessible');
   });
 
   test('tool_result panel renders (fixture page)', async ({ page }) => {
