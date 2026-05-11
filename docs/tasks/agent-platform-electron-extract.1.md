@@ -158,4 +158,4 @@ No unit or E2E tests are required unless this task changes executable code.
 - [x] Audit outcome captured in repo documentation.
 - [x] `pnpm docs:lint` executed and passing.
 - [x] PR/check/review requirements satisfied if this task is merged through a PR. PR #158 checks passed; no actionable review comments.
-- [ ] `bd close agent-platform-electron-extract.1 --reason "Audit complete"`
+- [x] `bd close agent-platform-electron-extract.1 --reason "Audit complete"`
