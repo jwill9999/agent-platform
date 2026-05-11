@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { helpSlashCommand } from '../src/application/slashCommands/builtin.js';
 import { DefaultSlashCommandParser } from '../src/application/slashCommands/parser.js';
 import { StaticSlashCommandRegistry } from '../src/application/slashCommands/registry.js';
 import { runSlashCommand } from '../src/application/slashCommands/runSlashCommand.js';
@@ -51,7 +52,7 @@ describe('slash command dispatch', () => {
       return { kind: 'handled', message: invocation.args || 'empty' };
     },
   };
-  const registry = new StaticSlashCommandRegistry([command]);
+  const registry = new StaticSlashCommandRegistry([helpSlashCommand, command]);
 
   it('runs registered commands without changing parser logic', () => {
     expect(
@@ -77,7 +78,41 @@ describe('slash command dispatch', () => {
     ).toEqual({
       kind: 'handled',
       status: 'unknown_command',
-      message: 'Command not recognised. Available commands: /echo.',
+      message: 'Command not recognised. Available commands: /echo, /help. Run /help for details.',
+    });
+  });
+
+  it('lists available commands from the registry via /help', () => {
+    expect(
+      runSlashCommand(
+        '/help',
+        { session, startProjectOnboarding: () => unreachable() },
+        {
+          registry,
+        },
+      ),
+    ).toEqual({
+      kind: 'handled',
+      status: 'handled',
+      message:
+        'Available slash commands:\n/echo - Echo a value.\n/help - Show available slash commands.',
+    });
+  });
+
+  it('shows command usage details via /help <command>', () => {
+    expect(
+      runSlashCommand(
+        '/help say',
+        { session, startProjectOnboarding: () => unreachable() },
+        {
+          registry,
+        },
+      ),
+    ).toEqual({
+      kind: 'handled',
+      status: 'handled',
+      message:
+        '/echo - Echo a value.\nUsage: /echo <value>\nScope: session\nDoes not change state.\nAliases: /say',
     });
   });
 
@@ -103,6 +138,20 @@ describe('slash command dispatch', () => {
       kind: 'handled',
       status: 'missing_context',
       message: 'Open a Project first, then run /init to set up Project instructions.',
+    });
+  });
+
+  it('exposes built-in slash command help without invoking command side effects', () => {
+    expect(
+      runSlashCommand('/help init', {
+        session,
+        startProjectOnboarding: () => unreachable(),
+      }),
+    ).toEqual({
+      kind: 'handled',
+      status: 'handled',
+      message:
+        '/init - Set up Project instructions for the selected Project.\nUsage: /init\nScope: project\nMay change Project state.',
     });
   });
 

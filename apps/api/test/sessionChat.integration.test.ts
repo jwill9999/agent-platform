@@ -333,7 +333,8 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(parseNdjsonEvents(res.text)).toEqual([
         {
           type: 'text',
-          content: 'Command not recognised. Available commands: /init.',
+          content:
+            'Command not recognised. Available commands: /help, /init. Run /help for details.',
         },
       ]);
 
@@ -343,7 +344,43 @@ describe('POST /v1/chat (session-aware)', () => {
           expect.objectContaining({ role: 'user', content: '/does-not-exist' }),
           expect.objectContaining({
             role: 'assistant',
-            content: 'Command not recognised. Available commands: /init.',
+            content:
+              'Command not recognised. Available commands: /help, /init. Run /help for details.',
+          }),
+        ]),
+      );
+    } finally {
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('lists slash command help before model execution', async () => {
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      const sessionId = await createDefaultSession(app);
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: '/help' })
+        .expect(200);
+
+      expect(mockToolCalls).not.toHaveBeenCalled();
+      expect(parseNdjsonEvents(res.text)).toEqual([
+        {
+          type: 'text',
+          content:
+            'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
+        },
+      ]);
+
+      const { listMessagesBySession } = await import('@agent-platform/db');
+      expect(listMessagesBySession(db, sessionId)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ role: 'user', content: '/help' }),
+          expect.objectContaining({
+            role: 'assistant',
+            content:
+              'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
           }),
         ]),
       );

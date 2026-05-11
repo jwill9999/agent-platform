@@ -395,7 +395,7 @@ function summariseProjectTree(
 
   visit(nodes, 0);
   if (lines.length >= options.maxEntries) {
-    lines.push(`- Additional entries omitted after ${options.maxEntries} items.`);
+    lines.push(`(additional entries omitted after ${options.maxEntries} items)`);
   }
   return lines;
 }

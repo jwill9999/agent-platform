@@ -90,7 +90,10 @@ import {
   parseProjectInstructionFileReferences,
 } from '../../projects/projectInstructions.js';
 import { startProjectOnboardingDraft } from '../../projects/projectOnboardingWorkflow.js';
-import { runSlashCommand } from '../../../application/slashCommands/runSlashCommand.js';
+import {
+  runSlashCommand,
+  type RunSlashCommandOptions,
+} from '../../../application/slashCommands/runSlashCommand.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
@@ -125,6 +128,7 @@ export type ChatRouterOptions = {
   llmReasonNode?: ReturnType<typeof createLlmReasonNode>;
   disableEvaluatorNodes?: boolean;
   sessionLock?: SessionLock;
+  slashCommands?: RunSlashCommandOptions;
   systemToolExecutorFactory?: (context: {
     sessionId: string;
     runId: string;
@@ -1152,11 +1156,15 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
       const session = getSession(db, sessionId);
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
-      const slashCommand = runSlashCommand(message, {
-        session,
-        project: session.projectId ? findProject(db, session.projectId) : undefined,
-        startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
-      });
+      const slashCommand = runSlashCommand(
+        message,
+        {
+          session,
+          project: session.projectId ? findProject(db, session.projectId) : undefined,
+          startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
+        },
+        options.slashCommands,
+      );
       if (slashCommand.kind === 'handled') {
         prepareNdjsonResponse(res);
         const emitter: OutputEmitter = createNdjsonEmitter(res);

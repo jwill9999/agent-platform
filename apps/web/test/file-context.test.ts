@@ -182,4 +182,18 @@ describe('formatBrowserProjectContext', () => {
     expect(output).toContain('Do not inspect or cite backend/container fallback paths');
     expect(output).not.toContain('/workspace');
   });
+
+  it('marks omitted browser Project entries as summary copy, not tree nodes', () => {
+    const output = formatBrowserProjectContext(
+      'large-project',
+      Array.from({ length: 90 }, (_, index) => ({
+        name: `file-${index}.ts`,
+        path: `/file-${index}.ts`,
+        type: 'file' as const,
+      })),
+    );
+
+    expect(output).toContain('(additional entries omitted after 80 items)');
+    expect(output).not.toContain('- Additional entries omitted');
+  });
 });

@@ -7,13 +7,20 @@ export type RunSlashCommandOptions = {
   registry?: SlashCommandRegistry;
 };
 
+export type RunSlashCommandContext = Omit<SlashCommandContext, 'commands'> & {
+  commands?: SlashCommandRegistry;
+};
+
+const defaultParser = new DefaultSlashCommandParser();
+const defaultRegistry = createBuiltinSlashCommandRegistry();
+
 export function runSlashCommand(
   message: string,
-  context: SlashCommandContext,
+  context: RunSlashCommandContext,
   options: RunSlashCommandOptions = {},
 ): RunSlashCommandResult {
-  const parser = options.parser ?? new DefaultSlashCommandParser();
-  const registry = options.registry ?? createBuiltinSlashCommandRegistry();
+  const parser = options.parser ?? defaultParser;
+  const registry = options.registry ?? context.commands ?? defaultRegistry;
   const parsed = parser.parse(message);
   if (parsed.kind === 'not_command') return { kind: 'not_command' };
 
@@ -28,12 +35,12 @@ export function runSlashCommand(
       kind: 'handled',
       status: 'unknown_command',
       message: commands
-        ? `Command not recognised. Available commands: ${commands}.`
+        ? `Command not recognised. Available commands: ${commands}. Run /help for details.`
         : 'Command not recognised.',
     };
   }
 
-  const result = command.execute(context, parsed.invocation);
+  const result = command.execute({ ...context, commands: registry }, parsed.invocation);
   return {
     kind: 'handled',
     status: result.kind,

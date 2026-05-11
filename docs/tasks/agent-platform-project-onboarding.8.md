@@ -37,6 +37,9 @@ on fuzzy model interpretation of user text.
   - known command with missing context returns a clear user-facing prompt.
   - unknown slash command returns a concise "command not recognised" response with available
     commands.
+  - `/help` returns the available command catalog from command metadata, without depending on a
+    specific UI surface.
+  - `/help <command>` returns command-specific usage/details from the same registry metadata.
   - syntactically invalid command usage returns the command's usage/help copy.
   - ordinary messages continue through the existing chat/harness path unchanged.
 - `/init` must require a selected/open Project folder before it attempts onboarding.
@@ -183,6 +186,7 @@ Design implications:
       logic or chat route control flow.
 - [ ] `/init` is registered as a deterministic Project onboarding command.
 - [ ] Unknown slash commands produce clear user-facing feedback without invoking the model.
+- [ ] `/help` exposes available commands and command-specific usage from the command registry.
 - [ ] Ordinary chat messages remain unchanged.
 - [ ] `/init` validates that a Project is selected before onboarding.
 - [ ] `/init` starts or resumes the AGENTS.md review/approval flow without silent writes.
