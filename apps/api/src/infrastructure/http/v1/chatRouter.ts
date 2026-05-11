@@ -34,6 +34,7 @@ import type {
   PromptMemoryBundle,
   ProjectAccessPolicy,
   SensorAgentProfile,
+  SessionRecord,
   WorkingMemoryToolSummary,
 } from '@agent-platform/contracts';
 import {
@@ -1156,7 +1157,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
       const session = getSession(db, sessionId);
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
-      if (await handleSlashCommandMessage(db, options, sessionLock, sessionId, message, res)) {
+      if (await handleSlashCommandMessage(db, options, sessionLock, session, message, res)) {
         return;
       }
 
@@ -1289,14 +1290,12 @@ async function handleSlashCommandMessage(
   db: DrizzleDb,
   options: ChatRouterOptions,
   sessionLock: SessionLock,
-  sessionId: string,
+  session: SessionRecord,
   message: string,
   res: Response,
 ): Promise<boolean> {
-  const release = await sessionLock.acquire(sessionId);
+  const release = await sessionLock.acquire(session.id);
   try {
-    const session = getSession(db, sessionId);
-    if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
     const slashCommand = runSlashCommand(
       message,
       {
@@ -1310,7 +1309,7 @@ async function handleSlashCommandMessage(
       prepareNdjsonResponse(res);
       const emitter: OutputEmitter = createNdjsonEmitter(res);
       await emitter.emit({ type: 'text', content: slashCommand.message });
-      persistSlashCommandMessages(db, sessionId, message, slashCommand.message);
+      persistSlashCommandMessages(db, session.id, message, slashCommand.message);
       if (!res.writableEnded) res.end();
       return true;
     }
