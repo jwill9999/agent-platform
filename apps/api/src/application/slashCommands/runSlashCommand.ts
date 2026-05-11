@@ -22,7 +22,7 @@ export function runSlashCommand(
     const commands = registry
       .list()
       .map((item) => `/${item.name}`)
-      .sort()
+      .sort((left, right) => left.localeCompare(right))
       .join(', ');
     return {
       kind: 'handled',
