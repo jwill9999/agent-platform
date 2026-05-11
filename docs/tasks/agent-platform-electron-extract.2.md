@@ -72,22 +72,22 @@ Playwright/E2E should be added only for behavior that can be tested without lock
 
 ## Definition of done
 
-- [ ] Slash command parser/registry/dispatch boundary is extracted or retained in an architecture-neutral form.
-- [ ] `/help` is backed by command metadata and can list available commands.
-- [ ] `/init` does not require browser-only Project-opening behavior.
-- [ ] `/init` clearly reports when a backend-bound Project is required.
-- [ ] Tests cover parser, help, unknown command, and no-Project `/init` behavior.
-- [ ] No browser-only/manual-path Project opening behavior is introduced or relied on.
-- [ ] Beads issue description points to this spec.
-- [ ] Beads parent is `agent-platform-electron-extract`.
-- [ ] Beads dependencies match this spec.
-- [ ] Required local gates pass.
+- [x] Slash command parser/registry/dispatch boundary is extracted or retained in an architecture-neutral form.
+- [x] `/help` is backed by command metadata and can list available commands.
+- [x] `/init` does not require browser-only Project-opening behavior.
+- [x] `/init` clearly reports when a backend-bound Project is required.
+- [x] Tests cover parser, help, unknown command, and no-Project `/init` behavior.
+- [x] No browser-only/manual-path Project opening behavior is introduced or relied on.
+- [x] Beads issue description points to this spec.
+- [x] Beads parent is `agent-platform-electron-extract`.
+- [x] Beads dependencies match this spec.
+- [x] Required local gates pass.
 - [ ] PR checks and review comments are resolved before closure.
 
 ## Sign-off
 
-- [ ] Task branch created from the correct parent before implementation work.
-- [ ] Unit/component tests executed and passing.
-- [ ] `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm docs:lint` executed and passing.
+- [x] Task branch created from the correct parent before implementation work.
+- [x] Unit/component tests executed and passing.
+- [x] `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm docs:lint` executed and passing.
 - [ ] PR/check/review requirements satisfied if this task is merged through a PR.
 - [ ] `bd close agent-platform-electron-extract.2 --reason "Slash command infrastructure extracted"`
