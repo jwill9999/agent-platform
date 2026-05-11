@@ -7,6 +7,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-11
+- **Session:** Added PR #164 from `task/promptfoo-pr-main-actions` to `main` to make Promptfoo Code Scan run automatically for pull requests targeting `main`, including commit pushes via `synchronize` and reopened PRs. Kept `promptfoo/code-scan-action@v0` because the PR proved `@v1` is not currently published/resolvable.
+- **Validation:** Local workflow checks passed: `pnpm exec prettier --check .github/workflows/promptfoo-code-scan.yml` and `git diff --check`. PR #164 passed Promptfoo `security-scan`, CI `verify`/`docker`/`e2e`, CodeQL, SonarCloud, GitGuardian, and Sourcery. Promptfoo output for the successful run was JSON with `success: true`, `severity: none`, and the finding `No LLM security vulnerabilities were found in this PR.`
+- **Current state:** `agent-platform-promptfoo-pr-main-actions` is closed in Beads. PR #164 is green and ready for owner merge to `main`. `output/` remains generated/untracked and should not be committed.
 - **Date:** 2026-05-08
 - **Session:** Closed `agent-platform-project-onboarding.6` after PR #155 to `feature/agent-platform-project-onboarding` passed GitHub Actions (`verify`, `docker`, `e2e`), docs checks, GitGuardian, and SonarCloud with 0 new issues/hotspots. Expanded `e2e/project-workspaces.spec.ts` to cover sufficient/missing/insufficient/nested/ambiguous onboarding states, no-change/material-drift refresh, closeout apply/reject, docs/non-code Project framing, and deterministic fixture markdown newlines; updated the task DoD checklist. Local gates passed: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, elevated `pnpm test`, `pnpm docs:lint`, focused Project workspace Playwright, full elevated `pnpm run test:e2e`, and Sonar branch issue listing returned 0 issues. Sonar Agentic Analysis remains unavailable because the org has not enabled it. Sourcery was skipped due weekly rate limit and posted no actionable review thread. The parent onboarding epic was reopened after Beads auto-closed it, so it remains open for human manual-test closeout.
 - **Date:** 2026-05-07
