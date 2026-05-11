@@ -75,7 +75,7 @@ import {
 import type { FileNode } from '@/hooks/use-file-system';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
-import { formatFileContext } from '@/lib/file-context';
+import { formatFileContext, type SanitisedFile } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 import { ApprovalCard } from '@/components/chat/approval-card';
 import { CriticBadges } from '@/components/chat/critic-badges';
@@ -105,6 +105,17 @@ import {
 } from '@/lib/code-workbench-branch-summary';
 
 type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
+
+export function buildIdeChatMessage(input: {
+  userLine: string;
+  sanitisedFiles: SanitisedFile[];
+}): string {
+  const userLine = input.userLine.trim();
+  if (userLine.startsWith('/')) return userLine;
+
+  const fileContext = formatFileContext(input.sanitisedFiles);
+  return fileContext ? `${fileContext}\n${userLine}` : userLine;
+}
 
 function projectMetadataString(project: ProjectRecord | null, key: string): string | undefined {
   const value = project?.metadata[key];
@@ -2331,8 +2342,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const handleSendMessage = useCallback(() => {
     const userLine = chatInput.trim();
     if (!userLine || !sessionId) return;
-    const prefix = formatFileContext(contextDraft.sanitisedFiles);
-    const messageForApi = prefix ? `${prefix}\n${userLine}` : userLine;
+    const messageForApi = buildIdeChatMessage({
+      userLine,
+      sanitisedFiles: contextDraft.sanitisedFiles,
+    });
     sendMessage(messageForApi, userLine).catch(() => {});
     setChatInput('');
   }, [chatInput, sessionId, contextDraft, sendMessage]);

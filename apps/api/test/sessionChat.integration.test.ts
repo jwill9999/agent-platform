@@ -217,6 +217,26 @@ async function createDefaultSession(app: Application): Promise<string> {
   return sessionRes.body.data.id;
 }
 
+async function expectHandledSlashMessage(
+  app: Application,
+  db: TestDb,
+  sessionId: string,
+  message: string,
+  expectedContent: string,
+) {
+  const res = await request(app).post('/v1/chat').send({ sessionId, message }).expect(200);
+  expect(mockToolCalls).not.toHaveBeenCalled();
+  expect(parseNdjsonEvents(res.text)).toEqual([{ type: 'text', content: expectedContent }]);
+
+  const { listMessagesBySession } = await import('@agent-platform/db');
+  expect(listMessagesBySession(db, sessionId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ role: 'user', content: message }),
+      expect.objectContaining({ role: 'assistant', content: expectedContent }),
+    ]),
+  );
+}
+
 async function createPendingToolApproval(
   app: Application,
   sessionId: string,
@@ -317,6 +337,59 @@ describe('POST /v1/chat (session-aware)', () => {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);
     }
+  });
+
+  it('handles safe slash commands before model execution', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const sessionId = await createDefaultSession(app);
+      await expectHandledSlashMessage(
+        app,
+        db,
+        sessionId,
+        '/does-not-exist',
+        'Command not recognised. Available commands: /help, /init. Run /help for details.',
+      );
+
+      await expectHandledSlashMessage(
+        app,
+        db,
+        sessionId,
+        '/help',
+        'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
+      );
+    });
+  });
+
+  it('starts Project onboarding draft with /init without writing AGENTS.md', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      mkdirSync(path.join(projectRoot, 'src'), { recursive: true });
+      writeFileSync(path.join(projectRoot, 'package.json'), '{"scripts":{"test":"vitest"}}\n');
+
+      const opened = await request(app)
+        .post('/v1/projects/open')
+        .send({ path: projectRoot, name: 'Slash Init Project' })
+        .expect(201);
+      const sessionRes = await request(app)
+        .post('/v1/sessions')
+        .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: opened.body.data.id })
+        .expect(201);
+
+      await expectHandledSlashMessage(
+        app,
+        db,
+        sessionRes.body.data.id,
+        '/init',
+        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+      );
+      expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
+
+      const project = await request(app).get(`/v1/projects/${opened.body.data.id}`).expect(200);
+      expect(project.body.data.metadata.onboardingDraft).toEqual(
+        expect.objectContaining({ targetPath: 'AGENTS.md' }),
+      );
+      expect(project.body.data.metadata.onboardingState).toBe('in_progress');
+    });
   });
 
   it('returns 404 when agent for session does not exist', async () => {

@@ -89,6 +89,11 @@ import {
   buildProjectInstructionPrompt,
   parseProjectInstructionFileReferences,
 } from '../../projects/projectInstructions.js';
+import { startProjectOnboardingDraft } from '../../projects/projectOnboardingWorkflow.js';
+import {
+  runSlashCommand,
+  type RunSlashCommandOptions,
+} from '../../../application/slashCommands/runSlashCommand.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
@@ -123,6 +128,7 @@ export type ChatRouterOptions = {
   llmReasonNode?: ReturnType<typeof createLlmReasonNode>;
   disableEvaluatorNodes?: boolean;
   sessionLock?: SessionLock;
+  slashCommands?: RunSlashCommandOptions;
   systemToolExecutorFactory?: (context: {
     sessionId: string;
     runId: string;
@@ -1150,6 +1156,24 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
       const session = getSession(db, sessionId);
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
+      const slashCommand = runSlashCommand(
+        message,
+        {
+          session,
+          project: session.projectId ? findProject(db, session.projectId) : undefined,
+          startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
+        },
+        options.slashCommands,
+      );
+      if (slashCommand.kind === 'handled') {
+        prepareNdjsonResponse(res);
+        const emitter: OutputEmitter = createNdjsonEmitter(res);
+        await emitter.emit({ type: 'text', content: slashCommand.message });
+        persistSlashCommandMessages(db, sessionId, message, slashCommand.message);
+        if (!res.writableEnded) res.end();
+        return;
+      }
+
       const agentCtx = await loadAgentContext(db, session.agentId, {
         globalPlugins: options.globalPlugins,
       });
@@ -1273,6 +1297,18 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
   );
 
   return router;
+}
+
+function persistSlashCommandMessages(
+  db: DrizzleDb,
+  sessionId: string,
+  userMessage: string,
+  assistantMessage: string,
+): void {
+  withTransaction(db, (tx) => {
+    appendMessage(tx, { sessionId, role: 'user', content: userMessage });
+    appendMessage(tx, { sessionId, role: 'assistant', content: assistantMessage });
+  });
 }
 
 // ---------------------------------------------------------------------------
