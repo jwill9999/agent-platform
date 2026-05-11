@@ -35,7 +35,7 @@ This task should preserve the existing web app as the product UI source while ad
 - [x] Development mode remains usable.
 - [x] Any renderer build constraints are documented.
 - [x] Relevant desktop/web tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Test strategy
 
