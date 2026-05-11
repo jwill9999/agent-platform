@@ -7,6 +7,10 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-11
+- **Session:** Added PR #164 from `task/promptfoo-pr-main-actions` to `main` to make Promptfoo Code Scan run automatically for pull requests targeting `main`, including commit pushes via `synchronize` and reopened PRs. Kept `promptfoo/code-scan-action@v0` because the PR proved `@v1` is not currently published/resolvable.
+- **Validation:** Local workflow checks passed: `pnpm exec prettier --check .github/workflows/promptfoo-code-scan.yml` and `git diff --check`. PR #164 passed Promptfoo `security-scan`, CI `verify`/`docker`/`e2e`, CodeQL, SonarCloud, GitGuardian, and Sourcery. Promptfoo output for the successful run was JSON with `success: true`, `severity: none`, and the finding `No LLM security vulnerabilities were found in this PR.`
+- **Current state:** `agent-platform-promptfoo-pr-main-actions` is closed in Beads. PR #164 is green and ready for owner merge to `main`. `output/` remains generated/untracked and should not be committed.
 - **Date:** 2026-05-07
 - **Session:** After pushing the onboarding/project-experience planning update to PR #149, all GitHub checks passed but SonarCloud reported two minor duplicate-import findings in `apps/api/src/infrastructure/http/v1/chatRouter.ts`. Consolidated the duplicate `@agent-platform/contracts` type import, verified API lint/typecheck plus docs lint/diff check, and prepared the Sonar cleanup commit for push.
 - **Date:** 2026-05-07
