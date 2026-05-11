@@ -13,6 +13,8 @@ Replace browser-only Project opening with Electron-native folder selection that 
 - Pass the selected host path to the backend through trusted Electron main code.
 - Create or update a backend Project record for the selected folder.
 - Bind Project sessions to the selected Project id.
+- Make the Project/session binding available to both ordinary chat messages and slash commands such
+  as `/help` and `/init`.
 - Render file tree and file content from the backend-bound Project.
 - Show Project names and relative paths in the UI.
 - Define web-only fallback behavior.
@@ -24,8 +26,9 @@ Replace browser-only Project opening with Electron-native folder selection that 
 3. Project-bound session creation.
 4. Recent Projects list and reopen.
 5. Backend-backed file tree/read APIs for desktop Projects.
-6. Web-only fallback UI.
-7. Electron E2E for Project open to session binding.
+6. Shared chat/slash-command Project context propagation.
+7. Web-only fallback UI.
+8. Electron E2E for Project open to session binding.
 
 ## Dependencies
 
@@ -38,7 +41,9 @@ Replace browser-only Project opening with Electron-native folder selection that 
 - Unit/API tests for Project registration and path validation.
 - Session binding tests proving `projectId` is set after native open.
 - Renderer tests for Project UI states with mocked desktop bridge.
-- Electron E2E against a built desktop runtime: open temp Project, create Project record, create Project session, verify `/help`.
+- Electron E2E against a built desktop runtime: open temp Project, create Project record, create
+  Project session, verify `/help`, verify `/init` sees the Project context, and verify normal Project
+  chat sees the same context.
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm docs:lint`, and relevant Electron E2E.
 
 ## Definition Of Done
@@ -47,5 +52,6 @@ Replace browser-only Project opening with Electron-native folder selection that 
 - Backend receives a real host path through the trusted desktop bridge.
 - Session has `projectId`.
 - `/help` works in the Project session.
+- `/init` and ordinary Project chat receive the same backend-bound Project context.
 - UI hides `/workspace` and host absolute paths by default.
 - Production-like Electron E2E proves Project open and session binding.

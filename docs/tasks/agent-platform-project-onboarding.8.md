@@ -9,6 +9,21 @@ Add first-class slash-command handling to the new harness/chat path, with `/init
 Project onboarding command. The command system must be reusable for future commands and must not rely
 on fuzzy model interpretation of user text.
 
+## Superseded / Re-scope Status
+
+This task is superseded for desktop Product delivery by the Electron extraction and onboarding work:
+
+- reusable slash-command infrastructure, `/help`, and safe no-Project `/init` behavior were extracted
+  under [Extract slash command infrastructure](./agent-platform-electron-extract.2.md);
+- the full `/init` onboarding path now belongs to
+  [Desktop Project onboarding and `/init`](./agent-platform-electron-onboarding.md), after
+  [Native Project access and session binding](./agent-platform-electron-project-access.md);
+- browser-only Project opening, renderer-only folder handles, and manual path entry are not valid
+  acceptance paths for this task's original Playwright flow.
+
+Do not continue this task as originally written. If the Beads issue remains open, treat it as parked
+reference material until it is either closed as superseded or replaced by Electron child tasks.
+
 ## Requirements
 
 - Add an extensible slash-command dispatch path before normal model execution.
@@ -42,7 +57,7 @@ on fuzzy model interpretation of user text.
   - `/help <command>` returns command-specific usage/details from the same registry metadata.
   - syntactically invalid command usage returns the command's usage/help copy.
   - ordinary messages continue through the existing chat/harness path unchanged.
-- `/init` must require a selected/open Project folder before it attempts onboarding.
+- `/init` must require a backend-bound Project context before it attempts onboarding.
 - `/init` must start or resume the existing Project onboarding flow:
   - inspect for existing Project instruction files, especially `AGENTS.md`.
   - draft a complete `AGENTS.md` when missing.
@@ -142,8 +157,8 @@ Design implications:
 8. Add a small UI affordance only if needed to expose available commands or command errors cleanly.
 9. Add tests for parser behavior, dispatch behavior, `/init` context validation, swappable parser/
    registry boundaries, and onboarding handoff.
-10. Add Playwright coverage that opens a Project, submits `/init`, reviews the draft flow, and verifies
-    no write happens before approval.
+10. Add Electron E2E coverage that opens a Project through native Project access, submits `/init`,
+    reviews the draft flow, and verifies no write happens before approval.
 
 ## Dependency Order
 
@@ -167,16 +182,16 @@ Design implications:
   - no Project selected returns a clear user-facing prompt.
   - Project selected starts/resumes onboarding without immediate file writes.
   - existing/missing `AGENTS.md` paths reuse the current review/approval flow.
-- Playwright:
-  - open/select a Project through the UI.
+- Playwright/Electron:
+  - open/select a Project through the Electron native Project opener.
   - submit `/init` in the agent chat.
   - assert onboarding UI/chat draft appears.
   - assert `AGENTS.md` is not written before approval.
   - approve the draft and assert expected file/write-gate outcome.
   - submit `/help` from the IDE chat and assert the slash-command catalog renders without falling
     through to the model path.
-  - open a Project through the single Project opener, submit `/init`, and assert the command uses
-    the open Project session instead of returning "Open a Project first".
+  - open a Project through the single native Project opener, submit `/init`, and assert the command
+    uses the backend-bound Project session instead of returning "Open a Project first".
 - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and
   focused/full Playwright as applicable.
 - PR checks, Sonar/Problems gate, and review comments must be green before closing the Bead.
@@ -192,9 +207,9 @@ Design implications:
 - [ ] Unknown slash commands produce clear user-facing feedback without invoking the model.
 - [ ] `/help` exposes available commands and command-specific usage from the command registry.
 - [ ] Ordinary chat messages remain unchanged.
-- [ ] `/init` validates that a Project is selected before onboarding.
+- [ ] `/init` validates that a backend-bound Project is selected before onboarding.
 - [ ] `/init` starts or resumes the AGENTS.md review/approval flow without silent writes.
 - [ ] Future UI CTAs can call the same command handler.
 - [ ] Unit/integration tests cover parser, dispatch, and `/init` behavior.
-- [ ] Playwright verifies the `/init` onboarding path through the UI.
+- [ ] Electron E2E verifies the `/init` onboarding path through the UI.
 - [ ] Local gates and PR checks are green before the Beads task is closed.

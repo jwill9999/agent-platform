@@ -14,9 +14,12 @@ Deliver the chat-first Project experience on top of the Electron runtime and nat
 - Make Project chat the default Project surface.
 - Keep IDE as an optional deeper view.
 - Preserve Project/session context when moving between chat and IDE.
+- Preserve the same Project/session context for slash commands and ordinary Project chat.
 - Add breadcrumbs or equivalent quiet location affordance.
 - Support generic Project profiles beyond coding.
 - Hide runtime implementation details in normal UI.
+- Do not reintroduce browser-only Project opening, duplicate folder CTAs, or manual absolute path
+  entry as the desktop Product path.
 
 ## Proposed Task Chain
 
@@ -26,7 +29,8 @@ Deliver the chat-first Project experience on top of the Electron runtime and nat
 4. Open IDE from Project chat.
 5. Breadcrumbs/return navigation.
 6. Project profile/capability labels.
-7. Electron E2E for navigation and reopen.
+7. Slash-command context parity in Project chat.
+8. Electron E2E for navigation and reopen.
 
 ## Dependencies
 
@@ -38,7 +42,8 @@ Deliver the chat-first Project experience on top of the Electron runtime and nat
 
 - Renderer tests for navigation states.
 - API/session tests for Project reopen metadata.
-- Electron E2E against built runtime: recent Project reopen, Project chat, IDE handoff, return navigation.
+- Electron E2E against built runtime: recent Project reopen, Project chat, `/help`/`/init` context
+  parity, IDE handoff, return navigation.
 - Visual/UI assertions that `/workspace`, backend roots, and internal states are not primary user-facing copy.
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm docs:lint`, and relevant Electron E2E.
 
@@ -47,5 +52,6 @@ Deliver the chat-first Project experience on top of the Electron runtime and nat
 - Users can reopen previous Projects.
 - Opening a Project lands in chat by default.
 - IDE preserves Project/session context.
+- Slash commands and ordinary Project chat preserve the same Project/session context.
 - UI avoids scattered Project CTAs and implementation paths/states.
 - Production-like Electron E2E covers Project reopen, Project chat, and IDE handoff.
