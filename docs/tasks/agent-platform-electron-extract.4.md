@@ -40,6 +40,15 @@ Execution order is enforced in Beads with `blocks` edges. Do not close this issu
 
 This task should align Beads, specs, and documentation. Beads allows epics to block epics, so `agent-platform-electron-foundation` is blocked by the parent `agent-platform-electron-extract` epic rather than this child task directly. If this task discovers that existing Project onboarding/experience tasks should be closed, superseded, or replaced by Electron tasks, document that recommendation before closing.
 
+### Superseded work recommendation
+
+`agent-platform-project-onboarding.8` should not continue as originally written. Its reusable
+slash-command framework was extracted under `agent-platform-electron-extract.2`, while full `/init`
+onboarding now depends on Electron-native Project access and should be implemented under
+`agent-platform-electron-onboarding` after `agent-platform-electron-project-access`. The older task
+should be closed as superseded or replaced by Electron child tasks once the owner confirms Beads
+cleanup policy.
+
 ## Implementation plan
 
 1. Review existing Project onboarding and Project experience specs.
@@ -74,22 +83,22 @@ If code changed in earlier extraction tasks and this is the segment tip, run the
 
 ## Definition of done
 
-- [ ] Existing Project onboarding specs no longer depend on browser-only Project opening.
-- [ ] Existing Project experience specs no longer depend on browser-only Project opening.
-- [ ] `/init` acceptance clearly requires backend-bound Project context.
-- [ ] Project chat and IDE handoff acceptance clearly require shared Project/session context.
-- [ ] Testing strategy requires production-like Electron E2E once Electron runtime exists.
-- [ ] Beads issue description points to this spec.
-- [ ] Beads parent is `agent-platform-electron-extract`.
-- [ ] Beads dependencies match this spec.
-- [ ] Required docs and local gates pass.
+- [x] Existing Project onboarding specs no longer depend on browser-only Project opening.
+- [x] Existing Project experience specs no longer depend on browser-only Project opening.
+- [x] `/init` acceptance clearly requires backend-bound Project context.
+- [x] Project chat and IDE handoff acceptance clearly require shared Project/session context.
+- [x] Testing strategy requires production-like Electron E2E once Electron runtime exists.
+- [x] Beads issue description points to this spec.
+- [x] Beads parent is `agent-platform-electron-extract`.
+- [x] Beads dependencies match this spec.
+- [x] Required docs and local gates pass.
 - [ ] Segment PR checks and review comments are resolved before closure.
 - [ ] Parent epic `agent-platform-electron-extract` is ready to close only after all child tasks are closed and the segment has passed its PR/check gate.
 
 ## Sign-off
 
-- [ ] Task branch created from the correct parent before implementation work.
-- [ ] `pnpm docs:lint` executed and passing.
-- [ ] Full segment gates executed and passing if this task is the segment tip.
+- [x] Task branch created from the correct parent before implementation work.
+- [x] `pnpm docs:lint` executed and passing.
+- [x] Full segment gates executed and passing if this task is the segment tip.
 - [ ] PR merged `task/agent-platform-electron-extract.4` to the agreed feature branch, or explicitly marked N/A with rationale.
 - [ ] `bd close agent-platform-electron-extract.4 --reason "Onboarding and experience specs re-scoped"`

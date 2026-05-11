@@ -8,10 +8,17 @@
 Let users explicitly open the IDE from an active Project Chat and continue the same Project/session
 context there.
 
+## Desktop Re-scope Note
+
+For desktop Product acceptance, IDE handoff consumes the same backend-bound Project/session created
+by Electron native Project access. It must not create a separate renderer-only folder context.
+
 ## Requirements
 
 - Project Chat exposes a clear but secondary Open IDE action.
 - IDE opens with the active Project, session, agent, and conversation context preserved.
+- IDE file tree, file reads, writes, and terminal affordances must be scoped to the same backend
+  Project root as Project Chat.
 - Users can return from IDE to Project Chat without losing context.
 - IDE remains optional and should not be the default Project destination.
 - IDE labels must use Project/folder terminology and hide runtime implementation details by default.
@@ -36,13 +43,15 @@ Keep Beads dependencies aligned with this table.
 
 - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
 - Focused UI tests for IDE handoff state and return navigation.
-- Playwright: open Project Chat, send/verify context, open IDE, verify same Project/session, return to
-  Project Chat, and verify conversation continuity.
+- Playwright/Electron: open Project Chat from a native Project, send/verify context, open IDE, verify
+  the same Project/session/backend root is used, return to Project Chat, and verify conversation
+  continuity.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
 ## Definition Of Done
 
 - [ ] IDE opens only after explicit user action from Project context.
 - [ ] IDE preserves Project/session/conversation context.
+- [ ] IDE and Project Chat use the same backend Project id and Project root.
 - [ ] Users can return from IDE to Project Chat.
 - [ ] IDE primary labels use Project/folder terminology.

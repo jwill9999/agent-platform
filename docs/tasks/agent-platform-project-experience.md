@@ -15,6 +15,26 @@ This epic follows `agent-platform-project-onboarding`. The onboarding epic may r
 experience: profile-aware Projects, chat-first entry, left-side navigation, recent/reopen Projects,
 optional IDE handoff, breadcrumbs, and user-facing labels.
 
+## Desktop Re-scope Status
+
+This epic remains the product experience reference, but desktop acceptance now depends on the
+Electron Project model.
+
+The desktop implementation must start with a backend-bound Project created by
+[Native Project access and session binding](./agent-platform-electron-project-access.md). Browser
+File System Access handles, duplicate browser `Open Folder` CTAs, and manual absolute path entry are
+parked and must not be used to prove the Project experience for the downloadable product.
+
+For desktop Product work:
+
+- Opening/reopening a Project creates or resumes a Project-bound chat/session.
+- The Project chat and optional IDE view must share the same Project id, session continuity, and
+  backend-visible Project root.
+- `/workspace`, host absolute paths, backend roots, and internal onboarding states remain technical
+  diagnostics, not primary user copy.
+- Web Playwright can cover route/component behavior, but final acceptance for Project reopen,
+  Project chat, and IDE handoff requires production-like Electron E2E.
+
 ## Product Decisions
 
 - Project means a folder/work context. It may be a code repository, docs/content folder, research
@@ -39,12 +59,16 @@ In scope:
 - Left explorer navigation for Projects and Chats/Sessions.
 - Recent/reopen Project list backed by existing Project records and metadata.
 - Open/New Project flow from the explorer.
+- Native desktop Project selection and reopen semantics are implemented in the Electron Project
+  access epic; this epic consumes that backend-bound Project model.
 - Project-scoped chat as the default Project surface.
 - Explicit Open IDE action from an active Project Chat.
 - Session/project continuity between Project Chat and IDE.
 - Breadcrumbs or equivalent quiet location affordance for Home, Chat, Project, and IDE.
 - User-facing Project labels that hide runtime implementation details.
 - Playwright coverage for the navigation and context-preservation flows.
+- Electron E2E coverage for desktop Project open/reopen, Project Chat, IDE handoff, and return
+  navigation once the desktop runtime exists.
 
 Out of scope:
 
@@ -87,3 +111,5 @@ Each child task must include concrete local and remote verification:
 - [ ] Normal UI hides `/workspace`, backend accessibility, backend root, and repository root.
 - [ ] Playwright verifies Chat, Project reopen, Project Chat, IDE handoff, return navigation, and
       context preservation.
+- [ ] Production-like Electron E2E verifies the same desktop path through native Project access;
+      browser-only/manual-path opening is not an acceptance path.

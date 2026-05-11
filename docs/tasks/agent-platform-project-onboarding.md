@@ -14,6 +14,28 @@ agent without requiring manual tester judgment outside the product.
 Epic 1 (`agent-platform-project-workspaces`) provides the Project runtime foundation and safety gate.
 This epic makes the onboarding experience complete end to end.
 
+## Desktop Re-scope Status
+
+This epic is retained as the behavioral reference for the `AGENTS.md` lifecycle, but it is no longer
+the desktop Product acceptance path by itself.
+
+Desktop acceptance now belongs to
+[Desktop Project onboarding and `/init`](./agent-platform-electron-onboarding.md), after
+[Native Project access and session binding](./agent-platform-electron-project-access.md) creates a
+backend-bound Project from an Electron-native folder picker. Browser File System Access handles,
+manual absolute path entry, and Docker/container paths are not acceptable ways to prove Project
+onboarding for the downloadable desktop product.
+
+For desktop Product work:
+
+- `/init` must run only when the active chat/session has a backend-bound Project context.
+- Project assessment, `AGENTS.md` reads/writes, refresh/rescan, and write-unlock decisions must use
+  the selected Project root registered by the Electron backend bridge.
+- The user-visible flow is Project chat first, then optional IDE handoff using the same
+  Project/session binding.
+- Existing web Playwright coverage remains useful for architecture-neutral behavior, but final
+  acceptance requires production-like Electron E2E once the runtime exists.
+
 ## Product Decisions
 
 - Project is a generic folder/work context, not necessarily a code repository. This epic implements
@@ -23,8 +45,8 @@ This epic makes the onboarding experience complete end to end.
   root, or repository root in normal user-facing copy. Show Project name, folder/relevant relative
   path, onboarding state, and branch/status only where useful.
 - The agent takes initiative during Project onboarding.
-- On first Project load, the agent reads existing `AGENTS.md` and performs read-only working-tree
-  traversal.
+- On first backend-bound Project load, or when `/init` is run in a Project-bound chat, the agent reads
+  existing `AGENTS.md` and performs read-only working-tree traversal.
 - The assessment is LLM-led rather than a rigid checklist, but it must return structured evidence:
   summary, files inspected, inferred structure, gaps, questions, and recommended updates.
 - If `AGENTS.md` is sufficient and consistent, onboarding can auto-approve with visible reasoning.
@@ -36,7 +58,8 @@ This epic makes the onboarding experience complete end to end.
 - Later factual `AGENTS.md` updates are batched at task/session closeout by default, reviewable by
   the user, and not blocking unless a stricter approval mode is enabled later.
 - Playwright should act as a human tester by opening Projects, reading prompts, approving/rejecting
-  onboarding actions, and validating UI and filesystem outcomes.
+  onboarding actions, and validating UI and filesystem outcomes. Desktop Product acceptance should
+  use Electron E2E against the native Project opener rather than browser-only folder handles.
 - A follow-up epic, `agent-platform-project-experience`, will implement the broader Project
   navigation model: chat-first Project entry, recent/reopen Projects, left explorer organization,
   optional IDE handoff, breadcrumbs, and generic Project profiles beyond coding.
@@ -54,11 +77,14 @@ In scope:
 - Closeout update candidates for durable facts learned during work.
 - User-triggered refresh/rescan of Project instructions.
 - Playwright E2E that verifies the full onboarding lifecycle through the UI.
+- Reuse of these flows in the Electron desktop runtime after Project access creates a backend-bound
+  Project and Project chat/session binding.
 
 Out of scope:
 
 - Broad Project navigation redesign, recent/reopen Project explorer UI, breadcrumbs, and
   project-chat-first routing. These belong to `agent-platform-project-experience`.
+- Browser-only Project folder opening or manual absolute path entry as Product onboarding.
 - Multi-agent reviewer orchestration for onboarding output.
 - Scheduled autonomous instruction drift jobs.
 - Hosted remote checkout management.
@@ -102,6 +128,8 @@ strategy must identify:
 - integration tests needed for assessment, persistence, runtime, or approval boundaries.
 - Playwright coverage for user-visible onboarding behavior. The strategy must define the UI actions
   Playwright performs and the visible/filesystem outputs it asserts.
+- Electron E2E coverage for desktop acceptance whenever the task depends on native Project opening,
+  `/init`, Project chat, IDE handoff, or filesystem writes.
 - filesystem assertions for `AGENTS.md` draft/finalization/update behavior.
 - CI/GitHub checks, logs, and artifacts that must be monitored on the task pull request.
 - deterministic fixture projects needed by the task.
@@ -125,8 +153,8 @@ passes, and CI/CD pipelines are green.
 ## Epic Definition Of Done
 
 - [ ] Each child task has a Beads issue, spec file, dependency edge, and Definition of Done.
-- [ ] First Project load performs read-only assessment of the working tree and existing
-      `AGENTS.md`.
+- [ ] First backend-bound Project load or Project-chat `/init` performs read-only assessment of the
+      selected Project root and existing `AGENTS.md`.
 - [ ] User-facing onboarding labels describe the Project and instruction state without exposing
       `/workspace`, backend accessibility, backend root, or repository root as primary copy.
 - [ ] Assessment returns structured visible evidence, gaps, questions, and recommendations.
@@ -140,6 +168,8 @@ passes, and CI/CD pipelines are green.
 - [ ] Playwright E2E covers sufficient existing instructions, missing instructions, insufficient
       instructions, collaborative Q&A, approval, rejected/revised drafts, approved code write, closeout
       update candidates, and refresh/rescan.
+- [ ] Desktop acceptance is covered by production-like Electron E2E after native Project access is
+      available; browser-only/manual-path Project opening is not an acceptance path.
 - [ ] The combined Epics 1 and 2 feature is ready for an end-to-end Playwright run without relying on
       manual human validation.
 - [ ] Every Epic 2 task is closed only after implementation is complete, local gates pass,
