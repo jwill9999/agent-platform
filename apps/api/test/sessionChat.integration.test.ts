@@ -319,6 +319,91 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
+  it('handles unknown slash commands before model execution', async () => {
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      const sessionId = await createDefaultSession(app);
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: '/does-not-exist' })
+        .expect(200);
+
+      expect(mockToolCalls).not.toHaveBeenCalled();
+      expect(parseNdjsonEvents(res.text)).toEqual([
+        {
+          type: 'text',
+          content: 'Command not recognised. Available commands: /init.',
+        },
+      ]);
+
+      const { listMessagesBySession } = await import('@agent-platform/db');
+      expect(listMessagesBySession(db, sessionId)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ role: 'user', content: '/does-not-exist' }),
+          expect.objectContaining({
+            role: 'assistant',
+            content: 'Command not recognised. Available commands: /init.',
+          }),
+        ]),
+      );
+    } finally {
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('starts Project onboarding draft with /init without writing AGENTS.md', async () => {
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      const projectRoot = createProjectRoot(dirs);
+      mkdirSync(path.join(projectRoot, 'src'), { recursive: true });
+      writeFileSync(path.join(projectRoot, 'package.json'), '{"scripts":{"test":"vitest"}}\n');
+
+      const opened = await request(app)
+        .post('/v1/projects/open')
+        .send({ path: projectRoot, name: 'Slash Init Project' })
+        .expect(201);
+      const sessionRes = await request(app)
+        .post('/v1/sessions')
+        .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: opened.body.data.id })
+        .expect(201);
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId: sessionRes.body.data.id, message: '/init' })
+        .expect(200);
+
+      expect(mockToolCalls).not.toHaveBeenCalled();
+      expect(parseNdjsonEvents(res.text)).toEqual([
+        {
+          type: 'text',
+          content:
+            'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+        },
+      ]);
+      expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
+
+      const project = await request(app).get(`/v1/projects/${opened.body.data.id}`).expect(200);
+      expect(project.body.data.metadata.onboardingDraft).toEqual(
+        expect.objectContaining({ targetPath: 'AGENTS.md' }),
+      );
+      expect(project.body.data.metadata.onboardingState).toBe('in_progress');
+
+      const { listMessagesBySession } = await import('@agent-platform/db');
+      expect(listMessagesBySession(db, sessionRes.body.data.id)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ role: 'user', content: '/init' }),
+          expect.objectContaining({
+            role: 'assistant',
+            content: expect.stringContaining('prepared a Project instructions draft'),
+          }),
+        ]),
+      );
+    } finally {
+      closeDatabase(sqlite);
+    }
+  });
+
   it('returns 404 when agent for session does not exist', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs);

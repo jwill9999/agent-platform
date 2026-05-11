@@ -635,7 +635,7 @@ function requireProjectAssessment(project: ProjectRecord): ProjectOnboardingAsse
   return parsed.data;
 }
 
-function startProjectOnboardingDraft(db: DrizzleDb, id: string): ProjectRecord {
+export function startProjectOnboardingDraft(db: DrizzleDb, id: string): ProjectRecord {
   const project = findProject(db, id);
   if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
   const assessment = requireProjectAssessment(project);
