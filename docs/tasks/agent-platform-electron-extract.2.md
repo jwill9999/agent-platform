@@ -82,12 +82,12 @@ Playwright/E2E should be added only for behavior that can be tested without lock
 - [x] Beads parent is `agent-platform-electron-extract`.
 - [x] Beads dependencies match this spec.
 - [x] Required local gates pass.
-- [ ] PR checks and review comments are resolved before closure.
+- [x] PR checks and review comments are resolved before closure.
 
 ## Sign-off
 
 - [x] Task branch created from the correct parent before implementation work.
 - [x] Unit/component tests executed and passing.
 - [x] `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm docs:lint` executed and passing.
-- [ ] PR/check/review requirements satisfied if this task is merged through a PR.
-- [ ] `bd close agent-platform-electron-extract.2 --reason "Slash command infrastructure extracted"`
+- [x] PR/check/review requirements satisfied if this task is merged through a PR.
+- [x] `bd close agent-platform-electron-extract.2 --reason "Slash command infrastructure extracted"`
