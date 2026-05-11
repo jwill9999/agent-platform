@@ -1,24 +1,22 @@
 import { DefaultSlashCommandParser, type SlashCommandParser } from './parser.js';
-import { createBuiltinSlashCommandRegistry } from './builtin.js';
 import type { RunSlashCommandResult, SlashCommandContext, SlashCommandRegistry } from './types.js';
 
 export type RunSlashCommandOptions = {
   parser?: SlashCommandParser;
-  registry?: SlashCommandRegistry;
+  registry: SlashCommandRegistry;
 };
 
 export type RunSlashCommandContext = Omit<SlashCommandContext, 'commands'>;
 
 const defaultParser = new DefaultSlashCommandParser();
-const builtinRegistry = createBuiltinSlashCommandRegistry();
 
 export function runSlashCommand(
   message: string,
   context: RunSlashCommandContext,
-  options: RunSlashCommandOptions = {},
+  options: RunSlashCommandOptions,
 ): RunSlashCommandResult {
   const parser = options.parser ?? defaultParser;
-  const registry = options.registry ?? builtinRegistry;
+  const { registry } = options;
   const parsed = parser.parse(message);
   if (parsed.kind === 'not_command') return { kind: 'not_command' };
 

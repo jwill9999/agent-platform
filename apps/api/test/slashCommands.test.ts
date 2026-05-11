@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { helpSlashCommand } from '../src/application/slashCommands/builtin.js';
+import {
+  createBuiltinSlashCommandRegistry,
+  helpSlashCommand,
+} from '../src/application/slashCommands/builtin.js';
 import { DefaultSlashCommandParser } from '../src/application/slashCommands/parser.js';
 import { StaticSlashCommandRegistry } from '../src/application/slashCommands/registry.js';
 import { runSlashCommand } from '../src/application/slashCommands/runSlashCommand.js';
@@ -41,6 +44,7 @@ describe('slash command parser', () => {
 });
 
 describe('slash command dispatch', () => {
+  const builtinRegistry = createBuiltinSlashCommandRegistry();
   const command: SlashCommandDefinition = {
     name: 'echo',
     aliases: ['say'],
@@ -130,10 +134,14 @@ describe('slash command dispatch', () => {
 
   it('requires Project context for /init', () => {
     expect(
-      runSlashCommand('/init', {
-        session,
-        startProjectOnboarding: () => unreachable(),
-      }),
+      runSlashCommand(
+        '/init',
+        {
+          session,
+          startProjectOnboarding: () => unreachable(),
+        },
+        { registry: builtinRegistry },
+      ),
     ).toEqual({
       kind: 'handled',
       status: 'missing_context',
@@ -143,10 +151,14 @@ describe('slash command dispatch', () => {
 
   it('exposes built-in slash command help without invoking command side effects', () => {
     expect(
-      runSlashCommand('/help init', {
-        session,
-        startProjectOnboarding: () => unreachable(),
-      }),
+      runSlashCommand(
+        '/help init',
+        {
+          session,
+          startProjectOnboarding: () => unreachable(),
+        },
+        { registry: builtinRegistry },
+      ),
     ).toEqual({
       kind: 'handled',
       status: 'handled',
@@ -157,10 +169,14 @@ describe('slash command dispatch', () => {
 
   it('returns usage copy for invalid /init arguments', () => {
     expect(
-      runSlashCommand('/init extra words', {
-        session,
-        startProjectOnboarding: () => unreachable(),
-      }),
+      runSlashCommand(
+        '/init extra words',
+        {
+          session,
+          startProjectOnboarding: () => unreachable(),
+        },
+        { registry: builtinRegistry },
+      ),
     ).toEqual({
       kind: 'handled',
       status: 'invalid_usage',

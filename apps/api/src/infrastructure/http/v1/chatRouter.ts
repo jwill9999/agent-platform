@@ -95,6 +95,7 @@ import {
   runSlashCommand,
   type RunSlashCommandOptions,
 } from '../../../application/slashCommands/runSlashCommand.js';
+import { createBuiltinSlashCommandRegistry } from '../../../application/slashCommands/builtin.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
@@ -122,6 +123,7 @@ const LegacyChatStreamBodySchema = z.object({
 // ---------------------------------------------------------------------------
 
 const MAX_TITLE_LENGTH = 80;
+const defaultSlashCommandRegistry = createBuiltinSlashCommandRegistry();
 
 export type ChatRouterOptions = {
   globalPlugins?: readonly RegisteredPlugin[];
@@ -137,6 +139,10 @@ export type ChatRouterOptions = {
     defaultRepoPath?: string;
   }) => NativeToolExecutor;
 };
+
+function resolveSlashCommandOptions(options?: RunSlashCommandOptions): RunSlashCommandOptions {
+  return options ?? { registry: defaultSlashCommandRegistry };
+}
 
 /** Derive a human-readable session title from the first user message. */
 function deriveSessionTitle(message: string): string {
@@ -1305,7 +1311,7 @@ async function handleSlashCommandMessage(
         project: session.projectId ? findProject(db, session.projectId) : undefined,
         startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
       },
-      options.slashCommands,
+      resolveSlashCommandOptions(options.slashCommands),
     );
     if (slashCommand.kind === 'handled') {
       persistSlashCommandMessages(db, session.id, message, slashCommand.message);
