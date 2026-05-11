@@ -173,6 +173,10 @@ Design implications:
   - assert onboarding UI/chat draft appears.
   - assert `AGENTS.md` is not written before approval.
   - approve the draft and assert expected file/write-gate outcome.
+  - submit `/help` from the IDE chat and assert the slash-command catalog renders without falling
+    through to the model path.
+  - open a Project through the single Project opener, submit `/init`, and assert the command uses
+    the open Project session instead of returning "Open a Project first".
 - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and
   focused/full Playwright as applicable.
 - PR checks, Sonar/Problems gate, and review comments must be green before closing the Bead.
