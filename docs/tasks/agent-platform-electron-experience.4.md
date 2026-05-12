@@ -40,7 +40,7 @@ conversation context.
 - [x] IDE opens with the same Project and session context.
 - [x] Duplicate/confusing Project open affordances are not visible in the handoff flow.
 - [x] Electron E2E verifies chat-to-IDE continuity.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation Notes
 
@@ -67,3 +67,13 @@ conversation context.
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm run test:e2e`
+- `sh .husky/pre-push`
+
+## PR Verification
+
+- PR #200 targets `feature/agent-platform-project-onboarding`.
+- GitHub checks passed: `verify`, `docker`, `e2e`, `desktop-e2e`, docs `markdownlint` and
+  `lychee`, GitGuardian, and SonarCloud.
+- SonarCloud reports 0 open PR issues and 0 security hotspots after the `void` cleanup.
+- No inline review comments are present; Sourcery skipped because the cumulative PR diff is above
+  its review limit.
