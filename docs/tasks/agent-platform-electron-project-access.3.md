@@ -27,6 +27,18 @@ Ensure opening a desktop Project creates or resumes a chat session with `project
 4. Add API tests for new Project session, resume existing Project session, and normal chat isolation.
 5. Update docs/spec notes for Project session binding.
 
+## Implementation notes
+
+- Project session binding uses `POST /v1/sessions/project` with `agentId` and `projectId`.
+- The route validates both the Agent and Project before creating a session.
+- If the Agent already has a Project-mode session for the same Project, the route returns that
+  session with `created: false`; otherwise it creates a new Project-mode session with
+  `projectId` set.
+- Existing non-Project session creation remains unchanged through `POST /v1/sessions`.
+- Ordinary chat already resolves Project workspace and instruction context from `session.projectId`;
+  this task adds regression coverage proving sessions created by the binding route receive that
+  context.
+
 ## Dependency order
 
 | Upstream                                   | Downstream                                 |

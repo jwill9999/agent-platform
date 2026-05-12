@@ -51,6 +51,7 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `DELETE /v1/agents/:id`                    |    ✅    |       ✅        | Agent dashboard                              |
 | `GET /v1/sessions`                         |    ✅    |       ✅        | Sessions page                                |
 | `POST /v1/sessions`                        |    ✅    |       ✅        | Home page, IDE chat                          |
+| `POST /v1/sessions/project`                |    —     |       ✅        | Create/resume a Project-bound session        |
 | `GET /v1/skills`                           |    ✅    |       ✅        | Skills dashboard, agent editor               |
 | `POST /v1/skills`                          |    ✅    |       ✅        | Skills dashboard                             |
 | `PUT /v1/skills/:id`                       |    ✅    |       ✅        | Skills dashboard                             |
@@ -346,10 +347,13 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 | `GET`    | `/v1/sessions/:id/sensors`        | Get session sensor dashboard        |
 | `POST`   | `/v1/sessions/:id/sensors/retry`  | Refresh sensor discovery view       |
 | `POST`   | `/v1/sessions`                    | Create a session                    |
+| `POST`   | `/v1/sessions/project`            | Create/resume Project session       |
 | `PUT`    | `/v1/sessions/:id`                | Update a session                    |
 | `DELETE` | `/v1/sessions/:id`                | Delete a session                    |
 
 Body schema: `SessionCreateBodySchema` — requires `agentId`. Agent must exist (FK constraint → 404 on missing).
+
+`POST /v1/sessions/project` body schema: `SessionProjectBindingBodySchema` — requires `agentId` and `projectId`. The API validates both resources, reuses the latest existing Project-mode session for that Agent and Project when present, or creates one with `projectId` set. The response shape is `{ "data": { "created": boolean, "session": SessionRecord } }`.
 
 `GET /v1/sessions/:id/working-memory` returns `{ "data": null }` until the session has completed at least one chat or resume turn that produced working-memory state. When present, the artifact is scoped to the session and contains the current goal, active project/task, key decisions, important files, bounded tool summaries, blockers, pending approval IDs, next action, and a compact summary used for session continuity.
 

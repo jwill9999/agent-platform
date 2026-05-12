@@ -192,6 +192,54 @@ describe('projectsRouter', () => {
     expect(JSON.stringify(selectedAgain.body.data)).not.toContain(repoRealPath);
   });
 
+  it('creates and resumes a Project-bound session for a registered desktop project', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-session-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), 'desktop project session\n');
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Session Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const created = await request(app)
+      .post('/v1/sessions/project')
+      .send({ agentId: 'agent-1', projectId })
+      .expect(201);
+    expect(created.body.data).toMatchObject({
+      created: true,
+      session: {
+        agentId: 'agent-1',
+        mode: 'project',
+        projectId,
+      },
+    });
+
+    const resumed = await request(app)
+      .post('/v1/sessions/project')
+      .send({ agentId: 'agent-1', projectId })
+      .expect(200);
+    expect(resumed.body.data).toMatchObject({
+      created: false,
+      session: {
+        id: created.body.data.session.id,
+        mode: 'project',
+        projectId,
+      },
+    });
+
+    const unscoped = await request(app)
+      .post('/v1/sessions')
+      .send({ agentId: 'agent-1' })
+      .expect(201);
+    expect(unscoped.body.data).toMatchObject({
+      mode: 'chat',
+      projectId: null,
+    });
+  });
+
   it('rejects desktop project registration without the desktop bridge or inspectable folder', async () => {
     await request(app)
       .post('/v1/projects/desktop/register')

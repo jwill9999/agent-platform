@@ -35,9 +35,13 @@ export {
 } from './message.js';
 export {
   SessionCreateBodySchema,
+  SessionProjectBindingBodySchema,
+  SessionProjectBindingResultSchema,
   SessionRecordSchema,
   SessionResumeBodySchema,
   type SessionCreateBody,
+  type SessionProjectBindingBody,
+  type SessionProjectBindingResult,
   type SessionRecord,
   type SessionResumeBody,
 } from './session.js';

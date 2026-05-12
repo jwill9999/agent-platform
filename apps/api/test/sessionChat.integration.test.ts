@@ -446,6 +446,37 @@ describe('POST /v1/chat (session-aware)', () => {
     });
   });
 
+  it('loads Project prompt context for sessions bound after desktop registration', async () => {
+    await withMockChatApp(dirs, async ({ app }) => {
+      const projectRoot = createProjectRoot(dirs);
+      writeFileSync(path.join(projectRoot, 'AGENTS.md'), 'desktop root rule\n');
+
+      const registered = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: projectRoot, name: 'Desktop Bound Project' })
+        .expect(201);
+      const sessionRes = await request(app)
+        .post('/v1/sessions/project')
+        .send({ agentId: DEFAULT_AGENT_ID, projectId: registered.body.data.project.id })
+        .expect(201);
+
+      mockToolCalls.mockReturnValueOnce('Read the desktop Project instructions');
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId: sessionRes.body.data.session.id, message: 'Inspect README.md' })
+        .expect(200);
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; content: string }>;
+      };
+      const systemPrompt = state.messages?.[0]?.content ?? '';
+      expect(systemPrompt).toContain('--- AGENTS.md ---');
+      expect(systemPrompt).toContain('desktop root rule');
+      expect(systemPrompt).not.toContain(projectRoot);
+    });
+  });
+
   it('returns 404 when agent for session does not exist', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs);
