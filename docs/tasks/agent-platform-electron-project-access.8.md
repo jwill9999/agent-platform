@@ -59,4 +59,4 @@ Add production-like Electron E2E coverage for native Project open through Projec
 - [x] Electron E2E verifies `/help`, `/init`, and the ordinary chat Project binding share Project context.
 - [x] UI hides `/workspace` and host absolute paths by default.
 - [x] Relevant tests and root gates pass locally.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
