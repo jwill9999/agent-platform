@@ -21,22 +21,30 @@ Deliver the chat-first Project experience on top of the Electron runtime and nat
 - Do not reintroduce browser-only Project opening, duplicate folder CTAs, or manual absolute path
   entry as the desktop Product path.
 
-## Proposed Task Chain
+## Task Chain
 
-1. Desktop Project navigation model.
-2. Recent Projects in left explorer.
-3. Project chat as default entry.
-4. Open IDE from Project chat.
-5. Breadcrumbs/return navigation.
-6. Project profile/capability labels.
-7. Slash-command context parity in Project chat.
-8. Electron E2E for navigation and reopen.
+1. `agent-platform-electron-experience.1` - Desktop Project navigation model.
+2. `agent-platform-electron-experience.2` - Recent Projects in left explorer.
+3. `agent-platform-electron-experience.3` - Project chat as default entry.
+4. `agent-platform-electron-experience.4` - Open IDE from Project chat.
+5. `agent-platform-electron-experience.5` - Breadcrumbs/return navigation.
+6. `agent-platform-electron-experience.6` - Project profile/capability labels.
+7. `agent-platform-electron-experience.7` - Slash-command context parity in Project chat.
+8. `agent-platform-electron-experience.8` - Electron E2E for navigation and reopen.
 
 ## Dependencies
 
-| Upstream                             | Downstream                        |
-| ------------------------------------ | --------------------------------- |
-| `agent-platform-electron-onboarding` | `agent-platform-electron-release` |
+| Upstream                               | Downstream                             |
+| -------------------------------------- | -------------------------------------- |
+| `agent-platform-electron-onboarding`   | `agent-platform-electron-experience.1` |
+| `agent-platform-electron-experience.1` | `agent-platform-electron-experience.2` |
+| `agent-platform-electron-experience.2` | `agent-platform-electron-experience.3` |
+| `agent-platform-electron-experience.3` | `agent-platform-electron-experience.4` |
+| `agent-platform-electron-experience.4` | `agent-platform-electron-experience.5` |
+| `agent-platform-electron-experience.5` | `agent-platform-electron-experience.6` |
+| `agent-platform-electron-experience.6` | `agent-platform-electron-experience.7` |
+| `agent-platform-electron-experience.7` | `agent-platform-electron-experience.8` |
+| `agent-platform-electron-experience`   | `agent-platform-electron-release`      |
 
 ## Testing Strategy
 
