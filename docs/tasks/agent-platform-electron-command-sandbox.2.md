@@ -52,4 +52,4 @@ Add a typed, swappable command execution boundary before changing host command b
 - [x] Existing `sys_bash` behavior is adapted through the interface without broad behavior changes.
 - [x] Result shapes cover success, command failure, denied, and approval-required outcomes.
 - [x] Tests prove the interface can be swapped without changing chat/harness call sites.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
