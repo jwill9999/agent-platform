@@ -48,4 +48,4 @@ Define and enforce first-release policy for destructive or risky shell commands.
 - [x] Safe read-only commands remain usable.
 - [x] Policy reasons are visible in bounded audit/approval output.
 - [x] Tests cover command chaining, removals, writes, package/script execution, and outside-root targeting.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
