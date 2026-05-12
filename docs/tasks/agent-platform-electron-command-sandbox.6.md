@@ -42,4 +42,4 @@ Add regression coverage that proves the command boundary works across relevant h
 - [x] Project-bound desktop context is covered where command execution uses Project roots.
 - [x] Tests do not require cloud model credentials.
 - [x] Docs identify the command-sandbox regression suite.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
