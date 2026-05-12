@@ -55,9 +55,9 @@ Show desktop Projects the user can reopen from stored Project metadata.
 
 ## Definition of done
 
-- [ ] User can see recent Projects.
-- [ ] User can reopen a Project from stored metadata.
-- [ ] Missing/moved folders have a clear state and do not crash the flow.
-- [ ] UI avoids `/workspace` and host absolute paths by default.
-- [ ] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] User can see recent Projects.
+- [x] User can reopen a Project from stored metadata.
+- [x] Missing/moved folders have a clear state and do not crash the flow.
+- [x] UI avoids `/workspace` and host absolute paths by default.
+- [x] Relevant tests and root gates pass.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
