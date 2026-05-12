@@ -446,6 +446,40 @@ describe('POST /v1/chat (session-aware)', () => {
     });
   });
 
+  it('starts desktop Project onboarding with /init as the first Project chat message', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      writeFileSync(path.join(projectRoot, 'package.json'), '{"scripts":{"test":"vitest"}}\n');
+
+      const registered = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: projectRoot, name: 'Desktop Slash Init Project' })
+        .expect(201);
+      const sessionRes = await request(app)
+        .post('/v1/sessions/project')
+        .send({ agentId: DEFAULT_AGENT_ID, projectId: registered.body.data.project.id })
+        .expect(201);
+
+      await expectHandledSlashMessage(
+        app,
+        db,
+        sessionRes.body.data.session.id,
+        '/init',
+        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+      );
+      expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
+
+      const project = await request(app)
+        .get(`/v1/projects/${registered.body.data.project.id}`)
+        .expect(200);
+      expect(project.body.data.metadata.onboardingDraft).toEqual(
+        expect.objectContaining({ targetPath: 'AGENTS.md' }),
+      );
+      expect(project.body.data.metadata.onboardingState).toBe('in_progress');
+    });
+  });
+
   it('loads Project prompt context for sessions bound after desktop registration', async () => {
     await withMockChatApp(dirs, async ({ app }) => {
       const projectRoot = createProjectRoot(dirs);

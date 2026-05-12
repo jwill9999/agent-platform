@@ -63,14 +63,14 @@ export const initSlashCommand: SlashCommandDefinition = {
         message: 'Usage: /init',
       };
     }
-    if (!context.project || !context.session.projectId) {
+    if (!context.project || !context.projectId) {
       return {
         kind: 'missing_context',
         message: 'Open a Project first, then run /init to set up Project instructions.',
       };
     }
 
-    const project = context.startProjectOnboarding(context.session.projectId);
+    const project = context.startProjectOnboarding(context.projectId);
     const draft = project.metadata['onboardingDraft'];
     const state = project.metadata['onboardingState'];
 

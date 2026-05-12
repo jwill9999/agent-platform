@@ -32,6 +32,7 @@ import type {
   MessageRecord,
   Output,
   PromptMemoryBundle,
+  ProjectRecord,
   ProjectAccessPolicy,
   SensorAgentProfile,
   SessionRecord,
@@ -124,6 +125,11 @@ const LegacyChatStreamBodySchema = z.object({
 
 const MAX_TITLE_LENGTH = 80;
 const defaultSlashCommandRegistry = createBuiltinSlashCommandRegistry();
+
+type SessionProjectContext = {
+  projectId?: string;
+  project?: ProjectRecord;
+};
 
 export type ChatRouterOptions = {
   globalPlugins?: readonly RegisteredPlugin[];
@@ -693,6 +699,18 @@ function resolveSessionProjectPath(db: DrizzleDb, sessionId: string): string | u
   return workingMemory?.activeProject;
 }
 
+function resolveSessionProjectContext(
+  db: DrizzleDb,
+  session: SessionRecord,
+  workingMemory?: ReturnType<typeof getWorkingMemoryArtifact>,
+): SessionProjectContext {
+  const projectId = session.projectId ?? workingMemory?.projectId ?? workingMemory?.activeProject;
+  if (!projectId) return {};
+
+  const project = findProject(db, projectId);
+  return project ? { projectId: project.id, project } : { projectId };
+}
+
 function resolveRuntimeWorkspace(
   db: DrizzleDb,
   sessionId: string,
@@ -1049,8 +1067,7 @@ export async function handleSessionResume(
       db,
       sessionId,
       withProjectInstructionPrompt(
-        db,
-        sessionId,
+        resolveSessionProjectContext(db, session),
         agentCtx.systemPrompt,
         JSON.stringify(toolCall.args),
       ),
@@ -1205,8 +1222,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
 
         const { messages, dropped, contextTokens, memoryBundle } = buildConversationMessages(
           db,
-          sessionId,
-          session.agentId,
+          session,
           message,
           agentCtx.systemPrompt,
           agentCtx.agent.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
@@ -1308,7 +1324,7 @@ async function handleSlashCommandMessage(
       message,
       {
         session,
-        project: session.projectId ? findProject(db, session.projectId) : undefined,
+        ...resolveSessionProjectContext(db, session),
         startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
       },
       resolveSlashCommandOptions(options.slashCommands),
@@ -1352,8 +1368,7 @@ function prepareNdjsonResponse(res: Response): void {
 
 function buildConversationMessages(
   db: DrizzleDb,
-  sessionId: string,
-  agentId: string,
+  session: SessionRecord,
   newMessage: string,
   systemPrompt: string,
   contextWindow: ContextWindow,
@@ -1364,15 +1379,16 @@ function buildConversationMessages(
   memoryBundle: PromptMemoryBundle;
 } {
   return withTransaction(db, (tx) => {
+    const sessionId = session.id;
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
     const workingMemory = getWorkingMemoryArtifact(tx, sessionId);
-    const session = getSession(tx, sessionId);
+    const projectContext = resolveSessionProjectContext(tx, session, workingMemory);
     const memoryBundle = retrievePromptMemories(tx, {
       scope: {
         sessionId,
-        agentId,
-        projectId: session?.projectId ?? workingMemory?.projectId ?? workingMemory?.activeProject,
+        agentId: session.agentId,
+        projectId: projectContext.projectId,
       },
       query: newMessage,
     });
@@ -1382,8 +1398,7 @@ function buildConversationMessages(
     const counter = createApproximateCounter();
     const effectiveSystemPrompt = withPromptMemoryBundle(
       withProjectInstructionPrompt(
-        tx,
-        sessionId,
+        projectContext,
         withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary),
         newMessage,
       ),
@@ -1404,14 +1419,11 @@ function projectScopePath(message: string): string | undefined {
 }
 
 function withProjectInstructionPrompt(
-  db: DrizzleDb,
-  sessionId: string,
+  projectContext: SessionProjectContext,
   systemPrompt: string,
   message: string,
 ): string {
-  const session = getSession(db, sessionId);
-  if (!session?.projectId) return systemPrompt;
-  const project = findProject(db, session.projectId);
+  const project = projectContext.project;
   const backendProjectRoot = project?.metadata['backendProjectRoot'];
   if (!project || typeof backendProjectRoot !== 'string') return systemPrompt;
   const prompt = buildProjectInstructionPrompt(

@@ -43,9 +43,17 @@ Make slash commands and ordinary Project chat resolve Project context through th
 
 ## Definition of done
 
-- [ ] `/help` works in Project-bound sessions.
-- [ ] `/init` receives Project context on the first slash command.
-- [ ] Ordinary Project chat and slash commands share one context source.
-- [ ] Missing Project context has clear guidance.
-- [ ] Relevant tests and root gates pass.
+- [x] `/help` works in Project-bound sessions.
+- [x] `/init` receives Project context on the first slash command.
+- [x] Ordinary Project chat and slash commands share one context source.
+- [x] Missing Project context has clear guidance.
+- [x] Relevant tests and root gates pass.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation notes
+
+- Added an explicit resolved Project context (`projectId` plus `project`) to slash command execution.
+- `/init` now uses the resolved Project context instead of reading `session.projectId` directly.
+- Session chat prompt construction and slash command execution now share `resolveSessionProjectContext`.
+- Added API regression coverage for desktop-registered Project `/init` as the first chat message.
+- Added compose-backed Playwright coverage for opening a desktop Project and running `/init` through the IDE chat UI.

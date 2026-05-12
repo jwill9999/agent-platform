@@ -88,4 +88,51 @@ test.describe('IDE Project opening is parked for desktop', () => {
       rmSync(projectRoot, { recursive: true, force: true });
     }
   });
+
+  test('runs slash init against the opened desktop Project session', async ({ page }) => {
+    const projectId = `agent-platform-e2e-slash-init-${Date.now()}`;
+    const projectRoot = join(process.cwd(), '.agent-platform', 'workspaces', 'default', projectId);
+    const backendProjectRoot = `/workspace/${projectId}`;
+    const projectName = `Desktop Slash Init ${Date.now()}`;
+    mkdirSync(join(projectRoot, 'src'), { recursive: true });
+    writeFileSync(join(projectRoot, 'package.json'), '{"scripts":{"test":"vitest"}}\n');
+    writeFileSync(join(projectRoot, 'src', 'index.ts'), 'export const ok = true;\n');
+
+    try {
+      await page.addInitScript(
+        ({ path, name }) => {
+          Object.defineProperty(globalThis, 'agentPlatformDesktop', {
+            configurable: true,
+            value: {
+              projects: {
+                selectFolder: async () => ({
+                  canceled: false,
+                  folder: { path, name },
+                }),
+              },
+            },
+          });
+        },
+        { path: backendProjectRoot, name: projectName },
+      );
+
+      await page.goto('/ide', { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Open Project' }).click();
+
+      await expect(page.getByLabel('Project binding').getByText(projectName).first()).toBeVisible();
+      await expect(page.getByTestId('chat-status-label')).toHaveText('Ready');
+
+      await page.getByPlaceholder('Ask about your code...').fill('/init');
+      await page.getByPlaceholder('Ask about your code...').press('Enter');
+
+      await expect(page.getByText('/init')).toBeVisible();
+      await expect(
+        page.getByText(
+          'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+        ),
+      ).toBeVisible();
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
 });

@@ -19,6 +19,16 @@ const session = {
   updatedAtMs: 1,
 };
 
+const project = {
+  id: 'project-1',
+  slug: 'project-1',
+  name: 'Project One',
+  workspacePath: '/workspace',
+  metadata: {},
+  createdAtMs: 1,
+  updatedAtMs: 1,
+};
+
 describe('slash command parser', () => {
   const parser = new DefaultSlashCommandParser();
 
@@ -147,6 +157,38 @@ describe('slash command dispatch', () => {
       status: 'missing_context',
       message: 'Open a Project first, then run /init to set up Project instructions.',
     });
+  });
+
+  it('runs /init against the resolved Project context without reading the session project id', () => {
+    let startedProjectId: string | undefined;
+
+    expect(
+      runSlashCommand(
+        '/init',
+        {
+          session,
+          project,
+          projectId: project.id,
+          startProjectOnboarding: (projectId) => {
+            startedProjectId = projectId;
+            return {
+              ...project,
+              metadata: {
+                onboardingState: 'in_progress',
+                onboardingDraft: { targetPath: 'AGENTS.md' },
+              },
+            };
+          },
+        },
+        { registry: builtinRegistry },
+      ),
+    ).toEqual({
+      kind: 'handled',
+      status: 'handled',
+      message:
+        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+    });
+    expect(startedProjectId).toBe(project.id);
   });
 
   it('exposes built-in slash command help without invoking command side effects', () => {

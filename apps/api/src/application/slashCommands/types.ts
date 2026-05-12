@@ -29,6 +29,7 @@ export type SlashCommandResult =
 
 export type SlashCommandContext = {
   session: SessionRecord;
+  projectId?: string;
   project?: ProjectRecord;
   commands: SlashCommandRegistry;
   startProjectOnboarding(projectId: string): ProjectRecord;
