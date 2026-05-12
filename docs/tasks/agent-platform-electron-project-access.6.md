@@ -48,7 +48,7 @@ Make slash commands and ordinary Project chat resolve Project context through th
 - [x] Ordinary Project chat and slash commands share one context source.
 - [x] Missing Project context has clear guidance.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
