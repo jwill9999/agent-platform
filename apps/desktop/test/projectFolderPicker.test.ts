@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   desktopProjectFolderOverrideEnv,
+  desktopProjectFolderOverrideQueueEnv,
   normalizeDesktopProjectFolderSelection,
   selectDesktopProjectFolder,
   type DesktopProjectFolderDialog,
@@ -82,6 +83,34 @@ describe('desktop Project folder picker', () => {
       folder: {
         name: 'electron-e2e-project',
         path: '/Users/example/projects/electron-e2e-project',
+      },
+    });
+    expect(showOpenDialog).not.toHaveBeenCalled();
+  });
+
+  it('uses queued E2E Project folder overrides in order', async () => {
+    const showOpenDialog = vi.fn();
+    const dialog = { showOpenDialog } satisfies DesktopProjectFolderDialog;
+    const window = {} as Parameters<typeof selectDesktopProjectFolder>[0]['window'];
+    const env = {
+      [desktopProjectFolderOverrideQueueEnv]: JSON.stringify([
+        '/Users/example/projects/first-project',
+        '/Users/example/projects/second-project',
+      ]),
+    };
+
+    await expect(selectDesktopProjectFolder({ dialog, env, window })).resolves.toEqual({
+      canceled: false,
+      folder: {
+        name: 'first-project',
+        path: '/Users/example/projects/first-project',
+      },
+    });
+    await expect(selectDesktopProjectFolder({ dialog, env, window })).resolves.toEqual({
+      canceled: false,
+      folder: {
+        name: 'second-project',
+        path: '/Users/example/projects/second-project',
       },
     });
     expect(showOpenDialog).not.toHaveBeenCalled();

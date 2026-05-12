@@ -41,6 +41,7 @@ import {
   buildProjectChatHref,
   desktopProjectFolderLabel,
   desktopProjectIsAvailable,
+  projectReopenRequestedEvent,
   recentProjectsUpdatedEvent,
   workspaceNavigationItems,
 } from '@/lib/project-navigation';
@@ -180,6 +181,13 @@ export function RecentProjectsNavSection({
                 href={buildProjectChatHref(project.id)}
                 className="flex flex-col rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 title={`Open ${project.name}`}
+                onClick={() => {
+                  globalThis.window.dispatchEvent(
+                    new CustomEvent(projectReopenRequestedEvent, {
+                      detail: { projectId: project.id },
+                    }),
+                  );
+                }}
               >
                 {content}
               </Link>

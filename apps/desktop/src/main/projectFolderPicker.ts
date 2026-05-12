@@ -18,6 +18,7 @@ export interface DesktopProjectFolderDialog {
 }
 
 export const desktopProjectFolderOverrideEnv = 'AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIR';
+export const desktopProjectFolderOverrideQueueEnv = 'AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS';
 
 export function normalizeDesktopProjectFolderSelection(
   result: Pick<OpenDialogReturnValue, 'canceled' | 'filePaths'>,
@@ -50,7 +51,7 @@ export async function selectDesktopProjectFolder({
   env?: NodeJS.ProcessEnv;
   window: BrowserWindow;
 }): Promise<DesktopProjectFolderSelectionResult> {
-  const testProjectDir = env[desktopProjectFolderOverrideEnv];
+  const testProjectDir = consumeTestProjectFolderOverride(env);
   if (testProjectDir) {
     return normalizeDesktopProjectFolderSelection({
       canceled: false,
@@ -66,4 +67,22 @@ export async function selectDesktopProjectFolder({
   });
 
   return normalizeDesktopProjectFolderSelection(result);
+}
+
+function consumeTestProjectFolderOverride(env: NodeJS.ProcessEnv): string | undefined {
+  const queued = env[desktopProjectFolderOverrideQueueEnv];
+  if (queued) {
+    const parsed = JSON.parse(queued) as unknown;
+    if (!Array.isArray(parsed)) {
+      throw new Error(`${desktopProjectFolderOverrideQueueEnv} must be a JSON string array.`);
+    }
+    const [next, ...remaining] = parsed;
+    if (next !== undefined && typeof next !== 'string') {
+      throw new Error(`${desktopProjectFolderOverrideQueueEnv} must contain only strings.`);
+    }
+    env[desktopProjectFolderOverrideQueueEnv] = JSON.stringify(remaining);
+    if (next) return next;
+  }
+
+  return env[desktopProjectFolderOverrideEnv];
 }

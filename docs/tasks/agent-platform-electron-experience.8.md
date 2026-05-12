@@ -38,8 +38,8 @@ Project chat, slash command context, IDE handoff, and return navigation.
 
 ## Definition Of Done
 
-- [ ] Electron E2E covers recent Project reopen.
-- [ ] Electron E2E covers Project chat default entry.
-- [ ] Electron E2E covers slash command context in Project chat.
-- [ ] Electron E2E covers IDE handoff and return navigation.
+- [x] Electron E2E covers recent Project reopen.
+- [x] Electron E2E covers Project chat default entry.
+- [x] Electron E2E covers slash command context in Project chat.
+- [x] Electron E2E covers IDE handoff and return navigation.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

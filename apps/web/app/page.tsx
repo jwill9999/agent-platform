@@ -28,6 +28,7 @@ import {
   projectDisplayProfile,
   projectOnboardingAssessmentFromMetadata,
   projectReopenSearchParam,
+  projectReopenRequestedEvent,
   recentProjectsUpdatedEvent,
   sessionReopenSearchParam,
   workspaceEntryCopy,
@@ -425,26 +426,8 @@ export default function HomePage() {
     }
   }, [bindActiveProjectSession, openProjectChat]);
 
-  useEffect(() => {
-    if (selectedMode !== 'project-chat') return;
-    if (selectedAgentId || agents.length === 0) return;
-    const def = pickDefaultAgentForMode(agents, 'project');
-    if (!def) return;
-    setSelectedAgentId(def.id);
-    setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
-  }, [agents, modelConfigs, selectedAgentId, selectedMode]);
-
-  useEffect(() => {
-    if (globalThis.window === undefined) return;
-    if (selectedMode === 'project-chat' && activeProject) return;
-    const params = new URLSearchParams(globalThis.window.location.search);
-    const projectId = params.get(projectReopenSearchParam);
-    const requestedSessionId = params.get(sessionReopenSearchParam);
-    if (!projectId) return;
-    if (attemptedProjectReopenIdRef.current === projectId) return;
-    attemptedProjectReopenIdRef.current = projectId;
-
-    void (async () => {
+  const reopenRecentProject = useCallback(
+    async (projectId: string, requestedSessionId: string | null) => {
       try {
         const projects = await loadRecentDesktopProjects();
         const project = projects.find((candidate) => candidate.id === projectId);
@@ -473,16 +456,48 @@ export default function HomePage() {
           error instanceof ApiRequestError ? error.message : 'Failed to reopen Project',
         );
       }
-    })();
-  }, [
-    activeProject,
-    agents,
-    bindActiveProjectSession,
-    modelConfigs,
-    openProjectChat,
-    refreshSensors,
-    selectedMode,
-  ]);
+    },
+    [agents, bindActiveProjectSession, modelConfigs, openProjectChat, refreshSensors],
+  );
+
+  useEffect(() => {
+    if (selectedMode !== 'project-chat') return;
+    if (selectedAgentId || agents.length === 0) return;
+    const def = pickDefaultAgentForMode(agents, 'project');
+    if (!def) return;
+    setSelectedAgentId(def.id);
+    setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
+  }, [agents, modelConfigs, selectedAgentId, selectedMode]);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const params = new URLSearchParams(globalThis.window.location.search);
+    const projectId = params.get(projectReopenSearchParam);
+    const requestedSessionId = params.get(sessionReopenSearchParam);
+    if (!projectId) return;
+    if (selectedMode === 'project-chat' && activeProject?.id === projectId) return;
+    if (attemptedProjectReopenIdRef.current === projectId) return;
+    attemptedProjectReopenIdRef.current = projectId;
+
+    void reopenRecentProject(projectId, requestedSessionId);
+  }, [activeProject, reopenRecentProject, selectedMode]);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const handleProjectReopenRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ projectId?: unknown }>).detail;
+      if (typeof detail?.projectId !== 'string') return;
+      void reopenRecentProject(detail.projectId, null);
+    };
+
+    globalThis.window.addEventListener(projectReopenRequestedEvent, handleProjectReopenRequest);
+    return () => {
+      globalThis.window.removeEventListener(
+        projectReopenRequestedEvent,
+        handleProjectReopenRequest,
+      );
+    };
+  }, [reopenRecentProject]);
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {

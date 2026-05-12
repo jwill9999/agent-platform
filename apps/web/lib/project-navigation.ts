@@ -69,6 +69,7 @@ export const workspaceEntryCopy = {
 export const projectReopenSearchParam = 'projectId';
 export const sessionReopenSearchParam = 'sessionId';
 export const recentProjectsUpdatedEvent = 'agent-platform:desktop-projects-updated';
+export const projectReopenRequestedEvent = 'agent-platform:project-reopen-requested';
 
 const projectProfileDisplayByProfile: Record<ProjectProfile, ProjectProfileDisplay> = {
   coding: {
