@@ -27,7 +27,7 @@ The docs must clearly distinguish developer runtime from desktop runtime: Docker
 - [x] Log/config/data locations are documented.
 - [x] macOS-first scope and future Windows/Linux work are documented.
 - [x] Docs lint passes.
-- [ ] PR checks and review comments are resolved before closure.
+- [x] PR checks and review comments are resolved before closure.
 
 ## Implementation notes
 
@@ -41,6 +41,10 @@ The docs must clearly distinguish developer runtime from desktop runtime: Docker
 
 - `pnpm docs:lint`
 - `git diff --check`
+
+PR #168 passed `verify`, `docker`, `e2e`, docs checks, GitGuardian, and SonarCloud. SonarCloud
+reported 0 open issues. Sourcery was skipped due the account rate limit and posted no actionable
+inline comments.
 
 ## Test strategy
 
