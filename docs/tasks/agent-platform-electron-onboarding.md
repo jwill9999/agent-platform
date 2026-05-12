@@ -22,19 +22,34 @@ Restore Project onboarding and `/init` on top of the Electron-native, backend-bo
 
 ## Proposed Task Chain
 
-1. Rebase/extract slash infrastructure.
-2. `/init` desktop Project context integration.
-3. Shared Project context for slash commands and ordinary Project chat.
-4. `AGENTS.md` draft/review/write path for native Projects.
-5. Refresh/rescan and update candidates.
-6. Project onboarding UI cleanup.
-7. Electron E2E for Open Project to `/init` to review to approval.
+1. `agent-platform-electron-onboarding.1` — Rebase/extract slash infrastructure.
+2. `agent-platform-electron-onboarding.2` — `/init` desktop Project context integration.
+3. `agent-platform-electron-onboarding.3` — Shared Project context for slash commands and ordinary
+   Project chat.
+4. `agent-platform-electron-onboarding.4` — `AGENTS.md` draft/review/write path for native Projects.
+5. `agent-platform-electron-onboarding.5` — Refresh/rescan and update candidates.
+6. `agent-platform-electron-onboarding.6` — Project onboarding UI cleanup.
+7. `agent-platform-electron-onboarding.7` — Electron E2E for Open Project to `/init` to review to
+   approval.
 
 ## Dependencies
 
 | Upstream                                  | Downstream                           |
 | ----------------------------------------- | ------------------------------------ |
 | `agent-platform-electron-command-sandbox` | `agent-platform-electron-experience` |
+
+## Child Task Specs
+
+| Task                                     | Spec                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| `agent-platform-electron-onboarding.1`   | `docs/tasks/agent-platform-electron-onboarding.1.md`                     |
+| `agent-platform-electron-onboarding.2`   | `docs/tasks/agent-platform-electron-onboarding.2.md`                     |
+| `agent-platform-electron-onboarding.3`   | `docs/tasks/agent-platform-electron-onboarding.3.md`                     |
+| `agent-platform-electron-onboarding.4`   | `docs/tasks/agent-platform-electron-onboarding.4.md`                     |
+| `agent-platform-electron-onboarding.5`   | `docs/tasks/agent-platform-electron-onboarding.5.md`                     |
+| `agent-platform-electron-onboarding.6`   | `docs/tasks/agent-platform-electron-onboarding.6.md`                     |
+| `agent-platform-electron-onboarding.7`   | `docs/tasks/agent-platform-electron-onboarding.7.md`                     |
+| `agent-platform-electron-onboarding` DoD | PR checks, Sonar/Problems gate, and review comments green for all tasks. |
 
 ## Testing Strategy
 
