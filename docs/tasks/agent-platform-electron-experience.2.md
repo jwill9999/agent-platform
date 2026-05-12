@@ -42,4 +42,4 @@ metadata without typing host paths or using duplicate folder controls.
 - [x] A recent Project can be reopened without manual path entry.
 - [x] Moved/unavailable Projects show user-facing unavailable state.
 - [x] Absolute host paths are hidden in normal UI.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
