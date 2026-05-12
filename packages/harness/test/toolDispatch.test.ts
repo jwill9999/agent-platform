@@ -2,7 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createToolDispatchNode, type ToolDispatchContext } from '../src/nodes/toolDispatch.js';
+import {
+  createToolDispatchNode,
+  type ApprovalRequestCreateInput,
+  type ToolDispatchContext,
+} from '../src/nodes/toolDispatch.js';
 import type { HarnessStateType } from '../src/graphState.js';
 import type {
   Agent,
@@ -426,6 +430,76 @@ describe('toolDispatchNode', () => {
       },
       { approvalGranted: true },
     );
+  });
+
+  it('keeps approval previews canonical while persisting resolved bash execution payloads', async () => {
+    const workspace = makeTmpDir();
+    const realWorkspace = realpathSync(workspace);
+    const emitted: Output[] = [];
+    const approvalRequests = {
+      create: vi.fn((request: ApprovalRequestCreateInput) =>
+        makeApprovalRequest({
+          argsJson: JSON.stringify(request.args),
+          executionPayloadJson: request.executionPayloadJson,
+        }),
+      ),
+    };
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: vi.fn(),
+      emitter: { emit: (event) => emitted.push(event), end: vi.fn() },
+      approvalRequests,
+      pathJail: new PathJail([
+        {
+          label: 'workspace',
+          hostPath: workspace,
+          containerPath: '/workspace',
+          permission: 'read_write',
+        },
+      ]),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    try {
+      const result = await node(
+        makeState({
+          sessionId: 'session-bash-preview',
+          runId: 'run-bash-preview',
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              {
+                id: 'tc-bash-preview',
+                name: 'sys_bash',
+                args: { command: 'touch /workspace/generated/report.md' },
+              },
+            ],
+          },
+        }),
+      );
+
+      expect(result.halted).toBe(true);
+      expect(emitted).toContainEqual(
+        expect.objectContaining({
+          type: 'approval_required',
+          argsPreview: { command: 'touch /workspace/generated/report.md' },
+        }),
+      );
+      expect(JSON.stringify(emitted)).not.toContain(realWorkspace);
+      expect(approvalRequests.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          args: { command: 'touch /workspace/generated/report.md' },
+          executionPayloadJson: JSON.stringify({
+            toolCallId: 'tc-bash-preview',
+            toolName: 'sys_bash',
+            args: { command: `touch ${join(realWorkspace, 'generated', 'report.md')}` },
+          }),
+        }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   it('blocks mutating shell commands while AGENTS.md onboarding is not approved', async () => {

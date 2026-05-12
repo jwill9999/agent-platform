@@ -762,9 +762,9 @@ function projectWorkspaceOutputExecutor(
   workspaceResolution: ProjectWorkspaceResolution | undefined,
 ): NativeToolExecutor {
   if (!workspaceResolution?.ok) return executor;
-  return async (toolId, args) =>
+  return async (toolId, args, executionOptions) =>
     mapProjectWorkspacePaths(
-      await executor(toolId, args),
+      await executor(toolId, args, executionOptions),
       workspaceResolution.workspaceRoot,
     ) as Output;
 }

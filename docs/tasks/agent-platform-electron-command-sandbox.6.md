@@ -31,10 +31,15 @@ Add regression coverage that proves the command boundary works across relevant h
 - Relevant Electron or browser Playwright tests if UI/session behavior is affected.
 - Root gates before PR closeout.
 
+## Implementation Notes
+
+- Added API integration coverage for a desktop-registered Project session where a write-capable `sys_bash` command requires approval, resumes after approval, writes inside the selected Project root, and streams only canonical `/workspace` paths.
+- Documented the command sandbox regression suite in [docs/testing/command-sandbox-regression-suite.md](../testing/command-sandbox-regression-suite.md), including the harness, API, audit, and desktop E2E coverage boundaries.
+
 ## Definition Of Done
 
-- [ ] Regression suite covers allowed, denied, approval-required, and destructive command paths.
-- [ ] Project-bound desktop context is covered where command execution uses Project roots.
-- [ ] Tests do not require cloud model credentials.
-- [ ] Docs identify the command-sandbox regression suite.
+- [x] Regression suite covers allowed, denied, approval-required, and destructive command paths.
+- [x] Project-bound desktop context is covered where command execution uses Project roots.
+- [x] Tests do not require cloud model credentials.
+- [x] Docs identify the command-sandbox regression suite.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

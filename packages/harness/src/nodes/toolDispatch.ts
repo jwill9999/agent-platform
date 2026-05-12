@@ -423,7 +423,8 @@ function markShellCommandApproved(call: ToolCallIntent): ToolCallIntent {
 async function createApprovalRequiredOutput(
   ctx: ToolDispatchContext,
   state: HarnessStateType,
-  call: ToolCallIntent,
+  displayCall: ToolCallIntent,
+  executionCall: ToolCallIntent,
   riskTier: RiskTier,
   reason: string,
 ): Promise<Output> {
@@ -431,12 +432,12 @@ async function createApprovalRequiredOutput(
     sessionId: state.sessionId ?? '',
     runId: state.runId,
     agentId: ctx.agent.id,
-    toolName: call.name,
-    args: call.args,
+    toolName: displayCall.name,
+    args: displayCall.args,
     executionPayloadJson: JSON.stringify({
-      toolCallId: call.id,
-      toolName: call.name,
-      args: call.args,
+      toolCallId: executionCall.id,
+      toolName: executionCall.name,
+      args: executionCall.args,
     }),
     riskTier,
     createdAtMs: Date.now(),
@@ -445,10 +446,10 @@ async function createApprovalRequiredOutput(
   return {
     type: 'approval_required',
     approvalRequestId: request.id,
-    toolName: call.name,
+    toolName: displayCall.name,
     riskTier,
     argsPreview: parseArgsPreview(request.argsJson),
-    message: `Tool "${call.name}" requires human approval before execution. ${reason}`,
+    message: `Tool "${displayCall.name}" requires human approval before execution. ${reason}`,
   };
 }
 
@@ -991,7 +992,14 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       const browserUrlReason = browserUrlApprovalReason(safeCall);
       if (browserUrlReason && !approvedForResume) {
         const output = ctx.approvalRequests
-          ? await createApprovalRequiredOutput(ctx, state, safeCall, 'medium', browserUrlReason)
+          ? await createApprovalRequiredOutput(
+              ctx,
+              state,
+              call,
+              safeCall,
+              'medium',
+              browserUrlReason,
+            )
           : buildApprovalRequiredOutput(safeCall, browserUrlReason);
 
         await emitToolOutput(ctx, output);
@@ -1058,7 +1066,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
         const output = ctx.approvalRequests
-          ? await createApprovalRequiredOutput(ctx, state, safeCall, riskTier, reason)
+          ? await createApprovalRequiredOutput(ctx, state, call, safeCall, riskTier, reason)
           : buildApprovalRequiredOutput(safeCall, reason);
 
         await emitToolOutput(ctx, output);

@@ -8,10 +8,12 @@ import {
   createModelConfig,
   createProject,
   DEFAULT_AGENT_ID,
+  getProject,
   openDatabase,
   parseMasterKeyFromBase64,
   queryMemories,
   runSeed,
+  updateProject,
 } from '@agent-platform/db';
 import type { NativeToolExecutor } from '@agent-platform/harness';
 import request from 'supertest';
@@ -917,6 +919,64 @@ describe('POST /v1/chat (session-aware)', () => {
       const projectFile = path.join(projectRoot, 'project-note.txt');
       expect(existsSync(projectFile)).toBe(true);
       expect(readFileSync(projectFile, 'utf8')).toBe('written in project root');
+    });
+  });
+
+  it('resumes approved Project bash writes inside a desktop-registered Project without leaking host paths', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      const registered = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: projectRoot, name: 'Desktop Command Project' })
+        .expect(201);
+      const projectId = registered.body.data.project.id as string;
+      const project = getProject(db, projectId);
+      updateProject(db, projectId, {
+        metadata: {
+          ...project.metadata,
+          onboardingState: 'approved',
+        },
+      });
+      const sessionRes = await request(app)
+        .post('/v1/sessions/project')
+        .send({ agentId: DEFAULT_AGENT_ID, projectId })
+        .expect(201);
+      const sessionId = sessionRes.body.data.session.id as string;
+
+      mockToolCallStream('sys_bash', { command: 'touch /workspace/command-note.txt' });
+      const chatRes = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Create the command note' })
+        .expect(200);
+      const approvalEvent = parseNdjsonEvents(chatRes.text).find(
+        (event) => event.type === 'approval_required',
+      );
+      expect(approvalEvent).toMatchObject({
+        type: 'approval_required',
+        toolName: 'sys_bash',
+        riskTier: 'high',
+      });
+      expect(chatRes.text).toContain('/workspace/command-note.txt');
+      expect(chatRes.text).not.toContain(projectRoot);
+
+      const approvalRequestId = approvalEvent!.approvalRequestId!;
+      await request(app)
+        .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+        .send({ reason: 'ok' })
+        .expect(200);
+
+      mockToolCalls.mockReturnValueOnce('Command complete');
+      const resumeRes = await request(app)
+        .post(`/v1/sessions/${sessionId}/resume`)
+        .send({ approvalRequestId })
+        .expect(200);
+
+      expect(resumeRes.text).toContain('tool_result');
+      expect(resumeRes.text).not.toContain(projectRoot);
+      expect(existsSync(path.join(projectRoot, 'command-note.txt'))).toBe(true);
+      await expectToolExecutionCount(db, sessionId, 'pending', 1);
+      await expectToolExecutionCount(db, sessionId, 'success', 1);
     });
   });
 
