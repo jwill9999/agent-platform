@@ -1,0 +1,51 @@
+# Task: Register selected desktop Projects with the backend
+
+**Beads issue:** `agent-platform-electron-project-access.2`
+**Spec file:** `docs/tasks/agent-platform-electron-project-access.2.md`
+**Parent epic:** `agent-platform-electron-project-access` — Native Project access and session binding
+
+The Beads issue description must begin with:
+`Spec: docs/tasks/agent-platform-electron-project-access.2.md`
+
+## Summary
+
+Create or update backend Project records from trusted Electron-selected host folders.
+
+## Requirements
+
+- Add an API path for desktop Project registration.
+- Accept only trusted folder paths supplied by the Electron backend bridge.
+- Persist Project name, root path, and reopen metadata.
+- Avoid exposing host absolute paths in normal user-facing UI payloads by default.
+- Keep browser/web fallback behavior explicit.
+
+## Implementation plan
+
+1. Inspect the current Project schema and API routes.
+2. Add or extend Project registration services for desktop-selected folders.
+3. Add validation for absolute host paths and stable Project names.
+4. Add API tests for create, update/reopen, invalid path, and display-safe payloads.
+5. Document the trusted registration boundary.
+
+## Dependency order
+
+| Upstream                                   | Downstream                                 |
+| ------------------------------------------ | ------------------------------------------ |
+| `agent-platform-electron-project-access.1` | `agent-platform-electron-project-access.2` |
+| `agent-platform-electron-project-access.2` | `agent-platform-electron-project-access.3` |
+
+## Tests and verification
+
+- API/service unit tests for Project registration.
+- DB tests for persisted metadata.
+- Contract tests if API response types change.
+- Root gates and PR checks before closure.
+
+## Definition of done
+
+- [ ] Backend can create/update a Project from a trusted desktop folder.
+- [ ] Invalid or unsupported paths are rejected.
+- [ ] API responses expose Project name and safe metadata without leaking host paths by default.
+- [ ] Reopening the same folder updates/reuses the existing Project record.
+- [ ] Relevant tests and root gates pass.
+- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

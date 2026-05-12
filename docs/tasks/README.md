@@ -88,8 +88,8 @@ Spec: docs/tasks/<issue-id>.md
 | Project experience       | `agent-platform-project-experience`       | `agent-platform-project-experience.{1-6}.md`                                     |
 | Electron extract         | `agent-platform-electron-extract`         | `agent-platform-electron-extract.{1-4}.md`                                       |
 | Electron foundation      | `agent-platform-electron-foundation`      | `agent-platform-electron-foundation.{1-5}.md`                                    |
-| Electron security/data   | `agent-platform-electron-security`        | child specs pending                                                              |
-| Electron Project access  | `agent-platform-electron-project-access`  | child specs pending                                                              |
+| Electron security/data   | `agent-platform-electron-security`        | `agent-platform-electron-security.{1-6}.md`                                      |
+| Electron Project access  | `agent-platform-electron-project-access`  | `agent-platform-electron-project-access.{1-8}.md`                                |
 | Electron command sandbox | `agent-platform-electron-command-sandbox` | child specs pending                                                              |
 | Electron onboarding      | `agent-platform-electron-onboarding`      | child specs pending                                                              |
 | Electron experience      | `agent-platform-electron-experience`      | child specs pending                                                              |

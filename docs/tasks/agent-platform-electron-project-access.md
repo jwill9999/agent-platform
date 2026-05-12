@@ -21,14 +21,14 @@ Replace browser-only Project opening with Electron-native folder selection that 
 
 ## Proposed Task Chain
 
-1. Native folder picker bridge.
-2. Backend Project registration for desktop paths.
-3. Project-bound session creation.
-4. Recent Projects list and reopen.
-5. Backend-backed file tree/read APIs for desktop Projects.
-6. Shared chat/slash-command Project context propagation.
-7. Web-only fallback UI.
-8. Electron E2E for Project open to session binding.
+1. `agent-platform-electron-project-access.1` — Native folder picker bridge.
+2. `agent-platform-electron-project-access.2` — Backend Project registration for desktop paths.
+3. `agent-platform-electron-project-access.3` — Project-bound session creation.
+4. `agent-platform-electron-project-access.4` — Recent Projects list and reopen.
+5. `agent-platform-electron-project-access.5` — Backend-backed file tree/read APIs for desktop Projects.
+6. `agent-platform-electron-project-access.6` — Shared chat/slash-command Project context propagation.
+7. `agent-platform-electron-project-access.7` — Web-only fallback UI.
+8. `agent-platform-electron-project-access.8` — Electron E2E for Project open to session binding.
 
 ## Dependencies
 
