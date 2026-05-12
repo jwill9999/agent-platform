@@ -1,4 +1,3 @@
-import vm from 'node:vm';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, extname, join, resolve } from 'node:path';
 import ts from 'typescript';
@@ -70,22 +69,43 @@ writeFileSync(join(outputDir, 'package.json'), `${JSON.stringify({ type: 'common
 function loadDesktopBridgeContract() {
   const sourcePath = join(sourceDir, 'desktopBridge.ts');
   const source = readFileSync(sourcePath, 'utf8');
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      esModuleInterop: true,
-      isolatedModules: true,
-      module: ts.ModuleKind.CommonJS,
-      moduleResolution: ts.ModuleResolutionKind.Node10,
-      target: ts.ScriptTarget.ES2022,
-      verbatimModuleSyntax: false,
-    },
-    fileName: sourcePath,
-  });
-  const sandbox = {
-    exports: {},
+  const sourceFile = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.ES2022, true);
+
+  return {
+    desktopBridgeApiName: readExportedStringConst(sourceFile, 'desktopBridgeApiName'),
+    resetLocalDataIpcChannel: readExportedStringConst(sourceFile, 'resetLocalDataIpcChannel'),
+    resetLocalDataConfirmationIpcChannel: readExportedStringConst(
+      sourceFile,
+      'resetLocalDataConfirmationIpcChannel',
+    ),
+    selectProjectFolderIpcChannel: readExportedStringConst(
+      sourceFile,
+      'selectProjectFolderIpcChannel',
+    ),
   };
+}
 
-  vm.runInNewContext(compiled.outputText, sandbox, { filename: 'desktopBridge.cjs' });
+function readExportedStringConst(sourceFile, name) {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement) || !hasExportModifier(statement)) {
+      continue;
+    }
 
-  return sandbox.exports;
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        ts.isIdentifier(declaration.name) &&
+        declaration.name.text === name &&
+        declaration.initializer &&
+        ts.isStringLiteral(declaration.initializer)
+      ) {
+        return declaration.initializer.text;
+      }
+    }
+  }
+
+  throw new Error(`Missing exported string constant ${name} in desktop preload contract.`);
+}
+
+function hasExportModifier(statement) {
+  return statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
 }
