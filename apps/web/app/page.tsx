@@ -48,6 +48,7 @@ type ErrorBannerProps = Readonly<{
 }>;
 type ProjectChatHeaderProps = Readonly<{
   project: ProjectDesktopRecord | null;
+  sessionId: string | null;
 }>;
 
 function getInputStatusText(
@@ -169,7 +170,10 @@ function ErrorBanner({
   );
 }
 
-function ProjectChatHeader({ project }: ProjectChatHeaderProps) {
+function ProjectChatHeader({
+  project,
+  sessionId,
+}: ProjectChatHeaderProps) {
   if (!project) {
     return null;
   }
@@ -181,7 +185,7 @@ function ProjectChatHeader({ project }: ProjectChatHeaderProps) {
         <div className="truncate text-xs text-muted-foreground">Project chat</div>
       </div>
       <Button asChild size="sm" variant="outline" className="shrink-0">
-        <Link href={buildProjectIdeHref(project.id)}>Open IDE</Link>
+        <Link href={buildProjectIdeHref(project.id, sessionId)}>Open IDE</Link>
       </Button>
     </div>
   );
@@ -333,6 +337,32 @@ export default function HomePage() {
     }
   }, [agents, modelConfigs]);
 
+  const bindActiveProjectSession = useCallback(
+    async (agentId: string, projectId: string) => {
+      setSessionError(null);
+      try {
+        const result = await bindProjectSession({
+          agentId,
+          projectId,
+        });
+        const session = result?.session;
+        if (!session?.id) {
+          setSessionError('Failed to create Project chat session');
+          setSessionId(null);
+          setSensorDashboard(null);
+          return;
+        }
+        setSessionId(session.id);
+        await refreshSensors(session.id);
+      } catch (error) {
+        setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to open Project chat');
+        setSessionId(null);
+        setSensorDashboard(null);
+      }
+    },
+    [refreshSensors],
+  );
+
   const openProjectChat = useCallback(
     (project: ProjectDesktopRecord) => {
       setSelectedMode('project-chat');
@@ -342,12 +372,14 @@ export default function HomePage() {
       setSessionError(null);
       setIsResuming(false);
       const def = pickDefaultAgentForMode(agents, 'project');
+      const nextAgentId = def?.id ?? selectedAgentId;
       if (def) {
         setSelectedAgentId(def.id);
         setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
       }
+      return nextAgentId ?? null;
     },
-    [agents, modelConfigs],
+    [agents, modelConfigs, selectedAgentId],
   );
 
   const handleOpenProject = useCallback(async () => {
@@ -356,7 +388,10 @@ export default function HomePage() {
     try {
       const result = await selectAndRegisterDesktopProject();
       if (!result) return;
-      openProjectChat(result.project);
+      const agentId = openProjectChat(result.project);
+      if (agentId) {
+        await bindActiveProjectSession(agentId, result.project.id);
+      }
       if (globalThis.window !== undefined) {
         globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
       }
@@ -365,7 +400,7 @@ export default function HomePage() {
     } finally {
       setIsOpeningProject(false);
     }
-  }, [openProjectChat]);
+  }, [bindActiveProjectSession, openProjectChat]);
 
   useEffect(() => {
     if (selectedMode !== 'project-chat') return;
@@ -434,29 +469,8 @@ export default function HomePage() {
   useEffect(() => {
     if (selectedMode !== 'project-chat') return;
     if (!selectedAgentId || !activeProject?.id) return;
-    setSessionError(null);
-    void (async () => {
-      try {
-        const result = await bindProjectSession({
-          agentId: selectedAgentId,
-          projectId: activeProject.id,
-        });
-        const session = result?.session;
-        if (!session?.id) {
-          setSessionError('Failed to create Project chat session');
-          setSessionId(null);
-          setSensorDashboard(null);
-          return;
-        }
-        setSessionId(session.id);
-        await refreshSensors(session.id);
-      } catch (error) {
-        setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to open Project chat');
-        setSessionId(null);
-        setSensorDashboard(null);
-      }
-    })();
-  }, [activeProject?.id, refreshSensors, selectedAgentId, selectedMode]);
+    void bindActiveProjectSession(selectedAgentId, activeProject.id);
+  }, [activeProject?.id, bindActiveProjectSession, selectedAgentId, selectedMode]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -527,7 +541,9 @@ export default function HomePage() {
             loading={sessionsLoading}
             disabled={isLoading}
           />
-          {selectedMode === 'project-chat' && <ProjectChatHeader project={activeProject} />}
+          {selectedMode === 'project-chat' && (
+            <ProjectChatHeader project={activeProject} sessionId={sessionId} />
+          )}
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           <AgentModelProvider

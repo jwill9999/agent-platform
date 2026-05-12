@@ -40,6 +40,10 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page.getByText(backendProjectRoot)).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
+      await expect(page.getByRole('link', { name: 'Open IDE' })).toHaveAttribute(
+        'href',
+        /\/ide\?projectId=.*&sessionId=.+/,
+      );
 
       await page.getByRole('link', { name: 'Open IDE' }).click();
       await page.waitForURL(/\/ide/);

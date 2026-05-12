@@ -36,8 +36,34 @@ conversation context.
 
 ## Definition Of Done
 
-- [ ] Project chat exposes one clear IDE handoff action.
-- [ ] IDE opens with the same Project and session context.
-- [ ] Duplicate/confusing Project open affordances are not visible in the handoff flow.
-- [ ] Electron E2E verifies chat-to-IDE continuity.
+- [x] Project chat exposes one clear IDE handoff action.
+- [x] IDE opens with the same Project and session context.
+- [x] Duplicate/confusing Project open affordances are not visible in the handoff flow.
+- [x] Electron E2E verifies chat-to-IDE continuity.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation Notes
+
+- Project chat now binds a Project session during Project open instead of waiting for later chat
+  interaction, so the composer and IDE handoff are ready as soon as setup completes.
+- The `Open IDE` handoff carries both `projectId` and `sessionId`.
+- The IDE validates a handed-off Project session, restores that session for the assistant panel, and
+  avoids replacing it with a different reusable Project session.
+- Existing duplicate browser folder/manual path affordances remain suppressed in the desktop Project
+  flow.
+
+## Local Verification
+
+- `make up`
+- `pnpm --filter @agent-platform/web exec vitest run test/project-navigation.test.ts test/project-onboarding-assessment-panel.test.ts`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm --filter @agent-platform/desktop run test:e2e`
+- `pnpm exec playwright test -c e2e/playwright.config.ts e2e/ide-project-opening-parked.spec.ts`
+- `pnpm docs:lint`
+- `pnpm format:check`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm run test:e2e`

@@ -12,6 +12,7 @@ import type {
   ProjectFileReadResult,
   ProjectFileTreeResult,
   ProjectRecord,
+  SessionRecord,
 } from '@agent-platform/contracts';
 import {
   ProjectOnboardingAssessmentSchema,
@@ -110,6 +111,7 @@ import {
   desktopProjectIsAvailable,
   projectReopenSearchParam,
   recentProjectsUpdatedEvent,
+  sessionReopenSearchParam,
 } from '@/lib/project-navigation';
 import {
   bindProjectSession,
@@ -1795,6 +1797,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [includeActiveFile, setIncludeActiveFile] = useState(true);
   const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
   const attemptedProjectReopenIdRef = useRef<string | null>(null);
+  const handoffSessionRef = useRef<{ projectId: string; sessionId: string } | null>(null);
 
   // Use backend-bound Project files first. Browser FS remains parked for product IDE use.
   let fileTree = initialFileTree ?? [];
@@ -1945,6 +1948,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setContextFiles([]);
     setEditProposal(null);
     setProjectFileTree([]);
+    setSessionId(null);
+    handoffSessionRef.current = null;
   }, []);
 
   const reopenDesktopProjectById = useCallback(
@@ -1968,15 +1973,29 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     if (globalThis.window === undefined) return;
     const params = new URLSearchParams(globalThis.window.location.search);
     const projectId = params.get(projectReopenSearchParam);
+    const requestedSessionId = params.get(sessionReopenSearchParam);
     if (!projectId || activeProject?.id === projectId) return;
     if (attemptedProjectReopenIdRef.current === projectId) return;
     attemptedProjectReopenIdRef.current = projectId;
 
     void (async () => {
       const reopened = await reopenDesktopProjectById(projectId);
+      if (reopened && requestedSessionId) {
+        try {
+          const session = await apiGet<SessionRecord>(apiPath('sessions', requestedSessionId));
+          if (session?.mode === 'project' && session.projectId === projectId) {
+            setSelectedAgentId(session.agentId);
+            setSessionId(session.id);
+            handoffSessionRef.current = { projectId, sessionId: session.id };
+          }
+        } catch {
+          toast.error('Failed to restore Project chat session');
+        }
+      }
       if (reopened && globalThis.window !== undefined) {
         const nextUrl = new URL(globalThis.window.location.href);
         nextUrl.searchParams.delete(projectReopenSearchParam);
+        nextUrl.searchParams.delete(sessionReopenSearchParam);
         globalThis.window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}`);
       }
     })();
@@ -2016,6 +2035,13 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
   useEffect(() => {
     if (!selectedAgentId || !activeProject?.id) return;
+    const handoffSession = handoffSessionRef.current;
+    if (
+      handoffSession?.projectId === activeProject.id &&
+      handoffSession.sessionId === sessionId
+    ) {
+      return;
+    }
     void (async () => {
       try {
         const result = await bindProjectSession({
@@ -2034,7 +2060,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         toast.error(e instanceof ApiRequestError ? e.message : 'Failed to create session');
       }
     })();
-  }, [activeProject?.id, selectedAgentId]);
+  }, [activeProject?.id, selectedAgentId, sessionId]);
 
   useEffect(() => {
     if (harnessError) {

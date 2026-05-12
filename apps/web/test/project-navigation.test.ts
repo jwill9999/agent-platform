@@ -7,6 +7,7 @@ import {
   desktopProjectIsAvailable,
   projectReopenSearchParam,
   resolveWorkspaceScope,
+  sessionReopenSearchParam,
   workspaceEntryCopy,
   workspaceNavigationItems,
   workspaceScopeLabel,
@@ -68,8 +69,12 @@ describe('Project navigation model', () => {
     } as const;
 
     expect(projectReopenSearchParam).toBe('projectId');
+    expect(sessionReopenSearchParam).toBe('sessionId');
     expect(buildProjectChatHref(project.id)).toBe('/?projectId=project%201');
     expect(buildProjectIdeHref(project.id)).toBe('/ide?projectId=project%201');
+    expect(buildProjectIdeHref(project.id, 'session 1')).toBe(
+      '/ide?projectId=project%201&sessionId=session%201',
+    );
     expect(desktopProjectFolderLabel(project)).toBe('auth-app');
     expect(desktopProjectIsAvailable(project)).toBe(true);
   });

@@ -80,6 +80,10 @@ test.describe('Electron Project access', () => {
       expect(project.metadata.folderName).toBe('electron-e2e-project');
       const session = await findProjectSession(backendPort, project.id);
       expect(session.mode).toBe('project');
+      await expect(page.getByRole('link', { name: 'Open IDE' })).toHaveAttribute(
+        'href',
+        `/ide?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(session.id)}`,
+      );
 
       const recentProjects = page.locator('section[aria-label="Recent Projects"]');
       await expect(

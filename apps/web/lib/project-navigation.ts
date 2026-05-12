@@ -49,6 +49,7 @@ export const workspaceEntryCopy = {
 } as const;
 
 export const projectReopenSearchParam = 'projectId';
+export const sessionReopenSearchParam = 'sessionId';
 export const recentProjectsUpdatedEvent = 'agent-platform:desktop-projects-updated';
 
 export function createWorkspaceNavigationState(input: {
@@ -109,8 +110,12 @@ export function desktopProjectIsAvailable(project: ProjectDesktopRecord): boolea
   return project.metadata.capabilityState !== 'unavailable';
 }
 
-export function buildProjectIdeHref(projectId: string): string {
-  return `/ide?${projectReopenSearchParam}=${encodeURIComponent(projectId)}`;
+export function buildProjectIdeHref(projectId: string, sessionId?: string | null): string {
+  const params = [`${projectReopenSearchParam}=${encodeURIComponent(projectId)}`];
+  if (sessionId) {
+    params.push(`${sessionReopenSearchParam}=${encodeURIComponent(sessionId)}`);
+  }
+  return `/ide?${params.join('&')}`;
 }
 
 export function buildProjectChatHref(projectId: string): string {
