@@ -4,8 +4,10 @@ import {
   desktopBridgeApiKeys,
   desktopBridgeApiName,
   desktopMaintenanceApiKeys,
+  desktopProjectsApiKeys,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
+  selectProjectFolderIpcChannel,
   desktopVersionsApiKeys,
 } from '../src/preload/desktopBridge.js';
 
@@ -15,7 +17,7 @@ describe('desktop preload bridge contract', () => {
   });
 
   it('limits the root bridge keys to the explicit contract', () => {
-    expect(desktopBridgeApiKeys).toEqual(['maintenance', 'versions']);
+    expect(desktopBridgeApiKeys).toEqual(['maintenance', 'projects', 'versions']);
   });
 
   it('limits maintenance helpers to explicit destructive actions', () => {
@@ -24,6 +26,10 @@ describe('desktop preload bridge contract', () => {
 
   it('limits version helpers to runtime version readers', () => {
     expect(desktopVersionsApiKeys).toEqual(['chrome', 'electron', 'node']);
+  });
+
+  it('limits Project helpers to native Project selection', () => {
+    expect(desktopProjectsApiKeys).toEqual(['selectFolder']);
   });
 
   it('does not include generic IPC, filesystem, shell, or path APIs', () => {
@@ -46,5 +52,12 @@ describe('desktop preload bridge contract', () => {
       expect(channel).not.toContain('shell');
       expect(channel).not.toContain('eval');
     }
+  });
+
+  it('keeps Project IPC channels scoped to explicit desktop actions', () => {
+    expect(selectProjectFolderIpcChannel).toBe('agent-platform:select-project-folder');
+    expect(selectProjectFolderIpcChannel).not.toContain('fs');
+    expect(selectProjectFolderIpcChannel).not.toContain('shell');
+    expect(selectProjectFolderIpcChannel).not.toContain('eval');
   });
 });

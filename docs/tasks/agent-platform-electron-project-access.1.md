@@ -43,9 +43,35 @@ Expose a narrow Electron-native Project folder picker through the preload bridge
 
 ## Definition of done
 
-- [ ] Renderer can request native Project folder selection through a named desktop bridge API.
-- [ ] Native folder selection runs in Electron main.
-- [ ] Cancellation is handled as a non-error result.
-- [ ] No generic filesystem, path, shell, or IPC APIs are exposed.
-- [ ] Relevant tests and root gates pass.
+- [x] Renderer can request native Project folder selection through a named desktop bridge API.
+- [x] Native folder selection runs in Electron main.
+- [x] Cancellation is handled as a non-error result.
+- [x] No generic filesystem, path, shell, or IPC APIs are exposed.
+- [x] Relevant tests and root gates pass.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation notes
+
+- Added `projects.selectFolder()` to the typed desktop preload bridge.
+- Added `agent-platform:select-project-folder` as the dedicated IPC channel for native Project
+  folder selection.
+- Added a main-process folder picker service that opens Electron's native directory picker and
+  normalizes the selected folder into `{ path, name }` metadata.
+- Registered the Project picker IPC handler with trusted-sender and no-payload validation.
+- Kept the bridge surface narrow; no generic filesystem, shell, path, or raw IPC APIs were exposed.
+
+## Verification notes
+
+- `pnpm --filter @agent-platform/desktop test -- test/projectFolderPicker.test.ts test/preloadContract.test.ts test/ipcValidation.test.ts`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop test`
+- `pnpm --filter @agent-platform/desktop smoke`
+- `pnpm --filter @agent-platform/desktop smoke:backend`
+- `pnpm docs:lint`
+- `pnpm format:check`
+- `git diff --check`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm build`
+- `pnpm test`

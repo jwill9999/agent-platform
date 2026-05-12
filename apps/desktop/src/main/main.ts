@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,6 +15,7 @@ import {
   resetDesktopLocalData,
   validateDesktopLocalDataResetRequest,
 } from './localDataReset.js';
+import { selectDesktopProjectFolder } from './projectFolderPicker.js';
 import {
   getRepoRootFromMainDir,
   getStandaloneRendererPaths,
@@ -35,6 +36,7 @@ import {
 import {
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
+  selectProjectFolderIpcChannel,
 } from '../preload/desktopBridge.js';
 import {
   applyRendererSecurity,
@@ -126,15 +128,27 @@ async function bootstrap(): Promise<void> {
 
   const window = await createMainWindow();
   registerDesktopMaintenanceIpc(window, runtimePaths);
+  registerDesktopProjectIpc(window);
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       const activatedWindow = await createMainWindow();
       registerDesktopMaintenanceIpc(activatedWindow, runtimePaths);
+      registerDesktopProjectIpc(activatedWindow);
       return;
     }
 
     focusMainWindow();
+  });
+}
+
+function registerDesktopProjectIpc(window: BrowserWindow): void {
+  ipcMain.removeHandler(selectProjectFolderIpcChannel);
+  ipcMain.handle(selectProjectFolderIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    validateIpcPayload(payload, validateNoPayload);
+
+    return selectDesktopProjectFolder({ dialog, window });
   });
 }
 

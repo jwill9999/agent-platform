@@ -4,6 +4,7 @@ import {
   desktopBridgeApiName,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
+  selectProjectFolderIpcChannel,
   type AgentPlatformDesktopApi,
 } from './desktopBridge.js';
 
@@ -14,6 +15,12 @@ const desktopApi = {
     resetLocalData: (request) =>
       ipcRenderer.invoke(resetLocalDataIpcChannel, request) as ReturnType<
         AgentPlatformDesktopApi['maintenance']['resetLocalData']
+      >,
+  },
+  projects: {
+    selectFolder: () =>
+      ipcRenderer.invoke(selectProjectFolderIpcChannel) as ReturnType<
+        AgentPlatformDesktopApi['projects']['selectFolder']
       >,
   },
   versions: {
