@@ -48,7 +48,7 @@ Expose a narrow Electron-native Project folder picker through the preload bridge
 - [x] Cancellation is handled as a non-error result.
 - [x] No generic filesystem, path, shell, or IPC APIs are exposed.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
@@ -75,3 +75,8 @@ Expose a narrow Electron-native Project folder picker through the preload bridge
 - `pnpm lint`
 - `pnpm build`
 - `pnpm test`
+- PR #175 passed GitHub `verify`, `docker`, `e2e`, docs `markdownlint`/`lychee`,
+  GitGuardian, and SonarCloud.
+- SonarCloud reported 0 new issues and 0 security hotspots.
+- Sourcery skipped because the PR diff exceeded the account review limit and posted no actionable
+  inline comments.
