@@ -891,12 +891,27 @@ describe('projectsRouter', () => {
       .post(`/v1/projects/${openedProject.body.data.id}/onboarding/refresh`)
       .send({})
       .expect(200);
+    expect(drifted.body.data.metadata.onboardingState).toBe('approved');
+    expect(drifted.body.data.metadata.onboardingApproval).toMatchObject({
+      source: 'auto_assessment',
+      targetPath: 'AGENTS.md',
+    });
     expect(drifted.body.data.metadata.onboardingRefresh).toMatchObject({
       previousState: 'approved',
       nextState: 'needs_review',
       updateStatus: 'material_drift',
       materialDrift: true,
     });
+    expect(drifted.body.data.metadata.instructionUpdateCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'refresh',
+          status: 'pending',
+          targetPath: 'AGENTS.md',
+          risk: 'needs_review',
+        }),
+      ]),
+    );
     expect(drifted.body.data.metadata.onboardingAssessment.profile).toBe('mixed');
 
     const missingInstructionsDir = path.join(tmpDir, 'repo-refresh-proposed-update');
@@ -916,6 +931,15 @@ describe('projectsRouter', () => {
       updateStatus: 'proposed_update',
       materialDrift: false,
     });
+    expect(proposedUpdate.body.data.metadata.instructionUpdateCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'refresh',
+          status: 'pending',
+          targetPath: 'AGENTS.md',
+        }),
+      ]),
+    );
   });
 
   it('keeps backend-inaccessible paths unavailable and does not create project records', async () => {

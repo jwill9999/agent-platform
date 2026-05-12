@@ -258,6 +258,82 @@ function appendInstructionUpdate(
   return `${trimmed}\n\n${heading}\n\n${update}`;
 }
 
+function projectBackendAssessment(project: ProjectRecord) {
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  const repositoryRoot = project.metadata['repositoryRoot'];
+  if (typeof backendProjectRoot !== 'string' || typeof repositoryRoot !== 'string') {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project root is not backend accessible');
+  }
+  const parsedState = ProjectOnboardingStateSchema.safeParse(project.metadata['onboardingState']);
+  const state = parsedState.success ? parsedState.data : 'missing';
+  const activeBranch =
+    typeof project.metadata['activeBranch'] === 'string'
+      ? project.metadata['activeBranch']
+      : undefined;
+  return {
+    backendProjectRoot,
+    repositoryRoot,
+    assessmentResult: assessProjectOnboarding({
+      projectId: project.id,
+      projectName: project.name,
+      projectRoot: backendProjectRoot,
+      repositoryRoot,
+      activeBranch,
+      currentState: state,
+      existingInstructionFiles: parseProjectInstructionFileReferences(project.metadata),
+    }),
+  };
+}
+
+function instructionFilesWithApproval(
+  assessmentResult: ReturnType<typeof assessProjectOnboarding>,
+): ProjectInstructionFileReference[] {
+  const approvedAtMs =
+    assessmentResult.nextState === 'approved'
+      ? assessmentResult.assessment.assessedAtMs
+      : undefined;
+  return assessmentResult.instructionFiles.map((file) =>
+    approvedAtMs && file.scope === 'root' ? { ...file, approvedAtMs } : file,
+  );
+}
+
+function mergeRefreshInstructionUpdateCandidates(input: {
+  existing: ProjectInstructionUpdateCandidate[];
+  assessment: ReturnType<typeof assessProjectOnboarding>['assessment'];
+  nowMs: number;
+}): ProjectInstructionUpdateCandidate[] {
+  const activeKeys = new Set(
+    input.existing
+      .filter((candidate) => candidate.status === 'pending' || candidate.status === 'proposed')
+      .map((candidate) => `${candidate.source}:${candidate.targetPath}:${candidate.summary}`),
+  );
+  const candidates = input.assessment.recommendedInstructionUpdates.flatMap(
+    (recommendation, index) => {
+      const targetPath = recommendation.targetPath ?? 'AGENTS.md';
+      const key = `refresh:${targetPath}:${recommendation.summary}`;
+      if (activeKeys.has(key)) return [];
+      activeKeys.add(key);
+      return [
+        ProjectInstructionUpdateCandidateSchema.parse({
+          id: `instruction-refresh-${input.nowMs}-${index + 1}`,
+          targetPath,
+          summary: recommendation.summary,
+          ...(recommendation.rationale ? { rationale: recommendation.rationale } : {}),
+          ...(recommendation.proposedMarkdown
+            ? { proposedMarkdown: recommendation.proposedMarkdown }
+            : {}),
+          source: 'refresh',
+          risk: 'needs_review',
+          status: 'pending',
+          evidence: [],
+          createdAtMs: input.nowMs,
+        }),
+      ];
+    },
+  );
+  return candidates.length ? [...input.existing, ...candidates] : input.existing;
+}
+
 function discoverBackendProjectMetadata(
   rawPath: string,
   existingMetadata: Record<string, unknown> = {},
@@ -800,39 +876,14 @@ function reviewProjectOnboarding(db: DrizzleDb, id: string, body: unknown): Proj
 function assessProjectForOnboarding(db: DrizzleDb, id: string): ProjectRecord {
   const project = findProject(db, id);
   if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
-  const backendProjectRoot = project.metadata['backendProjectRoot'];
-  const repositoryRoot = project.metadata['repositoryRoot'];
-  if (typeof backendProjectRoot !== 'string' || typeof repositoryRoot !== 'string') {
-    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project root is not backend accessible');
-  }
-  const parsedState = ProjectOnboardingStateSchema.safeParse(project.metadata['onboardingState']);
-  const state = parsedState.success ? parsedState.data : 'missing';
-  const activeBranch =
-    typeof project.metadata['activeBranch'] === 'string'
-      ? project.metadata['activeBranch']
-      : undefined;
-  const assessmentResult = assessProjectOnboarding({
-    projectId: project.id,
-    projectName: project.name,
-    projectRoot: backendProjectRoot,
-    repositoryRoot,
-    activeBranch,
-    currentState: state,
-    existingInstructionFiles: parseProjectInstructionFileReferences(project.metadata),
-  });
-  const approvedAtMs =
-    assessmentResult.nextState === 'approved'
-      ? assessmentResult.assessment.assessedAtMs
-      : undefined;
+  const { assessmentResult } = projectBackendAssessment(project);
 
   const updated = updateProject(db, id, {
     metadata: {
       ...project.metadata,
       onboardingState: assessmentResult.nextState,
       onboardingAssessment: assessmentResult.assessment,
-      instructionFiles: assessmentResult.instructionFiles.map((file) =>
-        approvedAtMs && file.scope === 'root' ? { ...file, approvedAtMs } : file,
-      ),
+      instructionFiles: instructionFilesWithApproval(assessmentResult),
     },
   });
   return withAutoApprovalMetadata(db, updated);
@@ -845,11 +896,11 @@ function refreshProjectOnboarding(db: DrizzleDb, id: string): ProjectRecord {
   const previousAssessment = ProjectOnboardingAssessmentSchema.safeParse(
     project.metadata['onboardingAssessment'],
   );
-  const refreshed = assessProjectForOnboarding(db, id);
-  const nextAssessment = ProjectOnboardingAssessmentSchema.parse(
-    refreshed.metadata['onboardingAssessment'],
-  );
-  const nextState = metadataOnboardingState(refreshed.metadata) ?? 'missing';
+  const previousInstructionFiles = parseProjectInstructionFileReferences(project.metadata);
+  const existingCandidates = parseInstructionUpdateCandidates(project.metadata);
+  const { assessmentResult } = projectBackendAssessment(project);
+  const nextAssessment = assessmentResult.assessment;
+  const nextState = assessmentResult.nextState;
   const previousAssessmentData = previousAssessment.success ? previousAssessment.data : undefined;
   const previousProfile = previousAssessmentData?.profile;
   const preserveProfile =
@@ -875,6 +926,20 @@ function refreshProjectOnboarding(db: DrizzleDb, id: string): ProjectRecord {
   } else if (assessment.recommendedInstructionUpdates.length > 0) {
     updateStatus = 'proposed_update';
   }
+  const preserveApprovedSetup = previousState === 'approved' && materialDrift;
+  const persistedState = preserveApprovedSetup ? previousState : nextState;
+  const instructionFiles = preserveApprovedSetup
+    ? previousInstructionFiles
+    : instructionFilesWithApproval(assessmentResult);
+  const nowMs = assessment.assessedAtMs;
+  const instructionUpdateCandidates =
+    updateStatus === 'no_change'
+      ? existingCandidates
+      : mergeRefreshInstructionUpdateCandidates({
+          existing: existingCandidates,
+          assessment,
+          nowMs,
+        });
   const result = ProjectOnboardingRefreshResultSchema.parse({
     previousState,
     nextState,
@@ -884,13 +949,17 @@ function refreshProjectOnboarding(db: DrizzleDb, id: string): ProjectRecord {
     refreshedAtMs: assessment.assessedAtMs,
   });
 
-  return updateProject(db, id, {
+  const updated = updateProject(db, id, {
     metadata: {
-      ...refreshed.metadata,
+      ...project.metadata,
+      onboardingState: persistedState,
+      instructionFiles,
       onboardingAssessment: assessment,
       onboardingRefresh: result,
+      instructionUpdateCandidates,
     },
   });
+  return withAutoApprovalMetadata(db, updated);
 }
 
 function collectInstructionUpdateCandidates(
