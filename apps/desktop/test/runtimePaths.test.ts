@@ -68,7 +68,7 @@ describe('desktop runtime path resolution', () => {
     expect(paths.sqlitePath).toBe(join(repoRuntime, 'data/agent.sqlite'));
   });
 
-  it('allows individual SQLite, config, and log path overrides', () => {
+  it('allows individual desktop SQLite, config, and log path overrides', () => {
     const root = makeTempDir();
     const sqlitePath = join(root, 'custom/db.sqlite');
     const configPath = join(root, 'custom/runtime.json');
@@ -78,7 +78,7 @@ describe('desktop runtime path resolution', () => {
       logDir: join(root, 'logs'),
       tempDir: join(root, 'temp'),
       env: {
-        SQLITE_PATH: sqlitePath,
+        AGENT_PLATFORM_DESKTOP_SQLITE_PATH: sqlitePath,
         AGENT_PLATFORM_DESKTOP_CONFIG_PATH: configPath,
         AGENT_PLATFORM_DESKTOP_LOG_DIR: logDir,
       },
@@ -87,6 +87,20 @@ describe('desktop runtime path resolution', () => {
     expect(paths.sqlitePath).toBe(sqlitePath);
     expect(paths.configPath).toBe(configPath);
     expect(paths.logDir).toBe(logDir);
+  });
+
+  it('ignores generic Docker SQLite overrides when resolving desktop app data', () => {
+    const root = makeTempDir();
+    const paths = resolveDesktopRuntimePaths({
+      userDataDir: join(root, 'app-data'),
+      logDir: join(root, 'logs'),
+      tempDir: join(root, 'temp'),
+      env: {
+        SQLITE_PATH: '/data/agent.sqlite',
+      },
+    });
+
+    expect(paths.sqlitePath).toBe(join(root, 'app-data/data/agent.sqlite'));
   });
 
   it('can resolve paths from the Electron app abstraction', () => {

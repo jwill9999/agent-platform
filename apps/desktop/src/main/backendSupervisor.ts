@@ -16,6 +16,7 @@ export interface DesktopBackendPaths {
   stderrLog: string;
   sqlitePath: string;
   configPath: string;
+  tempDir: string;
 }
 
 export interface DesktopBackendHandle {
@@ -36,6 +37,19 @@ interface StartDesktopBackendOptions {
   maxLogBytes?: number;
 }
 
+export interface DesktopBackendEnvironment {
+  readonly HOST: string;
+  readonly NODE_ENV: string;
+  readonly PORT: string;
+  readonly SCHEDULER_ENABLED: string;
+  readonly SQLITE_PATH: string;
+  readonly AGENT_PLATFORM_DESKTOP_CONFIG_PATH: string;
+  readonly AGENT_PLATFORM_DESKTOP_CONFIG_DIR: string;
+  readonly AGENT_PLATFORM_DESKTOP_DATA_DIR: string;
+  readonly AGENT_PLATFORM_DESKTOP_LOG_DIR: string;
+  readonly AGENT_PLATFORM_DESKTOP_TEMP_DIR: string;
+}
+
 const defaultBackendPort = 4310;
 const defaultMaxLogBytes = 1024 * 1024;
 
@@ -54,6 +68,7 @@ export function getDesktopBackendPaths(
     stderrLog: join(runtimePaths.logDir, 'backend.stderr.log'),
     sqlitePath: runtimePaths.sqlitePath,
     configPath: runtimePaths.configPath,
+    tempDir: runtimePaths.tempDir,
   };
 }
 
@@ -71,6 +86,29 @@ export function resolveDesktopBackendNodePath(
 
 export function desktopBackendAvailable(paths: DesktopBackendPaths): boolean {
   return existsSync(paths.apiEntry);
+}
+
+export function buildDesktopBackendEnvironment({
+  env,
+  paths,
+  port,
+}: {
+  env: NodeJS.ProcessEnv;
+  paths: DesktopBackendPaths;
+  port: string;
+}): DesktopBackendEnvironment {
+  return {
+    HOST: '127.0.0.1',
+    NODE_ENV: 'production',
+    PORT: port,
+    SCHEDULER_ENABLED: env.SCHEDULER_ENABLED ?? 'false',
+    SQLITE_PATH: paths.sqlitePath,
+    AGENT_PLATFORM_DESKTOP_CONFIG_PATH: paths.configPath,
+    AGENT_PLATFORM_DESKTOP_CONFIG_DIR: dirname(paths.configPath),
+    AGENT_PLATFORM_DESKTOP_DATA_DIR: dirname(paths.sqlitePath),
+    AGENT_PLATFORM_DESKTOP_LOG_DIR: dirname(paths.stdoutLog),
+    AGENT_PLATFORM_DESKTOP_TEMP_DIR: paths.tempDir,
+  };
 }
 
 export async function startDesktopBackend({
@@ -136,15 +174,13 @@ function spawnBackendProcess({
   env: NodeJS.ProcessEnv;
   port: string;
 }): ChildProcess {
+  const desktopEnv = buildDesktopBackendEnvironment({ env, paths, port });
+
   return spawn(nodePath, [paths.apiEntry], {
     cwd: paths.repoRoot,
     env: {
       ...env,
-      HOST: '127.0.0.1',
-      NODE_ENV: 'production',
-      PORT: port,
-      SCHEDULER_ENABLED: env.SCHEDULER_ENABLED ?? 'false',
-      SQLITE_PATH: env.SQLITE_PATH?.trim() || paths.sqlitePath,
+      ...desktopEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

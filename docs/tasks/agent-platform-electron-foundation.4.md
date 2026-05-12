@@ -36,7 +36,9 @@ This task should make the location explicit for the app while avoiding Docker pa
   - logs: `app.getPath('logs')`
   - temp/runtime scratch: `app.getPath('temp')`
 - The backend supervisor now receives resolved runtime paths instead of deriving repository-relative runtime storage.
-- `SQLITE_PATH`, `AGENT_PLATFORM_DESKTOP_CONFIG_PATH`, `AGENT_PLATFORM_DESKTOP_LOG_DIR`, and related overrides remain available for explicit development/testing scenarios.
+- `AGENT_PLATFORM_DESKTOP_SQLITE_PATH`, `AGENT_PLATFORM_DESKTOP_CONFIG_PATH`,
+  `AGENT_PLATFORM_DESKTOP_LOG_DIR`, and related overrides remain available for explicit
+  development/testing scenarios.
 - Docker development and CI storage remain unchanged; this task only changes the Electron-managed desktop runtime path contract.
 - Data deletion/uninstall remains a follow-up lifecycle task. The expected deletion scope is local app data/config/log/temp metadata and stored credentials, not user Project folders.
 

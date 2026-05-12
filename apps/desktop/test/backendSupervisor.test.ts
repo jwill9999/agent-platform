@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  buildDesktopBackendEnvironment,
   desktopBackendAvailable,
   getDesktopBackendPaths,
   getDesktopBackendUrl,
@@ -87,6 +88,34 @@ describe('desktop backend supervisor helpers', () => {
     expect(paths.stderrLog).toBe(join(runtimeRoot, 'logs/backend.stderr.log'));
     expect(paths.sqlitePath).toBe(join(runtimeRoot, 'data/agent.sqlite'));
     expect(paths.configPath).toBe(join(runtimeRoot, 'config/runtime.json'));
+    expect(paths.tempDir).toBe(join(runtimeRoot, 'tmp'));
+  });
+
+  it('builds a managed backend environment from resolved desktop paths', () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+    const env = buildDesktopBackendEnvironment({
+      env: {
+        SCHEDULER_ENABLED: 'true',
+        SQLITE_PATH: '/data/agent.sqlite',
+      },
+      paths,
+      port: '4500',
+    });
+
+    expect(env).toMatchObject({
+      HOST: '127.0.0.1',
+      NODE_ENV: 'production',
+      PORT: '4500',
+      SCHEDULER_ENABLED: 'true',
+      SQLITE_PATH: join(runtimeRoot, 'data/agent.sqlite'),
+      AGENT_PLATFORM_DESKTOP_CONFIG_PATH: join(runtimeRoot, 'config/runtime.json'),
+      AGENT_PLATFORM_DESKTOP_CONFIG_DIR: join(runtimeRoot, 'config'),
+      AGENT_PLATFORM_DESKTOP_DATA_DIR: join(runtimeRoot, 'data'),
+      AGENT_PLATFORM_DESKTOP_LOG_DIR: join(runtimeRoot, 'logs'),
+      AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeRoot, 'tmp'),
+    });
   });
 
   it('detects when the compiled API backend is available', () => {

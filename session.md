@@ -1580,3 +1580,29 @@ Tracked in Beads: `agent-platform-lt6`
   skipped due the account rate limit and posted no actionable inline comments.
 - Next task is `agent-platform-electron-security.3`: move desktop SQLite/config usage to app data
   paths.
+
+## 2026-05-12 Electron Security `.3`
+
+- Task `agent-platform-electron-security.3` started on
+  `task/agent-platform-electron-security.3`.
+- Tightened the desktop app-data contract:
+  - desktop SQLite overrides now use `AGENT_PLATFORM_DESKTOP_SQLITE_PATH`,
+  - generic Docker/API `SQLITE_PATH` is ignored while resolving desktop app data,
+  - the managed backend child still receives `SQLITE_PATH` after Electron resolves the desktop
+    path.
+- The managed backend environment now receives resolved desktop config, data, log, and temp paths.
+- First-run behavior is documented: desktop creates app-data directories and does not migrate
+  Docker `/data/agent.sqlite` automatically.
+- Local verification passed:
+  - `pnpm --filter @agent-platform/desktop test -- test/runtimePaths.test.ts test/backendSupervisor.test.ts`
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop lint`
+  - `pnpm --filter @agent-platform/desktop test`
+  - `pnpm --filter @agent-platform/desktop smoke:backend`
+  - `pnpm docs:lint`
+  - `pnpm format:check`
+  - `git diff --check`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm build`
+  - `pnpm test`

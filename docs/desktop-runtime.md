@@ -104,10 +104,20 @@ Development and tests may override desktop paths with:
 | `AGENT_PLATFORM_DESKTOP_DATA_DIR`     | Override data directory                      |
 | `AGENT_PLATFORM_DESKTOP_LOG_DIR`      | Override log directory                       |
 | `AGENT_PLATFORM_DESKTOP_TEMP_DIR`     | Override temp/scratch directory              |
-| `SQLITE_PATH`                         | Override SQLite file path                    |
+| `AGENT_PLATFORM_DESKTOP_SQLITE_PATH`  | Override desktop SQLite file path            |
 | `AGENT_PLATFORM_DESKTOP_CONFIG_PATH`  | Override runtime config file path            |
 | `AGENT_PLATFORM_DESKTOP_BACKEND_PORT` | Override managed backend loopback port       |
 | `AGENT_PLATFORM_DESKTOP_NODE_PATH`    | Override the Node executable for the backend |
+
+The managed desktop backend still receives `SQLITE_PATH` because the API process requires that
+environment variable. Desktop code derives that value from the desktop runtime resolver; it does
+not consume Docker's `/data/agent.sqlite` default as a desktop input.
+
+On first run, the desktop runtime creates the config, data, log, and temp directories before
+starting the managed backend. If no desktop SQLite database exists yet, the backend starts with the
+resolved app-data SQLite path and normal seed/setup flows can initialise it. There is no automatic
+migration from Docker's `/data/agent.sqlite`; Docker development data and desktop app data are
+separate by design.
 
 Do not copy user Project folders into app data. Project folders remain user-owned files outside the
 app data boundary.

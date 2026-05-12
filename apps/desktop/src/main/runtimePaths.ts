@@ -30,6 +30,7 @@ export function resolveDesktopRuntimePaths({
   const dataDir = resolve(env.AGENT_PLATFORM_DESKTOP_DATA_DIR ?? join(appDataDir, 'data'));
   const resolvedLogDir = resolve(env.AGENT_PLATFORM_DESKTOP_LOG_DIR ?? logDir);
   const resolvedTempDir = resolve(env.AGENT_PLATFORM_DESKTOP_TEMP_DIR ?? tempDir);
+  const sqliteOverride = env.AGENT_PLATFORM_DESKTOP_SQLITE_PATH?.trim();
 
   return {
     appDataDir,
@@ -37,7 +38,7 @@ export function resolveDesktopRuntimePaths({
     dataDir,
     logDir: resolvedLogDir,
     tempDir: resolvedTempDir,
-    sqlitePath: resolve(env.SQLITE_PATH?.trim() || join(dataDir, 'agent.sqlite')),
+    sqlitePath: resolve(sqliteOverride || join(dataDir, 'agent.sqlite')),
     configPath: resolve(env.AGENT_PLATFORM_DESKTOP_CONFIG_PATH ?? join(configDir, 'runtime.json')),
   };
 }
