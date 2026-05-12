@@ -22,12 +22,25 @@ The docs must clearly distinguish developer runtime from desktop runtime: Docker
 
 ## Definition of done
 
-- [ ] Developer workflow docs cover Docker and Electron modes separately.
-- [ ] Desktop runtime responsibilities are clear.
-- [ ] Log/config/data locations are documented.
-- [ ] macOS-first scope and future Windows/Linux work are documented.
-- [ ] Docs lint passes.
+- [x] Developer workflow docs cover Docker and Electron modes separately.
+- [x] Desktop runtime responsibilities are clear.
+- [x] Log/config/data locations are documented.
+- [x] macOS-first scope and future Windows/Linux work are documented.
+- [x] Docs lint passes.
 - [ ] PR checks and review comments are resolved before closure.
+
+## Implementation notes
+
+- Added [Desktop Runtime](../desktop-runtime.md) as the dedicated workflow reference.
+- Updated [Development Guide](../development.md) so Docker remains the default contributor/CI
+  runtime while Electron is documented as a separate macOS-first desktop path.
+- Updated the parent epic closeout checklist with completed foundation capabilities and remaining
+  follow-up boundaries.
+
+## Verification notes
+
+- `pnpm docs:lint`
+- `git diff --check`
 
 ## Test strategy
 

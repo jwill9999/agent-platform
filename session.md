@@ -1505,3 +1505,13 @@ Tracked in Beads: `agent-platform-lt6`
 - SonarQube MCP tools were not exposed in the current tool surface after discovery; local fallback completion gates passed. Final Sonar/Promptfoo/CI status still requires the pushed PR.
 - PR #167 initially failed SonarCloud rule `typescript:S5443` in `apps/desktop/test/runtimePaths.test.ts`; the test was patched to use private `mkdtempSync` paths instead of hardcoded public temp paths.
 - PR #167 is now clean: `verify`, `docker`, `e2e`, docs lint/link checks, GitGuardian, and SonarCloud all passed. Sonar reports 0 open issues. Sourcery was skipped due the account rate limit and posted no actionable code comments.
+
+## 2026-05-12 Electron Foundation `.5`
+
+- Task `agent-platform-electron-foundation.5` is in progress on
+  `task/agent-platform-electron-foundation.5`.
+- Added `docs/desktop-runtime.md` to document the Docker versus Electron runtime split, current
+  desktop commands, app data/log/config locations, troubleshooting, cleanup expectations, and
+  macOS-first limitations.
+- Updated `docs/development.md`, `README.md`, and the Electron foundation epic/task specs to point
+  developers toward the desktop workflow without changing the default Docker development path.

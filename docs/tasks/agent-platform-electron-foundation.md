@@ -45,9 +45,18 @@ Create the macOS-first Electron runtime foundation and prove the app can launch 
 
 ## Definition Of Done
 
-- macOS Electron app launches locally.
-- Built renderer loads without requiring the normal browser dev server.
-- Local backend starts, reports readiness, logs to a known location, and stops on app quit.
-- App data path can be resolved for SQLite/config/logs.
-- Docker dev workflow remains usable and documented.
+- [x] macOS Electron app launches locally.
+- [x] Built renderer loads without requiring the normal browser dev server.
+- [x] Local backend starts, reports readiness, logs to a known location, and stops on app quit.
+- [x] App data path can be resolved for SQLite/config/logs.
+- [x] Docker dev workflow remains usable and documented.
 - All child tasks are closed through PR/check/review gates before the epic closes.
+
+## Closeout Notes
+
+- Desktop runtime documentation now lives in [Desktop Runtime](../desktop-runtime.md).
+- Docker remains the normal contributor and CI runtime.
+- Electron is the desktop product runtime for app shell, local backend supervision, app data, and
+  future native Project access.
+- macOS is the first desktop target. Windows/Linux packaging and E2E coverage remain future work.
+- Electron is not the command/test sandbox. Sandbox design remains a separate follow-up.

@@ -58,7 +58,8 @@ make new
 | `make workspace-clean-dry-run` | Preview host workspace/data/config/log cleanup targets                     |
 | `make workspace-clean`         | Remove host workspace/data/config/log directories after typed confirmation |
 
-See [Development Guide](docs/development.md) for prerequisites, env vars, tests, and Docker.
+See [Development Guide](docs/development.md) for prerequisites, env vars, tests, Docker, and the
+current Electron desktop workflow.
 
 ## Documentation
 
@@ -70,6 +71,7 @@ See [Development Guide](docs/development.md) for prerequisites, env vars, tests,
 | [Database](docs/database.md)                                             | Schema, migrations, secret storage                                    |
 | [Development](docs/development.md)                                       | Local setup, build, test, lint commands                               |
 | [Deployment](docs/deployment.md)                                         | Docker, environment variables, production                             |
+| [Desktop Runtime](docs/desktop-runtime.md)                               | Electron desktop workflow, app data, logs, and limitations            |
 | [Configuration](docs/configuration.md)                                   | Env vars, model routing, limits, MCP, security                        |
 | [Workspace Storage](docs/workspace-storage.md)                           | Host workspace setup, security, cleanup, and validation               |
 | [Coding Runtime](docs/coding-runtime.md)                                 | Container CLI baseline and coding-agent policy                        |
@@ -83,6 +85,7 @@ See [Development Guide](docs/development.md) for prerequisites, env vars, tests,
 
 ```
 apps/api          Express REST API (port 3000)
+apps/desktop      Electron shell and desktop runtime foundation
 apps/web          Next.js chat UI (port 3001)
 packages/         Shared libraries (contracts, db, harness, model-router, mcp-adapter, etc.)
   harness/src/security/  Security guards: PathJail, bash guard, injection/output/MCP trust guards
