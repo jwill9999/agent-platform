@@ -1091,6 +1091,14 @@ export async function handleSessionResume(
         code: 'APPROVAL_REJECTED',
         message: 'Human rejected tool execution.',
       });
+      createAuditLog(db).logRejectedApproval(
+        toolCall.name,
+        toolCall.args,
+        agentCtx.agent.id,
+        sessionId,
+        'Human rejected tool execution.',
+        approval.riskTier,
+      );
     } else {
       nativeToolExecutor = createRuntimeNativeToolExecutor({
         db,

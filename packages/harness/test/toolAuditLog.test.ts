@@ -162,6 +162,20 @@ describe('createToolAuditLogger', () => {
     expect(completions[0]!.data.status).toBe('error');
   });
 
+  it('logs non-zero shell exit codes as error status', () => {
+    const { store, completions } = createMemoryStore();
+    const logger = createToolAuditLogger(store);
+
+    const id = logger.logStart('sys_bash', { command: 'false' }, 'agent-1', 'session-1');
+    logger.logComplete(id!, {
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: '', stderr: '', exitCode: 1 },
+    });
+
+    expect(completions[0]!.data.status).toBe('error');
+  });
+
   it('logs failed coding envelopes as error status', () => {
     const completions = completeCodingEnvelope('failed', {
       code: 'PATCH_DOES_NOT_APPLY',
@@ -189,6 +203,32 @@ describe('createToolAuditLogger', () => {
     const parsed = JSON.parse(entries[0]!.argsJson) as Record<string, unknown>;
     expect(parsed.command).toBe('curl');
     expect(parsed.token).toBe('[REDACTED]');
+  });
+
+  it('bounds command audit args and results while preserving redaction', () => {
+    const { store, entries, completions } = createMemoryStore();
+    const logger = createToolAuditLogger(store);
+    const longCommand = `echo ${'x'.repeat(20_000)}`;
+
+    const id = logger.logStart(
+      'sys_bash',
+      { command: longCommand, api_key: 'sk-secret' },
+      'agent-1',
+      'session-1',
+      'high',
+    );
+    logger.logComplete(id!, {
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: 'y'.repeat(20_000), stderr: '', exitCode: 0 },
+    });
+
+    expect(entries[0]!.argsJson.length).toBeLessThanOrEqual(8_192);
+    expect(completions[0]!.data.resultJson.length).toBeLessThanOrEqual(8_192);
+    expect(entries[0]!.argsJson).toContain('[REDACTED]');
+    expect(entries[0]!.argsJson).not.toContain('sk-secret');
+    expect(entries[0]!.argsJson).toContain('[TRUNCATED');
+    expect(completions[0]!.data.resultJson).toContain('[TRUNCATED');
   });
 
   it('logDenied creates a denied entry', () => {
@@ -233,6 +273,35 @@ describe('createToolAuditLogger', () => {
     expect(JSON.parse(entries[0]!.argsJson)).toEqual({ command: 'date' });
     expect(completions).toHaveLength(0);
   });
+
+  it('logRejectedApproval creates a denied entry with rejected evidence', () => {
+    const { store, entries, completions } = createMemoryStore();
+    const logger = createToolAuditLogger(store);
+
+    logger.logRejectedApproval(
+      'sys_bash',
+      { command: 'rm -rf generated' },
+      'agent-1',
+      'session-1',
+      'Human rejected tool execution.',
+      'high',
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      toolName: 'sys_bash',
+      agentId: 'agent-1',
+      sessionId: 'session-1',
+      riskTier: 'high',
+      status: 'denied',
+    });
+    expect(completions).toHaveLength(1);
+    expect(completions[0]!.data.status).toBe('denied');
+    expect(JSON.parse(completions[0]!.data.resultJson)).toMatchObject({
+      rejected: true,
+      reason: 'Human rejected tool execution.',
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -249,6 +318,7 @@ describe('createNoopAuditLogger', () => {
     const logger = createNoopAuditLogger();
     logger.logComplete('some-id', { type: 'tool_result', data: 'ok' });
     logger.logDenied('sys_bash', {}, 'a', 's', 'reason');
+    logger.logRejectedApproval('sys_bash', {}, 'a', 's', 'reason');
     expect(logger.logPendingApproval('sys_bash', {}, 'a', 's')).toBeNull();
   });
 });

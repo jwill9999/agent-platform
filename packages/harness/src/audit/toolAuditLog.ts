@@ -50,6 +50,56 @@ function resolveAuditRiskTier(toolName: string, riskTierOverride?: RiskTier): Ri
   return riskTierOverride ?? SYSTEM_TOOL_RISK[toolName] ?? 'high';
 }
 
+const MAX_AUDIT_JSON_LENGTH = 8_192;
+const MAX_AUDIT_STRING_LENGTH = 2_048;
+const MAX_AUDIT_ARRAY_ITEMS = 50;
+const MAX_AUDIT_OBJECT_KEYS = 50;
+const MAX_AUDIT_DEPTH = 6;
+
+function truncateAuditString(value: string): string {
+  if (value.length <= MAX_AUDIT_STRING_LENGTH) return value;
+  return `${value.slice(0, MAX_AUDIT_STRING_LENGTH)}[TRUNCATED ${value.length - MAX_AUDIT_STRING_LENGTH} chars]`;
+}
+
+function boundAuditValue(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') return truncateAuditString(value);
+  if (typeof value !== 'object' || value === null) return value;
+  if (depth >= MAX_AUDIT_DEPTH) return '[TRUNCATED depth]';
+  if (Array.isArray(value)) {
+    const items = value
+      .slice(0, MAX_AUDIT_ARRAY_ITEMS)
+      .map((item) => boundAuditValue(item, depth + 1));
+    if (value.length > MAX_AUDIT_ARRAY_ITEMS) {
+      items.push(`[TRUNCATED ${value.length - MAX_AUDIT_ARRAY_ITEMS} items]`);
+    }
+    return items;
+  }
+
+  const result: Record<string, unknown> = {};
+  const entries = Object.entries(value);
+  for (const [key, nested] of entries.slice(0, MAX_AUDIT_OBJECT_KEYS)) {
+    result[key] = boundAuditValue(nested, depth + 1);
+  }
+  if (entries.length > MAX_AUDIT_OBJECT_KEYS) {
+    result._truncated = `${entries.length - MAX_AUDIT_OBJECT_KEYS} keys`;
+  }
+  return result;
+}
+
+function stringifyAuditPayload(value: unknown): string {
+  const bounded = boundAuditValue(value);
+  const json = JSON.stringify(bounded);
+  if (json.length <= MAX_AUDIT_JSON_LENGTH) return json;
+  return JSON.stringify({
+    truncated: true,
+    preview: `${json.slice(0, MAX_AUDIT_JSON_LENGTH - 128)}[TRUNCATED ${json.length - MAX_AUDIT_JSON_LENGTH + 128} chars]`,
+  });
+}
+
+function redactAndStringifyArgs(args: Record<string, unknown>): string {
+  return stringifyAuditPayload(redactArgs(args));
+}
+
 // ---------------------------------------------------------------------------
 // Audit logger
 // ---------------------------------------------------------------------------
@@ -85,6 +135,16 @@ export interface ToolAuditLogger {
     sessionId: string,
     riskTier?: RiskTier,
   ): string | null;
+
+  /** Log a human-rejected approval request. */
+  logRejectedApproval(
+    toolName: string,
+    args: Record<string, unknown>,
+    agentId: string,
+    sessionId: string,
+    reason: string,
+    riskTier?: RiskTier,
+  ): void;
 }
 
 export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
@@ -96,7 +156,6 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return null;
 
       const id = randomUUID();
-      const redacted = redactArgs(args);
       const now = Date.now();
 
       startTimes.set(id, now);
@@ -106,7 +165,7 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
         toolName,
         agentId,
         sessionId,
-        argsJson: JSON.stringify(redacted),
+        argsJson: redactAndStringifyArgs(args),
         riskTier,
         status: 'pending',
         startedAtMs: now,
@@ -121,7 +180,9 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       startTimes.delete(id);
 
       const status = outputToAuditStatus(output);
-      const resultJson = JSON.stringify(output.type === 'tool_result' ? output.data : output);
+      const resultJson = stringifyAuditPayload(
+        output.type === 'tool_result' ? output.data : output,
+      );
 
       store.complete(id, {
         resultJson,
@@ -136,7 +197,6 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return;
 
       const id = randomUUID();
-      const redacted = redactArgs(args);
       const now = Date.now();
 
       store.insert({
@@ -144,14 +204,14 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
         toolName,
         agentId,
         sessionId,
-        argsJson: JSON.stringify(redacted),
+        argsJson: redactAndStringifyArgs(args),
         riskTier,
         status: 'denied',
         startedAtMs: now,
       });
 
       store.complete(id, {
-        resultJson: JSON.stringify({ denied: true, reason }),
+        resultJson: stringifyAuditPayload({ denied: true, reason }),
         status: 'denied',
         completedAtMs: now,
         durationMs: 0,
@@ -163,7 +223,6 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
       if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return null;
 
       const id = randomUUID();
-      const redacted = redactArgs(args);
       const now = Date.now();
 
       store.insert({
@@ -171,13 +230,39 @@ export function createToolAuditLogger(store: ToolAuditStore): ToolAuditLogger {
         toolName,
         agentId,
         sessionId,
-        argsJson: JSON.stringify(redacted),
+        argsJson: redactAndStringifyArgs(args),
         riskTier,
         status: 'pending',
         startedAtMs: now,
       });
 
       return id;
+    },
+
+    logRejectedApproval(toolName, args, agentId, sessionId, reason, riskTierOverride) {
+      const riskTier = resolveAuditRiskTier(toolName, riskTierOverride);
+      if (riskTier === 'zero' || (!riskTierOverride && isZeroRisk(toolName))) return;
+
+      const id = randomUUID();
+      const now = Date.now();
+
+      store.insert({
+        id,
+        toolName,
+        agentId,
+        sessionId,
+        argsJson: redactAndStringifyArgs(args),
+        riskTier,
+        status: 'denied',
+        startedAtMs: now,
+      });
+
+      store.complete(id, {
+        resultJson: stringifyAuditPayload({ rejected: true, reason }),
+        status: 'denied',
+        completedAtMs: now,
+        durationMs: 0,
+      });
     },
   };
 }
@@ -188,10 +273,16 @@ function outputToAuditStatus(output: Output): 'success' | 'error' | 'denied' {
     output.type === 'tool_result' &&
     typeof output.data === 'object' &&
     output.data !== null &&
-    !Array.isArray(output.data) &&
-    (output.data as { ok?: unknown }).ok === false
+    !Array.isArray(output.data)
   ) {
-    const evidence = (output.data as { evidence?: { status?: unknown } }).evidence;
+    const data = output.data as {
+      ok?: unknown;
+      evidence?: { status?: unknown };
+      exitCode?: unknown;
+    };
+    if (typeof data.exitCode === 'number' && data.exitCode !== 0) return 'error';
+    if (data.ok !== false) return 'success';
+    const evidence = data.evidence;
     return evidence?.status === 'denied' ? 'denied' : 'error';
   }
   return 'success';
@@ -210,5 +301,6 @@ export function createNoopAuditLogger(): ToolAuditLogger {
     logPendingApproval() {
       return null;
     },
+    logRejectedApproval() {},
   };
 }

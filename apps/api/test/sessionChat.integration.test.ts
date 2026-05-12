@@ -1279,6 +1279,22 @@ describe('POST /v1/chat (session-aware)', () => {
 
       const { listMessagesBySession } = await import('@agent-platform/db');
       await expectToolExecutionCount(db, sessionId, 'success', 0);
+      const { queryToolExecutions } = await import('@agent-platform/db');
+      const rejectedAudits = queryToolExecutions(db, {
+        sessionId,
+        toolName: 'sys_bash',
+        status: 'denied',
+        limit: 10,
+        offset: 0,
+      });
+      expect(rejectedAudits).toHaveLength(1);
+      const rejectedAudit = rejectedAudits[0];
+      if (!rejectedAudit) throw new Error('Expected rejected command audit record');
+      expect(rejectedAudit.resultJson).toEqual(expect.any(String));
+      expect(JSON.parse(rejectedAudit.resultJson ?? '{}')).toMatchObject({
+        rejected: true,
+        reason: 'Human rejected tool execution.',
+      });
       const toolMessage = listMessagesBySession(db, sessionId).find(
         (message) => message.role === 'tool',
       );
