@@ -1551,7 +1551,7 @@ Tracked in Beads: `agent-platform-lt6`
 
 ## 2026-05-12 Electron Security `.2`
 
-- Task `agent-platform-electron-security.2` started on
+- Task `agent-platform-electron-security.2` completed on
   `task/agent-platform-electron-security.2`.
 - Added an explicit typed preload bridge contract:
   - global API name: `agentPlatformDesktop`,
@@ -1570,3 +1570,13 @@ Tracked in Beads: `agent-platform-lt6`
   - `pnpm --filter @agent-platform/desktop smoke`
   - `pnpm format:check`
   - `pnpm docs:lint`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm build`
+  - `git diff --check`
+  - `pnpm test`
+- PR #170 is clean: `verify`, `docker`, `e2e`, docs checks, GitGuardian, and SonarCloud all
+  passed. SonarCloud reports 0 new issues after the minor test assertion cleanup. Sourcery was
+  skipped due the account rate limit and posted no actionable inline comments.
+- Next task is `agent-platform-electron-security.3`: move desktop SQLite/config usage to app data
+  paths.

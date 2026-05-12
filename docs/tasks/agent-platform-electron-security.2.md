@@ -47,7 +47,7 @@ main process.
 - [x] IPC handlers validate payloads and reject malformed requests.
 - [x] IPC sender/origin validation is implemented or explicitly documented where not applicable.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
@@ -72,3 +72,12 @@ main process.
 - `pnpm --filter @agent-platform/desktop smoke`
 - `pnpm format:check`
 - `pnpm docs:lint`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm build`
+- `git diff --check`
+- `pnpm test`
+
+PR #170 passed `verify`, `docker`, `e2e`, docs checks, GitGuardian, and SonarCloud. SonarCloud
+initially reported one minor test assertion issue; it was fixed and the rerun reported 0 new issues.
+Sourcery was skipped due the account rate limit and posted no actionable inline comments.
