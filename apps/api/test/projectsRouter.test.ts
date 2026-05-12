@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -289,6 +297,85 @@ describe('projectsRouter', () => {
     expect(recent.body.data.projects[0]).not.toHaveProperty('workspaceKey');
     expect(JSON.stringify(recent.body.data)).not.toContain(firstRealPath);
     expect(JSON.stringify(recent.body.data)).not.toContain(secondRealPath);
+  });
+
+  it('serves desktop project file trees and text reads without exposing host paths', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-files-project');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    mkdirSync(path.join(repoDir, 'src'), { recursive: true });
+    mkdirSync(path.join(repoDir, 'node_modules', 'hidden-package'), { recursive: true });
+    writeFileSync(path.join(repoDir, 'README.md'), '# Desktop files\n');
+    writeFileSync(path.join(repoDir, 'src', 'index.ts'), 'export const value = 1;\n');
+    writeFileSync(path.join(repoDir, 'node_modules', 'hidden-package', 'index.js'), 'hidden\n');
+    const realRoot = realpathSync(repoDir);
+
+    const openedProject = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Files Project' })
+      .expect(201);
+    const projectId = openedProject.body.data.project.id;
+
+    const tree = await request(app).get(`/v1/projects/${projectId}/files/tree`).expect(200);
+    expect(tree.body.data.rootName).toBe('desktop-files-project');
+    expect(tree.body.data.files).toEqual([
+      expect.objectContaining({
+        name: 'src',
+        path: 'src',
+        type: 'directory',
+        children: [expect.objectContaining({ name: 'index.ts', path: 'src/index.ts' })],
+      }),
+      expect.objectContaining({ name: 'README.md', path: 'README.md', type: 'file' }),
+    ]);
+    expect(JSON.stringify(tree.body.data)).not.toContain(realRoot);
+    expect(JSON.stringify(tree.body.data)).not.toContain('node_modules');
+
+    const read = await request(app)
+      .get(`/v1/projects/${projectId}/files/read`)
+      .query({ path: 'src/index.ts' })
+      .expect(200);
+    expect(read.body.data).toMatchObject({
+      name: 'index.ts',
+      path: 'src/index.ts',
+      content: 'export const value = 1;\n',
+      size: 24,
+    });
+    expect(JSON.stringify(read.body.data)).not.toContain(realRoot);
+  });
+
+  it('blocks project file traversal, symlink escapes, binary files, and oversized files', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-files-guarded');
+    const outsideDir = path.join(tmpDir, 'outside');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    mkdirSync(outsideDir, { recursive: true });
+    writeFileSync(path.join(outsideDir, 'secret.txt'), 'outside secret\n');
+    writeFileSync(path.join(repoDir, 'binary.bin'), Buffer.from([0x41, 0x00, 0x42]));
+    writeFileSync(path.join(repoDir, 'large.txt'), 'x'.repeat(512 * 1024 + 1));
+    symlinkSync(path.join(outsideDir, 'secret.txt'), path.join(repoDir, 'secret-link.txt'));
+
+    const openedProject = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Guarded Desktop Files' })
+      .expect(201);
+    const projectId = openedProject.body.data.project.id;
+
+    await request(app)
+      .get(`/v1/projects/${projectId}/files/read`)
+      .query({ path: '../outside/secret.txt' })
+      .expect(403);
+    await request(app)
+      .get(`/v1/projects/${projectId}/files/read`)
+      .query({ path: 'secret-link.txt' })
+      .expect(403);
+    await request(app)
+      .get(`/v1/projects/${projectId}/files/read`)
+      .query({ path: 'binary.bin' })
+      .expect(415);
+    await request(app)
+      .get(`/v1/projects/${projectId}/files/read`)
+      .query({ path: 'large.txt' })
+      .expect(413);
   });
 
   it('rejects desktop project registration without the desktop bridge or inspectable folder', async () => {

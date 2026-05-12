@@ -506,6 +506,38 @@ export type ProjectDesktopRecentProjectsResult = z.infer<
   typeof ProjectDesktopRecentProjectsResultSchema
 >;
 
+export type ProjectFileNode = {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+  children?: ProjectFileNode[];
+};
+
+export const ProjectFileNodeSchema: z.ZodType<ProjectFileNode> = z.lazy(() =>
+  z.object({
+    name: z.string().min(1),
+    path: z.string().min(1),
+    type: z.enum(['file', 'directory']),
+    size: z.number().int().nonnegative().optional(),
+    children: z.array(ProjectFileNodeSchema).optional(),
+  }),
+);
+
+export const ProjectFileTreeResultSchema = z.object({
+  rootName: z.string().min(1),
+  files: z.array(ProjectFileNodeSchema),
+});
+export type ProjectFileTreeResult = z.infer<typeof ProjectFileTreeResultSchema>;
+
+export const ProjectFileReadResultSchema = z.object({
+  name: z.string().min(1),
+  path: z.string().min(1),
+  content: z.string(),
+  size: z.number().int().nonnegative(),
+});
+export type ProjectFileReadResult = z.infer<typeof ProjectFileReadResultSchema>;
+
 export const ProjectQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false),
 });

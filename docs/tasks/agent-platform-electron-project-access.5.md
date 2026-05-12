@@ -49,3 +49,15 @@ Render file trees and file content from the backend-bound Project root rather th
 - [ ] Binary/large-file safeguards remain in place.
 - [ ] Relevant tests and root gates pass.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation notes
+
+- Added Project-scoped read APIs:
+  - `GET /v1/projects/:id/files/tree`
+  - `GET /v1/projects/:id/files/read?path=<relative-path>`
+- The API resolves Project roots from internal desktop Project metadata and never returns absolute
+  host paths.
+- File reads are guarded by `PathJail`, Project-relative path normalization, file size limits, and
+  binary detection.
+- The IDE explorer prefers backend Project file data when a desktop Project is active; browser file
+  handles remain parked for the product IDE.

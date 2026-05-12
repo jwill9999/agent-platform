@@ -11,6 +11,8 @@ import type {
   ProjectDesktopRecentProjectsResult,
   ProjectDesktopRecord,
   ProjectDesktopRegistrationResult,
+  ProjectFileReadResult,
+  ProjectFileTreeResult,
   ProjectRecord,
   SessionProjectBindingResult,
 } from '@agent-platform/contracts';
@@ -1747,9 +1749,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   // Browser File System Access is parked for the product IDE until Electron provides native Project access.
   const fs = useFileSystem({ enabled: false });
 
-  // Use FS API tree when a directory is open, otherwise fall back to props or empty
-  const fileTree = fs.isDirectoryOpen ? fs.fileTree : (initialFileTree ?? []);
-
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1759,6 +1758,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [recentDesktopProjects, setRecentDesktopProjects] = useState<ProjectDesktopRecord[]>([]);
   const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(false);
   const [isOpeningDesktopProject, setIsOpeningDesktopProject] = useState(false);
+  const [projectFileTree, setProjectFileTree] = useState<FileNode[]>([]);
+  const [isLoadingProjectFileTree, setIsLoadingProjectFileTree] = useState(false);
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
   const [isAssessingProject, setIsAssessingProject] = useState(false);
@@ -1785,6 +1786,14 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [includeActiveFile, setIncludeActiveFile] = useState(true);
   const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
 
+  // Use backend-bound Project files first. Browser FS remains parked for product IDE use.
+  const fileTree = activeProject
+    ? projectFileTree
+    : fs.isDirectoryOpen
+      ? fs.fileTree
+      : (initialFileTree ?? []);
+  const isExplorerLoading = fs.isLoading || isLoadingProjectFileTree;
+  const hasOpenProjectOrFolder = Boolean(activeProject) || fs.isDirectoryOpen;
   const workspaceName = activeProject?.name ?? fs.rootName ?? 'No folder open';
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
   const freshContextFiles = useMemo(
@@ -1879,6 +1888,32 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     loadRecentDesktopProjects().catch(() => {});
   }, [loadRecentDesktopProjects]);
 
+  const loadProjectFileTree = useCallback(async (projectId: string) => {
+    setIsLoadingProjectFileTree(true);
+    try {
+      const result = await apiGet<ProjectFileTreeResult>(
+        apiPath('projects', projectId, 'files', 'tree'),
+      );
+      setProjectFileTree(result?.files ?? []);
+      setProjectOpenError(null);
+    } catch (e) {
+      const message = e instanceof ApiRequestError ? e.message : 'Failed to load Project files';
+      setProjectOpenError(message);
+      setProjectFileTree([]);
+      toast.error(message);
+    } finally {
+      setIsLoadingProjectFileTree(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!activeProject?.id) {
+      setProjectFileTree([]);
+      return;
+    }
+    loadProjectFileTree(activeProject.id).catch(() => {});
+  }, [activeProject?.id, loadProjectFileTree]);
+
   const reopenDesktopProject = useCallback((project: ProjectDesktopRecord) => {
     if (!desktopProjectIsAvailable(project)) {
       const message = 'This Project folder could not be found. Open it again from your system.';
@@ -1892,6 +1927,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setActiveTab(null);
     setContextFiles([]);
     setEditProposal(null);
+    setProjectFileTree([]);
   }, []);
 
   const handleOpenDesktopProject = useCallback(async () => {
@@ -2160,14 +2196,37 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [fileTree],
   );
 
+  const readActiveProjectFile = useCallback(
+    async (path: string): Promise<ProjectFileReadResult> => {
+      if (!activeProject?.id) {
+        throw new ApiRequestError('Open a Project before reading files', 409);
+      }
+      const params = new URLSearchParams({ path });
+      const result = await apiGet<ProjectFileReadResult>(
+        `${apiPath('projects', activeProject.id, 'files', 'read')}?${params.toString()}`,
+      );
+      if (!result) throw new ApiRequestError('Failed to read Project file', 500);
+      return result;
+    },
+    [activeProject?.id],
+  );
+
   const handleFileSelect = useCallback(
     async (node: FileNode) => {
       if (node.type !== 'file') return;
       const exists = openTabs.some((tab) => tab.path === node.path);
       if (!exists) {
         let content = node.content ?? '';
-        // Read from filesystem if handle is available
-        if (node.handle) {
+        if (activeProject?.id && !node.handle) {
+          try {
+            content = (await readActiveProjectFile(node.path)).content;
+          } catch (error) {
+            const message =
+              error instanceof ApiRequestError ? error.message : `Failed to read ${node.path}`;
+            toast.error(message);
+            return;
+          }
+        } else if (node.handle) {
           try {
             content = await fs.readFile(node);
           } catch {
@@ -2186,7 +2245,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       }
       setActiveTab(node.path);
     },
-    [openTabs, fs],
+    [activeProject?.id, openTabs, fs, readActiveProjectFile],
   );
 
   const handleCloseTab = useCallback(
@@ -2275,7 +2334,16 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       }
 
       let content = node.content ?? '';
-      if (node.handle) {
+      if (activeProject?.id && !node.handle) {
+        try {
+          content = (await readActiveProjectFile(node.path)).content;
+        } catch (error) {
+          const message =
+            error instanceof ApiRequestError ? error.message : `Failed to read ${node.path}`;
+          toast.error(message);
+          return;
+        }
+      } else if (node.handle) {
         try {
           content = await fs.readFile(node);
         } catch {
@@ -2292,7 +2360,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         handle: node.handle as FileSystemFileHandle | undefined,
       });
     },
-    [fs, handleAddToContext, openTabs],
+    [activeProject?.id, fs, handleAddToContext, openTabs, readActiveProjectFile],
   );
 
   // --- Code apply from AI ---
@@ -2529,23 +2597,25 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     {projectFolderLabel ?? fs.rootName ?? 'Explorer'}
                   </span>
                   <div className="flex items-center gap-1 shrink-0">
-                    {fs.isDirectoryOpen && filteredFileTree.length > 0 && !fs.isLoading && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs font-normal normal-case tracking-normal text-muted-foreground hover:text-foreground"
-                        title="Collapse all folders in the tree"
-                        aria-label="Collapse all folders"
-                        onClick={() => {
-                          setExplorerCollapseSignal((n) => n + 1);
-                        }}
-                      >
-                        <ListCollapse className="h-3.5 w-3.5" aria-hidden />
-                        <span className="hidden sm:inline">Collapse</span>
-                      </Button>
-                    )}
-                    {fs.isLoading && (
+                    {hasOpenProjectOrFolder &&
+                      filteredFileTree.length > 0 &&
+                      !isExplorerLoading && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs font-normal normal-case tracking-normal text-muted-foreground hover:text-foreground"
+                          title="Collapse all folders in the tree"
+                          aria-label="Collapse all folders"
+                          onClick={() => {
+                            setExplorerCollapseSignal((n) => n + 1);
+                          }}
+                        >
+                          <ListCollapse className="h-3.5 w-3.5" aria-hidden />
+                          <span className="hidden sm:inline">Collapse</span>
+                        </Button>
+                      )}
+                    {isExplorerLoading && (
                       <span className="text-xs animate-pulse normal-case tracking-normal">
                         Loading…
                       </span>
@@ -2553,7 +2623,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   </div>
                 </div>
                 <div
-                  className="mx-2 mt-2 rounded-md border border-border bg-background px-3 py-2"
+                  className="mx-2 mt-2 shrink-0 rounded-md border border-border bg-background px-3 py-2"
                   aria-label="Project binding"
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
@@ -2717,14 +2787,16 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   {projectOpenError && (
                     <p className="mt-2 text-xs text-destructive">{projectOpenError}</p>
                   )}
-                  <RecentDesktopProjectsPanel
-                    projects={recentDesktopProjects}
-                    isLoading={isLoadingRecentProjects}
-                    onRefresh={() => {
-                      loadRecentDesktopProjects().catch(() => {});
-                    }}
-                    onReopen={reopenDesktopProject}
-                  />
+                  {!activeProject && (
+                    <RecentDesktopProjectsPanel
+                      projects={recentDesktopProjects}
+                      isLoading={isLoadingRecentProjects}
+                      onRefresh={() => {
+                        loadRecentDesktopProjects().catch(() => {});
+                      }}
+                      onReopen={reopenDesktopProject}
+                    />
+                  )}
                 </div>
                 {fs.needsFolderReconnect && (
                   <div className="mx-2 mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
@@ -2749,11 +2821,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   </div>
                 )}
                 {fs.error && <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>}
-                <ScrollArea className="flex-1">
+                <ScrollArea className="min-h-0 flex-1">
                   <div className="pb-4">
                     {filteredFileTree.length === 0 &&
-                      !fs.isLoading &&
-                      !fs.isDirectoryOpen &&
+                      !isExplorerLoading &&
+                      !hasOpenProjectOrFolder &&
                       !fs.needsFolderReconnect && (
                         <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
                           <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
@@ -2764,13 +2836,14 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                         </div>
                       )}
                     {filteredFileTree.length === 0 &&
-                      !fs.isLoading &&
-                      fs.isDirectoryOpen &&
-                      !fs.error && (
+                      !isExplorerLoading &&
+                      hasOpenProjectOrFolder &&
+                      !fs.error &&
+                      !projectOpenError && (
                         <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                           {searchQuery.trim()
                             ? 'No files match your search.'
-                            : 'This folder is empty, or everything here is hidden (ignored folders like node_modules).'}
+                            : 'This Project has no visible files, or everything here is hidden.'}
                         </div>
                       )}
                     {filteredFileTree.map((node) => (

@@ -3,6 +3,8 @@ import {
   ProjectDesktopRegistrationBodySchema,
   ProjectDesktopRecentProjectsResultSchema,
   ProjectDesktopRegistrationResultSchema,
+  ProjectFileReadResultSchema,
+  ProjectFileTreeResultSchema,
   type ProjectOpenBody,
   ProjectOpenBodySchema,
   ProjectOnboardingAnswerBodySchema,
@@ -18,6 +20,7 @@ import {
   ProjectInstructionUpdateProposalSchema,
   type ProjectInstructionUpdateCandidate,
   type ProjectInstructionFileReference,
+  type ProjectFileNode,
   type ProjectRecord,
   ProjectUpdateBodySchema,
 } from '@agent-platform/contracts';
@@ -33,10 +36,12 @@ import {
   slugify,
 } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
+import { PathJail } from '@agent-platform/harness';
 import { Router } from 'express';
 import type { Request } from 'express';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import {
   existsSync,
   readFileSync,
@@ -45,7 +50,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, isAbsolute, join, parse } from 'node:path';
+import { basename, isAbsolute, join, parse, posix, relative, sep } from 'node:path';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
@@ -462,6 +467,172 @@ function listRecentDesktopProjects(db: DrizzleDb) {
   return ProjectDesktopRecentProjectsResultSchema.parse({ projects });
 }
 
+const IGNORED_PROJECT_TREE_DIRECTORIES = new Set([
+  'node_modules',
+  '.git',
+  '.next',
+  'dist',
+  'build',
+  '.cache',
+  '__pycache__',
+  '.turbo',
+  'coverage',
+]);
+const MAX_PROJECT_TREE_DEPTH = 8;
+const MAX_PROJECT_TREE_ENTRIES = 2000;
+const MAX_PROJECT_FILE_READ_BYTES = 512 * 1024;
+const BINARY_PROBE_BYTES = 4096;
+
+function projectRootForBackendRead(project: ProjectRecord): string {
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  if (typeof backendProjectRoot !== 'string' || !backendProjectRoot.trim()) {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project folder is not available');
+  }
+
+  try {
+    const realRoot = realpathSync(backendProjectRoot);
+    if (!statSync(realRoot).isDirectory()) {
+      throw new Error('Project root is not a directory');
+    }
+    return realRoot;
+  } catch {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project folder could not be inspected');
+  }
+}
+
+function projectRelativePath(root: string, absolutePath: string): string {
+  return relative(root, absolutePath).split(sep).join('/');
+}
+
+function normalizeProjectRelativePath(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Project file path is required');
+  }
+  const trimmed = value.trim();
+  if (trimmed.includes('\0')) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Project file path is invalid');
+  }
+  if (trimmed.startsWith('/') || isAbsolute(trimmed)) {
+    throw new HttpError(403, 'PATH_ACCESS_DENIED', 'Use a Project-relative file path');
+  }
+
+  const normalized = posix.normalize(trimmed.replaceAll('\\', '/'));
+  if (normalized === '.' || normalized === '..' || normalized.startsWith('../')) {
+    throw new HttpError(403, 'PATH_ACCESS_DENIED', 'File path must stay inside the Project');
+  }
+  return normalized.startsWith('./') ? normalized.slice(2) : normalized;
+}
+
+function isLikelyBinary(buffer: Buffer): boolean {
+  return buffer.subarray(0, BINARY_PROBE_BYTES).includes(0);
+}
+
+async function listProjectFiles(project: ProjectRecord) {
+  const projectRoot = projectRootForBackendRead(project);
+  const jail = new PathJail([{ label: 'project', hostPath: projectRoot, permission: 'read_only' }]);
+  const counter = { count: 0 };
+
+  async function walk(directory: string, depth: number): Promise<ProjectFileNode[]> {
+    if (depth > MAX_PROJECT_TREE_DEPTH || counter.count >= MAX_PROJECT_TREE_ENTRIES) return [];
+
+    let entries: Array<{
+      name: string;
+      isDirectory(): boolean;
+      isFile(): boolean;
+    }>;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const nodes: ProjectFileNode[] = [];
+    for (const entry of entries) {
+      if (counter.count >= MAX_PROJECT_TREE_ENTRIES) break;
+      if (
+        entry.isDirectory() &&
+        (IGNORED_PROJECT_TREE_DIRECTORIES.has(entry.name) || entry.name.startsWith('.'))
+      ) {
+        continue;
+      }
+
+      const absolutePath = join(directory, entry.name);
+      const validation = await jail.validate(absolutePath, 'read');
+      if (!validation.allowed) continue;
+
+      let entryStat: Awaited<ReturnType<typeof stat>>;
+      try {
+        entryStat = await stat(validation.resolvedPath);
+      } catch {
+        continue;
+      }
+
+      counter.count += 1;
+      const nodePath = projectRelativePath(projectRoot, validation.resolvedPath);
+      if (entryStat.isDirectory()) {
+        nodes.push({
+          name: entry.name,
+          path: nodePath,
+          type: 'directory',
+          children: await walk(validation.resolvedPath, depth + 1),
+        });
+      } else if (entryStat.isFile()) {
+        nodes.push({
+          name: entry.name,
+          path: nodePath,
+          type: 'file',
+          size: entryStat.size,
+        });
+      }
+    }
+
+    return nodes.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  return ProjectFileTreeResultSchema.parse({
+    rootName: basename(projectRoot) || project.name,
+    files: await walk(projectRoot, 1),
+  });
+}
+
+async function readProjectFile(project: ProjectRecord, rawPath: unknown) {
+  const projectRoot = projectRootForBackendRead(project);
+  const relativePath = normalizeProjectRelativePath(rawPath);
+  const jail = new PathJail([{ label: 'project', hostPath: projectRoot, permission: 'read_only' }]);
+  const validation = await jail.validate(join(projectRoot, relativePath), 'read');
+  if (!validation.allowed) {
+    throw new HttpError(403, 'PATH_ACCESS_DENIED', 'File path must stay inside the Project');
+  }
+
+  let fileStat: Awaited<ReturnType<typeof stat>>;
+  try {
+    fileStat = await stat(validation.resolvedPath);
+  } catch {
+    throw new HttpError(404, 'PROJECT_FILE_NOT_FOUND', 'Project file not found');
+  }
+  if (!fileStat.isFile()) {
+    throw new HttpError(400, 'PROJECT_FILE_INVALID', 'Only files can be opened');
+  }
+  if (fileStat.size > MAX_PROJECT_FILE_READ_BYTES) {
+    throw new HttpError(413, 'PROJECT_FILE_TOO_LARGE', 'Project file is too large to open');
+  }
+
+  const buffer = await readFile(validation.resolvedPath);
+  if (isLikelyBinary(buffer)) {
+    throw new HttpError(415, 'PROJECT_FILE_BINARY', 'Binary files cannot be opened in the editor');
+  }
+
+  return ProjectFileReadResultSchema.parse({
+    name: basename(validation.resolvedPath),
+    path: projectRelativePath(projectRoot, validation.resolvedPath),
+    content: buffer.toString('utf8'),
+    size: fileStat.size,
+  });
+}
+
 function approveProjectOnboarding(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
   const project = findProject(db, id);
   if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
@@ -843,6 +1014,24 @@ export function createProjectsRouter(db: DrizzleDb): Router {
     '/desktop/recent',
     asyncHandler(async (_req, res) => {
       res.json({ data: listRecentDesktopProjects(db) });
+    }),
+  );
+
+  router.get(
+    '/:id/files/tree',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: await listProjectFiles(project) });
+    }),
+  );
+
+  router.get(
+    '/:id/files/read',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: await readProjectFile(project, req.query.path) });
     }),
   );
 

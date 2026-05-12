@@ -344,6 +344,8 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 | Method | Path                            | Description                             |
 | ------ | ------------------------------- | --------------------------------------- |
 | `GET`  | `/v1/projects/desktop/recent`   | List recent desktop Projects            |
+| `GET`  | `/v1/projects/:id/files/tree`   | List Project-relative file tree         |
+| `GET`  | `/v1/projects/:id/files/read`   | Read one Project-relative text file     |
 | `POST` | `/v1/projects/desktop/register` | Register a trusted desktop Project path |
 
 `GET /v1/projects/desktop/recent` returns `{ "data": { "projects": ProjectDesktopRecord[] } }`.
@@ -355,6 +357,14 @@ the stored path.
 `POST /v1/projects/desktop/register` is only for the desktop bridge. It requires
 `x-agent-platform-desktop-bridge: 1`, accepts `{ "path": "/absolute/host/folder", "name": "..." }`,
 persists the real path internally, and returns a safe `ProjectDesktopRegistrationResult`.
+
+`GET /v1/projects/:id/files/tree` returns `{ "data": { "rootName": "...", "files": ProjectFileNode[] } }`.
+The tree is built from the backend-bound Project root, omits generated or hidden directories such as
+`node_modules` and `.git`, and returns only Project-relative paths.
+
+`GET /v1/projects/:id/files/read?path=src/index.ts` reads a single Project-relative text file and
+returns `{ "data": { "name": "...", "path": "...", "content": "...", "size": 123 } }`. Absolute
+paths, parent traversal, symlink escapes, large files, and binary files are rejected.
 
 ### Sessions
 
