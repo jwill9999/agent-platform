@@ -42,4 +42,4 @@ internal runtime details.
 - [x] UI does not expose implementation details by default.
 - [x] Setup state copy is action-oriented and user-facing.
 - [x] Layout remains readable at supported desktop widths.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
