@@ -14,6 +14,7 @@ import {
   queryMemories,
   runSeed,
   updateProject,
+  upsertWorkingMemoryArtifact,
 } from '@agent-platform/db';
 import type { NativeToolExecutor } from '@agent-platform/harness';
 import request from 'supertest';
@@ -416,7 +417,7 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
-  it('starts Project onboarding draft with /init without writing AGENTS.md', async () => {
+  it('does not allow legacy backend-opened Projects to satisfy /init', async () => {
     await withMockChatApp(dirs, async ({ app, db }) => {
       const projectRoot = createProjectRoot(dirs);
       mkdirSync(path.join(projectRoot, 'src'), { recursive: true });
@@ -436,14 +437,12 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.id,
         '/init',
-        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+        'Open a Project with Open Project, then run /init to set up Project instructions.',
       );
       expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
 
       const project = await request(app).get(`/v1/projects/${opened.body.data.id}`).expect(200);
-      expect(project.body.data.metadata.onboardingDraft).toEqual(
-        expect.objectContaining({ targetPath: 'AGENTS.md' }),
-      );
+      expect(project.body.data.metadata.onboardingDraft).toBeUndefined();
       expect(project.body.data.metadata.onboardingState).toBe('in_progress');
     });
   });
@@ -479,6 +478,36 @@ describe('POST /v1/chat (session-aware)', () => {
         expect.objectContaining({ targetPath: 'AGENTS.md' }),
       );
       expect(project.body.data.metadata.onboardingState).toBe('in_progress');
+    });
+  });
+
+  it('does not let working memory Project inference satisfy /init without session binding', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      const project = createChatProject(db, {
+        name: 'Remembered Project',
+        workspaceKey: projectRoot,
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'backend_accessible',
+      });
+      const sessionId = await createDefaultSession(app);
+      upsertWorkingMemoryArtifact(db, {
+        sessionId,
+        projectId: project.id,
+        activeProject: project.id,
+        currentGoal: 'Assess remembered project',
+      });
+
+      await expectHandledSlashMessage(
+        app,
+        db,
+        sessionId,
+        '/init',
+        'Open a Project with Open Project, then run /init to set up Project instructions.',
+      );
+      const unchangedProject = await request(app).get(`/v1/projects/${project.id}`).expect(200);
+      expect(unchangedProject.body.data.metadata.onboardingDraft).toBeUndefined();
     });
   });
 

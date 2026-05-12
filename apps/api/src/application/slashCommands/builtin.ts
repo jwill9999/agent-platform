@@ -66,7 +66,7 @@ export const initSlashCommand: SlashCommandDefinition = {
     if (!context.project || !context.projectId) {
       return {
         kind: 'missing_context',
-        message: 'Open a Project first, then run /init to set up Project instructions.',
+        message: 'Open a Project with Open Project, then run /init to set up Project instructions.',
       };
     }
 
