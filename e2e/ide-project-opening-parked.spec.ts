@@ -56,7 +56,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
     try {
       await page.addInitScript(
         ({ path, name }) => {
-          Object.defineProperty(window, 'agentPlatformDesktop', {
+          Object.defineProperty(globalThis, 'agentPlatformDesktop', {
             configurable: true,
             value: {
               projects: {

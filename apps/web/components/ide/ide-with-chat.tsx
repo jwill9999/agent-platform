@@ -1787,11 +1787,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
 
   // Use backend-bound Project files first. Browser FS remains parked for product IDE use.
-  const fileTree = activeProject
-    ? projectFileTree
-    : fs.isDirectoryOpen
-      ? fs.fileTree
-      : (initialFileTree ?? []);
+  let fileTree = initialFileTree ?? [];
+  if (fs.isDirectoryOpen) fileTree = fs.fileTree;
+  if (activeProject) fileTree = projectFileTree;
   const isExplorerLoading = fs.isLoading || isLoadingProjectFileTree;
   const hasOpenProjectOrFolder = Boolean(activeProject) || fs.isDirectoryOpen;
   const workspaceName = activeProject?.name ?? fs.rootName ?? 'No folder open';
@@ -2211,28 +2209,37 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [activeProject?.id],
   );
 
+  const readFileNodeContent = useCallback(
+    async (node: FileNode): Promise<string | null> => {
+      if (activeProject?.id && !node.handle) {
+        try {
+          return (await readActiveProjectFile(node.path)).content;
+        } catch (error) {
+          const message =
+            error instanceof ApiRequestError ? error.message : `Failed to read ${node.path}`;
+          toast.error(message);
+          return null;
+        }
+      }
+
+      if (!node.handle) return node.content ?? '';
+
+      try {
+        return await fs.readFile(node);
+      } catch {
+        return `// Failed to read ${node.path}\n`;
+      }
+    },
+    [activeProject?.id, fs, readActiveProjectFile],
+  );
+
   const handleFileSelect = useCallback(
     async (node: FileNode) => {
       if (node.type !== 'file') return;
       const exists = openTabs.some((tab) => tab.path === node.path);
       if (!exists) {
-        let content = node.content ?? '';
-        if (activeProject?.id && !node.handle) {
-          try {
-            content = (await readActiveProjectFile(node.path)).content;
-          } catch (error) {
-            const message =
-              error instanceof ApiRequestError ? error.message : `Failed to read ${node.path}`;
-            toast.error(message);
-            return;
-          }
-        } else if (node.handle) {
-          try {
-            content = await fs.readFile(node);
-          } catch {
-            content = `// Failed to read ${node.path}\n`;
-          }
-        }
+        const content = await readFileNodeContent(node);
+        if (content === null) return;
         const newTab: OpenTab = {
           path: node.path,
           name: node.name,
@@ -2245,7 +2252,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       }
       setActiveTab(node.path);
     },
-    [activeProject?.id, openTabs, fs, readActiveProjectFile],
+    [openTabs, readFileNodeContent],
   );
 
   const handleCloseTab = useCallback(
