@@ -1,0 +1,253 @@
+import type { ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { createWriteStream, existsSync, mkdirSync, statSync, rmSync } from 'node:fs';
+import { get } from 'node:http';
+import { join, resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
+
+export type DesktopBackendMode = 'disabled' | 'managed';
+
+export interface DesktopBackendPaths {
+  repoRoot: string;
+  apiEntry: string;
+  runtimeRoot: string;
+  logDir: string;
+  stdoutLog: string;
+  stderrLog: string;
+  sqlitePath: string;
+}
+
+export interface DesktopBackendHandle {
+  url: string;
+  readyUrl: string;
+  logs: {
+    stdout: string;
+    stderr: string;
+  };
+  stop: () => Promise<void>;
+}
+
+interface StartDesktopBackendOptions {
+  paths: DesktopBackendPaths;
+  nodePath: string;
+  env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
+  maxLogBytes?: number;
+}
+
+const defaultBackendPort = 4310;
+const defaultMaxLogBytes = 1024 * 1024;
+
+export function resolveDesktopBackendMode(env: NodeJS.ProcessEnv): DesktopBackendMode {
+  return env.AGENT_PLATFORM_DESKTOP_BACKEND === 'managed' ? 'managed' : 'disabled';
+}
+
+export function getDesktopBackendPaths(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv = process.env,
+): DesktopBackendPaths {
+  const runtimeRoot = resolve(
+    env.AGENT_PLATFORM_DESKTOP_RUNTIME_DIR ?? join(repoRoot, '.agent-platform/desktop-runtime'),
+  );
+  const logDir = join(runtimeRoot, 'logs');
+
+  return {
+    repoRoot,
+    apiEntry: join(repoRoot, 'apps/api/dist/index.js'),
+    runtimeRoot,
+    logDir,
+    stdoutLog: join(logDir, 'backend.stdout.log'),
+    stderrLog: join(logDir, 'backend.stderr.log'),
+    sqlitePath: join(runtimeRoot, 'data/agent.sqlite'),
+  };
+}
+
+export function getDesktopBackendUrl(env: NodeJS.ProcessEnv): string {
+  const port = env.AGENT_PLATFORM_DESKTOP_BACKEND_PORT ?? String(defaultBackendPort);
+  return `http://127.0.0.1:${port}`;
+}
+
+export function resolveDesktopBackendNodePath(
+  env: NodeJS.ProcessEnv,
+  fallbackPath: string,
+): string {
+  return env.AGENT_PLATFORM_DESKTOP_NODE_PATH ?? env.npm_node_execpath ?? fallbackPath;
+}
+
+export function desktopBackendAvailable(paths: DesktopBackendPaths): boolean {
+  return existsSync(paths.apiEntry);
+}
+
+export async function startDesktopBackend({
+  paths,
+  nodePath,
+  env = process.env,
+  timeoutMs = 15_000,
+  maxLogBytes = defaultMaxLogBytes,
+}: StartDesktopBackendOptions): Promise<DesktopBackendHandle> {
+  if (!desktopBackendAvailable(paths)) {
+    throw new Error(
+      `Desktop backend build was not found at ${paths.apiEntry}. Run pnpm --filter @agent-platform/api... build first.`,
+    );
+  }
+
+  mkdirSync(paths.logDir, { recursive: true });
+  rotateLogIfNeeded(paths.stdoutLog, maxLogBytes);
+  rotateLogIfNeeded(paths.stderrLog, maxLogBytes);
+
+  const url = getDesktopBackendUrl(env);
+  const child = spawnBackendProcess({
+    nodePath,
+    paths,
+    env,
+    port: env.AGENT_PLATFORM_DESKTOP_BACKEND_PORT ?? String(defaultBackendPort),
+  });
+  let processError: Error | undefined;
+  child.once('error', (error: Error) => {
+    processError = error;
+  });
+  const stdout = createWriteStream(paths.stdoutLog, { flags: 'w' });
+  const stderr = createWriteStream(paths.stderrLog, { flags: 'w' });
+
+  child.stdout?.pipe(stdout);
+  child.stderr?.pipe(stderr);
+
+  try {
+    await waitForBackendReady(`${url}/health/ready`, timeoutMs, child, () => processError);
+  } catch (error) {
+    await stopDesktopChild(child, stdout, stderr);
+    throw error;
+  }
+
+  return {
+    url,
+    readyUrl: `${url}/health/ready`,
+    logs: {
+      stdout: paths.stdoutLog,
+      stderr: paths.stderrLog,
+    },
+    stop: () => stopDesktopChild(child, stdout, stderr),
+  };
+}
+
+function spawnBackendProcess({
+  nodePath,
+  paths,
+  env,
+  port,
+}: {
+  nodePath: string;
+  paths: DesktopBackendPaths;
+  env: NodeJS.ProcessEnv;
+  port: string;
+}): ChildProcess {
+  return spawn(nodePath, [paths.apiEntry], {
+    cwd: paths.repoRoot,
+    env: {
+      ...env,
+      HOST: '127.0.0.1',
+      NODE_ENV: 'production',
+      PORT: port,
+      SCHEDULER_ENABLED: env.SCHEDULER_ENABLED ?? 'false',
+      SQLITE_PATH: env.SQLITE_PATH?.trim() || paths.sqlitePath,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+export async function waitForBackendReady(
+  readyUrl: string,
+  timeoutMs: number,
+  child: Pick<ChildProcess, 'exitCode'>,
+  getProcessError?: () => Error | undefined,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const processError = getProcessError?.();
+    if (processError) {
+      throw new Error(`Desktop backend failed to start: ${processError.message}`);
+    }
+
+    if (child.exitCode !== null) {
+      throw new Error(`Desktop backend exited before becoming ready with code ${child.exitCode}.`);
+    }
+
+    if (await canReachReadyEndpoint(readyUrl)) {
+      return;
+    }
+
+    await delay(250);
+  }
+
+  throw new Error(`Timed out waiting for desktop backend at ${readyUrl}.`);
+}
+
+function canReachReadyEndpoint(url: string): Promise<boolean> {
+  return new Promise((resolveReachable) => {
+    let settled = false;
+    const resolveOnce = (reachable: boolean): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      resolveReachable(reachable);
+    };
+
+    const request = get(url, (response) => {
+      response.resume();
+      resolveOnce(response.statusCode === 200);
+    });
+
+    request.on('error', () => {
+      resolveOnce(false);
+    });
+    request.setTimeout(1_000, () => {
+      request.destroy();
+      resolveOnce(false);
+    });
+  });
+}
+
+function rotateLogIfNeeded(logPath: string, maxLogBytes: number): void {
+  if (!existsSync(logPath)) {
+    return;
+  }
+
+  if (statSync(logPath).size > maxLogBytes) {
+    rmSync(logPath, { force: true });
+  }
+}
+
+function stopDesktopChild(
+  child: ChildProcess,
+  stdout: NodeJS.WritableStream,
+  stderr: NodeJS.WritableStream,
+): Promise<void> {
+  const closeLogs = (): void => {
+    stdout.end();
+    stderr.end();
+  };
+
+  if (child.exitCode !== null || child.killed) {
+    closeLogs();
+    return Promise.resolve();
+  }
+
+  return new Promise((resolveStopped) => {
+    const timeout = setTimeout(() => {
+      child.kill('SIGKILL');
+      closeLogs();
+      resolveStopped();
+    }, 2_000);
+
+    child.once('exit', () => {
+      clearTimeout(timeout);
+      closeLogs();
+      resolveStopped();
+    });
+
+    child.kill('SIGTERM');
+  });
+}

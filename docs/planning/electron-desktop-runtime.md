@@ -308,7 +308,7 @@ This is for contributors and CI support, not normal users.
 Must use:
 
 - built renderer, currently loaded through the Next.js standalone server on a local loopback port rather than the normal web dev server,
-- built local backend,
+- built local backend, currently supervised from Electron main as a child Node process in the development spike,
 - Electron shell,
 - OS app data,
 - native Project picker,
@@ -457,6 +457,7 @@ We need to decide how Electron packages and runs the backend.
 Research questions:
 
 - Should the backend run as compiled JavaScript launched by Electron, or as a packaged binary?
+- Should the packaged app bundle a Node runtime for the backend, or rebuild native dependencies for Electron's Node ABI?
 - How do we choose and communicate the local API port?
 - How do we handle startup failure, crash restart, shutdown, and stale processes?
 - Where do backend logs live?
@@ -471,6 +472,12 @@ Output needed:
 ### SQLite and native dependency packaging
 
 The current DB stack uses SQLite through native bindings. Packaging must be proven on macOS before we rely on it.
+
+The foundation spike found that launching the API through Electron's `ELECTRON_RUN_AS_NODE`
+path can fail when `better-sqlite3` was built for the development Node ABI rather than
+Electron's Node ABI. During development, the backend supervisor uses the active Node
+executable when available. Public packaging still needs an explicit decision between a
+bundled Node runtime and Electron-native rebuild/signing of SQLite bindings.
 
 Research questions:
 

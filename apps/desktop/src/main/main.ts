@@ -3,6 +3,13 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  getDesktopBackendPaths,
+  resolveDesktopBackendNodePath,
+  resolveDesktopBackendMode,
+  startDesktopBackend,
+  type DesktopBackendHandle,
+} from './backendSupervisor.js';
+import {
   getRepoRootFromMainDir,
   getStandaloneRendererPaths,
   resolveDesktopDevServerUrl,
@@ -15,6 +22,7 @@ import { buildBootstrapHtml, createWindowOptions, getPreloadPath } from './windo
 
 const smokeMode = process.argv.includes('--smoke');
 let mainWindow: BrowserWindow | undefined;
+let desktopBackend: DesktopBackendHandle | undefined;
 let standaloneRenderer: StandaloneRendererHandle | undefined;
 
 export async function createMainWindow(): Promise<BrowserWindow> {
@@ -68,6 +76,17 @@ function focusMainWindow(): void {
 }
 
 async function bootstrap(): Promise<void> {
+  const mainDir = dirname(fileURLToPath(import.meta.url));
+  const repoRoot = getRepoRootFromMainDir(mainDir);
+
+  if (resolveDesktopBackendMode(process.env) === 'managed') {
+    desktopBackend = await startDesktopBackend({
+      nodePath: resolveDesktopBackendNodePath(process.env, process.execPath),
+      paths: getDesktopBackendPaths(repoRoot, process.env),
+    });
+    process.env.API_PROXY_URL = desktopBackend.url;
+  }
+
   await createMainWindow();
 
   app.on('activate', async () => {
@@ -91,6 +110,11 @@ app.on('before-quit', () => {
     console.error('Failed to stop Agent Platform standalone renderer.', error);
   });
   standaloneRenderer = undefined;
+
+  desktopBackend?.stop().catch((error: unknown) => {
+    console.error('Failed to stop Agent Platform desktop backend.', error);
+  });
+  desktopBackend = undefined;
 });
 
 app.on('ready', async () => {
