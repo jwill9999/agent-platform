@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 test.describe('IDE Project opening is parked for desktop', () => {
@@ -45,7 +44,9 @@ test.describe('IDE Project opening is parked for desktop', () => {
   });
 
   test('opens desktop Project files through the backend-bound Project root', async ({ page }) => {
-    const projectRoot = mkdtempSync(join(tmpdir(), 'agent-platform-e2e-project-'));
+    const projectId = `agent-platform-e2e-project-${Date.now()}`;
+    const projectRoot = join(process.cwd(), '.agent-platform', 'workspaces', 'default', projectId);
+    const backendProjectRoot = `/workspace/${projectId}`;
     const projectName = `Desktop E2E Project ${Date.now()}`;
     mkdirSync(join(projectRoot, 'docs'), { recursive: true });
     mkdirSync(join(projectRoot, 'node_modules', 'hidden'), { recursive: true });
@@ -67,7 +68,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
             },
           });
         },
-        { path: projectRoot, name: projectName },
+        { path: backendProjectRoot, name: projectName },
       );
 
       await page.goto('/ide', { waitUntil: 'networkidle' });
@@ -77,6 +78,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await expect(page.getByText('Desktop required')).toHaveCount(0);
       await expect(page.getByText('node_modules')).toHaveCount(0);
       await expect(page.getByText(projectRoot)).toHaveCount(0);
+      await expect(page.getByText(backendProjectRoot)).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
 
       await page.getByText('guide.md').click();
