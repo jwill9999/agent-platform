@@ -19,6 +19,7 @@ import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTi
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
+import { classifyBashCommand } from '../security/bashCommandPolicy.js';
 import { validateBashWorkspacePolicy } from '../security/bashWorkspacePolicy.js';
 import { ToolRateLimiter } from '../security/rateLimiter.js';
 import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
@@ -96,19 +97,6 @@ const WRITE_TOOL_IDS = new Set(
     .map(([toolId]) => toolId),
 );
 WRITE_TOOL_IDS.add(CODING_APPLY_PATCH_ID);
-
-const READ_ONLY_SHELL_COMMANDS = new Set([
-  'pwd',
-  'ls',
-  'find',
-  'rg',
-  'grep',
-  'cat',
-  'head',
-  'tail',
-]);
-const READ_ONLY_GIT_SUBCOMMANDS = new Set(['status', 'diff', 'log', 'branch', 'show', 'rev-parse']);
-const SHELL_MUTATION_OR_CHAIN_PATTERN = /(?:^|[^\\])(?:[;&|<>]|\$\(|`)/;
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -251,7 +239,13 @@ async function dispatchNativeTool(
     };
   }
   try {
-    const result = await ctx.nativeToolExecutor(call.name, call.args);
+    const options =
+      call.name === 'sys_bash' && call.approvalGranted === true
+        ? { approvalGranted: true }
+        : undefined;
+    const result = options
+      ? await ctx.nativeToolExecutor(call.name, call.args, options)
+      : await ctx.nativeToolExecutor(call.name, call.args);
     return { output: result, ok: isOutputOk(result) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -371,18 +365,8 @@ function stringArgValue(args: Record<string, unknown>, key: string): string | un
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
-function firstShellWords(command: string): string[] {
-  return command.trim().split(/\s+/).filter(Boolean);
-}
-
 function isReadOnlyShellCommand(command: string): boolean {
-  if (SHELL_MUTATION_OR_CHAIN_PATTERN.test(command)) return false;
-  const [commandName, subcommand] = firstShellWords(command);
-  if (!commandName) return false;
-  if (commandName === 'sed') return subcommand === '-n';
-  if (commandName === 'git')
-    return Boolean(subcommand && READ_ONLY_GIT_SUBCOMMANDS.has(subcommand));
-  return READ_ONLY_SHELL_COMMANDS.has(commandName);
+  return classifyBashCommand(command).state === 'allowed';
 }
 
 function browserUrlApprovalReason(call: ToolCallIntent): string | undefined {
@@ -394,6 +378,14 @@ function browserUrlApprovalReason(call: ToolCallIntent): string | undefined {
   const decision = evaluateBrowserUrlPolicy(url);
   if (decision.state !== 'approval_required') return undefined;
   return decision.reasons.at(0) ?? 'Browser URL policy requires human approval.';
+}
+
+function shellCommandPolicyDecision(
+  call: ToolCallIntent,
+): ReturnType<typeof classifyBashCommand> | undefined {
+  if (call.name !== 'sys_bash') return undefined;
+  const command = typeof call.args.command === 'string' ? call.args.command : '';
+  return classifyBashCommand(command);
 }
 
 function onboardingWriteBlockReason(
@@ -421,6 +413,11 @@ function markBrowserUrlApproved(call: ToolCallIntent): ToolCallIntent {
     return call;
   }
   return { ...call, args: { ...call.args, approved: true } };
+}
+
+function markShellCommandApproved(call: ToolCallIntent): ToolCallIntent {
+  if (call.name !== 'sys_bash') return call;
+  return { ...call, approvalGranted: true };
 }
 
 async function createApprovalRequiredOutput(
@@ -967,6 +964,30 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       const toolMetadata = resolveToolMetadata(safeCall, ctx);
       const approvedForResume = ctx.approvedToolCallIds?.has(safeCall.id) ?? false;
+      const shellPolicy = shellCommandPolicyDecision(safeCall);
+      if (shellPolicy?.state === 'denied') {
+        const output: Output = {
+          type: 'error',
+          code: 'COMMAND_POLICY_DENIED',
+          message: shellPolicy.reason,
+        };
+        ctx.auditLog?.logDenied(
+          safeCall.name,
+          safeCall.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          shellPolicy.reason,
+          toolMetadata?.riskTier ?? 'high',
+        );
+        toolMessages.push({
+          role: 'tool',
+          toolCallId: safeCall.id,
+          toolName: safeCall.name,
+          content: outputToContent(safeCall.name, output),
+        });
+        traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok: false });
+        continue;
+      }
       const browserUrlReason = browserUrlApprovalReason(safeCall);
       if (browserUrlReason && !approvedForResume) {
         const output = ctx.approvalRequests
@@ -1022,9 +1043,17 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       if (approvedForResume) {
         safeCall = markBrowserUrlApproved(safeCall);
+        safeCall = markShellCommandApproved(safeCall);
       }
 
-      const approval = evaluateApprovalPolicy(toolMetadata);
+      const approval =
+        shellPolicy?.state === 'approval_required'
+          ? {
+              required: true,
+              riskTier: shellPolicy.riskTier,
+              reason: shellPolicy.reason,
+            }
+          : evaluateApprovalPolicy(toolMetadata);
       if (approval.required && !approvedForResume) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';

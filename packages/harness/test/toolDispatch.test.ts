@@ -419,9 +419,13 @@ describe('toolDispatchNode', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
-      command: `mkdir -p ${expectedDir} && touch ${expectedPath}`,
-    });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'sys_bash',
+      {
+        command: `mkdir -p ${expectedDir} && touch ${expectedPath}`,
+      },
+      { approvalGranted: true },
+    );
   });
 
   it('blocks mutating shell commands while AGENTS.md onboarding is not approved', async () => {
@@ -479,9 +483,13 @@ describe('toolDispatchNode', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
-      command: 'ls /workspace/generated',
-    });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'sys_bash',
+      {
+        command: 'ls /workspace/generated',
+      },
+      { approvalGranted: true },
+    );
   });
 
   it('does not rewrite non-path args that happen to equal a path value', async () => {
@@ -618,6 +626,113 @@ describe('toolDispatchNode', () => {
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
+  });
+
+  it('denies destructive shell commands before creating an approval request', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: '', stderr: '', exitCode: 0 },
+    });
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(makeApprovalRequest()),
+    };
+    const logDenied = vi.fn();
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied,
+      logPendingApproval: vi.fn(),
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvalRequests,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-shell-policy-denied',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-shell-denied', name: 'sys_bash', args: { command: 'rm -rf data' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(approvalRequests.create).not.toHaveBeenCalled();
+    expect(logDenied).toHaveBeenCalledWith(
+      'sys_bash',
+      { command: 'rm -rf data' },
+      'agent-1',
+      'session-shell-policy-denied',
+      expect.stringContaining('Recursive removal commands are blocked'),
+      'high',
+    );
+    expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+      error: 'COMMAND_POLICY_DENIED',
+      message: expect.stringContaining('Recursive removal commands are blocked'),
+    });
+  });
+
+  it('uses command policy reasons for shell approval prompts', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: '', stderr: '', exitCode: 0 },
+    });
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(makeApprovalRequest()),
+    };
+    const logPendingApproval = vi.fn();
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied: vi.fn(),
+      logPendingApproval,
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvalRequests,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-shell-policy-approval',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-shell-write', name: 'sys_bash', args: { command: 'touch notes.md' } }],
+        },
+      }),
+    );
+
+    expect(result.halted).toBe(true);
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(approvalRequests.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'sys_bash',
+        args: { command: 'touch notes.md' },
+        riskTier: 'high',
+      }),
+    );
+    expect(logPendingApproval).toHaveBeenCalledWith(
+      'sys_bash',
+      { command: 'touch notes.md' },
+      'agent-1',
+      'session-shell-policy-approval',
+      'high',
+    );
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({ type: 'tool_approval_required', toolId: 'sys_bash' }),
+    );
   });
 
   it('rejects tool not in agent allowlist', async () => {

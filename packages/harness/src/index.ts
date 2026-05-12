@@ -137,7 +137,7 @@ export {
   resolveWorkspaceConfig,
 } from './security/index.js';
 export type { HostPlatform, WorkspaceConfig, WorkspaceEnv } from './security/index.js';
-export { validateBashCommand, buildAllowlist } from './security/index.js';
+export { validateBashCommand, buildAllowlist, classifyBashCommand } from './security/index.js';
 export { validateUrl } from './security/index.js';
 export { redactCredentials } from './security/index.js';
 export { ToolRateLimiter } from './security/index.js';
@@ -147,6 +147,7 @@ export type {
   PathOperation,
   PathValidationResult,
   BashValidationResult,
+  BashCommandPolicyDecision,
   UrlValidationResult,
   RateLimitResult,
 } from './security/index.js';

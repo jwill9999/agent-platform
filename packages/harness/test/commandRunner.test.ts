@@ -9,8 +9,34 @@ import {
   createProjectScopedCommandRunner,
   createSystemToolExecutor,
   type CommandRunner,
+  type CommandRunnerRequest,
 } from '../src/index.js';
 import { PathJail } from '../src/index.js';
+
+function commandRequest(
+  workspaceRoot: string,
+  overrides: Partial<CommandRunnerRequest> = {},
+): CommandRunnerRequest {
+  return {
+    command: 'pwd',
+    cwd: workspaceRoot,
+    env: { mode: 'inherit', variables: {} },
+    timeoutMs: 1000,
+    maxOutputBytes: 100,
+    workspace: { root: workspaceRoot },
+    audit: { toolId: 'sys_bash' },
+    ...overrides,
+  };
+}
+
+function scopedRunner(workspaceRoot: string, delegate: CommandRunner): CommandRunner {
+  return createProjectScopedCommandRunner({
+    delegate,
+    pathJail: new PathJail([
+      { label: 'Project', hostPath: workspaceRoot, permission: 'read_write' },
+    ]),
+  });
+}
 
 describe('CommandRunner boundary', () => {
   it('passes sys_bash execution through a swappable command runner', async () => {
@@ -40,6 +66,7 @@ describe('CommandRunner boundary', () => {
       env: { mode: 'inherit', variables: {} },
       timeoutMs: 120_000,
       maxOutputBytes: 100_000,
+      approval: { granted: false },
       workspace: { root: workspaceRoot },
       audit: { toolId: 'sys_bash' },
     });
@@ -129,15 +156,7 @@ describe('CommandRunner boundary', () => {
       ]),
     });
 
-    await scopedRunner.run({
-      command: 'cat /workspace/input.txt',
-      cwd: workspaceRoot,
-      env: { mode: 'inherit', variables: {} },
-      timeoutMs: 1000,
-      maxOutputBytes: 100,
-      workspace: { root: workspaceRoot },
-      audit: { toolId: 'sys_bash' },
-    });
+    await scopedRunner.run(commandRequest(workspaceRoot, { command: 'cat /workspace/input.txt' }));
 
     expect(runner.run).toHaveBeenCalledWith({
       command: `cat ${join(realWorkspaceRoot, 'input.txt')}`,
@@ -158,23 +177,14 @@ describe('CommandRunner boundary', () => {
     const runner: CommandRunner = {
       run: vi.fn(),
     };
-    const scopedRunner = createProjectScopedCommandRunner({
-      delegate: runner,
-      pathJail: new PathJail([
-        { label: 'Project', hostPath: workspaceRoot, permission: 'read_write' },
-      ]),
-    });
+    const scoped = scopedRunner(workspaceRoot, runner);
 
     await expect(
-      scopedRunner.run({
-        command: `cat ${join(outsideRoot, 'secret.txt')}`,
-        cwd: workspaceRoot,
-        env: { mode: 'inherit', variables: {} },
-        timeoutMs: 1000,
-        maxOutputBytes: 100,
-        workspace: { root: workspaceRoot },
-        audit: { toolId: 'sys_bash' },
-      }),
+      scoped.run(
+        commandRequest(workspaceRoot, {
+          command: `cat ${join(outsideRoot, 'secret.txt')}`,
+        }),
+      ),
     ).resolves.toMatchObject({
       status: 'denied',
       code: 'PATH_ACCESS_DENIED',
@@ -182,15 +192,12 @@ describe('CommandRunner boundary', () => {
     });
 
     await expect(
-      scopedRunner.run({
-        command: 'pwd',
-        cwd: outsideRoot,
-        env: { mode: 'inherit', variables: {} },
-        timeoutMs: 1000,
-        maxOutputBytes: 100,
-        workspace: { root: workspaceRoot },
-        audit: { toolId: 'sys_bash' },
-      }),
+      scoped.run(
+        commandRequest(workspaceRoot, {
+          command: 'pwd',
+          cwd: outsideRoot,
+        }),
+      ),
     ).resolves.toMatchObject({
       status: 'denied',
       code: 'PATH_ACCESS_DENIED',
@@ -202,6 +209,59 @@ describe('CommandRunner boundary', () => {
     await rm(outsideRoot, { recursive: true, force: true });
   });
 
+  it('requires approval for write commands and denies destructive commands before delegating', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const runner: CommandRunner = {
+      run: vi.fn(),
+    };
+    const scoped = scopedRunner(workspaceRoot, runner);
+
+    await expect(
+      scoped.run(commandRequest(workspaceRoot, { command: 'touch generated/report.md' })),
+    ).resolves.toMatchObject({
+      status: 'approval_required',
+      riskTier: 'high',
+      reason: 'write_command',
+    });
+
+    await expect(
+      scoped.run(commandRequest(workspaceRoot, { command: 'rm -rf generated' })),
+    ).resolves.toMatchObject({
+      status: 'denied',
+      code: 'COMMAND_POLICY_DENIED',
+      reason: 'recursive_removal',
+    });
+
+    expect(runner.run).not.toHaveBeenCalled();
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('delegates approval-gated project commands after approval is granted', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const runner: CommandRunner = {
+      run: vi.fn().mockResolvedValue({
+        status: 'success',
+        stdout: '',
+        stderr: '',
+        exitCode: 0,
+        durationMs: 4,
+      }),
+    };
+    const scoped = scopedRunner(workspaceRoot, runner);
+
+    await expect(
+      scoped.run(
+        commandRequest(workspaceRoot, {
+          command: 'touch generated/report.md',
+          approval: { granted: true },
+        }),
+      ),
+    ).resolves.toMatchObject({ status: 'success' });
+
+    expect(runner.run).toHaveBeenCalledOnce();
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
   it('denies symlink escapes before command execution', async () => {
     const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
     const outsideRoot = await mkdtemp(join(tmpdir(), 'agent-platform-outside-'));
@@ -210,23 +270,10 @@ describe('CommandRunner boundary', () => {
     const runner: CommandRunner = {
       run: vi.fn(),
     };
-    const scopedRunner = createProjectScopedCommandRunner({
-      delegate: runner,
-      pathJail: new PathJail([
-        { label: 'Project', hostPath: workspaceRoot, permission: 'read_write' },
-      ]),
-    });
+    const scoped = scopedRunner(workspaceRoot, runner);
 
     await expect(
-      scopedRunner.run({
-        command: 'cat ./linked-secret.txt',
-        cwd: workspaceRoot,
-        env: { mode: 'inherit', variables: {} },
-        timeoutMs: 1000,
-        maxOutputBytes: 100,
-        workspace: { root: workspaceRoot },
-        audit: { toolId: 'sys_bash' },
-      }),
+      scoped.run(commandRequest(workspaceRoot, { command: 'cat ./linked-secret.txt' })),
     ).resolves.toMatchObject({
       status: 'denied',
       code: 'PATH_ACCESS_DENIED',

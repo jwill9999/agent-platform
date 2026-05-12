@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 
 import type { Output, RiskTier } from '@agent-platform/contracts';
 
+import { classifyBashCommand } from './security/bashCommandPolicy.js';
 import { validateBashWorkspacePolicy } from './security/bashWorkspacePolicy.js';
 import type { PathJail } from './security/pathJail.js';
 import { toolError, toolResult, truncate } from './tools/toolHelpers.js';
@@ -31,6 +32,7 @@ export type CommandRunnerRequest = {
   env: CommandEnvironmentPolicy;
   timeoutMs: number;
   maxOutputBytes: number;
+  approval?: { granted: boolean };
   workspace?: CommandRunnerWorkspace;
   audit: CommandRunnerAuditMetadata;
 };
@@ -97,12 +99,34 @@ function pathAccessDenied(reason: string): CommandRunnerDeniedResult {
   };
 }
 
+function commandPolicyDenied(reason: string, message: string): CommandRunnerDeniedResult {
+  return {
+    status: 'denied',
+    code: 'COMMAND_POLICY_DENIED',
+    reason,
+    message,
+  };
+}
+
 export function createProjectScopedCommandRunner({
   delegate,
   pathJail,
 }: ProjectScopedCommandRunnerOptions): CommandRunner {
   return {
     run: async (request) => {
+      const commandPolicy = classifyBashCommand(request.command);
+      if (commandPolicy.state === 'denied') {
+        return commandPolicyDenied(commandPolicy.code, commandPolicy.reason);
+      }
+      if (commandPolicy.state === 'approval_required' && request.approval?.granted !== true) {
+        return {
+          status: 'approval_required',
+          riskTier: commandPolicy.riskTier,
+          message: commandPolicy.reason,
+          reason: commandPolicy.code,
+        };
+      }
+
       const cwd = await pathJail.validate(request.cwd, 'read');
       if (!cwd.allowed) return pathAccessDenied('outside_project_cwd');
 

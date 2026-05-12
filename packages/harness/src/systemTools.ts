@@ -11,6 +11,7 @@ import {
 } from './commandRunner.js';
 import type { NativeToolExecutor } from './types.js';
 import { validateBashCommand } from './security/bashGuard.js';
+import { classifyBashCommand } from './security/bashCommandPolicy.js';
 import { WORKSPACE_ROOT } from './security/mounts.js';
 import type { PathJail } from './security/pathJail.js';
 import {
@@ -239,7 +240,7 @@ const MAX_BASH_TIMEOUT_MS = 120_000;
 async function handleBash(
   toolId: string,
   args: Record<string, unknown>,
-  options: { cwd: string; commandRunner: CommandRunner },
+  options: { cwd: string; commandRunner: CommandRunner; approvalGranted?: boolean },
 ): Promise<Output> {
   const command = stringArg(args, 'command');
   if (!command.trim()) {
@@ -250,6 +251,18 @@ async function handleBash(
   if (!validation.allowed) {
     return toolError('BASH_COMMAND_BLOCKED', validation.reason ?? 'Command is not allowed');
   }
+  const commandPolicy = classifyBashCommand(command);
+  if (commandPolicy.state === 'denied') {
+    return toolError('COMMAND_POLICY_DENIED', commandPolicy.reason);
+  }
+  if (commandPolicy.state === 'approval_required' && options.approvalGranted !== true) {
+    return commandRunnerResultToOutput(toolId, {
+      status: 'approval_required',
+      riskTier: commandPolicy.riskTier,
+      message: commandPolicy.reason,
+      reason: commandPolicy.code,
+    });
+  }
   const rawTimeout =
     typeof args.timeout_ms === 'number' ? args.timeout_ms : DEFAULT_BASH_TIMEOUT_MS;
   const timeoutMs = Math.min(Math.max(rawTimeout, 1000), MAX_BASH_TIMEOUT_MS);
@@ -259,6 +272,7 @@ async function handleBash(
     env: { mode: 'inherit', variables: {} },
     timeoutMs,
     maxOutputBytes: MAX_OUTPUT_BYTES,
+    approval: { granted: options.approvalGranted === true },
     workspace: { root: options.cwd },
     audit: { toolId },
   });
@@ -338,11 +352,19 @@ export function createSystemToolExecutor(options?: {
   const commandRunner = options?.pathJail
     ? createProjectScopedCommandRunner({ delegate: hostCommandRunner, pathJail: options.pathJail })
     : hostCommandRunner;
-  return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
+  return async (
+    toolId: string,
+    args: Record<string, unknown>,
+    executionOptions,
+  ): Promise<Output> => {
     // Core tools
     switch (toolId) {
       case ids.bash:
-        return handleBash(toolId, args, { cwd: workspaceRoot, commandRunner });
+        return handleBash(toolId, args, {
+          cwd: workspaceRoot,
+          commandRunner,
+          approvalGranted: executionOptions?.approvalGranted,
+        });
       case ids.readFile:
         return handleReadFile(toolId, args);
       case ids.writeFile:

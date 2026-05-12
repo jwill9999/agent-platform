@@ -28,6 +28,7 @@ export type ToolCallIntent = {
   id: string;
   name: string;
   args: Record<string, unknown>;
+  approvalGranted?: boolean;
 };
 
 export type LlmTextOutput = {
@@ -57,7 +58,11 @@ export type LlmModelConfig = {
 // ---------------------------------------------------------------------------
 
 /** Pluggable executor for non-MCP (registry/native) tools. */
-export type NativeToolExecutor = (toolId: string, args: Record<string, unknown>) => Promise<Output>;
+export type NativeToolExecutor = (
+  toolId: string,
+  args: Record<string, unknown>,
+  options?: { approvalGranted?: boolean },
+) => Promise<Output>;
 
 // ---------------------------------------------------------------------------
 // Output emitter (streaming interface)
