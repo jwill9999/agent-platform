@@ -44,13 +44,24 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import {
   existsSync,
+  lstatSync,
   readFileSync,
   readdirSync,
   realpathSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, isAbsolute, join, parse, posix, relative, sep } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  parse,
+  posix,
+  relative,
+  resolve,
+  sep,
+} from 'node:path';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
@@ -125,6 +136,49 @@ function metadataOnboardingState(
 
 function sha256(content: string): string {
   return createHash('sha256').update(content).digest('hex');
+}
+
+function isInsideProjectRoot(root: string, candidate: string): boolean {
+  const rel = relative(root, candidate);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+function resolveProjectWriteTarget(projectRoot: string, targetPath: string): string {
+  const rootRealPath = realpathSync(projectRoot);
+  const targetFile = resolve(rootRealPath, targetPath);
+  const parentRealPath = realpathSync(dirname(targetFile));
+  if (!isInsideProjectRoot(rootRealPath, parentRealPath)) {
+    throw new HttpError(403, 'PROJECT_PATH_FORBIDDEN', 'Project write target is outside the root');
+  }
+
+  if (existsSync(targetFile)) {
+    const targetStats = lstatSync(targetFile);
+    if (targetStats.isSymbolicLink()) {
+      throw new HttpError(
+        403,
+        'PROJECT_PATH_FORBIDDEN',
+        'Project write target cannot be a symbolic link',
+      );
+    }
+    const targetRealPath = realpathSync(targetFile);
+    if (!isInsideProjectRoot(rootRealPath, targetRealPath)) {
+      throw new HttpError(
+        403,
+        'PROJECT_PATH_FORBIDDEN',
+        'Project write target is outside the root',
+      );
+    }
+  }
+
+  return targetFile;
+}
+
+function readExistingRootInstructions(project: ProjectRecord): string | undefined {
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  if (typeof backendProjectRoot !== 'string') return undefined;
+  const targetFile = resolveProjectWriteTarget(backendProjectRoot, 'AGENTS.md');
+  if (!existsSync(targetFile)) return undefined;
+  return readFileSync(targetFile, 'utf8');
 }
 
 function buildOnboardingApproval(input: {
@@ -644,7 +698,7 @@ function approveProjectOnboarding(db: DrizzleDb, id: string, body: unknown): Pro
   }
   const draft = parseStoredOnboardingDraft(project.metadata);
   const targetPath = draft?.targetPath ?? 'AGENTS.md';
-  const targetFile = join(backendProjectRoot, targetPath);
+  const targetFile = resolveProjectWriteTarget(backendProjectRoot, targetPath);
   if (draft) {
     writeFileSync(targetFile, draft.markdown, 'utf8');
   }
@@ -922,7 +976,7 @@ function decideInstructionUpdateCandidate(input: {
 
   const nowMs = Date.now();
   if (input.decision === 'apply') {
-    const targetFile = join(backendProjectRoot, candidate.targetPath);
+    const targetFile = resolveProjectWriteTarget(backendProjectRoot, candidate.targetPath);
     const current = readFileSync(targetFile, 'utf8');
     writeFileSync(targetFile, appendInstructionUpdate(current, candidate), 'utf8');
   }
@@ -984,6 +1038,7 @@ function answerProjectOnboardingQuestion(db: DrizzleDb, id: string, body: unknow
     project,
     assessment,
     previousDraft,
+    existingInstructionMarkdown: previousDraft ? undefined : readExistingRootInstructions(project),
     dialogue,
     nowMs,
   });

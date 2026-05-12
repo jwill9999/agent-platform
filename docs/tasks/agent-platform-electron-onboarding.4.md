@@ -39,8 +39,8 @@ root.
 
 ## Definition Of Done
 
-- [ ] First run drafts a complete `AGENTS.md`.
-- [ ] Later runs propose updates rather than destructive replacement.
-- [ ] User review is required before writes are enabled.
-- [ ] Approved writes stay inside selected Project root.
+- [x] First run drafts a complete `AGENTS.md`.
+- [x] Later runs propose updates rather than destructive replacement.
+- [x] User review is required before writes are enabled.
+- [x] Approved writes stay inside selected Project root.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

@@ -14,9 +14,13 @@ type DraftInput = {
   project: ProjectRecord;
   assessment: ProjectOnboardingAssessment;
   previousDraft?: ProjectOnboardingDraft;
+  existingInstructionMarkdown?: string;
   dialogue: ProjectOnboardingDialogue;
   nowMs: number;
 };
+
+const UPDATE_START_MARKER = '<!-- agent-platform:onboarding-update:start -->';
+const UPDATE_END_MARKER = '<!-- agent-platform:onboarding-update:end -->';
 
 function titleForProfile(profile: ProjectOnboardingAssessment['profile']): string {
   return profile
@@ -230,8 +234,7 @@ export function buildOnboardingDraft(input: DraftInput): ProjectOnboardingDraft 
         },
       ].slice(-5)
     : [];
-  const markdown = [
-    '# Agent Instructions',
+  const generatedSections = [
     '',
     '## Project Overview',
     '',
@@ -286,7 +289,20 @@ export function buildOnboardingDraft(input: DraftInput): ProjectOnboardingDraft 
     '',
     formatOpenQuestions({ assessment: input.assessment, dialogue: input.dialogue }),
     '',
-  ].join('\n');
+  ];
+  const existingInstructionMarkdown = input.existingInstructionMarkdown?.trim();
+  const markdown = existingInstructionMarkdown
+    ? [
+        existingInstructionMarkdown,
+        '',
+        UPDATE_START_MARKER,
+        '',
+        '## Proposed Agent Platform Updates',
+        ...generatedSections,
+        UPDATE_END_MARKER,
+        '',
+      ].join('\n')
+    : ['# Agent Instructions', ...generatedSections].join('\n');
 
   return ProjectOnboardingDraftSchema.parse({
     id: input.previousDraft?.id ?? `draft-${input.project.id}`,

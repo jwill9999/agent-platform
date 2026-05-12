@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
+  existsSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -504,6 +505,73 @@ describe('projectsRouter', () => {
       .expect(409);
   });
 
+  it('drafts updates for existing AGENTS.md without discarding the current instructions', async () => {
+    const repoDir = path.join(tmpDir, 'repo-with-thin-agents');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'AGENTS.md'), 'thin instructions\n');
+    writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'thin-agents-project',
+        scripts: { test: 'vitest' },
+      }),
+    );
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Thin Agents Project' })
+      .expect(201);
+
+    const started = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/draft`)
+      .send({})
+      .expect(200);
+
+    const draftMarkdown = started.body.data.metadata.onboardingDraft.markdown as string;
+    expect(draftMarkdown).toContain('thin instructions');
+    expect(draftMarkdown).toContain('<!-- agent-platform:onboarding-update:start -->');
+    expect(draftMarkdown).toContain('## Proposed Agent Platform Updates');
+    expect(draftMarkdown).toContain('pnpm test');
+    expect(readFileSync(path.join(repoDir, 'AGENTS.md'), 'utf8')).toBe('thin instructions\n');
+
+    const approved = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
+      .send({ reviewer: 'Test reviewer' })
+      .expect(200);
+
+    const approvedContent = readFileSync(path.join(repoDir, 'AGENTS.md'), 'utf8');
+    expect(approvedContent).toBe(approved.body.data.metadata.onboardingDraft.markdown);
+    expect(approvedContent).toContain('thin instructions');
+    expect(approvedContent).toContain('## Proposed Agent Platform Updates');
+  });
+
+  it('refuses approved AGENTS.md writes through a symlink outside the Project root', async () => {
+    const repoDir = path.join(tmpDir, 'repo-with-symlinked-agents');
+    const outsideDir = path.join(tmpDir, 'outside-root');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    mkdirSync(outsideDir, { recursive: true });
+    const outsideInstructions = path.join(outsideDir, 'AGENTS.md');
+    writeFileSync(outsideInstructions, 'outside instructions\n');
+    symlinkSync(outsideInstructions, path.join(repoDir, 'AGENTS.md'));
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Symlinked Agents Project' })
+      .expect(201);
+
+    await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/draft`)
+      .send({})
+      .expect(200);
+
+    await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
+      .send({ reviewer: 'Test reviewer' })
+      .expect(403);
+
+    expect(readFileSync(outsideInstructions, 'utf8')).toBe('outside instructions\n');
+  });
+
   it('stores onboarding dialogue answers, reviews feedback, and finalizes an approved draft', async () => {
     const repoDir = path.join(tmpDir, 'repo-needing-dialogue');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
@@ -596,6 +664,7 @@ describe('projectsRouter', () => {
         ]),
       }),
     });
+    expect(existsSync(path.join(repoDir, 'AGENTS.md'))).toBe(false);
 
     const approved = await request(app)
       .post(`/v1/projects/${openedProject.body.data.id}/onboarding/approve`)
