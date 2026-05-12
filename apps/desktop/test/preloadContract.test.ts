@@ -4,7 +4,6 @@ import {
   desktopBridgeApiKeys,
   desktopBridgeApiName,
   desktopVersionsApiKeys,
-  type AgentPlatformDesktopApi,
 } from '../src/preload/desktopBridge.js';
 
 describe('desktop preload bridge contract', () => {
@@ -24,7 +23,7 @@ describe('desktop preload bridge contract', () => {
     const forbiddenRootKeys = ['invoke', 'send', 'on', 'fs', 'shell', 'path', 'ipc', 'ipcRenderer'];
 
     for (const key of forbiddenRootKeys) {
-      expect(desktopBridgeApiKeys).not.toContain(key as keyof AgentPlatformDesktopApi);
+      expect(desktopBridgeApiKeys).not.toContain(key);
     }
   });
 });
