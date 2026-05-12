@@ -141,14 +141,10 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await expect(page.getByText(backendProjectRoot)).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
 
-      await expect(async () => {
-        const guideFile = page.getByRole('button', { name: /^guide\.md$/ }).first();
-        await expect(guideFile).toBeVisible();
-        await guideFile.click();
-        await expect(page.getByText('hello from desktop project')).toBeVisible({
-          timeout: 1_000,
-        });
-      }).toPass({ timeout: 10_000 });
+      const guideFile = page.getByRole('button', { name: /^guide\.md$/ }).first();
+      await expect(guideFile).toBeVisible({ timeout: 10_000 });
+      await guideFile.click();
+      await expect(page.getByText('hello from desktop project')).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText('docs/guide.md')).toBeVisible();
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });
