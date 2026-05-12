@@ -43,4 +43,4 @@ reviewing the generated setup, approving it, and verifying writes land in the se
 - [x] Test verifies write output inside selected Project root.
 - [x] Test verifies missing or duplicate legacy open paths do not drive onboarding.
 - [x] CI includes the onboarding E2E coverage.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
