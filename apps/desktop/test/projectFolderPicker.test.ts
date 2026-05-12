@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  desktopProjectFolderOverrideEnv,
   normalizeDesktopProjectFolderSelection,
   selectDesktopProjectFolder,
   type DesktopProjectFolderDialog,
@@ -61,5 +62,28 @@ describe('desktop Project folder picker', () => {
       properties: ['openDirectory'],
       title: 'Open Project',
     });
+  });
+
+  it('uses an explicit E2E Project folder override without opening a native dialog', async () => {
+    const showOpenDialog = vi.fn();
+    const dialog = { showOpenDialog } satisfies DesktopProjectFolderDialog;
+    const window = {} as Parameters<typeof selectDesktopProjectFolder>[0]['window'];
+
+    await expect(
+      selectDesktopProjectFolder({
+        dialog,
+        env: {
+          [desktopProjectFolderOverrideEnv]: '/Users/example/projects/electron-e2e-project',
+        },
+        window,
+      }),
+    ).resolves.toEqual({
+      canceled: false,
+      folder: {
+        name: 'electron-e2e-project',
+        path: '/Users/example/projects/electron-e2e-project',
+      },
+    });
+    expect(showOpenDialog).not.toHaveBeenCalled();
   });
 });

@@ -35,15 +35,28 @@ Add production-like Electron E2E coverage for native Project open through Projec
 
 ## Tests and verification
 
-- Electron E2E for native Project open, Project session binding, `/help`, `/init`, and ordinary chat.
+- `pnpm --filter @agent-platform/desktop test -- test/projectFolderPicker.test.ts test/windowConfig.test.ts test/preloadContract.test.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e`
+- Electron E2E for native Project open, Project session binding, `/help`, `/init`, and ordinary chat context binding.
 - Root gates and PR checks before closure.
 - Sonar/Problems gate and review comment resolution.
 
+## Implementation notes
+
+- The sandboxed Electron preload is emitted as a self-contained CommonJS file because Electron
+  sandboxed preloads cannot use ESM imports or require local modules.
+- Electron E2E uses `AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIR` to avoid a blocking native folder
+  picker while still exercising renderer -> preload -> IPC -> main -> backend Project registration.
+- The E2E verifies the backend Project record, a Project-bound session, `/help`, `/init`, relative
+  file reads, and that `/workspace` plus host absolute paths are not rendered by default.
+- Ordinary chat model execution is not invoked in CI because it would require provider credentials;
+  the test verifies the Project-bound session that ordinary chat uses for Project context.
+
 ## Definition of done
 
-- [ ] Electron E2E opens a local Project through the native desktop path.
-- [ ] Electron E2E verifies the backend Project record and Project-bound session.
-- [ ] Electron E2E verifies `/help`, `/init`, and ordinary Project chat share Project context.
-- [ ] UI hides `/workspace` and host absolute paths by default.
-- [ ] Relevant tests and root gates pass.
+- [x] Electron E2E opens a local Project through the native desktop path.
+- [x] Electron E2E verifies the backend Project record and Project-bound session.
+- [x] Electron E2E verifies `/help`, `/init`, and the ordinary chat Project binding share Project context.
+- [x] UI hides `/workspace` and host absolute paths by default.
+- [x] Relevant tests and root gates pass locally.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

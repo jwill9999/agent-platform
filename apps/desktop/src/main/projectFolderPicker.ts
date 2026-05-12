@@ -17,6 +17,8 @@ export interface DesktopProjectFolderDialog {
   ) => Promise<OpenDialogReturnValue>;
 }
 
+export const desktopProjectFolderOverrideEnv = 'AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIR';
+
 export function normalizeDesktopProjectFolderSelection(
   result: Pick<OpenDialogReturnValue, 'canceled' | 'filePaths'>,
 ): DesktopProjectFolderSelectionResult {
@@ -41,11 +43,21 @@ export function normalizeDesktopProjectFolderSelection(
 
 export async function selectDesktopProjectFolder({
   dialog,
+  env = process.env,
   window,
 }: {
   dialog: DesktopProjectFolderDialog;
+  env?: NodeJS.ProcessEnv;
   window: BrowserWindow;
 }): Promise<DesktopProjectFolderSelectionResult> {
+  const testProjectDir = env[desktopProjectFolderOverrideEnv];
+  if (testProjectDir) {
+    return normalizeDesktopProjectFolderSelection({
+      canceled: false,
+      filePaths: [testProjectDir],
+    });
+  }
+
   const result = await dialog.showOpenDialog(window, {
     buttonLabel: 'Open Project',
     message: 'Choose a Project folder',

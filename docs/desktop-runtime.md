@@ -65,6 +65,7 @@ Desktop commands run from the repo root through the `@agent-platform/desktop` pa
 | `pnpm --filter @agent-platform/desktop smoke:renderer`     | Smoke-test Electron with the built standalone renderer            |
 | `pnpm --filter @agent-platform/desktop smoke:backend`      | Smoke-test managed local backend startup/readiness                |
 | `pnpm --filter @agent-platform/desktop test`               | Run desktop unit tests                                            |
+| `pnpm --filter @agent-platform/desktop test:e2e`           | Build production-like desktop runtime and run Electron E2E        |
 | `pnpm --filter @agent-platform/desktop typecheck`          | Typecheck the desktop package                                     |
 | `pnpm --filter @agent-platform/desktop lint`               | Lint the desktop package                                          |
 
@@ -132,6 +133,10 @@ Development and tests may override desktop paths with:
 | `AGENT_PLATFORM_DESKTOP_BACKEND_PORT` | Override managed backend loopback port       |
 | `AGENT_PLATFORM_DESKTOP_NODE_PATH`    | Override the Node executable for the backend |
 
+Electron E2E also uses `AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIR` to bypass the native OS dialog
+with a deterministic temporary Project folder. Product code must not set this variable for normal
+desktop runs.
+
 The managed desktop backend still receives `SQLITE_PATH` because the API process requires that
 environment variable. Desktop code derives that value from the desktop runtime resolver; it does
 not consume Docker's `/data/agent.sqlite` default as a desktop input.
@@ -183,19 +188,19 @@ destructive action for those files.
 The desktop foundation currently protects the security and data lifecycle boundary with package
 tests rather than packaged-app E2E:
 
-| Boundary              | Current regression coverage                                       |
-| --------------------- | ----------------------------------------------------------------- |
-| Renderer isolation    | `windowConfig.test.ts` covers sandboxed `BrowserWindow` defaults  |
-| Bridge exposure       | `preloadContract.test.ts` covers the explicit preload API shape   |
-| IPC validation        | `ipcValidation.test.ts` and reset request validation tests        |
-| App data deletion     | `localDataReset.test.ts` covers app data scope and Project safety |
-| Credential lifecycle  | `secretStorage.test.ts` and reset tests cover master-key removal  |
-| Managed backend paths | `runtimePaths.test.ts` and `backendSupervisor.test.ts`            |
+| Boundary              | Current regression coverage                                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Renderer isolation    | `windowConfig.test.ts` covers sandboxed `BrowserWindow` defaults                                                                                                  |
+| Bridge exposure       | `preloadContract.test.ts` covers the explicit preload API shape                                                                                                   |
+| IPC validation        | `ipcValidation.test.ts` and reset request validation tests                                                                                                        |
+| App data deletion     | `localDataReset.test.ts` covers app data scope and Project safety                                                                                                 |
+| Credential lifecycle  | `secretStorage.test.ts` and reset tests cover master-key removal                                                                                                  |
+| Managed backend paths | `runtimePaths.test.ts` and `backendSupervisor.test.ts`                                                                                                            |
+| Native Project open   | `apps/desktop/e2e/project-access.e2e.ts` covers Electron Project open, backend registration, Project-bound session reuse, `/help`, `/init`, and safe path display |
 
 Later release work must add production-like packaged Electron E2E for:
 
 - the visible local-data reset UI once Settings exposes it,
-- native Project folder selection and reopen flows,
 - packaged app startup with the bundled backend/runtime strategy,
 - installer uninstall/reset behavior on macOS first, then Windows and Linux.
 
@@ -203,7 +208,8 @@ Later release work must add production-like packaged Electron E2E for:
 
 - macOS is the first supported desktop target.
 - Public installers, signing, notarization, update delivery, and uninstall cleanup are not complete.
-- Native Project picker and Project-bound desktop chat remain future epic work.
+- Native Project picker and Project-bound desktop chat have development E2E coverage; packaged-app
+  coverage remains future release work.
 - Command/test execution still requires a sandbox design; Electron is not the sandbox.
 - Windows/Linux support should reuse the runtime path resolver and add platform-specific packaging
   and E2E coverage later.
