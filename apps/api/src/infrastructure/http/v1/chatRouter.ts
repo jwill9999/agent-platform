@@ -719,8 +719,7 @@ function resolveDesktopSlashProjectContext(
 
   const project = findProject(db, session.projectId);
   if (
-    !project ||
-    project.metadata['source'] !== 'desktop' ||
+    project?.metadata['source'] !== 'desktop' ||
     typeof project.metadata['backendProjectRoot'] !== 'string'
   ) {
     return {};
