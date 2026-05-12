@@ -362,8 +362,8 @@ export function RecentDesktopProjectsPanel({
           {projects.slice(0, 6).map((project) => {
             const available = desktopProjectIsAvailable(project);
             const folderLabel = desktopProjectFolderLabel(project) ?? project.name;
-            const profile = projectDisplayProfile(project);
             const assessment = projectOnboardingAssessmentFromMetadata(project);
+            const profile = assessment ? projectDisplayProfile(project) : null;
             return (
               <button
                 key={project.id}
@@ -381,9 +381,11 @@ export function RecentDesktopProjectsPanel({
               >
                 <div className="truncate font-medium text-foreground">{project.name}</div>
                 <div className="mt-0.5 truncate text-muted-foreground">Folder: {folderLabel}</div>
-                <div className="mt-0.5 truncate text-muted-foreground">
-                  {profile.label} - {projectCapabilitySummary(assessment?.capabilities)}
-                </div>
+                {profile && (
+                  <div className="mt-0.5 truncate text-muted-foreground">
+                    {profile.label} - {projectCapabilitySummary(assessment?.capabilities)}
+                  </div>
+                )}
                 <div
                   className={cn(
                     'mt-1 text-[11px]',
@@ -2810,8 +2812,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           onboardingAssessment?.display.folderLabel ??
                           activeProject.name}
                       </div>
-                      <div className="truncate">{activeProjectProfile.label}</div>
-                      {activeProjectCapabilities.length > 0 && (
+                      {onboardingAssessment && (
+                        <div className="truncate">{activeProjectProfile.label}</div>
+                      )}
+                      {onboardingAssessment && activeProjectCapabilities.length > 0 && (
                         <div className="flex flex-wrap gap-1 pt-1">
                           {activeProjectCapabilities.slice(0, 6).map((capability) => (
                             <span
