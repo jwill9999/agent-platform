@@ -46,7 +46,7 @@ intact.
 - [x] App data deletion tests prove Project folders are preserved.
 - [x] Credential deletion behavior is covered.
 - [x] Remaining packaged-app E2E gaps are documented.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
@@ -74,3 +74,8 @@ intact.
 - `pnpm lint`
 - `pnpm build`
 - `pnpm test`
+- PR #174 passed GitHub `verify`, `docker`, `e2e`, docs `markdownlint`/`lychee`,
+  GitGuardian, and SonarCloud.
+- SonarCloud reported 0 new issues and 0 security hotspots.
+- Sourcery skipped because the PR diff exceeded the account review limit and posted no actionable
+  inline comments.
