@@ -471,6 +471,34 @@ export const ProjectOpenBodySchema = z.object({
   slug: ProjectSlugSchema.optional(),
 });
 
+export const ProjectDesktopRegistrationBodySchema = ProjectOpenBodySchema;
+export type ProjectDesktopRegistrationBody = z.infer<typeof ProjectDesktopRegistrationBodySchema>;
+
+export const ProjectDesktopMetadataSchema = z.object({
+  source: z.literal('desktop'),
+  folderName: z.string().min(1).max(200),
+  capabilityState: ProjectCapabilityStateSchema,
+  onboardingState: ProjectOnboardingStateSchema,
+  defaultAgentProfile: ProjectDefaultAgentProfileSchema,
+  activeBranch: z.string().min(1).max(300).optional(),
+  instructionFileCount: z.number().int().nonnegative(),
+});
+export type ProjectDesktopMetadata = z.infer<typeof ProjectDesktopMetadataSchema>;
+
+export const ProjectDesktopRecordSchema = ProjectRecordSchema.extend({
+  workspaceKey: z.undefined().optional(),
+  metadata: ProjectDesktopMetadataSchema,
+});
+export type ProjectDesktopRecord = z.infer<typeof ProjectDesktopRecordSchema>;
+
+export const ProjectDesktopRegistrationResultSchema = z.object({
+  created: z.boolean(),
+  project: ProjectDesktopRecordSchema,
+});
+export type ProjectDesktopRegistrationResult = z.infer<
+  typeof ProjectDesktopRegistrationResultSchema
+>;
+
 export const ProjectQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false),
 });

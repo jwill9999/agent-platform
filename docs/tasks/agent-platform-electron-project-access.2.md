@@ -27,6 +27,19 @@ Create or update backend Project records from trusted Electron-selected host fol
 4. Add API tests for create, update/reopen, invalid path, and display-safe payloads.
 5. Document the trusted registration boundary.
 
+## Implementation notes
+
+- Desktop Project registration uses `POST /v1/projects/desktop/register`.
+- The route is intended for the Electron-controlled bridge path and requires the
+  `x-agent-platform-desktop-bridge: 1` header so web/browser fallbacks remain explicit.
+- The backend persists the real host folder path in internal Project metadata for later file
+  access, but the desktop registration response returns a display-safe Project payload:
+  Project name, safe workspace label, folder display name, capability state, onboarding state,
+  default agent profile, branch label when available, and instruction-file count.
+- Reopening the same host folder uses a non-reversible `desktop:<sha256>` workspace key so
+  duplicate opens reuse the existing Project record without exposing the absolute host path in
+  UI-facing registration responses.
+
 ## Dependency order
 
 | Upstream                                   | Downstream                                 |

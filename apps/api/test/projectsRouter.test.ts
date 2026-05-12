@@ -7,7 +7,13 @@ import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { closeDatabase, createSession, openDatabase, replaceAgent } from '@agent-platform/db';
+import {
+  closeDatabase,
+  createSession,
+  listProjects,
+  openDatabase,
+  replaceAgent,
+} from '@agent-platform/db';
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 import { createProjectsRouter } from '../src/infrastructure/http/v1/projectsRouter.js';
 import { createSessionsRouter } from '../src/infrastructure/http/v1/sessionsRouter.js';
@@ -125,6 +131,87 @@ describe('projectsRouter', () => {
       mode: 'project',
       projectId: openedProject.body.data.id,
     });
+  });
+
+  it('registers a trusted desktop project with a safe response and stable reopen semantics', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), 'desktop project\n');
+    const repoRealPath = realpathSync(repoDir);
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Repo' })
+      .expect(201);
+
+    expect(registered.body.data).toMatchObject({
+      created: true,
+      project: {
+        name: 'Desktop Repo',
+        workspacePath: expect.stringMatching(/^projects\/desktop-repo-[a-f0-9]{8}$/),
+        metadata: {
+          source: 'desktop',
+          folderName: 'desktop-repo',
+          capabilityState: 'backend_accessible',
+          onboardingState: 'in_progress',
+          defaultAgentProfile: 'coding',
+          activeBranch: 'main',
+          instructionFileCount: 0,
+        },
+      },
+    });
+    expect(registered.body.data.project).not.toHaveProperty('workspaceKey');
+    expect(JSON.stringify(registered.body.data)).not.toContain(repoRealPath);
+
+    const persisted = listProjects(opened.db, { includeArchived: true }).find(
+      (project) => project.id === registered.body.data.project.id,
+    );
+    expect(persisted).toMatchObject({
+      workspaceKey: expect.stringMatching(/^desktop:[a-f0-9]{64}$/),
+      metadata: expect.objectContaining({
+        backendProjectRoot: repoRealPath,
+        repositoryRoot: repoRealPath,
+        source: 'desktop',
+      }),
+    });
+
+    const selectedAgain = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Repo Renamed' })
+      .expect(200);
+
+    expect(selectedAgain.body.data).toMatchObject({
+      created: false,
+      project: {
+        id: registered.body.data.project.id,
+        name: 'Desktop Repo Renamed',
+      },
+    });
+    expect(JSON.stringify(selectedAgain.body.data)).not.toContain(repoRealPath);
+  });
+
+  it('rejects desktop project registration without the desktop bridge or inspectable folder', async () => {
+    await request(app)
+      .post('/v1/projects/desktop/register')
+      .send({ path: tmpDir, name: 'Untrusted Desktop Repo' })
+      .expect(403);
+
+    const missingPath = path.join(tmpDir, 'missing-desktop-project');
+    const unavailable = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: missingPath, name: 'Missing Desktop Repo' })
+      .expect(422);
+
+    expect(unavailable.body.error).toMatchObject({
+      code: 'PROJECT_UNAVAILABLE',
+      details: {
+        capabilityState: 'unavailable',
+      },
+    });
+    expect(JSON.stringify(unavailable.body.error)).not.toContain(missingPath);
   });
 
   it('tracks AGENTS.md onboarding state and approval metadata', async () => {

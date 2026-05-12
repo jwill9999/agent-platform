@@ -1,5 +1,7 @@
 import {
   ProjectCreateBodySchema,
+  ProjectDesktopRegistrationBodySchema,
+  ProjectDesktopRegistrationResultSchema,
   type ProjectOpenBody,
   ProjectOpenBodySchema,
   ProjectOnboardingAnswerBodySchema,
@@ -27,13 +29,15 @@ import {
   ProjectSlugConflictError,
   ProjectWorkspacePathError,
   updateProject,
+  slugify,
 } from '@agent-platform/db';
 import type { DrizzleDb } from '@agent-platform/db';
 import { Router } from 'express';
+import type { Request } from 'express';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
-import { basename, isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join, parse } from 'node:path';
 
 import { asyncHandler } from '../asyncHandler.js';
 import { HttpError } from '../httpError.js';
@@ -85,6 +89,7 @@ type BackendProjectMetadata = {
 };
 
 const GIT_BINARY = '/usr/bin/git';
+const DESKTOP_PROJECT_REGISTRATION_HEADER = 'x-agent-platform-desktop-bridge';
 
 function gitValue(cwd: string, args: string[]): string | undefined {
   try {
@@ -261,6 +266,47 @@ function findProjectByWorkspaceKey(db: DrizzleDb, workspaceKey: string): Project
   );
 }
 
+function desktopWorkspaceKey(projectRoot: string): string {
+  return `desktop:${sha256(projectRoot)}`;
+}
+
+function stableDesktopSlug(
+  input: ProjectOpenBody,
+  projectName: string,
+  projectRoot: string,
+): string {
+  if (input.slug) return input.slug;
+  const base = slugify(projectName) || 'project';
+  return `${base.slice(0, 111)}-${sha256(projectRoot).slice(0, 8)}`;
+}
+
+function assertSupportedDesktopProjectRoot(projectRoot: string): void {
+  if (projectRoot === parse(projectRoot).root) {
+    throw new HttpError(422, 'PROJECT_UNAVAILABLE', 'Choose a folder inside your project.', {
+      capabilityState: 'unavailable',
+    });
+  }
+}
+
+function requireDesktopProjectRegistration(req: Request): void {
+  if (req.get(DESKTOP_PROJECT_REGISTRATION_HEADER) !== '1') {
+    throw new HttpError(
+      403,
+      'DESKTOP_PROJECT_REGISTRATION_REQUIRED',
+      'Project registration must come from the desktop app.',
+    );
+  }
+}
+
+function sanitizeDesktopProjectError(error: unknown): never {
+  if (error instanceof HttpError && error.code === 'PROJECT_UNAVAILABLE') {
+    throw new HttpError(error.status, error.code, error.message, {
+      capabilityState: 'unavailable',
+    });
+  }
+  mapProjectError(error);
+}
+
 function openBackendProject(
   db: DrizzleDb,
   input: ProjectOpenBody,
@@ -299,6 +345,81 @@ function openBackendProject(
     project: withAutoApprovalMetadata(db, created),
     created: true,
   };
+}
+
+function openDesktopProject(
+  db: DrizzleDb,
+  input: ProjectOpenBody,
+): {
+  project: ProjectRecord;
+  created: boolean;
+} {
+  const initialMetadata = discoverBackendProjectMetadata(input.path);
+  assertSupportedDesktopProjectRoot(initialMetadata.backendProjectRoot);
+  const workspaceKey = desktopWorkspaceKey(initialMetadata.backendProjectRoot);
+  const existing = findProjectByWorkspaceKey(db, workspaceKey);
+  const metadata = existing
+    ? discoverBackendProjectMetadata(input.path, existing.metadata)
+    : initialMetadata;
+  assertSupportedDesktopProjectRoot(metadata.backendProjectRoot);
+  const name = projectNameFor(input, metadata.backendProjectRoot);
+  const slug = stableDesktopSlug(input, name, metadata.backendProjectRoot);
+
+  if (existing) {
+    const updated = updateProject(db, existing.id, {
+      name,
+      slug,
+      workspaceKey,
+      metadata: { ...existing.metadata, ...metadata, source: 'desktop' },
+      archivedAtMs: null,
+    });
+    return {
+      project: withAutoApprovalMetadata(db, updated),
+      created: false,
+    };
+  }
+
+  const created = createProject(db, {
+    name,
+    slug,
+    workspaceKey,
+    metadata: { ...metadata, source: 'desktop' },
+  });
+  return {
+    project: withAutoApprovalMetadata(db, created),
+    created: true,
+  };
+}
+
+function toDesktopRegistrationResult(project: ProjectRecord, created: boolean) {
+  const onboardingState = metadataOnboardingState(project.metadata) ?? 'missing';
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  const folderName =
+    typeof backendProjectRoot === 'string'
+      ? basename(backendProjectRoot) || project.name
+      : project.name;
+  const instructionFiles = parseProjectInstructionFileReferences(project.metadata);
+  const activeBranch =
+    typeof project.metadata['activeBranch'] === 'string'
+      ? project.metadata['activeBranch']
+      : undefined;
+
+  return ProjectDesktopRegistrationResultSchema.parse({
+    created,
+    project: {
+      ...project,
+      workspaceKey: undefined,
+      metadata: {
+        source: 'desktop',
+        folderName,
+        capabilityState: 'backend_accessible',
+        onboardingState,
+        defaultAgentProfile: 'coding',
+        ...(activeBranch ? { activeBranch } : {}),
+        instructionFileCount: instructionFiles.length,
+      },
+    },
+  });
 }
 
 function approveProjectOnboarding(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
@@ -710,6 +831,24 @@ export function createProjectsRouter(db: DrizzleDb): Router {
         res.status(created ? 201 : 200).json({ data: project });
       } catch (error) {
         mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/desktop/register',
+    asyncHandler(async (req, res) => {
+      try {
+        requireDesktopProjectRegistration(req);
+        const { project, created } = openDesktopProject(
+          db,
+          parseBody(ProjectDesktopRegistrationBodySchema, req.body),
+        );
+        res
+          .status(created ? 201 : 200)
+          .json({ data: toDesktopRegistrationResult(project, created) });
+      } catch (error) {
+        sanitizeDesktopProjectError(error);
       }
     }),
   );
