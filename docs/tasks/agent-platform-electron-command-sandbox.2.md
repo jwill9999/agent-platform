@@ -25,6 +25,19 @@ Add a typed, swappable command execution boundary before changing host command b
 3. Wire `sys_bash` toward the interface behind existing approvals and guardrails.
 4. Add unit tests for result shapes and adapter behavior.
 
+## Implementation Notes
+
+- Added `packages/harness/src/commandRunner.ts` as the swappable command execution boundary.
+- `CommandRunnerRequest` carries command, cwd, env policy, timeout, output bounds, workspace
+  metadata, and audit metadata.
+- `CommandRunnerResult` distinguishes success, command failure, denied, and approval-required
+  outcomes.
+- `createSystemToolExecutor` now accepts an optional `commandRunner`; `sys_bash` uses it after the
+  existing bash guard validation and maps completed results back to the existing bash tool output
+  shape.
+- The default runner is `createHostShellCommandRunner`, preserving current host shell execution
+  behavior while making the runner replaceable in later tasks.
+
 ## Tests And Verification
 
 - Focused harness tests for the new interface and current shell adapter.
@@ -35,8 +48,8 @@ Add a typed, swappable command execution boundary before changing host command b
 
 ## Definition Of Done
 
-- [ ] `CommandRunner` is typed and exported from the appropriate harness boundary.
-- [ ] Existing `sys_bash` behavior is adapted through the interface without broad behavior changes.
-- [ ] Result shapes cover success, command failure, denied, and approval-required outcomes.
-- [ ] Tests prove the interface can be swapped without changing chat/harness call sites.
+- [x] `CommandRunner` is typed and exported from the appropriate harness boundary.
+- [x] Existing `sys_bash` behavior is adapted through the interface without broad behavior changes.
+- [x] Result shapes cover success, command failure, denied, and approval-required outcomes.
+- [x] Tests prove the interface can be swapped without changing chat/harness call sites.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

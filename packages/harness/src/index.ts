@@ -27,6 +27,19 @@ export type {
 } from './types.js';
 export { contractToolsToDefinitions } from './types.js';
 export {
+  commandRunnerResultToOutput,
+  createHostShellCommandRunner,
+  type CommandEnvironmentPolicy,
+  type CommandRunner,
+  type CommandRunnerAuditMetadata,
+  type CommandRunnerCompletedResult,
+  type CommandRunnerDeniedResult,
+  type CommandRunnerApprovalRequiredResult,
+  type CommandRunnerRequest,
+  type CommandRunnerResult,
+  type CommandRunnerWorkspace,
+} from './commandRunner.js';
+export {
   llmReasonNode,
   createLlmReasonNode,
   type LlmReasonNodeOptions,

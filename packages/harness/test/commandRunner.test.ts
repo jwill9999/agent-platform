@@ -1,0 +1,105 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  commandRunnerResultToOutput,
+  createSystemToolExecutor,
+  type CommandRunner,
+} from '../src/index.js';
+
+describe('CommandRunner boundary', () => {
+  it('passes sys_bash execution through a swappable command runner', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const runner: CommandRunner = {
+      run: vi.fn().mockResolvedValue({
+        status: 'success',
+        stdout: 'hello\n',
+        stderr: '',
+        exitCode: 0,
+        durationMs: 12,
+      }),
+    };
+    const executor = createSystemToolExecutor({ workspaceRoot, commandRunner: runner });
+
+    await expect(
+      executor('sys_bash', { command: 'echo hello', timeout_ms: 250_000 }),
+    ).resolves.toEqual({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: 'hello\n', stderr: '', exitCode: 0 },
+    });
+
+    expect(runner.run).toHaveBeenCalledWith({
+      command: 'echo hello',
+      cwd: workspaceRoot,
+      env: { mode: 'inherit', variables: {} },
+      timeoutMs: 120_000,
+      maxOutputBytes: 100_000,
+      workspace: { root: workspaceRoot },
+      audit: { toolId: 'sys_bash' },
+    });
+
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('maps command success and command failure results to existing bash tool output shape', () => {
+    expect(
+      commandRunnerResultToOutput('sys_bash', {
+        status: 'success',
+        stdout: 'ok',
+        stderr: '',
+        exitCode: 0,
+        durationMs: 5,
+      }),
+    ).toEqual({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: 'ok', stderr: '', exitCode: 0 },
+    });
+
+    expect(
+      commandRunnerResultToOutput('sys_bash', {
+        status: 'failed',
+        stdout: '',
+        stderr: 'nope',
+        exitCode: 2,
+        durationMs: 5,
+      }),
+    ).toEqual({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: '', stderr: 'nope', exitCode: 2 },
+    });
+  });
+
+  it('maps denied and approval-required command results distinctly', () => {
+    expect(
+      commandRunnerResultToOutput('sys_bash', {
+        status: 'denied',
+        code: 'COMMAND_DENIED',
+        message: 'outside project root',
+        reason: 'outside_root',
+      }),
+    ).toEqual({
+      type: 'error',
+      code: 'COMMAND_DENIED',
+      message: 'outside project root',
+    });
+
+    expect(
+      commandRunnerResultToOutput('sys_bash', {
+        status: 'approval_required',
+        riskTier: 'high',
+        message: 'destructive command needs approval',
+        reason: 'destructive_command',
+      }),
+    ).toEqual({
+      type: 'error',
+      code: 'APPROVAL_REQUIRED',
+      message: 'destructive command needs approval',
+    });
+  });
+});
