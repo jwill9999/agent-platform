@@ -469,7 +469,7 @@ export default function HomePage() {
   useEffect(() => {
     if (selectedMode !== 'project-chat') return;
     if (!selectedAgentId || !activeProject?.id) return;
-    void bindActiveProjectSession(selectedAgentId, activeProject.id);
+    bindActiveProjectSession(selectedAgentId, activeProject.id).catch(() => {});
   }, [activeProject?.id, bindActiveProjectSession, selectedAgentId, selectedMode]);
 
   const handleSend = useCallback(
