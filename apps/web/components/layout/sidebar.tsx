@@ -292,7 +292,7 @@ export function Sidebar() {
             </Link>
           );
         })}
-        {!collapsed && (
+        {!collapsed && recentProjects.length > 0 && (
           <RecentProjectsNavSection
             projects={recentProjects}
             isLoading={isLoadingRecentProjects}
