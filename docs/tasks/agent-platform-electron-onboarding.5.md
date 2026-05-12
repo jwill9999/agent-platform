@@ -40,4 +40,4 @@ Preserve refresh, rescan, and instruction update flows where they still fit the 
 - [x] Existing approved setup is preserved by default.
 - [x] Update candidates are visible when relevant.
 - [x] Legacy folder-handle paths do not affect desktop onboarding.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
