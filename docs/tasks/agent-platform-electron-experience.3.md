@@ -37,8 +37,36 @@ an optional deeper workspace.
 
 ## Definition Of Done
 
-- [ ] Opening or reopening a Project lands in Project chat by default.
-- [ ] First Project chat message has active Project context.
-- [ ] Normal chat remains separate from Project chat.
-- [ ] IDE can still be opened from the active Project.
+- [x] Opening or reopening a Project lands in Project chat by default.
+- [x] First Project chat message has active Project context.
+- [x] Normal chat remains separate from Project chat.
+- [x] IDE can still be opened from the active Project.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation Notes
+
+- Desktop Project selection now registers the folder and opens a Project-bound chat session on the
+  home surface instead of routing directly to the IDE.
+- Recent Projects in the left navigation reopen into Project chat; the Project chat header exposes
+  the optional `Open IDE` action for deeper file work.
+- Shared desktop Project helpers centralize folder selection, registration, recent Project loading,
+  and Project session binding.
+- Project chat has Project-specific empty state and composer copy so users are invited to describe a
+  task rather than manage paths.
+
+## Local Verification
+
+- `pnpm --filter @agent-platform/web exec vitest run test/project-navigation.test.ts test/project-onboarding-assessment-panel.test.ts`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run test`
+- `pnpm exec playwright test -c e2e/playwright.config.ts e2e/ide-project-opening-parked.spec.ts`
+- `pnpm --filter @agent-platform/desktop run test:e2e`
+- `pnpm docs:lint`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm format:check`
+- `pnpm run test:e2e`
+- `git diff --check`
+- `sh .husky/pre-push`

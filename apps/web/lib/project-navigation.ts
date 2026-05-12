@@ -112,3 +112,7 @@ export function desktopProjectIsAvailable(project: ProjectDesktopRecord): boolea
 export function buildProjectIdeHref(projectId: string): string {
   return `/ide?${projectReopenSearchParam}=${encodeURIComponent(projectId)}`;
 }
+
+export function buildProjectChatHref(projectId: string): string {
+  return `/?${projectReopenSearchParam}=${encodeURIComponent(projectId)}`;
+}

@@ -8,13 +8,10 @@ import type {
   ProjectOnboardingDraft,
   ProjectInstructionUpdateCandidate,
   ProjectInstructionUpdateProposal,
-  ProjectDesktopRecentProjectsResult,
   ProjectDesktopRecord,
-  ProjectDesktopRegistrationResult,
   ProjectFileReadResult,
   ProjectFileTreeResult,
   ProjectRecord,
-  SessionProjectBindingResult,
 } from '@agent-platform/contracts';
 import {
   ProjectOnboardingAssessmentSchema,
@@ -114,33 +111,15 @@ import {
   projectReopenSearchParam,
   recentProjectsUpdatedEvent,
 } from '@/lib/project-navigation';
+import {
+  bindProjectSession,
+  getDesktopProjectBridge,
+  hasDesktopProjectBridge,
+  loadRecentDesktopProjects as loadRecentDesktopProjectsFromApi,
+  registerDesktopProject,
+} from '@/lib/desktop-projects';
 
 type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
-
-interface DesktopSelectedProjectFolder {
-  readonly path: string;
-  readonly name: string;
-}
-
-type DesktopProjectFolderSelectionResult =
-  | { readonly canceled: true }
-  | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
-
-interface DesktopProjectBridge {
-  readonly projects?: {
-    readonly selectFolder?: () => Promise<DesktopProjectFolderSelectionResult>;
-  };
-}
-
-function getDesktopProjectBridge(): DesktopProjectBridge | undefined {
-  if (globalThis.window === undefined) return undefined;
-  return (globalThis as typeof globalThis & { agentPlatformDesktop?: DesktopProjectBridge })
-    .agentPlatformDesktop;
-}
-
-function hasDesktopProjectBridge(): boolean {
-  return Boolean(getDesktopProjectBridge()?.projects?.selectFolder);
-}
 
 export function buildIdeChatMessage(input: {
   userLine: string;
@@ -1903,10 +1882,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const loadRecentDesktopProjects = useCallback(async () => {
     setIsLoadingRecentProjects(true);
     try {
-      const result = await apiGet<ProjectDesktopRecentProjectsResult>(
-        apiPath('projects', 'desktop', 'recent'),
-      );
-      const projects = result?.projects ?? [];
+      const projects = await loadRecentDesktopProjectsFromApi();
       setRecentDesktopProjects(projects);
       return projects;
     } catch (e) {
@@ -2021,11 +1997,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     try {
       const selection = await selectFolder();
       if (selection.canceled) return;
-      const result = await apiPost<ProjectDesktopRegistrationResult>(
-        apiPath('projects', 'desktop', 'register'),
-        { path: selection.folder.path, name: selection.folder.name },
-        { headers: { 'x-agent-platform-desktop-bridge': '1' } },
-      );
+      const result = await registerDesktopProject(selection.folder);
       if (!result) throw new ApiRequestError('Failed to open Project', 500);
       reopenDesktopProject(result.project);
       await loadRecentDesktopProjects();
@@ -2046,7 +2018,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     if (!selectedAgentId || !activeProject?.id) return;
     void (async () => {
       try {
-        const result = await apiPost<SessionProjectBindingResult>(apiPath('sessions', 'project'), {
+        const result = await bindProjectSession({
           agentId: selectedAgentId,
           projectId: activeProject.id,
         });

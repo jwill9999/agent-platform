@@ -267,7 +267,7 @@ describe('Project onboarding assessment panel', () => {
     );
 
     expect(html).toContain('Recent Projects');
-    expect(html).toContain('href="/ide?projectId=project-1"');
+    expect(html).toContain('href="/?projectId=project-1"');
     expect(html).toContain('Auth App');
     expect(html).toContain('Ready to reopen');
     expect(html).toContain('Missing App');

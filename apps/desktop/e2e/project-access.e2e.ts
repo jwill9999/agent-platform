@@ -63,18 +63,16 @@ test.describe('Electron Project access', () => {
       });
 
       const page = await app.firstWindow();
-      await openIde(page);
+      await openProjectChat(page);
       await page.getByRole('button', { name: 'Open Project' }).click();
 
-      const binding = page.getByLabel('Project binding');
-      await expect(binding.getByText('electron-e2e-project').first()).toBeVisible();
+      await expect(page.getByText('electron-e2e-project').first()).toBeVisible();
+      await expect(page.getByText('Project chat')).toBeVisible();
+      await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
+      await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
       await expect(page.getByText('Restore folder')).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
-      await expect(page.getByText(projectDir)).toHaveCount(0);
-      await page.getByText('guide.md').click();
-      await expect(page.getByText('hello from electron project')).toBeVisible();
-      await expect(page.getByText('docs/guide.md')).toBeVisible();
       await expect(page.getByText(projectDir)).toHaveCount(0);
 
       const project = await findRecentProject(backendPort, 'electron-e2e-project');
@@ -90,21 +88,27 @@ test.describe('Electron Project access', () => {
       await expect(recentProjects.getByText('Ready to reopen')).toBeVisible();
       await expect(recentProjects.getByText(projectDir)).toHaveCount(0);
 
-      const ideUrl = new URL(page.url());
-      await page.goto(`${ideUrl.origin}/ide?projectId=${encodeURIComponent(project.id)}`);
-      await expect(binding.getByText('electron-e2e-project').first()).toBeVisible();
-      await expect(page.getByText('guide.md')).toBeVisible();
-      await expect(page.getByText(projectDir)).toHaveCount(0);
-
-      await sendChatMessage(page, '/help');
-      await expect(page.getByText('Available slash commands:')).toBeVisible();
-
-      await sendChatMessage(page, '/init');
+      await sendChatMessage(page, '/init', 'Ask about this Project...');
       await expect(
         page.getByText(
           'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
         ),
       ).toBeVisible();
+
+      await page.getByRole('link', { name: 'Open IDE' }).click();
+      await page.waitForURL(/\/ide/);
+      const binding = page.getByLabel('Project binding');
+      await expect(binding.getByText('electron-e2e-project').first()).toBeVisible();
+      await expect(page.getByText('guide.md')).toBeVisible();
+      await expect(page.getByText(projectDir)).toHaveCount(0);
+      await page.getByText('guide.md').click();
+      await expect(page.getByText('hello from electron project')).toBeVisible();
+      await expect(page.getByText('docs/guide.md')).toBeVisible();
+      await expect(page.getByText(projectDir)).toHaveCount(0);
+
+      await sendChatMessage(page, '/help', 'Ask about your code...');
+      await expect(page.getByText('Available slash commands:')).toBeVisible();
+
       await expect(binding.getByText('Project setup in progress')).toBeVisible();
       await expect(binding.getByRole('button', { name: 'Approve draft' })).toBeVisible();
       await binding.getByRole('button', { name: 'Approve draft' }).click();
@@ -127,15 +131,13 @@ test.describe('Electron Project access', () => {
   });
 });
 
-async function openIde(page: Page): Promise<void> {
+async function openProjectChat(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
-  await page.getByRole('link', { name: /Open Project/ }).click();
-  await page.waitForURL(/\/ide$/);
   await page.waitForLoadState('networkidle');
 }
 
-async function sendChatMessage(page: Page, message: string): Promise<void> {
-  const input = page.getByPlaceholder('Ask about your code...');
+async function sendChatMessage(page: Page, message: string, placeholder: string): Promise<void> {
+  const input = page.getByPlaceholder(placeholder);
   await input.fill(message);
   await input.press('Enter');
   await expect(page.getByText(message, { exact: true })).toBeVisible();

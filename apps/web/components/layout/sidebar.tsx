@@ -3,7 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import type { ProjectDesktopRecentProjectsResult, ProjectDesktopRecord } from '@agent-platform/contracts';
+import type {
+  ProjectDesktopRecentProjectsResult,
+  ProjectDesktopRecord,
+} from '@agent-platform/contracts';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import {
@@ -35,7 +38,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { apiGet, apiPath, ApiRequestError } from '@/lib/apiClient';
 import {
-  buildProjectIdeHref,
+  buildProjectChatHref,
   desktopProjectFolderLabel,
   desktopProjectIsAvailable,
   recentProjectsUpdatedEvent,
@@ -174,7 +177,7 @@ export function RecentProjectsNavSection({
             return (
               <Link
                 key={project.id}
-                href={buildProjectIdeHref(project.id)}
+                href={buildProjectChatHref(project.id)}
                 className="flex flex-col rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 title={`Open ${project.name}`}
               >

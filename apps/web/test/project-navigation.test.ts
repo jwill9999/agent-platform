@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildProjectChatHref,
   buildProjectIdeHref,
   createWorkspaceNavigationState,
   desktopProjectFolderLabel,
@@ -67,6 +68,7 @@ describe('Project navigation model', () => {
     } as const;
 
     expect(projectReopenSearchParam).toBe('projectId');
+    expect(buildProjectChatHref(project.id)).toBe('/?projectId=project%201');
     expect(buildProjectIdeHref(project.id)).toBe('/ide?projectId=project%201');
     expect(desktopProjectFolderLabel(project)).toBe('auth-app');
     expect(desktopProjectIsAvailable(project)).toBe(true);

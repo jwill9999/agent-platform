@@ -3,12 +3,12 @@
 import type {
   Agent,
   ModelConfig,
-  ProjectMode,
+  ProjectDesktopRecord,
   SensorDashboardResponse,
   SessionRecord,
 } from '@agent-platform/contracts';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Chat } from '../components/chat/chat';
 import { AgentModelProvider } from '../components/chat/agent-model-context';
 import { SessionDropdown } from '../components/chat/session-dropdown';
@@ -20,10 +20,26 @@ import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
-import { createWorkspaceNavigationState, workspaceEntryCopy } from '@/lib/project-navigation';
+import {
+  buildProjectIdeHref,
+  createWorkspaceNavigationState,
+  desktopProjectIsAvailable,
+  projectReopenSearchParam,
+  recentProjectsUpdatedEvent,
+  workspaceEntryCopy,
+} from '@/lib/project-navigation';
+import {
+  bindProjectSession,
+  hasDesktopProjectBridge,
+  loadRecentDesktopProjects,
+  selectAndRegisterDesktopProject,
+} from '@/lib/desktop-projects';
+
+type WorkspaceMode = 'chat' | 'project-chat';
 
 export default function HomePage() {
-  const [selectedMode, setSelectedMode] = useState<ProjectMode | null>(null);
+  const [selectedMode, setSelectedMode] = useState<WorkspaceMode | null>(null);
+  const [activeProject, setActiveProject] = useState<ProjectDesktopRecord | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -35,6 +51,9 @@ export default function HomePage() {
   const [sensorDashboard, setSensorDashboard] = useState<SensorDashboardResponse | null>(null);
   const [sensorLoading, setSensorLoading] = useState(false);
   const [sensorError, setSensorError] = useState<string | null>(null);
+  const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
+  const [isOpeningProject, setIsOpeningProject] = useState(false);
+  const attemptedProjectReopenIdRef = useRef<string | null>(null);
 
   const {
     messages,
@@ -88,6 +107,10 @@ export default function HomePage() {
   useEffect(() => {
     bootstrapAgents().catch(() => {});
   }, [bootstrapAgents]);
+
+  useEffect(() => {
+    setIsDesktopProjectBridgeAvailable(hasDesktopProjectBridge());
+  }, []);
 
   const refreshSensors = useCallback(async (id: string, retry = false) => {
     setSensorLoading(true);
@@ -152,6 +175,7 @@ export default function HomePage() {
 
   const handleOpenChat = useCallback(() => {
     setSelectedMode('chat');
+    setActiveProject(null);
     const def = pickDefaultAgentForMode(agents, 'chat');
     if (def) {
       setSelectedAgentId(def.id);
@@ -159,9 +183,77 @@ export default function HomePage() {
     }
   }, [agents, modelConfigs]);
 
+  const openProjectChat = useCallback(
+    (project: ProjectDesktopRecord) => {
+      setSelectedMode('project-chat');
+      setActiveProject(project);
+      setSessionId(null);
+      setSensorDashboard(null);
+      setSessionError(null);
+      setIsResuming(false);
+      const def = pickDefaultAgentForMode(agents, 'project');
+      if (def) {
+        setSelectedAgentId(def.id);
+        setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
+      }
+    },
+    [agents, modelConfigs],
+  );
+
+  const handleOpenProject = useCallback(async () => {
+    setIsOpeningProject(true);
+    setSessionError(null);
+    try {
+      const result = await selectAndRegisterDesktopProject();
+      if (!result) return;
+      openProjectChat(result.project);
+      if (globalThis.window !== undefined) {
+        globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+      }
+    } catch (error) {
+      setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to open Project');
+    } finally {
+      setIsOpeningProject(false);
+    }
+  }, [openProjectChat]);
+
+  useEffect(() => {
+    if (selectedMode !== 'project-chat') return;
+    if (selectedAgentId || agents.length === 0) return;
+    const def = pickDefaultAgentForMode(agents, 'project');
+    if (!def) return;
+    setSelectedAgentId(def.id);
+    setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
+  }, [agents, modelConfigs, selectedAgentId, selectedMode]);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    if (selectedMode === 'project-chat' && activeProject) return;
+    const params = new URLSearchParams(globalThis.window.location.search);
+    const projectId = params.get(projectReopenSearchParam);
+    if (!projectId) return;
+    if (attemptedProjectReopenIdRef.current === projectId) return;
+    attemptedProjectReopenIdRef.current = projectId;
+
+    void (async () => {
+      try {
+        const projects = await loadRecentDesktopProjects();
+        const project = projects.find((candidate) => candidate.id === projectId);
+        if (!project || !desktopProjectIsAvailable(project)) {
+          setSessionError('This recent Project is no longer available. Open it again.');
+          return;
+        }
+        openProjectChat(project);
+      } catch (error) {
+        setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to reopen Project');
+      }
+    })();
+  }, [activeProject, openProjectChat, selectedMode]);
+
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {
       setIsResuming(true);
+      setSelectedMode(session.mode === 'project' ? 'project-chat' : 'chat');
       setSelectedAgentId(session.agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(session.agentId, agents, modelConfigs));
       setSessionId(session.id);
@@ -184,11 +276,42 @@ export default function HomePage() {
   const canSend = Boolean(sessionId) && !hasPendingApproval;
   const inputStatusText = hasPendingApproval
     ? 'Resolve the pending approval before sending another message.'
+    : selectedMode === 'project-chat' && !sessionId
+      ? 'Opening Project chat…'
     : undefined;
   const navigationState = createWorkspaceNavigationState({
-    surface: selectedMode === 'chat' ? 'chat' : 'home',
+    surface:
+      selectedMode === 'project-chat' ? 'project-chat' : selectedMode === 'chat' ? 'chat' : 'home',
+    projectId: activeProject?.id,
     sessionId,
   });
+
+  useEffect(() => {
+    if (selectedMode !== 'project-chat') return;
+    if (!selectedAgentId || !activeProject?.id) return;
+    setSessionError(null);
+    void (async () => {
+      try {
+        const result = await bindProjectSession({
+          agentId: selectedAgentId,
+          projectId: activeProject.id,
+        });
+        const session = result?.session;
+        if (!session?.id) {
+          setSessionError('Failed to create Project chat session');
+          setSessionId(null);
+          setSensorDashboard(null);
+          return;
+        }
+        setSessionId(session.id);
+        await refreshSensors(session.id);
+      } catch (error) {
+        setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to open Project chat');
+        setSessionId(null);
+        setSensorDashboard(null);
+      }
+    })();
+  }, [activeProject?.id, refreshSensors, selectedAgentId, selectedMode]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -252,12 +375,15 @@ export default function HomePage() {
                 {workspaceEntryCopy.chatProfile}
               </span>
             </button>
-            <Button
-              asChild
-              variant="outline"
-              className="group flex h-auto min-h-44 flex-col items-start justify-between rounded-lg p-5 text-left"
-            >
-              <Link href="/ide">
+            {isDesktopProjectBridgeAvailable ? (
+              <button
+                type="button"
+                className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary disabled:opacity-70"
+                onClick={() => {
+                  handleOpenProject().catch(() => {});
+                }}
+                disabled={isOpeningProject}
+              >
                 <span>
                   <span className="block text-lg font-semibold text-foreground">
                     {workspaceEntryCopy.projectTitle}
@@ -267,10 +393,30 @@ export default function HomePage() {
                   </span>
                 </span>
                 <span className="text-sm font-medium text-primary">
-                  {workspaceEntryCopy.projectProfile}
+                  {isOpeningProject ? 'Opening...' : workspaceEntryCopy.projectProfile}
                 </span>
-              </Link>
-            </Button>
+              </button>
+            ) : (
+              <Button
+                asChild
+                variant="outline"
+                className="group flex h-auto min-h-44 flex-col items-start justify-between rounded-lg p-5 text-left"
+              >
+                <Link href="/ide">
+                  <span>
+                    <span className="block text-lg font-semibold text-foreground">
+                      {workspaceEntryCopy.projectTitle}
+                    </span>
+                    <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                      {workspaceEntryCopy.projectDescription}
+                    </span>
+                  </span>
+                  <span className="text-sm font-medium text-primary">
+                    {workspaceEntryCopy.projectProfile}
+                  </span>
+                </Link>
+              </Button>
+            )}
           </div>
         </section>
       </main>
@@ -309,6 +455,19 @@ export default function HomePage() {
             loading={sessionsLoading}
             disabled={isLoading}
           />
+          {selectedMode === 'project-chat' && activeProject && (
+            <div className="ml-auto flex min-w-0 items-center gap-3">
+              <div className="min-w-0 text-right">
+                <div className="truncate text-sm font-medium text-foreground">
+                  {activeProject.name}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">Project chat</div>
+              </div>
+              <Button asChild size="sm" variant="outline" className="shrink-0">
+                <Link href={buildProjectIdeHref(activeProject.id)}>Open IDE</Link>
+              </Button>
+            </div>
+          )}
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           <AgentModelProvider
@@ -344,6 +503,19 @@ export default function HomePage() {
               onRetrySensors={() => {
                 if (sessionId) refreshSensors(sessionId, true).catch(() => {});
               }}
+              inputPlaceholder={
+                selectedMode === 'project-chat' ? 'Ask about this Project...' : undefined
+              }
+              emptyStateTitle={
+                selectedMode === 'project-chat'
+                  ? (activeProject?.name ?? 'Project chat')
+                  : undefined
+              }
+              emptyStateDescription={
+                selectedMode === 'project-chat'
+                  ? 'Tell the assistant what you want done in this Project.'
+                  : undefined
+              }
             />
           </AgentModelProvider>
         </div>

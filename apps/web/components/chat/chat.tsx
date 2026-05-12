@@ -15,6 +15,9 @@ export interface ChatProps {
   messages: UIMessage[];
   onSend: (text: string) => void;
   isLoading: boolean;
+  inputPlaceholder?: string;
+  emptyStateTitle?: string;
+  emptyStateDescription?: string;
   /** When false, input is disabled until a session id exists. */
   canSend?: boolean;
   /** Optional input helper text shown below the composer. */
@@ -50,6 +53,9 @@ export function Chat({
   messages,
   onSend,
   isLoading,
+  inputPlaceholder,
+  emptyStateTitle,
+  emptyStateDescription,
   canSend = true,
   inputStatusText,
   attachments,
@@ -84,7 +90,7 @@ export function Chat({
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4">
             {messages.length === 0 ? (
-              <EmptyState />
+              <EmptyState title={emptyStateTitle} description={emptyStateDescription} />
             ) : (
               <>
                 {messages.map((message, index) => (
@@ -127,6 +133,7 @@ export function Chat({
         <ChatInput
           onSend={onSend}
           isLoading={isLoading}
+          placeholder={inputPlaceholder}
           canSend={canSend}
           statusText={inputStatusText}
           attachments={attachments}
@@ -147,7 +154,13 @@ export function Chat({
   );
 }
 
-function EmptyState() {
+function EmptyState({
+  title = 'AI Studio',
+  description = 'Send a message to begin chatting with the AI assistant',
+}: Readonly<{
+  title?: string;
+  description?: string;
+}>) {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center px-4">
       <div className="relative w-32 h-32 mb-8">
@@ -158,10 +171,8 @@ function EmptyState() {
           <Sparkles className="h-8 w-8 text-primary" />
         </div>
       </div>
-      <h2 className="text-2xl font-semibold text-foreground mb-2">AI Studio</h2>
-      <p className="text-muted-foreground max-w-md leading-relaxed">
-        Send a message to begin chatting with the AI assistant
-      </p>
+      <h2 className="text-2xl font-semibold text-foreground mb-2">{title}</h2>
+      <p className="text-muted-foreground max-w-md leading-relaxed">{description}</p>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { ChatModelSelector } from './chat-model-selector';
 interface ChatInputProps {
   onSend: (text: string) => void;
   isLoading: boolean;
+  placeholder?: string;
   /** When false, sending is blocked (e.g. session not ready yet). */
   canSend?: boolean;
   /** Optional status text shown below the composer. */
@@ -31,6 +32,7 @@ interface ChatInputProps {
 export function ChatInput({
   onSend,
   isLoading,
+  placeholder,
   canSend = true,
   statusText,
   attachments,
@@ -229,7 +231,8 @@ export function ChatInput({
               }}
               onKeyDown={handleKeyDown}
               placeholder={
-                onAddFiles ? 'Send a message... (drop files to attach)' : 'Send a message...'
+                placeholder ??
+                (onAddFiles ? 'Send a message... (drop files to attach)' : 'Send a message...')
               }
               className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-sm leading-relaxed max-h-[200px]"
               rows={1}

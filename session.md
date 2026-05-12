@@ -1708,6 +1708,35 @@ Tracked in Beads: `agent-platform-lt6`
   SonarCloud. SonarCloud reported 0 new issues and 0 security hotspots. Sourcery skipped because the
   PR diff exceeded the account review limit and posted no actionable inline comments.
 
+## 2026-05-12 Electron Experience `.3`
+
+- Task `agent-platform-electron-experience.3` started on
+  `task/agent-platform-electron-experience.3`.
+- Made Project chat the default desktop Project entry:
+  - desktop Project selection now opens a Project-bound chat session on the home surface,
+  - recent Projects in the left explorer reopen into Project chat,
+  - Project chat exposes `Open IDE` as the optional deeper workspace,
+  - the first Project chat message is sent through the Project session binding,
+  - normal chat remains separate from Project chat.
+- Added shared desktop Project helpers for folder selection, Project registration, recent Project
+  loading, and Project session binding.
+- Updated browser and Electron E2E coverage for chat-first Project opening and IDE continuation.
+- Local verification passed:
+  - `pnpm --filter @agent-platform/web exec vitest run test/project-navigation.test.ts test/project-onboarding-assessment-panel.test.ts`
+  - `pnpm --filter @agent-platform/web run lint`
+  - `pnpm --filter @agent-platform/web run typecheck`
+  - `pnpm --filter @agent-platform/web run test`
+  - `pnpm exec playwright test -c e2e/playwright.config.ts e2e/ide-project-opening-parked.spec.ts`
+  - `pnpm --filter @agent-platform/desktop run test:e2e`
+  - `pnpm docs:lint`
+  - `pnpm lint`
+  - `pnpm typecheck`
+  - `pnpm test`
+  - `pnpm format:check`
+  - `pnpm run test:e2e`
+  - `git diff --check`
+  - `sh .husky/pre-push`
+
 ## 2026-05-12 Electron Security `.5`
 
 - Task `agent-platform-electron-security.5` started on
