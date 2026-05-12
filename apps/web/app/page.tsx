@@ -37,6 +37,151 @@ import {
 
 type WorkspaceMode = 'chat' | 'project-chat';
 
+function getInputStatusText(
+  hasPendingApproval: boolean,
+  selectedMode: WorkspaceMode | null,
+  sessionId: string | null,
+) {
+  if (hasPendingApproval) {
+    return 'Resolve the pending approval before sending another message.';
+  }
+  if (selectedMode === 'project-chat' && !sessionId) {
+    return 'Opening Project chat...';
+  }
+  return undefined;
+}
+
+function getWorkspaceSurface(selectedMode: WorkspaceMode | null) {
+  if (selectedMode === 'project-chat') {
+    return 'project-chat';
+  }
+  if (selectedMode === 'chat') {
+    return 'chat';
+  }
+  return 'home';
+}
+
+function HomeEntryScreen({
+  isDesktopProjectBridgeAvailable,
+  isOpeningProject,
+  onOpenChat,
+  onOpenProject,
+}: {
+  isDesktopProjectBridgeAvailable: boolean;
+  isOpeningProject: boolean;
+  onOpenChat: () => void;
+  onOpenProject: () => void;
+}) {
+  return (
+    <main className="flex h-full min-h-0 flex-col bg-background">
+      <section className="border-b border-border px-6 py-5">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-1">
+          <h2 className="text-2xl font-semibold text-foreground">{workspaceEntryCopy.title}</h2>
+          <p className="text-sm text-muted-foreground">{workspaceEntryCopy.description}</p>
+        </div>
+      </section>
+      <section className="flex flex-1 items-center px-6 py-8">
+        <div className="mx-auto grid w-full max-w-5xl gap-4 md:grid-cols-2">
+          <button
+            type="button"
+            className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary"
+            onClick={onOpenChat}
+          >
+            <span>
+              <span className="block text-lg font-semibold text-foreground">
+                {workspaceEntryCopy.chatTitle}
+              </span>
+              <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                {workspaceEntryCopy.chatDescription}
+              </span>
+            </span>
+            <span className="text-sm font-medium text-primary">{workspaceEntryCopy.chatProfile}</span>
+          </button>
+          {isDesktopProjectBridgeAvailable ? (
+            <button
+              type="button"
+              className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary disabled:opacity-70"
+              onClick={onOpenProject}
+              disabled={isOpeningProject}
+            >
+              <span>
+                <span className="block text-lg font-semibold text-foreground">
+                  {workspaceEntryCopy.projectTitle}
+                </span>
+                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                  {workspaceEntryCopy.projectDescription}
+                </span>
+              </span>
+              <span className="text-sm font-medium text-primary">
+                {isOpeningProject ? 'Opening...' : workspaceEntryCopy.projectProfile}
+              </span>
+            </button>
+          ) : (
+            <Button
+              asChild
+              variant="outline"
+              className="group flex h-auto min-h-44 flex-col items-start justify-between rounded-lg p-5 text-left"
+            >
+              <Link href="/ide">
+                <span>
+                  <span className="block text-lg font-semibold text-foreground">
+                    {workspaceEntryCopy.projectTitle}
+                  </span>
+                  <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                    {workspaceEntryCopy.projectDescription}
+                  </span>
+                </span>
+                <span className="text-sm font-medium text-primary">
+                  {workspaceEntryCopy.projectProfile}
+                </span>
+              </Link>
+            </Button>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function ErrorBanner({
+  message,
+  onDismiss,
+}: {
+  message: string | null;
+  onDismiss: () => void;
+}) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div className="shrink-0 z-50 bg-destructive/15 border-b border-destructive/30 text-destructive px-4 py-2 text-sm">
+      {message}
+      <button type="button" className="ml-2 underline" onClick={onDismiss}>
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
+function ProjectChatHeader({ project }: { project: ProjectDesktopRecord | null }) {
+  if (!project) {
+    return null;
+  }
+
+  return (
+    <div className="ml-auto flex min-w-0 items-center gap-3">
+      <div className="min-w-0 text-right">
+        <div className="truncate text-sm font-medium text-foreground">{project.name}</div>
+        <div className="truncate text-xs text-muted-foreground">Project chat</div>
+      </div>
+      <Button asChild size="sm" variant="outline" className="shrink-0">
+        <Link href={buildProjectIdeHref(project.id)}>Open IDE</Link>
+      </Button>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [selectedMode, setSelectedMode] = useState<WorkspaceMode | null>(null);
   const [activeProject, setActiveProject] = useState<ProjectDesktopRecord | null>(null);
@@ -274,14 +419,9 @@ export default function HomePage() {
 
   const isLoading = status === 'streaming';
   const canSend = Boolean(sessionId) && !hasPendingApproval;
-  const inputStatusText = hasPendingApproval
-    ? 'Resolve the pending approval before sending another message.'
-    : selectedMode === 'project-chat' && !sessionId
-      ? 'Opening Project chat…'
-    : undefined;
+  const inputStatusText = getInputStatusText(hasPendingApproval, selectedMode, sessionId);
   const navigationState = createWorkspaceNavigationState({
-    surface:
-      selectedMode === 'project-chat' ? 'project-chat' : selectedMode === 'chat' ? 'chat' : 'home',
+    surface: getWorkspaceSurface(selectedMode),
     projectId: activeProject?.id,
     sessionId,
   });
@@ -345,101 +485,28 @@ export default function HomePage() {
 
   if (!selectedMode) {
     return (
-      <main className="flex h-full min-h-0 flex-col bg-background">
-        <section className="border-b border-border px-6 py-5">
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-1">
-            <h2 className="text-2xl font-semibold text-foreground">
-              {workspaceEntryCopy.title}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {workspaceEntryCopy.description}
-            </p>
-          </div>
-        </section>
-        <section className="flex flex-1 items-center px-6 py-8">
-          <div className="mx-auto grid w-full max-w-5xl gap-4 md:grid-cols-2">
-            <button
-              type="button"
-              className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary"
-              onClick={handleOpenChat}
-            >
-              <span>
-                <span className="block text-lg font-semibold text-foreground">
-                  {workspaceEntryCopy.chatTitle}
-                </span>
-                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                  {workspaceEntryCopy.chatDescription}
-                </span>
-              </span>
-              <span className="text-sm font-medium text-primary">
-                {workspaceEntryCopy.chatProfile}
-              </span>
-            </button>
-            {isDesktopProjectBridgeAvailable ? (
-              <button
-                type="button"
-                className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary disabled:opacity-70"
-                onClick={() => {
-                  handleOpenProject().catch(() => {});
-                }}
-                disabled={isOpeningProject}
-              >
-                <span>
-                  <span className="block text-lg font-semibold text-foreground">
-                    {workspaceEntryCopy.projectTitle}
-                  </span>
-                  <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                    {workspaceEntryCopy.projectDescription}
-                  </span>
-                </span>
-                <span className="text-sm font-medium text-primary">
-                  {isOpeningProject ? 'Opening...' : workspaceEntryCopy.projectProfile}
-                </span>
-              </button>
-            ) : (
-              <Button
-                asChild
-                variant="outline"
-                className="group flex h-auto min-h-44 flex-col items-start justify-between rounded-lg p-5 text-left"
-              >
-                <Link href="/ide">
-                  <span>
-                    <span className="block text-lg font-semibold text-foreground">
-                      {workspaceEntryCopy.projectTitle}
-                    </span>
-                    <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                      {workspaceEntryCopy.projectDescription}
-                    </span>
-                  </span>
-                  <span className="text-sm font-medium text-primary">
-                    {workspaceEntryCopy.projectProfile}
-                  </span>
-                </Link>
-              </Button>
-            )}
-          </div>
-        </section>
-      </main>
+      <HomeEntryScreen
+        isDesktopProjectBridgeAvailable={isDesktopProjectBridgeAvailable}
+        isOpeningProject={isOpeningProject}
+        onOpenChat={handleOpenChat}
+        onOpenProject={() => {
+          handleOpenProject().catch(() => {});
+        }}
+      />
     );
   }
+
+  const alertMessage = [loadError, sessionError, error].filter(Boolean).join(' — ') || null;
 
   return (
     <div className="flex h-full min-h-0">
       <div className="flex flex-col flex-1 min-h-0 min-w-0">
-        {(loadError || sessionError || error) && (
-          <div className="shrink-0 z-50 bg-destructive/15 border-b border-destructive/30 text-destructive px-4 py-2 text-sm">
-            {[loadError, sessionError, error].filter(Boolean).join(' — ')}
-            <button
-              type="button"
-              className="ml-2 underline"
-              onClick={() => {
-                setError(null);
-              }}
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        <ErrorBanner
+          message={alertMessage}
+          onDismiss={() => {
+            setError(null);
+          }}
+        />
         <div
           className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50"
           data-workspace-surface={navigationState.surface}
@@ -455,19 +522,7 @@ export default function HomePage() {
             loading={sessionsLoading}
             disabled={isLoading}
           />
-          {selectedMode === 'project-chat' && activeProject && (
-            <div className="ml-auto flex min-w-0 items-center gap-3">
-              <div className="min-w-0 text-right">
-                <div className="truncate text-sm font-medium text-foreground">
-                  {activeProject.name}
-                </div>
-                <div className="truncate text-xs text-muted-foreground">Project chat</div>
-              </div>
-              <Button asChild size="sm" variant="outline" className="shrink-0">
-                <Link href={buildProjectIdeHref(activeProject.id)}>Open IDE</Link>
-              </Button>
-            </div>
-          )}
+          {selectedMode === 'project-chat' && <ProjectChatHeader project={activeProject} />}
         </div>
         <div className="flex-1 flex flex-col min-h-0">
           <AgentModelProvider
