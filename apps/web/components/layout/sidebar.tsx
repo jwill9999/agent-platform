@@ -5,11 +5,9 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import {
-  MessageSquare,
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  Code2,
   Settings,
   Bot,
   Cpu,
@@ -32,21 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
-const navigation = [
-  {
-    name: 'Chat',
-    href: '/',
-    icon: MessageSquare,
-    description: 'Start conversations',
-  },
-  {
-    name: 'IDE',
-    href: '/ide',
-    icon: Code2,
-    description: 'Code with AI assistant',
-  },
-];
+import { workspaceNavigationItems } from '@/lib/project-navigation';
 
 const settingsNavigation = [
   {
@@ -148,7 +132,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navigation.map((item) => {
+        {workspaceNavigationItems.map((item) => {
           const isActive =
             pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
 

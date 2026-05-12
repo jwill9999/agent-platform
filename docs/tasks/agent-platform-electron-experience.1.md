@@ -38,8 +38,8 @@ keeps Chat and IDE as surfaces inside the selected Project rather than unrelated
 
 ## Definition Of Done
 
-- [ ] Navigation model represents active Project, active session, and active surface explicitly.
-- [ ] UI copy distinguishes Projects from Chat/IDE surfaces without exposing runtime internals.
-- [ ] Existing IDE Project open behavior remains functional.
-- [ ] Focused tests cover state transitions and user-facing labels.
+- [x] Navigation model represents active Project, active session, and active surface explicitly.
+- [x] UI copy distinguishes Projects from Chat/IDE surfaces without exposing runtime internals.
+- [x] Existing IDE Project open behavior remains functional.
+- [x] Focused tests cover state transitions and user-facing labels.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

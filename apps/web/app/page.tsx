@@ -20,6 +20,7 @@ import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
+import { createWorkspaceNavigationState, workspaceEntryCopy } from '@/lib/project-navigation';
 
 export default function HomePage() {
   const [selectedMode, setSelectedMode] = useState<ProjectMode | null>(null);
@@ -184,6 +185,10 @@ export default function HomePage() {
   const inputStatusText = hasPendingApproval
     ? 'Resolve the pending approval before sending another message.'
     : undefined;
+  const navigationState = createWorkspaceNavigationState({
+    surface: selectedMode === 'chat' ? 'chat' : 'home',
+    sessionId,
+  });
 
   const handleSend = useCallback(
     (text: string) => {
@@ -220,9 +225,11 @@ export default function HomePage() {
       <main className="flex h-full min-h-0 flex-col bg-background">
         <section className="border-b border-border px-6 py-5">
           <div className="mx-auto flex w-full max-w-5xl flex-col gap-1">
-            <h2 className="text-2xl font-semibold text-foreground">Choose a workspace</h2>
+            <h2 className="text-2xl font-semibold text-foreground">
+              {workspaceEntryCopy.title}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Open a general chat or move into a project coding surface.
+              {workspaceEntryCopy.description}
             </p>
           </div>
         </section>
@@ -234,12 +241,16 @@ export default function HomePage() {
               onClick={handleOpenChat}
             >
               <span>
-                <span className="block text-lg font-semibold text-foreground">Open Chat</span>
+                <span className="block text-lg font-semibold text-foreground">
+                  {workspaceEntryCopy.chatTitle}
+                </span>
                 <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                  Talk with the personal assistant without loading a working tree.
+                  {workspaceEntryCopy.chatDescription}
                 </span>
               </span>
-              <span className="text-sm font-medium text-primary">Personal assistant</span>
+              <span className="text-sm font-medium text-primary">
+                {workspaceEntryCopy.chatProfile}
+              </span>
             </button>
             <Button
               asChild
@@ -248,12 +259,16 @@ export default function HomePage() {
             >
               <Link href="/ide">
                 <span>
-                  <span className="block text-lg font-semibold text-foreground">Open Project</span>
+                  <span className="block text-lg font-semibold text-foreground">
+                    {workspaceEntryCopy.projectTitle}
+                  </span>
                   <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                    Work with files, branch context, terminal tools, and the coding agent.
+                    {workspaceEntryCopy.projectDescription}
                   </span>
                 </span>
-                <span className="text-sm font-medium text-primary">Coding agent</span>
+                <span className="text-sm font-medium text-primary">
+                  {workspaceEntryCopy.projectProfile}
+                </span>
               </Link>
             </Button>
           </div>
@@ -279,7 +294,11 @@ export default function HomePage() {
             </button>
           </div>
         )}
-        <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50">
+        <div
+          className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border bg-card/50"
+          data-workspace-surface={navigationState.surface}
+          data-workspace-scope={navigationState.scope}
+        >
           <SessionDropdown
             sessions={sessions}
             agents={agents}
