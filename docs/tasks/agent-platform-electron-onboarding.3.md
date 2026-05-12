@@ -42,4 +42,4 @@ session context.
 - [x] Session-consistency is covered by tests.
 - [x] User-facing output does not expose host paths.
 - [x] Existing Project chat behavior remains intact.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
