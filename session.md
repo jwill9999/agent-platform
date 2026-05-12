@@ -1504,3 +1504,4 @@ Tracked in Beads: `agent-platform-lt6`
   - `pnpm test`
 - SonarQube MCP tools were not exposed in the current tool surface after discovery; local fallback completion gates passed. Final Sonar/Promptfoo/CI status still requires the pushed PR.
 - PR #167 initially failed SonarCloud rule `typescript:S5443` in `apps/desktop/test/runtimePaths.test.ts`; the test was patched to use private `mkdtempSync` paths instead of hardcoded public temp paths.
+- PR #167 is now clean: `verify`, `docker`, `e2e`, docs lint/link checks, GitGuardian, and SonarCloud all passed. Sonar reports 0 open issues. Sourcery was skipped due the account rate limit and posted no actionable code comments.

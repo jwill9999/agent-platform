@@ -27,7 +27,7 @@ This task should make the location explicit for the app while avoiding Docker pa
 - [x] Docker development volume behavior remains unchanged.
 - [x] Uninstall/cleanup expectations are documented for later implementation.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
