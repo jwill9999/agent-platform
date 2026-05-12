@@ -49,4 +49,4 @@ Implement the first host command runner for desktop Projects with Project-root P
 - [x] Outside-root cwd and path references are denied before execution.
 - [x] Denial messages are user-safe and avoid exposing unnecessary host paths.
 - [x] Existing browser/Docker command behavior does not regress.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
