@@ -42,4 +42,4 @@ Document the first command-execution threat model for desktop Project work befor
 - [x] Threats are mapped to follow-up implementation tasks.
 - [x] The document distinguishes first host runner controls from future stronger sandbox runners.
 - [x] Docs lint passes locally.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
