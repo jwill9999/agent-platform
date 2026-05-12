@@ -50,6 +50,9 @@ Clarify browser/web fallback behavior now that native Project access is the desk
   files are unavailable in the browser view.
 - Browser Playwright coverage remains as fallback regression coverage; Product acceptance for native
   Project opening remains owned by Electron E2E in the next task.
+- PR #181 is green: GitHub `verify`, `docker`, `e2e`, docs `markdownlint`/`lychee`, GitGuardian, and
+  SonarCloud passed. SonarCloud reports 0 open new issues and 0 security hotspots. No inline review
+  comments are present; Sourcery skipped because the cumulative PR diff exceeds its review limit.
 
 ## Definition of done
 
@@ -58,4 +61,4 @@ Clarify browser/web fallback behavior now that native Project access is the desk
 - [x] Fallback copy is clear and avoids implementation details.
 - [x] Browser fixtures remain available for tests/development without defining Product acceptance.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
