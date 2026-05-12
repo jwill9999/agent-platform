@@ -1,13 +1,13 @@
 import { contextBridge } from 'electron';
 
+import { desktopBridgeApiName, type AgentPlatformDesktopApi } from './desktopBridge.js';
+
 const desktopApi = {
   versions: {
     chrome: () => process.versions.chrome,
     electron: () => process.versions.electron,
     node: () => process.versions.node,
   },
-} as const;
+} as const satisfies AgentPlatformDesktopApi;
 
-contextBridge.exposeInMainWorld('agentPlatformDesktop', desktopApi);
-
-export type AgentPlatformDesktopApi = typeof desktopApi;
+contextBridge.exposeInMainWorld(desktopBridgeApiName, desktopApi);

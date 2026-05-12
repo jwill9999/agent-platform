@@ -1,4 +1,4 @@
-import type { AgentPlatformDesktopApi } from './preload.js';
+import type { AgentPlatformDesktopApi } from './desktopBridge.js';
 
 declare global {
   interface Window {

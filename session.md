@@ -1548,3 +1548,25 @@ Tracked in Beads: `agent-platform-lt6`
   - `pnpm test`
 - Remaining closeout for `.1`: commit, push, open PR, monitor CI/Sonar/review comments, then close
   the Beads task only after the remote gates are clear.
+
+## 2026-05-12 Electron Security `.2`
+
+- Task `agent-platform-electron-security.2` started on
+  `task/agent-platform-electron-security.2`.
+- Added an explicit typed preload bridge contract:
+  - global API name: `agentPlatformDesktop`,
+  - current root key: `versions`,
+  - no generic IPC, filesystem, shell, path, or process API is exposed to the renderer.
+- Added reusable main-process IPC validation helpers for no-payload channels, typed payload
+  validators, and trusted sender checks.
+- There are still no production IPC channels; this task establishes the safe pattern before native
+  desktop APIs are added.
+- Local verification passed so far:
+  - `pnpm --filter @agent-platform/desktop test -- test/ipcValidation.test.ts test/preloadContract.test.ts`
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop lint`
+  - `pnpm --filter @agent-platform/desktop test`
+  - `pnpm --filter @agent-platform/desktop build`
+  - `pnpm --filter @agent-platform/desktop smoke`
+  - `pnpm format:check`
+  - `pnpm docs:lint`

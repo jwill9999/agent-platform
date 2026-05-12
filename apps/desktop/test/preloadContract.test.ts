@@ -1,0 +1,30 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  desktopBridgeApiKeys,
+  desktopBridgeApiName,
+  desktopVersionsApiKeys,
+  type AgentPlatformDesktopApi,
+} from '../src/preload/desktopBridge.js';
+
+describe('desktop preload bridge contract', () => {
+  it('uses a single named desktop API surface', () => {
+    expect(desktopBridgeApiName).toBe('agentPlatformDesktop');
+  });
+
+  it('limits the root bridge keys to the explicit contract', () => {
+    expect(desktopBridgeApiKeys).toEqual(['versions']);
+  });
+
+  it('limits version helpers to runtime version readers', () => {
+    expect(desktopVersionsApiKeys).toEqual(['chrome', 'electron', 'node']);
+  });
+
+  it('does not include generic IPC, filesystem, shell, or path APIs', () => {
+    const forbiddenRootKeys = ['invoke', 'send', 'on', 'fs', 'shell', 'path', 'ipc', 'ipcRenderer'];
+
+    for (const key of forbiddenRootKeys) {
+      expect(desktopBridgeApiKeys).not.toContain(key as keyof AgentPlatformDesktopApi);
+    }
+  });
+});

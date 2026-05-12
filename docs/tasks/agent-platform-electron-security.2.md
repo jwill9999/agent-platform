@@ -42,9 +42,33 @@ main process.
 
 ## Definition of done
 
-- [ ] Preload exposes only named, typed APIs.
-- [ ] Renderer cannot call generic IPC or filesystem/shell operations.
-- [ ] IPC handlers validate payloads and reject malformed requests.
-- [ ] IPC sender/origin validation is implemented or explicitly documented where not applicable.
-- [ ] Relevant tests and root gates pass.
+- [x] Preload exposes only named, typed APIs.
+- [x] Renderer cannot call generic IPC or filesystem/shell operations.
+- [x] IPC handlers validate payloads and reject malformed requests.
+- [x] IPC sender/origin validation is implemented or explicitly documented where not applicable.
+- [x] Relevant tests and root gates pass.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation notes
+
+- Added `desktopBridge.ts` as the explicit preload contract. The only exposed global is
+  `window.agentPlatformDesktop`, and the only current root key is `versions`.
+- The preload implementation now satisfies the named `AgentPlatformDesktopApi` contract instead of
+  deriving the public API type from the implementation object.
+- Added `ipcValidation.ts` with reusable helpers for:
+  - no-payload channels,
+  - typed payload validators,
+  - trusted sender checks against the expected `WebContents`.
+- There are still no main-process IPC channels in production code. These helpers establish the
+  expected pattern before future desktop APIs are added.
+
+## Verification notes
+
+- `pnpm --filter @agent-platform/desktop test -- test/ipcValidation.test.ts test/preloadContract.test.ts`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop test`
+- `pnpm --filter @agent-platform/desktop build`
+- `pnpm --filter @agent-platform/desktop smoke`
+- `pnpm format:check`
+- `pnpm docs:lint`
