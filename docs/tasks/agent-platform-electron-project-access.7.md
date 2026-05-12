@@ -40,11 +40,22 @@ Clarify browser/web fallback behavior now that native Project access is the desk
 - Browser Playwright tests for fallback copy and disabled/hidden native CTAs.
 - Root gates and PR checks before closure.
 
+## Implementation notes
+
+- Browser-only IDE mode now detects the absence of the desktop Project bridge and hides native
+  **Open Project** plus recent-Project reopen controls instead of rendering a dead CTA.
+- Desktop-bridge mode still renders the native Project open path, and the existing Playwright bridge
+  mock verifies Project file loading plus `/init` session binding.
+- Web-only fallback copy explains that Project folders open from the desktop app and that Project
+  files are unavailable in the browser view.
+- Browser Playwright coverage remains as fallback regression coverage; Product acceptance for native
+  Project opening remains owned by Electron E2E in the next task.
+
 ## Definition of done
 
-- [ ] Browser-only mode does not show dead native Project CTAs.
-- [ ] Desktop mode shows the native Project open path.
-- [ ] Fallback copy is clear and avoids implementation details.
-- [ ] Browser fixtures remain available for tests/development without defining Product acceptance.
-- [ ] Relevant tests and root gates pass.
+- [x] Browser-only mode does not show dead native Project CTAs.
+- [x] Desktop mode shows the native Project open path.
+- [x] Fallback copy is clear and avoids implementation details.
+- [x] Browser fixtures remain available for tests/development without defining Product acceptance.
+- [x] Relevant tests and root gates pass.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

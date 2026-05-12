@@ -132,6 +132,10 @@ function getDesktopProjectBridge(): DesktopProjectBridge | undefined {
     .agentPlatformDesktop;
 }
 
+function hasDesktopProjectBridge(): boolean {
+  return Boolean(getDesktopProjectBridge()?.projects?.selectFolder);
+}
+
 export function buildIdeChatMessage(input: {
   userLine: string;
   sanitisedFiles: SanitisedFile[];
@@ -261,6 +265,17 @@ function desktopProjectOpenButtonLabel(options: {
 }): string {
   if (options.isOpening) return 'Opening...';
   return options.hasActiveProject ? 'Change Project' : 'Open Project';
+}
+
+function projectBindingStatus(
+  project: ProjectRecord | null,
+  isDesktopProjectBridgeAvailable: boolean,
+): { label: string; className: string } {
+  if (project) return { label: 'Open', className: 'text-emerald-600' };
+  if (isDesktopProjectBridgeAvailable) {
+    return { label: 'Desktop ready', className: 'text-emerald-600' };
+  }
+  return { label: 'Desktop app required', className: 'text-muted-foreground' };
 }
 
 // ---------------------------------------------------------------------------
@@ -1756,6 +1771,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
   const [recentDesktopProjects, setRecentDesktopProjects] = useState<ProjectDesktopRecord[]>([]);
+  const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
   const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(false);
   const [isOpeningDesktopProject, setIsOpeningDesktopProject] = useState(false);
   const [projectFileTree, setProjectFileTree] = useState<FileNode[]>([]);
@@ -1827,6 +1843,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
   const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
   const projectFolderLabel = desktopProjectFolderLabel(activeProject);
+  const projectStatus = projectBindingStatus(activeProject, isDesktopProjectBridgeAvailable);
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
@@ -1883,8 +1900,16 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, []);
 
   useEffect(() => {
+    setIsDesktopProjectBridgeAvailable(hasDesktopProjectBridge());
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktopProjectBridgeAvailable) {
+      setRecentDesktopProjects([]);
+      return;
+    }
     loadRecentDesktopProjects().catch(() => {});
-  }, [loadRecentDesktopProjects]);
+  }, [isDesktopProjectBridgeAvailable, loadRecentDesktopProjects]);
 
   const loadProjectFileTree = useCallback(async (projectId: string) => {
     setIsLoadingProjectFileTree(true);
@@ -2637,32 +2662,38 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Project
                     </span>
-                    {activeProject ? (
-                      <span className="text-xs text-emerald-600">Open</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Desktop required</span>
-                    )}
+                    <span className={cn('text-xs', projectStatus.className)}>
+                      {projectStatus.label}
+                    </span>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={activeProject ? 'secondary' : 'outline'}
-                    className="mb-2 w-full gap-2"
-                    onClick={() => {
-                      handleOpenDesktopProject().catch(() => {});
-                    }}
-                    disabled={isOpeningDesktopProject}
-                  >
-                    <FolderOpen className="h-4 w-4" aria-hidden="true" />
-                    {desktopProjectOpenButtonLabel({
-                      isOpening: isOpeningDesktopProject,
-                      hasActiveProject: Boolean(activeProject),
-                    })}
-                  </Button>
-                  {!activeProject && (
+                  {isDesktopProjectBridgeAvailable && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={activeProject ? 'secondary' : 'outline'}
+                      className="mb-2 w-full gap-2"
+                      onClick={() => {
+                        handleOpenDesktopProject().catch(() => {});
+                      }}
+                      disabled={isOpeningDesktopProject}
+                    >
+                      <FolderOpen className="h-4 w-4" aria-hidden="true" />
+                      {desktopProjectOpenButtonLabel({
+                        isOpening: isOpeningDesktopProject,
+                        hasActiveProject: Boolean(activeProject),
+                      })}
+                    </Button>
+                  )}
+                  {!activeProject && isDesktopProjectBridgeAvailable && (
                     <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-xs leading-snug text-muted-foreground">
                       Use the desktop app to choose a folder with your system picker. Recent
                       Projects can be reopened below.
+                    </div>
+                  )}
+                  {!activeProject && !isDesktopProjectBridgeAvailable && (
+                    <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-xs leading-snug text-muted-foreground">
+                      Open this app on desktop to choose a Project folder. Chat remains available,
+                      but Project files cannot be opened from this browser view.
                     </div>
                   )}
                   {activeProject && (
@@ -2794,7 +2825,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   {projectOpenError && (
                     <p className="mt-2 text-xs text-destructive">{projectOpenError}</p>
                   )}
-                  {!activeProject && (
+                  {!activeProject && isDesktopProjectBridgeAvailable && (
                     <RecentDesktopProjectsPanel
                       projects={recentDesktopProjects}
                       isLoading={isLoadingRecentProjects}

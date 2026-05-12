@@ -12,3 +12,8 @@ the product path after the Electron desktop decision:
 Replacement coverage belongs in the Electron Project access and onboarding epics. The replacement
 suite should exercise the built desktop runtime: click **Open Project**, select a local folder with
 the native picker, verify the selected Project is bound to the local runtime, then run `/init`.
+
+Browser Playwright coverage remains valuable for guarding the fallback UI. In browser-only mode the
+IDE should not show **Open Project**, **Open Folder**, manual Project path entry, recent-Project
+reopen controls, `/workspace`, or backend/container implementation state. Those browser tests are
+fallback regression tests only; they do not prove desktop Project acceptance.

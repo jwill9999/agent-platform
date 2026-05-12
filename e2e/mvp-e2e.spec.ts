@@ -89,8 +89,10 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.locator('[aria-label="Active agent"]').first()).toContainText('Coding');
     await expect(page.getByLabel('Project folder path')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
-    await expect(page.getByText('Use the desktop app to choose a folder')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open Project' })).toHaveCount(0);
+    await expect(
+      page.getByText('Open this app on desktop to choose a Project folder'),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: /Terminal/ })).toBeVisible();
   });
 
@@ -100,10 +102,10 @@ test.describe('MVP E2E (compose-backed)', () => {
     await page.goto('/ide');
     const projectBinding = page.getByLabel('Project binding');
 
-    await expect(projectBinding.getByText('Desktop required')).toBeVisible();
+    await expect(projectBinding.getByText('Desktop app required')).toBeVisible();
     await expect(page.getByLabel('Project folder path')).toHaveCount(0);
     await expect(projectBinding.getByRole('button', { name: 'Open', exact: true })).toHaveCount(0);
-    await expect(projectBinding.getByRole('button', { name: 'Open Project' })).toBeVisible();
+    await expect(projectBinding.getByRole('button', { name: 'Open Project' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
     await expect(projectBinding).not.toContainText('/workspace');
     await expect(projectBinding).not.toContainText('backend accessible');

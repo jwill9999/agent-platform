@@ -8,10 +8,12 @@ test.describe('IDE Project opening is parked for desktop', () => {
 
     await expect(page.getByRole('button', { name: /Open Folder/i })).toHaveCount(0);
     await expect(page.getByLabel('Project folder path')).toHaveCount(0);
-    await expect(page.getByLabel('Project binding')).toContainText('Desktop required');
-    await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
-    await expect(page.getByText('Use the desktop app to choose a folder')).toBeVisible();
-    await expect(page.getByText('Recent Projects', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Project binding')).toContainText('Desktop app required');
+    await expect(page.getByRole('button', { name: 'Open Project' })).toHaveCount(0);
+    await expect(
+      page.getByText('Open this app on desktop to choose a Project folder'),
+    ).toBeVisible();
+    await expect(page.getByText('Recent Projects', { exact: true })).toHaveCount(0);
     await expect(page.getByText('/workspace')).toHaveCount(0);
     await expect(page.getByText(/backend accessible/i)).toHaveCount(0);
   });

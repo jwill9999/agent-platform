@@ -577,18 +577,32 @@ Output needed:
 
 ### Web-only mode
 
-We need to decide what remains available when running without Electron.
+When the desktop bridge is unavailable, web-only mode remains useful for general chat and
+development fixtures, but it is not the Product path for local Project access. The browser UI must
+not show native Project CTAs that cannot open the user's system picker. It should show a clear
+fallback state that explains Project folders open from the desktop app and that Project files are
+unavailable in the browser view.
+
+Current fallback rules:
+
+- hide browser-only folder opening and manual Project path entry;
+- hide native **Open Project** and recent-Project reopen controls unless the desktop bridge is
+  available;
+- do not expose host paths, `/workspace`, backend/container state, hashes, or internal capability
+  labels as user-facing Project status;
+- keep browser Playwright fixtures for regression tests and development, but do not treat them as
+  Product acceptance for local Project access.
 
 Research questions:
 
-- Should browser-only Project opening be removed, disabled, or retained as demo/import mode?
-- What UI copy appears in web-only mode?
 - Which tests remain web Playwright tests versus Electron E2E tests?
+- Should a future browser/import mode exist as a separate capability with its own copy and
+  acceptance criteria?
 
 Output needed:
 
 - Web-only capability matrix.
-- UI fallback rules.
+- Electron E2E test coverage for desktop Product acceptance.
 
 ## Open Questions For Retrospective
 
