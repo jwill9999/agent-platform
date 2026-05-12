@@ -43,4 +43,4 @@ root.
 - [x] Later runs propose updates rather than destructive replacement.
 - [x] User review is required before writes are enabled.
 - [x] Approved writes stay inside selected Project root.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
