@@ -55,9 +55,9 @@ Ensure opening a desktop Project creates or resumes a chat session with `project
 
 ## Definition of done
 
-- [ ] Opening a registered desktop Project creates or resumes a Project-bound session.
-- [ ] Project-bound sessions persist `projectId`.
-- [ ] Ordinary chat requests receive the same Project context from the session.
-- [ ] Non-Project chat behavior is unchanged.
-- [ ] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] Opening a registered desktop Project creates or resumes a Project-bound session.
+- [x] Project-bound sessions persist `projectId`.
+- [x] Ordinary chat requests receive the same Project context from the session.
+- [x] Non-Project chat behavior is unchanged.
+- [x] Relevant tests and root gates pass.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
