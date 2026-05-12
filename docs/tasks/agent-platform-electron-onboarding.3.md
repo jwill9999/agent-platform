@@ -38,8 +38,8 @@ session context.
 
 ## Definition Of Done
 
-- [ ] Slash commands and normal chat use the same Project context source.
-- [ ] Session-consistency is covered by tests.
-- [ ] User-facing output does not expose host paths.
-- [ ] Existing Project chat behavior remains intact.
+- [x] Slash commands and normal chat use the same Project context source.
+- [x] Session-consistency is covered by tests.
+- [x] User-facing output does not expose host paths.
+- [x] Existing Project chat behavior remains intact.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

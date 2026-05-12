@@ -481,6 +481,51 @@ describe('POST /v1/chat (session-aware)', () => {
     });
   });
 
+  it('starts /init from the session Project binding when working memory points elsewhere', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const boundRoot = createProjectRoot(dirs);
+      const rememberedRoot = createProjectRoot(dirs);
+      const bound = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: boundRoot, name: 'Bound Init Project' })
+        .expect(201);
+      const remembered = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: rememberedRoot, name: 'Remembered Init Project' })
+        .expect(201);
+      const sessionRes = await request(app)
+        .post('/v1/sessions/project')
+        .send({ agentId: DEFAULT_AGENT_ID, projectId: bound.body.data.project.id })
+        .expect(201);
+      const sessionId = sessionRes.body.data.session.id as string;
+      upsertWorkingMemoryArtifact(db, {
+        sessionId,
+        projectId: remembered.body.data.project.id,
+        activeProject: remembered.body.data.project.id,
+        currentGoal: 'Use remembered project',
+      });
+
+      await expectHandledSlashMessage(
+        app,
+        db,
+        sessionId,
+        '/init',
+        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+      );
+
+      const boundProject = await request(app).get(`/v1/projects/${bound.body.data.project.id}`);
+      const rememberedProject = await request(app).get(
+        `/v1/projects/${remembered.body.data.project.id}`,
+      );
+      expect(boundProject.body.data.metadata.onboardingDraft).toEqual(
+        expect.objectContaining({ targetPath: 'AGENTS.md' }),
+      );
+      expect(rememberedProject.body.data.metadata.onboardingDraft).toBeUndefined();
+    });
+  });
+
   it('does not let working memory Project inference satisfy /init without session binding', async () => {
     await withMockChatApp(dirs, async ({ app, db }) => {
       const projectRoot = createProjectRoot(dirs);
@@ -539,6 +584,49 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(systemPrompt).toContain('--- AGENTS.md ---');
       expect(systemPrompt).toContain('desktop root rule');
       expect(systemPrompt).not.toContain(projectRoot);
+    });
+  });
+
+  it('loads ordinary chat Project context from the session binding when memory points elsewhere', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const boundRoot = createProjectRoot(dirs);
+      const rememberedRoot = createProjectRoot(dirs);
+      writeFileSync(path.join(boundRoot, 'AGENTS.md'), 'bound project rule\n');
+      writeFileSync(path.join(rememberedRoot, 'AGENTS.md'), 'remembered project rule\n');
+
+      const bound = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: boundRoot, name: 'Bound Chat Project' })
+        .expect(201);
+      const remembered = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: rememberedRoot, name: 'Remembered Chat Project' })
+        .expect(201);
+      const sessionRes = await request(app)
+        .post('/v1/sessions/project')
+        .send({ agentId: DEFAULT_AGENT_ID, projectId: bound.body.data.project.id })
+        .expect(201);
+      const sessionId = sessionRes.body.data.session.id as string;
+      upsertWorkingMemoryArtifact(db, {
+        sessionId,
+        projectId: remembered.body.data.project.id,
+        activeProject: remembered.body.data.project.id,
+        currentGoal: 'Inspect remembered project',
+      });
+
+      mockToolCalls.mockReturnValueOnce('Using the bound Project');
+      await request(app).post('/v1/chat').send({ sessionId, message: 'Inspect README.md' });
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
+        messages?: Array<{ role: string; content: string }>;
+      };
+      const systemPrompt = state.messages?.[0]?.content ?? '';
+      expect(systemPrompt).toContain('bound project rule');
+      expect(systemPrompt).not.toContain('remembered project rule');
+      expect(systemPrompt).not.toContain(boundRoot);
+      expect(systemPrompt).not.toContain(rememberedRoot);
     });
   });
 

@@ -702,22 +702,16 @@ function resolveSessionProjectPath(db: DrizzleDb, sessionId: string): string | u
 function resolveSessionProjectContext(
   db: DrizzleDb,
   session: SessionRecord,
-  workingMemory?: ReturnType<typeof getWorkingMemoryArtifact>,
 ): SessionProjectContext {
-  const projectId = session.projectId ?? workingMemory?.projectId ?? workingMemory?.activeProject;
+  const projectId = session.projectId;
   if (!projectId) return {};
 
   const project = findProject(db, projectId);
   return project ? { projectId: project.id, project } : { projectId };
 }
 
-function resolveDesktopSlashProjectContext(
-  db: DrizzleDb,
-  session: SessionRecord,
-): SessionProjectContext {
-  if (!session.projectId) return {};
-
-  const project = findProject(db, session.projectId);
+function desktopSlashProjectContext(context: SessionProjectContext): SessionProjectContext {
+  const { project } = context;
   if (
     project?.metadata['source'] !== 'desktop' ||
     typeof project.metadata['backendProjectRoot'] !== 'string'
@@ -725,7 +719,7 @@ function resolveDesktopSlashProjectContext(
     return {};
   }
 
-  return { projectId: project.id, project };
+  return context;
 }
 
 function resolveRuntimeWorkspace(
@@ -1356,7 +1350,7 @@ async function handleSlashCommandMessage(
       message,
       {
         session,
-        ...resolveDesktopSlashProjectContext(db, session),
+        ...desktopSlashProjectContext(resolveSessionProjectContext(db, session)),
         startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
       },
       resolveSlashCommandOptions(options.slashCommands),
@@ -1415,7 +1409,7 @@ function buildConversationMessages(
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
     const workingMemory = getWorkingMemoryArtifact(tx, sessionId);
-    const projectContext = resolveSessionProjectContext(tx, session, workingMemory);
+    const projectContext = resolveSessionProjectContext(tx, session);
     const memoryBundle = retrievePromptMemories(tx, {
       scope: {
         sessionId,
