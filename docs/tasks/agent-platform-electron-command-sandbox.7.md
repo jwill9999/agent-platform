@@ -48,4 +48,4 @@ Research stronger command runner options and document the migration path beyond 
 - [x] Recommendation is explicit for macOS-first release and future cross-platform support.
 - [x] Migration path from host runner to stronger runner is documented.
 - [x] Follow-up tasks are created if needed.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
