@@ -46,40 +46,47 @@ describe('desktop runtime path resolution', () => {
   });
 
   it('supports explicit development/runtime overrides without changing Docker defaults', () => {
-    const repoRuntime = resolve('/repo/.agent-platform/desktop-runtime');
+    const root = makeTempDir();
+    const repoRuntime = resolve(root, '.agent-platform/desktop-runtime');
+    const logDir = join(root, 'logs');
+    const tempOverride = join(root, 'agent-platform-temp');
     const paths = resolveDesktopRuntimePaths({
-      userDataDir: '/Users/test/Library/Application Support/Agent Platform',
-      logDir: '/Users/test/Library/Logs/Agent Platform',
-      tempDir: '/var/folders/test/T',
+      userDataDir: join(root, 'user-data'),
+      logDir,
+      tempDir: join(root, 'os-temp'),
       env: {
         AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: repoRuntime,
-        AGENT_PLATFORM_DESKTOP_TEMP_DIR: '/tmp/agent-platform',
+        AGENT_PLATFORM_DESKTOP_TEMP_DIR: tempOverride,
       },
     });
 
     expect(paths.appDataDir).toBe(repoRuntime);
     expect(paths.configDir).toBe(join(repoRuntime, 'config'));
     expect(paths.dataDir).toBe(join(repoRuntime, 'data'));
-    expect(paths.logDir).toBe('/Users/test/Library/Logs/Agent Platform');
-    expect(paths.tempDir).toBe('/tmp/agent-platform');
+    expect(paths.logDir).toBe(logDir);
+    expect(paths.tempDir).toBe(tempOverride);
     expect(paths.sqlitePath).toBe(join(repoRuntime, 'data/agent.sqlite'));
   });
 
   it('allows individual SQLite, config, and log path overrides', () => {
+    const root = makeTempDir();
+    const sqlitePath = join(root, 'custom/db.sqlite');
+    const configPath = join(root, 'custom/runtime.json');
+    const logDir = join(root, 'custom/logs');
     const paths = resolveDesktopRuntimePaths({
-      userDataDir: '/app-data',
-      logDir: '/logs',
-      tempDir: '/tmp',
+      userDataDir: join(root, 'app-data'),
+      logDir: join(root, 'logs'),
+      tempDir: join(root, 'temp'),
       env: {
-        SQLITE_PATH: '/custom/db.sqlite',
-        AGENT_PLATFORM_DESKTOP_CONFIG_PATH: '/custom/runtime.json',
-        AGENT_PLATFORM_DESKTOP_LOG_DIR: '/custom/logs',
+        SQLITE_PATH: sqlitePath,
+        AGENT_PLATFORM_DESKTOP_CONFIG_PATH: configPath,
+        AGENT_PLATFORM_DESKTOP_LOG_DIR: logDir,
       },
     });
 
-    expect(paths.sqlitePath).toBe('/custom/db.sqlite');
-    expect(paths.configPath).toBe('/custom/runtime.json');
-    expect(paths.logDir).toBe('/custom/logs');
+    expect(paths.sqlitePath).toBe(sqlitePath);
+    expect(paths.configPath).toBe(configPath);
+    expect(paths.logDir).toBe(logDir);
   });
 
   it('can resolve paths from the Electron app abstraction', () => {
