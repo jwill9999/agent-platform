@@ -109,8 +109,14 @@ runtime owns the encryption master key:
   closed rather than storing credentials with an unprotected persistent fallback.
 
 Credential deletion is split by layer. Deleting a model config removes its encrypted `secret_refs`
-row. Deleting all desktop credentials in a later lifecycle task must remove both encrypted secret
-rows and the protected desktop master-key file; it must not delete user Project folders.
+row. The desktop local-data reset flow removes app-owned config, data, log, and temp directories,
+which includes the protected desktop master-key file and the app-owned SQLite database containing
+encrypted credential rows. It must not delete user Project folders.
+
+The desktop bridge exposes local-data reset as a destructive maintenance command. The caller must
+first request the exact confirmation phrase and then pass it back with the reset request. The reset
+flow stops the managed backend before deletion, deletes only app-owned runtime directories, recreates
+empty runtime directories, and reports that user Project folders were preserved.
 
 Development and tests may override desktop paths with:
 

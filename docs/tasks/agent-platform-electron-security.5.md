@@ -42,9 +42,37 @@ folders by default.
 
 ## Definition of done
 
-- [ ] Users can delete local app data through a supported flow.
-- [ ] Users can delete stored credentials through the supported flow.
-- [ ] User Project folders are preserved by default.
-- [ ] Destructive action requires clear confirmation.
-- [ ] Relevant tests and root gates pass.
+- [x] Users can delete local app data through a supported flow.
+- [x] Users can delete stored credentials through the supported flow.
+- [x] User Project folders are preserved by default.
+- [x] Destructive action requires clear confirmation.
+- [x] Relevant tests and root gates pass.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation notes
+
+- Added a desktop main-process local-data reset service that deletes app-owned config, data, log,
+  and temp directories only.
+- The reset scope includes app-owned SQLite data and the protected desktop master-key file, so stored
+  credentials are removed without touching user Project folders.
+- Added explicit confirmation text: `DELETE LOCAL APP DATA`.
+- Exposed the reset through the desktop preload bridge as a narrow maintenance API:
+  - `getResetLocalDataConfirmation()`,
+  - `resetLocalData({ confirmation })`.
+- The main-process IPC handler validates the renderer sender and the request payload, stops the
+  managed backend before deleting local data, and recreates empty app-owned runtime directories.
+
+## Verification notes
+
+- `pnpm --filter @agent-platform/desktop test -- test/localDataReset.test.ts test/preloadContract.test.ts test/ipcValidation.test.ts`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop test`
+- `pnpm --filter @agent-platform/desktop smoke:backend`
+- `pnpm docs:lint`
+- `pnpm format:check`
+- `git diff --check`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm build`
+- `pnpm test`

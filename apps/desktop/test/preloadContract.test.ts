@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   desktopBridgeApiKeys,
   desktopBridgeApiName,
+  desktopMaintenanceApiKeys,
   desktopVersionsApiKeys,
 } from '../src/preload/desktopBridge.js';
 
@@ -12,7 +13,11 @@ describe('desktop preload bridge contract', () => {
   });
 
   it('limits the root bridge keys to the explicit contract', () => {
-    expect(desktopBridgeApiKeys).toEqual(['versions']);
+    expect(desktopBridgeApiKeys).toEqual(['maintenance', 'versions']);
+  });
+
+  it('limits maintenance helpers to explicit destructive actions', () => {
+    expect(desktopMaintenanceApiKeys).toEqual(['getResetLocalDataConfirmation', 'resetLocalData']);
   });
 
   it('limits version helpers to runtime version readers', () => {

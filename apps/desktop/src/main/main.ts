@@ -1,4 +1,4 @@
-import { app, BrowserWindow, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage } from 'electron';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,6 +9,12 @@ import {
   startDesktopBackend,
   type DesktopBackendHandle,
 } from './backendSupervisor.js';
+import { assertTrustedIpcSender, validateIpcPayload, validateNoPayload } from './ipcValidation.js';
+import {
+  desktopResetConfirmationText,
+  resetDesktopLocalData,
+  validateDesktopLocalDataResetRequest,
+} from './localDataReset.js';
 import {
   getRepoRootFromMainDir,
   getStandaloneRendererPaths,
@@ -26,6 +32,10 @@ import {
   ensureDesktopRuntimeDirectories,
   resolveDesktopRuntimePathsFromApp,
 } from './runtimePaths.js';
+import {
+  resetLocalDataConfirmationIpcChannel,
+  resetLocalDataIpcChannel,
+} from '../preload/desktopBridge.js';
 import {
   applyRendererSecurity,
   buildBootstrapHtml,
@@ -97,9 +107,9 @@ function focusMainWindow(): void {
 async function bootstrap(): Promise<void> {
   const mainDir = dirname(fileURLToPath(import.meta.url));
   const repoRoot = getRepoRootFromMainDir(mainDir);
+  const runtimePaths = resolveDesktopRuntimePathsFromApp(app, process.env);
 
   if (resolveDesktopBackendMode(process.env) === 'managed') {
-    const runtimePaths = resolveDesktopRuntimePathsFromApp(app, process.env);
     ensureDesktopRuntimeDirectories(runtimePaths);
     const secrets = await ensureDesktopSecretsMasterKey({
       env: process.env,
@@ -114,15 +124,43 @@ async function bootstrap(): Promise<void> {
     process.env.API_PROXY_URL = desktopBackend.url;
   }
 
-  await createMainWindow();
+  const window = await createMainWindow();
+  registerDesktopMaintenanceIpc(window, runtimePaths);
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      await createMainWindow();
+      const activatedWindow = await createMainWindow();
+      registerDesktopMaintenanceIpc(activatedWindow, runtimePaths);
       return;
     }
 
     focusMainWindow();
+  });
+}
+
+function registerDesktopMaintenanceIpc(
+  window: BrowserWindow,
+  runtimePaths: ReturnType<typeof resolveDesktopRuntimePathsFromApp>,
+): void {
+  ipcMain.removeHandler(resetLocalDataConfirmationIpcChannel);
+  ipcMain.handle(resetLocalDataConfirmationIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    validateIpcPayload(payload, validateNoPayload);
+    return desktopResetConfirmationText;
+  });
+
+  ipcMain.removeHandler(resetLocalDataIpcChannel);
+  ipcMain.handle(resetLocalDataIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopLocalDataResetRequest);
+
+    await desktopBackend?.stop();
+    desktopBackend = undefined;
+
+    return resetDesktopLocalData({
+      confirmation: request.confirmation,
+      paths: runtimePaths,
+    });
   });
 }
 

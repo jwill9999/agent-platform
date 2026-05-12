@@ -1609,6 +1609,30 @@ Tracked in Beads: `agent-platform-lt6`
 - PR #172 passed GitHub `verify`, `docker`, `e2e`, docs `markdownlint`/`lychee`, GitGuardian, and
   SonarCloud. SonarCloud reported 0 new issues and 0 security hotspots. Sourcery skipped because the
   PR diff exceeded the account review limit and posted no actionable inline comments.
+
+## 2026-05-12 Electron Security `.5`
+
+- Task `agent-platform-electron-security.5` started on
+  `task/agent-platform-electron-security.5`.
+- Added the desktop local-data reset service and maintenance preload bridge:
+  - reset requires exact confirmation text `DELETE LOCAL APP DATA`,
+  - main-process IPC validates trusted sender and payload shape,
+  - reset stops the managed backend before deleting app-owned data,
+  - reset deletes config/data/log/temp runtime directories and recreates empty directories,
+  - user Project folders are outside the deletion scope and preserved by default.
+- Local verification passed:
+  - `pnpm --filter @agent-platform/desktop test -- test/localDataReset.test.ts test/preloadContract.test.ts test/ipcValidation.test.ts`
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop lint`
+  - `pnpm --filter @agent-platform/desktop test`
+  - `pnpm --filter @agent-platform/desktop smoke:backend`
+  - `pnpm docs:lint`
+  - `pnpm format:check`
+  - `git diff --check`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm build`
+  - `pnpm test`
 - PR #171 passed GitHub `verify`, `docker`, `e2e`, docs `markdownlint`/`lychee`, GitGuardian, and
   SonarCloud. SonarCloud reported 0 new issues and 0 security hotspots. Sourcery skipped because the
   PR diff exceeded the account review limit and posted no actionable inline comments.
