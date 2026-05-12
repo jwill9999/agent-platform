@@ -42,9 +42,36 @@ other local sensitive settings.
 
 ## Definition of done
 
-- [ ] Desktop credentials use protected storage or a documented safe fallback.
-- [ ] Credentials are not persisted in plaintext app config, logs, or renderer state.
-- [ ] Secret storage has a narrow adapter interface for future platform support.
-- [ ] Credential deletion behavior is defined.
-- [ ] Relevant tests and root gates pass.
+- [x] Desktop credentials use protected storage or a documented safe fallback.
+- [x] Credentials are not persisted in plaintext app config, logs, or renderer state.
+- [x] Secret storage has a narrow adapter interface for future platform support.
+- [x] Credential deletion behavior is defined.
+- [x] Relevant tests and root gates pass.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation notes
+
+- The API's existing `secret_refs` encryption remains the credential persistence mechanism.
+- Electron now owns desktop `SECRETS_MASTER_KEY` resolution for the managed backend:
+  - explicit `SECRETS_MASTER_KEY` is accepted for development/test runs,
+  - otherwise Electron `safeStorage` protects a generated 32-byte desktop master key under the
+    desktop config directory,
+  - if secure storage is unavailable and no env key is configured, desktop startup fails closed.
+- The renderer is not given access to the secret storage adapter or the resolved master key.
+- Credential deletion behavior is defined in [Desktop Runtime](../desktop-runtime.md); the full
+  delete/reset UI is owned by `agent-platform-electron-security.5`.
+
+## Verification notes
+
+- `pnpm --filter @agent-platform/desktop test -- test/secretStorage.test.ts test/runtimePaths.test.ts test/backendSupervisor.test.ts`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop test`
+- `pnpm --filter @agent-platform/desktop smoke:backend`
+- `pnpm docs:lint`
+- `pnpm format:check`
+- `git diff --check`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm build`
+- `pnpm test`

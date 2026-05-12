@@ -95,6 +95,23 @@ The desktop runtime resolves app-owned paths through Electron's OS path API:
 The current default paths are resolved in code, not hardcoded in docs, so Electron can apply the
 right OS conventions. On macOS these are normally under the user's `Library` locations.
 
+Desktop credentials still use the API's existing encrypted `secret_refs` table. The desktop
+runtime owns the encryption master key:
+
+- if `SECRETS_MASTER_KEY` is explicitly set, the managed backend uses that value for
+  development/test runs and does not persist a desktop key file,
+- otherwise Electron creates or reads a 32-byte master key protected by Electron `safeStorage`,
+  stores only the encrypted key metadata under the desktop config directory, and injects the
+  decrypted base64 key into the managed backend process environment,
+- the renderer never receives the master key, and the key is not written to runtime config or
+  backend logs by desktop code,
+- if OS secure storage is unavailable and no explicit `SECRETS_MASTER_KEY` exists, startup fails
+  closed rather than storing credentials with an unprotected persistent fallback.
+
+Credential deletion is split by layer. Deleting a model config removes its encrypted `secret_refs`
+row. Deleting all desktop credentials in a later lifecycle task must remove both encrypted secret
+rows and the protected desktop master-key file; it must not delete user Project folders.
+
 Development and tests may override desktop paths with:
 
 | Variable                              | Purpose                                      |

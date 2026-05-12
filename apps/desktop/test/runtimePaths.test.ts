@@ -43,6 +43,9 @@ describe('desktop runtime path resolution', () => {
     expect(paths.configPath).toBe(
       '/Users/test/Library/Application Support/Agent Platform/config/runtime.json',
     );
+    expect(paths.secretsMasterKeyPath).toBe(
+      '/Users/test/Library/Application Support/Agent Platform/config/secrets-master-key.json',
+    );
   });
 
   it('supports explicit development/runtime overrides without changing Docker defaults', () => {

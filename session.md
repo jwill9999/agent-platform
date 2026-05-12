@@ -1609,3 +1609,28 @@ Tracked in Beads: `agent-platform-lt6`
 - PR #171 passed GitHub `verify`, `docker`, `e2e`, docs `markdownlint`/`lychee`, GitGuardian, and
   SonarCloud. SonarCloud reported 0 new issues and 0 security hotspots. Sourcery skipped because the
   PR diff exceeded the account review limit and posted no actionable inline comments.
+
+## 2026-05-12 Electron Security `.4`
+
+- Task `agent-platform-electron-security.4` started on
+  `task/agent-platform-electron-security.4`.
+- Implemented the first desktop secret-storage boundary:
+  - model/provider credentials still persist through encrypted API `secret_refs`,
+  - Electron now creates or loads the desktop `SECRETS_MASTER_KEY` via OS-backed `safeStorage`,
+  - the managed backend receives the resolved master key through its private environment,
+  - the renderer does not receive the master key or secret-storage API.
+- Documented fail-closed behavior when OS secure storage is unavailable and no explicit
+  development/test `SECRETS_MASTER_KEY` is configured.
+- Local verification passed:
+  - `pnpm --filter @agent-platform/desktop test -- test/secretStorage.test.ts test/runtimePaths.test.ts test/backendSupervisor.test.ts`
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop lint`
+  - `pnpm --filter @agent-platform/desktop test`
+  - `pnpm --filter @agent-platform/desktop smoke:backend`
+  - `pnpm docs:lint`
+  - `pnpm format:check`
+  - `git diff --check`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm build`
+  - `pnpm test`

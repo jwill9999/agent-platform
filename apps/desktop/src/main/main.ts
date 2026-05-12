@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, safeStorage } from 'electron';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,6 +18,10 @@ import {
   type DesktopRendererMode,
   type StandaloneRendererHandle,
 } from './rendererServer.js';
+import {
+  createElectronSafeStorageProtector,
+  ensureDesktopSecretsMasterKey,
+} from './secretStorage.js';
 import {
   ensureDesktopRuntimeDirectories,
   resolveDesktopRuntimePathsFromApp,
@@ -97,9 +101,15 @@ async function bootstrap(): Promise<void> {
   if (resolveDesktopBackendMode(process.env) === 'managed') {
     const runtimePaths = resolveDesktopRuntimePathsFromApp(app, process.env);
     ensureDesktopRuntimeDirectories(runtimePaths);
+    const secrets = await ensureDesktopSecretsMasterKey({
+      env: process.env,
+      filePath: runtimePaths.secretsMasterKeyPath,
+      protector: createElectronSafeStorageProtector(safeStorage),
+    });
     desktopBackend = await startDesktopBackend({
       nodePath: resolveDesktopBackendNodePath(process.env, process.execPath),
       paths: getDesktopBackendPaths(repoRoot, runtimePaths),
+      secretsMasterKeyB64: secrets.masterKeyB64,
     });
     process.env.API_PROXY_URL = desktopBackend.url;
   }

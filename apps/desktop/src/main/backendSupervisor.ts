@@ -35,6 +35,7 @@ interface StartDesktopBackendOptions {
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
   maxLogBytes?: number;
+  secretsMasterKeyB64?: string;
 }
 
 export interface DesktopBackendEnvironment {
@@ -42,6 +43,7 @@ export interface DesktopBackendEnvironment {
   readonly NODE_ENV: string;
   readonly PORT: string;
   readonly SCHEDULER_ENABLED: string;
+  readonly SECRETS_MASTER_KEY?: string;
   readonly SQLITE_PATH: string;
   readonly AGENT_PLATFORM_DESKTOP_CONFIG_PATH: string;
   readonly AGENT_PLATFORM_DESKTOP_CONFIG_DIR: string;
@@ -92,16 +94,20 @@ export function buildDesktopBackendEnvironment({
   env,
   paths,
   port,
+  secretsMasterKeyB64,
 }: {
   env: NodeJS.ProcessEnv;
   paths: DesktopBackendPaths;
   port: string;
+  secretsMasterKeyB64?: string;
 }): DesktopBackendEnvironment {
+  const secretsMasterKey = secretsMasterKeyB64 ?? env.SECRETS_MASTER_KEY?.trim();
   return {
     HOST: '127.0.0.1',
     NODE_ENV: 'production',
     PORT: port,
     SCHEDULER_ENABLED: env.SCHEDULER_ENABLED ?? 'false',
+    ...(secretsMasterKey ? { SECRETS_MASTER_KEY: secretsMasterKey } : {}),
     SQLITE_PATH: paths.sqlitePath,
     AGENT_PLATFORM_DESKTOP_CONFIG_PATH: paths.configPath,
     AGENT_PLATFORM_DESKTOP_CONFIG_DIR: dirname(paths.configPath),
@@ -117,6 +123,7 @@ export async function startDesktopBackend({
   env = process.env,
   timeoutMs = 15_000,
   maxLogBytes = defaultMaxLogBytes,
+  secretsMasterKeyB64,
 }: StartDesktopBackendOptions): Promise<DesktopBackendHandle> {
   if (!desktopBackendAvailable(paths)) {
     throw new Error(
@@ -134,6 +141,7 @@ export async function startDesktopBackend({
     paths,
     env,
     port: env.AGENT_PLATFORM_DESKTOP_BACKEND_PORT ?? String(defaultBackendPort),
+    secretsMasterKeyB64,
   });
   let processError: Error | undefined;
   child.once('error', (error: Error) => {
@@ -168,13 +176,15 @@ function spawnBackendProcess({
   paths,
   env,
   port,
+  secretsMasterKeyB64,
 }: {
   nodePath: string;
   paths: DesktopBackendPaths;
   env: NodeJS.ProcessEnv;
   port: string;
+  secretsMasterKeyB64?: string;
 }): ChildProcess {
-  const desktopEnv = buildDesktopBackendEnvironment({ env, paths, port });
+  const desktopEnv = buildDesktopBackendEnvironment({ env, paths, port, secretsMasterKeyB64 });
 
   return spawn(nodePath, [paths.apiEntry], {
     cwd: paths.repoRoot,

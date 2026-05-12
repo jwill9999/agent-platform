@@ -48,6 +48,7 @@ function makeRuntimePaths(runtimeRoot: string): DesktopRuntimePaths {
     tempDir: join(runtimeRoot, 'tmp'),
     sqlitePath: join(runtimeRoot, 'data/agent.sqlite'),
     configPath: join(runtimeRoot, 'config/runtime.json'),
+    secretsMasterKeyPath: join(runtimeRoot, 'config/secrets-master-key.json'),
   };
 }
 
@@ -102,6 +103,7 @@ describe('desktop backend supervisor helpers', () => {
       },
       paths,
       port: '4500',
+      secretsMasterKeyB64: 'managed-key',
     });
 
     expect(env).toMatchObject({
@@ -109,6 +111,7 @@ describe('desktop backend supervisor helpers', () => {
       NODE_ENV: 'production',
       PORT: '4500',
       SCHEDULER_ENABLED: 'true',
+      SECRETS_MASTER_KEY: 'managed-key',
       SQLITE_PATH: join(runtimeRoot, 'data/agent.sqlite'),
       AGENT_PLATFORM_DESKTOP_CONFIG_PATH: join(runtimeRoot, 'config/runtime.json'),
       AGENT_PLATFORM_DESKTOP_CONFIG_DIR: join(runtimeRoot, 'config'),

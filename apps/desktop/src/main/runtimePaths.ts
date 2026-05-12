@@ -10,6 +10,7 @@ export interface DesktopRuntimePaths {
   tempDir: string;
   sqlitePath: string;
   configPath: string;
+  secretsMasterKeyPath: string;
 }
 
 export interface ResolveDesktopRuntimePathsOptions {
@@ -40,6 +41,7 @@ export function resolveDesktopRuntimePaths({
     tempDir: resolvedTempDir,
     sqlitePath: resolve(sqliteOverride || join(dataDir, 'agent.sqlite')),
     configPath: resolve(env.AGENT_PLATFORM_DESKTOP_CONFIG_PATH ?? join(configDir, 'runtime.json')),
+    secretsMasterKeyPath: resolve(join(configDir, 'secrets-master-key.json')),
   };
 }
 
