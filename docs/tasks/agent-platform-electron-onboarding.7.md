@@ -39,8 +39,8 @@ reviewing the generated setup, approving it, and verifying writes land in the se
 
 ## Definition Of Done
 
-- [ ] Built-runtime Electron E2E covers Project open to `/init` approval.
-- [ ] Test verifies write output inside selected Project root.
-- [ ] Test verifies missing or duplicate legacy open paths do not drive onboarding.
-- [ ] CI includes the onboarding E2E coverage.
+- [x] Built-runtime Electron E2E covers Project open to `/init` approval.
+- [x] Test verifies write output inside selected Project root.
+- [x] Test verifies missing or duplicate legacy open paths do not drive onboarding.
+- [x] CI includes the onboarding E2E coverage.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

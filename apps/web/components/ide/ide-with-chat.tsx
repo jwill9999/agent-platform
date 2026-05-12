@@ -2222,6 +2222,12 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     }
   }, [activeProject?.id, onboardingAnswer, onboardingDialogue?.activeQuestionId]);
 
+  const refreshActiveProject = useCallback(async () => {
+    if (!activeProject?.id) return;
+    const project = await apiGet<ProjectRecord>(apiPath('projects', activeProject.id));
+    if (project) setActiveProject(project);
+  }, [activeProject?.id]);
+
   // --- File operations ---
 
   const findFileByPath = useCallback(
@@ -2558,13 +2564,18 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const handleSendMessage = useCallback(() => {
     const userLine = chatInput.trim();
     if (!userLine || !sessionId) return;
+    const shouldRefreshProject = Boolean(activeProject?.id && userLine.startsWith('/'));
     const messageForApi = buildIdeChatMessage({
       userLine,
       sanitisedFiles: contextDraft.sanitisedFiles,
     });
-    sendMessage(messageForApi, userLine).catch(() => {});
+    sendMessage(messageForApi, userLine)
+      .then(async () => {
+        if (shouldRefreshProject) await refreshActiveProject();
+      })
+      .catch(() => {});
     setChatInput('');
-  }, [chatInput, sessionId, contextDraft, sendMessage]);
+  }, [activeProject?.id, chatInput, sessionId, contextDraft, refreshActiveProject, sendMessage]);
 
   // --- Keyboard shortcuts ---
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -68,6 +68,8 @@ test.describe('Electron Project access', () => {
 
       const binding = page.getByLabel('Project binding');
       await expect(binding.getByText('electron-e2e-project').first()).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
+      await expect(page.getByText('Restore folder')).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
       await expect(page.getByText(projectDir)).toHaveCount(0);
       await page.getByText('guide.md').click();
@@ -90,6 +92,16 @@ test.describe('Electron Project access', () => {
           'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
         ),
       ).toBeVisible();
+      await expect(binding.getByText('Project setup in progress')).toBeVisible();
+      await expect(binding.getByRole('button', { name: 'Approve draft' })).toBeVisible();
+      await binding.getByRole('button', { name: 'Approve draft' }).click();
+      await expect(binding.getByText('Project ready')).toBeVisible();
+      await expect(binding.getByText('Project instructions are approved')).toBeVisible();
+
+      const agentsPath = join(projectDir, 'AGENTS.md');
+      await expect.poll(() => existsSync(agentsPath)).toBe(true);
+      expect(readFileSync(agentsPath, 'utf8')).toContain('# Agent Instructions');
+      expect(existsSync(join(tempRoot, 'AGENTS.md'))).toBe(false);
 
       const refreshedSession = await fetchJson<ApiEnvelope<SessionRecord>>(
         `http://127.0.0.1:${backendPort}/v1/sessions/${session.id}`,
