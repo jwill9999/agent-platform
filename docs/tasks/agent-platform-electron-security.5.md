@@ -47,7 +47,7 @@ folders by default.
 - [x] User Project folders are preserved by default.
 - [x] Destructive action requires clear confirmation.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
@@ -76,3 +76,8 @@ folders by default.
 - `pnpm lint`
 - `pnpm build`
 - `pnpm test`
+- PR #173 passed GitHub `verify`, `docker`, `e2e`, docs `markdownlint`/`lychee`,
+  GitGuardian, and SonarCloud.
+- SonarCloud reported 0 new issues and 0 security hotspots.
+- Sourcery skipped because the PR diff exceeded the account review limit and posted no actionable
+  inline comments.
