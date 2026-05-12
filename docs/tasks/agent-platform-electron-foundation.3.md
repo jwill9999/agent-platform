@@ -28,7 +28,7 @@ The supervisor should be conservative: explicit lifecycle, bounded logs, readine
 - [x] Backend stops when Electron quits.
 - [x] Failure states are observable for developers without exposing internal implementation noise to end users.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
