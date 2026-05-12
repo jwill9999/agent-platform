@@ -1503,3 +1503,4 @@ Tracked in Beads: `agent-platform-lt6`
   - focused rerun of the transient API timeout test
   - `pnpm test`
 - SonarQube MCP tools were not exposed in the current tool surface after discovery; local fallback completion gates passed. Final Sonar/Promptfoo/CI status still requires the pushed PR.
+- PR #167 initially failed SonarCloud rule `typescript:S5443` in `apps/desktop/test/runtimePaths.test.ts`; the test was patched to use private `mkdtempSync` paths instead of hardcoded public temp paths.

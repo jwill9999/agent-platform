@@ -67,3 +67,7 @@ Local verification completed:
 
 The first full `pnpm test` run hit a transient timeout in one existing API integration test. The
 focused rerun and a subsequent full `pnpm test` both passed.
+
+PR #167 initially failed SonarCloud rule `typescript:S5443` on hardcoded public temp-style paths in
+`apps/desktop/test/runtimePaths.test.ts`. The test now uses private `mkdtempSync` directories for
+override assertions.
