@@ -56,9 +56,9 @@ Create or update backend Project records from trusted Electron-selected host fol
 
 ## Definition of done
 
-- [ ] Backend can create/update a Project from a trusted desktop folder.
-- [ ] Invalid or unsupported paths are rejected.
-- [ ] API responses expose Project name and safe metadata without leaking host paths by default.
-- [ ] Reopening the same folder updates/reuses the existing Project record.
-- [ ] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] Backend can create/update a Project from a trusted desktop folder.
+- [x] Invalid or unsupported paths are rejected.
+- [x] API responses expose Project name and safe metadata without leaking host paths by default.
+- [x] Reopening the same folder updates/reuses the existing Project record.
+- [x] Relevant tests and root gates pass.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
