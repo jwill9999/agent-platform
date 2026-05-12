@@ -9,6 +9,7 @@ import {
   ProjectOnboardingDraftPanel,
   RecentDesktopProjectsPanel,
 } from '@/components/ide/ide-with-chat';
+import { RecentProjectsNavSection } from '@/components/layout/sidebar';
 
 beforeAll(() => {
   vi.stubGlobal('React', React);
@@ -240,6 +241,58 @@ describe('Project onboarding assessment panel', () => {
     );
 
     expect(html).toContain('Recent Projects');
+    expect(html).toContain('Auth App');
+    expect(html).toContain('Ready to reopen');
+    expect(html).toContain('Missing App');
+    expect(html).toContain('Folder unavailable');
+    expect(html).not.toContain('/Users/');
+    expect(html).not.toContain('/workspace');
+  });
+
+  it('renders recent Projects in the left navigation without host paths', () => {
+    const html = renderToStaticMarkup(
+      createElement(RecentProjectsNavSection, {
+        projects: [
+          {
+            id: 'project-1',
+            slug: 'auth-app',
+            name: 'Auth App',
+            workspacePath: 'projects/auth-app',
+            metadata: {
+              source: 'desktop',
+              folderName: 'auth-app',
+              capabilityState: 'backend_accessible',
+              onboardingState: 'approved',
+              defaultAgentProfile: 'coding',
+              instructionFileCount: 1,
+            },
+            createdAtMs: 1,
+            updatedAtMs: 2,
+          },
+          {
+            id: 'project-2',
+            slug: 'missing-app',
+            name: 'Missing App',
+            workspacePath: 'projects/missing-app',
+            metadata: {
+              source: 'desktop',
+              folderName: 'missing-app',
+              capabilityState: 'unavailable',
+              onboardingState: 'missing',
+              defaultAgentProfile: 'coding',
+              instructionFileCount: 0,
+            },
+            createdAtMs: 1,
+            updatedAtMs: 1,
+          },
+        ],
+        isLoading: false,
+        onRefresh: () => {},
+      }),
+    );
+
+    expect(html).toContain('Recent Projects');
+    expect(html).toContain('href="/ide?projectId=project-1"');
     expect(html).toContain('Auth App');
     expect(html).toContain('Ready to reopen');
     expect(html).toContain('Missing App');

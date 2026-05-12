@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildProjectIdeHref,
   createWorkspaceNavigationState,
+  desktopProjectFolderLabel,
+  desktopProjectIsAvailable,
+  projectReopenSearchParam,
   resolveWorkspaceScope,
   workspaceEntryCopy,
   workspaceNavigationItems,
@@ -42,5 +46,29 @@ describe('Project navigation model', () => {
 
     expect(visibleCopy).toContain('Project');
     expect(visibleCopy).not.toMatch(/backend|\/workspace|container|coding agent/i);
+  });
+
+  it('builds safe Project reopen metadata for desktop Projects', () => {
+    const project = {
+      id: 'project 1',
+      slug: 'auth-app',
+      name: 'Auth App',
+      workspacePath: 'projects/auth-app',
+      metadata: {
+        source: 'desktop',
+        folderName: 'auth-app',
+        capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
+        defaultAgentProfile: 'coding',
+        instructionFileCount: 1,
+      },
+      createdAtMs: 1,
+      updatedAtMs: 2,
+    } as const;
+
+    expect(projectReopenSearchParam).toBe('projectId');
+    expect(buildProjectIdeHref(project.id)).toBe('/ide?projectId=project%201');
+    expect(desktopProjectFolderLabel(project)).toBe('auth-app');
+    expect(desktopProjectIsAvailable(project)).toBe(true);
   });
 });

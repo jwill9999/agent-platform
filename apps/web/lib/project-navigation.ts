@@ -1,3 +1,4 @@
+import type { ProjectDesktopRecord, ProjectRecord } from '@agent-platform/contracts';
 import { Code2, MessageSquare, type LucideIcon } from 'lucide-react';
 
 export type WorkspaceSurface = 'home' | 'chat' | 'project-chat' | 'ide';
@@ -47,6 +48,9 @@ export const workspaceEntryCopy = {
   projectProfile: 'Project workspace',
 } as const;
 
+export const projectReopenSearchParam = 'projectId';
+export const recentProjectsUpdatedEvent = 'agent-platform:desktop-projects-updated';
+
 export function createWorkspaceNavigationState(input: {
   readonly surface: WorkspaceSurface;
   readonly projectId?: string | null;
@@ -92,4 +96,19 @@ export function workspaceScopeLabel(state: WorkspaceNavigationState): string {
     case 'none':
       return 'Workspace';
   }
+}
+
+export function desktopProjectFolderLabel(
+  project: Pick<ProjectRecord, 'metadata' | 'name'> | null,
+): string | null {
+  const folderName = project?.metadata.folderName;
+  return typeof folderName === 'string' && folderName.trim() ? folderName : null;
+}
+
+export function desktopProjectIsAvailable(project: ProjectDesktopRecord): boolean {
+  return project.metadata.capabilityState !== 'unavailable';
+}
+
+export function buildProjectIdeHref(projectId: string): string {
+  return `/ide?${projectReopenSearchParam}=${encodeURIComponent(projectId)}`;
 }

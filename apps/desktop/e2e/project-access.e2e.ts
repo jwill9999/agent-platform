@@ -83,6 +83,19 @@ test.describe('Electron Project access', () => {
       const session = await findProjectSession(backendPort, project.id);
       expect(session.mode).toBe('project');
 
+      const recentProjects = page.locator('section[aria-label="Recent Projects"]');
+      await expect(
+        recentProjects.getByRole('link', { name: /electron-e2e-project/ }),
+      ).toBeVisible();
+      await expect(recentProjects.getByText('Ready to reopen')).toBeVisible();
+      await expect(recentProjects.getByText(projectDir)).toHaveCount(0);
+
+      const ideUrl = new URL(page.url());
+      await page.goto(`${ideUrl.origin}/ide?projectId=${encodeURIComponent(project.id)}`);
+      await expect(binding.getByText('electron-e2e-project').first()).toBeVisible();
+      await expect(page.getByText('guide.md')).toBeVisible();
+      await expect(page.getByText(projectDir)).toHaveCount(0);
+
       await sendChatMessage(page, '/help');
       await expect(page.getByText('Available slash commands:')).toBeVisible();
 

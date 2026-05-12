@@ -108,6 +108,12 @@ import {
   buildWorkbenchBranchSummary,
   type WorkbenchBranchSummary,
 } from '@/lib/code-workbench-branch-summary';
+import {
+  desktopProjectFolderLabel,
+  desktopProjectIsAvailable,
+  projectReopenSearchParam,
+  recentProjectsUpdatedEvent,
+} from '@/lib/project-navigation';
 
 type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
 
@@ -259,17 +265,6 @@ function projectOnboardingDescription(state: ProjectOnboardingState): string {
     case 'missing':
       return 'Start setup to create Project instructions. You can still inspect files and ask questions first.';
   }
-}
-
-function desktopProjectFolderLabel(
-  project: ProjectDesktopRecord | ProjectRecord | null,
-): string | null {
-  const folderName = project?.metadata.folderName;
-  return typeof folderName === 'string' && folderName.trim() ? folderName : null;
-}
-
-function desktopProjectIsAvailable(project: ProjectDesktopRecord): boolean {
-  return project.metadata.capabilityState !== 'unavailable';
 }
 
 function desktopProjectOpenButtonLabel(options: {
@@ -1820,6 +1815,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [contextFiles, setContextFiles] = useState<OpenTab[]>([]);
   const [includeActiveFile, setIncludeActiveFile] = useState(true);
   const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
+  const attemptedProjectReopenIdRef = useRef<string | null>(null);
 
   // Use backend-bound Project files first. Browser FS remains parked for product IDE use.
   let fileTree = initialFileTree ?? [];
@@ -1910,9 +1906,12 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       const result = await apiGet<ProjectDesktopRecentProjectsResult>(
         apiPath('projects', 'desktop', 'recent'),
       );
-      setRecentDesktopProjects(result?.projects ?? []);
+      const projects = result?.projects ?? [];
+      setRecentDesktopProjects(projects);
+      return projects;
     } catch (e) {
       toast.error(e instanceof ApiRequestError ? e.message : 'Failed to load recent Projects');
+      return [];
     } finally {
       setIsLoadingRecentProjects(false);
     }
@@ -1972,6 +1971,41 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     setProjectFileTree([]);
   }, []);
 
+  const reopenDesktopProjectById = useCallback(
+    async (projectId: string) => {
+      const projects =
+        recentDesktopProjects.length > 0 ? recentDesktopProjects : await loadRecentDesktopProjects();
+      const project = projects.find((candidate) => candidate.id === projectId);
+      if (!project) {
+        const message = 'This recent Project is no longer available. Open it again from your system.';
+        setProjectOpenError(message);
+        toast.error(message);
+        return false;
+      }
+      reopenDesktopProject(project);
+      return true;
+    },
+    [loadRecentDesktopProjects, recentDesktopProjects, reopenDesktopProject],
+  );
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const params = new URLSearchParams(globalThis.window.location.search);
+    const projectId = params.get(projectReopenSearchParam);
+    if (!projectId || activeProject?.id === projectId) return;
+    if (attemptedProjectReopenIdRef.current === projectId) return;
+    attemptedProjectReopenIdRef.current = projectId;
+
+    void (async () => {
+      const reopened = await reopenDesktopProjectById(projectId);
+      if (reopened && globalThis.window !== undefined) {
+        const nextUrl = new URL(globalThis.window.location.href);
+        nextUrl.searchParams.delete(projectReopenSearchParam);
+        globalThis.window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}`);
+      }
+    })();
+  }, [activeProject?.id, reopenDesktopProjectById]);
+
   const handleOpenDesktopProject = useCallback(async () => {
     const bridge = getDesktopProjectBridge();
     const selectFolder = bridge?.projects?.selectFolder;
@@ -1995,6 +2029,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       if (!result) throw new ApiRequestError('Failed to open Project', 500);
       reopenDesktopProject(result.project);
       await loadRecentDesktopProjects();
+      if (globalThis.window !== undefined) {
+        globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+      }
       toast.success(result.created ? 'Project opened' : 'Project reopened');
     } catch (e) {
       const message = e instanceof ApiRequestError ? e.message : 'Failed to open Project';

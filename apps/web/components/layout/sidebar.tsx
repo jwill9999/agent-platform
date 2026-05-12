@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import type { ProjectDesktopRecentProjectsResult, ProjectDesktopRecord } from '@agent-platform/contracts';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import {
@@ -19,6 +21,7 @@ import {
   FolderOpen,
   Brain,
   CalendarClock,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './sidebar-context';
@@ -30,7 +33,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { workspaceNavigationItems } from '@/lib/project-navigation';
+import { apiGet, apiPath, ApiRequestError } from '@/lib/apiClient';
+import {
+  buildProjectIdeHref,
+  desktopProjectFolderLabel,
+  desktopProjectIsAvailable,
+  recentProjectsUpdatedEvent,
+  workspaceNavigationItems,
+} from '@/lib/project-navigation';
 
 const settingsNavigation = [
   {
@@ -95,9 +105,128 @@ const settingsNavigation = [
   },
 ];
 
+export function RecentProjectsNavSection({
+  projects,
+  isLoading,
+  onRefresh,
+}: Readonly<{
+  projects: readonly ProjectDesktopRecord[];
+  isLoading: boolean;
+  onRefresh: () => void;
+}>) {
+  return (
+    <section className="mt-5 border-t border-border pt-4" aria-label="Recent Projects">
+      <div className="mb-2 flex items-center justify-between gap-2 px-3">
+        <div className="truncate text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Recent Projects
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0"
+          aria-label="Refresh recent Projects"
+          title="Refresh recent Projects"
+          onClick={onRefresh}
+          disabled={isLoading}
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} aria-hidden />
+        </Button>
+      </div>
+      {projects.length === 0 ? (
+        <p className="px-3 text-xs leading-snug text-muted-foreground">
+          {isLoading ? 'Loading Projects...' : 'No recent Projects'}
+        </p>
+      ) : (
+        <div className="space-y-1">
+          {projects.slice(0, 6).map((project) => {
+            const available = desktopProjectIsAvailable(project);
+            const folderLabel = desktopProjectFolderLabel(project) ?? project.name;
+            const content = (
+              <>
+                <span className="truncate text-sm font-medium">{project.name}</span>
+                <span className="truncate text-xs text-muted-foreground">{folderLabel}</span>
+                <span
+                  className={cn(
+                    'text-[11px]',
+                    available ? 'text-emerald-600' : 'text-amber-700 dark:text-amber-300',
+                  )}
+                >
+                  {available ? 'Ready to reopen' : 'Folder unavailable'}
+                </span>
+              </>
+            );
+
+            if (!available) {
+              return (
+                <button
+                  key={project.id}
+                  type="button"
+                  className="flex w-full cursor-not-allowed flex-col rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left"
+                  disabled
+                  aria-label={`${project.name} folder unavailable`}
+                >
+                  {content}
+                </button>
+              );
+            }
+
+            return (
+              <Link
+                key={project.id}
+                href={buildProjectIdeHref(project.id)}
+                className="flex flex-col rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                title={`Open ${project.name}`}
+              >
+                {content}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { collapsed, toggle } = useSidebar();
+  const [recentProjects, setRecentProjects] = useState<ProjectDesktopRecord[]>([]);
+  const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(false);
+
+  const loadRecentProjects = useCallback(async () => {
+    setIsLoadingRecentProjects(true);
+    try {
+      const result = await apiGet<ProjectDesktopRecentProjectsResult>(
+        apiPath('projects', 'desktop', 'recent'),
+      );
+      setRecentProjects(result?.projects ?? []);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 404) {
+        setRecentProjects([]);
+        return;
+      }
+      setRecentProjects([]);
+    } finally {
+      setIsLoadingRecentProjects(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (collapsed) return;
+    loadRecentProjects().catch(() => {});
+  }, [collapsed, loadRecentProjects]);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const refresh = () => {
+      loadRecentProjects().catch(() => {});
+    };
+    globalThis.window.addEventListener(recentProjectsUpdatedEvent, refresh);
+    return () => {
+      globalThis.window.removeEventListener(recentProjectsUpdatedEvent, refresh);
+    };
+  }, [loadRecentProjects]);
 
   return (
     <aside
@@ -163,6 +292,13 @@ export function Sidebar() {
             </Link>
           );
         })}
+        {!collapsed && (
+          <RecentProjectsNavSection
+            projects={recentProjects}
+            isLoading={isLoadingRecentProjects}
+            onRefresh={loadRecentProjects}
+          />
+        )}
       </nav>
 
       {/* Footer */}
