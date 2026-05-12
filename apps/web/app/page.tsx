@@ -36,6 +36,19 @@ import {
 } from '@/lib/desktop-projects';
 
 type WorkspaceMode = 'chat' | 'project-chat';
+type HomeEntryScreenProps = Readonly<{
+  isDesktopProjectBridgeAvailable: boolean;
+  isOpeningProject: boolean;
+  onOpenChat: () => void;
+  onOpenProject: () => void;
+}>;
+type ErrorBannerProps = Readonly<{
+  message: string | null;
+  onDismiss: () => void;
+}>;
+type ProjectChatHeaderProps = Readonly<{
+  project: ProjectDesktopRecord | null;
+}>;
 
 function getInputStatusText(
   hasPendingApproval: boolean,
@@ -66,12 +79,7 @@ function HomeEntryScreen({
   isOpeningProject,
   onOpenChat,
   onOpenProject,
-}: {
-  isDesktopProjectBridgeAvailable: boolean;
-  isOpeningProject: boolean;
-  onOpenChat: () => void;
-  onOpenProject: () => void;
-}) {
+}: HomeEntryScreenProps) {
   return (
     <main className="flex h-full min-h-0 flex-col bg-background">
       <section className="border-b border-border px-6 py-5">
@@ -146,10 +154,7 @@ function HomeEntryScreen({
 function ErrorBanner({
   message,
   onDismiss,
-}: {
-  message: string | null;
-  onDismiss: () => void;
-}) {
+}: ErrorBannerProps) {
   if (!message) {
     return null;
   }
@@ -164,7 +169,7 @@ function ErrorBanner({
   );
 }
 
-function ProjectChatHeader({ project }: { project: ProjectDesktopRecord | null }) {
+function ProjectChatHeader({ project }: ProjectChatHeaderProps) {
   if (!project) {
     return null;
   }
