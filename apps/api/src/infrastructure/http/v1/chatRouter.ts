@@ -710,18 +710,6 @@ function resolveSessionProjectContext(
   return project ? { projectId: project.id, project } : { projectId };
 }
 
-function desktopSlashProjectContext(context: SessionProjectContext): SessionProjectContext {
-  const { project } = context;
-  if (
-    project?.metadata['source'] !== 'desktop' ||
-    typeof project.metadata['backendProjectRoot'] !== 'string'
-  ) {
-    return {};
-  }
-
-  return context;
-}
-
 function resolveRuntimeWorkspace(
   db: DrizzleDb,
   sessionId: string,
@@ -1350,7 +1338,7 @@ async function handleSlashCommandMessage(
       message,
       {
         session,
-        ...desktopSlashProjectContext(resolveSessionProjectContext(db, session)),
+        ...resolveSessionProjectContext(db, session),
         startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
       },
       resolveSlashCommandOptions(options.slashCommands),

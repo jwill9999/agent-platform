@@ -98,6 +98,9 @@ test.describe('Electron Project access', () => {
           'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
         ),
       ).toBeVisible();
+      await sendChatMessage(page, '/help init', 'Ask about this Project...');
+      await expect(page.getByText('Scope: project').last()).toBeVisible();
+      await expect(page.getByText('May change Project state.').last()).toBeVisible();
 
       await page.getByRole('link', { name: 'Open IDE' }).click();
       await page.waitForURL(/\/ide/);
@@ -123,8 +126,8 @@ test.describe('Electron Project access', () => {
         page.getByLabel('Project binding').getByText('electron-e2e-project').first(),
       ).toBeVisible();
 
-      await sendChatMessage(page, '/help', 'Ask about your code...');
-      await expect(page.getByText('Available slash commands:')).toBeVisible();
+      await sendChatMessage(page, '/help init', 'Ask about your code...');
+      await expect(page.getByText('Usage: /init').last()).toBeVisible();
 
       await expect(binding.getByText('Project setup in progress')).toBeVisible();
       await expect(binding.getByRole('button', { name: 'Approve draft' })).toBeVisible();

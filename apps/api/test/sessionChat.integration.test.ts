@@ -417,7 +417,7 @@ describe('POST /v1/chat (session-aware)', () => {
     }
   });
 
-  it('does not allow legacy backend-opened Projects to satisfy /init', async () => {
+  it('starts /init from the backend-bound Project session resolver', async () => {
     await withMockChatApp(dirs, async ({ app, db }) => {
       const projectRoot = createProjectRoot(dirs);
       mkdirSync(path.join(projectRoot, 'src'), { recursive: true });
@@ -437,12 +437,14 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.id,
         '/init',
-        'Open a Project with Open Project, then run /init to set up Project instructions.',
+        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
       );
       expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
 
       const project = await request(app).get(`/v1/projects/${opened.body.data.id}`).expect(200);
-      expect(project.body.data.metadata.onboardingDraft).toBeUndefined();
+      expect(project.body.data.metadata.onboardingDraft).toEqual(
+        expect.objectContaining({ targetPath: 'AGENTS.md' }),
+      );
       expect(project.body.data.metadata.onboardingState).toBe('in_progress');
     });
   });
@@ -461,6 +463,14 @@ describe('POST /v1/chat (session-aware)', () => {
         .post('/v1/sessions/project')
         .send({ agentId: DEFAULT_AGENT_ID, projectId: registered.body.data.project.id })
         .expect(201);
+
+      await expectHandledSlashMessage(
+        app,
+        db,
+        sessionRes.body.data.session.id,
+        '/help init',
+        '/init - Set up Project instructions for the selected Project.\nUsage: /init\nScope: project\nMay change Project state.',
+      );
 
       await expectHandledSlashMessage(
         app,
@@ -594,35 +604,49 @@ describe('POST /v1/chat (session-aware)', () => {
       writeFileSync(path.join(boundRoot, 'AGENTS.md'), 'bound project rule\n');
       writeFileSync(path.join(rememberedRoot, 'AGENTS.md'), 'remembered project rule\n');
 
-      const bound = await request(app)
-        .post('/v1/projects/desktop/register')
-        .set('x-agent-platform-desktop-bridge', '1')
-        .send({ path: boundRoot, name: 'Bound Chat Project' })
-        .expect(201);
-      const remembered = await request(app)
-        .post('/v1/projects/desktop/register')
-        .set('x-agent-platform-desktop-bridge', '1')
-        .send({ path: rememberedRoot, name: 'Remembered Chat Project' })
-        .expect(201);
+      const bound = createChatProject(db, {
+        name: 'Bound Chat Project',
+        workspaceKey: boundRoot,
+        backendProjectRoot: boundRoot,
+        repositoryRoot: boundRoot,
+        capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
+        instructionFiles: [{ scope: 'root', path: 'AGENTS.md', approvedAtMs: 123 }],
+      });
+      const remembered = createChatProject(db, {
+        name: 'Remembered Chat Project',
+        workspaceKey: rememberedRoot,
+        backendProjectRoot: rememberedRoot,
+        repositoryRoot: rememberedRoot,
+        capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
+        instructionFiles: [{ scope: 'root', path: 'AGENTS.md', approvedAtMs: 123 }],
+      });
       const sessionRes = await request(app)
         .post('/v1/sessions/project')
-        .send({ agentId: DEFAULT_AGENT_ID, projectId: bound.body.data.project.id })
+        .send({ agentId: DEFAULT_AGENT_ID, projectId: bound.id })
         .expect(201);
       const sessionId = sessionRes.body.data.session.id as string;
       upsertWorkingMemoryArtifact(db, {
         sessionId,
-        projectId: remembered.body.data.project.id,
-        activeProject: remembered.body.data.project.id,
+        projectId: remembered.id,
+        activeProject: remembered.id,
         currentGoal: 'Inspect remembered project',
       });
 
       mockToolCalls.mockReturnValueOnce('Using the bound Project');
-      await request(app).post('/v1/chat').send({ sessionId, message: 'Inspect README.md' });
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Inspect README.md' })
+        .expect(200);
 
-      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
-        messages?: Array<{ role: string; content: string }>;
-      };
-      const systemPrompt = state.messages?.[0]?.content ?? '';
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as
+        | {
+            messages?: Array<{ role: string; content: string }>;
+          }
+        | undefined;
+      expect(state).toBeDefined();
+      const systemPrompt = state?.messages?.[0]?.content ?? '';
       expect(systemPrompt).toContain('bound project rule');
       expect(systemPrompt).not.toContain('remembered project rule');
       expect(systemPrompt).not.toContain(boundRoot);
