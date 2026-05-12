@@ -17,21 +17,36 @@ Define and implement the first desktop command execution boundary so agent tools
 - Define temporary directory and network behavior.
 - Research stronger future runners such as Docker, platform sandboxing, VM, or remote execution.
 
+Threat model: [Command Execution Threat Model](../design/command-execution-threat-model.md)
+
 ## Proposed Task Chain
 
-1. Command execution threat model.
-2. `CommandRunner` interface.
-3. Host runner with Project-root PathJail.
-4. Approval and audit integration.
-5. Deny/destructive command policy.
-6. Sandbox regression tests.
-7. Future runner research note.
+1. `agent-platform-electron-command-sandbox.1` — Command execution threat model.
+2. `agent-platform-electron-command-sandbox.2` — `CommandRunner` interface.
+3. `agent-platform-electron-command-sandbox.3` — Host runner with Project-root PathJail.
+4. `agent-platform-electron-command-sandbox.4` — Approval and audit integration.
+5. `agent-platform-electron-command-sandbox.5` — Deny/destructive command policy.
+6. `agent-platform-electron-command-sandbox.6` — Sandbox regression tests.
+7. `agent-platform-electron-command-sandbox.7` — Future runner research note.
 
 ## Dependencies
 
 | Upstream                                 | Downstream                           |
 | ---------------------------------------- | ------------------------------------ |
 | `agent-platform-electron-project-access` | `agent-platform-electron-onboarding` |
+
+## Child Task Specs
+
+| Task                                          | Spec                                                                     |
+| --------------------------------------------- | ------------------------------------------------------------------------ |
+| `agent-platform-electron-command-sandbox.1`   | `docs/tasks/agent-platform-electron-command-sandbox.1.md`                |
+| `agent-platform-electron-command-sandbox.2`   | `docs/tasks/agent-platform-electron-command-sandbox.2.md`                |
+| `agent-platform-electron-command-sandbox.3`   | `docs/tasks/agent-platform-electron-command-sandbox.3.md`                |
+| `agent-platform-electron-command-sandbox.4`   | `docs/tasks/agent-platform-electron-command-sandbox.4.md`                |
+| `agent-platform-electron-command-sandbox.5`   | `docs/tasks/agent-platform-electron-command-sandbox.5.md`                |
+| `agent-platform-electron-command-sandbox.6`   | `docs/tasks/agent-platform-electron-command-sandbox.6.md`                |
+| `agent-platform-electron-command-sandbox.7`   | `docs/tasks/agent-platform-electron-command-sandbox.7.md`                |
+| `agent-platform-electron-command-sandbox` DoD | PR checks, Sonar/Problems gate, and review comments green for all tasks. |
 
 ## Testing Strategy
 

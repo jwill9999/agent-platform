@@ -69,41 +69,41 @@ Spec: docs/tasks/<issue-id>.md
 
 ## Epic index (task spec files)
 
-| Epic                     | Beads id                                  | Task spec files                                                                  |
-| ------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------- |
-| Foundation               | `agent-platform-mov`                      | `agent-platform-mov.{1-5}.md`                                                    |
-| Persistence + API        | `agent-platform-j9x`                      | `agent-platform-j9x.{1-4}.md`                                                    |
-| Harness                  | `agent-platform-2tw`                      | `agent-platform-2tw.{1-5}.md`                                                    |
-| Planner + plugins        | `agent-platform-dx3`                      | `agent-platform-dx3.{1-4}.md`                                                    |
-| Frontend                 | `agent-platform-ast`                      | `agent-platform-ast.{1-3}.md`                                                    |
-| MVP E2E                  | `agent-platform-o36`                      | `agent-platform-o36.{1-2}.md`                                                    |
-| HITL approvals           | `agent-platform-hitl`                     | `agent-platform-hitl.{1-5}.md`                                                   |
-| Workspace storage        | `agent-platform-ws`                       | `agent-platform-ws.{1,1a,2-6}.md`                                                |
-| Coding tools             | `agent-platform-code-tools`               | `agent-platform-code-tools.{1-7}.md`                                             |
-| Browser tools            | `agent-platform-browser-tools`            | `agent-platform-browser-tools.{1-5}.md`, `agent-platform-browser-tools-guide.md` |
-| Operator experience      | `agent-platform-operator-experience`      | `agent-platform-operator-experience.{1-9}.md`                                    |
-| Code workbench           | `agent-platform-code-workbench`           | `agent-platform-code-workbench.{1-7}.md`                                         |
-| Project workspaces       | `agent-platform-project-workspaces`       | `agent-platform-project-workspaces.{1-6}.md`                                     |
-| Project onboarding       | `agent-platform-project-onboarding`       | `agent-platform-project-onboarding.{1-6}.md`                                     |
-| Project experience       | `agent-platform-project-experience`       | `agent-platform-project-experience.{1-6}.md`                                     |
-| Electron extract         | `agent-platform-electron-extract`         | `agent-platform-electron-extract.{1-4}.md`                                       |
-| Electron foundation      | `agent-platform-electron-foundation`      | `agent-platform-electron-foundation.{1-5}.md`                                    |
-| Electron security/data   | `agent-platform-electron-security`        | `agent-platform-electron-security.{1-6}.md`                                      |
-| Electron Project access  | `agent-platform-electron-project-access`  | `agent-platform-electron-project-access.{1-8}.md`                                |
-| Electron command sandbox | `agent-platform-electron-command-sandbox` | child specs pending                                                              |
-| Electron onboarding      | `agent-platform-electron-onboarding`      | child specs pending                                                              |
-| Electron experience      | `agent-platform-electron-experience`      | child specs pending                                                              |
-| Electron release         | `agent-platform-electron-release`         | child specs pending                                                              |
-| Research tools           | `agent-platform-research-tools`           | child specs pending                                                              |
-| Memory management        | `agent-platform-memory`                   | child specs pending                                                              |
-| Scheduler                | `agent-platform-scheduler`                | child specs pending                                                              |
-| Multi-agent              | `agent-platform-multi-agent`              | child specs pending                                                              |
-| Capability registry      | `agent-platform-capability-registry`      | child specs pending                                                              |
-| Skill authoring          | `agent-platform-skill-authoring`          | child specs pending                                                              |
-| Agent profile governance | `agent-platform-agent-profile-governance` | child specs pending                                                              |
-| Feedback sensors         | `agent-platform-feedback-sensors`         | `agent-platform-feedback-sensors.{1-6}.md`                                       |
-| UI quality sensors       | `agent-platform-ui-quality-sensors`       | child specs pending                                                              |
-| Session handoff hygiene  | `agent-platform-session-handoff-hygiene`  | `agent-platform-session-handoff-hygiene.md`                                      |
+| Epic                     | Beads id                                  | Task spec files                                                                                  |
+| ------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Foundation               | `agent-platform-mov`                      | `agent-platform-mov.{1-5}.md`                                                                    |
+| Persistence + API        | `agent-platform-j9x`                      | `agent-platform-j9x.{1-4}.md`                                                                    |
+| Harness                  | `agent-platform-2tw`                      | `agent-platform-2tw.{1-5}.md`                                                                    |
+| Planner + plugins        | `agent-platform-dx3`                      | `agent-platform-dx3.{1-4}.md`                                                                    |
+| Frontend                 | `agent-platform-ast`                      | `agent-platform-ast.{1-3}.md`                                                                    |
+| MVP E2E                  | `agent-platform-o36`                      | `agent-platform-o36.{1-2}.md`                                                                    |
+| HITL approvals           | `agent-platform-hitl`                     | `agent-platform-hitl.{1-5}.md`                                                                   |
+| Workspace storage        | `agent-platform-ws`                       | `agent-platform-ws.{1,1a,2-6}.md`                                                                |
+| Coding tools             | `agent-platform-code-tools`               | `agent-platform-code-tools.{1-7}.md`                                                             |
+| Browser tools            | `agent-platform-browser-tools`            | `agent-platform-browser-tools.{1-5}.md`, `agent-platform-browser-tools-guide.md`                 |
+| Operator experience      | `agent-platform-operator-experience`      | `agent-platform-operator-experience.{1-9}.md`                                                    |
+| Code workbench           | `agent-platform-code-workbench`           | `agent-platform-code-workbench.{1-7}.md`                                                         |
+| Project workspaces       | `agent-platform-project-workspaces`       | `agent-platform-project-workspaces.{1-6}.md`                                                     |
+| Project onboarding       | `agent-platform-project-onboarding`       | `agent-platform-project-onboarding.{1-6}.md`                                                     |
+| Project experience       | `agent-platform-project-experience`       | `agent-platform-project-experience.{1-6}.md`                                                     |
+| Electron extract         | `agent-platform-electron-extract`         | `agent-platform-electron-extract.{1-4}.md`                                                       |
+| Electron foundation      | `agent-platform-electron-foundation`      | `agent-platform-electron-foundation.{1-5}.md`                                                    |
+| Electron security/data   | `agent-platform-electron-security`        | `agent-platform-electron-security.{1-6}.md`                                                      |
+| Electron Project access  | `agent-platform-electron-project-access`  | `agent-platform-electron-project-access.{1-8}.md`                                                |
+| Electron command sandbox | `agent-platform-electron-command-sandbox` | `.1`–`.7` define threat model, runner interface, host runner, policy, tests, and future research |
+| Electron onboarding      | `agent-platform-electron-onboarding`      | child specs pending                                                                              |
+| Electron experience      | `agent-platform-electron-experience`      | child specs pending                                                                              |
+| Electron release         | `agent-platform-electron-release`         | child specs pending                                                                              |
+| Research tools           | `agent-platform-research-tools`           | child specs pending                                                                              |
+| Memory management        | `agent-platform-memory`                   | child specs pending                                                                              |
+| Scheduler                | `agent-platform-scheduler`                | child specs pending                                                                              |
+| Multi-agent              | `agent-platform-multi-agent`              | child specs pending                                                                              |
+| Capability registry      | `agent-platform-capability-registry`      | child specs pending                                                                              |
+| Skill authoring          | `agent-platform-skill-authoring`          | child specs pending                                                                              |
+| Agent profile governance | `agent-platform-agent-profile-governance` | child specs pending                                                                              |
+| Feedback sensors         | `agent-platform-feedback-sensors`         | `agent-platform-feedback-sensors.{1-6}.md`                                                       |
+| UI quality sensors       | `agent-platform-ui-quality-sensors`       | child specs pending                                                                              |
+| Session handoff hygiene  | `agent-platform-session-handoff-hygiene`  | `agent-platform-session-handoff-hygiene.md`                                                      |
 
 ## Commands
 
