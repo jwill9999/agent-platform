@@ -58,6 +58,18 @@ describe('desktop local data reset', () => {
       ok: true,
       value: { confirmation: desktopResetConfirmationText },
     });
+    expect(validateDesktopLocalDataResetRequest(null)).toEqual({
+      ok: false,
+      error: 'Expected reset request payload.',
+    });
+    expect(validateDesktopLocalDataResetRequest('delete')).toEqual({
+      ok: false,
+      error: 'Expected reset request payload.',
+    });
+    expect(validateDesktopLocalDataResetRequest({})).toEqual({
+      ok: false,
+      error: 'Expected reset confirmation text.',
+    });
     expect(validateDesktopLocalDataResetRequest({ confirmation: 1 })).toEqual({
       ok: false,
       error: 'Expected reset confirmation text.',
@@ -88,6 +100,33 @@ describe('desktop local data reset', () => {
     expect(existsSync(paths.dataDir)).toBe(true);
     expect(existsSync(paths.logDir)).toBe(true);
     expect(existsSync(paths.tempDir)).toBe(true);
+  });
+
+  it('deletes the protected credential key file with local app data', () => {
+    const root = makeTempDir();
+    const paths = makeRuntimePaths(root);
+    writeRuntimeFiles(paths);
+
+    const result = resetDesktopLocalData({ confirmation: desktopResetConfirmationText, paths });
+
+    expect(result.deletedPaths).toContain(paths.configDir);
+    expect(existsSync(paths.secretsMasterKeyPath)).toBe(false);
+  });
+
+  it('records missing app-owned paths without touching project folders', () => {
+    const root = makeTempDir();
+    const projectRoot = join(makeTempDir(), 'user-project');
+    const projectFile = join(projectRoot, 'README.md');
+    const paths = makeRuntimePaths(root);
+    mkdirSync(projectRoot, { recursive: true });
+    writeFileSync(projectFile, '# Project');
+
+    const result = resetDesktopLocalData({ confirmation: desktopResetConfirmationText, paths });
+
+    expect(result.deletedPaths).toEqual([]);
+    expect(result.missingPaths).toEqual(getDesktopLocalDataDeletionTargets(paths));
+    expect(result.preservedProjectFolders).toBe(true);
+    expect(existsSync(projectFile)).toBe(true);
   });
 
   it('requires the exact confirmation phrase before deleting anything', () => {

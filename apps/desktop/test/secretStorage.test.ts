@@ -65,6 +65,16 @@ describe('desktop secret storage', () => {
     expect(existsSync(filePath)).toBe(false);
   });
 
+  it('rejects malformed explicit environment master keys', async () => {
+    await expect(
+      ensureDesktopSecretsMasterKey({
+        env: { SECRETS_MASTER_KEY: Buffer.alloc(16, 7).toString('base64') },
+        filePath: join(makeTempDir(), 'config/secrets-master-key.json'),
+        protector: createProtector(),
+      }),
+    ).rejects.toThrow('SECRETS_MASTER_KEY must be base64 that decodes to exactly 32 bytes');
+  });
+
   it('creates and reuses an OS-protected desktop master key file', async () => {
     const filePath = join(makeTempDir(), 'config/secrets-master-key.json');
     const protector = createProtector();

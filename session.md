@@ -1661,3 +1661,30 @@ Tracked in Beads: `agent-platform-lt6`
   - `pnpm lint`
   - `pnpm build`
   - `pnpm test`
+
+## 2026-05-12 Electron Security `.6`
+
+- Task `agent-platform-electron-security.6` started on
+  `task/agent-platform-electron-security.6`.
+- Expanded desktop regression coverage for the completed Electron security/data lifecycle work:
+  - renderer navigation and webview guards now assert runtime prevention behavior,
+  - preload bridge tests cover the explicit maintenance IPC channel surface,
+  - local-data reset tests cover malformed payloads, missing app-owned paths, Project-folder
+    preservation, and protected credential key deletion,
+  - secret storage tests reject malformed explicit master keys.
+- Documented the current package-test coverage matrix and the remaining packaged Electron E2E gaps
+  in [Desktop Runtime](docs/desktop-runtime.md).
+- Focused verification passed:
+  - `pnpm --filter @agent-platform/desktop test -- test/windowConfig.test.ts test/preloadContract.test.ts test/ipcValidation.test.ts test/localDataReset.test.ts test/secretStorage.test.ts`
+- Local gates passed:
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop lint`
+  - `pnpm --filter @agent-platform/desktop test`
+  - `pnpm --filter @agent-platform/desktop smoke:backend`
+  - `pnpm docs:lint`
+  - `pnpm format:check`
+  - `git diff --check`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm build`
+  - `pnpm test`

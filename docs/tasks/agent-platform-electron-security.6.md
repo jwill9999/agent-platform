@@ -41,9 +41,36 @@ intact.
 
 ## Definition of done
 
-- [ ] Security regression tests cover renderer isolation and bridge exposure.
-- [ ] IPC validation failure paths are covered.
-- [ ] App data deletion tests prove Project folders are preserved.
-- [ ] Credential deletion behavior is covered.
-- [ ] Remaining packaged-app E2E gaps are documented.
+- [x] Security regression tests cover renderer isolation and bridge exposure.
+- [x] IPC validation failure paths are covered.
+- [x] App data deletion tests prove Project folders are preserved.
+- [x] Credential deletion behavior is covered.
+- [x] Remaining packaged-app E2E gaps are documented.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+
+## Implementation notes
+
+- Expanded desktop security regression coverage for:
+  - runtime navigation/webview guard behavior,
+  - explicit preload bridge API shape and scoped maintenance IPC channels,
+  - malformed local-data reset payloads,
+  - app-owned data reset when paths are missing,
+  - protected credential master-key deletion through local-data reset,
+  - malformed explicit secret master keys.
+- Documented the current package-test coverage matrix and the packaged Electron E2E gaps that
+  remain for release work in [Desktop Runtime](../desktop-runtime.md).
+
+## Verification notes
+
+- `pnpm --filter @agent-platform/desktop test -- test/windowConfig.test.ts test/preloadContract.test.ts test/ipcValidation.test.ts test/localDataReset.test.ts test/secretStorage.test.ts`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop test`
+- `pnpm --filter @agent-platform/desktop smoke:backend`
+- `pnpm docs:lint`
+- `pnpm format:check`
+- `git diff --check`
+- `pnpm typecheck`
+- `pnpm lint`
+- `pnpm build`
+- `pnpm test`

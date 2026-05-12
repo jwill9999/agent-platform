@@ -178,6 +178,27 @@ must eventually expose a supported cleanup/reset flow that removes:
 Cleanup must not delete user Project folders unless the user explicitly chooses a separate
 destructive action for those files.
 
+## Regression coverage
+
+The desktop foundation currently protects the security and data lifecycle boundary with package
+tests rather than packaged-app E2E:
+
+| Boundary              | Current regression coverage                                       |
+| --------------------- | ----------------------------------------------------------------- |
+| Renderer isolation    | `windowConfig.test.ts` covers sandboxed `BrowserWindow` defaults  |
+| Bridge exposure       | `preloadContract.test.ts` covers the explicit preload API shape   |
+| IPC validation        | `ipcValidation.test.ts` and reset request validation tests        |
+| App data deletion     | `localDataReset.test.ts` covers app data scope and Project safety |
+| Credential lifecycle  | `secretStorage.test.ts` and reset tests cover master-key removal  |
+| Managed backend paths | `runtimePaths.test.ts` and `backendSupervisor.test.ts`            |
+
+Later release work must add production-like packaged Electron E2E for:
+
+- the visible local-data reset UI once Settings exposes it,
+- native Project folder selection and reopen flows,
+- packaged app startup with the bundled backend/runtime strategy,
+- installer uninstall/reset behavior on macOS first, then Windows and Linux.
+
 ## Current limitations
 
 - macOS is the first supported desktop target.

@@ -88,6 +88,68 @@ describe('desktop window configuration', () => {
     expect(handlers.has('will-attach-webview')).toBe(true);
   });
 
+  it('prevents blocked navigation and webview attachment at runtime', () => {
+    const handlers = new Map<string, (...args: unknown[]) => void>();
+    const fakeWindow = {
+      webContents: {
+        on: (eventName: string, handler: (...args: unknown[]) => void) => {
+          handlers.set(eventName, handler);
+        },
+        setWindowOpenHandler: () => {},
+      },
+    };
+    const navigationEvent = {
+      prevented: false,
+      preventDefault() {
+        this.prevented = true;
+      },
+    };
+    const webviewEvent = {
+      prevented: false,
+      preventDefault() {
+        this.prevented = true;
+      },
+    };
+
+    applyRendererSecurity(
+      fakeWindow as Parameters<typeof applyRendererSecurity>[0],
+      'http://127.0.0.1:3456/',
+    );
+
+    handlers.get('will-navigate')?.(navigationEvent, 'https://example.com');
+    handlers.get('will-attach-webview')?.(webviewEvent);
+
+    expect(navigationEvent.prevented).toBe(true);
+    expect(webviewEvent.prevented).toBe(true);
+  });
+
+  it('allows same-origin renderer navigation without preventing it', () => {
+    const handlers = new Map<string, (...args: unknown[]) => void>();
+    const fakeWindow = {
+      webContents: {
+        on: (eventName: string, handler: (...args: unknown[]) => void) => {
+          handlers.set(eventName, handler);
+        },
+        setWindowOpenHandler: () => {},
+      },
+    };
+    const navigationEvent = {
+      prevented: false,
+      preventDefault() {
+        this.prevented = true;
+      },
+    };
+
+    applyRendererSecurity(
+      fakeWindow as Parameters<typeof applyRendererSecurity>[0],
+      'http://127.0.0.1:3456/',
+    );
+
+    handlers.get('will-navigate')?.(navigationEvent, 'http://127.0.0.1:3456/projects');
+
+    expect(navigationEvent.prevented).toBe(false);
+  });
+
   it('renders a minimal bootstrap shell until the web renderer is wired', () => {
     const html = buildBootstrapHtml();
 
