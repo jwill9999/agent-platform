@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import type { ProjectDesktopRecord } from '@agent-platform/contracts';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -14,6 +15,46 @@ import { RecentProjectsNavSection } from '@/components/layout/sidebar';
 beforeAll(() => {
   vi.stubGlobal('React', React);
 });
+
+function desktopProjectRecord(input: {
+  readonly id: string;
+  readonly name: string;
+  readonly folderName: string;
+  readonly available: boolean;
+}): ProjectDesktopRecord {
+  const slug = input.folderName;
+  return {
+    id: input.id,
+    slug,
+    name: input.name,
+    workspacePath: `projects/${slug}`,
+    metadata: {
+      source: 'desktop',
+      folderName: input.folderName,
+      capabilityState: input.available ? 'backend_accessible' : 'unavailable',
+      onboardingState: input.available ? 'approved' : 'missing',
+      defaultAgentProfile: 'coding',
+      instructionFileCount: input.available ? 1 : 0,
+    },
+    createdAtMs: 1,
+    updatedAtMs: input.available ? 2 : 1,
+  };
+}
+
+const recentDesktopProjectFixtures = [
+  desktopProjectRecord({
+    id: 'project-1',
+    name: 'Auth App',
+    folderName: 'auth-app',
+    available: true,
+  }),
+  desktopProjectRecord({
+    id: 'project-2',
+    name: 'Missing App',
+    folderName: 'missing-app',
+    available: false,
+  }),
+] as const;
 
 describe('Project onboarding assessment panel', () => {
   it('renders user-facing assessment status, gaps, and questions without runtime paths', () => {
@@ -200,40 +241,7 @@ describe('Project onboarding assessment panel', () => {
   it('renders recent desktop Projects without host paths and disables missing folders', () => {
     const html = renderToStaticMarkup(
       createElement(RecentDesktopProjectsPanel, {
-        projects: [
-          {
-            id: 'project-1',
-            slug: 'auth-app',
-            name: 'Auth App',
-            workspacePath: 'projects/auth-app',
-            metadata: {
-              source: 'desktop',
-              folderName: 'auth-app',
-              capabilityState: 'backend_accessible',
-              onboardingState: 'approved',
-              defaultAgentProfile: 'coding',
-              instructionFileCount: 1,
-            },
-            createdAtMs: 1,
-            updatedAtMs: 2,
-          },
-          {
-            id: 'project-2',
-            slug: 'missing-app',
-            name: 'Missing App',
-            workspacePath: 'projects/missing-app',
-            metadata: {
-              source: 'desktop',
-              folderName: 'missing-app',
-              capabilityState: 'unavailable',
-              onboardingState: 'missing',
-              defaultAgentProfile: 'coding',
-              instructionFileCount: 0,
-            },
-            createdAtMs: 1,
-            updatedAtMs: 1,
-          },
-        ],
+        projects: recentDesktopProjectFixtures,
         isLoading: false,
         onRefresh: () => {},
         onReopen: () => {},
@@ -252,40 +260,7 @@ describe('Project onboarding assessment panel', () => {
   it('renders recent Projects in the left navigation without host paths', () => {
     const html = renderToStaticMarkup(
       createElement(RecentProjectsNavSection, {
-        projects: [
-          {
-            id: 'project-1',
-            slug: 'auth-app',
-            name: 'Auth App',
-            workspacePath: 'projects/auth-app',
-            metadata: {
-              source: 'desktop',
-              folderName: 'auth-app',
-              capabilityState: 'backend_accessible',
-              onboardingState: 'approved',
-              defaultAgentProfile: 'coding',
-              instructionFileCount: 1,
-            },
-            createdAtMs: 1,
-            updatedAtMs: 2,
-          },
-          {
-            id: 'project-2',
-            slug: 'missing-app',
-            name: 'Missing App',
-            workspacePath: 'projects/missing-app',
-            metadata: {
-              source: 'desktop',
-              folderName: 'missing-app',
-              capabilityState: 'unavailable',
-              onboardingState: 'missing',
-              defaultAgentProfile: 'coding',
-              instructionFileCount: 0,
-            },
-            createdAtMs: 1,
-            updatedAtMs: 1,
-          },
-        ],
+        projects: recentDesktopProjectFixtures,
         isLoading: false,
         onRefresh: () => {},
       }),
