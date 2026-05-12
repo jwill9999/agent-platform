@@ -22,7 +22,12 @@ import {
   ensureDesktopRuntimeDirectories,
   resolveDesktopRuntimePathsFromApp,
 } from './runtimePaths.js';
-import { buildBootstrapHtml, createWindowOptions, getPreloadPath } from './windowConfig.js';
+import {
+  applyRendererSecurity,
+  buildBootstrapHtml,
+  createWindowOptions,
+  getPreloadPath,
+} from './windowConfig.js';
 
 const smokeMode = process.argv.includes('--smoke');
 let mainWindow: BrowserWindow | undefined;
@@ -31,11 +36,17 @@ let standaloneRenderer: StandaloneRendererHandle | undefined;
 
 export async function createMainWindow(): Promise<BrowserWindow> {
   const mainDir = dirname(fileURLToPath(import.meta.url));
-  const window = new BrowserWindow(createWindowOptions(getPreloadPath(mainDir)));
+  const window = new BrowserWindow(
+    createWindowOptions(getPreloadPath(mainDir), {
+      devTools: process.env.AGENT_PLATFORM_DESKTOP_DEVTOOLS === '1',
+    }),
+  );
   const rendererMode = resolveDesktopRendererMode(process.env);
+  const rendererUrl = await resolveRendererUrl(mainDir, rendererMode);
 
   mainWindow = window;
-  await window.loadURL(await resolveRendererUrl(mainDir, rendererMode));
+  applyRendererSecurity(window, rendererUrl);
+  await window.loadURL(rendererUrl);
 
   if (process.env.AGENT_PLATFORM_DESKTOP_DEVTOOLS === '1') {
     window.webContents.openDevTools({ mode: 'detach' });

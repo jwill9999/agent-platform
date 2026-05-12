@@ -1,11 +1,18 @@
-import type { BrowserWindowConstructorOptions } from 'electron';
+import type { BrowserWindow, BrowserWindowConstructorOptions } from 'electron';
 import { join } from 'node:path';
 
 export function getPreloadPath(mainDir: string): string {
   return join(mainDir, '../preload/preload.js');
 }
 
-export function createWindowOptions(preloadPath: string): BrowserWindowConstructorOptions {
+export interface WindowOptionsConfig {
+  readonly devTools?: boolean;
+}
+
+export function createWindowOptions(
+  preloadPath: string,
+  config: WindowOptionsConfig = {},
+): BrowserWindowConstructorOptions {
   return {
     width: 1280,
     height: 900,
@@ -15,11 +22,51 @@ export function createWindowOptions(preloadPath: string): BrowserWindowConstruct
     backgroundColor: '#050505',
     webPreferences: {
       preload: preloadPath,
+      devTools: config.devTools === true,
       contextIsolation: true,
       nodeIntegration: false,
+      nodeIntegrationInSubFrames: false,
+      nodeIntegrationInWorker: false,
       sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      webviewTag: false,
+      navigateOnDragDrop: false,
     },
   };
+}
+
+export function isAllowedRendererNavigation(candidateUrl: string, rendererUrl: string): boolean {
+  try {
+    const candidate = new URL(candidateUrl);
+    const renderer = new URL(rendererUrl);
+
+    if (renderer.protocol === 'data:') {
+      return candidate.href === renderer.href;
+    }
+
+    if (renderer.protocol === 'file:') {
+      return candidate.protocol === 'file:';
+    }
+
+    return candidate.origin === renderer.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function applyRendererSecurity(window: BrowserWindow, rendererUrl: string): void {
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  window.webContents.on('will-navigate', (event, navigationUrl) => {
+    if (!isAllowedRendererNavigation(navigationUrl, rendererUrl)) {
+      event.preventDefault();
+    }
+  });
+
+  window.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault();
+  });
 }
 
 export function buildBootstrapHtml(): string {
@@ -27,6 +74,10 @@ export function buildBootstrapHtml(): string {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; img-src 'self' data:; script-src 'none'; style-src 'unsafe-inline'"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Agent Platform</title>
     <style>

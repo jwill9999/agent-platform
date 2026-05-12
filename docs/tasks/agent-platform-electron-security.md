@@ -18,14 +18,14 @@ Lock down the Electron security boundary and define local data, secret, and dele
 - Add a supported local app data and credential deletion flow.
 - Ensure deletion never removes user-owned Project folders by default.
 
-## Proposed Task Chain
+## Task Chain
 
-1. Electron security hardening checklist.
-2. Preload bridge contract and IPC validation.
-3. SQLite app data migration.
-4. Secure secret storage spike.
-5. Local app data and credential deletion flow.
-6. Data lifecycle tests.
+1. `agent-platform-electron-security.1` — Audit and lock Electron security defaults.
+2. `agent-platform-electron-security.2` — Define preload bridge contract and IPC validation.
+3. `agent-platform-electron-security.3` — Move desktop SQLite/config usage to app data paths.
+4. `agent-platform-electron-security.4` — Implement secure secret storage strategy.
+5. `agent-platform-electron-security.5` — Add local app data and credential deletion flow.
+6. `agent-platform-electron-security.6` — Add data lifecycle and security regression tests.
 
 ## Dependencies
 

@@ -1508,7 +1508,7 @@ Tracked in Beads: `agent-platform-lt6`
 
 ## 2026-05-12 Electron Foundation `.5`
 
-- Task `agent-platform-electron-foundation.5` is in progress on
+- Task `agent-platform-electron-foundation.5` closed on
   `task/agent-platform-electron-foundation.5`.
 - Added `docs/desktop-runtime.md` to document the Docker versus Electron runtime split, current
   desktop commands, app data/log/config locations, troubleshooting, cleanup expectations, and
@@ -1518,3 +1518,33 @@ Tracked in Beads: `agent-platform-lt6`
 - PR #168 is clean: `verify`, `docker`, `e2e`, docs lint/link checks, GitGuardian, and SonarCloud
   all passed. Sonar reports 0 open issues. Sourcery was skipped due the account rate limit and
   posted no actionable code comments.
+
+## 2026-05-12 Electron Security `.1`
+
+- Created the six child tasks under `agent-platform-electron-security` and claimed
+  `agent-platform-electron-security.1`.
+- Task `.1` locks the baseline desktop window security posture before native Project access is
+  added.
+- Electron shell hardening added:
+  - explicit secure `BrowserWindow` web preferences,
+  - DevTools disabled unless `AGENT_PLATFORM_DESKTOP_DEVTOOLS=1`,
+  - renderer popup denial,
+  - top-level navigation constrained to the active renderer origin,
+  - webview attachment denial,
+  - restrictive CSP for the bootstrap data URL.
+- Local verification passed so far:
+  - `pnpm --filter @agent-platform/desktop test -- test/windowConfig.test.ts`
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop lint`
+  - `pnpm --filter @agent-platform/desktop test`
+  - `pnpm --filter @agent-platform/desktop build`
+  - `pnpm --filter @agent-platform/desktop smoke`
+  - `pnpm docs:lint`
+  - `pnpm format:check`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm build`
+  - `git diff --check`
+  - `pnpm test`
+- Remaining closeout for `.1`: commit, push, open PR, monitor CI/Sonar/review comments, then close
+  the Beads task only after the remote gates are clear.
