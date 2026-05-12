@@ -42,4 +42,4 @@ Project chat, slash command context, IDE handoff, and return navigation.
 - [x] Electron E2E covers Project chat default entry.
 - [x] Electron E2E covers slash command context in Project chat.
 - [x] Electron E2E covers IDE handoff and return navigation.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
