@@ -19,6 +19,14 @@ Define and implement the first desktop command execution boundary so agent tools
 
 Threat model: [Command Execution Threat Model](../design/command-execution-threat-model.md)
 
+Future runner research:
+[Future Command Runner Research](../design/future-command-runner-research.md)
+
+Recommended next stronger runner direction: keep the current Project-scoped host runner as the
+internal/private baseline, keep Docker as a development/CI and optional advanced runner, treat macOS
+App Sandbox as app hardening rather than the full command runner boundary, and prototype a
+lightweight local VM-backed `CommandRunner` adapter for the public macOS command execution path.
+
 ## Proposed Task Chain
 
 1. `agent-platform-electron-command-sandbox.1` — Command execution threat model.
@@ -63,3 +71,5 @@ Threat model: [Command Execution Threat Model](../design/command-execution-threa
 - Destructive commands are blocked or approval-gated.
 - Tool audit records allowed and denied operations.
 - Runner interface can support stronger sandbox implementations without rewriting chat/harness APIs.
+- Stronger runners can replace the `CommandRunner` delegate behind the existing Project policy
+  wrapper without rewriting chat, approval, audit, or harness APIs.
