@@ -1,4 +1,11 @@
-import type { ProjectDesktopRecord, ProjectRecord } from '@agent-platform/contracts';
+import type {
+  ProjectCapability,
+  ProjectDesktopRecord,
+  ProjectOnboardingAssessment,
+  ProjectProfile,
+  ProjectRecord,
+} from '@agent-platform/contracts';
+import { ProjectOnboardingAssessmentSchema } from '@agent-platform/contracts';
 import { Code2, MessageSquare, type LucideIcon } from 'lucide-react';
 
 export type WorkspaceSurface = 'home' | 'chat' | 'project-chat' | 'ide';
@@ -17,6 +24,17 @@ export interface WorkspaceNavigationItem {
   readonly href: string;
   readonly surface: WorkspaceSurface;
   readonly icon: LucideIcon;
+  readonly description: string;
+}
+
+export interface ProjectProfileDisplay {
+  readonly label: string;
+  readonly description: string;
+}
+
+export interface ProjectCapabilityDisplay {
+  readonly capability: ProjectCapability;
+  readonly label: string;
   readonly description: string;
 }
 
@@ -51,6 +69,76 @@ export const workspaceEntryCopy = {
 export const projectReopenSearchParam = 'projectId';
 export const sessionReopenSearchParam = 'sessionId';
 export const recentProjectsUpdatedEvent = 'agent-platform:desktop-projects-updated';
+
+const projectProfileDisplayByProfile: Record<ProjectProfile, ProjectProfileDisplay> = {
+  coding: {
+    label: 'Code project',
+    description: 'Files can be inspected with code-aware help when the Project allows it.',
+  },
+  docs_content: {
+    label: 'Docs/content project',
+    description: 'Files can be reviewed, summarized, and updated as content.',
+  },
+  research: {
+    label: 'Research project',
+    description: 'Research notes and reference files can be organized and summarized.',
+  },
+  automation: {
+    label: 'Automation project',
+    description: 'Automation files and schedules can be inspected before changes are made.',
+  },
+  mixed: {
+    label: 'Mixed project',
+    description: 'This Project may contain code, docs, automation, or other file types.',
+  },
+  unknown: {
+    label: 'Project',
+    description: 'Open the Project chat to describe what you want to do with these files.',
+  },
+};
+
+const projectCapabilityDisplayByCapability: Record<ProjectCapability, ProjectCapabilityDisplay> = {
+  files: {
+    capability: 'files',
+    label: 'Files',
+    description: 'Browse and reference Project files.',
+  },
+  chat: {
+    capability: 'chat',
+    label: 'Chat',
+    description: 'Discuss the Project with the assistant.',
+  },
+  coding_tools: {
+    capability: 'coding_tools',
+    label: 'Code tools',
+    description: 'Use code-aware editing and review tools when policy allows.',
+  },
+  terminal: {
+    capability: 'terminal',
+    label: 'Terminal',
+    description: 'Run Project commands when policy allows.',
+  },
+  git: {
+    capability: 'git',
+    label: 'Git',
+    description: 'Inspect repository state and branch information.',
+  },
+  tests: {
+    capability: 'tests',
+    label: 'Tests',
+    description: 'Run detected Project test commands.',
+  },
+  automation: {
+    capability: 'automation',
+    label: 'Automation',
+    description: 'Work with automation and scheduled-task files.',
+  },
+  docs_research: {
+    capability: 'docs_research',
+    label: 'Docs/research',
+    description: 'Summarize and improve documentation or research files.',
+  },
+};
 
 export function createWorkspaceNavigationState(input: {
   readonly surface: WorkspaceSurface;
@@ -108,6 +196,49 @@ export function desktopProjectFolderLabel(
 
 export function desktopProjectIsAvailable(project: ProjectDesktopRecord): boolean {
   return project.metadata.capabilityState !== 'unavailable';
+}
+
+export function projectOnboardingAssessmentFromMetadata(
+  project: { readonly metadata?: unknown } | null,
+): ProjectOnboardingAssessment | null {
+  const parsed = ProjectOnboardingAssessmentSchema.safeParse(
+    typeof project?.metadata === 'object' && project.metadata !== null
+      ? (project.metadata as { readonly onboardingAssessment?: unknown }).onboardingAssessment
+      : undefined,
+  );
+  return parsed.success ? parsed.data : null;
+}
+
+export function projectProfileDisplay(profile?: ProjectProfile | null): ProjectProfileDisplay {
+  return profile ? projectProfileDisplayByProfile[profile] : projectProfileDisplayByProfile.unknown;
+}
+
+export function projectDisplayProfile(
+  project: { readonly metadata?: unknown } | null,
+): ProjectProfileDisplay {
+  return projectProfileDisplay(projectOnboardingAssessmentFromMetadata(project)?.profile);
+}
+
+export function projectCapabilityDisplay(capability: ProjectCapability): ProjectCapabilityDisplay {
+  return projectCapabilityDisplayByCapability[capability];
+}
+
+export function projectCapabilityDisplays(
+  capabilities: readonly ProjectCapability[] | null | undefined,
+): ProjectCapabilityDisplay[] {
+  const uniqueCapabilities = new Set(capabilities ?? []);
+  return [...uniqueCapabilities].map(projectCapabilityDisplay);
+}
+
+export function projectCapabilitySummary(
+  capabilities: readonly ProjectCapability[] | null | undefined,
+  limit = 3,
+): string {
+  const labels = projectCapabilityDisplays(capabilities).map((capability) => capability.label);
+  if (labels.length === 0) return 'Files and chat';
+  const visible = labels.slice(0, limit);
+  const hiddenCount = labels.length - visible.length;
+  return hiddenCount > 0 ? `${visible.join(', ')} +${hiddenCount}` : visible.join(', ');
 }
 
 export function buildProjectIdeHref(projectId: string, sessionId?: string | null): string {

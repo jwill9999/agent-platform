@@ -24,6 +24,9 @@ import {
   buildProjectIdeHref,
   createWorkspaceNavigationState,
   desktopProjectIsAvailable,
+  projectCapabilitySummary,
+  projectDisplayProfile,
+  projectOnboardingAssessmentFromMetadata,
   projectReopenSearchParam,
   recentProjectsUpdatedEvent,
   sessionReopenSearchParam,
@@ -176,6 +179,9 @@ function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHead
     return null;
   }
 
+  const profile = projectDisplayProfile(project);
+  const assessment = projectOnboardingAssessmentFromMetadata(project);
+
   return (
     <div className="ml-auto flex min-w-0 items-center gap-3">
       <div className="min-w-0 text-right">
@@ -183,6 +189,9 @@ function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHead
           Project / Chat
         </div>
         <div className="truncate text-sm font-medium text-foreground">{project.name}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {profile.label} - {projectCapabilitySummary(assessment?.capabilities)}
+        </div>
       </div>
       <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onReturnHome}>
         Workspaces

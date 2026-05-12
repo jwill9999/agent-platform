@@ -98,7 +98,9 @@ describe('Project onboarding assessment panel', () => {
       }),
     );
 
-    expect(html).toContain('Mixed Project');
+    expect(html).toContain('Mixed project');
+    expect(html).toContain('Code tools');
+    expect(html).toContain('Docs/research');
     expect(html).toContain('Needs onboarding');
     expect(html).toContain('The root instructions need clearer project workflow rules.');
     expect(html).toContain('Should I draft updated root Project instructions?');
@@ -250,6 +252,7 @@ describe('Project onboarding assessment panel', () => {
 
     expect(html).toContain('Recent Projects');
     expect(html).toContain('Auth App');
+    expect(html).toContain('Project - Files and chat');
     expect(html).toContain('Ready to reopen');
     expect(html).toContain('Missing App');
     expect(html).toContain('Folder unavailable');

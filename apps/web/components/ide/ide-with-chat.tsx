@@ -16,7 +16,6 @@ import type {
   SessionRecord,
 } from '@agent-platform/contracts';
 import {
-  ProjectOnboardingAssessmentSchema,
   ProjectOnboardingDialogueSchema,
   ProjectOnboardingDraftSchema,
   ProjectInstructionUpdateCandidateSchema,
@@ -111,6 +110,11 @@ import {
   desktopProjectFolderLabel,
   desktopProjectIsAvailable,
   buildProjectChatHref,
+  projectCapabilityDisplays,
+  projectCapabilitySummary,
+  projectDisplayProfile,
+  projectOnboardingAssessmentFromMetadata,
+  projectProfileDisplay,
   projectReopenSearchParam,
   recentProjectsUpdatedEvent,
   sessionReopenSearchParam,
@@ -183,15 +187,6 @@ function hasInstructionUpdateReview(
   proposal: ProjectInstructionUpdateProposal | null,
 ): boolean {
   return candidates.length > 0 || proposal !== null;
-}
-
-function projectOnboardingAssessment(
-  project: ProjectRecord | null,
-): ProjectOnboardingAssessment | null {
-  const parsed = ProjectOnboardingAssessmentSchema.safeParse(
-    project?.metadata.onboardingAssessment,
-  );
-  return parsed.success ? parsed.data : null;
 }
 
 function projectOnboardingDraft(project: ProjectRecord | null): ProjectOnboardingDraft | null {
@@ -367,6 +362,8 @@ export function RecentDesktopProjectsPanel({
           {projects.slice(0, 6).map((project) => {
             const available = desktopProjectIsAvailable(project);
             const folderLabel = desktopProjectFolderLabel(project) ?? project.name;
+            const profile = projectDisplayProfile(project);
+            const assessment = projectOnboardingAssessmentFromMetadata(project);
             return (
               <button
                 key={project.id}
@@ -384,6 +381,9 @@ export function RecentDesktopProjectsPanel({
               >
                 <div className="truncate font-medium text-foreground">{project.name}</div>
                 <div className="mt-0.5 truncate text-muted-foreground">Folder: {folderLabel}</div>
+                <div className="mt-0.5 truncate text-muted-foreground">
+                  {profile.label} - {projectCapabilitySummary(assessment?.capabilities)}
+                </div>
                 <div
                   className={cn(
                     'mt-1 text-[11px]',
@@ -410,13 +410,14 @@ export function ProjectOnboardingAssessmentPanel({
   isRefreshing: boolean;
   onRefresh: () => void;
 }>) {
+  const profile = projectProfileDisplay(assessment.profile);
+  const capabilities = projectCapabilityDisplays(assessment.capabilities);
+
   return (
     <div className="rounded-md border border-border bg-background px-2 py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-medium text-foreground">
-            {assessment.display.profileLabel ?? 'Project assessment'}
-          </div>
+          <div className="truncate font-medium text-foreground">{profile.label}</div>
           <div className="text-muted-foreground">{assessment.display.onboardingLabel}</div>
         </div>
         <Button
@@ -432,6 +433,19 @@ export function ProjectOnboardingAssessmentPanel({
           <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden />
         </Button>
       </div>
+      {capabilities.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {capabilities.slice(0, 6).map((capability) => (
+            <span
+              key={capability.capability}
+              className="rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+              title={capability.description}
+            >
+              {capability.label}
+            </span>
+          ))}
+        </div>
+      )}
       <p className="mt-2 leading-snug">{assessment.summary}</p>
       {assessment.gaps.length > 0 && (
         <ul className="mt-2 space-y-1">
@@ -1855,7 +1869,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [contextFiles],
   );
   const onboardingState = projectOnboardingState(activeProject);
-  const onboardingAssessment = projectOnboardingAssessment(activeProject);
+  const onboardingAssessment = projectOnboardingAssessmentFromMetadata(activeProject);
+  const activeProjectProfile = projectDisplayProfile(activeProject);
+  const activeProjectCapabilities = projectCapabilityDisplays(onboardingAssessment?.capabilities);
   const onboardingDraft = projectOnboardingDraft(activeProject);
   const onboardingDialogue = projectOnboardingDialogue(activeProject);
   const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
@@ -2794,6 +2810,20 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           onboardingAssessment?.display.folderLabel ??
                           activeProject.name}
                       </div>
+                      <div className="truncate">{activeProjectProfile.label}</div>
+                      {activeProjectCapabilities.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {activeProjectCapabilities.slice(0, 6).map((capability) => (
+                            <span
+                              key={capability.capability}
+                              className="rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[11px]"
+                              title={capability.description}
+                            >
+                              {capability.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {activeProject.metadata.activeBranch && (
                         <div className="truncate">
                           Branch: {String(activeProject.metadata.activeBranch)}
