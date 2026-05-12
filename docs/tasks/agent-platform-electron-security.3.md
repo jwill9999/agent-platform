@@ -46,7 +46,7 @@ of repository-relative or Docker-specific locations.
 - [x] Docker runtime storage remains unchanged.
 - [x] First-run and migration assumptions are documented.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
@@ -79,3 +79,8 @@ of repository-relative or Docker-specific locations.
 - `pnpm lint`
 - `pnpm build`
 - `pnpm test`
+- PR #171 checks passed: `verify`, `docker`, `e2e`, `markdownlint`, `lychee`, GitGuardian, and
+  SonarCloud.
+- SonarCloud PR analysis reported 0 new issues and 0 security hotspots.
+- No inline PR review comments were posted. Sourcery skipped because the PR diff exceeded the
+  account review limit.
