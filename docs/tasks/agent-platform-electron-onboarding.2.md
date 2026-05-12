@@ -41,4 +41,4 @@ Project registered by the Electron Project open flow.
 - [x] `/init` sees a Project opened through Electron Project registration.
 - [x] Missing-Project output is clear and user-facing.
 - [x] No legacy folder-opening path can satisfy desktop `/init`.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
