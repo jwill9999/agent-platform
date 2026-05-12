@@ -1,6 +1,7 @@
 import {
   ProjectCreateBodySchema,
   ProjectDesktopRegistrationBodySchema,
+  ProjectDesktopRecentProjectsResultSchema,
   ProjectDesktopRegistrationResultSchema,
   type ProjectOpenBody,
   ProjectOpenBodySchema,
@@ -36,7 +37,14 @@ import { Router } from 'express';
 import type { Request } from 'express';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, isAbsolute, join, parse } from 'node:path';
 
 import { asyncHandler } from '../asyncHandler.js';
@@ -391,7 +399,22 @@ function openDesktopProject(
   };
 }
 
-function toDesktopRegistrationResult(project: ProjectRecord, created: boolean) {
+function desktopProjectCapabilityState(project: ProjectRecord) {
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  if (typeof backendProjectRoot !== 'string') return 'unavailable';
+  try {
+    return existsSync(backendProjectRoot) && statSync(backendProjectRoot).isDirectory()
+      ? 'backend_accessible'
+      : 'unavailable';
+  } catch {
+    return 'unavailable';
+  }
+}
+
+function toDesktopProjectRecord(
+  project: ProjectRecord,
+  capabilityState = desktopProjectCapabilityState(project),
+) {
   const onboardingState = metadataOnboardingState(project.metadata) ?? 'missing';
   const backendProjectRoot = project.metadata['backendProjectRoot'];
   const folderName =
@@ -404,22 +427,39 @@ function toDesktopRegistrationResult(project: ProjectRecord, created: boolean) {
       ? project.metadata['activeBranch']
       : undefined;
 
+  return {
+    ...project,
+    workspaceKey: undefined,
+    metadata: {
+      source: 'desktop',
+      folderName,
+      capabilityState,
+      onboardingState,
+      defaultAgentProfile: 'coding',
+      ...(activeBranch ? { activeBranch } : {}),
+      instructionFileCount: instructionFiles.length,
+    },
+  };
+}
+
+function toDesktopRegistrationResult(project: ProjectRecord, created: boolean) {
   return ProjectDesktopRegistrationResultSchema.parse({
     created,
-    project: {
-      ...project,
-      workspaceKey: undefined,
-      metadata: {
-        source: 'desktop',
-        folderName,
-        capabilityState: 'backend_accessible',
-        onboardingState,
-        defaultAgentProfile: 'coding',
-        ...(activeBranch ? { activeBranch } : {}),
-        instructionFileCount: instructionFiles.length,
-      },
-    },
+    project: toDesktopProjectRecord(project, 'backend_accessible'),
   });
+}
+
+function isDesktopProject(project: ProjectRecord): boolean {
+  return project.metadata['source'] === 'desktop';
+}
+
+function listRecentDesktopProjects(db: DrizzleDb) {
+  const projects = listProjects(db)
+    .filter(isDesktopProject)
+    .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
+    .map((project) => toDesktopProjectRecord(project));
+
+  return ProjectDesktopRecentProjectsResultSchema.parse({ projects });
 }
 
 function approveProjectOnboarding(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
@@ -796,6 +836,13 @@ export function createProjectsRouter(db: DrizzleDb): Router {
     asyncHandler(async (req, res) => {
       const query = ProjectQuerySchema.parse(req.query);
       res.json({ data: listProjects(db, query) });
+    }),
+  );
+
+  router.get(
+    '/desktop/recent',
+    asyncHandler(async (_req, res) => {
+      res.json({ data: listRecentDesktopProjects(db) });
     }),
   );
 

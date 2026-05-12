@@ -52,6 +52,8 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `GET /v1/sessions`                         |    ✅    |       ✅        | Sessions page                                |
 | `POST /v1/sessions`                        |    ✅    |       ✅        | Home page, IDE chat                          |
 | `POST /v1/sessions/project`                |    —     |       ✅        | Create/resume a Project-bound session        |
+| `GET /v1/projects/desktop/recent`          |    ✅    |       ✅        | Recent desktop Projects without host paths   |
+| `POST /v1/projects/desktop/register`       |    ✅    |       ✅        | Trusted desktop Project registration         |
 | `GET /v1/skills`                           |    ✅    |       ✅        | Skills dashboard, agent editor               |
 | `POST /v1/skills`                          |    ✅    |       ✅        | Skills dashboard                             |
 | `PUT /v1/skills/:id`                       |    ✅    |       ✅        | Skills dashboard                             |
@@ -336,6 +338,23 @@ Saved LLM provider configurations with securely stored API keys. Assigned to age
 On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 
 > **Security:** `SECRETS_MASTER_KEY` must be set to store or use API keys in model configs. Keys are encrypted with AES-256-GCM and never appear in API responses or logs.
+
+### Projects
+
+| Method | Path                            | Description                             |
+| ------ | ------------------------------- | --------------------------------------- |
+| `GET`  | `/v1/projects/desktop/recent`   | List recent desktop Projects            |
+| `POST` | `/v1/projects/desktop/register` | Register a trusted desktop Project path |
+
+`GET /v1/projects/desktop/recent` returns `{ "data": { "projects": ProjectDesktopRecord[] } }`.
+Records include Project names, safe folder labels, onboarding state, and capability state. They do
+not include `workspaceKey` or absolute host paths. A moved or missing folder is returned with
+`metadata.capabilityState: "unavailable"` so the UI can show a clear reopen state without exposing
+the stored path.
+
+`POST /v1/projects/desktop/register` is only for the desktop bridge. It requires
+`x-agent-platform-desktop-bridge: 1`, accepts `{ "path": "/absolute/host/folder", "name": "..." }`,
+persists the real path internally, and returns a safe `ProjectDesktopRegistrationResult`.
 
 ### Sessions
 

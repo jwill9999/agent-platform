@@ -240,6 +240,57 @@ describe('projectsRouter', () => {
     });
   });
 
+  it('lists recent desktop projects with safe labels and unavailable state for moved folders', async () => {
+    const firstRepo = path.join(tmpDir, 'desktop-recent-first');
+    const secondRepo = path.join(tmpDir, 'desktop-recent-second');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', firstRepo], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', secondRepo], { stdio: 'ignore' });
+    writeFileSync(path.join(firstRepo, 'README.md'), 'first desktop project\n');
+    writeFileSync(path.join(secondRepo, 'README.md'), 'second desktop project\n');
+    const firstRealPath = realpathSync(firstRepo);
+    const secondRealPath = realpathSync(secondRepo);
+
+    const first = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: firstRepo, name: 'First Desktop Project' })
+      .expect(201);
+    const second = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: secondRepo, name: 'Second Desktop Project' })
+      .expect(201);
+
+    rmSync(firstRepo, { recursive: true, force: true });
+
+    const recent = await request(app).get('/v1/projects/desktop/recent').expect(200);
+    expect(recent.body.data.projects.map((project: { id: string }) => project.id)).toEqual([
+      second.body.data.project.id,
+      first.body.data.project.id,
+    ]);
+    expect(recent.body.data.projects).toEqual([
+      expect.objectContaining({
+        id: second.body.data.project.id,
+        metadata: expect.objectContaining({
+          source: 'desktop',
+          folderName: 'desktop-recent-second',
+          capabilityState: 'backend_accessible',
+        }),
+      }),
+      expect.objectContaining({
+        id: first.body.data.project.id,
+        metadata: expect.objectContaining({
+          source: 'desktop',
+          folderName: 'desktop-recent-first',
+          capabilityState: 'unavailable',
+        }),
+      }),
+    ]);
+    expect(recent.body.data.projects[0]).not.toHaveProperty('workspaceKey');
+    expect(JSON.stringify(recent.body.data)).not.toContain(firstRealPath);
+    expect(JSON.stringify(recent.body.data)).not.toContain(secondRealPath);
+  });
+
   it('rejects desktop project registration without the desktop bridge or inspectable folder', async () => {
     await request(app)
       .post('/v1/projects/desktop/register')

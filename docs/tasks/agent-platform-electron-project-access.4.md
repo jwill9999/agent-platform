@@ -27,6 +27,18 @@ Show desktop Projects the user can reopen from stored Project metadata.
 4. Add tests for list ordering, missing folder state, and reopen behavior.
 5. Update user-facing copy to avoid implementation paths.
 
+## Implementation notes
+
+- Recent desktop Projects use `GET /v1/projects/desktop/recent`.
+- The response returns safe desktop Project records only: Project name, safe folder label,
+  onboarding state, capability state, and instruction count.
+- The recent list omits `workspaceKey` and absolute host paths. Missing or moved folders are
+  reported as `metadata.capabilityState: "unavailable"` rather than exposing the stored path.
+- The IDE uses the Electron preload bridge for native folder selection, then calls trusted desktop
+  registration and binds chat through `POST /v1/sessions/project`.
+- Backend-backed file tree and file reads remain owned by
+  `agent-platform-electron-project-access.5`.
+
 ## Dependency order
 
 | Upstream                                   | Downstream                                 |

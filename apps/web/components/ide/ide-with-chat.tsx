@@ -8,8 +8,11 @@ import type {
   ProjectOnboardingDraft,
   ProjectInstructionUpdateCandidate,
   ProjectInstructionUpdateProposal,
+  ProjectDesktopRecentProjectsResult,
+  ProjectDesktopRecord,
+  ProjectDesktopRegistrationResult,
   ProjectRecord,
-  SessionRecord,
+  SessionProjectBindingResult,
 } from '@agent-platform/contracts';
 import {
   ProjectOnboardingAssessmentSchema,
@@ -105,6 +108,27 @@ import {
 } from '@/lib/code-workbench-branch-summary';
 
 type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
+
+interface DesktopSelectedProjectFolder {
+  readonly path: string;
+  readonly name: string;
+}
+
+type DesktopProjectFolderSelectionResult =
+  | { readonly canceled: true }
+  | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
+
+interface DesktopProjectBridge {
+  readonly projects?: {
+    readonly selectFolder?: () => Promise<DesktopProjectFolderSelectionResult>;
+  };
+}
+
+function getDesktopProjectBridge(): DesktopProjectBridge | undefined {
+  if (globalThis.window === undefined) return undefined;
+  return (globalThis as typeof globalThis & { agentPlatformDesktop?: DesktopProjectBridge })
+    .agentPlatformDesktop;
+}
 
 export function buildIdeChatMessage(input: {
   userLine: string;
@@ -218,6 +242,25 @@ function projectOnboardingLabel(state: ProjectOnboardingState): string {
   }
 }
 
+function desktopProjectFolderLabel(
+  project: ProjectDesktopRecord | ProjectRecord | null,
+): string | null {
+  const folderName = project?.metadata.folderName;
+  return typeof folderName === 'string' && folderName.trim() ? folderName : null;
+}
+
+function desktopProjectIsAvailable(project: ProjectDesktopRecord): boolean {
+  return project.metadata.capabilityState !== 'unavailable';
+}
+
+function desktopProjectOpenButtonLabel(options: {
+  isOpening: boolean;
+  hasActiveProject: boolean;
+}): string {
+  if (options.isOpening) return 'Opening...';
+  return options.hasActiveProject ? 'Change Project' : 'Open Project';
+}
+
 // ---------------------------------------------------------------------------
 // Small presentational components
 // ---------------------------------------------------------------------------
@@ -273,6 +316,80 @@ function ContentActivityBlocks({
         />
       ))}
     </>
+  );
+}
+
+export function RecentDesktopProjectsPanel({
+  projects,
+  isLoading,
+  onRefresh,
+  onReopen,
+}: Readonly<{
+  projects: readonly ProjectDesktopRecord[];
+  isLoading: boolean;
+  onRefresh: () => void;
+  onReopen: (project: ProjectDesktopRecord) => void;
+}>) {
+  return (
+    <div className="mt-3 rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Recent Projects
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {projects.length === 0 ? 'No recent Projects' : `${projects.length} available`}
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0"
+          aria-label="Refresh recent Projects"
+          title="Refresh recent Projects"
+          onClick={onRefresh}
+          disabled={isLoading}
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} aria-hidden />
+        </Button>
+      </div>
+      {projects.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {projects.slice(0, 6).map((project) => {
+            const available = desktopProjectIsAvailable(project);
+            const folderLabel = desktopProjectFolderLabel(project) ?? project.name;
+            return (
+              <button
+                key={project.id}
+                type="button"
+                className={cn(
+                  'w-full rounded-md border px-2 py-2 text-left text-xs transition-colors',
+                  available
+                    ? 'border-border bg-card/50 hover:bg-muted/60'
+                    : 'border-amber-500/30 bg-amber-500/10 cursor-not-allowed',
+                )}
+                onClick={() => {
+                  onReopen(project);
+                }}
+                disabled={!available}
+              >
+                <div className="truncate font-medium text-foreground">{project.name}</div>
+                <div className="mt-0.5 truncate text-muted-foreground">Folder: {folderLabel}</div>
+                <div
+                  className={cn(
+                    'mt-1 text-[11px]',
+                    available ? 'text-emerald-600' : 'text-amber-700 dark:text-amber-300',
+                  )}
+                >
+                  {available ? 'Ready to reopen' : 'Folder unavailable'}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1639,6 +1756,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [pathInput, setPathInput] = useState('');
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
+  const [recentDesktopProjects, setRecentDesktopProjects] = useState<ProjectDesktopRecord[]>([]);
+  const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(false);
+  const [isOpeningDesktopProject, setIsOpeningDesktopProject] = useState(false);
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
   const [isAssessingProject, setIsAssessingProject] = useState(false);
@@ -1699,6 +1819,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const onboardingDialogue = projectOnboardingDialogue(activeProject);
   const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
   const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
+  const projectFolderLabel = desktopProjectFolderLabel(activeProject);
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
@@ -1740,15 +1861,81 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     })();
   }, []);
 
+  const loadRecentDesktopProjects = useCallback(async () => {
+    setIsLoadingRecentProjects(true);
+    try {
+      const result = await apiGet<ProjectDesktopRecentProjectsResult>(
+        apiPath('projects', 'desktop', 'recent'),
+      );
+      setRecentDesktopProjects(result?.projects ?? []);
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : 'Failed to load recent Projects');
+    } finally {
+      setIsLoadingRecentProjects(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRecentDesktopProjects().catch(() => {});
+  }, [loadRecentDesktopProjects]);
+
+  const reopenDesktopProject = useCallback((project: ProjectDesktopRecord) => {
+    if (!desktopProjectIsAvailable(project)) {
+      const message = 'This Project folder could not be found. Open it again from your system.';
+      setProjectOpenError(message);
+      toast.error(message);
+      return;
+    }
+    setActiveProject(project);
+    setProjectOpenError(null);
+    setOpenTabs([]);
+    setActiveTab(null);
+    setContextFiles([]);
+    setEditProposal(null);
+  }, []);
+
+  const handleOpenDesktopProject = useCallback(async () => {
+    const bridge = getDesktopProjectBridge();
+    const selectFolder = bridge?.projects?.selectFolder;
+    if (!selectFolder) {
+      const message = 'Project opening is available in the desktop app.';
+      setProjectOpenError(message);
+      toast.error(message);
+      return;
+    }
+
+    setIsOpeningDesktopProject(true);
+    setProjectOpenError(null);
+    try {
+      const selection = await selectFolder();
+      if (selection.canceled) return;
+      const result = await apiPost<ProjectDesktopRegistrationResult>(
+        apiPath('projects', 'desktop', 'register'),
+        { path: selection.folder.path, name: selection.folder.name },
+        { headers: { 'x-agent-platform-desktop-bridge': '1' } },
+      );
+      if (!result) throw new ApiRequestError('Failed to open Project', 500);
+      reopenDesktopProject(result.project);
+      await loadRecentDesktopProjects();
+      toast.success(result.created ? 'Project opened' : 'Project reopened');
+    } catch (e) {
+      const message = e instanceof ApiRequestError ? e.message : 'Failed to open Project';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsOpeningDesktopProject(false);
+    }
+  }, [loadRecentDesktopProjects, reopenDesktopProject]);
+
   useEffect(() => {
     if (!selectedAgentId || !activeProject?.id) return;
     void (async () => {
       try {
-        const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+        const result = await apiPost<SessionProjectBindingResult>(apiPath('sessions', 'project'), {
           agentId: selectedAgentId,
-          mode: 'project',
           projectId: activeProject.id,
         });
+        const session = result?.session;
         if (session?.id) {
           setSessionId(session.id);
         } else {
@@ -2338,7 +2525,9 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   </div>
                 </div>
                 <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between gap-2 min-w-0">
-                  <span className="truncate">{fs.rootName ?? 'Explorer'}</span>
+                  <span className="truncate">
+                    {projectFolderLabel ?? fs.rootName ?? 'Explorer'}
+                  </span>
                   <div className="flex items-center gap-1 shrink-0">
                     {fs.isDirectoryOpen && filteredFileTree.length > 0 && !fs.isLoading && (
                       <Button
@@ -2372,22 +2561,41 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                       Project
                     </span>
                     {activeProject ? (
-                      <span className="text-xs text-emerald-600">Available</span>
+                      <span className="text-xs text-emerald-600">Open</span>
                     ) : (
                       <span className="text-xs text-muted-foreground">Desktop required</span>
                     )}
                   </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={activeProject ? 'secondary' : 'outline'}
+                    className="mb-2 w-full gap-2"
+                    onClick={() => {
+                      handleOpenDesktopProject().catch(() => {});
+                    }}
+                    disabled={isOpeningDesktopProject}
+                  >
+                    <FolderOpen className="h-4 w-4" aria-hidden="true" />
+                    {desktopProjectOpenButtonLabel({
+                      isOpening: isOpeningDesktopProject,
+                      hasActiveProject: Boolean(activeProject),
+                    })}
+                  </Button>
                   {!activeProject && (
                     <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-xs leading-snug text-muted-foreground">
-                      Project opening is parked in the web preview. The desktop app will use your
-                      system folder picker so the agent can work with the selected folder.
+                      Use the desktop app to choose a folder with your system picker. Recent
+                      Projects can be reopened below.
                     </div>
                   )}
                   {activeProject && (
                     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                       <div className="truncate text-foreground">{activeProject.name}</div>
                       <div className="truncate">
-                        Folder: {onboardingAssessment?.display.folderLabel ?? activeProject.name}
+                        Folder:{' '}
+                        {projectFolderLabel ??
+                          onboardingAssessment?.display.folderLabel ??
+                          activeProject.name}
                       </div>
                       {activeProject.metadata.activeBranch && (
                         <div className="truncate">
@@ -2509,6 +2717,14 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   {projectOpenError && (
                     <p className="mt-2 text-xs text-destructive">{projectOpenError}</p>
                   )}
+                  <RecentDesktopProjectsPanel
+                    projects={recentDesktopProjects}
+                    isLoading={isLoadingRecentProjects}
+                    onRefresh={() => {
+                      loadRecentDesktopProjects().catch(() => {});
+                    }}
+                    onReopen={reopenDesktopProject}
+                  />
                 </div>
                 {fs.needsFolderReconnect && (
                   <div className="mx-2 mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
@@ -2610,7 +2826,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
               <>
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={30} minSize={15} maxSize={60}>
-                  <Terminal sessionId={sessionId} explorerFolderOpen={fs.isDirectoryOpen} />
+                  <Terminal
+                    sessionId={sessionId}
+                    explorerFolderOpen={fs.isDirectoryOpen || Boolean(activeProject)}
+                  />
                 </ResizablePanel>
               </>
             )}

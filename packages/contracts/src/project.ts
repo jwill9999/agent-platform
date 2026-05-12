@@ -499,6 +499,13 @@ export type ProjectDesktopRegistrationResult = z.infer<
   typeof ProjectDesktopRegistrationResultSchema
 >;
 
+export const ProjectDesktopRecentProjectsResultSchema = z.object({
+  projects: ProjectDesktopRecordSchema.array(),
+});
+export type ProjectDesktopRecentProjectsResult = z.infer<
+  typeof ProjectDesktopRecentProjectsResultSchema
+>;
+
 export const ProjectQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false),
 });

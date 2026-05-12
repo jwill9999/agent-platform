@@ -7,6 +7,7 @@ import {
   ProjectInstructionUpdatesPanel,
   ProjectOnboardingAssessmentPanel,
   ProjectOnboardingDraftPanel,
+  RecentDesktopProjectsPanel,
 } from '@/components/ide/ide-with-chat';
 
 beforeAll(() => {
@@ -164,6 +165,58 @@ describe('Project onboarding assessment panel', () => {
     expect(html).toContain('Focused API tests: pnpm --filter @agent-platform/api test');
     expect(html).toContain('Apply');
     expect(html).toContain('Reject');
+    expect(html).not.toContain('/workspace');
+  });
+
+  it('renders recent desktop Projects without host paths and disables missing folders', () => {
+    const html = renderToStaticMarkup(
+      createElement(RecentDesktopProjectsPanel, {
+        projects: [
+          {
+            id: 'project-1',
+            slug: 'auth-app',
+            name: 'Auth App',
+            workspacePath: 'projects/auth-app',
+            metadata: {
+              source: 'desktop',
+              folderName: 'auth-app',
+              capabilityState: 'backend_accessible',
+              onboardingState: 'approved',
+              defaultAgentProfile: 'coding',
+              instructionFileCount: 1,
+            },
+            createdAtMs: 1,
+            updatedAtMs: 2,
+          },
+          {
+            id: 'project-2',
+            slug: 'missing-app',
+            name: 'Missing App',
+            workspacePath: 'projects/missing-app',
+            metadata: {
+              source: 'desktop',
+              folderName: 'missing-app',
+              capabilityState: 'unavailable',
+              onboardingState: 'missing',
+              defaultAgentProfile: 'coding',
+              instructionFileCount: 0,
+            },
+            createdAtMs: 1,
+            updatedAtMs: 1,
+          },
+        ],
+        isLoading: false,
+        onRefresh: () => {},
+        onReopen: () => {},
+      }),
+    );
+
+    expect(html).toContain('Recent Projects');
+    expect(html).toContain('Auth App');
+    expect(html).toContain('Ready to reopen');
+    expect(html).toContain('Missing App');
+    expect(html).toContain('Folder unavailable');
+    expect(html).not.toContain('/Users/');
     expect(html).not.toContain('/workspace');
   });
 });
