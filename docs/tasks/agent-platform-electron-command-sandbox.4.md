@@ -48,4 +48,4 @@ Connect command runner decisions to the existing approval and tool audit feedbac
 - [x] Audit records capture allowed, denied, approval-required, approved, rejected, and failed command outcomes.
 - [x] Audit payloads are bounded and avoid secrets.
 - [x] Denied commands do not create misleading successful tool output.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
