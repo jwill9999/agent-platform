@@ -43,12 +43,12 @@ Render file trees and file content from the backend-bound Project root rather th
 
 ## Definition of done
 
-- [ ] File tree is loaded from the backend-bound Project root.
-- [ ] File reads are restricted to the Project root.
-- [ ] UI displays Project-relative paths.
-- [ ] Binary/large-file safeguards remain in place.
-- [ ] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] File tree is loaded from the backend-bound Project root.
+- [x] File reads are restricted to the Project root.
+- [x] UI displays Project-relative paths.
+- [x] Binary/large-file safeguards remain in place.
+- [x] Relevant tests and root gates pass.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
@@ -61,3 +61,9 @@ Render file trees and file content from the backend-bound Project root rather th
   binary detection.
 - The IDE explorer prefers backend Project file data when a desktop Project is active; browser file
   handles remain parked for the product IDE.
+- PR #179 targets `feature/agent-platform-project-onboarding`.
+- CI passed on the latest pushed head: `verify`, `docker`, `e2e`, docs `markdownlint`/`lychee`,
+  GitGuardian, and SonarCloud.
+- SonarCloud initially reported 3 new issues; the follow-up commits resolved them, and the latest
+  analysis reports 0 new open issues and 0 security hotspots.
+- No inline PR review comments were present. Sourcery skipped on this cumulative branch.
