@@ -67,7 +67,7 @@ test.describe('Electron Project access', () => {
       await page.getByRole('button', { name: 'Open Project' }).click();
 
       await expect(page.getByText('electron-e2e-project').first()).toBeVisible();
-      await expect(page.getByText('Project chat')).toBeVisible();
+      await expect(page.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
@@ -109,6 +109,19 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('hello from electron project')).toBeVisible();
       await expect(page.getByText('docs/guide.md')).toBeVisible();
       await expect(page.getByText(projectDir)).toHaveCount(0);
+      await expect(page.getByRole('link', { name: /Project .* IDE/ })).toHaveAttribute(
+        'href',
+        `/?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(session.id)}`,
+      );
+      await page.getByRole('link', { name: /Project .* IDE/ }).click();
+      await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page.getByText('Project / Chat')).toBeVisible();
+      await expect(page.getByText('electron-e2e-project').first()).toBeVisible();
+      await page.getByRole('link', { name: 'Open IDE' }).click();
+      await page.waitForURL(/\/ide/);
+      await expect(
+        page.getByLabel('Project binding').getByText('electron-e2e-project').first(),
+      ).toBeVisible();
 
       await sendChatMessage(page, '/help', 'Ask about your code...');
       await expect(page.getByText('Available slash commands:')).toBeVisible();

@@ -26,6 +26,7 @@ import {
   desktopProjectIsAvailable,
   projectReopenSearchParam,
   recentProjectsUpdatedEvent,
+  sessionReopenSearchParam,
   workspaceEntryCopy,
 } from '@/lib/project-navigation';
 import {
@@ -49,6 +50,7 @@ type ErrorBannerProps = Readonly<{
 type ProjectChatHeaderProps = Readonly<{
   project: ProjectDesktopRecord | null;
   sessionId: string | null;
+  onReturnHome: () => void;
 }>;
 
 function getInputStatusText(
@@ -104,7 +106,9 @@ function HomeEntryScreen({
                 {workspaceEntryCopy.chatDescription}
               </span>
             </span>
-            <span className="text-sm font-medium text-primary">{workspaceEntryCopy.chatProfile}</span>
+            <span className="text-sm font-medium text-primary">
+              {workspaceEntryCopy.chatProfile}
+            </span>
           </button>
           {isDesktopProjectBridgeAvailable ? (
             <button
@@ -152,10 +156,7 @@ function HomeEntryScreen({
   );
 }
 
-function ErrorBanner({
-  message,
-  onDismiss,
-}: ErrorBannerProps) {
+function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
   if (!message) {
     return null;
   }
@@ -170,10 +171,7 @@ function ErrorBanner({
   );
 }
 
-function ProjectChatHeader({
-  project,
-  sessionId,
-}: ProjectChatHeaderProps) {
+function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHeaderProps) {
   if (!project) {
     return null;
   }
@@ -181,9 +179,14 @@ function ProjectChatHeader({
   return (
     <div className="ml-auto flex min-w-0 items-center gap-3">
       <div className="min-w-0 text-right">
+        <div className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
+          Project / Chat
+        </div>
         <div className="truncate text-sm font-medium text-foreground">{project.name}</div>
-        <div className="truncate text-xs text-muted-foreground">Project chat</div>
       </div>
+      <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onReturnHome}>
+        Workspaces
+      </Button>
       <Button asChild size="sm" variant="outline" className="shrink-0">
         <Link href={buildProjectIdeHref(project.id, sessionId)}>Open IDE</Link>
       </Button>
@@ -337,6 +340,15 @@ export default function HomePage() {
     }
   }, [agents, modelConfigs]);
 
+  const handleReturnHome = useCallback(() => {
+    setSelectedMode(null);
+    setActiveProject(null);
+    setSessionId(null);
+    setSensorDashboard(null);
+    setSessionError(null);
+    setIsResuming(false);
+  }, []);
+
   const bindActiveProjectSession = useCallback(
     async (agentId: string, projectId: string) => {
       setSessionError(null);
@@ -355,7 +367,9 @@ export default function HomePage() {
         setSessionId(session.id);
         await refreshSensors(session.id);
       } catch (error) {
-        setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to open Project chat');
+        setSessionError(
+          error instanceof ApiRequestError ? error.message : 'Failed to open Project chat',
+        );
         setSessionId(null);
         setSensorDashboard(null);
       }
@@ -416,6 +430,7 @@ export default function HomePage() {
     if (selectedMode === 'project-chat' && activeProject) return;
     const params = new URLSearchParams(globalThis.window.location.search);
     const projectId = params.get(projectReopenSearchParam);
+    const requestedSessionId = params.get(sessionReopenSearchParam);
     if (!projectId) return;
     if (attemptedProjectReopenIdRef.current === projectId) return;
     attemptedProjectReopenIdRef.current = projectId;
@@ -428,12 +443,37 @@ export default function HomePage() {
           setSessionError('This recent Project is no longer available. Open it again.');
           return;
         }
-        openProjectChat(project);
+        const agentId = openProjectChat(project);
+        if (requestedSessionId) {
+          const session = await apiGet<SessionRecord>(apiPath('sessions', requestedSessionId));
+          if (session?.mode === 'project' && session.projectId === project.id) {
+            setSelectedAgentId(session.agentId);
+            setSelectedModelConfigId(
+              resolveChatModelConfigId(session.agentId, agents, modelConfigs),
+            );
+            setSessionId(session.id);
+            await refreshSensors(session.id);
+            return;
+          }
+        }
+        if (agentId) {
+          await bindActiveProjectSession(agentId, project.id);
+        }
       } catch (error) {
-        setSessionError(error instanceof ApiRequestError ? error.message : 'Failed to reopen Project');
+        setSessionError(
+          error instanceof ApiRequestError ? error.message : 'Failed to reopen Project',
+        );
       }
     })();
-  }, [activeProject, openProjectChat, selectedMode]);
+  }, [
+    activeProject,
+    agents,
+    bindActiveProjectSession,
+    modelConfigs,
+    openProjectChat,
+    refreshSensors,
+    selectedMode,
+  ]);
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {
@@ -542,7 +582,11 @@ export default function HomePage() {
             disabled={isLoading}
           />
           {selectedMode === 'project-chat' && (
-            <ProjectChatHeader project={activeProject} sessionId={sessionId} />
+            <ProjectChatHeader
+              project={activeProject}
+              sessionId={sessionId}
+              onReturnHome={handleReturnHome}
+            />
           )}
         </div>
         <div className="flex-1 flex flex-col min-h-0">

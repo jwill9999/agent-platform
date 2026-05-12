@@ -36,7 +36,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
 
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(projectName).first()).toBeVisible();
-      await expect(page.getByText('Project chat', { exact: true })).toBeVisible();
+      await expect(page.getByText('Project / Chat', { exact: true })).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page.getByText(backendProjectRoot)).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
@@ -49,6 +49,14 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await page.waitForURL(/\/ide/);
       await expect(page.getByLabel('Project binding').getByText(projectName).first()).toBeVisible();
       await expect(page.getByText('guide.md')).toBeVisible();
+      await expect(page.getByRole('link', { name: /Project .* IDE/ })).toHaveAttribute(
+        'href',
+        /\/\?projectId=.*&sessionId=.+/,
+      );
+      await page.getByRole('link', { name: /Project .* IDE/ }).click();
+      await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page.getByText(projectName).first()).toBeVisible();
+      await expect(page.getByText('Project / Chat', { exact: true })).toBeVisible();
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });
     }
@@ -133,8 +141,14 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await expect(page.getByText(backendProjectRoot)).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
 
-      await page.getByText('guide.md').click();
-      await expect(page.getByText('hello from desktop project')).toBeVisible();
+      await expect(async () => {
+        const guideFile = page.getByRole('button', { name: /^guide\.md$/ }).first();
+        await expect(guideFile).toBeVisible();
+        await guideFile.click();
+        await expect(page.getByText('hello from desktop project')).toBeVisible({
+          timeout: 1_000,
+        });
+      }).toPass({ timeout: 10_000 });
       await expect(page.getByText('docs/guide.md')).toBeVisible();
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });

@@ -118,6 +118,10 @@ export function buildProjectIdeHref(projectId: string, sessionId?: string | null
   return `/ide?${params.join('&')}`;
 }
 
-export function buildProjectChatHref(projectId: string): string {
-  return `/?${projectReopenSearchParam}=${encodeURIComponent(projectId)}`;
+export function buildProjectChatHref(projectId: string, sessionId?: string | null): string {
+  const params = [`${projectReopenSearchParam}=${encodeURIComponent(projectId)}`];
+  if (sessionId) {
+    params.push(`${sessionReopenSearchParam}=${encodeURIComponent(sessionId)}`);
+  }
+  return `/?${params.join('&')}`;
 }

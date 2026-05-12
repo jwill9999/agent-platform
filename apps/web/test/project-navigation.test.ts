@@ -71,6 +71,9 @@ describe('Project navigation model', () => {
     expect(projectReopenSearchParam).toBe('projectId');
     expect(sessionReopenSearchParam).toBe('sessionId');
     expect(buildProjectChatHref(project.id)).toBe('/?projectId=project%201');
+    expect(buildProjectChatHref(project.id, 'session 1')).toBe(
+      '/?projectId=project%201&sessionId=session%201',
+    );
     expect(buildProjectIdeHref(project.id)).toBe('/ide?projectId=project%201');
     expect(buildProjectIdeHref(project.id, 'session 1')).toBe(
       '/ide?projectId=project%201&sessionId=session%201',

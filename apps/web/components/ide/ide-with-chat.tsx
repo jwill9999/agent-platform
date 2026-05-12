@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import type {
   Agent,
   ProjectOnboardingAssessment,
@@ -109,6 +110,7 @@ import {
 import {
   desktopProjectFolderLabel,
   desktopProjectIsAvailable,
+  buildProjectChatHref,
   projectReopenSearchParam,
   recentProjectsUpdatedEvent,
   sessionReopenSearchParam,
@@ -988,6 +990,8 @@ function getSaveTitle(activeFileIsDirty: boolean, canSaveActiveFile: boolean): s
 }
 
 function IDEToolbar({
+  projectName,
+  projectChatHref,
   showExplorer,
   setShowExplorer,
   showTerminal,
@@ -1005,6 +1009,8 @@ function IDEToolbar({
   onLoadFromPath,
   canUseProjectTools,
 }: Readonly<{
+  projectName: string | null;
+  projectChatHref: string | null;
   showExplorer: boolean;
   setShowExplorer: (v: boolean) => void;
   showTerminal: boolean;
@@ -1039,6 +1045,21 @@ function IDEToolbar({
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
       <div className="flex items-center gap-2">
+        {projectChatHref ? (
+          <Button asChild variant="ghost" size="sm" className="max-w-56 justify-start gap-2">
+            <Link href={projectChatHref} title="Return to Project chat">
+              <MessageSquare className="h-4 w-4 shrink-0" />
+              <span className="hidden md:inline truncate">
+                Project / {projectName ?? 'Project'} / IDE
+              </span>
+              <span className="md:hidden">Project</span>
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/">Workspaces</Link>
+          </Button>
+        )}
         <Button
           variant={explorerButton.variant}
           size="sm"
@@ -1841,6 +1862,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
   const projectFolderLabel = desktopProjectFolderLabel(activeProject);
   const projectStatus = projectBindingStatus(activeProject, isDesktopProjectBridgeAvailable);
+  const projectChatHref = activeProject ? buildProjectChatHref(activeProject.id, sessionId) : null;
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
   const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
@@ -1955,10 +1977,13 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const reopenDesktopProjectById = useCallback(
     async (projectId: string) => {
       const projects =
-        recentDesktopProjects.length > 0 ? recentDesktopProjects : await loadRecentDesktopProjects();
+        recentDesktopProjects.length > 0
+          ? recentDesktopProjects
+          : await loadRecentDesktopProjects();
       const project = projects.find((candidate) => candidate.id === projectId);
       if (!project) {
-        const message = 'This recent Project is no longer available. Open it again from your system.';
+        const message =
+          'This recent Project is no longer available. Open it again from your system.';
         setProjectOpenError(message);
         toast.error(message);
         return false;
@@ -2036,10 +2061,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   useEffect(() => {
     if (!selectedAgentId || !activeProject?.id) return;
     const handoffSession = handoffSessionRef.current;
-    if (
-      handoffSession?.projectId === activeProject.id &&
-      handoffSession.sessionId === sessionId
-    ) {
+    if (handoffSession?.projectId === activeProject.id && handoffSession.sessionId === sessionId) {
       return;
     }
     void (async () => {
@@ -2652,6 +2674,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   return (
     <div className="flex flex-col h-full bg-background">
       <IDEToolbar
+        projectName={activeProject?.name ?? null}
+        projectChatHref={projectChatHref}
         showExplorer={showExplorer}
         setShowExplorer={setShowExplorer}
         showTerminal={showTerminal}
