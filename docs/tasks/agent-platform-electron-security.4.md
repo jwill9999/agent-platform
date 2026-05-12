@@ -47,7 +47,7 @@ other local sensitive settings.
 - [x] Secret storage has a narrow adapter interface for future platform support.
 - [x] Credential deletion behavior is defined.
 - [x] Relevant tests and root gates pass.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation notes
 
@@ -75,3 +75,8 @@ other local sensitive settings.
 - `pnpm lint`
 - `pnpm build`
 - `pnpm test`
+- PR #172 checks passed: `verify`, `docker`, `e2e`, `markdownlint`, `lychee`, GitGuardian, and
+  SonarCloud.
+- SonarCloud PR analysis reported 0 new issues and 0 security hotspots.
+- No inline PR review comments were posted. Sourcery skipped because the PR diff exceeded the
+  account review limit.
