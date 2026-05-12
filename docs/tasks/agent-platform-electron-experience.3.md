@@ -41,7 +41,7 @@ an optional deeper workspace.
 - [x] First Project chat message has active Project context.
 - [x] Normal chat remains separate from Project chat.
 - [x] IDE can still be opened from the active Project.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
 
 ## Implementation Notes
 
@@ -70,3 +70,12 @@ an optional deeper workspace.
 - `pnpm run test:e2e`
 - `git diff --check`
 - `sh .husky/pre-push`
+
+## PR Verification
+
+- PR #199 targets `feature/agent-platform-project-onboarding`.
+- GitHub checks passed: `verify`, `docker`, `e2e`, `desktop-e2e`, docs `markdownlint` and
+  `lychee`, GitGuardian, and SonarCloud.
+- SonarCloud reports 0 open PR issues and 0 security hotspots after the page-complexity cleanup.
+- No inline review comments are present; Sourcery skipped because the cumulative PR diff is above
+  its review limit.
