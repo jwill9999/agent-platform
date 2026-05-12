@@ -38,8 +38,8 @@ internal runtime details.
 
 ## Definition Of Done
 
-- [ ] Users see one coherent Project open path in desktop.
-- [ ] UI does not expose implementation details by default.
-- [ ] Setup state copy is action-oriented and user-facing.
-- [ ] Layout remains readable at supported desktop widths.
+- [x] Users see one coherent Project open path in desktop.
+- [x] UI does not expose implementation details by default.
+- [x] Setup state copy is action-oriented and user-facing.
+- [x] Layout remains readable at supported desktop widths.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

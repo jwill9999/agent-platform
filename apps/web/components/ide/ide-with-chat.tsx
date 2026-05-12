@@ -238,13 +238,26 @@ function projectInstructionUpdateProposal(
 function projectOnboardingLabel(state: ProjectOnboardingState): string {
   switch (state) {
     case 'approved':
-      return 'Instructions approved';
+      return 'Project ready';
     case 'needs_review':
-      return 'Instructions review required';
+      return 'Review Project instructions';
     case 'in_progress':
-      return 'Instructions review in progress';
+      return 'Project setup in progress';
     case 'missing':
-      return 'Instructions missing';
+      return 'Project setup needed';
+  }
+}
+
+function projectOnboardingDescription(state: ProjectOnboardingState): string {
+  switch (state) {
+    case 'approved':
+      return 'Project instructions are approved. File edits are available when allowed by policy.';
+    case 'needs_review':
+      return 'Review the proposed Project instructions before enabling file edits.';
+    case 'in_progress':
+      return 'Finish the Project setup questions or review the draft before enabling file edits.';
+    case 'missing':
+      return 'Start setup to create Project instructions. You can still inspect files and ask questions first.';
   }
 }
 
@@ -545,6 +558,12 @@ export function ProjectOnboardingDraftPanel({
             {isSubmitting ? 'Saving...' : 'Send answer'}
           </Button>
         </form>
+      )}
+      {!draft && (
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
+          Create Project instructions so the assistant understands how to work in this folder before
+          making file changes.
+        </p>
       )}
       {draft && (
         <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-2 text-xs leading-relaxed text-foreground">
@@ -2724,9 +2743,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                             {projectOnboardingLabel(onboardingState)}
                           </div>
                           <div className="mt-1 leading-snug text-muted-foreground">
-                            {onboardingState === 'approved'
-                              ? 'Code edits and write tools are available when allowed by policy.'
-                              : 'Initial project instructions are required before code edits, commits, installs, migrations, or destructive commands. Read-only inspection and planning remain available.'}
+                            {projectOnboardingDescription(onboardingState)}
                           </div>
                           {canApproveProjectInstructions && (
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -2775,7 +2792,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                           }}
                         />
                       )}
-                      {onboardingState !== 'approved' && onboardingAssessment && (
+                      {onboardingState !== 'approved' && (
                         <ProjectOnboardingDraftPanel
                           draft={onboardingDraft}
                           dialogue={onboardingDialogue}
@@ -2836,29 +2853,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                     />
                   )}
                 </div>
-                {fs.needsFolderReconnect && (
-                  <div className="mx-2 mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
-                    <p className="mb-2 leading-snug">
-                      Restore access to{' '}
-                      <span className="font-medium">
-                        {fs.pendingReconnectFolderName ?? 'your folder'}
-                      </span>{' '}
-                      after refresh (browser permission).
-                    </p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        fs.reconnectFolder().catch(() => {});
-                      }}
-                    >
-                      Restore folder…
-                    </Button>
-                  </div>
-                )}
-                {fs.error && <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>}
                 <ScrollArea className="min-h-0 flex-1">
                   <div className="pb-4">
                     {filteredFileTree.length === 0 &&

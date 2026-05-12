@@ -126,6 +126,34 @@ describe('Project onboarding assessment panel', () => {
     expect(html).not.toContain('Code edits and write tools are available');
   });
 
+  it('renders a clear setup action before a draft exists', () => {
+    const html = renderToStaticMarkup(
+      createElement(ProjectOnboardingDraftPanel, {
+        draft: null,
+        dialogue: null,
+        answer: '',
+        isStarting: false,
+        isSubmitting: false,
+        isReviewing: false,
+        reviewComment: '',
+        onStart: () => {},
+        onAnswerChange: () => {},
+        onSubmitAnswer: () => {},
+        onReviewCommentChange: () => {},
+        onApprove: () => {},
+        onRequestChanges: () => {},
+        onReject: () => {},
+      }),
+    );
+
+    expect(html).toContain('Onboarding draft');
+    expect(html).toContain('Not started');
+    expect(html).toContain('Start');
+    expect(html).toContain('Create Project instructions');
+    expect(html).not.toContain('/workspace');
+    expect(html).not.toContain('backend');
+  });
+
   it('renders closeout instruction update candidates for review', () => {
     const html = renderToStaticMarkup(
       createElement(ProjectInstructionUpdatesPanel, {
