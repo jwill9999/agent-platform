@@ -52,4 +52,4 @@ current desktop branch without coupling it to `/init` implementation details.
 - [x] `/help` lists available slash commands without requiring a Project.
 - [x] Registry selection is explicit at call sites.
 - [x] Non-slash chat messages continue through the normal chat path.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
