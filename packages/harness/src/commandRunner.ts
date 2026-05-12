@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 
 import type { Output, RiskTier } from '@agent-platform/contracts';
 
+import { validateBashWorkspacePolicy } from './security/bashWorkspacePolicy.js';
+import type { PathJail } from './security/pathJail.js';
 import { toolError, toolResult, truncate } from './tools/toolHelpers.js';
 
 export type CommandEnvironmentPolicy = {
@@ -64,6 +66,11 @@ export type CommandRunner = {
   run(request: CommandRunnerRequest): Promise<CommandRunnerResult>;
 };
 
+export type ProjectScopedCommandRunnerOptions = {
+  delegate: CommandRunner;
+  pathJail: PathJail;
+};
+
 export function commandRunnerResultToOutput(toolId: string, result: CommandRunnerResult): Output {
   switch (result.status) {
     case 'success':
@@ -78,6 +85,47 @@ export function commandRunnerResultToOutput(toolId: string, result: CommandRunne
     case 'denied':
       return toolError(result.code, result.message);
   }
+}
+
+function pathAccessDenied(reason: string): CommandRunnerDeniedResult {
+  return {
+    status: 'denied',
+    code: 'PATH_ACCESS_DENIED',
+    reason,
+    message:
+      'This command tries to access a path outside the approved Project. Use a path inside the selected Project.',
+  };
+}
+
+export function createProjectScopedCommandRunner({
+  delegate,
+  pathJail,
+}: ProjectScopedCommandRunnerOptions): CommandRunner {
+  return {
+    run: async (request) => {
+      const cwd = await pathJail.validate(request.cwd, 'read');
+      if (!cwd.allowed) return pathAccessDenied('outside_project_cwd');
+
+      const policy = await validateBashWorkspacePolicy(request.command, pathJail);
+      if (!policy.allowed) return pathAccessDenied('outside_project');
+
+      const command = (
+        await Promise.all(
+          policy.accesses.map(async (access) => ({
+            original: access.path,
+            resolved: await pathJail.enforce(access.path, access.operation),
+          })),
+        )
+      )
+        .sort((a, b) => b.original.length - a.original.length)
+        .reduce(
+          (rewritten, access) => rewritten.split(access.original).join(access.resolved),
+          request.command,
+        );
+
+      return delegate.run({ ...request, command, cwd: cwd.resolvedPath });
+    },
+  };
 }
 
 export function createHostShellCommandRunner(): CommandRunner {

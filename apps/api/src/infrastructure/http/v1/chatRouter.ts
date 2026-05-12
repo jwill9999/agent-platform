@@ -790,6 +790,7 @@ function createRuntimeNativeToolExecutor({
     ? workspaceResolution.defaultRepoPath
     : resolveSessionProjectPath(db, sessionId);
   const workspaceRoot = workspaceResolution?.ok ? workspaceResolution.workspaceRoot : undefined;
+  const pathJail = workspaceResolution?.ok ? new PathJail(workspaceResolution.mounts) : undefined;
   const factoryExecutor = options.systemToolExecutorFactory?.({
     sessionId,
     runId,
@@ -812,8 +813,14 @@ function createRuntimeNativeToolExecutor({
             memory: { db, sessionId, agentId: agentCtx.agent.id },
             defaultRepoPath,
             workspaceRoot,
+            pathJail,
           }
-        : { memory: { db, sessionId, agentId: agentCtx.agent.id }, defaultRepoPath, workspaceRoot },
+        : {
+            memory: { db, sessionId, agentId: agentCtx.agent.id },
+            defaultRepoPath,
+            workspaceRoot,
+            pathJail,
+          },
     ),
     workspaceResolution,
   );

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -6,9 +6,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   commandRunnerResultToOutput,
+  createProjectScopedCommandRunner,
   createSystemToolExecutor,
   type CommandRunner,
 } from '../src/index.js';
+import { PathJail } from '../src/index.js';
 
 describe('CommandRunner boundary', () => {
   it('passes sys_bash execution through a swappable command runner', async () => {
@@ -101,5 +103,138 @@ describe('CommandRunner boundary', () => {
       code: 'APPROVAL_REQUIRED',
       message: 'destructive command needs approval',
     });
+  });
+
+  it('rewrites workspace paths and defaults cwd through the project-scoped runner', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const realWorkspaceRoot = await realpath(workspaceRoot);
+    const runner: CommandRunner = {
+      run: vi.fn().mockResolvedValue({
+        status: 'success',
+        stdout: 'ok',
+        stderr: '',
+        exitCode: 0,
+        durationMs: 4,
+      }),
+    };
+    const scopedRunner = createProjectScopedCommandRunner({
+      delegate: runner,
+      pathJail: new PathJail([
+        {
+          label: 'Project',
+          hostPath: workspaceRoot,
+          containerPath: '/workspace',
+          permission: 'read_write',
+        },
+      ]),
+    });
+
+    await scopedRunner.run({
+      command: 'cat /workspace/input.txt',
+      cwd: workspaceRoot,
+      env: { mode: 'inherit', variables: {} },
+      timeoutMs: 1000,
+      maxOutputBytes: 100,
+      workspace: { root: workspaceRoot },
+      audit: { toolId: 'sys_bash' },
+    });
+
+    expect(runner.run).toHaveBeenCalledWith({
+      command: `cat ${join(realWorkspaceRoot, 'input.txt')}`,
+      cwd: realWorkspaceRoot,
+      env: { mode: 'inherit', variables: {} },
+      timeoutMs: 1000,
+      maxOutputBytes: 100,
+      workspace: { root: workspaceRoot },
+      audit: { toolId: 'sys_bash' },
+    });
+
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('denies outside-root command paths and cwd before delegating', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'agent-platform-outside-'));
+    const runner: CommandRunner = {
+      run: vi.fn(),
+    };
+    const scopedRunner = createProjectScopedCommandRunner({
+      delegate: runner,
+      pathJail: new PathJail([
+        { label: 'Project', hostPath: workspaceRoot, permission: 'read_write' },
+      ]),
+    });
+
+    await expect(
+      scopedRunner.run({
+        command: `cat ${join(outsideRoot, 'secret.txt')}`,
+        cwd: workspaceRoot,
+        env: { mode: 'inherit', variables: {} },
+        timeoutMs: 1000,
+        maxOutputBytes: 100,
+        workspace: { root: workspaceRoot },
+        audit: { toolId: 'sys_bash' },
+      }),
+    ).resolves.toMatchObject({
+      status: 'denied',
+      code: 'PATH_ACCESS_DENIED',
+      reason: 'outside_project',
+    });
+
+    await expect(
+      scopedRunner.run({
+        command: 'pwd',
+        cwd: outsideRoot,
+        env: { mode: 'inherit', variables: {} },
+        timeoutMs: 1000,
+        maxOutputBytes: 100,
+        workspace: { root: workspaceRoot },
+        audit: { toolId: 'sys_bash' },
+      }),
+    ).resolves.toMatchObject({
+      status: 'denied',
+      code: 'PATH_ACCESS_DENIED',
+      reason: 'outside_project_cwd',
+    });
+
+    expect(runner.run).not.toHaveBeenCalled();
+    await rm(workspaceRoot, { recursive: true, force: true });
+    await rm(outsideRoot, { recursive: true, force: true });
+  });
+
+  it('denies symlink escapes before command execution', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'agent-platform-outside-'));
+    await writeFile(join(outsideRoot, 'secret.txt'), 'secret');
+    await symlink(join(outsideRoot, 'secret.txt'), join(workspaceRoot, 'linked-secret.txt'));
+    const runner: CommandRunner = {
+      run: vi.fn(),
+    };
+    const scopedRunner = createProjectScopedCommandRunner({
+      delegate: runner,
+      pathJail: new PathJail([
+        { label: 'Project', hostPath: workspaceRoot, permission: 'read_write' },
+      ]),
+    });
+
+    await expect(
+      scopedRunner.run({
+        command: 'cat ./linked-secret.txt',
+        cwd: workspaceRoot,
+        env: { mode: 'inherit', variables: {} },
+        timeoutMs: 1000,
+        maxOutputBytes: 100,
+        workspace: { root: workspaceRoot },
+        audit: { toolId: 'sys_bash' },
+      }),
+    ).resolves.toMatchObject({
+      status: 'denied',
+      code: 'PATH_ACCESS_DENIED',
+      reason: 'outside_project',
+    });
+
+    expect(runner.run).not.toHaveBeenCalled();
+    await rm(workspaceRoot, { recursive: true, force: true });
+    await rm(outsideRoot, { recursive: true, force: true });
   });
 });

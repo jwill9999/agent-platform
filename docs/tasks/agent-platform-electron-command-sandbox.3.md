@@ -26,6 +26,17 @@ Implement the first host command runner for desktop Projects with Project-root P
 3. Implement runner-level cwd/path validation before command execution.
 4. Add integration tests for in-root success and outside-root denial.
 
+## Implementation Notes
+
+- Added `createProjectScopedCommandRunner`, a runner wrapper that validates command `cwd` and
+  shell-discovered path accesses with `PathJail` before delegating to the host shell runner.
+- `/workspace/...` command paths are rewritten to resolved host Project paths before execution,
+  preserving existing Docker/canonical workspace behavior while allowing desktop Project roots.
+- Outside-root command paths, outside-root cwd values, and symlink escapes return structured
+  `PATH_ACCESS_DENIED` results before command execution.
+- API chat runtime now passes the Project session `PathJail` into `createSystemToolExecutor`, so
+  `sys_bash` is protected at both the tool-dispatch boundary and the command-runner boundary.
+
 ## Tests And Verification
 
 - Harness/API focused tests for Project-bound command cwd and PathJail denial.
@@ -34,8 +45,8 @@ Implement the first host command runner for desktop Projects with Project-root P
 
 ## Definition Of Done
 
-- [ ] Host runner defaults to the selected Project root.
-- [ ] Outside-root cwd and path references are denied before execution.
-- [ ] Denial messages are user-safe and avoid exposing unnecessary host paths.
-- [ ] Existing browser/Docker command behavior does not regress.
+- [x] Host runner defaults to the selected Project root.
+- [x] Outside-root cwd and path references are denied before execution.
+- [x] Denial messages are user-safe and avoid exposing unnecessary host paths.
+- [x] Existing browser/Docker command behavior does not regress.
 - [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.

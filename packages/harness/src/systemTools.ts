@@ -4,10 +4,15 @@ import { resolve } from 'node:path';
 
 import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/contracts';
 import type { CommandRunner } from './commandRunner.js';
-import { commandRunnerResultToOutput, createHostShellCommandRunner } from './commandRunner.js';
+import {
+  commandRunnerResultToOutput,
+  createHostShellCommandRunner,
+  createProjectScopedCommandRunner,
+} from './commandRunner.js';
 import type { NativeToolExecutor } from './types.js';
 import { validateBashCommand } from './security/bashGuard.js';
 import { WORKSPACE_ROOT } from './security/mounts.js';
+import type { PathJail } from './security/pathJail.js';
 import {
   ZERO_RISK_TOOLS,
   ZERO_RISK_MAP,
@@ -322,13 +327,17 @@ export function createSystemToolExecutor(options?: {
   workspaceRoot?: string;
   defaultRepoPath?: string;
   commandRunner?: CommandRunner;
+  pathJail?: PathJail;
 }): NativeToolExecutor {
   const configuredWorkspaceRoot = options?.workspaceRoot ?? WORKSPACE_ROOT;
   const workspaceRoot = existsSync(configuredWorkspaceRoot)
     ? configuredWorkspaceRoot
     : process.cwd();
   const browserManager = new BrowserSessionManager({ workspaceRoot });
-  const commandRunner = options?.commandRunner ?? createHostShellCommandRunner();
+  const hostCommandRunner = options?.commandRunner ?? createHostShellCommandRunner();
+  const commandRunner = options?.pathJail
+    ? createProjectScopedCommandRunner({ delegate: hostCommandRunner, pathJail: options.pathJail })
+    : hostCommandRunner;
   return async (toolId: string, args: Record<string, unknown>): Promise<Output> => {
     // Core tools
     switch (toolId) {
