@@ -12,6 +12,7 @@ import {
   resolveDesktopBackendMode,
   waitForBackendReady,
 } from '../src/main/backendSupervisor.js';
+import type { DesktopRuntimePaths } from '../src/main/runtimePaths.js';
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -35,6 +36,18 @@ function makeTempRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), 'agent-platform-desktop-backend-test-'));
   tempDirs.push(dir);
   return dir;
+}
+
+function makeRuntimePaths(runtimeRoot: string): DesktopRuntimePaths {
+  return {
+    appDataDir: runtimeRoot,
+    configDir: join(runtimeRoot, 'config'),
+    dataDir: join(runtimeRoot, 'data'),
+    logDir: join(runtimeRoot, 'logs'),
+    tempDir: join(runtimeRoot, 'tmp'),
+    sqlitePath: join(runtimeRoot, 'data/agent.sqlite'),
+    configPath: join(runtimeRoot, 'config/runtime.json'),
+  };
 }
 
 async function startReadyServer(statusCode: number): Promise<string> {
@@ -67,20 +80,18 @@ describe('desktop backend supervisor helpers', () => {
   it('resolves backend runtime paths under the desktop runtime directory', () => {
     const repoRoot = makeTempRepo();
     const runtimeRoot = join(repoRoot, 'runtime');
-    const paths = getDesktopBackendPaths(repoRoot, {
-      AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeRoot,
-    });
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
 
     expect(paths.apiEntry).toBe(join(repoRoot, 'apps/api/dist/index.js'));
-    expect(paths.runtimeRoot).toBe(runtimeRoot);
     expect(paths.stdoutLog).toBe(join(runtimeRoot, 'logs/backend.stdout.log'));
     expect(paths.stderrLog).toBe(join(runtimeRoot, 'logs/backend.stderr.log'));
     expect(paths.sqlitePath).toBe(join(runtimeRoot, 'data/agent.sqlite'));
+    expect(paths.configPath).toBe(join(runtimeRoot, 'config/runtime.json'));
   });
 
   it('detects when the compiled API backend is available', () => {
     const repoRoot = makeTempRepo();
-    const paths = getDesktopBackendPaths(repoRoot);
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(join(repoRoot, 'runtime')));
 
     expect(desktopBackendAvailable(paths)).toBe(false);
 

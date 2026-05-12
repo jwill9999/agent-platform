@@ -2,19 +2,20 @@ import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, statSync, rmSync } from 'node:fs';
 import { get } from 'node:http';
-import { join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+
+import type { DesktopRuntimePaths } from './runtimePaths.js';
 
 export type DesktopBackendMode = 'disabled' | 'managed';
 
 export interface DesktopBackendPaths {
   repoRoot: string;
   apiEntry: string;
-  runtimeRoot: string;
-  logDir: string;
   stdoutLog: string;
   stderrLog: string;
   sqlitePath: string;
+  configPath: string;
 }
 
 export interface DesktopBackendHandle {
@@ -44,21 +45,15 @@ export function resolveDesktopBackendMode(env: NodeJS.ProcessEnv): DesktopBacken
 
 export function getDesktopBackendPaths(
   repoRoot: string,
-  env: NodeJS.ProcessEnv = process.env,
+  runtimePaths: DesktopRuntimePaths,
 ): DesktopBackendPaths {
-  const runtimeRoot = resolve(
-    env.AGENT_PLATFORM_DESKTOP_RUNTIME_DIR ?? join(repoRoot, '.agent-platform/desktop-runtime'),
-  );
-  const logDir = join(runtimeRoot, 'logs');
-
   return {
     repoRoot,
     apiEntry: join(repoRoot, 'apps/api/dist/index.js'),
-    runtimeRoot,
-    logDir,
-    stdoutLog: join(logDir, 'backend.stdout.log'),
-    stderrLog: join(logDir, 'backend.stderr.log'),
-    sqlitePath: join(runtimeRoot, 'data/agent.sqlite'),
+    stdoutLog: join(runtimePaths.logDir, 'backend.stdout.log'),
+    stderrLog: join(runtimePaths.logDir, 'backend.stderr.log'),
+    sqlitePath: runtimePaths.sqlitePath,
+    configPath: runtimePaths.configPath,
   };
 }
 
@@ -91,7 +86,7 @@ export async function startDesktopBackend({
     );
   }
 
-  mkdirSync(paths.logDir, { recursive: true });
+  mkdirSync(dirname(paths.stdoutLog), { recursive: true });
   rotateLogIfNeeded(paths.stdoutLog, maxLogBytes);
   rotateLogIfNeeded(paths.stderrLog, maxLogBytes);
 

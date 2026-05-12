@@ -18,6 +18,10 @@ import {
   type DesktopRendererMode,
   type StandaloneRendererHandle,
 } from './rendererServer.js';
+import {
+  ensureDesktopRuntimeDirectories,
+  resolveDesktopRuntimePathsFromApp,
+} from './runtimePaths.js';
 import { buildBootstrapHtml, createWindowOptions, getPreloadPath } from './windowConfig.js';
 
 const smokeMode = process.argv.includes('--smoke');
@@ -80,9 +84,11 @@ async function bootstrap(): Promise<void> {
   const repoRoot = getRepoRootFromMainDir(mainDir);
 
   if (resolveDesktopBackendMode(process.env) === 'managed') {
+    const runtimePaths = resolveDesktopRuntimePathsFromApp(app, process.env);
+    ensureDesktopRuntimeDirectories(runtimePaths);
     desktopBackend = await startDesktopBackend({
       nodePath: resolveDesktopBackendNodePath(process.env, process.execPath),
-      paths: getDesktopBackendPaths(repoRoot, process.env),
+      paths: getDesktopBackendPaths(repoRoot, runtimePaths),
     });
     process.env.API_PROXY_URL = desktopBackend.url;
   }

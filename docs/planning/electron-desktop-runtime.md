@@ -101,6 +101,16 @@ Examples:
 
 Electron should use `app.getPath('userData')` or an equivalent platform abstraction.
 
+The Electron foundation now resolves desktop runtime paths through Electron's OS path
+abstraction rather than defaulting to repository-relative storage:
+
+- app data/config/data: `app.getPath('userData')`,
+- logs: `app.getPath('logs')`,
+- temp/runtime scratch: `app.getPath('temp')`.
+
+Explicit environment overrides remain available for development and tests, but the
+desktop default must be OS app data rather than Docker volumes or repository paths.
+
 ### 5. Secrets require protected storage
 
 API keys and tokens should not be stored as plain text in Project folders.
@@ -518,6 +528,8 @@ Research questions:
 - What does the macOS installer/uninstaller path normally remove?
 - Should the app expose `Settings > Data > Delete local app data` before relying on installer behavior?
 - How do we delete SQLite, logs, cache, local memory, and recent Project metadata safely?
+- How do we remove credentials from secure storage as part of an uninstall/reset flow?
+- How do we avoid deleting user Project folders while still deleting Project metadata?
 - How do we delete OS secure-storage credentials?
 - How do we make it clear that Project folders are not deleted?
 

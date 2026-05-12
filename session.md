@@ -1479,3 +1479,27 @@ Tracked in Beads: `agent-platform-lt6`
 - Fixed assessment display metadata to omit unknown branch labels and added a plain-folder API regression test.
 - Updated the Project workspace E2E assertions to match the new assessment flow: incomplete or missing onboarding now reports `in_progress` until approved.
 - SonarCloud PR sweep identified command inference complexity and nested template literals; refactored command construction into focused helpers.
+
+## 2026-05-12 Electron Foundation `.4`
+
+- Task `agent-platform-electron-foundation.4` resolves desktop runtime paths through Electron OS path APIs instead of defaulting desktop storage to repository-relative directories.
+- Desktop app data/config/data now resolve from `app.getPath('userData')`; logs resolve from `app.getPath('logs')`; runtime scratch/temp resolves from `app.getPath('temp')`.
+- The managed desktop backend receives explicit SQLite, runtime config, stdout log, and stderr log paths from the runtime path resolver.
+- Docker development and CI storage remain unchanged. Environment overrides remain available for development and tests.
+- Uninstall/reset cleanup remains future work: delete app metadata, SQLite/config/log/temp state, and stored credentials, but do not delete user Project folders.
+- Local verification passed:
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop lint`
+  - `pnpm --filter @agent-platform/desktop test`
+  - `pnpm --filter @agent-platform/desktop smoke:backend`
+  - `pnpm --filter @agent-platform/desktop smoke`
+  - `pnpm --filter @agent-platform/desktop smoke:renderer`
+  - `pnpm format:check`
+  - `pnpm typecheck`
+  - `pnpm lint`
+  - `pnpm build`
+  - `pnpm docs:lint`
+  - `git diff --check`
+  - focused rerun of the transient API timeout test
+  - `pnpm test`
+- SonarQube MCP tools were not exposed in the current tool surface after discovery; local fallback completion gates passed. Final Sonar/Promptfoo/CI status still requires the pushed PR.
