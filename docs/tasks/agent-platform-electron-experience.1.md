@@ -42,4 +42,4 @@ keeps Chat and IDE as surfaces inside the selected Project rather than unrelated
 - [x] UI copy distinguishes Projects from Chat/IDE surfaces without exposing runtime internals.
 - [x] Existing IDE Project open behavior remains functional.
 - [x] Focused tests cover state transitions and user-facing labels.
-- [ ] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
+- [x] PR checks, Sonar/Problems gate, and review comments are resolved before closure.
