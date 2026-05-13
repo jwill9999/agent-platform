@@ -90,6 +90,9 @@ Expected behavior:
 For the development/runtime split and closeout rules, see
 [Electron Development Workflow](../development/electron-development-workflow.md).
 
+For repeatable owner/manual testing during stabilisation, use
+[Electron Project Experience Manual QA](../qa/electron-project-experience-manual-qa.md).
+
 ### Prerequisites
 
 From the repository root:
