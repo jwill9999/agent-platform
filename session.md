@@ -7,6 +7,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-13
+- **Session:** Created the `agent-platform-electron-stabilisation` Beads epic and five child tasks so the team can pause new feature work, stabilise the stacked Electron/Project PRs, and decide whether to use a staging branch/fix-forward flow before merging to `main`.
+- **Today’s outputs:** Added specs for `agent-platform-electron-stabilisation.{1-5}` covering Electron development workflow docs, a manual QA checklist, findings-to-Beads triage, PR stack/staging branch planning, and UI regression E2E coverage planning. Updated the Electron experience/release specs and task index so release is blocked behind stabilisation.
+- **Validation:** Documentation lint and `git diff --check` passed for the new specs. Beads now shows `agent-platform-electron-stabilisation.1` ready; `agent-platform-electron-release` remains blocked by the Electron experience closeout and stabilisation epic.
+- **Current state:** Branch `task/agent-platform-electron-experience.8` contains the latest code and planning docs for PR #204 into `feature/agent-platform-project-onboarding`. `main` does not yet contain this latest Electron experience work. `output/` remains generated/untracked and should not be committed.
+- **Next:** Start `agent-platform-electron-stabilisation.1`, document the Electron development workflow, then create the manual QA checklist and use owner findings to decide whether a staging integration branch is required before any merge to `main`.
 - **Date:** 2026-05-12
 - **Session:** Completed `agent-platform-electron-experience.8` on `task/agent-platform-electron-experience.8`. Added built-runtime Electron E2E coverage for the complete Project navigation/reopen path and fixed in-place Recent Project switching from Project chat.
 - **Today’s outputs:** PR #204 targets `feature/agent-platform-project-onboarding` and adds queued Electron test Project folder overrides, a Project reopen request event from the Recent Projects sidebar, shared reopen handling for URL restore and in-place Project switching, and an Electron E2E flow that opens two Projects, reopens the first, verifies Project chat default entry, `/init` and `/help init` context, IDE handoff/return navigation, draft approval, and hidden host paths.
