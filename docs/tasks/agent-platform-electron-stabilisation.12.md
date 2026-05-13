@@ -18,6 +18,81 @@ Experience or release work can start.
 - Confirm automated Electron/browser E2E coverage exists or has explicit follow-up tasks.
 - Record the final merge/release recommendation.
 
+## Closeout Review
+
+### Stabilisation task status
+
+| Area                            | Task                                       | Outcome                                                                                                                |
+| ------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Development workflow            | `agent-platform-electron-stabilisation.1`  | Closed; Electron development workflow is documented.                                                                   |
+| Manual QA checklist             | `agent-platform-electron-stabilisation.2`  | Closed; repeatable checklist exists in `docs/qa/electron-project-experience-manual-qa.md`.                             |
+| Finding triage                  | `agent-platform-electron-stabilisation.3`  | Closed; owner QA findings are classified and mapped to Beads.                                                          |
+| Staging branch plan             | `agent-platform-electron-stabilisation.4`  | Closed; `feature/agent-platform-electron-stabilisation` is the integration branch.                                     |
+| Regression coverage plan        | `agent-platform-electron-stabilisation.5`  | Closed; Electron/browser E2E gaps are mapped to follow-up tasks.                                                       |
+| Chat-first navigation           | `agent-platform-electron-stabilisation.6`  | Closed through PR #208; Projects open into Project Chat and IDE is removed from the primary path.                      |
+| Native Project binding          | `agent-platform-electron-stabilisation.7`  | Closed through PR #209; host folders bind as Projects without path entry or folder copying.                            |
+| Project Chat and slash commands | `agent-platform-electron-stabilisation.8`  | Closed through PR #210; normal messages and `/help`, `/help init`, `/init` work with Project context.                  |
+| Recent Projects                 | `agent-platform-electron-stabilisation.9`  | Closed through PR #211; Recent Projects is single, safer, and can reopen Projects.                                     |
+| User-facing copy                | `agent-platform-electron-stabilisation.10` | Closed through PR #212; internal diagnostics are moved out of primary copy.                                            |
+| IDE handoff and previews design | `agent-platform-electron-stabilisation.11` | Closed through PR #213; external/default IDE handoff, generated previews, and activity panel are scoped for follow-up. |
+
+### Manual QA finding disposition
+
+| Finding group                                             | Disposition                                                                                                           |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Stale or duplicated Recent Projects                       | Fixed in `.9`; follow-on integrated Project Experience E2E remains assigned to `agent-platform-project-experience.6`. |
+| Open Project did not bind selected local folders          | Fixed in `.7`; Electron E2E covers native picker/test-bridge Project binding.                                         |
+| Project Chat input and slash commands would not submit    | Fixed in `.8`; Electron E2E covers normal Project chat and slash command first messages.                              |
+| Workspace chooser and IDE-first navigation were confusing | Fixed in `.6`; Project Chat is the default Project destination.                                                       |
+| Backend/internal copy leaked into normal UI               | Fixed in `.10`; future UI work must keep raw diagnostics out of primary copy.                                         |
+| Breadcrumbs/settings return navigation                    | Deferred to `agent-platform-project-experience.5`.                                                                    |
+| External/default IDE handoff                              | Deferred to `agent-platform-project-experience.4`.                                                                    |
+| Generated artifact previews                               | Deferred to `agent-platform-project-experience.7`.                                                                    |
+| Right-side Project activity panel                         | Deferred to `agent-platform-project-experience.8`.                                                                    |
+| Full integrated desktop Project Experience pass           | Deferred to `agent-platform-project-experience.6`.                                                                    |
+
+### Automated gate status
+
+The stabilisation branch has passed the normal task-level gates for the merged fix PRs:
+
+- local docs lint and whitespace checks for documentation tasks;
+- affected-package pre-push build, typecheck, and test gates for changed packages;
+- GitHub `verify`, `docker`, browser `e2e`, desktop `desktop-e2e`, docs `markdownlint`/`lychee`,
+  SonarCloud, and GitGuardian on the stabilisation task PRs;
+- PR review-comment sweeps before task closure.
+
+`agent-platform-electron-stabilisation.5` records the test ownership split and remaining coverage
+gaps. Future Project UI tasks must include Electron E2E when they touch native folder selection,
+Project binding, Recent Projects, external IDE handoff, desktop app data, or preload/main-process
+behavior.
+
+### Human sign-off status
+
+Owner manual QA has **not** been rerun by the agent after the final stabilisation fixes. That is a
+human gate, not an automated one.
+
+Recommended state:
+
+- The stabilisation feature branch is ready for owner manual QA using
+  `docs/qa/electron-project-experience-manual-qa.md`.
+- Do not merge `feature/agent-platform-electron-stabilisation` into `main` for release until the
+  owner reruns or signs off the checklist.
+- Follow-on Project Experience planning can proceed from the stabilised direction, but release/main
+  promotion remains gated on owner QA.
+
+### Merge and next-epic recommendation
+
+Recommendation: keep `feature/agent-platform-electron-stabilisation` as the current stable
+integration branch until owner manual QA is complete. If manual QA passes, merge the feature branch
+to `main` and begin `agent-platform-project-experience.1`.
+
+If manual QA finds more blocker regressions, create fix-forward tasks under this stabilisation epic
+or the Project Experience epic depending on scope:
+
+- regressions in already stabilised behavior stay in `agent-platform-electron-stabilisation`;
+- planned enhancements such as breadcrumbs, external IDE handoff, previews, and activity panel stay
+  in `agent-platform-project-experience`.
+
 ## Implementation Plan
 
 1. Review stabilisation tasks `.3` through `.11`.
@@ -32,6 +107,8 @@ Experience or release work can start.
 - Required local and CI gates from the completed fix tasks.
 - `bd list --parent agent-platform-electron-stabilisation` shows all stabilisation work resolved or
   explicitly deferred.
+- `pnpm docs:lint`
+- `git diff --check`
 
 ## Definition Of Done
 

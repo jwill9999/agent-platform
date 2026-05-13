@@ -46,6 +46,16 @@ primary Project workflow.
 11. `agent-platform-electron-stabilisation.11` - Define IDE handoff and generated Project side panel.
 12. `agent-platform-electron-stabilisation.12` - Stabilisation closeout and next-epic gate.
 
+## Closeout Status
+
+As of 2026-05-13, stabilisation implementation tasks `.6` through `.10` are merged into
+`feature/agent-platform-electron-stabilisation`; `.11` and `.5` document the follow-up design and
+coverage plan. The remaining gate is owner manual QA against the latest feature branch.
+
+The feature branch should not be promoted to `main` for release until the owner reruns or signs off
+`docs/qa/electron-project-experience-manual-qa.md`. Follow-on Project Experience work can use the
+documented chat-first direction, but release/main promotion remains gated on that manual QA result.
+
 ## Parallel Worktree Strategy
 
 The stabilisation work should not be treated as a single long chain. Use independent worktrees where
