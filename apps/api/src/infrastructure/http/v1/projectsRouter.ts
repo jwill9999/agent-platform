@@ -443,9 +443,14 @@ function requireDesktopProjectRegistration(req: Request): void {
 
 function sanitizeDesktopProjectError(error: unknown): never {
   if (error instanceof HttpError && error.code === 'PROJECT_UNAVAILABLE') {
-    throw new HttpError(error.status, error.code, error.message, {
-      capabilityState: 'unavailable',
-    });
+    throw new HttpError(
+      error.status,
+      error.code,
+      'This Project folder could not be opened. Choose a folder you can access and try again.',
+      {
+        capabilityState: 'unavailable',
+      },
+    );
   }
   mapProjectError(error);
 }
