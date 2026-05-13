@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildIdeChatMessage } from '@/components/ide/ide-with-chat';
+import { buildIdeChatMessage, ideChatUnavailableText } from '@/components/ide/ide-with-chat';
 
 describe('buildIdeChatMessage', () => {
   it('sends slash commands without browser Project context', () => {
@@ -49,5 +49,30 @@ describe('buildIdeChatMessage', () => {
         sanitisedFiles,
       }),
     ).toBe('/init');
+  });
+});
+
+describe('ideChatUnavailableText', () => {
+  it('keeps the IDE assistant from becoming a typed-but-unsendable input', () => {
+    expect(
+      ideChatUnavailableText({
+        sessionReady: false,
+        hasActiveProject: false,
+      }),
+    ).toBe('Open a Project to chat with the assistant.');
+
+    expect(
+      ideChatUnavailableText({
+        sessionReady: false,
+        hasActiveProject: true,
+      }),
+    ).toBe('Opening Project chat...');
+
+    expect(
+      ideChatUnavailableText({
+        sessionReady: true,
+        hasActiveProject: true,
+      }),
+    ).toBeNull();
   });
 });
