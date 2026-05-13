@@ -87,6 +87,9 @@ Expected behavior:
 
 ## Demo Setup
 
+For the development/runtime split and closeout rules, see
+[Electron Development Workflow](../development/electron-development-workflow.md).
+
 ### Prerequisites
 
 From the repository root:

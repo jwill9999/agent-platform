@@ -8,7 +8,9 @@
 
 > **Default development runtime:** use Docker for the API/web stack. The Electron desktop runtime is
 > a separate macOS-first foundation path for native app behavior and local Project access. See
-> [Desktop Runtime](desktop-runtime.md) before using Electron commands.
+> [Desktop Runtime](desktop-runtime.md) and
+> [Electron Development Workflow](development/electron-development-workflow.md) before using
+> Electron commands.
 
 ## Quick Start
 
@@ -201,8 +203,9 @@ Managed backend logs are written as `backend.stdout.log` and `backend.stderr.log
 desktop logs directory. The desktop app must not copy user Project folders into app data; Project
 folders remain user-owned files outside the app data boundary.
 
-See [Desktop Runtime](desktop-runtime.md) for the full desktop workflow, environment overrides,
-troubleshooting, cleanup expectations, and current macOS-first limitations.
+See [Desktop Runtime](desktop-runtime.md) for the full desktop runtime reference and
+[Electron Development Workflow](development/electron-development-workflow.md) for when Electron is
+required during development, manual QA, and task closeout.
 
 ### Host-Side Quality Gates
 
