@@ -1508,14 +1508,16 @@ function WorkbenchBranchPanel({ summary }: Readonly<{ summary: WorkbenchBranchSu
         </div>
       )}
 
-      <div className="mt-2 space-y-1">
-        {summary.providers.map((provider) => (
-          <div key={provider.label} className="text-[11px] leading-snug text-muted-foreground">
-            <span className="font-medium text-foreground">{provider.label} unavailable:</span>{' '}
-            {provider.description}
-          </div>
-        ))}
-      </div>
+      {summary.providers.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {summary.providers.map((provider) => (
+            <div key={provider.label} className="text-[11px] leading-snug text-muted-foreground">
+              <span className="font-medium text-foreground">{provider.label} unavailable:</span>{' '}
+              {provider.description}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

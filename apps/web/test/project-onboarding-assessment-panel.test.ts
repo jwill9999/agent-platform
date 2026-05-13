@@ -253,8 +253,9 @@ describe('Project onboarding assessment panel', () => {
     expect(html).toContain('Auth App');
     expect(html).toContain('Ready to reopen');
     expect(html).toContain('Missing App');
-    expect(html).toContain('Folder unavailable');
+    expect(html).toContain('Open again to reconnect');
     expect(html).not.toContain('/Users/');
     expect(html).not.toContain('/workspace');
+    expect(html).not.toContain('backend');
   });
 });

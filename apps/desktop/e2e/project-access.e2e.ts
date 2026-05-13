@@ -163,6 +163,10 @@ test.describe('Electron Project access', () => {
       await page.waitForURL(/\/ide/);
       const binding = page.getByLabel('Project binding');
       await expect(binding.getByText(firstProjectName).first()).toBeVisible();
+      await expect(page.getByText('Project activity')).toBeVisible();
+      await expect(page.getByText('Branch not connected')).toHaveCount(0);
+      await expect(page.getByText('Git branch unavailable')).toHaveCount(0);
+      await expect(page.getByText('Remote checks unavailable')).toHaveCount(0);
       await expect(page.getByText('guide.md')).toBeVisible();
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
       await page.getByText('guide.md').click();
