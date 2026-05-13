@@ -11,10 +11,10 @@
     "lint": "eslint . --max-warnings 0",
     "smoke": "pnpm run build && electron . --smoke",
     "smoke:backend": "pnpm run build:backend && pnpm run build && SECRETS_MASTER_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= AGENT_PLATFORM_DESKTOP_BACKEND=managed electron . --smoke",
-    "smoke:renderer": "pnpm run build:renderer && pnpm run build && AGENT_PLATFORM_DESKTOP_RENDERER=standalone electron . --smoke",
+    "smoke:renderer": "pnpm run build:backend && pnpm run build:renderer && pnpm run build && AGENT_PLATFORM_DESKTOP_BACKEND=managed AGENT_PLATFORM_DESKTOP_RENDERER=standalone electron . --smoke",
     "start": "pnpm run build && electron .",
     "start:dev-renderer": "pnpm run build && AGENT_PLATFORM_DESKTOP_RENDERER=dev-server electron .",
-    "start:renderer": "pnpm run build:renderer && pnpm run build && AGENT_PLATFORM_DESKTOP_RENDERER=standalone electron .",
+    "start:renderer": "pnpm run build:backend && pnpm run build:renderer && pnpm run build && AGENT_PLATFORM_DESKTOP_BACKEND=managed AGENT_PLATFORM_DESKTOP_RENDERER=standalone electron .",
     "test": "vitest run",
     "test:e2e": "pnpm run build:backend && pnpm run build:renderer && pnpm run build && playwright test -c e2e/playwright.electron.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

@@ -394,10 +394,13 @@ describe('projectsRouter', () => {
 
     expect(unavailable.body.error).toMatchObject({
       code: 'PROJECT_UNAVAILABLE',
+      message:
+        'This Project folder could not be opened. Choose a folder you can access and try again.',
       details: {
         capabilityState: 'unavailable',
       },
     });
+    expect(unavailable.body.error.message).not.toMatch(/backend|inspect|path/i);
     expect(JSON.stringify(unavailable.body.error)).not.toContain(missingPath);
   });
 
