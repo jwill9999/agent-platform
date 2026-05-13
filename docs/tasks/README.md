@@ -85,7 +85,7 @@ Spec: docs/tasks/<issue-id>.md
 | Code workbench           | `agent-platform-code-workbench`           | `agent-platform-code-workbench.{1-7}.md`                                                         |
 | Project workspaces       | `agent-platform-project-workspaces`       | `agent-platform-project-workspaces.{1-6}.md`                                                     |
 | Project onboarding       | `agent-platform-project-onboarding`       | `agent-platform-project-onboarding.{1-6}.md`                                                     |
-| Project experience       | `agent-platform-project-experience`       | `agent-platform-project-experience.{1-6}.md`                                                     |
+| Project experience       | `agent-platform-project-experience`       | `agent-platform-project-experience.{1-8}.md`                                                     |
 | Electron extract         | `agent-platform-electron-extract`         | `agent-platform-electron-extract.{1-4}.md`                                                       |
 | Electron foundation      | `agent-platform-electron-foundation`      | `agent-platform-electron-foundation.{1-5}.md`                                                    |
 | Electron security/data   | `agent-platform-electron-security`        | `agent-platform-electron-security.{1-6}.md`                                                      |

@@ -28,8 +28,13 @@ absolute path entry.
   - Project Chat has backend Project context before `/init` or Project-aware slash commands run.
   - Project Chat and general Chat remain separate.
   - IDE opens only by explicit user action.
-  - IDE preserves the active Project/session/conversation context.
+  - external/default IDE handoff or any secondary built-in file view preserves the active
+    Project/session/conversation context.
   - breadcrumbs or equivalent navigation can return to Home/Project Chat.
+  - generated HTML/app, Markdown/document, and PDF outputs render as previews or safe fallback
+    cards when those features are implemented.
+  - the right-side Project activity panel shows changed/generated files, previews, checks, CI, and
+    review feedback when those features are implemented.
   - primary UI hides runtime implementation details, including `/workspace`, backend roots, host
     absolute paths, and internal state names.
 - Test output must be deterministic enough for CI.
@@ -37,8 +42,8 @@ absolute path entry.
 ## Implementation Plan
 
 1. Add deterministic Project fixtures and seeding helpers.
-2. Add Playwright helpers for explorer navigation, Project reopen, Project Chat, IDE handoff, and
-   breadcrumb navigation.
+2. Add Playwright helpers for explorer navigation, Project reopen, Project Chat, external/default
+   IDE handoff, preview cards, activity-panel states, and breadcrumb navigation.
 3. Write E2E flows for coding and mixed/non-code Projects.
 4. Verify primary UI labels do not expose runtime implementation terms.
 5. Update docs with the final Project experience flow.
@@ -48,6 +53,8 @@ absolute path entry.
 | Upstream                              | Downstream |
 | ------------------------------------- | ---------- |
 | `agent-platform-project-experience.5` | none       |
+| `agent-platform-project-experience.7` | none       |
+| `agent-platform-project-experience.8` | none       |
 
 Keep Beads dependencies aligned with this table.
 
@@ -56,8 +63,9 @@ Keep Beads dependencies aligned with this table.
 - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e`
   against the Docker runtime.
 - Focused tests needed to stabilize fixtures and route state.
-- Electron E2E for native Project open/reopen, Projects explorer, Project Chat, slash command context,
-  IDE handoff, return navigation, and label cleanup.
+- Electron E2E for native Project open/reopen, Projects explorer, Project Chat, slash command
+  context, IDE handoff, rendered previews, activity-panel states, return navigation, and label
+  cleanup.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
 ## Definition Of Done
@@ -66,4 +74,5 @@ Keep Beads dependencies aligned with this table.
 - [ ] Tests verify Project reopen and context preservation across Project Chat and IDE.
 - [ ] Tests verify `/help` and `/init` run with the same Project context as ordinary Project chat.
 - [ ] Tests verify general Chat remains independent.
+- [ ] Tests verify rendered preview and right-side activity-panel behavior once implemented.
 - [ ] Tests verify runtime implementation labels are hidden from primary UI.

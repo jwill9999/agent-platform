@@ -54,6 +54,8 @@ For desktop Product work:
   with external/default IDE handoff preferred unless a built-in IDE is separately scoped.
 - Generated artifacts such as landing pages, Markdown documents, PDFs, and HTML/app output should be
   previewable from chat/activity surfaces instead of requiring file-system navigation.
+- The right-side Project panel should show changed files, generated outputs, preview cards, tests,
+  CI, review comments, and approvals in user-facing language.
 - Primary navigation belongs in the left explorer: top-level app routes, recent/reopen Projects, and
   recent Chats/Sessions.
 - User-facing copy should show Project name, folder/relevant relative path, profile/status, and
@@ -93,14 +95,29 @@ Out of scope:
 
 ## Proposed Task Chain
 
-| Task                                  | Purpose                                                  |
-| ------------------------------------- | -------------------------------------------------------- |
-| `agent-platform-project-experience.1` | Generalize Project profiles and capability metadata      |
-| `agent-platform-project-experience.2` | Add left explorer Project and Chat navigation            |
-| `agent-platform-project-experience.3` | Make Project Chat the default Project surface            |
-| `agent-platform-project-experience.4` | Add optional file/default-IDE handoff with continuity    |
-| `agent-platform-project-experience.5` | Clean Project labels and add breadcrumbs                 |
-| `agent-platform-project-experience.6` | Verify Project experience navigation with Playwright E2E |
+| Task                                  | Purpose                                                   |
+| ------------------------------------- | --------------------------------------------------------- |
+| `agent-platform-project-experience.1` | Generalize Project profiles and capability metadata       |
+| `agent-platform-project-experience.2` | Add left explorer Project and Chat navigation             |
+| `agent-platform-project-experience.3` | Make Project Chat the default Project surface             |
+| `agent-platform-project-experience.4` | Add optional external/default-IDE handoff with continuity |
+| `agent-platform-project-experience.5` | Clean Project labels and add breadcrumbs                  |
+| `agent-platform-project-experience.6` | Verify Project experience navigation with Playwright E2E  |
+| `agent-platform-project-experience.7` | Render generated outputs in Project Chat                  |
+| `agent-platform-project-experience.8` | Add Project activity side panel                           |
+
+## Parallel Implementation Notes
+
+After `agent-platform-project-experience.3` has made Project Chat the default Project surface:
+
+- `agent-platform-project-experience.4` and `.5` should remain sequential because the handoff and
+  breadcrumb copy touch shared navigation.
+- `agent-platform-project-experience.7` can run in parallel with `.4`/`.5` if it is limited to
+  generated-output preview components and chat artifact rendering.
+- `agent-platform-project-experience.8` can run in parallel after the panel data contract is agreed,
+  but should avoid editing the same preview components owned by `.7`.
+- `agent-platform-project-experience.6` remains the integration verification gate and should absorb
+  E2E coverage from `.4`, `.5`, `.7`, and `.8`.
 
 ## Testing Strategy Requirements
 
@@ -124,6 +141,8 @@ Each child task must include concrete local and remote verification:
       without making the built-in IDE the primary workflow.
 - [ ] Users can return to Home/Project Chat through breadcrumbs or equivalent quiet navigation.
 - [ ] Generated artifacts can be previewed from chat/activity surfaces where supported.
+- [ ] Right-side Project activity shows changed files, previews, tests, CI, review feedback, and
+      approvals without leaking raw implementation state.
 - [ ] Normal UI hides `/workspace`, backend accessibility, backend root, and repository root.
 - [ ] Playwright verifies Chat, Project reopen, Project Chat, optional file/IDE handoff, rendered
       previews, return navigation, and context preservation.
