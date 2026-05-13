@@ -39,11 +39,16 @@ import {
 import { apiGet, apiPath, ApiRequestError } from '@/lib/apiClient';
 import {
   buildProjectChatHref,
+  personalChatModeSearchValue,
   desktopProjectFolderLabel,
   desktopProjectIsAvailable,
   projectReopenRequestedEvent,
+  projectReopenSearchParam,
   recentProjectsUpdatedEvent,
+  workspaceHomeRequestedEvent,
+  workspaceModeSearchParam,
   workspaceNavigationItems,
+  workspacePersonalChatRequestedEvent,
 } from '@/lib/project-navigation';
 
 const settingsNavigation = [
@@ -204,6 +209,7 @@ export function Sidebar() {
   const { collapsed, toggle } = useSidebar();
   const [recentProjects, setRecentProjects] = useState<ProjectDesktopRecord[]>([]);
   const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(false);
+  const [searchString, setSearchString] = useState('');
 
   const loadRecentProjects = useCallback(async () => {
     setIsLoadingRecentProjects(true);
@@ -239,6 +245,18 @@ export function Sidebar() {
     };
   }, [loadRecentProjects]);
 
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const syncSearchString = () => {
+      setSearchString(globalThis.window.location.search);
+    };
+    syncSearchString();
+    globalThis.window.addEventListener('popstate', syncSearchString);
+    return () => {
+      globalThis.window.removeEventListener('popstate', syncSearchString);
+    };
+  }, []);
+
   return (
     <aside
       className={cn(
@@ -273,13 +291,30 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {workspaceNavigationItems.map((item) => {
+          const searchParams = new URLSearchParams(searchString);
+          const currentMode = searchParams.get(workspaceModeSearchParam);
+          const currentProjectId = searchParams.get(projectReopenSearchParam);
+          const isRoot = pathname === '/';
           const isActive =
-            pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+            item.surface === 'home'
+              ? isRoot && !currentMode && !currentProjectId
+              : isRoot && currentMode === personalChatModeSearchValue && !currentProjectId;
 
           return (
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => {
+                const url = new URL(item.href, globalThis.window.location.href);
+                setSearchString(url.search);
+                if (item.surface === 'home') {
+                  globalThis.window.dispatchEvent(new CustomEvent(workspaceHomeRequestedEvent));
+                } else if (item.surface === 'chat') {
+                  globalThis.window.dispatchEvent(
+                    new CustomEvent(workspacePersonalChatRequestedEvent),
+                  );
+                }
+              }}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group',
                 isActive
