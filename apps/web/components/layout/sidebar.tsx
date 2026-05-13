@@ -45,6 +45,7 @@ import {
   projectReopenRequestedEvent,
   projectReopenSearchParam,
   recentProjectsUpdatedEvent,
+  visibleRecentDesktopProjects,
   workspaceHomeRequestedEvent,
   workspaceModeSearchParam,
   workspaceNavigationItems,
@@ -123,6 +124,8 @@ export function RecentProjectsNavSection({
   isLoading: boolean;
   onRefresh: () => void;
 }>) {
+  const visibleProjects = visibleRecentDesktopProjects(projects);
+
   return (
     <section className="mt-5 border-t border-border pt-4" aria-label="Recent Projects">
       <div className="mb-2 flex items-center justify-between gap-2 px-3">
@@ -142,13 +145,13 @@ export function RecentProjectsNavSection({
           <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} aria-hidden />
         </Button>
       </div>
-      {projects.length === 0 ? (
+      {visibleProjects.length === 0 ? (
         <p className="px-3 text-xs leading-snug text-muted-foreground">
           {isLoading ? 'Loading Projects...' : 'No recent Projects'}
         </p>
       ) : (
         <div className="space-y-1">
-          {projects.slice(0, 6).map((project) => {
+          {visibleProjects.map((project) => {
             const available = desktopProjectIsAvailable(project);
             const folderLabel = desktopProjectFolderLabel(project) ?? project.name;
             const content = (

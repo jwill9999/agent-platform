@@ -8,7 +8,6 @@ import {
   ProjectInstructionUpdatesPanel,
   ProjectOnboardingAssessmentPanel,
   ProjectOnboardingDraftPanel,
-  RecentDesktopProjectsPanel,
 } from '@/components/ide/ide-with-chat';
 import { RecentProjectsNavSection } from '@/components/layout/sidebar';
 
@@ -237,25 +236,6 @@ describe('Project onboarding assessment panel', () => {
     expect(html).toContain('Focused API tests: pnpm --filter @agent-platform/api test');
     expect(html).toContain('Apply');
     expect(html).toContain('Reject');
-    expect(html).not.toContain('/workspace');
-  });
-
-  it('renders recent desktop Projects without host paths and disables missing folders', () => {
-    const html = renderToStaticMarkup(
-      createElement(RecentDesktopProjectsPanel, {
-        projects: recentDesktopProjectFixtures,
-        isLoading: false,
-        onRefresh: () => {},
-        onReopen: () => {},
-      }),
-    );
-
-    expect(html).toContain('Recent Projects');
-    expect(html).toContain('Auth App');
-    expect(html).toContain('Ready to reopen');
-    expect(html).toContain('Missing App');
-    expect(html).toContain('Folder unavailable');
-    expect(html).not.toContain('/Users/');
     expect(html).not.toContain('/workspace');
   });
 

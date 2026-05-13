@@ -204,6 +204,31 @@ export function desktopProjectIsAvailable(project: ProjectDesktopRecord): boolea
   return project.metadata.capabilityState !== 'unavailable';
 }
 
+export function visibleRecentDesktopProjects(
+  projects: readonly ProjectDesktopRecord[],
+  options: {
+    readonly limit?: number;
+    readonly unavailableLimit?: number;
+  } = {},
+): ProjectDesktopRecord[] {
+  const limit = options.limit ?? 6;
+  const unavailableLimit = options.unavailableLimit ?? 2;
+  const seen = new Set<string>();
+  const unique = projects.filter((project) => {
+    const folderLabel = desktopProjectFolderLabel(project)?.toLowerCase() ?? '';
+    const dedupeKey = `${project.id}:${project.name.toLowerCase()}:${folderLabel}`;
+    if (seen.has(dedupeKey)) return false;
+    seen.add(dedupeKey);
+    return true;
+  });
+  const available = unique.filter(desktopProjectIsAvailable);
+  const unavailable = unique.filter((project) => !desktopProjectIsAvailable(project));
+  const visibleAvailable = available.slice(0, limit);
+  const remainingSlots = Math.max(0, limit - visibleAvailable.length);
+  const visibleUnavailable = unavailable.slice(0, Math.min(unavailableLimit, remainingSlots));
+  return [...visibleAvailable, ...visibleUnavailable];
+}
+
 export function projectOnboardingAssessmentFromMetadata(
   project: { readonly metadata?: unknown } | null,
 ): ProjectOnboardingAssessment | null {
