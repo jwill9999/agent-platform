@@ -21,9 +21,11 @@ import { Button } from '@/components/ui/button';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
 import {
+  buildPersonalChatHref,
   buildProjectIdeHref,
   createWorkspaceNavigationState,
   desktopProjectIsAvailable,
+  personalChatModeSearchValue,
   projectCapabilitySummary,
   projectDisplayProfile,
   projectOnboardingAssessmentFromMetadata,
@@ -31,7 +33,10 @@ import {
   projectReopenRequestedEvent,
   recentProjectsUpdatedEvent,
   sessionReopenSearchParam,
+  workspaceHomeRequestedEvent,
   workspaceEntryCopy,
+  workspaceModeSearchParam,
+  workspacePersonalChatRequestedEvent,
 } from '@/lib/project-navigation';
 import {
   bindProjectSession,
@@ -134,25 +139,23 @@ function HomeEntryScreen({
               </span>
             </button>
           ) : (
-            <Button
-              asChild
-              variant="outline"
-              className="group flex h-auto min-h-44 flex-col items-start justify-between rounded-lg p-5 text-left"
+            <button
+              type="button"
+              className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left opacity-75"
+              disabled
             >
-              <Link href="/ide">
-                <span>
-                  <span className="block text-lg font-semibold text-foreground">
-                    {workspaceEntryCopy.projectTitle}
-                  </span>
-                  <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                    {workspaceEntryCopy.projectDescription}
-                  </span>
+              <span>
+                <span className="block text-lg font-semibold text-foreground">
+                  {workspaceEntryCopy.projectTitle}
                 </span>
-                <span className="text-sm font-medium text-primary">
-                  {workspaceEntryCopy.projectProfile}
+                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                  {workspaceEntryCopy.projectDescription}
                 </span>
-              </Link>
-            </Button>
+              </span>
+              <span className="text-sm font-medium text-muted-foreground">
+                Open this app on desktop to choose a Project folder.
+              </span>
+            </button>
           )}
         </div>
       </section>
@@ -340,17 +343,30 @@ export default function HomePage() {
     [agents, modelConfigs],
   );
 
-  const handleOpenChat = useCallback(() => {
-    setSelectedMode('chat');
-    setActiveProject(null);
-    const def = pickDefaultAgentForMode(agents, 'chat');
-    if (def) {
-      setSelectedAgentId(def.id);
-      setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
-    }
-  }, [agents, modelConfigs]);
+  const handleOpenChat = useCallback(
+    (options?: { readonly updateUrl?: boolean }) => {
+      if (options?.updateUrl !== false && globalThis.window !== undefined) {
+        globalThis.window.history.pushState(null, '', buildPersonalChatHref());
+      }
+      setSelectedMode('chat');
+      setActiveProject(null);
+      setSessionId(null);
+      setSensorDashboard(null);
+      setSessionError(null);
+      setIsResuming(false);
+      const def = pickDefaultAgentForMode(agents, 'chat');
+      if (def) {
+        setSelectedAgentId(def.id);
+        setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
+      }
+    },
+    [agents, modelConfigs],
+  );
 
   const handleReturnHome = useCallback(() => {
+    if (globalThis.window !== undefined) {
+      globalThis.window.history.pushState(null, '', '/');
+    }
     setSelectedMode(null);
     setActiveProject(null);
     setSessionId(null);
@@ -358,6 +374,28 @@ export default function HomePage() {
     setSessionError(null);
     setIsResuming(false);
   }, []);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const returnHome = () => {
+      handleReturnHome();
+    };
+    globalThis.window.addEventListener(workspaceHomeRequestedEvent, returnHome);
+    return () => {
+      globalThis.window.removeEventListener(workspaceHomeRequestedEvent, returnHome);
+    };
+  }, [handleReturnHome]);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const openPersonalChat = () => {
+      handleOpenChat({ updateUrl: false });
+    };
+    globalThis.window.addEventListener(workspacePersonalChatRequestedEvent, openPersonalChat);
+    return () => {
+      globalThis.window.removeEventListener(workspacePersonalChatRequestedEvent, openPersonalChat);
+    };
+  }, [handleOpenChat]);
 
   const bindActiveProjectSession = useCallback(
     async (agentId: string, projectId: string) => {
@@ -484,6 +522,17 @@ export default function HomePage() {
 
   useEffect(() => {
     if (globalThis.window === undefined) return;
+    const params = new URLSearchParams(globalThis.window.location.search);
+    const requestedMode = params.get(workspaceModeSearchParam);
+    const projectId = params.get(projectReopenSearchParam);
+    if (projectId || requestedMode !== personalChatModeSearchValue || selectedMode === 'chat') {
+      return;
+    }
+    handleOpenChat({ updateUrl: false });
+  }, [handleOpenChat, selectedMode]);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
     const handleProjectReopenRequest = (event: Event) => {
       const detail = (event as CustomEvent<{ projectId?: unknown }>).detail;
       if (typeof detail?.projectId !== 'string') return;
@@ -571,7 +620,9 @@ export default function HomePage() {
       <HomeEntryScreen
         isDesktopProjectBridgeAvailable={isDesktopProjectBridgeAvailable}
         isOpeningProject={isOpeningProject}
-        onOpenChat={handleOpenChat}
+        onOpenChat={() => {
+          handleOpenChat();
+        }}
         onOpenProject={() => {
           handleOpenProject().catch(() => {});
         }}

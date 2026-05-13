@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildPersonalChatHref,
   buildProjectChatHref,
   buildProjectIdeHref,
   createWorkspaceNavigationState,
@@ -13,6 +14,7 @@ import {
   projectReopenSearchParam,
   resolveWorkspaceScope,
   sessionReopenSearchParam,
+  workspaceModeSearchParam,
   workspaceEntryCopy,
   workspaceNavigationItems,
   workspaceScopeLabel,
@@ -98,6 +100,7 @@ describe('Project navigation model', () => {
 
     expect(visibleCopy).toContain('Project');
     expect(visibleCopy).not.toMatch(/backend|\/workspace|container|coding agent/i);
+    expect(workspaceNavigationItems.map((item) => item.name)).toEqual(['Workspaces', 'Chat']);
   });
 
   it('builds safe Project reopen metadata for desktop Projects', () => {
@@ -120,6 +123,8 @@ describe('Project navigation model', () => {
 
     expect(projectReopenSearchParam).toBe('projectId');
     expect(sessionReopenSearchParam).toBe('sessionId');
+    expect(workspaceModeSearchParam).toBe('mode');
+    expect(buildPersonalChatHref()).toBe('/?mode=chat');
     expect(buildProjectChatHref(project.id)).toBe('/?projectId=project%201');
     expect(buildProjectChatHref(project.id, 'session 1')).toBe(
       '/?projectId=project%201&sessionId=session%201',

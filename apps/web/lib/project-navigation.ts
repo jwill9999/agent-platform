@@ -6,7 +6,7 @@ import type {
   ProjectRecord,
 } from '@agent-platform/contracts';
 import { ProjectOnboardingAssessmentSchema } from '@agent-platform/contracts';
-import { Code2, MessageSquare, type LucideIcon } from 'lucide-react';
+import { House, MessageSquare, type LucideIcon } from 'lucide-react';
 
 export type WorkspaceSurface = 'home' | 'chat' | 'project-chat' | 'ide';
 
@@ -40,18 +40,18 @@ export interface ProjectCapabilityDisplay {
 
 export const workspaceNavigationItems: readonly WorkspaceNavigationItem[] = [
   {
-    name: 'Chat',
+    name: 'Workspaces',
     href: '/',
-    surface: 'chat',
-    icon: MessageSquare,
-    description: 'Start conversations',
+    surface: 'home',
+    icon: House,
+    description: 'Choose chat or Project',
   },
   {
-    name: 'IDE',
-    href: '/ide',
-    surface: 'ide',
-    icon: Code2,
-    description: 'Inspect Project files',
+    name: 'Chat',
+    href: '/?mode=chat',
+    surface: 'chat',
+    icon: MessageSquare,
+    description: 'Personal assistant',
   },
 ];
 
@@ -68,8 +68,13 @@ export const workspaceEntryCopy = {
 
 export const projectReopenSearchParam = 'projectId';
 export const sessionReopenSearchParam = 'sessionId';
+export const workspaceModeSearchParam = 'mode';
+export const personalChatModeSearchValue = 'chat';
 export const recentProjectsUpdatedEvent = 'agent-platform:desktop-projects-updated';
 export const projectReopenRequestedEvent = 'agent-platform:project-reopen-requested';
+export const workspaceHomeRequestedEvent = 'agent-platform:workspace-home-requested';
+export const workspacePersonalChatRequestedEvent =
+  'agent-platform:workspace-personal-chat-requested';
 
 const projectProfileDisplayByProfile: Record<ProjectProfile, ProjectProfileDisplay> = {
   coding: {
@@ -256,4 +261,8 @@ export function buildProjectChatHref(projectId: string, sessionId?: string | nul
     params.push(`${sessionReopenSearchParam}=${encodeURIComponent(sessionId)}`);
   }
   return `/?${params.join('&')}`;
+}
+
+export function buildPersonalChatHref(): string {
+  return `/?${workspaceModeSearchParam}=${personalChatModeSearchValue}`;
 }

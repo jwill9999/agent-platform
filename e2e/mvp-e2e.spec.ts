@@ -39,7 +39,8 @@ test.describe('MVP E2E (compose-backed)', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Open Chat/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Open Project/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Open Project/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open Project/ })).toHaveCount(0);
   });
 
   test('sessions move from sidebar panel to header dropdown', async ({ page }) => {
@@ -54,12 +55,13 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.getByRole('menuitem', { name: 'New chat with current agent' })).toBeVisible();
   });
 
-  test('sidebar shows Chat/IDE and settings overflow menu', async ({ page }) => {
+  test('sidebar shows Workspaces/Chat and settings overflow menu', async ({ page }) => {
     await page.goto('/');
 
     const sidebar = page.locator('aside').first();
+    await expect(sidebar.getByRole('link', { name: 'Workspaces' })).toBeVisible();
     await expect(sidebar.getByRole('link', { name: 'Chat' })).toBeVisible();
-    await expect(sidebar.getByRole('link', { name: 'IDE' })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: 'IDE' })).toHaveCount(0);
 
     await expect(sidebar.getByRole('link', { name: 'Agents' })).toHaveCount(0);
     await expect(sidebar.getByRole('link', { name: 'Tools' })).toHaveCount(0);
@@ -76,6 +78,7 @@ test.describe('MVP E2E (compose-backed)', () => {
     await page.goto('/');
 
     await page.getByRole('button', { name: /Open Chat/ }).click();
+    await expect(page).toHaveURL(/\/\?mode=chat$/);
     await expect(page.locator('[aria-label="Active agent"]').first()).toContainText(
       'Personal assistant',
     );
@@ -84,16 +87,27 @@ test.describe('MVP E2E (compose-backed)', () => {
     await expect(page.getByRole('button', { name: /Terminal/ })).toHaveCount(0);
 
     await page.goto('/');
-    await page.getByRole('link', { name: /Open Project/ }).click();
-    await expect(page).toHaveURL(/\/ide$/);
-    await expect(page.locator('[aria-label="Active agent"]').first()).toContainText('Coding');
-    await expect(page.getByLabel('Project folder path')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Open Project' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Open Project/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Open Project/ })).toBeDisabled();
     await expect(
-      page.getByText('Open this app on desktop to choose a Project folder'),
+      page.getByText('Open this app on desktop to choose a Project folder.'),
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: /Terminal/ })).toBeVisible();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test('personal chat nav and workspace return have separate meanings', async ({ page }) => {
+    await page.goto('/');
+    const sidebar = page.locator('aside').first();
+
+    await sidebar.getByRole('link', { name: 'Chat' }).click();
+    await expect(page).toHaveURL(/\/\?mode=chat$/);
+    await expect(page.locator('[aria-label="Active agent"]').first()).toContainText(
+      'Personal assistant',
+    );
+
+    await sidebar.getByRole('link', { name: 'Workspaces' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
   });
 
   test('IDE does not present manual Project path binding as the product opener', async ({
