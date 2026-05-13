@@ -101,6 +101,16 @@ test.describe('Electron Project access', () => {
         `/ide?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(session.id)}`,
       );
 
+      await sendChatMessage(page, '/help', 'Ask about this Project...');
+      await expect(
+        page.getByText(
+          'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
+        ),
+      ).toBeVisible();
+      await sendChatMessage(page, '/help init', 'Ask about this Project...');
+      await expect(page.getByText('Scope: project').last()).toBeVisible();
+      await expect(page.getByText('May change Project state.').last()).toBeVisible();
+
       const recentProjects = page.locator('section[aria-label="Recent Projects"]');
       await expect(
         recentProjects.getByRole('link', { name: new RegExp(firstProjectName) }),
@@ -147,9 +157,6 @@ test.describe('Electron Project access', () => {
           'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
         ),
       ).toBeVisible();
-      await sendChatMessage(page, '/help init', 'Ask about this Project...');
-      await expect(page.getByText('Scope: project').last()).toBeVisible();
-      await expect(page.getByText('May change Project state.').last()).toBeVisible();
 
       await page.getByRole('link', { name: 'Open IDE' }).click();
       await page.waitForURL(/\/ide/);

@@ -284,6 +284,16 @@ function StatusLabel({
   );
 }
 
+export function ideChatUnavailableText(options: {
+  readonly sessionReady: boolean;
+  readonly hasActiveProject: boolean;
+}): string | null {
+  if (options.sessionReady) return null;
+  return options.hasActiveProject
+    ? 'Opening Project chat...'
+    : 'Open a Project to chat with the assistant.';
+}
+
 function ContentActivityBlocks({
   criticEvents,
   thinking,
@@ -1359,6 +1369,7 @@ function ChatPanel({
   selectedAgentId,
   onAgentChange,
   sessionReady,
+  chatUnavailableText,
   criticEventsByMessage,
   thinkingByMessage,
   toolEventsByMessage,
@@ -1388,6 +1399,7 @@ function ChatPanel({
   selectedAgentId: string | null;
   onAgentChange: (id: string) => void;
   sessionReady: boolean;
+  chatUnavailableText: string | null;
   criticEventsByMessage: Record<string, CriticEvent[]>;
   thinkingByMessage: Record<string, string>;
   toolEventsByMessage: Record<string, ToolTraceEvent[]>;
@@ -1511,7 +1523,7 @@ function ChatPanel({
         />
         <div className="flex gap-2">
           <Textarea
-            placeholder="Ask about your code..."
+            placeholder={chatUnavailableText ?? 'Ask about your code...'}
             value={chatInput}
             onChange={(e) => {
               setChatInput(e.target.value);
@@ -1523,16 +1535,20 @@ function ChatPanel({
               }
             }}
             className="min-h-[60px] max-h-[120px] text-sm resize-none"
+            disabled={isLoading || Boolean(chatUnavailableText)}
           />
           <Button
             size="icon"
             onClick={onSendMessage}
-            disabled={!chatInput.trim() || isLoading || !sessionReady}
+            disabled={!chatInput.trim() || isLoading || !sessionReady || Boolean(chatUnavailableText)}
             className="flex-shrink-0"
           >
             <Send className="h-4 w-4" />
           </Button>
         </div>
+        {chatUnavailableText ? (
+          <p className="mt-2 text-xs text-muted-foreground">{chatUnavailableText}</p>
+        ) : null}
       </div>
     </div>
   );
@@ -2110,6 +2126,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, [harnessError, setHarnessError]);
 
   const isLoading = status === 'streaming';
+  const chatUnavailableText = ideChatUnavailableText({
+    sessionReady: Boolean(sessionId),
+    hasActiveProject: Boolean(activeProject),
+  });
 
   const handleApproveProjectInstructions = useCallback(async () => {
     if (!activeProject?.id) return;
@@ -2638,7 +2658,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
   const handleSendMessage = useCallback(() => {
     const userLine = chatInput.trim();
-    if (!userLine || !sessionId) return;
+    if (!userLine || !sessionId || isLoading) return;
     const shouldRefreshProject = Boolean(activeProject?.id && userLine.startsWith('/'));
     const messageForApi = buildIdeChatMessage({
       userLine,
@@ -2650,7 +2670,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       })
       .catch(() => {});
     setChatInput('');
-  }, [activeProject?.id, chatInput, sessionId, contextDraft, refreshActiveProject, sendMessage]);
+  }, [
+    activeProject?.id,
+    chatInput,
+    sessionId,
+    isLoading,
+    contextDraft,
+    refreshActiveProject,
+    sendMessage,
+  ]);
 
   // --- Keyboard shortcuts ---
 
@@ -3074,6 +3102,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 selectedAgentId={selectedAgentId}
                 onAgentChange={setSelectedAgentId}
                 sessionReady={Boolean(sessionId)}
+                chatUnavailableText={chatUnavailableText}
                 criticEventsByMessage={criticEventsByMessage}
                 thinkingByMessage={thinkingByMessage}
                 toolEventsByMessage={toolEventsByMessage}
