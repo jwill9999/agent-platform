@@ -164,7 +164,7 @@ export function RecentProjectsNavSection({
                     available ? 'text-emerald-600' : 'text-amber-700 dark:text-amber-300',
                   )}
                 >
-                  {available ? 'Ready to reopen' : 'Folder unavailable'}
+                  {available ? 'Ready to reopen' : 'Open again to reconnect'}
                 </span>
               </>
             );
@@ -176,7 +176,7 @@ export function RecentProjectsNavSection({
                   type="button"
                   className="flex w-full cursor-not-allowed flex-col rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left"
                   disabled
-                  aria-label={`${project.name} folder unavailable`}
+                  aria-label={`${project.name} open again to reconnect`}
                 >
                   {content}
                 </button>
