@@ -31,8 +31,8 @@ For desktop Product work:
 - `/init` must run only when the active chat/session has a backend-bound Project context.
 - Project assessment, `AGENTS.md` reads/writes, refresh/rescan, and write-unlock decisions must use
   the selected Project root registered by the Electron backend bridge.
-- The user-visible flow is Project chat first, then optional IDE handoff using the same
-  Project/session binding.
+- The user-visible flow is Project chat first. The built-in IDE is not required for onboarding and
+  should not be the primary onboarding surface.
 - Existing web Playwright coverage remains useful for architecture-neutral behavior, but final
   acceptance requires production-like Electron E2E once the runtime exists.
 
@@ -62,7 +62,7 @@ For desktop Product work:
   use Electron E2E against the native Project opener rather than browser-only folder handles.
 - A follow-up epic, `agent-platform-project-experience`, will implement the broader Project
   navigation model: chat-first Project entry, recent/reopen Projects, left explorer organization,
-  optional IDE handoff, breadcrumbs, and generic Project profiles beyond coding.
+  optional file/default-IDE handoff, breadcrumbs, and generic Project profiles beyond coding.
 
 ## Epic 2 Scope
 
@@ -129,7 +129,7 @@ strategy must identify:
 - Playwright coverage for user-visible onboarding behavior. The strategy must define the UI actions
   Playwright performs and the visible/filesystem outputs it asserts.
 - Electron E2E coverage for desktop acceptance whenever the task depends on native Project opening,
-  `/init`, Project chat, IDE handoff, or filesystem writes.
+  `/init`, Project chat, optional file/IDE handoff, or filesystem writes.
 - filesystem assertions for `AGENTS.md` draft/finalization/update behavior.
 - CI/GitHub checks, logs, and artifacts that must be monitored on the task pull request.
 - deterministic fixture projects needed by the task.

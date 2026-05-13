@@ -20,6 +20,15 @@ optional IDE handoff, breadcrumbs, and user-facing labels.
 This epic remains the product experience reference, but desktop acceptance now depends on the
 Electron Project model.
 
+After Electron manual QA, the Product direction is chat-first with a narrower role for the built-in
+IDE. The desktop implementation should prioritise Project Chat, Project activity, slash commands,
+native Project binding, and rendered previews. Direct manual editing should be explicit, preferably
+through a user-configured/default IDE handoff unless a future built-in IDE is deliberately scoped.
+
+Do not start this epic until
+[Stabilisation closeout and next-epic gate](./agent-platform-electron-stabilisation.12.md) has
+confirmed the Electron stabilisation work is ready to move forward.
+
 The desktop implementation must start with a backend-bound Project created by
 [Native Project access and session binding](./agent-platform-electron-project-access.md). Browser
 File System Access handles, duplicate browser `Open Folder` CTAs, and manual absolute path entry are
@@ -41,7 +50,10 @@ For desktop Product work:
   folder, automation workspace, generated app, or mixed files.
 - The coding agent is a Project profile/tooling choice, not the definition of Project.
 - Opening a Project should land in project-scoped chat by default.
-- The IDE is an optional deeper view that preserves the active Project and conversation.
+- The built-in IDE is no longer a primary workflow. Manual editing should be explicit and secondary,
+  with external/default IDE handoff preferred unless a built-in IDE is separately scoped.
+- Generated artifacts such as landing pages, Markdown documents, PDFs, and HTML/app output should be
+  previewable from chat/activity surfaces instead of requiring file-system navigation.
 - Primary navigation belongs in the left explorer: top-level app routes, recent/reopen Projects, and
   recent Chats/Sessions.
 - User-facing copy should show Project name, folder/relevant relative path, profile/status, and
@@ -62,8 +74,10 @@ In scope:
 - Native desktop Project selection and reopen semantics are implemented in the Electron Project
   access epic; this epic consumes that backend-bound Project model.
 - Project-scoped chat as the default Project surface.
-- Explicit Open IDE action from an active Project Chat.
-- Session/project continuity between Project Chat and IDE.
+- Explicit file/IDE handoff from an active Project Chat, with external/default IDE handoff preferred
+  over extending the built-in IDE during stabilisation.
+- Session/project continuity between Project Chat and any optional file/IDE surface.
+- Rendered preview surfaces for generated documents/apps where appropriate.
 - Breadcrumbs or equivalent quiet location affordance for Home, Chat, Project, and IDE.
 - User-facing Project labels that hide runtime implementation details.
 - Playwright coverage for the navigation and context-preservation flows.
@@ -73,7 +87,7 @@ In scope:
 Out of scope:
 
 - Full `AGENTS.md` onboarding implementation, which belongs to `agent-platform-project-onboarding`.
-- External host IDE integration.
+- Full embedded IDE implementation.
 - Multi-user permissions or remote checkout management.
 - Scheduled task/cron runtime implementation beyond representing automation as a Project profile.
 
@@ -84,7 +98,7 @@ Out of scope:
 | `agent-platform-project-experience.1` | Generalize Project profiles and capability metadata      |
 | `agent-platform-project-experience.2` | Add left explorer Project and Chat navigation            |
 | `agent-platform-project-experience.3` | Make Project Chat the default Project surface            |
-| `agent-platform-project-experience.4` | Add optional IDE handoff with session continuity         |
+| `agent-platform-project-experience.4` | Add optional file/default-IDE handoff with continuity    |
 | `agent-platform-project-experience.5` | Clean Project labels and add breadcrumbs                 |
 | `agent-platform-project-experience.6` | Verify Project experience navigation with Playwright E2E |
 
@@ -95,8 +109,8 @@ Each child task must include concrete local and remote verification:
 - mandatory local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`, unless
   the task explains why a narrower gate is sufficient.
 - focused unit/contract/component tests for touched behavior.
-- Playwright coverage for user-visible navigation, Project reopen, Project Chat, IDE handoff, and
-  context preservation when the task changes those flows.
+- Playwright coverage for user-visible navigation, Project reopen, Project Chat, optional file/IDE
+  handoff, preview rendering, and context preservation when the task changes those flows.
 - GitHub PR checks, SonarCloud/GitGuardian/Sourcery state, and review comments must be monitored
   before closing Beads tasks.
 
@@ -106,10 +120,12 @@ Each child task must include concrete local and remote verification:
 - [ ] Users can see Projects and Chats/Sessions in the left explorer without scattered CTAs.
 - [ ] Users can reopen previous Projects from stored metadata.
 - [ ] Opening a Project lands in project-scoped chat by default.
-- [ ] Users can explicitly open the IDE from a Project and keep the same Project/session context.
+- [ ] Users can explicitly open files or hand off to their configured/default IDE from a Project
+      without making the built-in IDE the primary workflow.
 - [ ] Users can return to Home/Project Chat through breadcrumbs or equivalent quiet navigation.
+- [ ] Generated artifacts can be previewed from chat/activity surfaces where supported.
 - [ ] Normal UI hides `/workspace`, backend accessibility, backend root, and repository root.
-- [ ] Playwright verifies Chat, Project reopen, Project Chat, IDE handoff, return navigation, and
-      context preservation.
+- [ ] Playwright verifies Chat, Project reopen, Project Chat, optional file/IDE handoff, rendered
+      previews, return navigation, and context preservation.
 - [ ] Production-like Electron E2E verifies the same desktop path through native Project access;
       browser-only/manual-path opening is not an acceptance path.
