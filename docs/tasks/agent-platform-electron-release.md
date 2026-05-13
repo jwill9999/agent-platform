@@ -9,6 +9,7 @@ Make the macOS desktop app distributable for the owner/internal users first, the
 
 ## Requirements
 
+- Start only after Electron stabilisation/manual QA triage is complete.
 - Decide the first macOS artifact shape.
 - Build a macOS Electron artifact.
 - Document the release process.
@@ -29,9 +30,9 @@ Make the macOS desktop app distributable for the owner/internal users first, the
 
 ## Dependencies
 
-| Upstream                             | Downstream |
-| ------------------------------------ | ---------- |
-| `agent-platform-electron-experience` | none       |
+| Upstream                                | Downstream |
+| --------------------------------------- | ---------- |
+| `agent-platform-electron-stabilisation` | none       |
 
 ## Testing Strategy
 

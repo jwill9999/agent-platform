@@ -93,6 +93,7 @@ Spec: docs/tasks/<issue-id>.md
 | Electron command sandbox | `agent-platform-electron-command-sandbox` | `.1`–`.7` define threat model, runner interface, host runner, policy, tests, and future research |
 | Electron onboarding      | `agent-platform-electron-onboarding`      | child specs pending                                                                              |
 | Electron experience      | `agent-platform-electron-experience`      | child specs pending                                                                              |
+| Electron stabilisation   | `agent-platform-electron-stabilisation`   | `agent-platform-electron-stabilisation.{1-5}.md`                                                 |
 | Electron release         | `agent-platform-electron-release`         | child specs pending                                                                              |
 | Research tools           | `agent-platform-research-tools`           | child specs pending                                                                              |
 | Memory management        | `agent-platform-memory`                   | child specs pending                                                                              |

@@ -34,17 +34,17 @@ Deliver the chat-first Project experience on top of the Electron runtime and nat
 
 ## Dependencies
 
-| Upstream                               | Downstream                             |
-| -------------------------------------- | -------------------------------------- |
-| `agent-platform-electron-onboarding`   | `agent-platform-electron-experience.1` |
-| `agent-platform-electron-experience.1` | `agent-platform-electron-experience.2` |
-| `agent-platform-electron-experience.2` | `agent-platform-electron-experience.3` |
-| `agent-platform-electron-experience.3` | `agent-platform-electron-experience.4` |
-| `agent-platform-electron-experience.4` | `agent-platform-electron-experience.5` |
-| `agent-platform-electron-experience.5` | `agent-platform-electron-experience.6` |
-| `agent-platform-electron-experience.6` | `agent-platform-electron-experience.7` |
-| `agent-platform-electron-experience.7` | `agent-platform-electron-experience.8` |
-| `agent-platform-electron-experience`   | `agent-platform-electron-release`      |
+| Upstream                               | Downstream                              |
+| -------------------------------------- | --------------------------------------- |
+| `agent-platform-electron-onboarding`   | `agent-platform-electron-experience.1`  |
+| `agent-platform-electron-experience.1` | `agent-platform-electron-experience.2`  |
+| `agent-platform-electron-experience.2` | `agent-platform-electron-experience.3`  |
+| `agent-platform-electron-experience.3` | `agent-platform-electron-experience.4`  |
+| `agent-platform-electron-experience.4` | `agent-platform-electron-experience.5`  |
+| `agent-platform-electron-experience.5` | `agent-platform-electron-experience.6`  |
+| `agent-platform-electron-experience.6` | `agent-platform-electron-experience.7`  |
+| `agent-platform-electron-experience.7` | `agent-platform-electron-experience.8`  |
+| `agent-platform-electron-experience`   | `agent-platform-electron-stabilisation` |
 
 ## Testing Strategy
 
@@ -63,3 +63,5 @@ Deliver the chat-first Project experience on top of the Electron runtime and nat
 - Slash commands and ordinary Project chat preserve the same Project/session context.
 - UI avoids scattered Project CTAs and implementation paths/states.
 - Production-like Electron E2E covers Project reopen, Project chat, and IDE handoff.
+- Owner/manual QA closeout happens in `agent-platform-electron-stabilisation` before release work
+  starts.
