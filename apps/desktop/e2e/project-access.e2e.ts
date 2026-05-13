@@ -112,6 +112,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('May change Project state.').last()).toBeVisible();
 
       const recentProjects = page.locator('section[aria-label="Recent Projects"]');
+      await expect(recentProjects).toHaveCount(1);
       await expect(
         recentProjects.getByRole('link', { name: new RegExp(firstProjectName) }),
       ).toBeVisible();

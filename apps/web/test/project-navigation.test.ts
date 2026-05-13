@@ -14,6 +14,7 @@ import {
   projectReopenSearchParam,
   resolveWorkspaceScope,
   sessionReopenSearchParam,
+  visibleRecentDesktopProjects,
   workspaceModeSearchParam,
   workspaceEntryCopy,
   workspaceNavigationItems,
@@ -67,6 +68,30 @@ describe('Project navigation model', () => {
     } as const;
   }
 
+  function desktopProject(input: {
+    readonly id: string;
+    readonly name: string;
+    readonly folderName: string;
+    readonly available: boolean;
+  }) {
+    return {
+      id: input.id,
+      slug: input.folderName,
+      name: input.name,
+      workspacePath: `projects/${input.folderName}`,
+      metadata: {
+        source: 'desktop',
+        folderName: input.folderName,
+        capabilityState: input.available ? 'backend_accessible' : 'unavailable',
+        onboardingState: input.available ? 'approved' : 'missing',
+        defaultAgentProfile: 'coding',
+        instructionFileCount: input.available ? 1 : 0,
+      },
+      createdAtMs: 1,
+      updatedAtMs: input.available ? 2 : 1,
+    } as const;
+  }
+
   it('tracks surface, Project, and session context explicitly', () => {
     expect(
       createWorkspaceNavigationState({
@@ -104,22 +129,12 @@ describe('Project navigation model', () => {
   });
 
   it('builds safe Project reopen metadata for desktop Projects', () => {
-    const project = {
+    const project = desktopProject({
       id: 'project 1',
-      slug: 'auth-app',
       name: 'Auth App',
-      workspacePath: 'projects/auth-app',
-      metadata: {
-        source: 'desktop',
-        folderName: 'auth-app',
-        capabilityState: 'backend_accessible',
-        onboardingState: 'approved',
-        defaultAgentProfile: 'coding',
-        instructionFileCount: 1,
-      },
-      createdAtMs: 1,
-      updatedAtMs: 2,
-    } as const;
+      folderName: 'auth-app',
+      available: true,
+    });
 
     expect(projectReopenSearchParam).toBe('projectId');
     expect(sessionReopenSearchParam).toBe('sessionId');
@@ -135,6 +150,45 @@ describe('Project navigation model', () => {
     );
     expect(desktopProjectFolderLabel(project)).toBe('auth-app');
     expect(desktopProjectIsAvailable(project)).toBe(true);
+  });
+
+  it('keeps Recent Projects focused on available Projects and limits stale unavailable entries', () => {
+    const projects = [
+      desktopProject({
+        id: 'missing-1',
+        name: 'Missing One',
+        folderName: 'missing-one',
+        available: false,
+      }),
+      desktopProject({
+        id: 'available-1',
+        name: 'Available One',
+        folderName: 'available-one',
+        available: true,
+      }),
+      desktopProject({
+        id: 'missing-2',
+        name: 'Missing Two',
+        folderName: 'missing-two',
+        available: false,
+      }),
+      desktopProject({
+        id: 'available-2',
+        name: 'Available Two',
+        folderName: 'available-two',
+        available: true,
+      }),
+      desktopProject({
+        id: 'missing-3',
+        name: 'Missing Three',
+        folderName: 'missing-three',
+        available: false,
+      }),
+    ];
+
+    expect(
+      visibleRecentDesktopProjects(projects, { limit: 4, unavailableLimit: 1 }).map((p) => p.id),
+    ).toEqual(['available-1', 'available-2', 'missing-1']);
   });
 
   it('maps Project profiles to generic user-facing labels', () => {
