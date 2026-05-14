@@ -232,17 +232,31 @@ async function expectHandledSlashMessage(
   db: TestDb,
   sessionId: string,
   message: string,
-  expectedContent: string,
+  expectedContent: string | RegExp,
 ) {
   const res = await request(app).post('/v1/chat').send({ sessionId, message }).expect(200);
   expect(mockToolCalls).not.toHaveBeenCalled();
-  expect(parseNdjsonEvents(res.text)).toEqual([{ type: 'text', content: expectedContent }]);
+  const events = parseNdjsonEvents(res.text);
+  expect(events).toHaveLength(1);
+  expect(events[0]).toMatchObject({ type: 'text' });
+  const content = events[0]!.content ?? '';
+  if (typeof expectedContent === 'string') {
+    expect(content).toBe(expectedContent);
+  } else {
+    expect(content).toMatch(expectedContent);
+  }
 
   const { listMessagesBySession } = await import('@agent-platform/db');
   expect(listMessagesBySession(db, sessionId)).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ role: 'user', content: message }),
-      expect.objectContaining({ role: 'assistant', content: expectedContent }),
+      expect.objectContaining({
+        role: 'assistant',
+        content:
+          typeof expectedContent === 'string'
+            ? expectedContent
+            : expect.stringMatching(expectedContent),
+      }),
     ]),
   );
 }
@@ -437,7 +451,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.id,
         '/init',
-        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+        'I prepared a Project instructions draft for AGENTS.md.\n\nReview the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
       );
       expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
 
@@ -477,7 +491,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.session.id,
         '/init',
-        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+        'I prepared a Project instructions draft for AGENTS.md.\n\nReview the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
       );
       expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
 
@@ -522,7 +536,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionId,
         '/init',
-        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+        'I prepared a Project instructions draft for AGENTS.md.\n\nReview the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
       );
 
       const boundProject = await request(app).get(`/v1/projects/${bound.body.data.project.id}`);
@@ -651,6 +665,47 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(systemPrompt).not.toContain('remembered project rule');
       expect(systemPrompt).not.toContain(boundRoot);
       expect(systemPrompt).not.toContain(rememberedRoot);
+    });
+  });
+
+  it('uses Project-relative paths in assistant-facing Project Chat copy', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      writeFileSync(path.join(projectRoot, 'AGENTS.md'), 'Use project-relative paths.\n');
+      const sessionId = await createProjectSession(app, db, {
+        name: 'Project Path Copy',
+        workspaceKey: projectRoot,
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'backend_accessible',
+        onboardingState: 'approved',
+        instructionFiles: [{ scope: 'root', path: 'AGENTS.md', approvedAtMs: 123 }],
+      });
+
+      mockToolCalls.mockReturnValueOnce('Yes, /workspace/AGENTS.md exists in /workspace.');
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'did you create the AGENTS.md file?' })
+        .expect(200);
+
+      const messagesRes = await request(app).get(`/v1/sessions/${sessionId}/messages`).expect(200);
+      expect(messagesRes.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'assistant',
+            content: 'Yes, AGENTS.md exists in the Project root.',
+          }),
+        ]),
+      );
+
+      const state = mockToolCalls.mock.calls.at(-1)?.[0] as
+        | {
+            messages?: Array<{ role: string; content: string }>;
+          }
+        | undefined;
+      const systemPrompt = state?.messages?.[0]?.content ?? '';
+      expect(systemPrompt).toContain('use Project-relative paths');
+      expect(systemPrompt).toContain('do not mention the internal /workspace mount');
     });
   });
 
@@ -892,6 +947,49 @@ describe('POST /v1/chat (session-aware)', () => {
         .expect(200);
       expect(duplicateResume.body.data.resumedAtMs).toEqual(expect.any(Number));
       await expectToolExecutionCount(db, sessionId, 'success', 1);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('persists reconstructed approval tool-call context before the approved tool result', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionId = await createDefaultSession(app);
+      const { approvalRequestId } = await createPendingToolApproval(app, sessionId);
+      const { listMessagesBySession } = await import('@agent-platform/db');
+      const assistantToolCallMessage = listMessagesBySession(db, sessionId).find(
+        (message) => message.role === 'assistant' && message.toolCalls?.length,
+      );
+      expect(assistantToolCallMessage?.id).toEqual(expect.any(String));
+
+      sqlite
+        .prepare('UPDATE messages SET tool_calls_json = NULL WHERE id = ?')
+        .run(assistantToolCallMessage!.id);
+
+      await request(app)
+        .post(`/v1/approval-requests/${approvalRequestId}/approve`)
+        .send({ reason: 'ok' })
+        .expect(200);
+
+      mockToolCalls.mockReturnValueOnce('Done with date');
+      await request(app)
+        .post(`/v1/sessions/${sessionId}/resume`)
+        .send({ approvalRequestId })
+        .expect(200);
+
+      const messages = listMessagesBySession(db, sessionId);
+      const toolMessageIndex = messages.findIndex((message) => message.role === 'tool');
+      expect(toolMessageIndex).toBeGreaterThan(0);
+      const precedingMessage = messages[toolMessageIndex - 1];
+      expect(precedingMessage).toMatchObject({
+        role: 'assistant',
+        toolCalls: [{ id: 'tc-approval', name: 'sys_bash', args: { command: 'date' } }],
+      });
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

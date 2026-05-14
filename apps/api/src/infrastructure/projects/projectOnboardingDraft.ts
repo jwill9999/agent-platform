@@ -240,7 +240,6 @@ export function buildOnboardingDraft(input: DraftInput): ProjectOnboardingDraft 
     '',
     `- Project: ${input.project.name}`,
     `- Profile: ${titleForProfile(input.assessment.profile)}`,
-    `- Onboarding status: ${input.assessment.status}`,
     `- Summary: ${input.assessment.summary}`,
     '',
     '## User Workflow Notes',

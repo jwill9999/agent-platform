@@ -145,7 +145,11 @@ export function buildProjectInstructionPrompt(
     (ref): ref is ProjectInstructionFileReference => Boolean(ref),
   );
   return [
-    'Project instruction files for this session follow. Treat them as user-provided operating instructions for code work in /workspace.',
+    [
+      'Project instruction files for this session follow.',
+      'Treat them as user-provided operating instructions for work in the active Project.',
+      'When replying to the user, use Project-relative paths and do not mention the internal /workspace mount.',
+    ].join(' '),
     ...selected.map((ref) => `\n--- ${ref.path} ---\n${readPromptFile(root, ref)}`),
   ].join('\n');
 }

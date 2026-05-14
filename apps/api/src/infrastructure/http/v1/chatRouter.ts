@@ -508,17 +508,19 @@ function buildResumeMessages(
   sessionId: string,
   systemPrompt: string,
   toolCall: ToolCallIntent,
-): ChatMessage[] {
-  const history = sanitiseToolCallHistory(
-    listMessagesBySession(db, sessionId).map(dbRecordToChatMessage),
-  );
+): { messages: ChatMessage[]; reconstructedToolCallContext: boolean } {
+  const rawHistory = listMessagesBySession(db, sessionId).map(dbRecordToChatMessage);
+  const hasPersistedToolCallContext = hasAssistantToolCall(rawHistory, toolCall.id);
+  const history = sanitiseToolCallHistory(rawHistory);
   const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...history];
+  let reconstructedToolCallContext = false;
 
   if (!hasAssistantToolCall(messages, toolCall.id)) {
     messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+    reconstructedToolCallContext = !hasPersistedToolCallContext;
   }
 
-  return messages;
+  return { messages, reconstructedToolCallContext };
 }
 
 function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalRequest): ChatMessage {
@@ -753,6 +755,49 @@ function mapProjectWorkspacePaths(value: unknown, workspaceRoot: string): unknow
       key,
       mapProjectWorkspacePaths(entry, workspaceRoot),
     ]),
+  );
+}
+
+function sanitizeProjectFacingText(value: string): string {
+  return value
+    .replace(/\/workspace\/([^\s`"')\]},]+)/g, '$1')
+    .replace(/\/workspace\b/g, 'the Project root');
+}
+
+function sanitizeProjectFacingOutput(event: Output): Output {
+  if (event.type === 'text') {
+    return { ...event, content: sanitizeProjectFacingText(event.content) };
+  }
+  if (event.type === 'error') {
+    return { ...event, message: sanitizeProjectFacingText(event.message) };
+  }
+  return event;
+}
+
+function projectUserFacingEmitter(
+  emitter: OutputEmitter,
+  projectContext: SessionProjectContext,
+): OutputEmitter {
+  if (!projectContext.project) return emitter;
+  return {
+    emit(event) {
+      return emitter.emit(sanitizeProjectFacingOutput(event));
+    },
+    end() {
+      emitter.end();
+    },
+  };
+}
+
+function sanitizeProjectAssistantMessages(
+  messages: ChatMessage[] | undefined,
+  projectContext: SessionProjectContext,
+): ChatMessage[] | undefined {
+  if (!projectContext.project || !messages) return messages;
+  return messages.map((message) =>
+    message.role === 'assistant'
+      ? { ...message, content: sanitizeProjectFacingText(message.content) }
+      : message,
   );
 }
 
@@ -1069,17 +1114,19 @@ export async function handleSessionResume(
     ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
     const emitter: OutputEmitter = createNdjsonEmitter(res);
 
-    const messages = buildResumeMessages(
+    const projectContext = resolveSessionProjectContext(db, session);
+    const resumeBuild = buildResumeMessages(
       db,
       sessionId,
       withProjectInstructionPrompt(
-        resolveSessionProjectContext(db, session),
+        projectContext,
         agentCtx.systemPrompt,
         JSON.stringify(toolCall.args),
       ),
       toolCall,
     );
-    const initialCount = messages.length;
+    const messages = resumeBuild.messages;
+    const initialCount = messages.length - (resumeBuild.reconstructedToolCallContext ? 1 : 0);
 
     let resumeMessages: ChatMessage[];
     let nativeToolExecutor: NativeToolExecutor | undefined;
@@ -1155,14 +1202,18 @@ export async function handleSessionResume(
       configurable: { thread_id: sessionId, signal },
     });
 
-    persistNewMessages(db, sessionId, finalState?.messages, initialCount);
+    const persistedMessages = sanitizeProjectAssistantMessages(
+      finalState?.messages,
+      projectContext,
+    );
+    persistNewMessages(db, sessionId, persistedMessages, initialCount);
     refreshWorkingMemory({
       db,
       sessionId,
       agentId: session.agentId,
       runId,
       userMessage: 'Resume reviewed tool call.',
-      newMessages: finalState?.messages?.slice(initialCount) ?? [],
+      newMessages: persistedMessages?.slice(initialCount) ?? [],
     });
     await safePluginCall(() =>
       agentCtx.pluginDispatcher.onTaskEnd({ sessionId, runId, taskId: runId, ok: true }),
@@ -1227,7 +1278,11 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         );
 
         ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
-        const emitter: OutputEmitter = createNdjsonEmitter(res);
+        const projectContext = resolveSessionProjectContext(db, session);
+        const emitter: OutputEmitter = projectUserFacingEmitter(
+          createNdjsonEmitter(res),
+          projectContext,
+        );
         const dispatcher = agentCtx.pluginDispatcher;
 
         await emitTaskStart(agentCtx, sessionId, runId);
@@ -1257,14 +1312,18 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           configurable: { thread_id: sessionId, signal },
         });
 
-        persistNewMessages(db, sessionId, finalState?.messages, messages.length);
+        const persistedMessages = sanitizeProjectAssistantMessages(
+          finalState?.messages,
+          projectContext,
+        );
+        persistNewMessages(db, sessionId, persistedMessages, messages.length);
         refreshWorkingMemory({
           db,
           sessionId,
           agentId: session.agentId,
           runId,
           userMessage: message,
-          newMessages: finalState?.messages?.slice(messages.length) ?? [],
+          newMessages: persistedMessages?.slice(messages.length) ?? [],
         });
         await safePluginCall(() =>
           dispatcher.onTaskEnd({

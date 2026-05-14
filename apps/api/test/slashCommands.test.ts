@@ -175,7 +175,16 @@ describe('slash command dispatch', () => {
               ...project,
               metadata: {
                 onboardingState: 'in_progress',
-                onboardingDraft: { targetPath: 'AGENTS.md' },
+                onboardingDraft: {
+                  id: 'draft-project-1',
+                  projectId: project.id,
+                  targetPath: 'AGENTS.md',
+                  markdown: '# Agent Instructions\n\nReview me.',
+                  revision: 1,
+                  history: [],
+                  createdAtMs: 1,
+                  updatedAtMs: 1,
+                },
               },
             };
           },
@@ -186,7 +195,7 @@ describe('slash command dispatch', () => {
       kind: 'handled',
       status: 'handled',
       message:
-        'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+        'I prepared a Project instructions draft for AGENTS.md.\n\nReview the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
     });
     expect(startedProjectId).toBe(project.id);
   });

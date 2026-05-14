@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 
 import {
@@ -53,8 +53,11 @@ type AssessmentInput = {
 type PackageManifest = {
   path: string;
   packageName?: string;
+  packageManager: PackageManager;
   scripts: Record<string, string>;
 };
+
+type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
 function toRelativeProjectPath(root: string, filePath: string): string {
   return relative(root, filePath).split(sep).join('/');
@@ -123,6 +126,38 @@ function safeReadText(filePath: string): string | undefined {
   }
 }
 
+function packageManagerFromPackageJson(value: unknown): PackageManager | undefined {
+  if (typeof value !== 'string') return undefined;
+  if (value.startsWith('pnpm@')) return 'pnpm';
+  if (value.startsWith('yarn@')) return 'yarn';
+  if (value.startsWith('bun@')) return 'bun';
+  if (value.startsWith('npm@')) return 'npm';
+  return undefined;
+}
+
+function detectPackageManager(
+  root: string,
+  manifestPath: string,
+  packageManager: unknown,
+): PackageManager {
+  const manifestDir = dirname(join(root, manifestPath));
+  const candidates = [manifestDir, root];
+  for (const dir of candidates) {
+    if (existsSync(join(dir, 'pnpm-lock.yaml')) || existsSync(join(dir, 'pnpm-workspace.yaml'))) {
+      return 'pnpm';
+    }
+    if (existsSync(join(dir, 'yarn.lock'))) return 'yarn';
+    if (existsSync(join(dir, 'bun.lockb')) || existsSync(join(dir, 'bun.lock'))) return 'bun';
+    if (
+      existsSync(join(dir, 'package-lock.json')) ||
+      existsSync(join(dir, 'npm-shrinkwrap.json'))
+    ) {
+      return 'npm';
+    }
+  }
+  return packageManagerFromPackageJson(packageManager) ?? 'npm';
+}
+
 function readPackageManifest(root: string, path: string): PackageManifest | undefined {
   const content = safeReadText(join(root, path));
   if (!content) return undefined;
@@ -143,6 +178,7 @@ function readPackageManifest(root: string, path: string): PackageManifest | unde
     return {
       path,
       packageName: typeof name === 'string' && name.trim() ? name : undefined,
+      packageManager: detectPackageManager(root, path, record['packageManager']),
       scripts,
     };
   } catch {
@@ -185,9 +221,31 @@ function packageCommand(
   script: string,
   path: string | undefined,
 ): string {
-  if (!path) return `pnpm ${script}`;
+  if (!path) return rootPackageCommand(manifest.packageManager, script);
   const packageName = manifest.packageName ?? basename(path);
-  return `pnpm --filter ${packageName} ${script}`;
+  switch (manifest.packageManager) {
+    case 'pnpm':
+      return `pnpm --filter ${packageName} ${script}`;
+    case 'yarn':
+      return `yarn --cwd ${path} ${script}`;
+    case 'bun':
+      return `bun --cwd ${path} run ${script}`;
+    case 'npm':
+      return `npm --prefix ${path} run ${script}`;
+  }
+}
+
+function rootPackageCommand(packageManager: PackageManager, script: string): string {
+  switch (packageManager) {
+    case 'pnpm':
+      return `pnpm ${script}`;
+    case 'yarn':
+      return `yarn ${script}`;
+    case 'bun':
+      return `bun run ${script}`;
+    case 'npm':
+      return `npm run ${script}`;
+  }
 }
 
 function commandKind(script: string): ProjectOnboardingCommand['kind'] | undefined {
