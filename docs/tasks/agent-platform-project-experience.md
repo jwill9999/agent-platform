@@ -7,23 +7,26 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Objective
 
-Turn Project into a clear, generic work context that users can reopen, chat with, and optionally
-inspect in the IDE without being forced into coding or runtime implementation details.
+Turn Project into a clear, generic work context that users can reopen, chat with, run commands
+against, preview generated outputs from, and optionally hand off to their local/default IDE without
+being forced into coding or runtime implementation details.
 
 This epic follows `agent-platform-project-onboarding`. The onboarding epic may remain focused on
 `AGENTS.md` and coding-capable Projects, while this epic implements the broader Project product
 experience: profile-aware Projects, chat-first entry, left-side navigation, recent/reopen Projects,
-optional IDE handoff, breadcrumbs, and user-facing labels.
+branch selection, terminal access, preview rendering, external/default IDE handoff, breadcrumbs, and
+user-facing labels.
 
 ## Desktop Re-scope Status
 
 This epic remains the product experience reference, but desktop acceptance now depends on the
 Electron Project model.
 
-After Electron manual QA, the Product direction is chat-first with a narrower role for the built-in
-IDE. The desktop implementation should prioritise Project Chat, Project activity, slash commands,
-native Project binding, and rendered previews. Direct manual editing should be explicit, preferably
-through a user-configured/default IDE handoff unless a future built-in IDE is deliberately scoped.
+After Electron manual QA, the Product direction is chat-first and the built-in IDE is not a product
+investment path. The desktop implementation should prioritise Project Chat, Project activity, slash
+commands, branch context, terminal access, native Project binding, and rendered previews. Direct
+manual editing should be explicit through a user-configured/default IDE handoff. Any remaining
+built-in file view is transitional and must not become the proof path for the product experience.
 
 Do not start this epic until
 [Stabilisation closeout and next-epic gate](./agent-platform-electron-stabilisation.12.md) has
@@ -37,12 +40,15 @@ parked and must not be used to prove the Project experience for the downloadable
 For desktop Product work:
 
 - Opening/reopening a Project creates or resumes a Project-bound chat/session.
-- The Project chat and optional IDE view must share the same Project id, session continuity, and
-  backend-visible Project root.
+- Project Chat is the primary workspace. Branch selection, terminal sessions, previews, activity,
+  slash commands, and generated-output review should attach to the active Project Chat.
+- Any external/default IDE handoff must use the same Project id, session continuity, and
+  backend-visible Project root without copying the Project folder.
 - `/workspace`, host absolute paths, backend roots, and internal onboarding states remain technical
   diagnostics, not primary user copy.
 - Web Playwright can cover route/component behavior, but final acceptance for Project reopen,
-  Project chat, and IDE handoff requires production-like Electron E2E.
+  Project chat, branch selection, terminal dock, previews, and IDE handoff requires production-like
+  Electron E2E where native desktop behavior is involved.
 
 ## Product Decisions
 
@@ -50,8 +56,12 @@ For desktop Product work:
   folder, automation workspace, generated app, or mixed files.
 - The coding agent is a Project profile/tooling choice, not the definition of Project.
 - Opening a Project should land in project-scoped chat by default.
-- The built-in IDE is no longer a primary workflow. Manual editing should be explicit and secondary,
-  with external/default IDE handoff preferred unless a built-in IDE is separately scoped.
+- The built-in IDE is no longer a primary workflow and should not receive further feature
+  investment. Manual editing should be explicit through external/default IDE handoff.
+- Project Chat should expose the active branch and allow branch selection where the active Project
+  is a Git repository.
+- Project Chat should provide a governed terminal dock backed by a real PTY implementation:
+  `node-pty` in Electron main, `xterm.js` in the renderer, and a typed IPC bridge.
 - Generated artifacts such as landing pages, Markdown documents, PDFs, and HTML/app output should be
   previewable from chat/activity surfaces instead of requiring file-system navigation.
 - The right-side Project panel should show changed files, generated outputs, preview cards, tests,
@@ -76,35 +86,42 @@ In scope:
 - Native desktop Project selection and reopen semantics are implemented in the Electron Project
   access epic; this epic consumes that backend-bound Project model.
 - Project-scoped chat as the default Project surface.
-- Explicit file/IDE handoff from an active Project Chat, with external/default IDE handoff preferred
-  over extending the built-in IDE during stabilisation.
-- Session/project continuity between Project Chat and any optional file/IDE surface.
+- Explicit external/default IDE handoff from an active Project Chat.
+- Session/project continuity between Project Chat and any external IDE or secondary file surface.
+- Branch selector from Project Chat for Git-backed Projects.
+- Governed terminal dock from Project Chat using `node-pty`, `xterm.js`, typed IPC, Project-root
+  scoping, and safe process lifecycle handling.
 - Rendered preview surfaces for generated documents/apps where appropriate.
-- Breadcrumbs or equivalent quiet location affordance for Home, Chat, Project, and IDE.
+- Breadcrumbs or equivalent quiet location affordance for Home, Chat, Project, and any secondary
+  surface.
 - User-facing Project labels that hide runtime implementation details.
 - Playwright coverage for the navigation and context-preservation flows.
-- Electron E2E coverage for desktop Project open/reopen, Project Chat, IDE handoff, and return
-  navigation once the desktop runtime exists.
+- Electron E2E coverage for desktop Project open/reopen, Project Chat, branch selection, terminal
+  dock, external/default IDE handoff, previews, and return navigation once the desktop runtime
+  exists.
 
 Out of scope:
 
 - Full `AGENTS.md` onboarding implementation, which belongs to `agent-platform-project-onboarding`.
-- Full embedded IDE implementation.
+- Full embedded IDE implementation or further investment in the built-in IDE as a primary product
+  surface.
 - Multi-user permissions or remote checkout management.
 - Scheduled task/cron runtime implementation beyond representing automation as a Project profile.
 
 ## Proposed Task Chain
 
-| Task                                  | Purpose                                                   |
-| ------------------------------------- | --------------------------------------------------------- |
-| `agent-platform-project-experience.1` | Generalize Project profiles and capability metadata       |
-| `agent-platform-project-experience.2` | Add left explorer Project and Chat navigation             |
-| `agent-platform-project-experience.3` | Make Project Chat the default Project surface             |
-| `agent-platform-project-experience.4` | Add optional external/default-IDE handoff with continuity |
-| `agent-platform-project-experience.5` | Clean Project labels and add breadcrumbs                  |
-| `agent-platform-project-experience.6` | Verify Project experience navigation with Playwright E2E  |
-| `agent-platform-project-experience.7` | Render generated outputs in Project Chat                  |
-| `agent-platform-project-experience.8` | Add Project activity side panel                           |
+| Task                                   | Purpose                                                   |
+| -------------------------------------- | --------------------------------------------------------- |
+| `agent-platform-project-experience.1`  | Generalize Project profiles and capability metadata       |
+| `agent-platform-project-experience.2`  | Add left explorer Project and Chat navigation             |
+| `agent-platform-project-experience.3`  | Make Project Chat the default Project surface             |
+| `agent-platform-project-experience.4`  | Add optional external/default-IDE handoff with continuity |
+| `agent-platform-project-experience.5`  | Clean Project labels and add breadcrumbs                  |
+| `agent-platform-project-experience.6`  | Verify Project experience navigation with Playwright E2E  |
+| `agent-platform-project-experience.7`  | Render generated outputs in Project Chat                  |
+| `agent-platform-project-experience.8`  | Add Project activity side panel                           |
+| `agent-platform-project-experience.9`  | Add Project Chat branch selector                          |
+| `agent-platform-project-experience.10` | Add governed terminal dock                                |
 
 ## Parallel Implementation Notes
 
@@ -116,8 +133,14 @@ After `agent-platform-project-experience.3` has made Project Chat the default Pr
   generated-output preview components and chat artifact rendering.
 - `agent-platform-project-experience.8` can run in parallel after the panel data contract is agreed,
   but should avoid editing the same preview components owned by `.7`.
+- `agent-platform-project-experience.9` can run in parallel with preview/activity work if it owns
+  only branch discovery, branch switching UX, and Project Chat branch context.
+- `agent-platform-project-experience.10` should be planned carefully before implementation because
+  it touches Electron main/preload, native PTY lifecycle, command safety, Project-root scoping, and
+  terminal rendering. It can run in parallel only if its write set is isolated from preview/activity
+  components.
 - `agent-platform-project-experience.6` remains the integration verification gate and should absorb
-  E2E coverage from `.4`, `.5`, `.7`, and `.8`.
+  E2E coverage from `.4`, `.5`, `.7`, `.8`, `.9`, and `.10`.
 
 ## Testing Strategy Requirements
 
@@ -126,8 +149,9 @@ Each child task must include concrete local and remote verification:
 - mandatory local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`, unless
   the task explains why a narrower gate is sufficient.
 - focused unit/contract/component tests for touched behavior.
-- Playwright coverage for user-visible navigation, Project reopen, Project Chat, optional file/IDE
-  handoff, preview rendering, and context preservation when the task changes those flows.
+- Playwright coverage for user-visible navigation, Project reopen, Project Chat, branch selection,
+  terminal dock behavior, optional external/default IDE handoff, preview rendering, and context
+  preservation when the task changes those flows.
 - GitHub PR checks, SonarCloud/GitGuardian/Sourcery state, and review comments must be monitored
   before closing Beads tasks.
 
@@ -137,14 +161,16 @@ Each child task must include concrete local and remote verification:
 - [ ] Users can see Projects and Chats/Sessions in the left explorer without scattered CTAs.
 - [ ] Users can reopen previous Projects from stored metadata.
 - [ ] Opening a Project lands in project-scoped chat by default.
-- [ ] Users can explicitly open files or hand off to their configured/default IDE from a Project
-      without making the built-in IDE the primary workflow.
+- [ ] Users can hand off to their configured/default IDE from a Project without making the built-in
+      IDE the primary workflow.
+- [ ] Users can choose the active branch from Project Chat when the Project is a Git repository.
+- [ ] Users can open a governed Project terminal dock backed by `node-pty`/`xterm.js`.
 - [ ] Users can return to Home/Project Chat through breadcrumbs or equivalent quiet navigation.
 - [ ] Generated artifacts can be previewed from chat/activity surfaces where supported.
 - [ ] Right-side Project activity shows changed files, previews, tests, CI, review feedback, and
       approvals without leaking raw implementation state.
 - [ ] Normal UI hides `/workspace`, backend accessibility, backend root, and repository root.
-- [ ] Playwright verifies Chat, Project reopen, Project Chat, optional file/IDE handoff, rendered
-      previews, return navigation, and context preservation.
+- [ ] Playwright verifies Chat, Project reopen, Project Chat, branch selection, terminal dock,
+      external/default IDE handoff, rendered previews, return navigation, and context preservation.
 - [ ] Production-like Electron E2E verifies the same desktop path through native Project access;
       browser-only/manual-path opening is not an acceptance path.

@@ -14,6 +14,8 @@ Experience or release work can start.
 - Confirm blocker tasks for Project Chat, Project binding, slash commands, Recent Projects, and
   user-facing copy are complete or explicitly parked with owner approval.
 - Confirm generated preview and external/default IDE handoff design is documented.
+- Confirm the revised product direction is documented: Project Chat remains primary, no further
+  built-in IDE investment, branch selection and terminal dock move into Project Experience.
 - Rerun the Electron manual QA checklist against the stabilisation branch.
 - Confirm automated Electron/browser E2E coverage exists or has explicit follow-up tasks.
 - Record the final merge/release recommendation.
@@ -49,7 +51,24 @@ Experience or release work can start.
 | External/default IDE handoff                              | Deferred to `agent-platform-project-experience.4`.                                                                    |
 | Generated artifact previews                               | Deferred to `agent-platform-project-experience.7`.                                                                    |
 | Right-side Project activity panel                         | Deferred to `agent-platform-project-experience.8`.                                                                    |
+| Project Chat branch selector                              | Deferred to `agent-platform-project-experience.9`.                                                                    |
+| Governed Project terminal dock                            | Deferred to `agent-platform-project-experience.10`.                                                                   |
 | Full integrated desktop Project Experience pass           | Deferred to `agent-platform-project-experience.6`.                                                                    |
+
+### Product direction after re-baseline
+
+The post-stabilisation Product direction is:
+
+- Project Chat is the default and primary Project surface.
+- The built-in IDE should not receive further feature investment.
+- Manual editing should hand off to the user's local/default IDE.
+- Branch selection belongs in Project Chat.
+- Terminal access belongs in Project Chat through a governed terminal dock using `node-pty` in
+  Electron main, `xterm.js` in the renderer, and typed IPC.
+- Generated HTML, Markdown, PDF, app, and document outputs should be previewed from Project Chat or
+  the Project activity panel rather than requiring file-tree navigation.
+- The `agent-platform-code-workbench` epic is deferred/re-scoped so it does not compete with the
+  Project Chat-first direction.
 
 ### Automated gate status
 

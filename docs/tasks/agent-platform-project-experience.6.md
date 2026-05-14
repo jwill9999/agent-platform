@@ -6,7 +6,8 @@
 ## Summary
 
 Prove the full Project experience navigation through Playwright: open Chat, open/reopen Projects,
-use Project Chat, hand off to IDE, return, and preserve context.
+use Project Chat, select branches, use the terminal dock, hand off to a local/default IDE, return,
+and preserve context.
 
 ## Desktop Re-scope Note
 
@@ -27,9 +28,13 @@ absolute path entry.
   - opening a Project lands in Project Chat.
   - Project Chat has backend Project context before `/init` or Project-aware slash commands run.
   - Project Chat and general Chat remain separate.
-  - IDE opens only by explicit user action.
-  - external/default IDE handoff or any secondary built-in file view preserves the active
+  - external/default IDE handoff opens only by explicit user action.
+  - external/default IDE handoff or any secondary file view preserves the active
     Project/session/conversation context.
+  - branch selection works from Project Chat for Git-backed Projects and shows safe unavailable
+    states for non-Git Projects.
+  - the terminal dock can open, run a harmless command, resize/hide, and close in the Electron
+    runtime.
   - breadcrumbs or equivalent navigation can return to Home/Project Chat.
   - generated HTML/app, Markdown/document, and PDF outputs render as previews or safe fallback
     cards when those features are implemented.
@@ -42,19 +47,22 @@ absolute path entry.
 ## Implementation Plan
 
 1. Add deterministic Project fixtures and seeding helpers.
-2. Add Playwright helpers for explorer navigation, Project reopen, Project Chat, external/default
-   IDE handoff, preview cards, activity-panel states, and breadcrumb navigation.
+2. Add Playwright helpers for explorer navigation, Project reopen, Project Chat, branch selection,
+   terminal dock, external/default IDE handoff, preview cards, activity-panel states, and breadcrumb
+   navigation.
 3. Write E2E flows for coding and mixed/non-code Projects.
 4. Verify primary UI labels do not expose runtime implementation terms.
 5. Update docs with the final Project experience flow.
 
 ## Dependency Order
 
-| Upstream                              | Downstream |
-| ------------------------------------- | ---------- |
-| `agent-platform-project-experience.5` | none       |
-| `agent-platform-project-experience.7` | none       |
-| `agent-platform-project-experience.8` | none       |
+| Upstream                               | Downstream |
+| -------------------------------------- | ---------- |
+| `agent-platform-project-experience.5`  | none       |
+| `agent-platform-project-experience.7`  | none       |
+| `agent-platform-project-experience.8`  | none       |
+| `agent-platform-project-experience.9`  | none       |
+| `agent-platform-project-experience.10` | none       |
 
 Keep Beads dependencies aligned with this table.
 
@@ -64,14 +72,16 @@ Keep Beads dependencies aligned with this table.
   against the Docker runtime.
 - Focused tests needed to stabilize fixtures and route state.
 - Electron E2E for native Project open/reopen, Projects explorer, Project Chat, slash command
-  context, IDE handoff, rendered previews, activity-panel states, return navigation, and label
-  cleanup.
+  context, branch selection, terminal dock, external/default IDE handoff, rendered previews,
+  activity-panel states, return navigation, and label cleanup.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
 ## Definition Of Done
 
 - [ ] Playwright covers the complete Project experience navigation flow.
-- [ ] Tests verify Project reopen and context preservation across Project Chat and IDE.
+- [ ] Tests verify Project reopen and context preservation across Project Chat and external/default
+      IDE handoff.
+- [ ] Tests verify branch selection and terminal dock behavior from Project Chat.
 - [ ] Tests verify `/help` and `/init` run with the same Project context as ordinary Project chat.
 - [ ] Tests verify general Chat remains independent.
 - [ ] Tests verify rendered preview and right-side activity-panel behavior once implemented.
