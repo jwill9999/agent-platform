@@ -71,11 +71,7 @@ type ProjectChatHeaderProps = Readonly<{
   sessionId: string | null;
   onReturnHome: () => void;
 }>;
-type ApprovedProjectInstructions = Readonly<{
-  projectId: string;
-  targetPath: string;
-}>;
-type RejectedProjectInstructions = Readonly<{
+type ProjectInstructionsDecision = Readonly<{
   projectId: string;
   targetPath: string;
 }>;
@@ -113,7 +109,8 @@ function projectOnboardingDraft(
 }
 
 function projectOnboardingIsApproved(project: ProjectDesktopRecord | null): boolean {
-  const parsed = ProjectOnboardingStateSchema.safeParse(project?.metadata.onboardingState);
+  const metadata = project?.metadata as Record<string, unknown> | undefined;
+  const parsed = ProjectOnboardingStateSchema.safeParse(metadata?.['onboardingState']);
   return parsed.success && parsed.data === 'approved';
 }
 
@@ -265,9 +262,9 @@ export default function HomePage() {
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
   const [isRejectingProjectInstructions, setIsRejectingProjectInstructions] = useState(false);
   const [approvedProjectInstructions, setApprovedProjectInstructions] =
-    useState<ApprovedProjectInstructions | null>(null);
+    useState<ProjectInstructionsDecision | null>(null);
   const [rejectedProjectInstructions, setRejectedProjectInstructions] =
-    useState<RejectedProjectInstructions | null>(null);
+    useState<ProjectInstructionsDecision | null>(null);
   const attemptedProjectReopenIdRef = useRef<string | null>(null);
 
   const {
