@@ -122,6 +122,76 @@ function projectOnboardingApprovalTargetPath(project: ProjectDesktopRecord): str
   return typeof targetPath === 'string' && targetPath.trim() ? targetPath : 'AGENTS.md';
 }
 
+function projectInstructionsDecisionApplies(
+  decision: ProjectInstructionsDecision | null,
+  project: ProjectDesktopRecord | null,
+): decision is ProjectInstructionsDecision {
+  return Boolean(decision) && decision?.projectId === project?.id;
+}
+
+function projectChatPlaceholder(selectedMode: WorkspaceMode | null): string | undefined {
+  return selectedMode === 'project-chat' ? 'Ask about this Project...' : undefined;
+}
+
+function projectChatEmptyStateTitle(
+  selectedMode: WorkspaceMode | null,
+  project: ProjectDesktopRecord | null,
+): string | undefined {
+  if (selectedMode !== 'project-chat') return undefined;
+  return project?.name ?? 'Project chat';
+}
+
+function projectChatEmptyStateDescription(
+  selectedMode: WorkspaceMode | null,
+): string | undefined {
+  if (selectedMode !== 'project-chat') return undefined;
+  return 'Tell the assistant what you want done in this Project.';
+}
+
+type ProjectInstructionsConversationAccessoryProps = Readonly<{
+  draft: ProjectOnboardingDraft | null;
+  approved: ProjectInstructionsDecision | null;
+  rejected: ProjectInstructionsDecision | null;
+  project: ProjectDesktopRecord | null;
+  selectedMode: WorkspaceMode | null;
+  isApproving: boolean;
+  isRejecting: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}>;
+
+function ProjectInstructionsConversationAccessory({
+  draft,
+  approved,
+  rejected,
+  project,
+  selectedMode,
+  isApproving,
+  isRejecting,
+  onApprove,
+  onReject,
+}: ProjectInstructionsConversationAccessoryProps) {
+  if (selectedMode !== 'project-chat') return null;
+  if (draft && !projectOnboardingIsApproved(project)) {
+    return (
+      <ProjectInstructionsReview
+        draft={draft}
+        isApproving={isApproving}
+        isRejecting={isRejecting}
+        onApprove={onApprove}
+        onReject={onReject}
+      />
+    );
+  }
+  if (projectInstructionsDecisionApplies(approved, project)) {
+    return <ProjectInstructionsApprovalNotice targetPath={approved.targetPath} />;
+  }
+  if (projectInstructionsDecisionApplies(rejected, project)) {
+    return <ProjectInstructionsRejectedNotice targetPath={rejected.targetPath} />;
+  }
+  return null;
+}
+
 function HomeEntryScreen({
   isDesktopProjectBridgeAvailable,
   isOpeningProject,
@@ -697,20 +767,6 @@ export default function HomePage() {
   const canSend = Boolean(sessionId) && !hasPendingApproval;
   const inputStatusText = getInputStatusText(hasPendingApproval, selectedMode, sessionId);
   const onboardingDraft = projectOnboardingDraft(activeProject);
-  const showProjectInstructionReview =
-    selectedMode === 'project-chat' &&
-    Boolean(onboardingDraft) &&
-    !projectOnboardingIsApproved(activeProject);
-  const showProjectInstructionApprovalNotice =
-    selectedMode === 'project-chat' &&
-    Boolean(approvedProjectInstructions) &&
-    approvedProjectInstructions?.projectId === activeProject?.id &&
-    !showProjectInstructionReview;
-  const showProjectInstructionRejectedNotice =
-    selectedMode === 'project-chat' &&
-    Boolean(rejectedProjectInstructions) &&
-    rejectedProjectInstructions?.projectId === activeProject?.id &&
-    !showProjectInstructionReview;
   const navigationState = createWorkspaceNavigationState({
     surface: getWorkspaceSurface(selectedMode),
     projectId: activeProject?.id,
@@ -842,37 +898,21 @@ export default function HomePage() {
               onRetrySensors={() => {
                 if (sessionId) refreshSensors(sessionId, true).catch(() => {});
               }}
-              inputPlaceholder={
-                selectedMode === 'project-chat' ? 'Ask about this Project...' : undefined
-              }
-              emptyStateTitle={
-                selectedMode === 'project-chat'
-                  ? (activeProject?.name ?? 'Project chat')
-                  : undefined
-              }
-              emptyStateDescription={
-                selectedMode === 'project-chat'
-                  ? 'Tell the assistant what you want done in this Project.'
-                  : undefined
-              }
+              inputPlaceholder={projectChatPlaceholder(selectedMode)}
+              emptyStateTitle={projectChatEmptyStateTitle(selectedMode, activeProject)}
+              emptyStateDescription={projectChatEmptyStateDescription(selectedMode)}
               conversationAccessory={
-                showProjectInstructionReview && onboardingDraft ? (
-                  <ProjectInstructionsReview
-                    draft={onboardingDraft}
-                    isApproving={isApprovingProjectInstructions}
-                    isRejecting={isRejectingProjectInstructions}
-                    onApprove={handleApproveProjectInstructions}
-                    onReject={handleRejectProjectInstructions}
-                  />
-                ) : showProjectInstructionApprovalNotice && approvedProjectInstructions ? (
-                  <ProjectInstructionsApprovalNotice
-                    targetPath={approvedProjectInstructions.targetPath}
-                  />
-                ) : showProjectInstructionRejectedNotice && rejectedProjectInstructions ? (
-                  <ProjectInstructionsRejectedNotice
-                    targetPath={rejectedProjectInstructions.targetPath}
-                  />
-                ) : null
+                <ProjectInstructionsConversationAccessory
+                  draft={onboardingDraft}
+                  approved={approvedProjectInstructions}
+                  rejected={rejectedProjectInstructions}
+                  project={activeProject}
+                  selectedMode={selectedMode}
+                  isApproving={isApprovingProjectInstructions}
+                  isRejecting={isRejectingProjectInstructions}
+                  onApprove={handleApproveProjectInstructions}
+                  onReject={handleRejectProjectInstructions}
+                />
               }
             />
           </AgentModelProvider>
