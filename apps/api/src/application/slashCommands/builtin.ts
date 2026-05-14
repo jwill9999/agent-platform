@@ -1,5 +1,20 @@
+import { ProjectOnboardingDraftSchema } from '@agent-platform/contracts';
+
 import type { SlashCommandDefinition, SlashCommandRegistry } from './types.js';
 import { StaticSlashCommandRegistry } from './registry.js';
+
+function formatInitDraftMessage(draft: unknown): string {
+  const parsed = ProjectOnboardingDraftSchema.safeParse(draft);
+  if (!parsed.success) {
+    return 'I started Project setup. Review the Project instructions draft in Project Chat, then approve it when you are ready to enable file edits.';
+  }
+
+  return [
+    `I prepared a Project instructions draft for ${parsed.data.targetPath}.`,
+    '',
+    'Review the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
+  ].join('\n');
+}
 
 export const helpSlashCommand: SlashCommandDefinition = {
   name: 'help',
@@ -85,8 +100,7 @@ export const initSlashCommand: SlashCommandDefinition = {
     if (draft) {
       return {
         kind: 'handled',
-        message:
-          'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
+        message: formatInitDraftMessage(draft),
       };
     }
 

@@ -867,10 +867,15 @@ function reviewProjectOnboarding(db: DrizzleDb, id: string, body: unknown): Proj
     decidedAtMs: nowMs,
     ...(input.comment ? { comment: input.comment } : {}),
   });
+  let metadata = project.metadata;
+  if (input.decision === 'reject') {
+    metadata = { ...project.metadata };
+    delete metadata['onboardingDraft'];
+  }
 
   return updateProject(db, id, {
     metadata: {
-      ...project.metadata,
+      ...metadata,
       onboardingState: 'in_progress',
       onboardingDialogue: dialogue,
       onboardingReview: review,

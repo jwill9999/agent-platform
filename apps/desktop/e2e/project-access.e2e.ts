@@ -154,10 +154,11 @@ test.describe('Electron Project access', () => {
 
       await sendChatMessage(page, '/init', 'Ask about this Project...');
       await expect(
-        page.getByText(
-          'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
-        ),
+        page.getByText('I prepared a Project instructions draft for AGENTS.md.'),
       ).toBeVisible();
+      await expect(page.getByText('Review Project instructions')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Reject draft' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
 
       await page.getByRole('link', { name: 'Open IDE' }).click();
       await page.waitForURL(/\/ide/);

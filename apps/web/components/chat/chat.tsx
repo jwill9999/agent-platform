@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { UIMessage } from 'ai';
 import { Sparkles } from 'lucide-react';
 import { Message, getMessageText } from './message';
@@ -47,6 +47,8 @@ export interface ChatProps {
   sensorLoading?: boolean;
   sensorError?: string | null;
   onRetrySensors?: () => void;
+  /** Optional Project/session review content rendered in the main chat column. */
+  conversationAccessory?: ReactNode;
 }
 
 export function Chat({
@@ -72,6 +74,7 @@ export function Chat({
   sensorLoading,
   sensorError,
   onRetrySensors,
+  conversationAccessory,
 }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -90,7 +93,10 @@ export function Chat({
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4">
             {messages.length === 0 ? (
-              <EmptyState title={emptyStateTitle} description={emptyStateDescription} />
+              <>
+                <EmptyState title={emptyStateTitle} description={emptyStateDescription} />
+                {conversationAccessory}
+              </>
             ) : (
               <>
                 {messages.map((message, index) => (
@@ -123,6 +129,7 @@ export function Chat({
                     onApprovalDecision={onApprovalDecision}
                   />
                 ))}
+                {conversationAccessory}
                 <div ref={messagesEndRef} className="h-4" />
               </>
             )}

@@ -3,9 +3,14 @@
 import type {
   Agent,
   ModelConfig,
+  ProjectOnboardingDraft,
   ProjectDesktopRecord,
   SensorDashboardResponse,
   SessionRecord,
+} from '@agent-platform/contracts';
+import {
+  ProjectOnboardingDraftSchema,
+  ProjectOnboardingStateSchema,
 } from '@agent-platform/contracts';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,6 +23,11 @@ import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
+import {
+  ProjectInstructionsApprovalNotice,
+  ProjectInstructionsRejectedNotice,
+  ProjectInstructionsReview,
+} from '@/components/project/project-instructions-review';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
 import {
@@ -61,6 +71,10 @@ type ProjectChatHeaderProps = Readonly<{
   sessionId: string | null;
   onReturnHome: () => void;
 }>;
+type ProjectInstructionsDecision = Readonly<{
+  projectId: string;
+  targetPath: string;
+}>;
 
 function getInputStatusText(
   hasPendingApproval: boolean,
@@ -84,6 +98,98 @@ function getWorkspaceSurface(selectedMode: WorkspaceMode | null) {
     return 'chat';
   }
   return 'home';
+}
+
+function projectOnboardingDraft(
+  project: ProjectDesktopRecord | null,
+): ProjectOnboardingDraft | null {
+  const metadata = project?.metadata as Record<string, unknown> | undefined;
+  const parsed = ProjectOnboardingDraftSchema.safeParse(metadata?.['onboardingDraft']);
+  return parsed.success ? parsed.data : null;
+}
+
+function projectOnboardingIsApproved(project: ProjectDesktopRecord | null): boolean {
+  const metadata = project?.metadata as Record<string, unknown> | undefined;
+  const parsed = ProjectOnboardingStateSchema.safeParse(metadata?.['onboardingState']);
+  return parsed.success && parsed.data === 'approved';
+}
+
+function projectOnboardingApprovalTargetPath(project: ProjectDesktopRecord): string {
+  const metadata = project.metadata as Record<string, unknown>;
+  const approval = metadata['onboardingApproval'];
+  if (typeof approval !== 'object' || approval === null) return 'AGENTS.md';
+  const targetPath = (approval as Record<string, unknown>)['targetPath'];
+  return typeof targetPath === 'string' && targetPath.trim() ? targetPath : 'AGENTS.md';
+}
+
+function projectInstructionsDecisionApplies(
+  decision: ProjectInstructionsDecision | null,
+  project: ProjectDesktopRecord | null,
+): decision is ProjectInstructionsDecision {
+  return Boolean(decision) && decision?.projectId === project?.id;
+}
+
+function projectChatPlaceholder(selectedMode: WorkspaceMode | null): string | undefined {
+  return selectedMode === 'project-chat' ? 'Ask about this Project...' : undefined;
+}
+
+function projectChatEmptyStateTitle(
+  selectedMode: WorkspaceMode | null,
+  project: ProjectDesktopRecord | null,
+): string | undefined {
+  if (selectedMode !== 'project-chat') return undefined;
+  return project?.name ?? 'Project chat';
+}
+
+function projectChatEmptyStateDescription(
+  selectedMode: WorkspaceMode | null,
+): string | undefined {
+  if (selectedMode !== 'project-chat') return undefined;
+  return 'Tell the assistant what you want done in this Project.';
+}
+
+type ProjectInstructionsConversationAccessoryProps = Readonly<{
+  draft: ProjectOnboardingDraft | null;
+  approved: ProjectInstructionsDecision | null;
+  rejected: ProjectInstructionsDecision | null;
+  project: ProjectDesktopRecord | null;
+  selectedMode: WorkspaceMode | null;
+  isApproving: boolean;
+  isRejecting: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}>;
+
+function ProjectInstructionsConversationAccessory({
+  draft,
+  approved,
+  rejected,
+  project,
+  selectedMode,
+  isApproving,
+  isRejecting,
+  onApprove,
+  onReject,
+}: ProjectInstructionsConversationAccessoryProps) {
+  if (selectedMode !== 'project-chat') return null;
+  if (draft && !projectOnboardingIsApproved(project)) {
+    return (
+      <ProjectInstructionsReview
+        draft={draft}
+        isApproving={isApproving}
+        isRejecting={isRejecting}
+        onApprove={onApprove}
+        onReject={onReject}
+      />
+    );
+  }
+  if (projectInstructionsDecisionApplies(approved, project)) {
+    return <ProjectInstructionsApprovalNotice targetPath={approved.targetPath} />;
+  }
+  if (projectInstructionsDecisionApplies(rejected, project)) {
+    return <ProjectInstructionsRejectedNotice targetPath={rejected.targetPath} />;
+  }
+  return null;
 }
 
 function HomeEntryScreen({
@@ -223,6 +329,12 @@ export default function HomePage() {
   const [sensorError, setSensorError] = useState<string | null>(null);
   const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
   const [isOpeningProject, setIsOpeningProject] = useState(false);
+  const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
+  const [isRejectingProjectInstructions, setIsRejectingProjectInstructions] = useState(false);
+  const [approvedProjectInstructions, setApprovedProjectInstructions] =
+    useState<ProjectInstructionsDecision | null>(null);
+  const [rejectedProjectInstructions, setRejectedProjectInstructions] =
+    useState<ProjectInstructionsDecision | null>(null);
   const attemptedProjectReopenIdRef = useRef<string | null>(null);
 
   const {
@@ -498,6 +610,87 @@ export default function HomePage() {
     [agents, bindActiveProjectSession, modelConfigs, openProjectChat, refreshSensors],
   );
 
+  const refreshActiveProject = useCallback(async () => {
+    if (!activeProject?.id) return;
+    const project = await apiGet<ProjectDesktopRecord>(apiPath('projects', activeProject.id));
+    if (project) setActiveProject(project);
+  }, [activeProject?.id]);
+
+  const handleApproveProjectInstructions = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsApprovingProjectInstructions(true);
+    setSessionError(null);
+    try {
+      const project = await apiPost<ProjectDesktopRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'approve'),
+        { decision: 'approve', reviewer: 'User' },
+      );
+      if (!project) throw new ApiRequestError('Failed to approve Project instructions', 500);
+      setActiveProject(project);
+      setApprovedProjectInstructions({
+        projectId: project.id,
+        targetPath: projectOnboardingApprovalTargetPath(project),
+      });
+      setRejectedProjectInstructions(null);
+      if (globalThis.window !== undefined) {
+        globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+      }
+    } catch (error) {
+      setSessionError(
+        error instanceof ApiRequestError ? error.message : 'Failed to approve Project instructions',
+      );
+    } finally {
+      setIsApprovingProjectInstructions(false);
+    }
+  }, [activeProject?.id]);
+
+  const handleRejectProjectInstructions = useCallback(async () => {
+    if (!activeProject?.id) return;
+    const draft = projectOnboardingDraft(activeProject);
+    setIsRejectingProjectInstructions(true);
+    setSessionError(null);
+    try {
+      const project = await apiPost<ProjectDesktopRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'review'),
+        {
+          decision: 'reject',
+          reviewer: 'User',
+          comment: 'Rejected from Project Chat review.',
+        },
+      );
+      if (!project) throw new ApiRequestError('Failed to reject Project instructions', 500);
+      setActiveProject(project);
+      setApprovedProjectInstructions(null);
+      setRejectedProjectInstructions({
+        projectId: project.id,
+        targetPath: draft?.targetPath ?? 'AGENTS.md',
+      });
+      if (globalThis.window !== undefined) {
+        globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+      }
+    } catch (error) {
+      setSessionError(
+        error instanceof ApiRequestError ? error.message : 'Failed to reject Project instructions',
+      );
+    } finally {
+      setIsRejectingProjectInstructions(false);
+    }
+  }, [activeProject]);
+
+  useEffect(() => {
+    if (!approvedProjectInstructions) return;
+    if (approvedProjectInstructions.projectId !== activeProject?.id) {
+      setApprovedProjectInstructions(null);
+    }
+  }, [activeProject?.id, approvedProjectInstructions]);
+
+  useEffect(() => {
+    if (!rejectedProjectInstructions) return;
+    if (rejectedProjectInstructions.projectId !== activeProject?.id) {
+      setRejectedProjectInstructions(null);
+    }
+  }, [activeProject?.id, rejectedProjectInstructions]);
+
   useEffect(() => {
     if (selectedMode !== 'project-chat') return;
     if (selectedAgentId || agents.length === 0) return;
@@ -573,6 +766,7 @@ export default function HomePage() {
   const isLoading = status === 'streaming';
   const canSend = Boolean(sessionId) && !hasPendingApproval;
   const inputStatusText = getInputStatusText(hasPendingApproval, selectedMode, sessionId);
+  const onboardingDraft = projectOnboardingDraft(activeProject);
   const navigationState = createWorkspaceNavigationState({
     surface: getWorkspaceSurface(selectedMode),
     projectId: activeProject?.id,
@@ -593,6 +787,9 @@ export default function HomePage() {
         .then(async () => {
           await refreshSessions();
           if (sessionId) await refreshSensors(sessionId);
+          if (selectedMode === 'project-chat' && activeProject?.id) {
+            await refreshActiveProject();
+          }
         })
         .catch(() => {});
       clearAttachments();
@@ -605,6 +802,9 @@ export default function HomePage() {
       selectedModelConfigId,
       sessionId,
       refreshSensors,
+      selectedMode,
+      activeProject?.id,
+      refreshActiveProject,
     ],
   );
 
@@ -698,18 +898,21 @@ export default function HomePage() {
               onRetrySensors={() => {
                 if (sessionId) refreshSensors(sessionId, true).catch(() => {});
               }}
-              inputPlaceholder={
-                selectedMode === 'project-chat' ? 'Ask about this Project...' : undefined
-              }
-              emptyStateTitle={
-                selectedMode === 'project-chat'
-                  ? (activeProject?.name ?? 'Project chat')
-                  : undefined
-              }
-              emptyStateDescription={
-                selectedMode === 'project-chat'
-                  ? 'Tell the assistant what you want done in this Project.'
-                  : undefined
+              inputPlaceholder={projectChatPlaceholder(selectedMode)}
+              emptyStateTitle={projectChatEmptyStateTitle(selectedMode, activeProject)}
+              emptyStateDescription={projectChatEmptyStateDescription(selectedMode)}
+              conversationAccessory={
+                <ProjectInstructionsConversationAccessory
+                  draft={onboardingDraft}
+                  approved={approvedProjectInstructions}
+                  rejected={rejectedProjectInstructions}
+                  project={activeProject}
+                  selectedMode={selectedMode}
+                  isApproving={isApprovingProjectInstructions}
+                  isRejecting={isRejectingProjectInstructions}
+                  onApprove={handleApproveProjectInstructions}
+                  onReject={handleRejectProjectInstructions}
+                />
               }
             />
           </AgentModelProvider>

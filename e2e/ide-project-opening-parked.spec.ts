@@ -178,21 +178,23 @@ test.describe('IDE Project opening is parked for desktop', () => {
         { path: backendProjectRoot, name: projectName },
       );
 
-      await page.goto('/ide', { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: 'Open Project' }).click();
+      await page.goto('/', { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: /Open Project/ }).click();
 
-      await expect(page.getByLabel('Project binding').getByText(projectName).first()).toBeVisible();
-      await expect(page.getByTestId('chat-status-label')).toHaveText('Ready');
+      await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page.getByText(projectName).first()).toBeVisible();
+      await expect(page.getByText('Project / Chat', { exact: true })).toBeVisible();
 
-      await page.getByPlaceholder('Ask about your code...').fill('/init');
-      await page.getByPlaceholder('Ask about your code...').press('Enter');
+      await page.getByPlaceholder('Ask about this Project...').fill('/init');
+      await page.getByPlaceholder('Ask about this Project...').press('Enter');
 
       await expect(page.getByText('/init')).toBeVisible();
       await expect(
-        page.getByText(
-          'I started Project setup and prepared a Project instructions draft. Review the draft, then approve it when you are ready to enable file edits.',
-        ),
+        page.getByText('I prepared a Project instructions draft for AGENTS.md.'),
       ).toBeVisible();
+      await expect(page.getByText('Review Project instructions')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Reject draft' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });
     }

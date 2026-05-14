@@ -534,7 +534,7 @@ describe('projectsRouter', () => {
     expect(draftMarkdown).toContain('thin instructions');
     expect(draftMarkdown).toContain('<!-- agent-platform:onboarding-update:start -->');
     expect(draftMarkdown).toContain('## Proposed Agent Platform Updates');
-    expect(draftMarkdown).toContain('pnpm test');
+    expect(draftMarkdown).toContain('npm run test');
     expect(readFileSync(path.join(repoDir, 'AGENTS.md'), 'utf8')).toBe('thin instructions\n');
 
     const approved = await request(app)
@@ -546,6 +546,123 @@ describe('projectsRouter', () => {
     expect(approvedContent).toBe(approved.body.data.metadata.onboardingDraft.markdown);
     expect(approvedContent).toContain('thin instructions');
     expect(approvedContent).toContain('## Proposed Agent Platform Updates');
+  });
+
+  it('uses npm commands in onboarding drafts for npm Projects', async () => {
+    const repoDir = path.join(tmpDir, 'repo-with-npm-lock');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'npm-project',
+        scripts: { build: 'tsc', test: 'vitest', lint: 'eslint .' },
+      }),
+    );
+    writeFileSync(path.join(repoDir, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3 }));
+    writeFileSync(path.join(repoDir, 'README.md'), 'Run npm commands for this project.\n');
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'NPM Project' })
+      .expect(201);
+
+    const started = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/draft`)
+      .send({})
+      .expect(200);
+
+    const draftMarkdown = started.body.data.metadata.onboardingDraft.markdown as string;
+    expect(draftMarkdown).toContain('npm run test');
+    expect(draftMarkdown).toContain('npm run build');
+    expect(draftMarkdown).not.toContain('pnpm test');
+    expect(draftMarkdown).not.toContain('pnpm build');
+  });
+
+  it('refreshes an existing onboarding draft from current Project evidence', async () => {
+    const repoDir = path.join(tmpDir, 'repo-package-manager-refresh');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'package-manager-refresh',
+        scripts: { build: 'tsc', test: 'vitest' },
+      }),
+    );
+    writeFileSync(path.join(repoDir, 'pnpm-lock.yaml'), 'lockfileVersion: 9.0\n');
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Package Manager Refresh' })
+      .expect(201);
+
+    const firstDraft = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/draft`)
+      .send({})
+      .expect(200);
+
+    expect(firstDraft.body.data.metadata.onboardingDraft).toMatchObject({
+      revision: 1,
+      markdown: expect.stringContaining('pnpm test'),
+    });
+
+    rmSync(path.join(repoDir, 'pnpm-lock.yaml'), { force: true });
+    writeFileSync(path.join(repoDir, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3 }));
+
+    const refreshedDraft = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/draft`)
+      .send({})
+      .expect(200);
+
+    const refreshedMarkdown = refreshedDraft.body.data.metadata.onboardingDraft.markdown as string;
+    expect(refreshedDraft.body.data.metadata.onboardingDraft).toMatchObject({
+      revision: 2,
+      history: [expect.objectContaining({ revision: 1 })],
+    });
+    expect(refreshedMarkdown).toContain('npm run test');
+    expect(refreshedMarkdown).toContain('npm run build');
+    expect(refreshedMarkdown).not.toContain('pnpm test');
+    expect(refreshedMarkdown).not.toContain('pnpm build');
+  });
+
+  it('rejects an onboarding draft without leaving stale instructions approvable', async () => {
+    const repoDir = path.join(tmpDir, 'repo-reject-draft');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(
+      path.join(repoDir, 'package.json'),
+      JSON.stringify({
+        name: 'reject-draft',
+        scripts: { test: 'vitest' },
+      }),
+    );
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Reject Draft' })
+      .expect(201);
+
+    await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/draft`)
+      .send({})
+      .expect(200);
+
+    const rejected = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/review`)
+      .send({
+        decision: 'reject',
+        reviewer: 'Test reviewer',
+        comment: 'Use different commands.',
+      })
+      .expect(200);
+
+    expect(rejected.body.data.metadata).toMatchObject({
+      onboardingState: 'in_progress',
+      onboardingReview: expect.objectContaining({
+        decision: 'reject',
+        reviewer: 'Test reviewer',
+      }),
+    });
+    expect(rejected.body.data.metadata.onboardingDraft).toBeUndefined();
+    expect(existsSync(path.join(repoDir, 'AGENTS.md'))).toBe(false);
   });
 
   it('refuses approved AGENTS.md writes through a symlink outside the Project root', async () => {
@@ -611,7 +728,7 @@ describe('projectsRouter', () => {
       }),
     });
     expect(started.body.data.metadata.onboardingDraft.markdown).toContain('Dialogue Project');
-    expect(started.body.data.metadata.onboardingDraft.markdown).toContain('pnpm test');
+    expect(started.body.data.metadata.onboardingDraft.markdown).toContain('npm run test');
 
     const answered = await request(app)
       .post(`/v1/projects/${openedProject.body.data.id}/onboarding/answer`)
