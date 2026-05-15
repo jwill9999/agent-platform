@@ -504,7 +504,7 @@ function ProjectBranchSelector({
           {projectBranchFallbackLabel(summary)}
         </div>
       )}
-      {(error || (summary?.status !== 'available' ? summary?.message : null)) && (
+      {(error || (summary?.status === 'available' ? null : summary?.message)) && (
         <div className="max-w-[14rem] truncate text-[11px] text-muted-foreground">
           {error ?? summary?.message}
         </div>

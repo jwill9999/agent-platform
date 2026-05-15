@@ -736,7 +736,12 @@ function listProjectBranches(project: ProjectRecord): ProjectBranchSummary {
       current: branch.name === currentBranch,
     }));
 
-  const status = currentBranch ? (dirty ? 'dirty' : 'available') : 'detached';
+  let status: ProjectBranchSummary['status'] = 'detached';
+  if (currentBranch && dirty) {
+    status = 'dirty';
+  } else if (currentBranch) {
+    status = 'available';
+  }
   return ProjectBranchSummarySchema.parse({
     status,
     ...(currentBranch ? { currentBranch } : {}),
