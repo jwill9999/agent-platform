@@ -125,6 +125,25 @@ describe('coding_apply_patch', () => {
       await expect(readFile(file, 'utf-8')).resolves.toBe('new file\n');
     }));
 
+  it('creates a file when oldText is null and the file is missing', async () =>
+    withWorkspace(async (workspace) => {
+      const file = join(workspace, 'created-from-null.txt');
+
+      const output = await executeCodingEditTool(
+        CODING_APPLY_PATCH_ID,
+        {
+          reason: 'Create file from nullable oldText',
+          operations: [{ path: file, oldText: null, newText: 'new file\n' }],
+        },
+        { workspaceRoot: workspace },
+      );
+
+      const data = dataOf(output!);
+      expect(data.ok).toBe(true);
+      expect(data.result).toMatchObject({ createdFiles: ['created-from-null.txt'] });
+      await expect(readFile(file, 'utf-8')).resolves.toBe('new file\n');
+    }));
+
   it('rejects binary edits', async () =>
     withWorkspace(async (workspace) => {
       const file = join(workspace, 'binary.bin');

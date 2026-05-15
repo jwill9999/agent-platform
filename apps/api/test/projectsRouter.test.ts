@@ -298,6 +298,13 @@ describe('projectsRouter', () => {
     expect(recent.body.data.projects[0]).not.toHaveProperty('workspaceKey');
     expect(JSON.stringify(recent.body.data)).not.toContain(firstRealPath);
     expect(JSON.stringify(recent.body.data)).not.toContain(secondRealPath);
+
+    await request(app).delete(`/v1/projects/${second.body.data.project.id}`).expect(204);
+
+    const afterForget = await request(app).get('/v1/projects/desktop/recent').expect(200);
+    expect(afterForget.body.data.projects.map((project: { id: string }) => project.id)).toEqual([
+      first.body.data.project.id,
+    ]);
   });
 
   it('serves desktop project file trees and text reads without exposing host paths', async () => {
@@ -576,6 +583,29 @@ describe('projectsRouter', () => {
     expect(draftMarkdown).toContain('npm run build');
     expect(draftMarkdown).not.toContain('pnpm test');
     expect(draftMarkdown).not.toContain('pnpm build');
+  });
+
+  it('drafts useful baseline instructions for a simple static HTML Project', async () => {
+    const repoDir = path.join(tmpDir, 'static-html-project');
+    mkdirSync(repoDir, { recursive: true });
+    writeFileSync(path.join(repoDir, 'index.html'), '<h1>Chocolate shop</h1>\n');
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: repoDir, name: 'Static HTML Project' })
+      .expect(201);
+
+    const started = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/onboarding/draft`)
+      .send({})
+      .expect(200);
+
+    const draftMarkdown = started.body.data.metadata.onboardingDraft.markdown as string;
+    expect(draftMarkdown).toContain('index.html (source)');
+    expect(draftMarkdown).toContain('Follow existing files and local project conventions first.');
+    expect(draftMarkdown).not.toContain('No project evidence files were discovered');
+    expect(draftMarkdown).not.toContain('write-capable Project work');
+    expect(draftMarkdown).not.toContain('approval of generated instructions remain blocked');
   });
 
   it('refreshes an existing onboarding draft from current Project evidence', async () => {

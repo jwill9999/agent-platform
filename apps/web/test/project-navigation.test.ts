@@ -12,6 +12,7 @@ import {
   desktopProjectPathLabel,
   desktopProjectSecondaryLabel,
   desktopProjectIsAvailable,
+  mostRecentTitledProjectSession,
   projectOnboardingAssessmentFromMetadata,
   projectProfileDisplay,
   projectReopenSearchParam,
@@ -110,6 +111,50 @@ describe('Project navigation model', () => {
       projectId: 'project-1',
       sessionId: 'session-1',
     });
+  });
+
+  it('selects the latest titled Project session across agents for recent Project reopen', () => {
+    const sessions = [
+      {
+        id: 'new-empty-session',
+        agentId: 'default-agent',
+        title: null,
+        mode: 'project',
+        projectId: 'project-1',
+        createdAtMs: 10,
+        updatedAtMs: 30,
+      },
+      {
+        id: 'older-chat',
+        agentId: 'coding-agent',
+        title: 'Create a node server',
+        mode: 'project',
+        projectId: 'project-1',
+        createdAtMs: 1,
+        updatedAtMs: 20,
+      },
+      {
+        id: 'latest-chat',
+        agentId: 'review-agent',
+        title: 'Review generated files',
+        mode: 'project',
+        projectId: 'project-1',
+        createdAtMs: 2,
+        updatedAtMs: 25,
+      },
+      {
+        id: 'other-project-chat',
+        agentId: 'review-agent',
+        title: 'Other Project',
+        mode: 'project',
+        projectId: 'project-2',
+        createdAtMs: 3,
+        updatedAtMs: 40,
+      },
+    ] as const;
+
+    expect(mostRecentTitledProjectSession(sessions, 'project-1')?.id).toBe('latest-chat');
+    expect(mostRecentTitledProjectSession(sessions, 'missing-project')).toBeNull();
   });
 
   it('distinguishes global chat from Project-bound surfaces', () => {

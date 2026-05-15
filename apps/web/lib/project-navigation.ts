@@ -4,6 +4,7 @@ import type {
   ProjectOnboardingAssessment,
   ProjectProfile,
   ProjectRecord,
+  SessionRecord,
 } from '@agent-platform/contracts';
 import { ProjectOnboardingAssessmentSchema } from '@agent-platform/contracts';
 import { House, MessageSquare, type LucideIcon } from 'lucide-react';
@@ -257,6 +258,22 @@ export function visibleRecentDesktopProjects(
   const remainingSlots = Math.max(0, limit - visibleAvailable.length);
   const visibleUnavailable = unavailable.slice(0, Math.min(unavailableLimit, remainingSlots));
   return [...visibleAvailable, ...visibleUnavailable];
+}
+
+export function mostRecentTitledProjectSession(
+  sessions: readonly SessionRecord[],
+  projectId: string,
+): SessionRecord | null {
+  return (
+    sessions
+      .filter(
+        (session) =>
+          session.mode === 'project' &&
+          session.projectId === projectId &&
+          Boolean(session.title?.trim()),
+      )
+      .toSorted((a, b) => b.updatedAtMs - a.updatedAtMs)[0] ?? null
+  );
 }
 
 export function projectOnboardingAssessmentFromMetadata(

@@ -96,7 +96,10 @@ import {
   runSlashCommand,
   type RunSlashCommandOptions,
 } from '../../../application/slashCommands/runSlashCommand.js';
-import { createBuiltinSlashCommandRegistry } from '../../../application/slashCommands/builtin.js';
+import {
+  createBuiltinSlashCommandRegistry,
+  formatInitDraftMessage,
+} from '../../../application/slashCommands/builtin.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
 
@@ -917,6 +920,7 @@ function createRuntimeToolDispatchNode({
     approvedToolCallIds,
     skillResolver: (id: string) => getSkill(db, id),
     projectAccessPolicy,
+    projectWriteBlockHandler: createProjectWriteBlockHandler(db, sessionId),
   });
 }
 
@@ -926,6 +930,20 @@ function projectAccessPolicyForSession(
 ): ProjectAccessPolicy | undefined {
   const resolution = resolveRuntimeWorkspace(db, sessionId);
   return resolution?.ok ? resolution.accessPolicy : undefined;
+}
+
+function createProjectWriteBlockHandler(
+  db: DrizzleDb,
+  sessionId: string,
+): ((input: { reason: string }) => Promise<{ message: string } | undefined>) | undefined {
+  const session = getSession(db, sessionId);
+  if (!session?.projectId) return undefined;
+
+  return async ({ reason }) => {
+    if (reason !== 'onboarding_not_approved') return undefined;
+    const project = startProjectOnboardingDraft(db, session.projectId!);
+    return { message: formatInitDraftMessage(project.metadata['onboardingDraft']) };
+  };
 }
 
 function buildRuntimeGraph(
@@ -1507,24 +1525,6 @@ function withProjectInstructionPrompt(
   return prompt ? `${systemPrompt}\n\n${prompt}` : systemPrompt;
 }
 
-const ONBOARDING_BLOCKED_TOOL_IDS = new Set([
-  'sys_bash',
-  'sys_write_file',
-  'sys_append_file',
-  'sys_copy_file',
-  'sys_create_directory',
-  'sys_download_file',
-  'coding_apply_patch',
-]);
-
-function visibleToolsForProjectPolicy(
-  tools: readonly AgentContext['tools'][number][],
-  projectAccessPolicy?: ProjectAccessPolicy,
-) {
-  if (projectAccessPolicy?.canWrite !== false) return tools;
-  return tools.filter((tool) => !ONBOARDING_BLOCKED_TOOL_IDS.has(tool.id));
-}
-
 function buildInitialState(
   runId: string,
   sessionId: string,
@@ -1542,7 +1542,6 @@ function buildInitialState(
   const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
   const memoryBundle = contextInfo.memoryBundle;
   const sensorProfile = inferSensorAgentProfile(agentCtx);
-  const tools = [...visibleToolsForProjectPolicy(agentCtx.tools, contextInfo.projectAccessPolicy)];
   return {
     trace: [
       {
@@ -1570,7 +1569,7 @@ function buildInitialState(
     halted: false,
     mode: 'react' as const,
     messages,
-    toolDefinitions: contractToolsToDefinitions(tools),
+    toolDefinitions: contractToolsToDefinitions(agentCtx.tools),
     llmOutput: null,
     modelConfig,
     stepCount: 0,

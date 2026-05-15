@@ -467,7 +467,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.id,
         '/init',
-        'I prepared a Project instructions draft for AGENTS.md.\n\nReview the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
+        'I prepared a Project instructions draft for AGENTS.md.\n\nI have not created the requested Project files yet.\nReview the draft shown in Project Chat, approve it to enable file edits, then send your request again.',
       );
       expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
 
@@ -507,7 +507,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.session.id,
         '/init',
-        'I prepared a Project instructions draft for AGENTS.md.\n\nReview the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
+        'I prepared a Project instructions draft for AGENTS.md.\n\nI have not created the requested Project files yet.\nReview the draft shown in Project Chat, approve it to enable file edits, then send your request again.',
       );
       expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
 
@@ -552,7 +552,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionId,
         '/init',
-        'I prepared a Project instructions draft for AGENTS.md.\n\nReview the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
+        'I prepared a Project instructions draft for AGENTS.md.\n\nI have not created the requested Project files yet.\nReview the draft shown in Project Chat, approve it to enable file edits, then send your request again.',
       );
 
       const boundProject = await request(app).get(`/v1/projects/${bound.body.data.project.id}`);
@@ -1235,7 +1235,7 @@ describe('POST /v1/chat (session-aware)', () => {
     });
   });
 
-  it('blocks Project writes before AGENTS.md onboarding is approved', async () => {
+  it('allows Project writes before AGENTS.md onboarding is approved', async () => {
     await withMockChatApp(dirs, async ({ app, db }) => {
       const projectRoot = createProjectRoot(dirs);
       const sessionId = await createProjectSession(app, db, {
@@ -1246,15 +1246,79 @@ describe('POST /v1/chat (session-aware)', () => {
         capabilityState: 'backend_accessible',
         onboardingState: 'needs_review',
       });
-      mockProjectWrite('tc-project-write-blocked', 'should not write');
+      mockProjectWrite('tc-project-write-allowed', 'written before onboarding');
 
       const res = await request(app)
         .post('/v1/chat')
         .send({ sessionId, message: 'Write the project note' })
         .expect(200);
 
-      expect(res.text).not.toContain('tool_result');
-      expect(existsSync(path.join(projectRoot, 'project-note.txt'))).toBe(false);
+      expect(res.text).toContain('tool_result');
+      expect(readFileSync(path.join(projectRoot, 'project-note.txt'), 'utf8')).toBe(
+        'written before onboarding',
+      );
+    });
+  });
+
+  it('writes from a new desktop Project first request without auto-starting AGENTS.md setup', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      const registered = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: projectRoot, name: 'Fresh Desktop Project' })
+        .expect(201);
+      const projectId = registered.body.data.project.id as string;
+      const sessionRes = await request(app)
+        .post('/v1/sessions/project')
+        .send({ agentId: DEFAULT_AGENT_ID, projectId })
+        .expect(201);
+      const sessionId = sessionRes.body.data.session.id as string;
+
+      mockProjectWrite('tc-project-first-write', 'written on first request');
+      const firstWrite = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Create a simple Node project' })
+        .expect(200);
+
+      expect(firstWrite.text).toContain('tool_result');
+      expect(firstWrite.text).not.toContain('I prepared a Project instructions draft');
+      expect(firstWrite.text).not.toContain(projectRoot);
+      expect(readFileSync(path.join(projectRoot, 'project-note.txt'), 'utf8')).toBe(
+        'written on first request',
+      );
+      expect(getProject(db, projectId).metadata['onboardingDraft']).toBeUndefined();
+    });
+  });
+
+  it('keeps write tools visible in new Project Chat so first write attempts can execute', async () => {
+    await withMockChatApp(dirs, async ({ app }) => {
+      const projectRoot = createProjectRoot(dirs);
+      const registered = await request(app)
+        .post('/v1/projects/desktop/register')
+        .set('x-agent-platform-desktop-bridge', '1')
+        .send({ path: projectRoot, name: 'Fresh Tool Visibility Project' })
+        .expect(201);
+      const projectId = registered.body.data.project.id as string;
+      const sessionRes = await request(app)
+        .post('/v1/sessions/project')
+        .send({ agentId: DEFAULT_AGENT_ID, projectId })
+        .expect(201);
+      const sessionId = sessionRes.body.data.session.id as string;
+      let visibleToolNames: string[] = [];
+
+      mockToolCalls.mockImplementationOnce((state) => {
+        visibleToolNames = state.toolDefinitions.map((tool: { name: string }) => tool.name);
+        return 'I can create files now.';
+      });
+
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Create a simple Node project' })
+        .expect(200);
+
+      expect(visibleToolNames).toContain('sys_write_file');
+      expect(visibleToolNames).toContain('coding_apply_patch');
     });
   });
 

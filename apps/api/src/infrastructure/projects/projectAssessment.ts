@@ -108,6 +108,7 @@ function evidenceKindFor(name: string): EvidenceKind | undefined {
     return 'config';
   }
   if (name.endsWith('.md') || name.endsWith('.mdx')) return 'docs';
+  if (/\.(html|css)$/.test(name)) return 'source';
   if (/\.(ts|tsx|js|jsx|py|go|rs|java|kt|swift|cs)$/.test(name)) return 'source';
   if (/\.(test|spec)\.(ts|tsx|js|jsx)$/.test(name)) return 'test';
   if (name.includes('cron') || name.includes('schedule')) return 'automation';

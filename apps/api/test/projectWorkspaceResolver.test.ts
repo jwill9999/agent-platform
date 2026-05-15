@@ -103,8 +103,8 @@ describe('resolveSessionWorkspace', () => {
       defaultRepoPath: projectRoot,
       accessPolicy: {
         canInspect: true,
-        canWrite: false,
-        writeBlockReason: 'onboarding_not_approved',
+        canWrite: true,
+        writeBlockReason: undefined,
       },
       mounts: [
         {

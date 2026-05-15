@@ -504,6 +504,14 @@ describe('contracts round-trip', () => {
       operations: [{ path: 'src/example.ts', oldText: 'hello', newText: 'hello world' }],
     });
     expect(CodingApplyPatchInputSchema.parse(structuredClone(input))).toEqual(input);
+    expect(
+      CodingApplyPatchInputSchema.parse({
+        reason: 'Create file',
+        operations: [{ path: 'src/new.ts', oldText: null, newText: 'export {};\n' }],
+      }),
+    ).toMatchObject({
+      operations: [{ path: 'src/new.ts', newText: 'export {};\n' }],
+    });
 
     const result = CodingApplyPatchResultSchema.parse({
       dryRun: true,

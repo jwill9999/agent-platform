@@ -258,4 +258,42 @@ describe('Project onboarding assessment panel', () => {
     expect(html).not.toContain('/workspace');
     expect(html).not.toContain('backend');
   });
+
+  it('renders forget actions and collapses long recent Project lists', () => {
+    const projects = [
+      ...recentDesktopProjectFixtures,
+      desktopProjectRecord({
+        id: 'project-3',
+        name: 'Third App',
+        folderName: 'third-app',
+        available: true,
+      }),
+      desktopProjectRecord({
+        id: 'project-4',
+        name: 'Fourth App',
+        folderName: 'fourth-app',
+        available: true,
+      }),
+      desktopProjectRecord({
+        id: 'project-5',
+        name: 'Fifth App',
+        folderName: 'fifth-app',
+        available: true,
+      }),
+    ] as const;
+
+    const html = renderToStaticMarkup(
+      createElement(RecentProjectsNavSection, {
+        projects,
+        isLoading: false,
+        onRefresh: () => {},
+        onForgetProject: () => {},
+      }),
+    );
+
+    expect(html).toContain('Forget Auth App');
+    expect(html).toContain('Forget Fifth App');
+    expect(html).toContain('Show 1 more');
+    expect(html).not.toContain('Missing App');
+  });
 });

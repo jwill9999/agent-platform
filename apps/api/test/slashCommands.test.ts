@@ -240,7 +240,7 @@ describe('slash command dispatch', () => {
       kind: 'handled',
       status: 'handled',
       message:
-        'I prepared a Project instructions draft for AGENTS.md.\n\nReview the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
+        'I prepared a Project instructions draft for AGENTS.md.\n\nI have not created the requested Project files yet.\nReview the draft shown in Project Chat, approve it to enable file edits, then send your request again.',
     });
     expect(startedProjectId).toBe(project.id);
   });

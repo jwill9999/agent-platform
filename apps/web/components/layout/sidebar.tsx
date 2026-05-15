@@ -25,6 +25,7 @@ import {
   Brain,
   CalendarClock,
   RefreshCw,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from './sidebar-context';
@@ -36,7 +37,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { apiGet, apiPath, ApiRequestError } from '@/lib/apiClient';
+import { apiDelete, apiGet, apiPath, ApiRequestError } from '@/lib/apiClient';
 import {
   buildProjectChatHref,
   desktopProjectIsAvailable,
@@ -51,6 +52,8 @@ import {
   workspaceNavigationItems,
   workspacePersonalChatRequestedEvent,
 } from '@/lib/project-navigation';
+
+const COLLAPSED_RECENT_PROJECT_COUNT = 4;
 
 const settingsNavigation = [
   {
@@ -119,12 +122,20 @@ export function RecentProjectsNavSection({
   projects,
   isLoading,
   onRefresh,
+  onForgetProject,
 }: Readonly<{
   projects: readonly ProjectDesktopRecord[];
   isLoading: boolean;
   onRefresh: () => void;
+  onForgetProject?: (project: ProjectDesktopRecord) => void;
 }>) {
   const visibleProjects = visibleRecentDesktopProjects(projects);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hasOverflow = visibleProjects.length > COLLAPSED_RECENT_PROJECT_COUNT;
+  const displayedProjects =
+    hasOverflow && !isExpanded
+      ? visibleProjects.slice(0, COLLAPSED_RECENT_PROJECT_COUNT)
+      : visibleProjects;
 
   return (
     <section className="mt-5 border-t border-border pt-4" aria-label="Recent Projects">
@@ -151,7 +162,7 @@ export function RecentProjectsNavSection({
         </p>
       ) : (
         <div className="space-y-1">
-          {visibleProjects.map((project) => {
+          {displayedProjects.map((project) => {
             const available = desktopProjectIsAvailable(project);
             const folderLabel = desktopProjectSecondaryLabel(project, visibleProjects);
             const content = (
@@ -171,40 +182,91 @@ export function RecentProjectsNavSection({
 
             if (!available) {
               return (
-                <button
+                <div
                   key={project.id}
-                  type="button"
-                  className="flex w-full cursor-not-allowed flex-col rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left"
-                  disabled
-                  aria-label={`${project.name} open again to reconnect`}
+                  className="group flex items-start gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2"
                 >
-                  {content}
-                </button>
+                  <div
+                    className="flex min-w-0 flex-1 cursor-not-allowed flex-col text-left"
+                    aria-label={`${project.name} open again to reconnect`}
+                  >
+                    {content}
+                  </div>
+                  {onForgetProject && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 shrink-0 opacity-70 hover:opacity-100"
+                      aria-label={`Forget ${project.name}`}
+                      title={`Forget ${project.name}`}
+                      onClick={() => onForgetProject(project)}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </Button>
+                  )}
+                </div>
               );
             }
 
             return (
-              <Link
-                key={project.id}
-                href={buildProjectChatHref(project.id)}
-                className="flex flex-col rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                title={`Open ${project.name}`}
-                onClick={() => {
-                  globalThis.window.dispatchEvent(
-                    new CustomEvent(projectReopenRequestedEvent, {
-                      detail: { projectId: project.id },
-                    }),
-                  );
-                }}
-              >
-                {content}
-              </Link>
+              <div key={project.id} className="group flex items-start gap-1 rounded-lg">
+                <Link
+                  href={buildProjectChatHref(project.id)}
+                  className="flex min-w-0 flex-1 flex-col rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  title={`Open ${project.name}`}
+                  onClick={() => {
+                    globalThis.window.dispatchEvent(
+                      new CustomEvent(projectReopenRequestedEvent, {
+                        detail: { projectId: project.id },
+                      }),
+                    );
+                  }}
+                >
+                  {content}
+                </Link>
+                {onForgetProject && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="mt-1 h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                    aria-label={`Forget ${project.name}`}
+                    title={`Forget ${project.name}`}
+                    onClick={() => onForgetProject(project)}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </Button>
+                )}
+              </div>
             );
           })}
+          {hasOverflow && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="mt-1 h-8 w-full justify-start px-3 text-xs text-muted-foreground"
+              onClick={() => setIsExpanded((value) => !value)}
+            >
+              {isExpanded
+                ? 'Show fewer Projects'
+                : `Show ${visibleProjects.length - COLLAPSED_RECENT_PROJECT_COUNT} more`}
+            </Button>
+          )}
         </div>
       )}
     </section>
   );
+}
+
+function forgetProjectInLocation(projectId: string) {
+  const currentProjectId = new URLSearchParams(globalThis.window.location.search).get(
+    projectReopenSearchParam,
+  );
+  if (currentProjectId !== projectId) return;
+  globalThis.window.history.pushState(null, '', '/');
+  globalThis.window.dispatchEvent(new CustomEvent(workspaceHomeRequestedEvent));
 }
 
 export function Sidebar() {
@@ -231,6 +293,17 @@ export function Sidebar() {
       setIsLoadingRecentProjects(false);
     }
   }, []);
+
+  const forgetRecentProject = useCallback(async (project: ProjectDesktopRecord) => {
+    try {
+      await apiDelete(apiPath('projects', project.id));
+      setRecentProjects((current) => current.filter((candidate) => candidate.id !== project.id));
+      forgetProjectInLocation(project.id);
+      globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+    } catch {
+      loadRecentProjects().catch(() => {});
+    }
+  }, [loadRecentProjects]);
 
   useEffect(() => {
     if (collapsed) return;
@@ -351,6 +424,7 @@ export function Sidebar() {
             projects={recentProjects}
             isLoading={isLoadingRecentProjects}
             onRefresh={loadRecentProjects}
+            onForgetProject={forgetRecentProject}
           />
         )}
       </nav>

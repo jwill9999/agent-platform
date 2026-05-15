@@ -47,6 +47,17 @@ describe('Project instructions review UI', () => {
     expect(html).not.toContain('backend');
   });
 
+  it('renders a dismiss action for approved Project instructions when provided', () => {
+    const html = renderToStaticMarkup(
+      createElement(ProjectInstructionsApprovalNotice, {
+        targetPath: 'AGENTS.md',
+        onDismiss: () => {},
+      }),
+    );
+
+    expect(html).toContain('Dismiss Project instructions notice');
+  });
+
   it('confirms rejected Project instructions in user-facing language', () => {
     const html = renderToStaticMarkup(
       createElement(ProjectInstructionsRejectedNotice, { targetPath: 'AGENTS.md' }),

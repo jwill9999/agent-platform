@@ -55,6 +55,10 @@ export type ToolDispatchContext = {
     canWrite: boolean;
     writeBlockReason?: string;
   };
+  projectWriteBlockHandler?: (input: {
+    call: ToolCallIntent;
+    reason: string;
+  }) => Promise<{ message: string } | undefined>;
 };
 
 export type ApprovalRequestCreateInput = {
@@ -284,7 +288,7 @@ async function dispatchSingleTool(
 
   const onboardingBlockReason = onboardingWriteBlockReason(call, ctx);
   if (onboardingBlockReason) {
-    const output = buildProjectOnboardingBlockedOutput(call);
+    const { output } = await handleProjectWriteBlock(call, ctx, onboardingBlockReason);
     ctx.auditLog?.logDenied(
       call.name,
       call.args,
@@ -405,6 +409,31 @@ function buildProjectOnboardingBlockedOutput(call: ToolCallIntent): Output {
     type: 'error',
     code: 'PROJECT_ONBOARDING_REQUIRED',
     message: `Tool "${call.name}" is blocked until the Project AGENTS.md onboarding review is approved. Read-only inspection is still available.`,
+  };
+}
+
+async function handleProjectWriteBlock(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+  reason: string,
+): Promise<{ output: Output; message?: ChatMessage }> {
+  const handled = await ctx.projectWriteBlockHandler?.({ call, reason });
+  if (handled?.message) {
+    return {
+      output: { type: 'text', content: handled.message },
+      message: { role: 'assistant', content: handled.message },
+    };
+  }
+
+  const output = buildProjectOnboardingBlockedOutput(call);
+  return {
+    output,
+    message: {
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: outputToContent(call.name, output),
+    },
   };
 }
 
@@ -904,7 +933,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       const onboardingBlockReason = onboardingWriteBlockReason(call, ctx);
       if (onboardingBlockReason) {
-        const output = buildProjectOnboardingBlockedOutput(call);
+        const { output, message } = await handleProjectWriteBlock(call, ctx, onboardingBlockReason);
         ctx.auditLog?.logDenied(
           call.name,
           call.args,
@@ -912,13 +941,20 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           state.sessionId ?? '',
           onboardingBlockReason,
         );
-        toolMessages.push({
-          role: 'tool',
-          toolCallId: call.id,
-          toolName: call.name,
-          content: outputToContent(call.name, output),
-        });
+        await emitToolOutput(ctx, output);
+        if (message) toolMessages.push(message);
         traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        if (output.type === 'text') {
+          return {
+            halted: true,
+            llmOutput: null,
+            messages: toolMessages,
+            trace: traceEvents,
+            totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+            totalToolCalls: toolCallCount,
+            loadedSkillIds: newLoadedSkillIds,
+          };
+        }
         continue;
       }
 

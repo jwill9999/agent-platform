@@ -147,19 +147,19 @@ Project capability has three states: `backend_accessible` means the backend can 
 eligible commands in the working tree; `readonly` means the backend can inspect but writes and
 destructive commands are blocked; `unavailable` means the backend cannot access the requested
 working tree. Onboarding has four states: `missing`, `in_progress`, `approved`, and `needs_review`.
-Writes require `backend_accessible` capability and `approved` onboarding. Other states may allow
-read-only inspection but block file creation, edits, deletes, commits, and destructive commands.
+Writes require `backend_accessible` capability and normal tool approval when policy requires it.
+Onboarding state is advisory until the user explicitly runs `/init`.
 
 Instruction precedence is root-first. Root `AGENTS.md` applies to the whole repository. The nearest
 nested `AGENTS.md` may refine the root instructions for an active subproject scope, but it does not
 replace the root safety guidance.
 
-The current Epic 1 onboarding gate is intentionally minimal. Opening a backend-accessible Project
+The current Epic 1 onboarding flow is intentionally minimal. Opening a backend-accessible Project
 discovers root and nested `AGENTS.md` files, stores instruction metadata on the Project, and shows a
-review/approval state in the Project panel. Until the root instructions are approved, Project
-sessions may inspect and plan but write tools, file edits, commits, installs, migrations, and
-destructive shell actions remain blocked. The full assessment, drafting, refresh, and lifecycle
-behavior is tracked separately in the Project onboarding epic.
+review/approval state in the Project panel. Project sessions may create files without first
+approving root instructions; users can run `/init` when they want to draft or review Project
+instructions. The full assessment, drafting, refresh, and lifecycle behavior is tracked separately
+in the Project onboarding epic.
 
 ## Browser Automation Contracts
 

@@ -45,6 +45,7 @@ import {
   createWorkspaceNavigationState,
   desktopProjectIsAvailable,
   desktopProjectPathLabel,
+  mostRecentTitledProjectSession,
   personalChatModeSearchValue,
   projectCapabilitySummary,
   projectDisplayProfile,
@@ -180,6 +181,8 @@ type ProjectInstructionsConversationAccessoryProps = Readonly<{
   isRejecting: boolean;
   onApprove: () => void;
   onReject: () => void;
+  onDismissApproved: () => void;
+  onDismissRejected: () => void;
 }>;
 
 function ProjectInstructionsConversationAccessory({
@@ -192,6 +195,8 @@ function ProjectInstructionsConversationAccessory({
   isRejecting,
   onApprove,
   onReject,
+  onDismissApproved,
+  onDismissRejected,
 }: ProjectInstructionsConversationAccessoryProps) {
   if (selectedMode !== 'project-chat') return null;
   if (draft && !projectOnboardingIsApproved(project)) {
@@ -206,10 +211,20 @@ function ProjectInstructionsConversationAccessory({
     );
   }
   if (projectInstructionsDecisionApplies(approved, project)) {
-    return <ProjectInstructionsApprovalNotice targetPath={approved.targetPath} />;
+    return (
+      <ProjectInstructionsApprovalNotice
+        targetPath={approved.targetPath}
+        onDismiss={onDismissApproved}
+      />
+    );
   }
   if (projectInstructionsDecisionApplies(rejected, project)) {
-    return <ProjectInstructionsRejectedNotice targetPath={rejected.targetPath} />;
+    return (
+      <ProjectInstructionsRejectedNotice
+        targetPath={rejected.targetPath}
+        onDismiss={onDismissRejected}
+      />
+    );
   }
   return null;
 }
@@ -805,6 +820,18 @@ export default function HomePage() {
             return;
           }
         }
+        const projectSessions = (await apiGet<SessionRecord[]>(apiPath('sessions'))) ?? [];
+        const reusableSession = mostRecentTitledProjectSession(projectSessions, project.id);
+        if (reusableSession) {
+          setIsResuming(true);
+          setSelectedAgentId(reusableSession.agentId);
+          setSelectedModelConfigId(
+            resolveChatModelConfigId(reusableSession.agentId, agents, modelConfigs),
+          );
+          setSessionId(reusableSession.id);
+          await refreshSensors(reusableSession.id);
+          return;
+        }
         if (agentId) {
           await bindActiveProjectSession(agentId, project.id);
         }
@@ -1028,6 +1055,8 @@ export default function HomePage() {
 
   const handleSend = useCallback(
     (text: string) => {
+      setApprovedProjectInstructions(null);
+      setRejectedProjectInstructions(null);
       const messageForApi = formattedContext ? `${formattedContext}\n${text}` : text;
       const displayText = formattedContext ? text : undefined;
       sendMessage(messageForApi, displayText, selectedModelConfigId)
@@ -1151,7 +1180,7 @@ export default function HomePage() {
             />
           )}
         </div>
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AgentModelProvider
             value={{
               agents,
@@ -1202,6 +1231,8 @@ export default function HomePage() {
                   isRejecting={isRejectingProjectInstructions}
                   onApprove={handleApproveProjectInstructions}
                   onReject={handleRejectProjectInstructions}
+                  onDismissApproved={() => setApprovedProjectInstructions(null)}
+                  onDismissRejected={() => setRejectedProjectInstructions(null)}
                 />
               }
             />

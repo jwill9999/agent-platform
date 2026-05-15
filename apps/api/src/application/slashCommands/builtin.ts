@@ -8,7 +8,7 @@ import type {
 } from './types.js';
 import { StaticSlashCommandRegistry } from './registry.js';
 
-function formatInitDraftMessage(draft: unknown): string {
+export function formatInitDraftMessage(draft: unknown): string {
   const parsed = ProjectOnboardingDraftSchema.safeParse(draft);
   if (!parsed.success) {
     return 'I started Project setup. Review the Project instructions draft in Project Chat, then approve it when you are ready to enable file edits.';
@@ -17,7 +17,8 @@ function formatInitDraftMessage(draft: unknown): string {
   return [
     `I prepared a Project instructions draft for ${parsed.data.targetPath}.`,
     '',
-    'Review the draft shown in Project Chat, then approve it when you are ready to enable file edits.',
+    'I have not created the requested Project files yet.',
+    'Review the draft shown in Project Chat, approve it to enable file edits, then send your request again.',
   ].join('\n');
 }
 

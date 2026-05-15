@@ -569,24 +569,11 @@ export function getProjectAccessPolicy(input: {
         writeBlockReason: 'readonly_capability',
       };
     case 'backend_accessible':
-      switch (input.onboardingState) {
-        case 'approved':
-          return {
-            canInspect: true,
-            canWrite: true,
-            writeBlockReason: undefined,
-          };
-        case 'missing':
-        case 'in_progress':
-        case 'needs_review':
-          return {
-            canInspect: true,
-            canWrite: false,
-            writeBlockReason: 'onboarding_not_approved',
-          };
-        default:
-          return assertNever(input.onboardingState);
-      }
+      return {
+        canInspect: true,
+        canWrite: true,
+        writeBlockReason: undefined,
+      };
     default:
       return assertNever(input.capabilityState);
   }

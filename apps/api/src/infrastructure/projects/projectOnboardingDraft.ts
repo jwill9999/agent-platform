@@ -172,7 +172,7 @@ function listOrPlaceholder(values: readonly string[], placeholder: string): stri
 function formatEvidence(assessment: ProjectOnboardingAssessment): string {
   return listOrPlaceholder(
     assessment.evidenceFiles.slice(0, 12).map((file) => `${file.path} (${file.kind})`),
-    'No project evidence files were discovered during the read-only assessment.',
+    'No project files were discovered yet. Inspect the folder again before making broad assumptions.',
   );
 }
 
@@ -181,7 +181,7 @@ function formatScopes(assessment: ProjectOnboardingAssessment): string {
     assessment.subprojectScopes.map((scope) =>
       scope.packageName ? `${scope.path} (${scope.packageName})` : scope.path,
     ),
-    'No separate app, package, or service scopes were discovered.',
+    'Treat the Project root as the active scope unless the user asks for a subfolder.',
   );
 }
 
@@ -190,7 +190,7 @@ function formatCommands(assessment: ProjectOnboardingAssessment): string {
     assessment.commands.map((command) =>
       command.path ? `${command.command} from ${command.path}` : command.command,
     ),
-    'Ask the user for run, build, test, lint, and automation commands before executing them.',
+    'No commands were discovered. Ask before installing dependencies or inventing a workflow.',
   );
 }
 
@@ -219,6 +219,22 @@ function formatOpenQuestions(input: {
     unanswered.map((question) => question.prompt),
     'No open onboarding questions remain.',
   );
+}
+
+function formatProjectGuidance(assessment: ProjectOnboardingAssessment): string[] {
+  if (assessment.evidenceFiles.length === 0) {
+    return [
+      '- This Project has little or no detectable structure yet.',
+      '- Create files directly in the Project root when the user asks for a new project scaffold.',
+      '- Ask one focused question only when the requested stack, scope, or command workflow is ambiguous.',
+    ];
+  }
+
+  return [
+    '- Use the files listed above as the current Project evidence.',
+    '- Follow existing structure and conventions before adding new tools, folders, or frameworks.',
+    '- Ask the user before assuming an active subproject, service boundary, or non-code workflow.',
+  ];
 }
 
 export function buildOnboardingDraft(input: DraftInput): ProjectOnboardingDraft {
@@ -256,8 +272,7 @@ export function buildOnboardingDraft(input: DraftInput): ProjectOnboardingDraft 
     '',
     '## Architecture Overview',
     '',
-    '- Use the files listed above as read-only evidence until the Project instructions are approved.',
-    '- Ask the user before assuming an active subproject, service boundary, or non-code workflow.',
+    ...formatProjectGuidance(input.assessment),
     '',
     '## Commands',
     '',
@@ -266,7 +281,7 @@ export function buildOnboardingDraft(input: DraftInput): ProjectOnboardingDraft 
     '## Docker And Containers',
     '',
     '- Use discovered Docker or compose files only after confirming the intended workflow.',
-    '- Do not start, rebuild, or remove containers until Project onboarding is approved.',
+    '- Do not start, rebuild, or remove containers unless the user asks for container work.',
     '',
     '## Environment And Secrets',
     '',
@@ -280,8 +295,8 @@ export function buildOnboardingDraft(input: DraftInput): ProjectOnboardingDraft 
     '',
     '## Agent Safety Rules',
     '',
-    '- Read-only inspection and planning are allowed during onboarding.',
-    '- Code writes, commits, installs, migrations, destructive commands, and approval of generated instructions remain blocked until human approval.',
+    '- Keep edits scoped to the Project folder.',
+    '- Ask for approval before installs, migrations, destructive commands, commits, or pushes.',
     '- If project scope or commands are ambiguous, ask a focused question instead of guessing.',
     '',
     '## Open Questions',
