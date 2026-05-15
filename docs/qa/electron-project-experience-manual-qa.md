@@ -8,6 +8,15 @@ The goal is to find regressions before the staging branch is merged toward `main
 finding to Beads as either existing coverage, a merge blocker, a follow-up task, a known limitation,
 or a product decision.
 
+The current Product direction is Project Chat-first:
+
+- Opening a Project should land in Project Chat.
+- The built-in IDE/file view is not the primary workflow and should not receive further feature
+  investment.
+- Manual editing should eventually hand off to the user's local/default IDE.
+- Branch selection, terminal dock, generated previews, and activity panels are tracked as Project
+  Experience follow-up work, not stabilisation blockers unless they break an already-shipped path.
+
 ## Test Environment
 
 Run this checklist against the staging branch:
@@ -57,7 +66,7 @@ Severity guidance:
 | Check                                  | Expected                                                                                         | Result | Finding ID |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------ | ------ | ---------- |
 | Launch Electron with `start:renderer`. | App opens without requiring Docker commands from the user-facing UI.                             |        |            |
-| Initial screen is readable.            | Navigation, Chat, IDE, and Project affordances are visible at normal font sizes.                 |        |            |
+| Initial screen is readable.            | Navigation, Chat, Workspaces, and Project affordances are visible at normal font sizes.          |        |            |
 | No implementation paths are visible.   | UI does not show `/workspace`, backend roots, hashes, or internal runtime states as normal copy. |        |            |
 | Assistant panel is usable.             | Input is enabled unless a clear user-facing reason is shown.                                     |        |            |
 
@@ -67,7 +76,7 @@ Severity guidance:
 | ----------------------------- | -------------------------------------------------------------------------------------------- | ------ | ---------- |
 | Open Settings.                | Settings opens from the left navigation.                                                     |        |            |
 | Open model/provider settings. | User can find where model/API key configuration lives.                                       |        |            |
-| Return to main workspace.     | Navigation back to Chat/Projects/IDE is clear.                                               |        |            |
+| Return to main workspace.     | Navigation back to Workspaces, Chat, and Project Chat is clear.                              |        |            |
 | No reset requirement appears. | Testing should not require wiping saved API keys or local app data unless explicitly chosen. |        |            |
 
 ### 3. Native Open Project
@@ -109,36 +118,41 @@ Severity guidance:
 | Repeat `/init`.                                  | Existing instructions are updated or refreshed rather than duplicated.                    |        |            |
 | Chat remains usable after `/init`.               | Input does not become stuck or disabled after the command.                                |        |            |
 
-### 7. IDE Handoff
+### 7. Secondary File View / Legacy IDE
 
-| Check                                 | Expected                                                                   | Result | Finding ID |
-| ------------------------------------- | -------------------------------------------------------------------------- | ------ | ---------- |
-| Click **Open IDE** from Project chat. | IDE opens for the same selected Project/session.                           |        |            |
-| Explorer renders files.               | File tree reflects the selected Project.                                   |        |            |
-| Open a file.                          | Editor opens the selected file.                                            |        |            |
-| Relative path display is correct.     | UI shows Project-relative path where needed, not host absolute path.       |        |            |
-| IDE assistant input is usable.        | User can continue the Project conversation from the IDE.                   |        |            |
-| Active file context is clear.         | If active file is attached to chat, UI shows that in user-facing language. |        |            |
+This section verifies that any remaining built-in file view is secondary and does not break Project
+Chat. It is not the proof path for future manual editing; external/default IDE handoff is tracked in
+`agent-platform-project-experience.4`.
+
+| Check                                      | Expected                                                                                  | Result | Finding ID |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- | ------ | ---------- |
+| Optional file view action is secondary.    | Project Chat remains the default surface and any file view action is explicit.            |        |            |
+| Open the secondary file view if available. | The view opens for the same selected Project/session.                                     |        |            |
+| Explorer renders files if available.       | File tree reflects the selected Project.                                                  |        |            |
+| Open a file if available.                  | File content opens for inspection without making the file view the primary workflow.      |        |            |
+| Relative path display is correct.          | UI shows Project-relative path where needed, not host absolute path.                      |        |            |
+| Return to Project Chat.                    | User can return to the same Project Chat without losing conversation or selected Project. |        |            |
 
 ### 8. Return Navigation
 
-| Check                                  | Expected                                                     | Result | Finding ID |
-| -------------------------------------- | ------------------------------------------------------------ | ------ | ---------- |
-| Use breadcrumb/return action from IDE. | App returns to the same Project chat.                        |        |            |
-| Session context is preserved.          | Conversation and selected Project remain consistent.         |        |            |
-| Reopen IDE.                            | IDE opens the same Project, not a previous or empty Project. |        |            |
-| Chat remains usable.                   | User can send another message after returning from IDE.      |        |            |
+| Check                                             | Expected                                             | Result | Finding ID |
+| ------------------------------------------------- | ---------------------------------------------------- | ------ | ---------- |
+| Use Workspaces/return action from Project Chat.   | App returns to the workspace chooser.                |        |            |
+| Reopen the same Project from Recent Projects.     | App returns to the same Project chat.                |        |            |
+| Session context is preserved.                     | Conversation and selected Project remain consistent. |        |            |
+| Chat remains usable after navigation.             | User can send another Project Chat message.          |        |            |
+| Secondary file view return works if tested above. | App returns to the same Project Chat.                |        |            |
 
 ### 9. Recent Projects
 
-| Check                                          | Expected                                                                    | Result | Finding ID |
-| ---------------------------------------------- | --------------------------------------------------------------------------- | ------ | ---------- |
-| Open a second Project.                         | App switches active Project cleanly.                                        |        |            |
-| Recent Projects list is visible.               | Previously opened Projects appear in the left explorer.                     |        |            |
-| Reopen the first Project from Recent Projects. | Active Project switches to the first Project.                               |        |            |
-| Chat context follows active Project.           | Project chat and URL/state agree on the selected Project.                   |        |            |
-| IDE context follows active Project.            | Opening IDE after recent reopen uses the selected recent Project.           |        |            |
-| Unavailable Project state is safe.             | Missing/unavailable Projects do not expose full host paths or crash the UI. |        |            |
+| Check                                          | Expected                                                                       | Result | Finding ID |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ | ------ | ---------- |
+| Open a second Project.                         | App switches active Project cleanly.                                           |        |            |
+| Recent Projects list is visible.               | Previously opened Projects appear in the left explorer.                        |        |            |
+| Reopen the first Project from Recent Projects. | Active Project switches to the first Project.                                  |        |            |
+| Chat context follows active Project.           | Project chat and URL/state agree on the selected Project.                      |        |            |
+| Secondary file view follows active Project.    | Opening any secondary file view after recent reopen uses the selected Project. |        |            |
+| Unavailable Project state is safe.             | Missing/unavailable Projects do not expose full host paths or crash the UI.    |        |            |
 
 ### 10. User-Facing Copy And Internal State
 

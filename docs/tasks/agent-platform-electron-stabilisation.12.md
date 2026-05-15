@@ -94,6 +94,9 @@ Recommended state:
 
 - The stabilisation feature branch is ready for owner manual QA using
   `docs/qa/electron-project-experience-manual-qa.md`.
+- The manual QA checklist has been re-baselined so Project Chat is the proof path, the built-in file
+  view is secondary/legacy, and branch selector/terminal/preview/activity work is tracked under
+  Project Experience.
 - Do not merge `feature/agent-platform-electron-stabilisation` into `main` for release until the
   owner reruns or signs off the checklist.
 - Follow-on Project Experience planning can proceed from the stabilised direction, but release/main
