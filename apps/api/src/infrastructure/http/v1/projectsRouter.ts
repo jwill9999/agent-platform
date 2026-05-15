@@ -3,6 +3,8 @@ import {
   ProjectDesktopRegistrationBodySchema,
   ProjectDesktopRecentProjectsResultSchema,
   ProjectDesktopRegistrationResultSchema,
+  ProjectBranchCheckoutBodySchema,
+  ProjectBranchListResultSchema,
   ProjectFileReadResultSchema,
   ProjectFileTreeResultSchema,
   type ProjectOpenBody,
@@ -22,6 +24,7 @@ import {
   type ProjectInstructionFileReference,
   type ProjectFileNode,
   type ProjectRecord,
+  type ProjectBranchListResult,
   ProjectUpdateBodySchema,
 } from '@agent-platform/contracts';
 import {
@@ -125,6 +128,17 @@ function gitValue(cwd: string, args: string[]): string | undefined {
     return output || undefined;
   } catch {
     return undefined;
+  }
+}
+
+function gitOutput(cwd: string, args: string[]): string {
+  try {
+    return execFileSync(GIT_BINARY, ['-C', cwd, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    throw new HttpError(409, 'PROJECT_GIT_UNAVAILABLE', 'Git is not available for this Project.');
   }
 }
 
@@ -650,6 +664,84 @@ function projectRootForBackendRead(project: ProjectRecord): string {
   } catch {
     throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project folder could not be inspected');
   }
+}
+
+function repositoryRootForBranchOperations(project: ProjectRecord): string {
+  const repositoryRoot = project.metadata['repositoryRoot'];
+  if (typeof repositoryRoot !== 'string' || !repositoryRoot.trim()) {
+    throw new HttpError(409, 'PROJECT_GIT_UNAVAILABLE', 'Git is not available for this Project.');
+  }
+
+  try {
+    const realRoot = realpathSync(repositoryRoot);
+    if (!statSync(realRoot).isDirectory()) {
+      throw new Error('Repository root is not a directory');
+    }
+    const insideWorkTree = gitOutput(realRoot, ['rev-parse', '--is-inside-work-tree']);
+    if (insideWorkTree !== 'true') {
+      throw new Error('Not a Git work tree');
+    }
+    return realRoot;
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(409, 'PROJECT_GIT_UNAVAILABLE', 'Git is not available for this Project.');
+  }
+}
+
+function projectBranchList(project: ProjectRecord): ProjectBranchListResult {
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const currentBranch = gitOutput(repositoryRoot, ['branch', '--show-current']);
+  if (!currentBranch) {
+    throw new HttpError(
+      409,
+      'PROJECT_BRANCH_DETACHED',
+      'Project is currently on a detached Git HEAD.',
+    );
+  }
+  const branchOutput = gitOutput(repositoryRoot, [
+    'for-each-ref',
+    '--format=%(refname:short)',
+    'refs/heads',
+  ]);
+  const clean = gitOutput(repositoryRoot, ['status', '--porcelain']) === '';
+  const branchNames = branchOutput
+    .split('\n')
+    .map((branch) => branch.trim())
+    .filter(Boolean);
+
+  return ProjectBranchListResultSchema.parse({
+    currentBranch,
+    clean,
+    branches: branchNames.map((name) => ({ name, current: name === currentBranch })),
+  });
+}
+
+function checkoutProjectBranch(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const input = parseBody(ProjectBranchCheckoutBodySchema, body);
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const branches = projectBranchList(project);
+  if (!branches.clean) {
+    throw new HttpError(
+      409,
+      'PROJECT_BRANCH_DIRTY',
+      'Commit or stash local changes before switching branches.',
+    );
+  }
+  if (!branches.branches.some((branch) => branch.name === input.branch)) {
+    throw new HttpError(404, 'PROJECT_BRANCH_NOT_FOUND', 'Project branch was not found.');
+  }
+  gitOutput(repositoryRoot, ['switch', input.branch]);
+  const activeBranch = gitOutput(repositoryRoot, ['branch', '--show-current']);
+  const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD']);
+  return updateProject(db, id, {
+    metadata: {
+      ...project.metadata,
+      activeBranch,
+      activeWorktreeId: headSha ? `${repositoryRoot}:${headSha}` : repositoryRoot,
+    },
+  });
 }
 
 function projectRelativePath(root: string, absolutePath: string): string {
@@ -1183,6 +1275,28 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: await readProjectFile(project, req.query.path) });
+    }),
+  );
+
+  router.get(
+    '/:id/branches',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: projectBranchList(project) });
+    }),
+  );
+
+  router.post(
+    '/:id/branches/checkout',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({
+          data: checkoutProjectBranch(db, requireParam(req.params, 'id'), req.body),
+        });
+      } catch (error) {
+        mapProjectError(error);
+      }
     }),
   );
 

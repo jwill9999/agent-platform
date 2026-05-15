@@ -37,6 +37,7 @@ import {
   ProjectInstructionsRejectedNotice,
   ProjectInstructionsReview,
 } from '@/components/project/project-instructions-review';
+import { ProjectBranchSelector } from '@/components/project/project-branch-selector';
 import { ProjectTerminalDock } from '@/components/project/project-terminal-dock';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
@@ -1244,6 +1245,17 @@ export default function HomePage() {
               inputPlaceholder={projectChatPlaceholder(selectedMode)}
               emptyStateTitle={projectChatEmptyStateTitle(selectedMode, activeProject)}
               emptyStateDescription={projectChatEmptyStateDescription(selectedMode)}
+              inputSelectorAccessory={
+                selectedMode === 'project-chat' ? (
+                  <ProjectBranchSelector
+                    projectId={activeProject?.id ?? null}
+                    activeBranch={activeProject?.metadata.activeBranch}
+                    disabled={isLoading}
+                    onProjectChanged={setActiveProject}
+                    onError={setSessionError}
+                  />
+                ) : null
+              }
               conversationAccessory={
                 <ProjectInstructionsConversationAccessory
                   draft={onboardingDraft}

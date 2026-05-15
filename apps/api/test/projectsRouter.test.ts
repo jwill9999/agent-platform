@@ -201,6 +201,104 @@ describe('projectsRouter', () => {
     expect(JSON.stringify(selectedAgain.body.data)).not.toContain(repoRealPath);
   });
 
+  it('lists Project branches and switches clean Git-backed Projects', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-branches-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['switch', '-c', 'feature/chat-input-branch'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'feature\n');
+    execFileSync(GIT_BINARY, ['commit', '-am', 'feature'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['switch', 'main'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Branches Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const branches = await request(app).get(`/v1/projects/${projectId}/branches`).expect(200);
+    expect(branches.body.data).toMatchObject({
+      currentBranch: 'main',
+      clean: true,
+      branches: expect.arrayContaining([
+        { name: 'main', current: true },
+        { name: 'feature/chat-input-branch', current: false },
+      ]),
+    });
+
+    const switched = await request(app)
+      .post(`/v1/projects/${projectId}/branches/checkout`)
+      .send({ branch: 'feature/chat-input-branch' })
+      .expect(200);
+
+    expect(switched.body.data).toMatchObject({
+      metadata: {
+        activeBranch: 'feature/chat-input-branch',
+      },
+    });
+    expect(
+      execFileSync(GIT_BINARY, ['branch', '--show-current'], {
+        cwd: repoDir,
+        encoding: 'utf8',
+      }).trim(),
+    ).toBe('feature/chat-input-branch');
+  });
+
+  it('blocks Project branch switching when the working tree is dirty', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-dirty-branches-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['branch', 'feature/clean-target'], { cwd: repoDir, stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), 'dirty\n');
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Dirty Branches Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const response = await request(app)
+      .post(`/v1/projects/${projectId}/branches/checkout`)
+      .send({ branch: 'feature/clean-target' })
+      .expect(409);
+
+    expect(response.body.error).toMatchObject({
+      code: 'PROJECT_BRANCH_DIRTY',
+      message: 'Commit or stash local changes before switching branches.',
+    });
+    expect(
+      execFileSync(GIT_BINARY, ['branch', '--show-current'], {
+        cwd: repoDir,
+        encoding: 'utf8',
+      }).trim(),
+    ).toBe('main');
+  });
+
   it('creates and resumes a Project-bound session for a registered desktop project', async () => {
     const repoDir = path.join(tmpDir, 'desktop-session-repo');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });

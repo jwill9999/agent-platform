@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback, type KeyboardEvent, type DragEvent } from 'react';
+import {
+  useState,
+  useRef,
+  useCallback,
+  type KeyboardEvent,
+  type DragEvent,
+  type ReactNode,
+} from 'react';
 import {
   Send,
   Loader2,
@@ -35,6 +42,8 @@ interface ChatInputProps {
   onClearAttachments?: () => void;
   /** Sanitisation warnings from file validation. */
   attachmentWarnings?: string[];
+  /** Optional controls rendered beside the agent/model selectors. */
+  selectorAccessory?: ReactNode;
   // agent/model selector props removed; use context via `useAgentModelContext()`
 }
 
@@ -49,6 +58,7 @@ export function ChatInput({
   onRemoveAttachment,
   onClearAttachments,
   attachmentWarnings,
+  selectorAccessory,
   // agent/model props removed — use context
 }: Readonly<ChatInputProps>) {
   const [input, setInput] = useState('');
@@ -280,6 +290,7 @@ export function ChatInput({
                 onSelect={ctx.onSelectModelConfig!}
                 disabled={ctx.selectorDisabled || isLoading}
               />
+              {selectorAccessory}
             </div>
           </div>
         </section>

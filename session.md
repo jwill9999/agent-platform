@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-15
+- **Session:** Implemented `agent-platform-u9n` on `task/agent-platform-project-branch-selector-input`: Project Chat now exposes branch switching beside the composer model selector.
+- **Today’s outputs:** Added Project branch contracts, backend branch listing/checkout endpoints with safe branch-name validation and dirty-worktree blocking, a Project Chat input branch selector beside the agent/model controls, and Electron E2E coverage that switches a real Git-backed Project from `main` to `feature/e2e-branch`.
+- **Validation:** Passed contracts project tests, API router tests, API/contracts/web/desktop typecheck, API/web lint, full web unit tests, web build, desktop unit tests, elevated Electron E2E, `pnpm format:check`, and `git diff --check`. SonarQube MCP remained unavailable via tool discovery in this task chain, so the fallback gate used typecheck/lint/tests.
+- **Current state:** Bead `agent-platform-u9n` is closed locally. Branch is `task/agent-platform-project-branch-selector-input`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Run `bd dolt push`, commit and push this branch, then owner can manually test changing branches from the Project Chat composer row.
+- **Date:** 2026-05-15
 - **Session:** Completed `agent-platform-1bg` on `task/agent-platform-project-experience-terminal-tabs`: Project Chat terminal dock now supports multiple human-controlled terminal tabs.
 - **Today’s outputs:** Added tab state over the existing Electron PTY bridge, with independent PTY/xterm runtime per tab, New Terminal creation, tab selection, per-tab close, global hide preserving open tabs, and global close disposing all tabs. Extended Electron E2E to verify Terminal 1 and Terminal 2 keep independent shell output while both start at the active Project root.
 - **Validation:** Passed web typecheck, web lint, web unit tests, web build, full desktop unit tests, elevated Electron E2E, `pnpm format:check`, and `git diff --check`. SonarQube MCP remained unavailable via tool discovery, so the documented fallback gate used typecheck/lint/tests.

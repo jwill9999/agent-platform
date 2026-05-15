@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ProjectModeSchema,
+  ProjectBranchCheckoutBodySchema,
+  ProjectBranchListResultSchema,
   ProjectOpenBodySchema,
   ProjectWorkspaceBindingSchema,
   ProjectCapabilityStateSchema,
@@ -25,6 +27,32 @@ describe('Project mode and workspace binding contracts', () => {
     });
 
     expect(() => ProjectOpenBodySchema.parse({ path: '' })).toThrow();
+  });
+
+  it('validates Project branch list and checkout contracts', () => {
+    expect(
+      ProjectBranchListResultSchema.parse({
+        currentBranch: 'main',
+        clean: true,
+        branches: [
+          { name: 'main', current: true },
+          { name: 'feature/chat-input-branch', current: false },
+        ],
+      }),
+    ).toEqual({
+      currentBranch: 'main',
+      clean: true,
+      branches: [
+        { name: 'main', current: true },
+        { name: 'feature/chat-input-branch', current: false },
+      ],
+    });
+
+    expect(ProjectBranchCheckoutBodySchema.parse({ branch: 'feature/chat-input-branch' })).toEqual({
+      branch: 'feature/chat-input-branch',
+    });
+    expect(() => ProjectBranchCheckoutBodySchema.parse({ branch: '-bad' })).toThrow();
+    expect(() => ProjectBranchCheckoutBodySchema.parse({ branch: '../bad' })).toThrow();
   });
 
   it('captures backend-accessible Project working-tree metadata without conflating chat workspace', () => {

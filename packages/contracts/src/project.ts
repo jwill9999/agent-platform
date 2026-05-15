@@ -507,6 +507,38 @@ export type ProjectDesktopRecentProjectsResult = z.infer<
   typeof ProjectDesktopRecentProjectsResultSchema
 >;
 
+const ProjectBranchNameSchema = z
+  .string()
+  .min(1)
+  .max(300)
+  .refine(
+    (value) =>
+      value.trim() === value &&
+      !value.startsWith('-') &&
+      !value.includes('\\') &&
+      !value.includes('..') &&
+      !/[\s~^:?*[\]\0]/.test(value),
+    { message: 'Branch name must be a safe Git branch reference' },
+  );
+
+export const ProjectBranchSummarySchema = z.object({
+  name: ProjectBranchNameSchema,
+  current: z.boolean(),
+});
+export type ProjectBranchSummary = z.infer<typeof ProjectBranchSummarySchema>;
+
+export const ProjectBranchListResultSchema = z.object({
+  currentBranch: ProjectBranchNameSchema.optional(),
+  clean: z.boolean(),
+  branches: z.array(ProjectBranchSummarySchema),
+});
+export type ProjectBranchListResult = z.infer<typeof ProjectBranchListResultSchema>;
+
+export const ProjectBranchCheckoutBodySchema = z.object({
+  branch: ProjectBranchNameSchema,
+});
+export type ProjectBranchCheckoutBody = z.infer<typeof ProjectBranchCheckoutBodySchema>;
+
 export type ProjectFileNode = {
   name: string;
   path: string;
