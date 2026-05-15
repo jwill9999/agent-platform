@@ -53,6 +53,8 @@ Experience or release work can start.
 | Right-side Project activity panel                         | Deferred to `agent-platform-project-experience.8`.                                                                    |
 | Project Chat branch selector                              | Deferred to `agent-platform-project-experience.9`.                                                                    |
 | Governed Project terminal dock                            | Deferred to `agent-platform-project-experience.10`.                                                                   |
+| Image attachments rejected as text files                  | Mapped to `agent-platform-electron-stabilisation.14`.                                                                 |
+| Duplicate Project names and Project session history       | Mapped to `agent-platform-project-experience.11`.                                                                     |
 | Full integrated desktop Project Experience pass           | Deferred to `agent-platform-project-experience.6`.                                                                    |
 
 ### Product direction after re-baseline
@@ -97,6 +99,11 @@ Recommended state:
 - The manual QA checklist has been re-baselined so Project Chat is the proof path, the built-in file
   view is secondary/legacy, and branch selector/terminal/preview/activity work is tracked under
   Project Experience.
+- Owner manual QA has confirmed the core Project Chat flow works when excluding the legacy built-in
+  IDE path. Remaining findings are now mapped rather than left ambiguous:
+  - image attachments belong to `agent-platform-electron-stabilisation.14`;
+  - duplicate Project names and Project-scoped session history belong to
+    `agent-platform-project-experience.11`.
 - Do not merge `feature/agent-platform-electron-stabilisation` into `main` for release until the
   owner reruns or signs off the checklist.
 - Follow-on Project Experience planning can proceed from the stabilised direction, but release/main

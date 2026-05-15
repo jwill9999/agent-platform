@@ -122,6 +122,7 @@ Out of scope:
 | `agent-platform-project-experience.8`  | Add Project activity side panel                           |
 | `agent-platform-project-experience.9`  | Add Project Chat branch selector                          |
 | `agent-platform-project-experience.10` | Add governed terminal dock                                |
+| `agent-platform-project-experience.11` | Disambiguate duplicate Projects and restore history       |
 
 ## Parallel Implementation Notes
 
@@ -139,8 +140,11 @@ After `agent-platform-project-experience.3` has made Project Chat the default Pr
   it touches Electron main/preload, native PTY lifecycle, command safety, Project-root scoping, and
   terminal rendering. It can run in parallel only if its write set is isolated from preview/activity
   components.
+- `agent-platform-project-experience.11` should run after Project Chat is the default surface. It can
+  run in parallel with branch selector, preview, and activity work if it owns only Project display
+  naming, Recent Projects, and Project-scoped session history.
 - `agent-platform-project-experience.6` remains the integration verification gate and should absorb
-  E2E coverage from `.4`, `.5`, `.7`, `.8`, `.9`, and `.10`.
+  E2E coverage from `.4`, `.5`, `.7`, `.8`, `.9`, `.10`, and `.11`.
 
 ## Testing Strategy Requirements
 
@@ -160,6 +164,10 @@ Each child task must include concrete local and remote verification:
 - [ ] Project records can represent generic folder/work contexts with profile/capability metadata.
 - [ ] Users can see Projects and Chats/Sessions in the left explorer without scattered CTAs.
 - [ ] Users can reopen previous Projects from stored metadata.
+- [ ] Projects with the same folder name are distinguishable through short user-facing parent-path
+      labels such as `~/projects/agent-platform` and `~/work/client-a/agent-platform`.
+- [ ] Project Chat restores the last active Project-scoped session, while Personal Chat sessions
+      remain separate.
 - [ ] Opening a Project lands in project-scoped chat by default.
 - [ ] Users can hand off to their configured/default IDE from a Project without making the built-in
       IDE the primary workflow.

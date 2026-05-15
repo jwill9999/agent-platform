@@ -97,6 +97,7 @@ Severity guidance:
 | Chat input is enabled.        | User can type without first opening the IDE or selecting a file.                                  |        |            |
 | Empty state is clear.         | Copy invites the user to ask what they want done in the Project.                                  |        |            |
 | Send a normal message.        | Assistant has Project context or explains any missing setup in user-facing language.              |        |            |
+| Attach a PNG/JPEG image.      | Image attachment is accepted or a model-support warning is shown before send.                     |        |            |
 | No internal status leakage.   | Copy avoids states like `in_progress`, `needs_review`, backend roots, hashes, or raw diagnostics. |        |            |
 
 ### 5. Slash Command Help
@@ -148,9 +149,11 @@ Chat. It is not the proof path for future manual editing; external/default IDE h
 | Check                                          | Expected                                                                       | Result | Finding ID |
 | ---------------------------------------------- | ------------------------------------------------------------------------------ | ------ | ---------- |
 | Open a second Project.                         | App switches active Project cleanly.                                           |        |            |
+| Open two Projects with the same folder name.   | Recent Projects distinguish them with short parent-path labels.                |        |            |
 | Recent Projects list is visible.               | Previously opened Projects appear in the left explorer.                        |        |            |
 | Reopen the first Project from Recent Projects. | Active Project switches to the first Project.                                  |        |            |
 | Chat context follows active Project.           | Project chat and URL/state agree on the selected Project.                      |        |            |
+| Project session history is visible.            | The Sessions menu shows sessions for the active Project, not unrelated chats.  |        |            |
 | Secondary file view follows active Project.    | Opening any secondary file view after recent reopen uses the selected Project. |        |            |
 | Unavailable Project state is safe.             | Missing/unavailable Projects do not expose full host paths or crash the UI.    |        |            |
 
