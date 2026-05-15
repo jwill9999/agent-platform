@@ -105,7 +105,8 @@ Severity guidance:
 | Check                                | Expected                                                                                  | Result | Finding ID |
 | ------------------------------------ | ----------------------------------------------------------------------------------------- | ------ | ---------- |
 | Send `/help`.                        | Assistant lists available slash commands.                                                 |        |            |
-| Confirm `/init` is listed.           | `/init` appears with a short user-facing description.                                     |        |            |
+| Confirm `/init` is listed.           | `/init` appears as a separate entry with a short user-facing description.                 |        |            |
+| Help formatting is readable.         | Commands render as a list/table/card rather than a single run-on line.                    |        |            |
 | Send `/help init`.                   | Assistant explains usage, scope, and whether the command changes Project state.           |        |            |
 | Help works as first Project message. | Slash command does not require a prior ordinary chat message to discover Project context. |        |            |
 
