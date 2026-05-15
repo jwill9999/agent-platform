@@ -175,7 +175,17 @@ test.describe('Electron Project access', () => {
       await expect(recentProjects.getByText('Ready to reopen')).toBeVisible();
       await expect(recentProjects.getByText(firstProjectDir)).toHaveCount(0);
 
-      await page.getByRole('button', { name: 'Workspaces' }).click();
+      await page.getByRole('link', { name: /Chat/ }).click();
+      await expect(page.locator('[data-workspace-surface="chat"]')).toBeVisible();
+      await expect(page.getByPlaceholder('Send a message... (drop files to attach)')).toBeVisible();
+      await expect(page.locator('section[aria-label="Recent Projects"]')).toHaveCount(0);
+      await expect(page.getByText('Sensors')).toHaveCount(0);
+      await expect(page.getByText('Project activity')).toHaveCount(0);
+      await expect(page.getByPlaceholder('Ask about this Project...')).toHaveCount(0);
+      await expect(page.getByText('project-chat-screenshot.jpg')).toHaveCount(0);
+      await expect(page.getByText('project-chat-notes.md')).toHaveCount(0);
+
+      await page.getByRole('link', { name: /Workspaces/ }).click();
       await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
       await page.getByRole('button', { name: 'Open Project' }).click();
       await expect(projectChatHeader.getByText(secondProjectName)).toBeVisible();

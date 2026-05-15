@@ -426,14 +426,16 @@ export default function HomePage() {
           return;
         }
         setSessionId(session.id);
-        await refreshSensors(session.id);
+        setSensorDashboard(null);
+        setSensorError(null);
+        setSensorLoading(false);
       } catch (e) {
         setSessionError(e instanceof ApiRequestError ? e.message : String(e));
         setSessionId(null);
         setSensorDashboard(null);
       }
     },
-    [refreshSensors],
+    [],
   );
 
   useEffect(() => {
@@ -464,6 +466,8 @@ export default function HomePage() {
       setActiveProject(null);
       setSessionId(null);
       setSensorDashboard(null);
+      setSensorError(null);
+      setSensorLoading(false);
       setSessionError(null);
       setIsResuming(false);
       clearAttachments();
@@ -484,6 +488,8 @@ export default function HomePage() {
     setActiveProject(null);
     setSessionId(null);
     setSensorDashboard(null);
+    setSensorError(null);
+    setSensorLoading(false);
     setSessionError(null);
     setIsResuming(false);
     clearAttachments();
@@ -752,7 +758,13 @@ export default function HomePage() {
       setSelectedModelConfigId(resolveChatModelConfigId(session.agentId, agents, modelConfigs));
       setSessionId(session.id);
       clearAttachments();
-      refreshSensors(session.id).catch(() => {});
+      if (session.mode === 'project') {
+        refreshSensors(session.id).catch(() => {});
+      } else {
+        setSensorDashboard(null);
+        setSensorError(null);
+        setSensorLoading(false);
+      }
     },
     [agents, clearAttachments, modelConfigs, refreshSensors],
   );
@@ -791,7 +803,9 @@ export default function HomePage() {
       sendMessage(messageForApi, displayText, selectedModelConfigId)
         .then(async () => {
           await refreshSessions();
-          if (sessionId) await refreshSensors(sessionId);
+          if (selectedMode === 'project-chat' && sessionId) {
+            await refreshSensors(sessionId);
+          }
           if (selectedMode === 'project-chat' && activeProject?.id) {
             await refreshActiveProject();
           }
@@ -897,11 +911,14 @@ export default function HomePage() {
               toolEventsByMessage={toolEventsByMessage}
               approvalEventsByMessage={approvalEventsByMessage}
               onApprovalDecision={handleApprovalDecision}
+              showSensors={selectedMode === 'project-chat'}
               sensorDashboard={sensorDashboard}
               sensorLoading={sensorLoading}
               sensorError={sensorError}
               onRetrySensors={() => {
-                if (sessionId) refreshSensors(sessionId, true).catch(() => {});
+                if (selectedMode === 'project-chat' && sessionId) {
+                  refreshSensors(sessionId, true).catch(() => {});
+                }
               }}
               inputPlaceholder={projectChatPlaceholder(selectedMode)}
               emptyStateTitle={projectChatEmptyStateTitle(selectedMode, activeProject)}
