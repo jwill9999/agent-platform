@@ -2,6 +2,8 @@ import type {
   ProjectDesktopRecentProjectsResult,
   ProjectDesktopRecord,
   ProjectDesktopRegistrationResult,
+  ProjectBranchSummary,
+  ProjectBranchSwitchResult,
   SessionProjectBindingResult,
 } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
@@ -77,6 +79,22 @@ export async function loadRecentDesktopProjects(): Promise<ProjectDesktopRecord[
     apiPath('projects', 'desktop', 'recent'),
   );
   return result?.projects ?? [];
+}
+
+export async function loadProjectBranches(projectId: string): Promise<ProjectBranchSummary | null> {
+  return (await apiGet<ProjectBranchSummary>(apiPath('projects', projectId, 'branches'))) ?? null;
+}
+
+export async function switchProjectBranch(input: {
+  readonly projectId: string;
+  readonly branch: string;
+}): Promise<ProjectBranchSwitchResult | null> {
+  return (
+    (await apiPost<ProjectBranchSwitchResult>(
+      apiPath('projects', input.projectId, 'branches', 'switch'),
+      { branch: input.branch },
+    )) ?? null
+  );
 }
 
 export async function bindProjectSession(input: {

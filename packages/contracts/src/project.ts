@@ -539,6 +539,45 @@ export const ProjectFileReadResultSchema = z.object({
 });
 export type ProjectFileReadResult = z.infer<typeof ProjectFileReadResultSchema>;
 
+export const ProjectBranchKindSchema = z.enum(['local', 'remote']);
+export type ProjectBranchKind = z.infer<typeof ProjectBranchKindSchema>;
+
+export const ProjectBranchStatusSchema = z.enum([
+  'available',
+  'non_git',
+  'detached',
+  'dirty',
+  'unavailable',
+]);
+export type ProjectBranchStatus = z.infer<typeof ProjectBranchStatusSchema>;
+
+export const ProjectBranchSchema = z.object({
+  name: z.string().min(1).max(300),
+  kind: ProjectBranchKindSchema,
+  current: z.boolean().default(false),
+});
+export type ProjectBranch = z.infer<typeof ProjectBranchSchema>;
+
+export const ProjectBranchSummarySchema = z.object({
+  status: ProjectBranchStatusSchema,
+  currentBranch: z.string().min(1).max(300).optional(),
+  branches: z.array(ProjectBranchSchema).default([]),
+  dirty: z.boolean().default(false),
+  message: z.string().min(1).max(500).optional(),
+});
+export type ProjectBranchSummary = z.infer<typeof ProjectBranchSummarySchema>;
+
+export const ProjectBranchSwitchBodySchema = z.object({
+  branch: z.string().trim().min(1).max(300),
+});
+export type ProjectBranchSwitchBody = z.infer<typeof ProjectBranchSwitchBodySchema>;
+
+export const ProjectBranchSwitchResultSchema = z.object({
+  project: ProjectDesktopRecordSchema,
+  branch: ProjectBranchSummarySchema,
+});
+export type ProjectBranchSwitchResult = z.infer<typeof ProjectBranchSwitchResultSchema>;
+
 export const ProjectQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false),
 });

@@ -3,6 +3,7 @@
 import type {
   Agent,
   ModelConfig,
+  ProjectBranchSummary,
   ProjectOnboardingDraft,
   ProjectDesktopRecord,
   SensorDashboardResponse,
@@ -33,6 +34,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   ProjectInstructionsApprovalNotice,
   ProjectInstructionsRejectedNotice,
   ProjectInstructionsReview,
@@ -60,10 +68,12 @@ import {
 } from '@/lib/project-navigation';
 import {
   bindProjectSession,
+  loadProjectBranches,
   createAndRegisterDesktopProject,
   hasDesktopProjectBridge,
   loadRecentDesktopProjects,
   selectAndRegisterDesktopProject,
+  switchProjectBranch,
 } from '@/lib/desktop-projects';
 
 type WorkspaceMode = 'chat' | 'project-chat';
@@ -93,6 +103,10 @@ type ErrorBannerProps = Readonly<{
 type ProjectChatHeaderProps = Readonly<{
   project: ProjectDesktopRecord | null;
   sessionId: string | null;
+  branchSummary: ProjectBranchSummary | null;
+  branchLoading: boolean;
+  branchError: string | null;
+  onSwitchBranch: (branch: string) => void;
   onReturnHome: () => void;
 }>;
 type ProjectInstructionsDecision = Readonly<{
@@ -434,7 +448,80 @@ function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
   );
 }
 
-function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHeaderProps) {
+function projectBranchFallbackLabel(summary: ProjectBranchSummary | null): string {
+  switch (summary?.status) {
+    case 'non_git':
+      return 'No Git branch';
+    case 'detached':
+      return 'Detached HEAD';
+    case 'dirty':
+      return summary.currentBranch ? `${summary.currentBranch} changes` : 'Uncommitted changes';
+    case 'unavailable':
+      return 'Branch unavailable';
+    case 'available':
+      return summary.currentBranch ?? 'Choose branch';
+    default:
+      return 'Branch';
+  }
+}
+
+function ProjectBranchSelector({
+  summary,
+  loading,
+  error,
+  onSwitchBranch,
+}: Readonly<{
+  summary: ProjectBranchSummary | null;
+  loading: boolean;
+  error: string | null;
+  onSwitchBranch: (branch: string) => void;
+}>) {
+  if (loading && !summary) {
+    return <div className="text-xs text-muted-foreground">Checking branch...</div>;
+  }
+
+  const selectableBranches = summary?.branches ?? [];
+  const canSwitch = summary?.status === 'available' && selectableBranches.length > 0;
+  const currentBranch = summary?.currentBranch;
+
+  return (
+    <div className="flex min-w-[10rem] flex-col items-end gap-1">
+      {canSwitch && currentBranch ? (
+        <Select value={currentBranch} onValueChange={onSwitchBranch} disabled={loading}>
+          <SelectTrigger className="h-8 w-[10rem] text-xs" aria-label="Project branch">
+            <SelectValue placeholder="Choose branch" />
+          </SelectTrigger>
+          <SelectContent>
+            {selectableBranches.map((branch) => (
+              <SelectItem key={branch.name} value={branch.name}>
+                {branch.kind === 'remote' ? `${branch.name} (remote)` : branch.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <div className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground">
+          {projectBranchFallbackLabel(summary)}
+        </div>
+      )}
+      {(error || (summary?.status !== 'available' ? summary?.message : null)) && (
+        <div className="max-w-[14rem] truncate text-[11px] text-muted-foreground">
+          {error ?? summary?.message}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProjectChatHeader({
+  project,
+  sessionId,
+  branchSummary,
+  branchLoading,
+  branchError,
+  onSwitchBranch,
+  onReturnHome,
+}: ProjectChatHeaderProps) {
   if (!project) {
     return null;
   }
@@ -460,6 +547,12 @@ function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHead
       <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onReturnHome}>
         Workspaces
       </Button>
+      <ProjectBranchSelector
+        summary={branchSummary}
+        loading={branchLoading}
+        error={branchError}
+        onSwitchBranch={onSwitchBranch}
+      />
       <Button asChild size="sm" variant="outline" className="shrink-0">
         <Link href={buildProjectIdeHref(project.id, sessionId)}>Open IDE</Link>
       </Button>
@@ -481,6 +574,9 @@ export default function HomePage() {
   const [sensorDashboard, setSensorDashboard] = useState<SensorDashboardResponse | null>(null);
   const [sensorLoading, setSensorLoading] = useState(false);
   const [sensorError, setSensorError] = useState<string | null>(null);
+  const [branchSummary, setBranchSummary] = useState<ProjectBranchSummary | null>(null);
+  const [branchLoading, setBranchLoading] = useState(false);
+  const [branchError, setBranchError] = useState<string | null>(null);
   const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
   const [isOpeningProject, setIsOpeningProject] = useState(false);
   const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
@@ -574,6 +670,31 @@ export default function HomePage() {
     }
   }, []);
 
+  const refreshProjectBranches = useCallback(async (projectId: string) => {
+    setBranchLoading(true);
+    setBranchError(null);
+    try {
+      setBranchSummary(await loadProjectBranches(projectId));
+    } catch (error) {
+      setBranchSummary(null);
+      setBranchError(
+        error instanceof ApiRequestError ? error.message : 'Branch information is unavailable',
+      );
+    } finally {
+      setBranchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedMode !== 'project-chat' || !activeProject?.id) {
+      setBranchSummary(null);
+      setBranchError(null);
+      setBranchLoading(false);
+      return;
+    }
+    refreshProjectBranches(activeProject.id).catch(() => {});
+  }, [activeProject?.id, refreshProjectBranches, selectedMode]);
+
   const createSessionForAgent = useCallback(async (agentId: string) => {
     setSessionError(null);
     setIsResuming(false);
@@ -629,6 +750,9 @@ export default function HomePage() {
       setSensorDashboard(null);
       setSensorError(null);
       setSensorLoading(false);
+      setBranchSummary(null);
+      setBranchError(null);
+      setBranchLoading(false);
       setSessionError(null);
       setIsResuming(false);
       clearAttachments();
@@ -651,6 +775,9 @@ export default function HomePage() {
     setSensorDashboard(null);
     setSensorError(null);
     setSensorLoading(false);
+    setBranchSummary(null);
+    setBranchError(null);
+    setBranchLoading(false);
     setSessionError(null);
     setIsResuming(false);
     clearAttachments();
@@ -713,6 +840,8 @@ export default function HomePage() {
       setActiveProject(project);
       setSessionId(null);
       setSensorDashboard(null);
+      setBranchSummary(null);
+      setBranchError(null);
       setSessionError(null);
       setIsResuming(false);
       clearAttachments();
@@ -822,6 +951,40 @@ export default function HomePage() {
     const project = await apiGet<ProjectDesktopRecord>(apiPath('projects', activeProject.id));
     if (project) setActiveProject(project);
   }, [activeProject?.id]);
+
+  const handleSwitchProjectBranch = useCallback(
+    async (branch: string) => {
+      if (!activeProject?.id || branch === branchSummary?.currentBranch) return;
+      setBranchLoading(true);
+      setBranchError(null);
+      try {
+        const result = await switchProjectBranch({ projectId: activeProject.id, branch });
+        if (!result) throw new ApiRequestError('Branch could not be changed', 500);
+        setActiveProject(result.project);
+        setBranchSummary(result.branch);
+        if (sessionId) {
+          await refreshSensors(sessionId, true);
+        }
+        if (globalThis.window !== undefined) {
+          globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+        }
+      } catch (error) {
+        setBranchError(
+          error instanceof ApiRequestError ? error.message : 'Branch could not be changed',
+        );
+        await refreshProjectBranches(activeProject.id);
+      } finally {
+        setBranchLoading(false);
+      }
+    },
+    [
+      activeProject?.id,
+      branchSummary?.currentBranch,
+      refreshProjectBranches,
+      refreshSensors,
+      sessionId,
+    ],
+  );
 
   const handleApproveProjectInstructions = useCallback(async () => {
     if (!activeProject?.id) return;
@@ -1147,6 +1310,10 @@ export default function HomePage() {
             <ProjectChatHeader
               project={activeProject}
               sessionId={sessionId}
+              branchSummary={branchSummary}
+              branchLoading={branchLoading}
+              branchError={branchError}
+              onSwitchBranch={handleSwitchProjectBranch}
               onReturnHome={handleReturnHome}
             />
           )}

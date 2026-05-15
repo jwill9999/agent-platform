@@ -29,6 +29,17 @@ import { createSessionsRouter } from '../src/infrastructure/http/v1/sessionsRout
 
 const GIT_BINARY = '/usr/bin/git';
 
+function git(cwd: string, args: string[]) {
+  execFileSync(GIT_BINARY, ['-C', cwd, ...args], { stdio: 'ignore' });
+}
+
+function commitAll(cwd: string, message: string) {
+  git(cwd, ['config', 'user.email', 'test@example.com']);
+  git(cwd, ['config', 'user.name', 'Test User']);
+  git(cwd, ['add', '.']);
+  git(cwd, ['commit', '-m', message]);
+}
+
 function buildTestApp(db: ReturnType<typeof openDatabase>['db']) {
   const app = express();
   app.use(express.json());
@@ -342,6 +353,115 @@ describe('projectsRouter', () => {
       size: 24,
     });
     expect(JSON.stringify(read.body.data)).not.toContain(realRoot);
+  });
+
+  it('lists and switches clean Git branches for desktop projects without exposing host paths', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-branch-project');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), '# Branches\n');
+    commitAll(repoDir, 'initial commit');
+    git(repoDir, ['switch', '-c', 'task/docs']);
+    writeFileSync(path.join(repoDir, 'docs.md'), 'docs\n');
+    commitAll(repoDir, 'docs commit');
+    git(repoDir, ['switch', 'main']);
+    const realRoot = realpathSync(repoDir);
+
+    const openedProject = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Branch Project' })
+      .expect(201);
+    const projectId = openedProject.body.data.project.id;
+
+    const branches = await request(app).get(`/v1/projects/${projectId}/branches`).expect(200);
+    expect(branches.body.data).toMatchObject({
+      status: 'available',
+      currentBranch: 'main',
+      dirty: false,
+      branches: expect.arrayContaining([
+        expect.objectContaining({ name: 'main', kind: 'local', current: true }),
+        expect.objectContaining({ name: 'task/docs', kind: 'local', current: false }),
+      ]),
+    });
+    expect(JSON.stringify(branches.body.data)).not.toContain(realRoot);
+
+    const switched = await request(app)
+      .post(`/v1/projects/${projectId}/branches/switch`)
+      .send({ branch: 'task/docs' })
+      .expect(200);
+    expect(switched.body.data).toMatchObject({
+      project: {
+        id: projectId,
+        metadata: expect.objectContaining({ activeBranch: 'task/docs' }),
+      },
+      branch: {
+        status: 'available',
+        currentBranch: 'task/docs',
+      },
+    });
+    expect(JSON.stringify(switched.body.data)).not.toContain(realRoot);
+  });
+
+  it('blocks branch switching when the project has uncommitted changes', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-dirty-branch-project');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), '# Dirty branches\n');
+    commitAll(repoDir, 'initial commit');
+    git(repoDir, ['switch', '-c', 'task/docs']);
+    git(repoDir, ['switch', 'main']);
+    writeFileSync(path.join(repoDir, 'uncommitted.txt'), 'dirty\n');
+
+    const openedProject = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Dirty Branch Project' })
+      .expect(201);
+    const projectId = openedProject.body.data.project.id;
+
+    const branches = await request(app).get(`/v1/projects/${projectId}/branches`).expect(200);
+    expect(branches.body.data).toMatchObject({
+      status: 'dirty',
+      currentBranch: 'main',
+      dirty: true,
+      message: 'Commit or stash your changes before switching branches.',
+    });
+
+    const blocked = await request(app)
+      .post(`/v1/projects/${projectId}/branches/switch`)
+      .send({ branch: 'task/docs' })
+      .expect(409);
+    expect(blocked.body.error).toMatchObject({
+      code: 'PROJECT_BRANCH_DIRTY',
+      message: 'Commit or stash your changes before switching branches.',
+    });
+  });
+
+  it('reports non-Git projects with a user-facing branch fallback', async () => {
+    const projectDir = path.join(tmpDir, 'plain-desktop-project');
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(path.join(projectDir, 'notes.md'), 'plain project\n');
+    const realRoot = realpathSync(projectDir);
+
+    const openedProject = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: projectDir, name: 'Plain Desktop Project' })
+      .expect(201);
+    const projectId = openedProject.body.data.project.id;
+
+    const branches = await request(app).get(`/v1/projects/${projectId}/branches`).expect(200);
+    expect(branches.body.data).toEqual({
+      status: 'non_git',
+      branches: [],
+      dirty: false,
+      message: 'This Project is not a Git repository.',
+    });
+    expect(JSON.stringify(branches.body.data)).not.toContain(realRoot);
+
+    await request(app)
+      .post(`/v1/projects/${projectId}/branches/switch`)
+      .send({ branch: 'main' })
+      .expect(409);
   });
 
   it('blocks project file traversal, symlink escapes, binary files, and oversized files', async () => {

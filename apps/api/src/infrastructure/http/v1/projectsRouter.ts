@@ -3,6 +3,9 @@ import {
   ProjectDesktopRegistrationBodySchema,
   ProjectDesktopRecentProjectsResultSchema,
   ProjectDesktopRegistrationResultSchema,
+  ProjectBranchSummarySchema,
+  ProjectBranchSwitchBodySchema,
+  ProjectBranchSwitchResultSchema,
   ProjectFileReadResultSchema,
   ProjectFileTreeResultSchema,
   type ProjectOpenBody,
@@ -21,6 +24,8 @@ import {
   type ProjectInstructionUpdateCandidate,
   type ProjectInstructionFileReference,
   type ProjectFileNode,
+  type ProjectBranch,
+  type ProjectBranchSummary,
   type ProjectRecord,
   ProjectUpdateBodySchema,
 } from '@agent-platform/contracts';
@@ -126,6 +131,31 @@ function gitValue(cwd: string, args: string[]): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function gitLines(cwd: string, args: string[]): string[] {
+  const output = gitValue(cwd, args);
+  return output
+    ? output
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : [];
+}
+
+function gitCommand(cwd: string, args: string[]): void {
+  execFileSync(GIT_BINARY, ['-C', cwd, ...args], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'ignore', 'ignore'],
+  });
+}
+
+function isSafeGitBranchName(value: string): boolean {
+  if (!value || value.length > 300) return false;
+  if (value.startsWith('-') || value.startsWith('/') || value.endsWith('/')) return false;
+  if (value.includes('..') || value.includes('//') || value.includes('@{')) return false;
+  if (/[\s~^:?*[\\\0]/.test(value)) return false;
+  return true;
 }
 
 function metadataOnboardingState(
@@ -617,6 +647,181 @@ function listRecentDesktopProjects(db: DrizzleDb) {
     .map((project) => toDesktopProjectRecord(project));
 
   return ProjectDesktopRecentProjectsResultSchema.parse({ projects });
+}
+
+function projectGitRepositoryRoot(project: ProjectRecord): string {
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  if (typeof backendProjectRoot !== 'string' || !backendProjectRoot.trim()) {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project folder is not available');
+  }
+
+  try {
+    const realRoot = realpathSync(backendProjectRoot);
+    if (!statSync(realRoot).isDirectory()) {
+      throw new Error('Project root is not a directory');
+    }
+    const repositoryRoot = gitValue(realRoot, ['rev-parse', '--show-toplevel']);
+    if (!repositoryRoot) {
+      throw new HttpError(409, 'PROJECT_NOT_GIT', 'This Project is not a Git repository.');
+    }
+    return repositoryRoot;
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project folder could not be inspected');
+  }
+}
+
+function branchStatusMessage(status: ProjectBranchSummary['status']): string {
+  switch (status) {
+    case 'available':
+      return 'Branch selection is available.';
+    case 'dirty':
+      return 'Commit or stash your changes before switching branches.';
+    case 'detached':
+      return 'This Project is in detached HEAD state.';
+    case 'non_git':
+      return 'This Project is not a Git repository.';
+    case 'unavailable':
+      return 'Project branch information is unavailable.';
+  }
+}
+
+function listProjectBranches(project: ProjectRecord): ProjectBranchSummary {
+  let repositoryRoot: string;
+  try {
+    repositoryRoot = projectGitRepositoryRoot(project);
+  } catch (error) {
+    if (error instanceof HttpError && error.code === 'PROJECT_NOT_GIT') {
+      return ProjectBranchSummarySchema.parse({
+        status: 'non_git',
+        branches: [],
+        dirty: false,
+        message: branchStatusMessage('non_git'),
+      });
+    }
+    return ProjectBranchSummarySchema.parse({
+      status: 'unavailable',
+      branches: [],
+      dirty: false,
+      message: branchStatusMessage('unavailable'),
+    });
+  }
+
+  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
+  const dirty = Boolean(gitValue(repositoryRoot, ['status', '--porcelain']));
+  const localBranches = gitLines(repositoryRoot, [
+    'for-each-ref',
+    '--format=%(refname:short)',
+    'refs/heads',
+  ]);
+  const remoteBranches = gitLines(repositoryRoot, [
+    'for-each-ref',
+    '--format=%(refname:short)',
+    'refs/remotes',
+  ]).filter((branch) => !branch.endsWith('/HEAD'));
+
+  const seen = new Set<string>();
+  const branches: ProjectBranch[] = [
+    ...localBranches.map((name) => ({ name, kind: 'local' as const })),
+    ...remoteBranches.map((name) => ({ name, kind: 'remote' as const })),
+  ]
+    .filter((branch) => {
+      const key = `${branch.kind}:${branch.name}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return isSafeGitBranchName(branch.name);
+    })
+    .map((branch) => ({
+      ...branch,
+      current: branch.name === currentBranch,
+    }));
+
+  const status = currentBranch ? (dirty ? 'dirty' : 'available') : 'detached';
+  return ProjectBranchSummarySchema.parse({
+    status,
+    ...(currentBranch ? { currentBranch } : {}),
+    branches,
+    dirty,
+    message: branchStatusMessage(status),
+  });
+}
+
+function refreshProjectBranchMetadata(db: DrizzleDb, project: ProjectRecord): ProjectRecord {
+  const repositoryRoot = project.metadata['repositoryRoot'];
+  if (typeof repositoryRoot !== 'string') return project;
+  const activeBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
+  const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD']);
+  const metadata = { ...project.metadata };
+  if (activeBranch) metadata['activeBranch'] = activeBranch;
+  else delete metadata['activeBranch'];
+  metadata['activeWorktreeId'] = headSha ? `${repositoryRoot}:${headSha}` : repositoryRoot;
+  return updateProject(db, project.id, { metadata });
+}
+
+function switchProjectBranch(
+  db: DrizzleDb,
+  projectId: string,
+  body: unknown,
+): ReturnType<typeof ProjectBranchSwitchResultSchema.parse> {
+  const project = findProject(db, projectId);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const input = parseBody(ProjectBranchSwitchBodySchema, body);
+  const requestedBranch = input.branch;
+  if (!isSafeGitBranchName(requestedBranch)) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Choose a valid branch.');
+  }
+
+  const before = listProjectBranches(project);
+  if (
+    before.status === 'non_git' ||
+    before.status === 'detached' ||
+    before.status === 'unavailable'
+  ) {
+    throw new HttpError(
+      409,
+      'PROJECT_BRANCH_UNAVAILABLE',
+      before.message ?? branchStatusMessage(before.status),
+    );
+  }
+  if (before.dirty) {
+    throw new HttpError(409, 'PROJECT_BRANCH_DIRTY', branchStatusMessage('dirty'));
+  }
+
+  const localBranch = before.branches.find(
+    (branch) => branch.kind === 'local' && branch.name === requestedBranch,
+  );
+  const remoteBranch = before.branches.find(
+    (branch) => branch.kind === 'remote' && branch.name === requestedBranch,
+  );
+  if (!localBranch && !remoteBranch) {
+    throw new HttpError(404, 'PROJECT_BRANCH_NOT_FOUND', 'Choose one of the available branches.');
+  }
+
+  const repositoryRoot = projectGitRepositoryRoot(project);
+  try {
+    if (localBranch) {
+      gitCommand(repositoryRoot, ['switch', localBranch.name]);
+    } else if (remoteBranch) {
+      const localName = remoteBranch.name.replace(/^[^/]+\//, '');
+      if (!isSafeGitBranchName(localName)) {
+        throw new HttpError(400, 'VALIDATION_ERROR', 'Choose a valid branch.');
+      }
+      gitCommand(repositoryRoot, ['switch', '--track', remoteBranch.name]);
+    }
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(
+      409,
+      'PROJECT_BRANCH_SWITCH_FAILED',
+      'Branch could not be changed. Check for local changes and try again.',
+    );
+  }
+
+  const updated = refreshProjectBranchMetadata(db, project);
+  return ProjectBranchSwitchResultSchema.parse({
+    project: toDesktopProjectRecord(updated),
+    branch: listProjectBranches(updated),
+  });
 }
 
 const IGNORED_PROJECT_TREE_DIRECTORIES = new Set([
@@ -1183,6 +1388,26 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: await readProjectFile(project, req.query.path) });
+    }),
+  );
+
+  router.get(
+    '/:id/branches',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: listProjectBranches(project) });
+    }),
+  );
+
+  router.post(
+    '/:id/branches/switch',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({ data: switchProjectBranch(db, requireParam(req.params, 'id'), req.body) });
+      } catch (error) {
+        mapProjectError(error);
+      }
     }),
   );
 

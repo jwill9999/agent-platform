@@ -60,11 +60,13 @@ test.describe('Electron Project access', () => {
       join(firstProjectDir, 'docs', 'guide.md'),
       '# Guide\n\nhello from first electron project\n',
     );
+    initialiseGitProject(firstProjectDir, 'feature/e2e-branch');
     writeFileSync(join(secondProjectDir, 'README.md'), '# Electron E2E Project Two\n');
     writeFileSync(
       join(secondProjectDir, 'docs', 'guide.md'),
       '# Guide\n\nhello from second electron project\n',
     );
+    initialiseGitProject(secondProjectDir);
     seedDesktopDatabase(sqlitePath);
 
     try {
@@ -139,6 +141,13 @@ test.describe('Electron Project access', () => {
       await expect(projectChatHeader.getByText(firstProjectPathLabel)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
+      await expect(page.getByRole('combobox', { name: 'Project branch' })).toBeVisible();
+      await expect(page.getByRole('combobox', { name: 'Project branch' })).toHaveText('main');
+      await page.getByRole('combobox', { name: 'Project branch' }).click();
+      await page.getByRole('option', { name: 'feature/e2e-branch' }).click();
+      await expect(page.getByRole('combobox', { name: 'Project branch' })).toHaveText(
+        'feature/e2e-branch',
+      );
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
       await expect(page.getByText('Restore folder')).toHaveCount(0);
@@ -376,6 +385,30 @@ function sessionIdFromHref(href: string | null): string {
   const sessionId = url.searchParams.get('sessionId');
   expect(sessionId).toBeTruthy();
   return sessionId as string;
+}
+
+function initialiseGitProject(projectDir: string, extraBranch?: string): void {
+  execFileSync('/usr/bin/git', ['init', '-b', 'main', projectDir], { stdio: 'ignore' });
+  execFileSync('/usr/bin/git', ['-C', projectDir, 'config', 'user.email', 'e2e@example.com'], {
+    stdio: 'ignore',
+  });
+  execFileSync('/usr/bin/git', ['-C', projectDir, 'config', 'user.name', 'Electron E2E'], {
+    stdio: 'ignore',
+  });
+  execFileSync('/usr/bin/git', ['-C', projectDir, 'add', '.'], { stdio: 'ignore' });
+  execFileSync('/usr/bin/git', ['-C', projectDir, 'commit', '-m', 'initial commit'], {
+    stdio: 'ignore',
+  });
+  if (!extraBranch) return;
+  execFileSync('/usr/bin/git', ['-C', projectDir, 'switch', '-c', extraBranch], {
+    stdio: 'ignore',
+  });
+  writeFileSync(join(projectDir, 'branch-note.md'), `# ${extraBranch}\n`);
+  execFileSync('/usr/bin/git', ['-C', projectDir, 'add', '.'], { stdio: 'ignore' });
+  execFileSync('/usr/bin/git', ['-C', projectDir, 'commit', '-m', 'branch commit'], {
+    stdio: 'ignore',
+  });
+  execFileSync('/usr/bin/git', ['-C', projectDir, 'switch', 'main'], { stdio: 'ignore' });
 }
 
 function seedDesktopDatabase(sqlitePath: string): void {
