@@ -124,4 +124,4 @@ Feature: Project identity and session history
 - [x] Personal Chat sessions remain separate.
 - [x] Gherkin E2E Strategy is present in the task spec.
 - [x] Playwright tests cover duplicate Project display and Project session restore.
-- [ ] Tests and CI/CD gates pass before the Beads task is closed.
+- [x] Tests and CI/CD gates pass before the Beads task is closed.
