@@ -35,6 +35,7 @@ import {
   buildProjectIdeHref,
   createWorkspaceNavigationState,
   desktopProjectIsAvailable,
+  desktopProjectPathLabel,
   personalChatModeSearchValue,
   projectCapabilitySummary,
   projectDisplayProfile,
@@ -291,6 +292,7 @@ function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHead
 
   const profile = projectDisplayProfile(project);
   const assessment = projectOnboardingAssessmentFromMetadata(project);
+  const folderPathLabel = desktopProjectPathLabel(project);
 
   return (
     <div className="ml-auto flex min-w-0 items-center gap-3">
@@ -302,6 +304,9 @@ function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHead
         <div className="truncate text-xs text-muted-foreground">
           {profile.label} - {projectCapabilitySummary(assessment?.capabilities)}
         </div>
+        {folderPathLabel && (
+          <div className="truncate text-[11px] text-muted-foreground">{folderPathLabel}</div>
+        )}
       </div>
       <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onReturnHome}>
         Workspaces
@@ -351,6 +356,12 @@ export default function HomePage() {
     hasPendingApproval,
   } = useHarnessChat(sessionId, isResuming);
   const { sessions, loading: sessionsLoading, refresh: refreshSessions } = useSessions();
+  const scopedSessions =
+    selectedMode === 'project-chat' && activeProject
+      ? sessions.filter(
+          (session) => session.mode === 'project' && session.projectId === activeProject.id,
+        )
+      : sessions.filter((session) => session.mode === 'chat' && !session.projectId);
   const {
     attachments,
     warnings: attachmentWarnings,
@@ -532,6 +543,7 @@ export default function HomePage() {
           setSensorDashboard(null);
           return;
         }
+        setIsResuming(Boolean(result && !result.created));
         setSessionId(session.id);
         await refreshSensors(session.id);
       } catch (error) {
@@ -775,9 +787,41 @@ export default function HomePage() {
       setSelectedAgentId(agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
       clearAttachments();
+      if (selectedMode === 'project-chat' && activeProject?.id) {
+        setSessionError(null);
+        apiPost<SessionRecord>(apiPath('sessions'), {
+          agentId,
+          mode: 'project',
+          projectId: activeProject.id,
+        })
+          .then((session) => {
+            if (!session?.id) {
+              setSessionError('Failed to create Project chat session');
+              return;
+            }
+            setSessionId(session.id);
+            refreshSessions().catch(() => {});
+            refreshSensors(session.id).catch(() => {});
+          })
+          .catch((error) => {
+            setSessionError(
+              error instanceof ApiRequestError ? error.message : 'Failed to create Project chat',
+            );
+          });
+        return;
+      }
       createSessionForAgent(agentId).catch(() => {});
     },
-    [agents, clearAttachments, createSessionForAgent, modelConfigs],
+    [
+      activeProject?.id,
+      agents,
+      clearAttachments,
+      createSessionForAgent,
+      modelConfigs,
+      refreshSensors,
+      refreshSessions,
+      selectedMode,
+    ],
   );
 
   const isLoading = status === 'streaming';
@@ -866,10 +910,18 @@ export default function HomePage() {
           data-workspace-scope={navigationState.scope}
         >
           <SessionDropdown
-            sessions={sessions}
+            sessions={scopedSessions}
             agents={agents}
             activeSessionId={sessionId}
             selectedAgentId={selectedAgentId}
+            scopeLabel={
+              selectedMode === 'project-chat' && activeProject
+                ? `${activeProject.name} sessions`
+                : 'Personal chat sessions'
+            }
+            newChatLabel={
+              selectedMode === 'project-chat' ? 'New Project chat' : 'New personal chat'
+            }
             onSelectSession={handleSelectSession}
             onNewChatForAgent={handleNewChatForAgent}
             loading={sessionsLoading}

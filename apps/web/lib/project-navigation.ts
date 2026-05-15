@@ -200,6 +200,36 @@ export function desktopProjectFolderLabel(
   return typeof folderName === 'string' && folderName.trim() ? folderName : null;
 }
 
+export function desktopProjectPathLabel(project: ProjectDesktopRecord | null): string | null {
+  const folderPathLabel = project?.metadata.folderPathLabel;
+  return typeof folderPathLabel === 'string' && folderPathLabel.trim() ? folderPathLabel : null;
+}
+
+export function desktopProjectNeedsDisambiguator(
+  project: ProjectDesktopRecord,
+  projects: readonly ProjectDesktopRecord[],
+): boolean {
+  const folderLabel = (desktopProjectFolderLabel(project) ?? project.name).toLowerCase();
+  return (
+    projects.filter((candidate) => {
+      const candidateFolderLabel = (
+        desktopProjectFolderLabel(candidate) ?? candidate.name
+      ).toLowerCase();
+      return candidateFolderLabel === folderLabel;
+    }).length > 1
+  );
+}
+
+export function desktopProjectSecondaryLabel(
+  project: ProjectDesktopRecord,
+  projects: readonly ProjectDesktopRecord[],
+): string {
+  if (desktopProjectNeedsDisambiguator(project, projects)) {
+    return desktopProjectPathLabel(project) ?? desktopProjectFolderLabel(project) ?? project.name;
+  }
+  return desktopProjectFolderLabel(project) ?? project.name;
+}
+
 export function desktopProjectIsAvailable(project: ProjectDesktopRecord): boolean {
   return project.metadata.capabilityState !== 'unavailable';
 }

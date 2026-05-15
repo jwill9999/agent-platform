@@ -477,6 +477,7 @@ export type ProjectDesktopRegistrationBody = z.infer<typeof ProjectDesktopRegist
 export const ProjectDesktopMetadataSchema = z.object({
   source: z.literal('desktop'),
   folderName: z.string().min(1).max(200),
+  folderPathLabel: z.string().min(1).max(1000).optional(),
   capabilityState: ProjectCapabilityStateSchema,
   onboardingState: ProjectOnboardingStateSchema,
   defaultAgentProfile: ProjectDefaultAgentProfileSchema,

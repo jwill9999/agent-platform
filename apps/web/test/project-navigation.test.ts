@@ -8,6 +8,9 @@ import {
   projectCapabilitySummary,
   projectDisplayProfile,
   desktopProjectFolderLabel,
+  desktopProjectNeedsDisambiguator,
+  desktopProjectPathLabel,
+  desktopProjectSecondaryLabel,
   desktopProjectIsAvailable,
   projectOnboardingAssessmentFromMetadata,
   projectProfileDisplay,
@@ -72,6 +75,7 @@ describe('Project navigation model', () => {
     readonly id: string;
     readonly name: string;
     readonly folderName: string;
+    readonly folderPathLabel?: string;
     readonly available: boolean;
   }) {
     return {
@@ -82,6 +86,7 @@ describe('Project navigation model', () => {
       metadata: {
         source: 'desktop',
         folderName: input.folderName,
+        ...(input.folderPathLabel ? { folderPathLabel: input.folderPathLabel } : {}),
         capabilityState: input.available ? 'backend_accessible' : 'unavailable',
         onboardingState: input.available ? 'approved' : 'missing',
         defaultAgentProfile: 'coding',
@@ -149,7 +154,39 @@ describe('Project navigation model', () => {
       '/ide?projectId=project%201&sessionId=session%201',
     );
     expect(desktopProjectFolderLabel(project)).toBe('auth-app');
+    expect(desktopProjectPathLabel(project)).toBe(null);
     expect(desktopProjectIsAvailable(project)).toBe(true);
+  });
+
+  it('uses a safe folder path label only when Project names need disambiguating', () => {
+    const first = desktopProject({
+      id: 'project-a',
+      name: 'agent-platform',
+      folderName: 'agent-platform',
+      folderPathLabel: '~/projects/agent-platform',
+      available: true,
+    });
+    const second = desktopProject({
+      id: 'project-b',
+      name: 'agent-platform',
+      folderName: 'agent-platform',
+      folderPathLabel: '~/work/client-a/agent-platform',
+      available: true,
+    });
+    const third = desktopProject({
+      id: 'project-c',
+      name: 'authentication-frontend',
+      folderName: 'authentication-frontend',
+      folderPathLabel: '~/projects/authentication-frontend',
+      available: true,
+    });
+    const projects = [first, second, third];
+
+    expect(desktopProjectNeedsDisambiguator(first, projects)).toBe(true);
+    expect(desktopProjectSecondaryLabel(first, projects)).toBe('~/projects/agent-platform');
+    expect(desktopProjectSecondaryLabel(second, projects)).toBe('~/work/client-a/agent-platform');
+    expect(desktopProjectNeedsDisambiguator(third, projects)).toBe(false);
+    expect(desktopProjectSecondaryLabel(third, projects)).toBe('authentication-frontend');
   });
 
   it('keeps Recent Projects focused on available Projects and limits stale unavailable entries', () => {

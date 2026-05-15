@@ -84,10 +84,44 @@ Keep Beads dependencies aligned with this table.
   session history appears.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Project identity and session history
+
+  Background:
+    Given the desktop app is running in an isolated Electron test environment
+    And two local Project folders have the same folder name but different parent folders
+
+  Scenario: Recent Projects disambiguates duplicate folder names
+    Given I open the first Project through the native Project picker
+    And I open the second Project through the native Project picker
+    When I view Recent Projects in the Project workspace
+    Then both Projects are listed by folder name
+    And each duplicate Project shows a short user-safe parent-path label
+    And the UI does not show full host absolute paths
+
+  Scenario: Reopening a Project restores its Project Chat session
+    Given I have sent a message in the first Project Chat
+    And I have opened another Project
+    When I reopen the first Project from Recent Projects
+    Then I return to the first Project Chat
+    And the previous Project Chat message is visible
+    And Personal Chat sessions are not shown in the Project session menu
+
+  Scenario: Personal Chat remains separate from Project sessions
+    Given I switch from Project Chat to Personal Chat
+    When I open the sessions menu
+    Then only Personal Chat sessions are listed
+    And Project sensors and Recent Projects are hidden from the Personal Chat surface
+```
+
 ## Definition Of Done
 
-- [ ] Duplicate Project folder names are distinguishable in Recent Projects and Project Chat.
-- [ ] Project Chat restores the last active session for the selected Project.
-- [ ] Project session menu lists only sessions for the active Project.
-- [ ] Personal Chat sessions remain separate.
+- [x] Duplicate Project folder names are distinguishable in Recent Projects and Project Chat.
+- [x] Project Chat restores the last active session for the selected Project.
+- [x] Project session menu lists only sessions for the active Project.
+- [x] Personal Chat sessions remain separate.
+- [x] Gherkin E2E Strategy is present in the task spec.
+- [x] Playwright tests cover duplicate Project display and Project session restore.
 - [ ] Tests and CI/CD gates pass before the Beads task is closed.

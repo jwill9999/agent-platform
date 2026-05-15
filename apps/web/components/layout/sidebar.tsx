@@ -39,9 +39,9 @@ import {
 import { apiGet, apiPath, ApiRequestError } from '@/lib/apiClient';
 import {
   buildProjectChatHref,
-  personalChatModeSearchValue,
-  desktopProjectFolderLabel,
   desktopProjectIsAvailable,
+  desktopProjectSecondaryLabel,
+  personalChatModeSearchValue,
   projectReopenRequestedEvent,
   projectReopenSearchParam,
   recentProjectsUpdatedEvent,
@@ -153,7 +153,7 @@ export function RecentProjectsNavSection({
         <div className="space-y-1">
           {visibleProjects.map((project) => {
             const available = desktopProjectIsAvailable(project);
-            const folderLabel = desktopProjectFolderLabel(project) ?? project.name;
+            const folderLabel = desktopProjectSecondaryLabel(project, visibleProjects);
             const content = (
               <>
                 <span className="truncate text-sm font-medium">{project.name}</span>
