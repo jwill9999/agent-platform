@@ -45,6 +45,12 @@ const resetLocalDataConfirmationIpcChannel = ${JSON.stringify(
   )};
 const createProjectFolderIpcChannel = ${JSON.stringify(desktopBridge.createProjectFolderIpcChannel)};
 const selectProjectFolderIpcChannel = ${JSON.stringify(desktopBridge.selectProjectFolderIpcChannel)};
+const createTerminalIpcChannel = ${JSON.stringify(desktopBridge.createTerminalIpcChannel)};
+const inputTerminalIpcChannel = ${JSON.stringify(desktopBridge.inputTerminalIpcChannel)};
+const resizeTerminalIpcChannel = ${JSON.stringify(desktopBridge.resizeTerminalIpcChannel)};
+const disposeTerminalIpcChannel = ${JSON.stringify(desktopBridge.disposeTerminalIpcChannel)};
+const terminalDataIpcChannel = ${JSON.stringify(desktopBridge.terminalDataIpcChannel)};
+const terminalExitIpcChannel = ${JSON.stringify(desktopBridge.terminalExitIpcChannel)};
 
 const desktopApi = {
   maintenance: {
@@ -54,6 +60,22 @@ const desktopApi = {
   projects: {
     createFolder: (request) => ipcRenderer.invoke(createProjectFolderIpcChannel, request),
     selectFolder: () => ipcRenderer.invoke(selectProjectFolderIpcChannel),
+  },
+  terminal: {
+    create: (request) => ipcRenderer.invoke(createTerminalIpcChannel, request),
+    input: (request) => ipcRenderer.invoke(inputTerminalIpcChannel, request),
+    resize: (request) => ipcRenderer.invoke(resizeTerminalIpcChannel, request),
+    dispose: (request) => ipcRenderer.invoke(disposeTerminalIpcChannel, request),
+    onData: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on(terminalDataIpcChannel, listener);
+      return () => ipcRenderer.removeListener(terminalDataIpcChannel, listener);
+    },
+    onExit: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on(terminalExitIpcChannel, listener);
+      return () => ipcRenderer.removeListener(terminalExitIpcChannel, listener);
+    },
   },
   versions: {
     chrome: () => process.versions.chrome,
@@ -88,6 +110,12 @@ function loadDesktopBridgeContract() {
       sourceFile,
       'selectProjectFolderIpcChannel',
     ),
+    createTerminalIpcChannel: readExportedStringConst(sourceFile, 'createTerminalIpcChannel'),
+    inputTerminalIpcChannel: readExportedStringConst(sourceFile, 'inputTerminalIpcChannel'),
+    resizeTerminalIpcChannel: readExportedStringConst(sourceFile, 'resizeTerminalIpcChannel'),
+    disposeTerminalIpcChannel: readExportedStringConst(sourceFile, 'disposeTerminalIpcChannel'),
+    terminalDataIpcChannel: readExportedStringConst(sourceFile, 'terminalDataIpcChannel'),
+    terminalExitIpcChannel: readExportedStringConst(sourceFile, 'terminalExitIpcChannel'),
   };
 }
 

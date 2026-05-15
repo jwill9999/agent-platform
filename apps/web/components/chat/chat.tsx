@@ -50,6 +50,8 @@ export interface ChatProps {
   onRetrySensors?: () => void;
   /** Optional Project/session review content rendered in the main chat column. */
   conversationAccessory?: ReactNode;
+  /** Optional dock rendered above the composer without entering the chat transcript. */
+  bottomAccessory?: ReactNode;
 }
 
 export function Chat({
@@ -77,6 +79,7 @@ export function Chat({
   sensorError,
   onRetrySensors,
   conversationAccessory,
+  bottomAccessory,
 }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -137,6 +140,8 @@ export function Chat({
             )}
           </div>
         </div>
+
+        {bottomAccessory}
 
         {/* Input */}
         <ChatInput

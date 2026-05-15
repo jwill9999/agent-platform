@@ -5,9 +5,14 @@ import {
   desktopBridgeApiName,
   desktopMaintenanceApiKeys,
   desktopProjectsApiKeys,
+  desktopTerminalApiKeys,
+  createTerminalIpcChannel,
+  disposeTerminalIpcChannel,
+  inputTerminalIpcChannel,
   createProjectFolderIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
+  resizeTerminalIpcChannel,
   selectProjectFolderIpcChannel,
   desktopVersionsApiKeys,
 } from '../src/preload/desktopBridge.js';
@@ -18,7 +23,7 @@ describe('desktop preload bridge contract', () => {
   });
 
   it('limits the root bridge keys to the explicit contract', () => {
-    expect(desktopBridgeApiKeys).toEqual(['maintenance', 'projects', 'versions']);
+    expect(desktopBridgeApiKeys).toEqual(['maintenance', 'projects', 'terminal', 'versions']);
   });
 
   it('limits maintenance helpers to explicit destructive actions', () => {
@@ -31,6 +36,17 @@ describe('desktop preload bridge contract', () => {
 
   it('limits Project helpers to native Project selection and creation', () => {
     expect(desktopProjectsApiKeys).toEqual(['createFolder', 'selectFolder']);
+  });
+
+  it('limits terminal helpers to human-controlled terminal lifecycle and IO', () => {
+    expect(desktopTerminalApiKeys).toEqual([
+      'create',
+      'input',
+      'resize',
+      'dispose',
+      'onData',
+      'onExit',
+    ]);
   });
 
   it('does not include generic IPC, filesystem, shell, or path APIs', () => {
@@ -61,6 +77,23 @@ describe('desktop preload bridge contract', () => {
     for (const channel of [createProjectFolderIpcChannel, selectProjectFolderIpcChannel]) {
       expect(channel).not.toContain('fs');
       expect(channel).not.toContain('shell');
+      expect(channel).not.toContain('eval');
+    }
+  });
+
+  it('keeps terminal IPC channels scoped to explicit terminal actions', () => {
+    expect(createTerminalIpcChannel).toBe('agent-platform:terminal:create');
+    expect(inputTerminalIpcChannel).toBe('agent-platform:terminal:input');
+    expect(resizeTerminalIpcChannel).toBe('agent-platform:terminal:resize');
+    expect(disposeTerminalIpcChannel).toBe('agent-platform:terminal:dispose');
+
+    for (const channel of [
+      createTerminalIpcChannel,
+      inputTerminalIpcChannel,
+      resizeTerminalIpcChannel,
+      disposeTerminalIpcChannel,
+    ]) {
+      expect(channel).toMatch(/^agent-platform:terminal:/);
       expect(channel).not.toContain('eval');
     }
   });

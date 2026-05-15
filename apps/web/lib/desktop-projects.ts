@@ -26,6 +26,40 @@ export interface DesktopProjectBridge {
     ) => Promise<DesktopProjectFolderSelectionResult>;
     readonly selectFolder?: () => Promise<DesktopProjectFolderSelectionResult>;
   };
+  readonly terminal?: DesktopTerminalBridge;
+}
+
+export interface DesktopTerminalCreateRequest {
+  readonly projectId?: string;
+  readonly cols: number;
+  readonly rows: number;
+}
+
+export interface DesktopTerminalCreateResult {
+  readonly terminalId: string;
+  readonly cwd: string;
+  readonly shell: string;
+  readonly pid: number;
+}
+
+export interface DesktopTerminalDataEvent {
+  readonly terminalId: string;
+  readonly data: string;
+}
+
+export interface DesktopTerminalExitEvent {
+  readonly terminalId: string;
+  readonly exitCode: number;
+  readonly signal?: number;
+}
+
+export interface DesktopTerminalBridge {
+  readonly create?: (request: DesktopTerminalCreateRequest) => Promise<DesktopTerminalCreateResult>;
+  readonly input?: (request: { terminalId: string; data: string }) => Promise<void>;
+  readonly resize?: (request: { terminalId: string; cols: number; rows: number }) => Promise<void>;
+  readonly dispose?: (request: { terminalId: string }) => Promise<void>;
+  readonly onData?: (callback: (event: DesktopTerminalDataEvent) => void) => () => void;
+  readonly onExit?: (callback: (event: DesktopTerminalExitEvent) => void) => () => void;
 }
 
 export function getDesktopProjectBridge(): DesktopProjectBridge | undefined {
@@ -40,6 +74,18 @@ export function hasDesktopProjectBridge(): boolean {
 
 export function hasDesktopProjectCreationBridge(): boolean {
   return Boolean(getDesktopProjectBridge()?.projects?.createFolder);
+}
+
+export function hasDesktopTerminalBridge(): boolean {
+  const terminal = getDesktopProjectBridge()?.terminal;
+  return Boolean(
+    terminal?.create &&
+    terminal.input &&
+    terminal.resize &&
+    terminal.dispose &&
+    terminal.onData &&
+    terminal.onExit,
+  );
 }
 
 export async function registerDesktopProject(

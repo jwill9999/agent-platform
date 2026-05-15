@@ -145,6 +145,23 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('/workspace')).toHaveCount(0);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
 
+      await page.getByRole('button', { name: /Terminal/ }).click();
+      const projectTerminal = page.getByRole('region', { name: 'Project terminal' });
+      await expect(projectTerminal).toBeVisible();
+      await expect(projectTerminal.getByText('open')).toBeVisible();
+      await projectTerminal.locator('.xterm').click();
+      await page.keyboard.type('printf "AP_TERM_CWD:%s\\n" "$PWD"');
+      await page.keyboard.press('Enter');
+      await expect(projectTerminal).toContainText(`AP_TERM_CWD:${firstProjectDir}`, {
+        timeout: 10_000,
+      });
+      await projectTerminal.getByTitle('Hide terminal').click();
+      await expect(projectTerminal).toBeHidden();
+      await page.getByRole('button', { name: /Terminal/ }).click();
+      await expect(projectTerminal).toContainText(`AP_TERM_CWD:${firstProjectDir}`);
+      await projectTerminal.getByTitle('Close terminal').click();
+      await expect(projectTerminal).toBeHidden();
+
       await attachFilesToComposer(page, [
         {
           name: 'project-chat-screenshot.jpg',

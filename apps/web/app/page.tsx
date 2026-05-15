@@ -37,6 +37,7 @@ import {
   ProjectInstructionsRejectedNotice,
   ProjectInstructionsReview,
 } from '@/components/project/project-instructions-review';
+import { ProjectTerminalDock } from '@/components/project/project-terminal-dock';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
 import {
@@ -66,6 +67,7 @@ import {
   loadRecentDesktopProjects,
   selectAndRegisterDesktopProject,
 } from '@/lib/desktop-projects';
+import { Terminal as TerminalIcon } from 'lucide-react';
 
 type WorkspaceMode = 'chat' | 'project-chat';
 type HomeEntryScreenProps = Readonly<{
@@ -95,6 +97,8 @@ type ProjectChatHeaderProps = Readonly<{
   project: ProjectDesktopRecord | null;
   sessionId: string | null;
   onReturnHome: () => void;
+  terminalOpen: boolean;
+  onToggleTerminal: () => void;
 }>;
 type ProjectInstructionsDecision = Readonly<{
   projectId: string;
@@ -449,7 +453,13 @@ function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
   );
 }
 
-function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHeaderProps) {
+function ProjectChatHeader({
+  project,
+  sessionId,
+  onReturnHome,
+  terminalOpen,
+  onToggleTerminal,
+}: ProjectChatHeaderProps) {
   if (!project) {
     return null;
   }
@@ -472,6 +482,17 @@ function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHead
           <div className="truncate text-[11px] text-muted-foreground">{folderPathLabel}</div>
         )}
       </div>
+      <Button
+        type="button"
+        size="sm"
+        variant={terminalOpen ? 'secondary' : 'outline'}
+        className="shrink-0"
+        onClick={onToggleTerminal}
+        title={terminalOpen ? 'Hide terminal' : 'Show terminal'}
+      >
+        <TerminalIcon className="h-4 w-4" />
+        <span className="hidden sm:inline">{terminalOpen ? 'Hide Terminal' : 'Terminal'}</span>
+      </Button>
       <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onReturnHome}>
         Workspaces
       </Button>
@@ -485,6 +506,7 @@ function ProjectChatHeader({ project, sessionId, onReturnHome }: ProjectChatHead
 export default function HomePage() {
   const [selectedMode, setSelectedMode] = useState<WorkspaceMode | null>(null);
   const [activeProject, setActiveProject] = useState<ProjectDesktopRecord | null>(null);
+  const [projectTerminalOpen, setProjectTerminalOpen] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -1177,6 +1199,8 @@ export default function HomePage() {
               project={activeProject}
               sessionId={sessionId}
               onReturnHome={handleReturnHome}
+              terminalOpen={projectTerminalOpen}
+              onToggleTerminal={() => setProjectTerminalOpen((open) => !open)}
             />
           )}
         </div>
@@ -1234,6 +1258,17 @@ export default function HomePage() {
                   onDismissApproved={() => setApprovedProjectInstructions(null)}
                   onDismissRejected={() => setRejectedProjectInstructions(null)}
                 />
+              }
+              bottomAccessory={
+                selectedMode === 'project-chat' ? (
+                  <ProjectTerminalDock
+                    projectId={activeProject?.id ?? null}
+                    projectName={activeProject?.name ?? null}
+                    activeBranch={activeProject?.metadata.activeBranch}
+                    open={projectTerminalOpen}
+                    onOpenChange={setProjectTerminalOpen}
+                  />
+                ) : null
               }
             />
           </AgentModelProvider>

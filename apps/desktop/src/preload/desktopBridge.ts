@@ -42,9 +42,64 @@ export interface DesktopProjectsApi {
   readonly selectFolder: () => Promise<DesktopProjectFolderSelectionResult>;
 }
 
+export interface DesktopTerminalCreateRequest {
+  readonly projectId?: string;
+  readonly cols: number;
+  readonly rows: number;
+}
+
+export interface DesktopTerminalInputRequest {
+  readonly terminalId: string;
+  readonly data: string;
+}
+
+export interface DesktopTerminalResizeRequest {
+  readonly terminalId: string;
+  readonly cols: number;
+  readonly rows: number;
+}
+
+export interface DesktopTerminalDisposeRequest {
+  readonly terminalId: string;
+}
+
+export interface DesktopTerminalCreateResult {
+  readonly terminalId: string;
+  readonly cwd: string;
+  readonly shell: string;
+  readonly pid: number;
+}
+
+export interface DesktopTerminalDataEvent {
+  readonly terminalId: string;
+  readonly data: string;
+}
+
+export interface DesktopTerminalExitEvent {
+  readonly terminalId: string;
+  readonly exitCode: number;
+  readonly signal?: number;
+}
+
+export type DesktopTerminalUnsubscribe = () => void;
+
+export interface DesktopTerminalApi {
+  readonly create: (request: DesktopTerminalCreateRequest) => Promise<DesktopTerminalCreateResult>;
+  readonly input: (request: DesktopTerminalInputRequest) => Promise<void>;
+  readonly resize: (request: DesktopTerminalResizeRequest) => Promise<void>;
+  readonly dispose: (request: DesktopTerminalDisposeRequest) => Promise<void>;
+  readonly onData: (
+    callback: (event: DesktopTerminalDataEvent) => void,
+  ) => DesktopTerminalUnsubscribe;
+  readonly onExit: (
+    callback: (event: DesktopTerminalExitEvent) => void,
+  ) => DesktopTerminalUnsubscribe;
+}
+
 export interface AgentPlatformDesktopApi {
   readonly maintenance: DesktopMaintenanceApi;
   readonly projects: DesktopProjectsApi;
+  readonly terminal: DesktopTerminalApi;
   readonly versions: DesktopVersionsApi;
 }
 
@@ -54,10 +109,17 @@ export const resetLocalDataConfirmationIpcChannel =
   'agent-platform:get-reset-local-data-confirmation';
 export const selectProjectFolderIpcChannel = 'agent-platform:select-project-folder';
 export const createProjectFolderIpcChannel = 'agent-platform:create-project-folder';
+export const createTerminalIpcChannel = 'agent-platform:terminal:create';
+export const inputTerminalIpcChannel = 'agent-platform:terminal:input';
+export const resizeTerminalIpcChannel = 'agent-platform:terminal:resize';
+export const disposeTerminalIpcChannel = 'agent-platform:terminal:dispose';
+export const terminalDataIpcChannel = 'agent-platform:terminal:data';
+export const terminalExitIpcChannel = 'agent-platform:terminal:exit';
 
 export const desktopBridgeApiKeys = [
   'maintenance',
   'projects',
+  'terminal',
   'versions',
 ] as const satisfies readonly (keyof AgentPlatformDesktopApi)[];
 
@@ -70,6 +132,15 @@ export const desktopProjectsApiKeys = [
   'createFolder',
   'selectFolder',
 ] as const satisfies readonly (keyof DesktopProjectsApi)[];
+
+export const desktopTerminalApiKeys = [
+  'create',
+  'input',
+  'resize',
+  'dispose',
+  'onData',
+  'onExit',
+] as const satisfies readonly (keyof DesktopTerminalApi)[];
 
 export const desktopVersionsApiKeys = [
   'chrome',

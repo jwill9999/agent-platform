@@ -119,6 +119,10 @@ importers:
         version: 2.1.9(@types/node@24.12.3)(lightningcss@1.32.0)
 
   apps/desktop:
+    dependencies:
+      node-pty:
+        specifier: ^1.1.0
+        version: 1.1.0
     devDependencies:
       '@types/node':
         specifier: ^20.19.25
