@@ -52,8 +52,16 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Opening/reopening a Project lands in Project Chat, not the IDE.
-- [ ] Project Chat binds to the selected Project and profile-appropriate agent.
-- [ ] Slash commands and ordinary Project chat share the same backend-bound Project context.
-- [ ] General Chat and Project Chat remain separate.
-- [ ] Project Chat avoids runtime/backend implementation labels.
+- [x] Opening/reopening a Project lands in Project Chat, not the IDE.
+- [x] Project Chat binds to the selected Project and profile-appropriate agent.
+- [x] Slash commands and ordinary Project chat share the same backend-bound Project context.
+- [x] General Chat and Project Chat remain separate.
+- [x] Project Chat avoids runtime/backend implementation labels.
+
+## Completion Evidence
+
+- Covered by the merged Electron experience and stabilisation task chain, including PRs #199, #203,
+  #204, #220, and #221.
+- Latest relevant PR #221 passed GitHub `verify`, `docker`, `e2e`, `desktop-e2e`, markdownlint,
+  lychee, GitGuardian, SonarCloud, and Sourcery before merge into
+  `feature/agent-platform-electron-stabilisation`.
