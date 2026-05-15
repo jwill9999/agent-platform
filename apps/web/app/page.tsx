@@ -466,13 +466,14 @@ export default function HomePage() {
       setSensorDashboard(null);
       setSessionError(null);
       setIsResuming(false);
+      clearAttachments();
       const def = pickDefaultAgentForMode(agents, 'chat');
       if (def) {
         setSelectedAgentId(def.id);
         setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
       }
     },
-    [agents, modelConfigs],
+    [agents, clearAttachments, modelConfigs],
   );
 
   const handleReturnHome = useCallback(() => {
@@ -485,7 +486,8 @@ export default function HomePage() {
     setSensorDashboard(null);
     setSessionError(null);
     setIsResuming(false);
-  }, []);
+    clearAttachments();
+  }, [clearAttachments]);
 
   useEffect(() => {
     if (globalThis.window === undefined) return;
@@ -545,6 +547,7 @@ export default function HomePage() {
       setSensorDashboard(null);
       setSessionError(null);
       setIsResuming(false);
+      clearAttachments();
       const def = pickDefaultAgentForMode(agents, 'project');
       const nextAgentId = def?.id ?? selectedAgentId;
       if (def) {
@@ -553,7 +556,7 @@ export default function HomePage() {
       }
       return nextAgentId ?? null;
     },
-    [agents, modelConfigs, selectedAgentId],
+    [agents, clearAttachments, modelConfigs, selectedAgentId],
   );
 
   const handleOpenProject = useCallback(async () => {
@@ -748,9 +751,10 @@ export default function HomePage() {
       setSelectedAgentId(session.agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(session.agentId, agents, modelConfigs));
       setSessionId(session.id);
+      clearAttachments();
       refreshSensors(session.id).catch(() => {});
     },
-    [agents, modelConfigs, refreshSensors],
+    [agents, clearAttachments, modelConfigs, refreshSensors],
   );
 
   const handleNewChatForAgent = useCallback(
@@ -758,9 +762,10 @@ export default function HomePage() {
       setIsResuming(false);
       setSelectedAgentId(agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
+      clearAttachments();
       createSessionForAgent(agentId).catch(() => {});
     },
-    [agents, createSessionForAgent, modelConfigs],
+    [agents, clearAttachments, createSessionForAgent, modelConfigs],
   );
 
   const isLoading = status === 'streaming';
