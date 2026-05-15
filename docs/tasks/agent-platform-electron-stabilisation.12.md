@@ -56,6 +56,7 @@ Experience or release work can start.
 | Image attachments rejected as text files                  | Mapped to `agent-platform-electron-stabilisation.14`.                                                                 |
 | Duplicate Project names and Project session history       | Mapped to `agent-platform-project-experience.11`.                                                                     |
 | Slash command help streams as one line                    | Mapped to `agent-platform-electron-stabilisation.15`.                                                                 |
+| Personal Chat shows Project UI and stale context          | Mapped to `agent-platform-electron-stabilisation.16`.                                                                 |
 | Full integrated desktop Project Experience pass           | Deferred to `agent-platform-project-experience.6`.                                                                    |
 
 ### Product direction after re-baseline
@@ -104,6 +105,7 @@ Recommended state:
   IDE path. Remaining findings are now mapped rather than left ambiguous:
   - image attachments belong to `agent-platform-electron-stabilisation.14`;
   - slash command help formatting belongs to `agent-platform-electron-stabilisation.15`;
+  - Personal Chat state/chrome separation belongs to `agent-platform-electron-stabilisation.16`;
   - duplicate Project names and Project-scoped session history belong to
     `agent-platform-project-experience.11`.
 - Do not merge `feature/agent-platform-electron-stabilisation` into `main` for release until the

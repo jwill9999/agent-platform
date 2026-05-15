@@ -100,6 +100,16 @@ Severity guidance:
 | Attach a PNG/JPEG image.      | Image attachment is accepted or a model-support warning is shown before send.                     |        |            |
 | No internal status leakage.   | Copy avoids states like `in_progress`, `needs_review`, backend roots, hashes, or raw diagnostics. |        |            |
 
+### 4a. Personal Chat Separation
+
+| Check                                | Expected                                                                                  | Result | Finding ID |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- | ------ | ---------- |
+| Click **Chat** from Workspaces.      | A fresh Personal Chat is shown unless the user explicitly selected a previous session.    |        |            |
+| Check left sidebar in Personal Chat. | Recent Projects are hidden or replaced with Personal-Chat-relevant session history.       |        |            |
+| Check right side in Personal Chat.   | Sensors, branch, CI, repository, and Project activity panels are hidden.                  |        |            |
+| Attach an image in Personal Chat.    | Common image attachments are accepted or blocked with a model-support warning.            |        |            |
+| Switch Project Chat to Chat.         | Project context, Project attachments, and Project history do not leak into Personal Chat. |        |            |
+
 ### 5. Slash Command Help
 
 | Check                                | Expected                                                                                  | Result | Finding ID |
