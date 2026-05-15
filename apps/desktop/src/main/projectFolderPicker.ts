@@ -121,7 +121,7 @@ export function validateDesktopProjectFolderName(name: string): string {
   if (trimmed === '.' || trimmed === '..' || /[/\\]/.test(trimmed)) {
     throw new Error('Project name must be a folder name, not a path.');
   }
-  if ([...trimmed].some((character) => character.charCodeAt(0) < 32)) {
+  if ([...trimmed].some((character) => (character.codePointAt(0) ?? 0) < 32)) {
     throw new Error('Project name contains unsupported characters.');
   }
   return trimmed;

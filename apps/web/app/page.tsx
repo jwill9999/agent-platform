@@ -773,12 +773,10 @@ export default function HomePage() {
         globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
       }
     } catch (error) {
-      const message =
-        error instanceof ApiRequestError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : 'Failed to create Project';
+      let message = 'Failed to create Project';
+      if (error instanceof ApiRequestError || error instanceof Error) {
+        message = error.message;
+      }
       setNewProjectError(message);
     } finally {
       setIsCreatingProject(false);
