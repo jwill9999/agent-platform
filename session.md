@@ -7,6 +7,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-16
+- **Session:** Implemented `agent-platform-8ib` on `task/agent-platform-branch-selector-git-switch`: Project Chat branch selector now explains why branch switching is blocked when the Project worktree is dirty.
+- **Today’s outputs:** Kept conservative dirty-worktree branch blocking, added a clear disabled-state tooltip/accessibility label telling users to commit, stash, or use the terminal manually, and documented the scoped task. API coverage keeps dirty checkout blocking, and Electron E2E now opens a dirty Git Project and verifies the selector is disabled with the explanatory label.
+- **Validation:** Passed web typecheck, web lint, desktop typecheck, API typecheck, elevated focused API router tests, and elevated Electron E2E. Initial sandboxed API test failed because supertest could not bind a local socket (`listen EPERM`), then passed outside the sandbox.
+- **Current state:** Bead `agent-platform-8ib` is closed locally. Branch is `task/agent-platform-branch-selector-git-switch`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Run format/diff checks, close the bead, push Beads, commit, and push the task branch.
 - **Date:** 2026-05-15
 - **Date:** 2026-05-16
 - **Session:** Implemented `agent-platform-57s` on `task/agent-platform-terminal-placement-polish`: Project terminal polish after owner manual testing.

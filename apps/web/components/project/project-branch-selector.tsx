@@ -60,6 +60,10 @@ export function ProjectBranchSelector({
   const currentBranch = branches?.currentBranch ?? activeBranch;
   const branchItems = useMemo(() => branches?.branches ?? [], [branches?.branches]);
   const branchSwitchDisabled = disabled || loading || switching || !branches?.clean;
+  const dirtyWorktreeMessage =
+    branches && !branches.clean
+      ? 'Branch switching is disabled because this Project has uncommitted changes. Commit or stash them first, or use the terminal to handle the switch manually.'
+      : null;
 
   const handleBranchChange = useCallback(
     async (branch: string) => {
@@ -90,7 +94,7 @@ export function ProjectBranchSelector({
   return (
     <div
       className="inline-flex min-w-0 items-center gap-1.5"
-      title={unavailableReason ?? (!branches?.clean ? 'Commit or stash changes before switching.' : undefined)}
+      title={unavailableReason ?? dirtyWorktreeMessage ?? undefined}
     >
       {switching || loading ? (
         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
@@ -103,7 +107,9 @@ export function ProjectBranchSelector({
         disabled={branchSwitchDisabled || branchItems.length === 0}
       >
         <SelectTrigger
-          aria-label="Active branch"
+          aria-label={
+            dirtyWorktreeMessage ? `Active branch. ${dirtyWorktreeMessage}` : 'Active branch'
+          }
           className="h-8 max-w-[190px] text-sm sm:max-w-[240px]"
         >
           <SelectValue placeholder="No branch" />

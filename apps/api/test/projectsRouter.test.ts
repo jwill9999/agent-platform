@@ -282,6 +282,12 @@ describe('projectsRouter', () => {
       .expect(201);
     const projectId = registered.body.data.project.id;
 
+    const branches = await request(app).get(`/v1/projects/${projectId}/branches`).expect(200);
+    expect(branches.body.data).toMatchObject({
+      currentBranch: 'main',
+      clean: false,
+    });
+
     const response = await request(app)
       .post(`/v1/projects/${projectId}/branches/checkout`)
       .send({ branch: 'feature/clean-target' })
