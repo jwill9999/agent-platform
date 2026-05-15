@@ -20,6 +20,10 @@ export interface DesktopSelectedProjectFolder {
   readonly name: string;
 }
 
+export interface DesktopCreateProjectFolderRequest {
+  readonly name: string;
+}
+
 export type DesktopProjectFolderSelectionResult =
   | { readonly canceled: true }
   | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
@@ -32,6 +36,9 @@ export interface DesktopMaintenanceApi {
 }
 
 export interface DesktopProjectsApi {
+  readonly createFolder: (
+    request: DesktopCreateProjectFolderRequest,
+  ) => Promise<DesktopProjectFolderSelectionResult>;
   readonly selectFolder: () => Promise<DesktopProjectFolderSelectionResult>;
 }
 
@@ -46,6 +53,7 @@ export const resetLocalDataIpcChannel = 'agent-platform:reset-local-data';
 export const resetLocalDataConfirmationIpcChannel =
   'agent-platform:get-reset-local-data-confirmation';
 export const selectProjectFolderIpcChannel = 'agent-platform:select-project-folder';
+export const createProjectFolderIpcChannel = 'agent-platform:create-project-folder';
 
 export const desktopBridgeApiKeys = [
   'maintenance',
@@ -59,6 +67,7 @@ export const desktopMaintenanceApiKeys = [
 ] as const satisfies readonly (keyof DesktopMaintenanceApi)[];
 
 export const desktopProjectsApiKeys = [
+  'createFolder',
   'selectFolder',
 ] as const satisfies readonly (keyof DesktopProjectsApi)[];
 

@@ -43,6 +43,7 @@ const resetLocalDataIpcChannel = ${JSON.stringify(desktopBridge.resetLocalDataIp
 const resetLocalDataConfirmationIpcChannel = ${JSON.stringify(
     desktopBridge.resetLocalDataConfirmationIpcChannel,
   )};
+const createProjectFolderIpcChannel = ${JSON.stringify(desktopBridge.createProjectFolderIpcChannel)};
 const selectProjectFolderIpcChannel = ${JSON.stringify(desktopBridge.selectProjectFolderIpcChannel)};
 
 const desktopApi = {
@@ -51,6 +52,7 @@ const desktopApi = {
     resetLocalData: (request) => ipcRenderer.invoke(resetLocalDataIpcChannel, request),
   },
   projects: {
+    createFolder: (request) => ipcRenderer.invoke(createProjectFolderIpcChannel, request),
     selectFolder: () => ipcRenderer.invoke(selectProjectFolderIpcChannel),
   },
   versions: {
@@ -77,6 +79,10 @@ function loadDesktopBridgeContract() {
     resetLocalDataConfirmationIpcChannel: readExportedStringConst(
       sourceFile,
       'resetLocalDataConfirmationIpcChannel',
+    ),
+    createProjectFolderIpcChannel: readExportedStringConst(
+      sourceFile,
+      'createProjectFolderIpcChannel',
     ),
     selectProjectFolderIpcChannel: readExportedStringConst(
       sourceFile,

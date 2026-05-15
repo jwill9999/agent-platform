@@ -108,6 +108,49 @@ Keep Beads dependencies aligned with this table.
   - verify cancel paths do not create folders or records.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
+## Playwright E2E Strategy
+
+Feature: New Project creation from Workspaces
+
+Background:
+
+- Given the Electron desktop app starts with isolated runtime data
+- And the desktop Project bridge is available
+- And the test harness provides a temporary parent folder for new Projects
+
+Scenario: Start from scratch creates a host folder and opens Project Chat
+
+- Given I am on the Workspaces screen
+- When I choose "New Project"
+- And I choose "Start from scratch"
+- And I enter a Project name
+- And I create the Project
+- Then the folder is created inside the selected parent folder
+- And the app opens Project Chat for the new Project
+- And the Project appears in Recent Projects
+- And no absolute host path or internal runtime path is shown as normal copy
+
+Scenario: Use an existing folder remains available
+
+- Given I am on the Workspaces screen
+- When I choose "Open Project"
+- Then the native Project folder selection flow is used
+- And the selected folder opens into Project Chat
+
+Scenario: Import from Chat is safely represented before artifact support exists
+
+- Given I am on the New Project choices dialog
+- Then "Import from Chat" is visible as unavailable
+- And selecting it cannot create a folder or Project record
+
+Scenario: Cancel does not mutate state
+
+- Given I am creating a Project
+- When I cancel the native parent folder picker
+- Then no Project folder is created
+- And no Project record is registered
+- And the user remains in control of the dialog.
+
 ## Definition Of Done
 
 - [ ] Users can create a new Project folder without typing an absolute path.

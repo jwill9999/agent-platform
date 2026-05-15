@@ -11,12 +11,19 @@ export interface DesktopSelectedProjectFolder {
   readonly name: string;
 }
 
+export interface DesktopCreateProjectFolderRequest {
+  readonly name: string;
+}
+
 export type DesktopProjectFolderSelectionResult =
   | { readonly canceled: true }
   | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
 
 export interface DesktopProjectBridge {
   readonly projects?: {
+    readonly createFolder?: (
+      request: DesktopCreateProjectFolderRequest,
+    ) => Promise<DesktopProjectFolderSelectionResult>;
     readonly selectFolder?: () => Promise<DesktopProjectFolderSelectionResult>;
   };
 }
@@ -29,6 +36,10 @@ export function getDesktopProjectBridge(): DesktopProjectBridge | undefined {
 
 export function hasDesktopProjectBridge(): boolean {
   return Boolean(getDesktopProjectBridge()?.projects?.selectFolder);
+}
+
+export function hasDesktopProjectCreationBridge(): boolean {
+  return Boolean(getDesktopProjectBridge()?.projects?.createFolder);
 }
 
 export async function registerDesktopProject(
@@ -47,6 +58,16 @@ export async function selectAndRegisterDesktopProject(): Promise<ProjectDesktopR
   const selectFolder = getDesktopProjectBridge()?.projects?.selectFolder;
   if (!selectFolder) return null;
   const selection = await selectFolder();
+  if (selection.canceled) return null;
+  return registerDesktopProject(selection.folder);
+}
+
+export async function createAndRegisterDesktopProject(
+  request: DesktopCreateProjectFolderRequest,
+): Promise<ProjectDesktopRegistrationResult | null> {
+  const createFolder = getDesktopProjectBridge()?.projects?.createFolder;
+  if (!createFolder) return null;
+  const selection = await createFolder(request);
   if (selection.canceled) return null;
   return registerDesktopProject(selection.folder);
 }
