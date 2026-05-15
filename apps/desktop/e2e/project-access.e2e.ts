@@ -39,6 +39,8 @@ test.describe('Electron Project access', () => {
   test('opens a local Project and binds chat/slash commands to the same Project session', async () => {
     const tempRoot = join(repoRoot, '.agent-platform', 'electron-e2e', String(Date.now()));
     const runtimeDir = join(tempRoot, 'runtime');
+    const newProjectParentDir = join(tempRoot, 'new-projects');
+    const newProjectName = 'fresh-e2e-project';
     const firstProjectName = 'agent-platform';
     const secondProjectName = 'agent-platform';
     const firstProjectDir = join(tempRoot, 'client-a', firstProjectName);
@@ -52,6 +54,7 @@ test.describe('Electron Project access', () => {
 
     mkdirSync(join(firstProjectDir, 'docs'), { recursive: true });
     mkdirSync(join(secondProjectDir, 'docs'), { recursive: true });
+    mkdirSync(newProjectParentDir, { recursive: true });
     writeFileSync(join(firstProjectDir, 'README.md'), '# Electron E2E Project One\n');
     writeFileSync(
       join(firstProjectDir, 'docs', 'guide.md'),
@@ -77,6 +80,7 @@ test.describe('Electron Project access', () => {
           AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
           AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
           AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
+          AGENT_PLATFORM_DESKTOP_TEST_PROJECT_PARENT_DIR: newProjectParentDir,
           AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([
             firstProjectDir,
             secondProjectDir,
@@ -87,6 +91,20 @@ test.describe('Electron Project access', () => {
 
       const page = await app.firstWindow();
       await openProjectChat(page);
+
+      await page.getByRole('button', { name: 'New Project' }).click();
+      await expect(page.getByRole('dialog', { name: 'New Project' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Import from Chat/ })).toBeDisabled();
+      await page.getByRole('button', { name: /Start from scratch/ }).click();
+      await page.getByLabel('Project name').fill(newProjectName);
+      await page.getByRole('button', { name: 'Create Project' }).click();
+      await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
+      await expect(page.getByRole('heading', { name: newProjectName })).toBeVisible();
+      expect(existsSync(join(newProjectParentDir, newProjectName))).toBe(true);
+      const createdProject = await findRecentProject(backendPort, newProjectName);
+      expect(createdProject.metadata.source).toBe('desktop');
+      await page.getByRole('button', { name: 'Workspaces' }).click();
+      await expect(page.getByRole('button', { name: 'Open Chat' })).toBeVisible();
 
       await page.getByRole('button', { name: 'Open Chat' }).click();
       await expect(page.getByPlaceholder('Send a message... (drop files to attach)')).toBeVisible();
@@ -176,7 +194,12 @@ test.describe('Electron Project access', () => {
       await expect(
         recentProjects.getByRole('link').filter({ hasText: firstProjectName }),
       ).toBeVisible();
-      await expect(recentProjects.getByText('Ready to reopen')).toBeVisible();
+      await expect(
+        recentProjects
+          .getByRole('link')
+          .filter({ hasText: firstProjectName })
+          .getByText('Ready to reopen'),
+      ).toBeVisible();
       await expect(recentProjects.getByText(firstProjectDir)).toHaveCount(0);
 
       await page.getByRole('link', { name: /Chat/ }).click();

@@ -5,6 +5,7 @@ import {
   desktopBridgeApiName,
   desktopMaintenanceApiKeys,
   desktopProjectsApiKeys,
+  createProjectFolderIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   selectProjectFolderIpcChannel,
@@ -28,8 +29,8 @@ describe('desktop preload bridge contract', () => {
     expect(desktopVersionsApiKeys).toEqual(['chrome', 'electron', 'node']);
   });
 
-  it('limits Project helpers to native Project selection', () => {
-    expect(desktopProjectsApiKeys).toEqual(['selectFolder']);
+  it('limits Project helpers to native Project selection and creation', () => {
+    expect(desktopProjectsApiKeys).toEqual(['createFolder', 'selectFolder']);
   });
 
   it('does not include generic IPC, filesystem, shell, or path APIs', () => {
@@ -55,9 +56,12 @@ describe('desktop preload bridge contract', () => {
   });
 
   it('keeps Project IPC channels scoped to explicit desktop actions', () => {
+    expect(createProjectFolderIpcChannel).toBe('agent-platform:create-project-folder');
     expect(selectProjectFolderIpcChannel).toBe('agent-platform:select-project-folder');
-    expect(selectProjectFolderIpcChannel).not.toContain('fs');
-    expect(selectProjectFolderIpcChannel).not.toContain('shell');
-    expect(selectProjectFolderIpcChannel).not.toContain('eval');
+    for (const channel of [createProjectFolderIpcChannel, selectProjectFolderIpcChannel]) {
+      expect(channel).not.toContain('fs');
+      expect(channel).not.toContain('shell');
+      expect(channel).not.toContain('eval');
+    }
   });
 });

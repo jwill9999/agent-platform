@@ -24,6 +24,15 @@ import { useSessions } from '@/hooks/use-sessions';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
   ProjectInstructionsApprovalNotice,
   ProjectInstructionsRejectedNotice,
   ProjectInstructionsReview,
@@ -51,6 +60,7 @@ import {
 } from '@/lib/project-navigation';
 import {
   bindProjectSession,
+  createAndRegisterDesktopProject,
   hasDesktopProjectBridge,
   loadRecentDesktopProjects,
   selectAndRegisterDesktopProject,
@@ -58,10 +68,23 @@ import {
 
 type WorkspaceMode = 'chat' | 'project-chat';
 type HomeEntryScreenProps = Readonly<{
+  isCreatingProject: boolean;
   isDesktopProjectBridgeAvailable: boolean;
   isOpeningProject: boolean;
+  onCreateProject: () => void;
   onOpenChat: () => void;
   onOpenProject: () => void;
+}>;
+type NewProjectDialogProps = Readonly<{
+  error: string | null;
+  isCreating: boolean;
+  isDesktopProjectBridgeAvailable: boolean;
+  name: string;
+  onCreate: () => void;
+  onNameChange: (name: string) => void;
+  onOpenChange: (open: boolean) => void;
+  onUseExistingFolder: () => void;
+  open: boolean;
 }>;
 type ErrorBannerProps = Readonly<{
   message: string | null;
@@ -142,9 +165,7 @@ function projectChatEmptyStateTitle(
   return project?.name ?? 'Project chat';
 }
 
-function projectChatEmptyStateDescription(
-  selectedMode: WorkspaceMode | null,
-): string | undefined {
+function projectChatEmptyStateDescription(selectedMode: WorkspaceMode | null): string | undefined {
   if (selectedMode !== 'project-chat') return undefined;
   return 'Tell the assistant what you want done in this Project.';
 }
@@ -194,8 +215,10 @@ function ProjectInstructionsConversationAccessory({
 }
 
 function HomeEntryScreen({
+  isCreatingProject,
   isDesktopProjectBridgeAvailable,
   isOpeningProject,
+  onCreateProject,
   onOpenChat,
   onOpenProject,
 }: HomeEntryScreenProps) {
@@ -208,7 +231,7 @@ function HomeEntryScreen({
         </div>
       </section>
       <section className="flex flex-1 items-center px-6 py-8">
-        <div className="mx-auto grid w-full max-w-5xl gap-4 md:grid-cols-2">
+        <div className="mx-auto grid w-full max-w-5xl gap-4 lg:grid-cols-3">
           <button
             type="button"
             className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary"
@@ -227,24 +250,42 @@ function HomeEntryScreen({
             </span>
           </button>
           {isDesktopProjectBridgeAvailable ? (
-            <button
-              type="button"
-              className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary disabled:opacity-70"
-              onClick={onOpenProject}
-              disabled={isOpeningProject}
-            >
-              <span>
-                <span className="block text-lg font-semibold text-foreground">
-                  {workspaceEntryCopy.projectTitle}
+            <>
+              <button
+                type="button"
+                className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary disabled:opacity-70"
+                onClick={onCreateProject}
+                disabled={isCreatingProject}
+              >
+                <span>
+                  <span className="block text-lg font-semibold text-foreground">New Project</span>
+                  <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                    Create a new folder on your computer and open it in Project Chat.
+                  </span>
                 </span>
-                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                  {workspaceEntryCopy.projectDescription}
+                <span className="text-sm font-medium text-primary">
+                  {isCreatingProject ? 'Creating...' : 'Start from scratch'}
                 </span>
-              </span>
-              <span className="text-sm font-medium text-primary">
-                {isOpeningProject ? 'Opening...' : workspaceEntryCopy.projectProfile}
-              </span>
-            </button>
+              </button>
+              <button
+                type="button"
+                className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary disabled:opacity-70"
+                onClick={onOpenProject}
+                disabled={isOpeningProject}
+              >
+                <span>
+                  <span className="block text-lg font-semibold text-foreground">
+                    {workspaceEntryCopy.projectTitle}
+                  </span>
+                  <span className="mt-2 block text-sm leading-6 text-muted-foreground">
+                    {workspaceEntryCopy.projectDescription}
+                  </span>
+                </span>
+                <span className="text-sm font-medium text-primary">
+                  {isOpeningProject ? 'Opening...' : 'Use existing folder'}
+                </span>
+              </button>
+            </>
           ) : (
             <button
               type="button"
@@ -267,6 +308,114 @@ function HomeEntryScreen({
         </div>
       </section>
     </main>
+  );
+}
+
+function NewProjectDialog({
+  error,
+  isCreating,
+  isDesktopProjectBridgeAvailable,
+  name,
+  onCreate,
+  onNameChange,
+  onOpenChange,
+  onUseExistingFolder,
+  open,
+}: NewProjectDialogProps) {
+  const [step, setStep] = useState<'choices' | 'start'>('choices');
+
+  useEffect(() => {
+    if (open) setStep('choices');
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        {step === 'choices' ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>New Project</DialogTitle>
+              <DialogDescription>
+                Choose how you want to start. Projects are folders on your computer.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-border p-4 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => setStep('start')}
+              >
+                <span className="block text-sm font-medium text-foreground">
+                  Start from scratch
+                </span>
+                <span className="mt-1 block text-sm text-muted-foreground">
+                  Create a new folder and open it in Project Chat.
+                </span>
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-border p-4 text-left transition-colors hover:border-primary disabled:opacity-60"
+                onClick={onUseExistingFolder}
+                disabled={!isDesktopProjectBridgeAvailable}
+              >
+                <span className="block text-sm font-medium text-foreground">
+                  Use an existing folder
+                </span>
+                <span className="mt-1 block text-sm text-muted-foreground">
+                  Choose a folder you already work from.
+                </span>
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-border p-4 text-left opacity-60"
+                disabled
+              >
+                <span className="block text-sm font-medium text-foreground">Import from Chat</span>
+                <span className="mt-1 block text-sm text-muted-foreground">
+                  Coming later for chat-generated artifacts.
+                </span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Start from scratch</DialogTitle>
+              <DialogDescription>
+                Name the Project, then choose where to create the folder.
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              className="grid gap-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                onCreate();
+              }}
+            >
+              <div className="grid gap-2">
+                <Label htmlFor="new-project-name">Project name</Label>
+                <Input
+                  id="new-project-name"
+                  autoFocus
+                  value={name}
+                  onChange={(event) => onNameChange(event.target.value)}
+                  placeholder="Project name"
+                />
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <div className="flex justify-between gap-2">
+                <Button type="button" variant="ghost" onClick={() => setStep('choices')}>
+                  Back
+                </Button>
+                <Button type="submit" disabled={isCreating}>
+                  {isCreating ? 'Creating...' : 'Create Project'}
+                </Button>
+              </div>
+            </form>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -334,6 +483,10 @@ export default function HomePage() {
   const [sensorError, setSensorError] = useState<string | null>(null);
   const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
   const [isOpeningProject, setIsOpeningProject] = useState(false);
+  const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectError, setNewProjectError] = useState<string | null>(null);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
   const [isRejectingProjectInstructions, setIsRejectingProjectInstructions] = useState(false);
   const [approvedProjectInstructions, setApprovedProjectInstructions] =
@@ -421,33 +574,30 @@ export default function HomePage() {
     }
   }, []);
 
-  const createSessionForAgent = useCallback(
-    async (agentId: string) => {
-      setSessionError(null);
-      setIsResuming(false);
-      try {
-        const session = await apiPost<SessionRecord>(apiPath('sessions'), {
-          agentId,
-          mode: 'chat',
-        });
-        if (!session?.id) {
-          setSessionError('Failed to create session');
-          setSessionId(null);
-          setSensorDashboard(null);
-          return;
-        }
-        setSessionId(session.id);
-        setSensorDashboard(null);
-        setSensorError(null);
-        setSensorLoading(false);
-      } catch (e) {
-        setSessionError(e instanceof ApiRequestError ? e.message : String(e));
+  const createSessionForAgent = useCallback(async (agentId: string) => {
+    setSessionError(null);
+    setIsResuming(false);
+    try {
+      const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+        agentId,
+        mode: 'chat',
+      });
+      if (!session?.id) {
+        setSessionError('Failed to create session');
         setSessionId(null);
         setSensorDashboard(null);
+        return;
       }
-    },
-    [],
-  );
+      setSessionId(session.id);
+      setSensorDashboard(null);
+      setSensorError(null);
+      setSensorLoading(false);
+    } catch (e) {
+      setSessionError(e instanceof ApiRequestError ? e.message : String(e));
+      setSessionId(null);
+      setSensorDashboard(null);
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedMode !== 'chat') return;
@@ -596,6 +746,44 @@ export default function HomePage() {
       setIsOpeningProject(false);
     }
   }, [bindActiveProjectSession, openProjectChat]);
+
+  const handleCreateProject = useCallback(async () => {
+    const name = newProjectName.trim();
+    if (!name) {
+      setNewProjectError('Enter a Project name.');
+      return;
+    }
+
+    setIsCreatingProject(true);
+    setNewProjectError(null);
+    setSessionError(null);
+    try {
+      const result = await createAndRegisterDesktopProject({ name });
+      if (!result) {
+        setNewProjectError('Project creation is available only in the desktop app.');
+        return;
+      }
+      const agentId = openProjectChat(result.project);
+      if (agentId) {
+        await bindActiveProjectSession(agentId, result.project.id);
+      }
+      setIsNewProjectDialogOpen(false);
+      setNewProjectName('');
+      if (globalThis.window !== undefined) {
+        globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+      }
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to create Project';
+      setNewProjectError(message);
+    } finally {
+      setIsCreatingProject(false);
+    }
+  }, [bindActiveProjectSession, newProjectName, openProjectChat]);
 
   const reopenRecentProject = useCallback(
     async (projectId: string, requestedSessionId: string | null) => {
@@ -880,16 +1068,46 @@ export default function HomePage() {
 
   if (!selectedMode) {
     return (
-      <HomeEntryScreen
-        isDesktopProjectBridgeAvailable={isDesktopProjectBridgeAvailable}
-        isOpeningProject={isOpeningProject}
-        onOpenChat={() => {
-          handleOpenChat();
-        }}
-        onOpenProject={() => {
-          handleOpenProject().catch(() => {});
-        }}
-      />
+      <>
+        <HomeEntryScreen
+          isCreatingProject={isCreatingProject}
+          isDesktopProjectBridgeAvailable={isDesktopProjectBridgeAvailable}
+          isOpeningProject={isOpeningProject}
+          onCreateProject={() => {
+            setIsNewProjectDialogOpen(true);
+          }}
+          onOpenChat={() => {
+            handleOpenChat();
+          }}
+          onOpenProject={() => {
+            handleOpenProject().catch(() => {});
+          }}
+        />
+        <NewProjectDialog
+          error={newProjectError}
+          isCreating={isCreatingProject}
+          isDesktopProjectBridgeAvailable={isDesktopProjectBridgeAvailable}
+          name={newProjectName}
+          onCreate={() => {
+            handleCreateProject().catch(() => {});
+          }}
+          onNameChange={(name) => {
+            setNewProjectName(name);
+            setNewProjectError(null);
+          }}
+          onOpenChange={(open) => {
+            setIsNewProjectDialogOpen(open);
+            if (!open) {
+              setNewProjectError(null);
+            }
+          }}
+          onUseExistingFolder={() => {
+            setIsNewProjectDialogOpen(false);
+            handleOpenProject().catch(() => {});
+          }}
+          open={isNewProjectDialogOpen}
+        />
+      </>
     );
   }
 

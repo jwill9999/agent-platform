@@ -15,7 +15,11 @@ import {
   resetDesktopLocalData,
   validateDesktopLocalDataResetRequest,
 } from './localDataReset.js';
-import { selectDesktopProjectFolder } from './projectFolderPicker.js';
+import {
+  createDesktopProjectFolder,
+  selectDesktopProjectFolder,
+  validateDesktopCreateProjectFolderRequest,
+} from './projectFolderPicker.js';
 import {
   getRepoRootFromMainDir,
   getStandaloneRendererPaths,
@@ -36,6 +40,7 @@ import {
 import {
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
+  createProjectFolderIpcChannel,
   selectProjectFolderIpcChannel,
 } from '../preload/desktopBridge.js';
 import {
@@ -143,6 +148,14 @@ async function bootstrap(): Promise<void> {
 }
 
 function registerDesktopProjectIpc(window: BrowserWindow): void {
+  ipcMain.removeHandler(createProjectFolderIpcChannel);
+  ipcMain.handle(createProjectFolderIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopCreateProjectFolderRequest);
+
+    return createDesktopProjectFolder({ dialog, request, window });
+  });
+
   ipcMain.removeHandler(selectProjectFolderIpcChannel);
   ipcMain.handle(selectProjectFolderIpcChannel, async (event, payload) => {
     assertTrustedIpcSender(event, window.webContents);

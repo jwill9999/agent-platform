@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import {
   desktopBridgeApiName,
+  createProjectFolderIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   selectProjectFolderIpcChannel,
@@ -18,6 +19,10 @@ const desktopApi = {
       >,
   },
   projects: {
+    createFolder: (request) =>
+      ipcRenderer.invoke(createProjectFolderIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['projects']['createFolder']
+      >,
     selectFolder: () =>
       ipcRenderer.invoke(selectProjectFolderIpcChannel) as ReturnType<
         AgentPlatformDesktopApi['projects']['selectFolder']
