@@ -1797,6 +1797,10 @@ Tracked in Beads: `agent-platform-lt6`
   - `pnpm --filter @agent-platform/api lint`
   - `pnpm --filter @agent-platform/desktop typecheck`
   - `pnpm --filter @agent-platform/desktop run test:e2e -- e2e/project-access.e2e.ts`
+- PR #219 passed GitHub `verify`, `docker`, `e2e`, `desktop-e2e`, docs `markdownlint`/`lychee`,
+  GitGuardian, and SonarCloud. Sourcery skipped because the account weekly diff limit was reached and
+  posted no actionable inline comments. The PR was merged into
+  `feature/agent-platform-electron-stabilisation`, and Beads task `.15` was closed.
 
 ## 2026-05-12 Electron Security `.5`
 
