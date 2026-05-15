@@ -23,11 +23,7 @@ export interface AttachmentEntry {
   isSnippet?: boolean;
 }
 
-interface AttachmentDraft {
-  name: string;
-  type?: string;
-  size?: number;
-}
+type AttachmentFileMetadata = Pick<File, 'name' | 'type' | 'size'>;
 
 export interface UseContextAttachments {
   /** Currently attached entries. */
@@ -101,12 +97,12 @@ function extensionFromName(name: string): string {
   return dotIndex >= 0 ? base.slice(dotIndex + 1).toLowerCase() : '';
 }
 
-function isImageFile(file: AttachmentDraft): boolean {
+function isImageFile(file: AttachmentFileMetadata): boolean {
   const mime = file.type?.toLowerCase() ?? '';
   return mime.startsWith('image/') || IMAGE_EXTENSIONS.has(extensionFromName(file.name));
 }
 
-function isKnownUnsupportedBinary(file: AttachmentDraft): boolean {
+function isKnownUnsupportedBinary(file: AttachmentFileMetadata): boolean {
   const mime = file.type?.toLowerCase() ?? '';
   return (
     mime.startsWith('application/octet-stream') ||
@@ -116,7 +112,7 @@ function isKnownUnsupportedBinary(file: AttachmentDraft): boolean {
   );
 }
 
-export function classifyAttachmentFile(file: AttachmentDraft): AttachmentEntry['kind'] {
+export function classifyAttachmentFile(file: AttachmentFileMetadata): AttachmentEntry['kind'] {
   if (isImageFile(file)) return 'image';
   if (isKnownUnsupportedBinary(file)) return 'unsupported';
   return 'text';
@@ -173,7 +169,10 @@ export function useContextAttachments(): UseContextAttachments {
   );
 
   const formattedContext = useMemo(
-    () => [formatFileContext(sanitised.files), formatImageAttachmentContext(attachments)].join(''),
+    () =>
+      [formatFileContext(sanitised.files), formatImageAttachmentContext(attachments)]
+        .filter(Boolean)
+        .join('\n\n'),
     [attachments, sanitised.files],
   );
 
