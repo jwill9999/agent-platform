@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-15
+- **Session:** Started `agent-platform-project-experience.11` on `task/agent-platform-project-experience.11`: duplicate Project names and Project-scoped session history.
+- **Today’s outputs:** Added a user-safe desktop Project path label to backend Project responses, introduced Project display helpers for duplicate-name disambiguation, scoped the chat Sessions menu to Personal Chat or the active Project, made new chats from Project Chat create Project sessions, and updated the Electron E2E path to open two Projects with the same folder name and verify Project Chat history restores on reopen.
+- **Validation:** Local gates passed: web project-navigation Vitest, API projects/session-chat Vitest, web/api/desktop typecheck, web/api lint, docs lint, format check, `git diff --check`, and focused Electron Playwright `project-access.e2e.ts`.
+- **Current state:** Local branch is `task/agent-platform-project-experience.11`. Known unrelated local `AGENTS.md`, `Makefile`, and `output/` changes remain uncommitted and should not be included.
+- **Next:** Commit/push, create the task PR to `feature/agent-platform-electron-stabilisation`, monitor CI/review/security comments, then merge into the feature branch when green.
+- **Date:** 2026-05-15
 - **Session:** Implemented `agent-platform-electron-stabilisation.16` on `task/agent-platform-electron-stabilisation.16`: Personal Chat and Project Chat now use separate UI chrome and state boundaries.
 - **Today’s outputs:** Hid Recent Projects from Personal Chat, hid the Sensors/Project activity panel outside Project Chat, stopped Personal Chat sessions from fetching repository sensors, cleared sensor state when switching to general chat, and extended the Electron Project access Playwright flow to verify that Personal Chat is clean after Project Chat usage. The `.16` task spec now includes a Gherkin Playwright E2E strategy.
 - **Validation:** Passed `pnpm --filter @agent-platform/web typecheck`, `pnpm --filter @agent-platform/web lint`, `pnpm --filter @agent-platform/desktop typecheck`, `pnpm --filter @agent-platform/api typecheck`, `pnpm format:check`, `git diff --check`, and focused `pnpm --filter @agent-platform/desktop run test:e2e -- e2e/project-access.e2e.ts`.

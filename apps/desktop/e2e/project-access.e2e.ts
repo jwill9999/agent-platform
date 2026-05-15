@@ -8,7 +8,8 @@ import {
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { dirname, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 interface ApiEnvelope<T> {
@@ -38,10 +39,12 @@ test.describe('Electron Project access', () => {
   test('opens a local Project and binds chat/slash commands to the same Project session', async () => {
     const tempRoot = join(repoRoot, '.agent-platform', 'electron-e2e', String(Date.now()));
     const runtimeDir = join(tempRoot, 'runtime');
-    const firstProjectName = 'electron-e2e-project-one';
-    const secondProjectName = 'electron-e2e-project-two';
-    const firstProjectDir = join(tempRoot, 'projects', firstProjectName);
-    const secondProjectDir = join(tempRoot, 'projects', secondProjectName);
+    const firstProjectName = 'agent-platform';
+    const secondProjectName = 'agent-platform';
+    const firstProjectDir = join(tempRoot, 'client-a', firstProjectName);
+    const secondProjectDir = join(tempRoot, 'client-b', secondProjectName);
+    const firstProjectPathLabel = desktopProjectPathLabelForTest(firstProjectDir);
+    const secondProjectPathLabel = desktopProjectPathLabelForTest(secondProjectDir);
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
     const backendPort = await getOpenPort();
     const rendererPort = await getOpenPort();
@@ -114,7 +117,8 @@ test.describe('Electron Project access', () => {
       await page.getByRole('button', { name: 'Open Project' }).click();
       const projectChatHeader = page.locator('[data-workspace-surface="project-chat"]');
 
-      await expect(projectChatHeader.getByText(firstProjectName)).toBeVisible();
+      await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
+      await expect(projectChatHeader.getByText(firstProjectPathLabel)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(/\/ide/);
@@ -170,7 +174,7 @@ test.describe('Electron Project access', () => {
       const recentProjects = page.locator('section[aria-label="Recent Projects"]');
       await expect(recentProjects).toHaveCount(1);
       await expect(
-        recentProjects.getByRole('link', { name: new RegExp(firstProjectName) }),
+        recentProjects.getByRole('link').filter({ hasText: firstProjectName }),
       ).toBeVisible();
       await expect(recentProjects.getByText('Ready to reopen')).toBeVisible();
       await expect(recentProjects.getByText(firstProjectDir)).toHaveCount(0);
@@ -188,26 +192,30 @@ test.describe('Electron Project access', () => {
       await page.getByRole('link', { name: /Workspaces/ }).click();
       await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
       await page.getByRole('button', { name: 'Open Project' }).click();
-      await expect(projectChatHeader.getByText(secondProjectName)).toBeVisible();
+      await expect(projectChatHeader.getByText(secondProjectName, { exact: true })).toBeVisible();
+      await expect(projectChatHeader.getByText(secondProjectPathLabel)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(/\/ide/);
-      const secondProject = await findRecentProject(backendPort, secondProjectName);
+      const secondProject = await findRecentProjectByPathLabel(backendPort, secondProjectPathLabel);
       expect(secondProject.metadata.source).toBe('desktop');
       expect(secondProject.metadata.folderName).toBe(secondProjectName);
       await expect(
-        recentProjects.getByRole('link', { name: new RegExp(firstProjectName) }),
+        recentProjects.getByRole('link').filter({ hasText: firstProjectPathLabel }),
       ).toBeVisible();
       await expect(
-        recentProjects.getByRole('link', { name: new RegExp(secondProjectName) }),
+        recentProjects.getByRole('link').filter({ hasText: secondProjectPathLabel }),
       ).toBeVisible();
       await expect(recentProjects.getByText(firstProjectDir)).toHaveCount(0);
       await expect(recentProjects.getByText(secondProjectDir)).toHaveCount(0);
 
-      await recentProjects.getByRole('link', { name: new RegExp(firstProjectName) }).click();
+      await recentProjects.getByRole('link').filter({ hasText: firstProjectPathLabel }).click();
       await expect(page).toHaveURL(new RegExp(`projectId=${encodeURIComponent(project.id)}`));
-      await expect(projectChatHeader.getByText(firstProjectName)).toBeVisible();
+      await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
+      await expect(projectChatHeader.getByText(firstProjectPathLabel)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
+      await expect(page.getByText('/help init', { exact: true }).last()).toBeVisible();
+      await expect(page.getByText('Scope: Selected Project').last()).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
@@ -247,7 +255,7 @@ test.describe('Electron Project access', () => {
       await page.getByRole('link', { name: /Project .* IDE/ }).click();
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
-      await expect(projectChatHeader.getByText(firstProjectName)).toBeVisible();
+      await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
       await page.getByRole('link', { name: 'Open IDE' }).click();
       await page.waitForURL(/\/ide/);
       await expect(
@@ -289,7 +297,7 @@ async function sendChatMessage(page: Page, message: string, placeholder: string)
   const input = page.getByPlaceholder(placeholder);
   await input.fill(message);
   await input.press('Enter');
-  await expect(page.getByText(message, { exact: true })).toBeVisible();
+  await expect(page.getByText(message, { exact: true }).last()).toBeVisible();
 }
 
 async function attachFilesToComposer(page: Page, files: FilePayload[]): Promise<void> {
@@ -303,6 +311,25 @@ async function findRecentProject(port: number, name: string): Promise<ProjectRec
   const project = response.data.projects.find((candidate) => candidate.name === name);
   expect(project).toBeDefined();
   return project as ProjectRecord;
+}
+
+async function findRecentProjectByPathLabel(port: number, folderPathLabel: string) {
+  const response = await fetchJson<ApiEnvelope<RecentDesktopProjects>>(
+    `http://127.0.0.1:${port}/v1/projects/desktop/recent`,
+  );
+  const project = response.data.projects.find(
+    (candidate) => candidate.metadata.folderPathLabel === folderPathLabel,
+  );
+  expect(project).toBeDefined();
+  return project as ProjectRecord;
+}
+
+function desktopProjectPathLabelForTest(projectDir: string): string {
+  const homeRelative = relative(homedir(), resolve(projectDir));
+  if (homeRelative && !homeRelative.startsWith('..') && !isAbsolute(homeRelative)) {
+    return `~/${homeRelative.split(sep).join('/')}`;
+  }
+  return projectDir.split(sep).slice(-2).join('/');
 }
 
 async function findProjectSession(port: number, projectId: string): Promise<SessionRecord> {

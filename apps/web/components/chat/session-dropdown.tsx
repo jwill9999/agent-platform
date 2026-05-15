@@ -18,6 +18,8 @@ interface SessionDropdownProps {
   agents: Agent[];
   activeSessionId: string | null;
   selectedAgentId: string | null;
+  scopeLabel?: string;
+  newChatLabel?: string;
   onSelectSession: (session: SessionRecord) => void;
   onNewChatForAgent: (agentId: string) => void;
   loading?: boolean;
@@ -49,6 +51,8 @@ export function SessionDropdown({
   agents,
   activeSessionId,
   selectedAgentId,
+  scopeLabel = 'Session history',
+  newChatLabel = 'New chat with current agent',
   onSelectSession,
   onNewChatForAgent,
   loading,
@@ -111,7 +115,7 @@ export function SessionDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[320px] max-h-[420px] overflow-y-auto">
-        <DropdownMenuLabel>Session history</DropdownMenuLabel>
+        <DropdownMenuLabel>{scopeLabel}</DropdownMenuLabel>
         <DropdownMenuItem
           onClick={() => {
             if (!selectedAgentId) return;
@@ -120,7 +124,7 @@ export function SessionDropdown({
           disabled={!canStartNewChat}
         >
           <Plus className="h-4 w-4 mr-2" />
-          New chat with current agent
+          {newChatLabel}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
 

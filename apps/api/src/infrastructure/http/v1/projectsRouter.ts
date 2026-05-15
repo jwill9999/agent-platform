@@ -41,6 +41,7 @@ import { Router } from 'express';
 import type { Request } from 'express';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import {
   existsSync,
@@ -561,6 +562,10 @@ function toDesktopProjectRecord(
     typeof backendProjectRoot === 'string'
       ? basename(backendProjectRoot) || project.name
       : project.name;
+  const folderPathLabel =
+    typeof backendProjectRoot === 'string'
+      ? userFacingDesktopProjectPathLabel(backendProjectRoot, folderName)
+      : undefined;
   const instructionFiles = parseProjectInstructionFileReferences(project.metadata);
   const activeBranch =
     typeof project.metadata['activeBranch'] === 'string'
@@ -573,6 +578,7 @@ function toDesktopProjectRecord(
     metadata: {
       source: 'desktop',
       folderName,
+      ...(folderPathLabel ? { folderPathLabel } : {}),
       capabilityState,
       onboardingState,
       defaultAgentProfile: 'coding',
@@ -580,6 +586,17 @@ function toDesktopProjectRecord(
       instructionFileCount: instructionFiles.length,
     },
   };
+}
+
+function userFacingDesktopProjectPathLabel(root: string, folderName: string): string {
+  const normalizedRoot = resolve(root);
+  const homeRelative = relative(homedir(), normalizedRoot);
+  if (homeRelative && !homeRelative.startsWith('..') && !isAbsolute(homeRelative)) {
+    return `~/${homeRelative.split(sep).join('/')}`;
+  }
+
+  const parentName = basename(dirname(normalizedRoot));
+  return parentName ? `${parentName}/${folderName}` : folderName;
 }
 
 function toDesktopRegistrationResult(project: ProjectRecord, created: boolean) {
