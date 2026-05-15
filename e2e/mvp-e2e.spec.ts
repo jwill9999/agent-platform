@@ -52,7 +52,7 @@ test.describe('MVP E2E (compose-backed)', () => {
 
     await page.getByRole('button', { name: 'Open sessions menu' }).click();
     await expect(page.getByRole('menuitem', { name: 'Manage sessions' })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: 'New chat with current agent' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'New personal chat' })).toBeVisible();
   });
 
   test('sidebar shows Workspaces/Chat and settings overflow menu', async ({ page }) => {
