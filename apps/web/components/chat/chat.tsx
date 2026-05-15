@@ -43,6 +43,7 @@ export interface ChatProps {
   /** User decision handler for approval requests. */
   onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
   /** Session-scoped sensor status, kept outside the chat transcript. */
+  showSensors?: boolean;
   sensorDashboard?: SensorDashboardResponse | null;
   sensorLoading?: boolean;
   sensorError?: string | null;
@@ -70,6 +71,7 @@ export function Chat({
   toolEventsByMessage,
   approvalEventsByMessage,
   onApprovalDecision,
+  showSensors = true,
   sensorDashboard,
   sensorLoading,
   sensorError,
@@ -151,12 +153,14 @@ export function Chat({
         />
       </div>
 
-      <SensorStatusPanel
-        dashboard={sensorDashboard ?? null}
-        loading={sensorLoading}
-        error={sensorError}
-        onRetry={onRetrySensors}
-      />
+      {showSensors && (
+        <SensorStatusPanel
+          dashboard={sensorDashboard ?? null}
+          loading={sensorLoading}
+          error={sensorError}
+          onRetry={onRetrySensors}
+        />
+      )}
     </div>
   );
 }

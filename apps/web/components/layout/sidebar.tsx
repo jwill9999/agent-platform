@@ -260,6 +260,15 @@ export function Sidebar() {
     };
   }, []);
 
+  const searchParams = new URLSearchParams(searchString);
+  const currentMode = searchParams.get(workspaceModeSearchParam);
+  const currentProjectId = searchParams.get(projectReopenSearchParam);
+  const isRoot = pathname === '/';
+  const isPersonalChatSurface =
+    isRoot && currentMode === personalChatModeSearchValue && !currentProjectId;
+  const shouldShowRecentProjects =
+    !collapsed && !isPersonalChatSurface && recentProjects.length > 0;
+
   return (
     <aside
       className={cn(
@@ -294,10 +303,6 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {workspaceNavigationItems.map((item) => {
-          const searchParams = new URLSearchParams(searchString);
-          const currentMode = searchParams.get(workspaceModeSearchParam);
-          const currentProjectId = searchParams.get(projectReopenSearchParam);
-          const isRoot = pathname === '/';
           const isActive =
             item.surface === 'home'
               ? isRoot && !currentMode && !currentProjectId
@@ -341,7 +346,7 @@ export function Sidebar() {
             </Link>
           );
         })}
-        {!collapsed && recentProjects.length > 0 && (
+        {shouldShowRecentProjects && (
           <RecentProjectsNavSection
             projects={recentProjects}
             isLoading={isLoadingRecentProjects}

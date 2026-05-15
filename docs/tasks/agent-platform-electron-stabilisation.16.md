@@ -70,6 +70,41 @@ Personal Chat and Project Chat are separate experiences:
   restored only through that action.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
+## Playwright E2E Strategy
+
+```gherkin
+Feature: Personal Chat and Project Chat stay separate
+
+  Scenario: Opening Personal Chat starts a clean general assistant surface
+    Given the desktop app has recent Projects available
+    When the user opens Personal Chat from the sidebar
+    Then the chat composer is enabled for a general assistant message
+    And the sidebar does not show Recent Projects
+    And the right side does not show Sensors or Project activity
+    And no previous Project attachments or warnings are visible
+
+  Scenario: Personal Chat accepts common image attachments without text parsing errors
+    Given the user is in Personal Chat
+    When the user attaches a PNG image and a Markdown file
+    Then both files appear as attachments
+    And no "not an allowed text format" warning is shown
+
+  Scenario: Project Chat keeps Project-specific chrome
+    Given the user opens a local Project with the native folder picker
+    When Project Chat opens
+    Then the Project name is shown in the header
+    And Recent Projects are visible in the sidebar
+    And the Project Sensors panel is available
+    And the Personal Chat composer state is not shown
+
+  Scenario: Switching back to Personal Chat clears Project-only context
+    Given the user has opened Project Chat and attached Project files
+    When the user opens Personal Chat from the sidebar
+    Then a new Personal Chat session is active
+    And Project attachments are cleared
+    And Project Sensors are hidden
+```
+
 ## Definition Of Done
 
 - [ ] Chat navigation opens a fresh Personal Chat by default.
