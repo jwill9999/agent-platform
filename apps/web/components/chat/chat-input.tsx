@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useRef, useCallback, type KeyboardEvent, type DragEvent } from 'react';
-import { Send, Loader2, Paperclip, X, FileText, AlertTriangle } from 'lucide-react';
+import {
+  Send,
+  Loader2,
+  Paperclip,
+  X,
+  FileText,
+  AlertTriangle,
+  Image,
+  FileWarning,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import { useAgentModelContext } from './agent-model-context';
@@ -159,7 +168,7 @@ export function ChatInput({
                   key={`${att.name}-${i}`}
                   className="inline-flex items-center gap-1 text-xs bg-secondary text-secondary-foreground rounded-lg px-2 py-1 max-w-[200px]"
                 >
-                  <FileText className="h-3 w-3 flex-shrink-0" />
+                  <AttachmentIcon kind={att.kind} />
                   <span className="truncate">{att.name}</span>
                   {onRemoveAttachment && (
                     <button
@@ -283,4 +292,10 @@ export function ChatInput({
       </form>
     </div>
   );
+}
+
+function AttachmentIcon({ kind }: Readonly<{ kind: AttachmentEntry['kind'] }>) {
+  if (kind === 'image') return <Image className="h-3 w-3 flex-shrink-0" />;
+  if (kind === 'unsupported') return <FileWarning className="h-3 w-3 flex-shrink-0" />;
+  return <FileText className="h-3 w-3 flex-shrink-0" />;
 }

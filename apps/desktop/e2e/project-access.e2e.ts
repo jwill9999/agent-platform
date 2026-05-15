@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+import {
+  _electron as electron,
+  type ElectronApplication,
+  type FilePayload,
+  type Page,
+} from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -79,6 +84,33 @@ test.describe('Electron Project access', () => {
 
       const page = await app.firstWindow();
       await openProjectChat(page);
+
+      await page.getByRole('button', { name: 'Open Chat' }).click();
+      await expect(page.getByPlaceholder('Send a message... (drop files to attach)')).toBeVisible();
+      await attachFilesToComposer(page, [
+        {
+          name: 'personal-chat-screenshot.png',
+          mimeType: 'image/png',
+          buffer: Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l7qVZAAAAABJRU5ErkJggg==',
+            'base64',
+          ),
+        },
+        {
+          name: 'personal-chat-notes.md',
+          mimeType: 'text/markdown',
+          buffer: Buffer.from('# Personal chat notes\n'),
+        },
+      ]);
+      await expect(page.getByText('personal-chat-screenshot.png')).toBeVisible();
+      await expect(page.getByText('personal-chat-notes.md')).toBeVisible();
+      await expect(page.getByText('not an allowed text format')).toHaveCount(0);
+
+      await page.getByRole('link', { name: /Workspaces/ }).click();
+      await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
+      await expect(page.getByText('personal-chat-screenshot.png')).toHaveCount(0);
+      await expect(page.getByText('personal-chat-notes.md')).toHaveCount(0);
+
       await page.getByRole('button', { name: 'Open Project' }).click();
       const projectChatHeader = page.locator('[data-workspace-surface="project-chat"]');
 
@@ -90,6 +122,28 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('Restore folder')).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
+
+      await attachFilesToComposer(page, [
+        {
+          name: 'project-chat-screenshot.jpg',
+          mimeType: 'image/jpeg',
+          buffer: Buffer.from(
+            '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAH/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAEFAqf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/Aaf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/Aaf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAY/Aqf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/IX//2gAMAwEAAgADAAAAEP/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8QH//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8QH//EABQQAQAAAAAAAAAAAAAAAAAAABD/2gAIAQEAAT8QH//Z',
+            'base64',
+          ),
+        },
+        {
+          name: 'project-chat-notes.md',
+          mimeType: 'text/markdown',
+          buffer: Buffer.from('# Project chat notes\n'),
+        },
+      ]);
+      await expect(page.getByText('project-chat-screenshot.jpg')).toBeVisible();
+      await expect(page.getByText('project-chat-notes.md')).toBeVisible();
+      await expect(page.getByText('not an allowed text format')).toHaveCount(0);
+      await sendChatMessage(page, 'attachment smoke test', 'Ask about this Project...');
+      await expect(page.getByText('project-chat-screenshot.jpg')).toHaveCount(0);
+      await expect(page.getByText('project-chat-notes.md')).toHaveCount(0);
 
       const project = await findRecentProject(backendPort, firstProjectName);
       expect(project.metadata.source).toBe('desktop');
@@ -223,6 +277,10 @@ async function sendChatMessage(page: Page, message: string, placeholder: string)
   await input.fill(message);
   await input.press('Enter');
   await expect(page.getByText(message, { exact: true })).toBeVisible();
+}
+
+async function attachFilesToComposer(page: Page, files: FilePayload[]): Promise<void> {
+  await page.locator('input[type="file"]').setInputFiles(files);
 }
 
 async function findRecentProject(port: number, name: string): Promise<ProjectRecord> {
