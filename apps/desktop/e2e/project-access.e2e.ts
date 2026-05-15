@@ -155,11 +155,25 @@ test.describe('Electron Project access', () => {
       await expect(projectTerminal).toContainText(`AP_TERM_CWD:${firstProjectDir}`, {
         timeout: 10_000,
       });
+      await projectTerminal.getByTitle('New terminal').click();
+      await expect(
+        projectTerminal.getByRole('button', { name: 'Terminal 2', exact: true }),
+      ).toBeVisible();
+      const activeTerminalPane = projectTerminal.locator('[data-terminal-active="true"]');
+      await activeTerminalPane.locator('.xterm').click();
+      await page.keyboard.type('printf "AP_TERM_TWO:%s\\n" "$PWD"');
+      await page.keyboard.press('Enter');
+      await expect(activeTerminalPane).toContainText(`AP_TERM_TWO:${firstProjectDir}`, {
+        timeout: 10_000,
+      });
+      await projectTerminal.getByRole('button', { name: 'Terminal 1', exact: true }).click();
+      await expect(activeTerminalPane).toContainText(`AP_TERM_CWD:${firstProjectDir}`);
+      await expect(activeTerminalPane).not.toContainText('AP_TERM_TWO:');
       await projectTerminal.getByTitle('Hide terminal').click();
       await expect(projectTerminal).toBeHidden();
       await page.getByRole('button', { name: /Terminal/ }).click();
       await expect(projectTerminal).toContainText(`AP_TERM_CWD:${firstProjectDir}`);
-      await projectTerminal.getByTitle('Close terminal').click();
+      await projectTerminal.getByRole('button', { name: 'Close terminal', exact: true }).click();
       await expect(projectTerminal).toBeHidden();
 
       await attachFilesToComposer(page, [

@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-15
+- **Session:** Completed `agent-platform-1bg` on `task/agent-platform-project-experience-terminal-tabs`: Project Chat terminal dock now supports multiple human-controlled terminal tabs.
+- **Today’s outputs:** Added tab state over the existing Electron PTY bridge, with independent PTY/xterm runtime per tab, New Terminal creation, tab selection, per-tab close, global hide preserving open tabs, and global close disposing all tabs. Extended Electron E2E to verify Terminal 1 and Terminal 2 keep independent shell output while both start at the active Project root.
+- **Validation:** Passed web typecheck, web lint, web unit tests, web build, full desktop unit tests, elevated Electron E2E, `pnpm format:check`, and `git diff --check`. SonarQube MCP remained unavailable via tool discovery, so the documented fallback gate used typecheck/lint/tests.
+- **Current state:** Bead `agent-platform-1bg` is closed locally. Branch is `task/agent-platform-project-experience-terminal-tabs`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Commit this session handoff and tab implementation, run `bd dolt push`, push the branch, confirm branch is up to date with origin, then owner can manually test multiple terminal tabs and terminal toggle behavior in Electron.
+- **Date:** 2026-05-15
 - **Session:** Completed `agent-platform-project-experience.10` on `task/agent-platform-project-experience.10`: Project Chat now has a native Electron terminal dock for human-controlled shell sessions.
 - **Today’s outputs:** Added `node-pty` to the desktop app, created an Electron main terminal service with typed preload IPC, resolved the initial cwd from the active Project root when available, rendered a Project Chat `xterm.js` bottom dock with hide/show/close lifecycle, and kept the terminal separate from agent/harness command execution.
 - **Validation:** Passed desktop/web typecheck, lint, builds, full desktop unit tests, web unit tests, `pnpm format:check`, and elevated Electron E2E verifying the terminal starts in the Project folder, accepts keyboard input, survives hide/show, and closes explicitly. SonarQube MCP was not available via tool discovery, so the documented fallback gate used typecheck/lint/tests.

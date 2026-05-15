@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Maximize2, Square, Terminal as TerminalIcon, X } from 'lucide-react';
+import { Maximize2, Plus, Square, Terminal as TerminalIcon, X } from 'lucide-react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -18,7 +18,24 @@ export interface ProjectTerminalDockProps {
   readonly onOpenChange: (open: boolean) => void;
 }
 
-type TerminalState = 'idle' | 'starting' | 'open' | 'closed' | 'error' | 'unavailable';
+type TerminalState = 'starting' | 'open' | 'closed' | 'error' | 'unavailable';
+
+interface TerminalTab {
+  readonly id: string;
+  readonly title: string;
+  readonly state: TerminalState;
+  readonly terminalId?: string;
+  readonly cwd?: string;
+  readonly error?: string;
+}
+
+interface TerminalRuntime {
+  readonly term: XTerm;
+  readonly fit: FitAddon;
+  readonly inputDisposable: { dispose: () => void };
+  readonly unsubscribeData: () => void;
+  readonly unsubscribeExit: () => void;
+}
 
 export function ProjectTerminalDock({
   projectId,
@@ -27,153 +44,211 @@ export function ProjectTerminalDock({
   open,
   onOpenChange,
 }: ProjectTerminalDockProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<XTerm | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
-  const terminalIdRef = useRef<string | null>(null);
-  const [cwd, setCwd] = useState<string | null>(null);
-  const [state, setState] = useState<TerminalState>('idle');
-  const [error, setError] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<TerminalTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [height, setHeight] = useState(300);
+  const tabCounterRef = useRef(0);
+  const runtimesRef = useRef(new Map<string, TerminalRuntime>());
+  const containersRef = useRef(new Map<string, HTMLDivElement>());
 
-  const disposeTerminal = useCallback(async () => {
-    const terminalId = terminalIdRef.current;
-    terminalIdRef.current = null;
-    if (terminalId) {
-      await getDesktopProjectBridge()?.terminal?.dispose?.({ terminalId });
-    }
-    terminalRef.current?.dispose();
-    terminalRef.current = null;
-    fitRef.current = null;
-    setCwd(null);
-    setState('closed');
+  const updateTab = useCallback((tabId: string, patch: Partial<TerminalTab>) => {
+    setTabs((current) => current.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)));
   }, []);
 
-  useEffect(() => {
-    return () => {
-      void disposeTerminal();
-    };
-  }, [disposeTerminal]);
-
-  useEffect(() => {
-    void disposeTerminal();
-  }, [disposeTerminal, projectId]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (terminalIdRef.current) {
-      requestAnimationFrame(() => fitRef.current?.fit());
-      return;
+  const disposeTabRuntime = useCallback((tab: TerminalTab) => {
+    const runtime = runtimesRef.current.get(tab.id);
+    if (runtime) {
+      runtime.inputDisposable.dispose();
+      runtime.unsubscribeData();
+      runtime.unsubscribeExit();
+      runtime.term.dispose();
+      runtimesRef.current.delete(tab.id);
     }
-    if (!hasDesktopTerminalBridge()) {
-      setState('unavailable');
-      return;
+    if (tab.terminalId) {
+      void getDesktopProjectBridge()?.terminal?.dispose?.({ terminalId: tab.terminalId });
     }
-    const bridge = getDesktopProjectBridge()?.terminal;
-    const container = containerRef.current;
-    if (!bridge?.create || !bridge.input || !bridge.resize || !bridge.onData || !bridge.onExit) {
-      setState('unavailable');
-      return;
-    }
-    if (!container) return;
+  }, []);
 
-    setState('starting');
-    setError(null);
-    const term = new XTerm({
-      cursorBlink: true,
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-      fontSize: 13,
-      scrollback: 5000,
-      theme: {
-        background: '#111827',
-        foreground: '#e5e7eb',
-        cursor: '#e5e7eb',
-        selectionBackground: '#475569',
-      },
+  const disposeAllTabs = useCallback(() => {
+    setTabs((current) => {
+      for (const tab of current) {
+        disposeTabRuntime(tab);
+      }
+      return [];
     });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(container);
-    terminalRef.current = term;
-    fitRef.current = fit;
-    fit.fit();
+    containersRef.current.clear();
+    setActiveTabId(null);
+  }, [disposeTabRuntime]);
 
-    let disposed = false;
-    const unsubscribeData = bridge.onData((event) => {
-      if (event.terminalId === terminalIdRef.current) {
-        term.write(event.data);
-      }
-    });
-    const unsubscribeExit = bridge.onExit((event) => {
-      if (event.terminalId === terminalIdRef.current) {
-        terminalIdRef.current = null;
-        setState('closed');
-      }
-    });
-    const inputDisposable = term.onData((data) => {
-      const terminalId = terminalIdRef.current;
-      if (terminalId) {
-        void bridge.input?.({ terminalId, data });
-      }
-    });
+  const addTab = useCallback(() => {
+    tabCounterRef.current += 1;
+    const id = `terminal-tab-${tabCounterRef.current}`;
+    const title = `Terminal ${tabCounterRef.current}`;
+    setTabs((current) => [...current, { id, title, state: 'starting' }]);
+    setActiveTabId(id);
+  }, []);
 
-    bridge
-      .create({
-        ...(projectId ? { projectId } : {}),
-        cols: Math.max(term.cols, 80),
-        rows: Math.max(term.rows, 24),
-      })
-      .then((result) => {
-        if (disposed) {
-          void bridge.dispose?.({ terminalId: result.terminalId });
-          return;
+  const closeTab = useCallback(
+    (tabId: string) => {
+      setTabs((current) => {
+        const target = current.find((tab) => tab.id === tabId);
+        if (target) {
+          disposeTabRuntime(target);
         }
-        terminalIdRef.current = result.terminalId;
-        setCwd(result.cwd);
-        setState('open');
-        requestAnimationFrame(() => {
-          fit.fit();
-          const terminalId = terminalIdRef.current;
-          if (terminalId) {
+        const nextTabs = current.filter((tab) => tab.id !== tabId);
+        setActiveTabId((active) => {
+          if (active !== tabId) return active;
+          return nextTabs.at(-1)?.id ?? null;
+        });
+        if (nextTabs.length === 0) {
+          onOpenChange(false);
+        }
+        return nextTabs;
+      });
+    },
+    [disposeTabRuntime, onOpenChange],
+  );
+
+  const startTabRuntime = useCallback(
+    (tab: TerminalTab, container: HTMLDivElement) => {
+      if (runtimesRef.current.has(tab.id)) return;
+      if (!hasDesktopTerminalBridge()) {
+        updateTab(tab.id, { state: 'unavailable' });
+        return;
+      }
+      const bridge = getDesktopProjectBridge()?.terminal;
+      if (!bridge?.create || !bridge.input || !bridge.resize || !bridge.onData || !bridge.onExit) {
+        updateTab(tab.id, { state: 'unavailable' });
+        return;
+      }
+
+      const term = new XTerm({
+        cursorBlink: true,
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontSize: 13,
+        scrollback: 5000,
+        theme: {
+          background: '#111827',
+          foreground: '#e5e7eb',
+          cursor: '#e5e7eb',
+          selectionBackground: '#475569',
+        },
+      });
+      const fit = new FitAddon();
+      term.loadAddon(fit);
+      term.open(container);
+      fit.fit();
+
+      let terminalId: string | null = null;
+      const unsubscribeData = bridge.onData((event) => {
+        if (event.terminalId === terminalId) {
+          term.write(event.data);
+        }
+      });
+      const unsubscribeExit = bridge.onExit((event) => {
+        if (event.terminalId === terminalId) {
+          updateTab(tab.id, { state: 'closed', terminalId: undefined });
+        }
+      });
+      const inputDisposable = term.onData((data) => {
+        if (terminalId) {
+          void bridge.input?.({ terminalId, data });
+        }
+      });
+
+      runtimesRef.current.set(tab.id, {
+        term,
+        fit,
+        inputDisposable,
+        unsubscribeData,
+        unsubscribeExit,
+      });
+
+      bridge
+        .create({
+          ...(projectId ? { projectId } : {}),
+          cols: Math.max(term.cols, 80),
+          rows: Math.max(term.rows, 24),
+        })
+        .then((result) => {
+          if (!runtimesRef.current.has(tab.id)) {
+            void bridge.dispose?.({ terminalId: result.terminalId });
+            return;
+          }
+          terminalId = result.terminalId;
+          updateTab(tab.id, {
+            cwd: result.cwd,
+            state: 'open',
+            terminalId: result.terminalId,
+          });
+          requestAnimationFrame(() => {
+            fit.fit();
             void bridge.resize?.({
-              terminalId,
+              terminalId: result.terminalId,
               cols: Math.max(term.cols, 2),
               rows: Math.max(term.rows, 2),
             });
-          }
+          });
+        })
+        .catch((cause: unknown) => {
+          updateTab(tab.id, {
+            error: cause instanceof Error ? cause.message : 'Failed to start terminal.',
+            state: 'error',
+          });
         });
-      })
-      .catch((cause: unknown) => {
-        setState('error');
-        setError(cause instanceof Error ? cause.message : 'Failed to start terminal.');
-      });
-
-    return () => {
-      disposed = true;
-      inputDisposable.dispose();
-      unsubscribeData();
-      unsubscribeExit();
-    };
-  }, [open, projectId]);
+    },
+    [projectId, updateTab],
+  );
 
   useEffect(() => {
-    if (!open || !containerRef.current) return;
+    return () => {
+      disposeAllTabs();
+    };
+  }, [disposeAllTabs]);
+
+  useEffect(() => {
+    disposeAllTabs();
+    tabCounterRef.current = 0;
+  }, [disposeAllTabs, projectId]);
+
+  useEffect(() => {
+    if (open && tabs.length === 0) {
+      addTab();
+    }
+  }, [addTab, open, tabs.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const activeRuntime = activeTabId ? runtimesRef.current.get(activeTabId) : undefined;
+    if (!activeRuntime) return;
+    requestAnimationFrame(() => activeRuntime.fit.fit());
+  }, [activeTabId, open]);
+
+  useEffect(() => {
+    if (!open) return;
     const resizeObserver = new ResizeObserver(() => {
-      const fit = fitRef.current;
-      const terminalId = terminalIdRef.current;
-      if (!fit || !terminalId) return;
-      fit.fit();
+      const activeRuntime = activeTabId ? runtimesRef.current.get(activeTabId) : undefined;
+      const activeTab = tabs.find((tab) => tab.id === activeTabId);
+      if (!activeRuntime || !activeTab?.terminalId) return;
+      activeRuntime.fit.fit();
       void getDesktopProjectBridge()?.terminal?.resize?.({
-        terminalId,
-        cols: Math.max(terminalRef.current?.cols ?? 80, 2),
-        rows: Math.max(terminalRef.current?.rows ?? 24, 2),
+        terminalId: activeTab.terminalId,
+        cols: Math.max(activeRuntime.term.cols, 2),
+        rows: Math.max(activeRuntime.term.rows, 2),
       });
     });
-    resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
-  }, [open, height]);
 
-  if (!open && !terminalIdRef.current) return null;
+    for (const container of containersRef.current.values()) {
+      resizeObserver.observe(container);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, [activeTabId, height, open, tabs]);
+
+  if (!open && tabs.length === 0) return null;
+
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+  const activeState = activeTab?.state ?? 'closed';
 
   return (
     <section
@@ -183,13 +258,50 @@ export function ProjectTerminalDock({
     >
       <div className="flex h-10 items-center gap-2 border-b border-slate-800 px-3 text-xs">
         <TerminalIcon className="h-4 w-4 shrink-0 text-slate-300" />
-        <div className="min-w-0 flex-1 truncate">
-          <span className="font-medium text-slate-100">{projectName ?? 'Terminal'}</span>
-          {activeBranch ? <span className="text-slate-400"> · {activeBranch}</span> : null}
-          {cwd ? <span className="text-slate-400"> · {cwd}</span> : null}
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              className={cn(
+                'flex shrink-0 items-center rounded border border-transparent bg-slate-900',
+                tab.id === activeTabId && 'border-slate-600 bg-slate-800',
+              )}
+            >
+              <button
+                type="button"
+                className="px-3 py-1.5 text-left text-xs text-slate-100"
+                onClick={() => setActiveTabId(tab.id)}
+              >
+                {tab.title}
+              </button>
+              <button
+                type="button"
+                className="px-1.5 text-slate-400 hover:text-slate-100"
+                onClick={() => closeTab(tab.id)}
+                title={`Close ${tab.title}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 shrink-0 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+            onClick={addTab}
+            title="New terminal"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="hidden min-w-0 max-w-[35%] truncate text-slate-400 lg:block">
+          {projectName ?? 'Terminal'}
+          {activeBranch ? ` · ${activeBranch}` : ''}
+          {activeTab?.cwd ? ` · ${activeTab.cwd}` : ''}
         </div>
         <span className="rounded bg-slate-800 px-2 py-1 text-[11px] uppercase tracking-wide text-slate-300">
-          {state}
+          {activeState}
         </span>
         <Button
           type="button"
@@ -217,7 +329,7 @@ export function ProjectTerminalDock({
           variant="ghost"
           className="h-7 w-7 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
           onClick={() => {
-            void disposeTerminal();
+            disposeAllTabs();
             onOpenChange(false);
           }}
           title="Close terminal"
@@ -225,14 +337,32 @@ export function ProjectTerminalDock({
           <X className="h-4 w-4" />
         </Button>
       </div>
-      {state === 'unavailable' ? (
+      {activeState === 'unavailable' ? (
         <div className="flex h-[calc(100%-2.5rem)] items-center justify-center text-sm text-slate-300">
           Native terminal is available in the desktop app.
         </div>
-      ) : state === 'error' ? (
-        <div className="p-4 text-sm text-red-200">{error ?? 'Terminal failed to start.'}</div>
+      ) : activeState === 'error' ? (
+        <div className="p-4 text-sm text-red-200">
+          {activeTab?.error ?? 'Terminal failed to start.'}
+        </div>
       ) : (
-        <div ref={containerRef} className="h-[calc(100%-2.5rem)] min-h-0 p-2" />
+        <div className="h-[calc(100%-2.5rem)] min-h-0">
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              ref={(node) => {
+                if (node) {
+                  containersRef.current.set(tab.id, node);
+                  startTabRuntime(tab, node);
+                } else {
+                  containersRef.current.delete(tab.id);
+                }
+              }}
+              data-terminal-active={tab.id === activeTabId ? 'true' : 'false'}
+              className={cn('h-full min-h-0 p-2', tab.id === activeTabId ? 'block' : 'hidden')}
+            />
+          ))}
+        </div>
       )}
     </section>
   );
