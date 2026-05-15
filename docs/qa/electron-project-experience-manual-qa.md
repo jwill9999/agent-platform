@@ -89,6 +89,17 @@ Severity guidance:
 | Project name is shown.            | UI uses user-facing Project/folder names, not full host paths.                  |        |            |
 | Project opens into chat first.    | User lands in Project chat, not directly in the IDE.                            |        |            |
 
+### 3a. Native New Project
+
+| Check                                  | Expected                                                                 | Result | Finding ID |
+| -------------------------------------- | ------------------------------------------------------------------------ | ------ | ---------- |
+| Click **New Project** from Workspaces. | User can choose Start from scratch, Use existing folder, or Import flow. |        |            |
+| Choose **Start from scratch**.         | App asks for Project name and parent location through user-facing UI.    |        |            |
+| Select parent location.                | Native operating-system folder picker is used.                           |        |            |
+| Create the Project.                    | Folder is created on the host filesystem and opened into Project Chat.   |        |            |
+| Cancel creation.                       | No folder or Project record is created.                                  |        |            |
+| Import from Chat unavailable.          | If no chat artifacts exist, unavailable state is clear and non-blocking. |        |            |
+
 ### 4. Project Chat Default Surface
 
 | Check                         | Expected                                                                                          | Result | Finding ID |

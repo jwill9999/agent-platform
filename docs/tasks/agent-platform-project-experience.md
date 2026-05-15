@@ -55,6 +55,8 @@ For desktop Product work:
 - Project means a folder/work context. It may be a code repository, docs/content folder, research
   folder, automation workspace, generated app, or mixed files.
 - The coding agent is a Project profile/tooling choice, not the definition of Project.
+- Backend Project architecture should separate Project identity/folder binding from profile
+  detection, capability policy, chat/session state, scheduled work, and generated artifacts.
 - Opening a Project should land in project-scoped chat by default.
 - The built-in IDE is no longer a primary workflow and should not receive further feature
   investment. Manual editing should be explicit through external/default IDE handoff.
@@ -68,6 +70,8 @@ For desktop Product work:
   CI, review comments, and approvals in user-facing language.
 - Primary navigation belongs in the left explorer: top-level app routes, recent/reopen Projects, and
   recent Chats/Sessions.
+- Workspaces should support creating a new Project, opening an existing folder, and importing a
+  Project from previous Chat artifacts when available.
 - User-facing copy should show Project name, folder/relevant relative path, profile/status, and
   branch only where useful. Runtime details such as `/workspace`, backend root, repository root, and
   backend accessibility are technical details.
@@ -80,9 +84,13 @@ In scope:
 
 - Project profile/capability model for coding, docs/content, research, automation, mixed, and
   unknown Projects.
+- Clear backend boundaries between Project records, capability/tool policy, Project sessions,
+  scheduled jobs, and generated artifacts.
 - Left explorer navigation for Projects and Chats/Sessions.
 - Recent/reopen Project list backed by existing Project records and metadata.
 - Open/New Project flow from the explorer.
+- New Project creation from Workspaces, including Start from scratch, Use existing folder, and
+  Import from Chat where available.
 - Native desktop Project selection and reopen semantics are implemented in the Electron Project
   access epic; this epic consumes that backend-bound Project model.
 - Project-scoped chat as the default Project surface.
@@ -123,6 +131,7 @@ Out of scope:
 | `agent-platform-project-experience.9`  | Add Project Chat branch selector                          |
 | `agent-platform-project-experience.10` | Add governed terminal dock                                |
 | `agent-platform-project-experience.11` | Disambiguate duplicate Projects and restore history       |
+| `agent-platform-project-experience.12` | Add New Project creation flow                             |
 
 ## Parallel Implementation Notes
 
@@ -143,8 +152,11 @@ After `agent-platform-project-experience.3` has made Project Chat the default Pr
 - `agent-platform-project-experience.11` should run after Project Chat is the default surface. It can
   run in parallel with branch selector, preview, and activity work if it owns only Project display
   naming, Recent Projects, and Project-scoped session history.
+- `agent-platform-project-experience.12` should run after `.11` so new Projects participate in the
+  same display-name and Recent Projects rules. It should avoid touching terminal, branch selector,
+  or preview components.
 - `agent-platform-project-experience.6` remains the integration verification gate and should absorb
-  E2E coverage from `.4`, `.5`, `.7`, `.8`, `.9`, `.10`, and `.11`.
+  E2E coverage from `.4`, `.5`, `.7`, `.8`, `.9`, `.10`, `.11`, and `.12`.
 
 ## Testing Strategy Requirements
 
@@ -164,6 +176,8 @@ Each child task must include concrete local and remote verification:
 - [ ] Project records can represent generic folder/work contexts with profile/capability metadata.
 - [ ] Users can see Projects and Chats/Sessions in the left explorer without scattered CTAs.
 - [ ] Users can reopen previous Projects from stored metadata.
+- [ ] Users can create a new Project folder from Workspaces without typing an absolute path.
+- [ ] Users can distinguish Start from scratch, Use existing folder, and Import from Chat flows.
 - [ ] Projects with the same folder name are distinguishable through short user-facing parent-path
       labels such as `~/projects/agent-platform` and `~/work/client-a/agent-platform`.
 - [ ] Project Chat restores the last active Project-scoped session, while Personal Chat sessions
