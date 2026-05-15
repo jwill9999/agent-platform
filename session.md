@@ -1779,6 +1779,25 @@ Tracked in Beads: `agent-platform-lt6`
   - `git diff --check`
   - `sh .husky/pre-push`
 
+## 2026-05-15 Electron Stabilisation `.15`
+
+- Task `agent-platform-electron-stabilisation.15` started on
+  `task/agent-platform-electron-stabilisation.15`.
+- Updated slash command help to render from reusable command metadata as readable Markdown entries:
+  - `/help` now lists commands as separate entries with usage, scope, and state effect,
+  - `/help init` now shows focused usage, selected-Project scope, and setup side-effect guidance,
+  - the formatter is API-side and can be reused by non-chat surfaces later.
+- Added a Gherkin E2E strategy to
+  [agent-platform-electron-stabilisation.15.md](docs/tasks/agent-platform-electron-stabilisation.15.md).
+- Updated Electron Playwright coverage so Project Chat and IDE assistant `/help` output are checked
+  through the real UI flow.
+- Local verification passed:
+  - `pnpm --filter @agent-platform/api test -- slashCommands.test.ts sessionChat.integration.test.ts`
+  - `pnpm --filter @agent-platform/api typecheck`
+  - `pnpm --filter @agent-platform/api lint`
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop run test:e2e -- e2e/project-access.e2e.ts`
+
 ## 2026-05-12 Electron Security `.5`
 
 - Task `agent-platform-electron-security.5` started on

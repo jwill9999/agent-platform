@@ -1,6 +1,11 @@
 import { ProjectOnboardingDraftSchema } from '@agent-platform/contracts';
 
-import type { SlashCommandDefinition, SlashCommandRegistry } from './types.js';
+import type {
+  SlashCommandDefinition,
+  SlashCommandMetadata,
+  SlashCommandRegistry,
+  SlashCommandScope,
+} from './types.js';
 import { StaticSlashCommandRegistry } from './registry.js';
 
 function formatInitDraftMessage(draft: unknown): string {
@@ -16,6 +21,47 @@ function formatInitDraftMessage(draft: unknown): string {
   ].join('\n');
 }
 
+function formatCommandScope(scope: SlashCommandScope): string {
+  return scope === 'project' ? 'Selected Project' : 'Current chat';
+}
+
+function formatCommandStateEffect(command: SlashCommandMetadata): string {
+  return command.sideEffects ? 'May update Project setup.' : 'Does not change Project state.';
+}
+
+function formatCommandHelpEntry(command: SlashCommandMetadata): string {
+  return [
+    `- **/${command.name}** - ${command.summary}`,
+    `  - Usage: \`${command.usage}\``,
+    `  - Scope: ${formatCommandScope(command.scope)}`,
+    `  - State: ${formatCommandStateEffect(command)}`,
+  ].join('\n');
+}
+
+export function formatAvailableSlashCommandHelp(commands: readonly SlashCommandMetadata[]): string {
+  const entries = [...commands]
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map(formatCommandHelpEntry);
+
+  if (entries.length === 0) return 'No slash commands are available.';
+
+  return ['Available slash commands:', '', ...entries].join('\n');
+}
+
+export function formatFocusedSlashCommandHelp(command: SlashCommandMetadata): string {
+  const aliasList = command.aliases?.map((alias) => `\`/${alias}\``).join(', ');
+  return [
+    `### /${command.name}`,
+    '',
+    command.summary,
+    '',
+    `- Usage: \`${command.usage}\``,
+    `- Scope: ${formatCommandScope(command.scope)}`,
+    `- State: ${formatCommandStateEffect(command)}`,
+    ...(aliasList ? [`- Aliases: ${aliasList}`] : []),
+  ].join('\n');
+}
+
 export const helpSlashCommand: SlashCommandDefinition = {
   name: 'help',
   summary: 'Show available slash commands.',
@@ -24,15 +70,9 @@ export const helpSlashCommand: SlashCommandDefinition = {
   sideEffects: false,
   execute(context, invocation) {
     if (!invocation.args) {
-      const commands = context.commands
-        .list()
-        .map((command) => `/${command.name} - ${command.summary}`)
-        .sort((left, right) => left.localeCompare(right));
       return {
         kind: 'handled',
-        message: commands.length
-          ? `Available slash commands:\n${commands.join('\n')}`
-          : 'No slash commands are available.',
+        message: formatAvailableSlashCommandHelp(context.commands.list()),
       };
     }
 
@@ -55,12 +95,9 @@ export const helpSlashCommand: SlashCommandDefinition = {
       };
     }
 
-    const aliasList = command.aliases?.map((alias) => `/${alias}`).join(', ') ?? '';
-    const aliases = aliasList ? `\nAliases: ${aliasList}` : '';
-    const effect = command.sideEffects ? 'May change Project state.' : 'Does not change state.';
     return {
       kind: 'handled',
-      message: `/${command.name} - ${command.summary}\nUsage: ${command.usage}\nScope: ${command.scope}\n${effect}${aliases}`,
+      message: formatFocusedSlashCommandHelp(command),
     };
   },
 };

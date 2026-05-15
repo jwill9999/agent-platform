@@ -156,14 +156,16 @@ test.describe('Electron Project access', () => {
       );
 
       await sendChatMessage(page, '/help', 'Ask about this Project...');
+      await expect(page.getByText('Available slash commands:').last()).toBeVisible();
+      await expect(page.getByText('Show available slash commands.').last()).toBeVisible();
       await expect(
-        page.getByText(
-          'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
-        ),
+        page.getByText('Set up Project instructions for the selected Project.').last(),
       ).toBeVisible();
+      await expect(page.getByText('Usage: /help [command]').last()).toBeVisible();
+      await expect(page.getByText('Usage: /init').last()).toBeVisible();
       await sendChatMessage(page, '/help init', 'Ask about this Project...');
-      await expect(page.getByText('Scope: project').last()).toBeVisible();
-      await expect(page.getByText('May change Project state.').last()).toBeVisible();
+      await expect(page.getByText('Scope: Selected Project').last()).toBeVisible();
+      await expect(page.getByText('May update Project setup.').last()).toBeVisible();
 
       const recentProjects = page.locator('section[aria-label="Recent Projects"]');
       await expect(recentProjects).toHaveCount(1);
@@ -244,6 +246,7 @@ test.describe('Electron Project access', () => {
 
       await sendChatMessage(page, '/help init', 'Ask about your code...');
       await expect(page.getByText('Usage: /init').last()).toBeVisible();
+      await expect(page.getByText('Scope: Selected Project').last()).toBeVisible();
 
       await expect(binding.getByText('Project setup in progress')).toBeVisible();
       await expect(binding.getByRole('button', { name: 'Approve draft' })).toBeVisible();

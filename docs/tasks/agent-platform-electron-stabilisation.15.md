@@ -50,6 +50,34 @@ command help should render as structured, readable UI that can scale as more com
   `/help init`, verify focused usage copy renders cleanly.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Slash command help
+  Help output should be readable and reusable across interfaces.
+
+  Scenario: Project Chat lists available slash commands
+    Given a Project is open in Project Chat
+    When the user sends "/help"
+    Then the assistant shows "Available slash commands:"
+    And each available command is shown as its own entry
+    And each entry includes usage, scope, and whether it changes Project state
+    And the output does not mention backend roots, hashes, or internal runtime states
+
+  Scenario: Project Chat explains init
+    Given a Project is open in Project Chat
+    When the user sends "/help init"
+    Then the assistant shows focused help for "/init"
+    And the help explains that it applies to the selected Project
+    And the help explains that it may update Project setup
+    And no Project setup is started by reading help
+
+  Scenario: IDE assistant uses the same slash help metadata
+    Given a Project is open and the user opens the IDE surface
+    When the user sends "/help init" in the assistant
+    Then the same focused "/init" usage and state guidance is visible
+```
+
 ## Definition Of Done
 
 - [ ] `/help` renders available slash commands as separate readable entries.
