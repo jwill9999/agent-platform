@@ -1,12 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Maximize2, Plus, Square, Terminal as TerminalIcon, X } from 'lucide-react';
+import { Maximize2, Plus, Terminal as TerminalIcon, X } from 'lucide-react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/cn';
 import { getDesktopProjectBridge, hasDesktopTerminalBridge } from '@/lib/desktop-projects';
 
@@ -37,6 +44,37 @@ interface TerminalRuntime {
   readonly unsubscribeExit: () => void;
 }
 
+const TERMINAL_FONT_OPTIONS = [
+  {
+    label: 'System Mono',
+    value: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  },
+  {
+    label: 'MesloLGS NF',
+    value: '"MesloLGS NF", "MesloLGS Nerd Font", ui-monospace, monospace',
+  },
+  {
+    label: 'JetBrains Mono',
+    value: '"JetBrains Mono", ui-monospace, monospace',
+  },
+  {
+    label: 'Fira Code',
+    value: '"Fira Code", ui-monospace, monospace',
+  },
+  {
+    label: 'Menlo',
+    value: 'Menlo, Monaco, Consolas, monospace',
+  },
+] as const;
+
+function terminalStatusLabel(state: TerminalState): string {
+  if (state === 'open') return 'Running';
+  if (state === 'starting') return 'Starting';
+  if (state === 'closed') return 'Closed';
+  if (state === 'error') return 'Error';
+  return 'Unavailable';
+}
+
 export function ProjectTerminalDock({
   projectId,
   projectName,
@@ -47,6 +85,7 @@ export function ProjectTerminalDock({
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [height, setHeight] = useState(300);
+  const [terminalFont, setTerminalFont] = useState<string>(TERMINAL_FONT_OPTIONS[0].value);
   const tabCounterRef = useRef(0);
   const runtimesRef = useRef(new Map<string, TerminalRuntime>());
   const containersRef = useRef(new Map<string, HTMLDivElement>());
@@ -124,7 +163,7 @@ export function ProjectTerminalDock({
 
       const term = new XTerm({
         cursorBlink: true,
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontFamily: terminalFont,
         fontSize: 13,
         scrollback: 5000,
         theme: {
@@ -197,7 +236,7 @@ export function ProjectTerminalDock({
           });
         });
     },
-    [projectId, updateTab],
+    [projectId, terminalFont, updateTab],
   );
 
   useEffect(() => {
@@ -223,6 +262,13 @@ export function ProjectTerminalDock({
     if (!activeRuntime) return;
     requestAnimationFrame(() => activeRuntime.fit.fit());
   }, [activeTabId, open]);
+
+  useEffect(() => {
+    for (const runtime of runtimesRef.current.values()) {
+      runtime.term.options.fontFamily = terminalFont;
+      requestAnimationFrame(() => runtime.fit.fit());
+    }
+  }, [terminalFont]);
 
   useEffect(() => {
     if (!open) return;
@@ -300,8 +346,26 @@ export function ProjectTerminalDock({
           {activeBranch ? ` · ${activeBranch}` : ''}
           {activeTab?.cwd ? ` · ${activeTab.cwd}` : ''}
         </div>
-        <span className="rounded bg-slate-800 px-2 py-1 text-[11px] uppercase tracking-wide text-slate-300">
-          {activeState}
+        <Select value={terminalFont} onValueChange={setTerminalFont}>
+          <SelectTrigger
+            aria-label="Terminal font"
+            className="h-7 w-[150px] shrink-0 border-slate-700 bg-slate-900 px-2 text-xs text-slate-100 shadow-none hover:bg-slate-800"
+          >
+            <SelectValue placeholder="Font" />
+          </SelectTrigger>
+          <SelectContent>
+            {TERMINAL_FONT_OPTIONS.map((font) => (
+              <SelectItem key={font.value} value={font.value}>
+                {font.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span
+          className="rounded bg-slate-800 px-2 py-1 text-[11px] text-slate-300"
+          aria-label={`Terminal status: ${terminalStatusLabel(activeState)}`}
+        >
+          {terminalStatusLabel(activeState)}
         </span>
         <Button
           type="button"
@@ -309,32 +373,33 @@ export function ProjectTerminalDock({
           variant="ghost"
           className="h-7 w-7 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
           onClick={() => setHeight((value) => (value < 420 ? 480 : 300))}
-          title="Resize terminal"
+          title="Toggle terminal height"
+          aria-label="Toggle terminal height"
         >
           <Maximize2 className="h-4 w-4" />
         </Button>
         <Button
           type="button"
-          size="icon"
           variant="ghost"
-          className="h-7 w-7 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+          className="h-7 px-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-slate-100"
           onClick={() => onOpenChange(false)}
           title="Hide terminal"
+          aria-label="Hide terminal"
         >
-          <Square className="h-4 w-4" />
+          Hide
         </Button>
         <Button
           type="button"
-          size="icon"
           variant="ghost"
-          className="h-7 w-7 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+          className="h-7 px-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-slate-100"
           onClick={() => {
             disposeAllTabs();
             onOpenChange(false);
           }}
           title="Close terminal"
+          aria-label="Close terminal"
         >
-          <X className="h-4 w-4" />
+          Close
         </Button>
       </div>
       {activeState === 'unavailable' ? (

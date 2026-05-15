@@ -8,6 +8,13 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-15
+- **Date:** 2026-05-16
+- **Session:** Implemented `agent-platform-57s` on `task/agent-platform-terminal-placement-polish`: Project terminal polish after owner manual testing.
+- **Today’s outputs:** Moved the Project terminal dock below the Project Chat composer, replaced the confusing inert `open` badge with status text, changed terminal hide/close actions to explicit labelled controls, and added a terminal font selector with common monospace/Nerd Font choices for better prompt glyph rendering. Extended Electron E2E to assert the terminal appears below the composer, exposes the font selector, and keeps hide/show behavior working.
+- **Validation:** Passed web typecheck, web lint, web unit tests, desktop typecheck, desktop unit tests, elevated Electron E2E, `pnpm format:check`, and `git diff --check`.
+- **Current state:** Bead `agent-platform-57s` is closed locally. Branch is `task/agent-platform-terminal-placement-polish`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Run `bd dolt push`, commit and push the task branch, then owner can manually test the terminal placement and font selector in Electron.
+- **Date:** 2026-05-15
 - **Session:** Implemented `agent-platform-u9n` on `task/agent-platform-project-branch-selector-input`: Project Chat now exposes branch switching beside the composer model selector.
 - **Today’s outputs:** Added Project branch contracts, backend branch listing/checkout endpoints with safe branch-name validation and dirty-worktree blocking, a Project Chat input branch selector beside the agent/model controls, and Electron E2E coverage that switches a real Git-backed Project from `main` to `feature/e2e-branch`.
 - **Validation:** Passed contracts project tests, API router tests, API/contracts/web/desktop typecheck, API/web lint, full web unit tests, web build, desktop unit tests, elevated Electron E2E, `pnpm format:check`, and `git diff --check`. SonarQube MCP remained unavailable via tool discovery in this task chain, so the fallback gate used typecheck/lint/tests.

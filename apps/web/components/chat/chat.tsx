@@ -50,7 +50,7 @@ export interface ChatProps {
   onRetrySensors?: () => void;
   /** Optional Project/session review content rendered in the main chat column. */
   conversationAccessory?: ReactNode;
-  /** Optional dock rendered above the composer without entering the chat transcript. */
+  /** Optional dock rendered below the composer without entering the chat transcript. */
   bottomAccessory?: ReactNode;
   /** Optional control rendered beside the composer agent/model selectors. */
   inputSelectorAccessory?: ReactNode;
@@ -96,7 +96,7 @@ export function Chat({
 
   return (
     <div className="grid h-full min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] overflow-hidden bg-gradient-to-b from-background to-secondary/20">
-      <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden">
+      <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden">
         {/* Messages */}
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto min-h-full max-w-3xl px-4 pb-8">
@@ -144,8 +144,6 @@ export function Chat({
           </div>
         </div>
 
-        {bottomAccessory}
-
         {/* Input */}
         <ChatInput
           onSend={onSend}
@@ -160,6 +158,8 @@ export function Chat({
           attachmentWarnings={attachmentWarnings}
           selectorAccessory={inputSelectorAccessory}
         />
+
+        {bottomAccessory}
       </div>
 
       {showSensors && (

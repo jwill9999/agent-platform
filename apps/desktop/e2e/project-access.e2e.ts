@@ -175,8 +175,13 @@ test.describe('Electron Project access', () => {
 
       await page.getByRole('button', { name: /Terminal/ }).click();
       const projectTerminal = page.getByRole('region', { name: 'Project terminal' });
+      const composer = page.getByRole('textbox', { name: /Ask about this Project/ });
       await expect(projectTerminal).toBeVisible();
-      await expect(projectTerminal.getByText('open')).toBeVisible();
+      await expect(projectTerminal.getByRole('combobox', { name: 'Terminal font' })).toBeVisible();
+      await expect(projectTerminal.getByText('open', { exact: true })).toHaveCount(0);
+      const terminalBox = await projectTerminal.boundingBox();
+      const composerBox = await composer.boundingBox();
+      expect(terminalBox?.y).toBeGreaterThan((composerBox?.y ?? 0) + (composerBox?.height ?? 0));
       await projectTerminal.locator('.xterm').click();
       await page.keyboard.type('printf "AP_TERM_CWD:%s\\n" "$PWD"');
       await page.keyboard.press('Enter');
@@ -197,7 +202,7 @@ test.describe('Electron Project access', () => {
       await projectTerminal.getByRole('button', { name: 'Terminal 1', exact: true }).click();
       await expect(activeTerminalPane).toContainText(`AP_TERM_CWD:${firstProjectDir}`);
       await expect(activeTerminalPane).not.toContainText('AP_TERM_TWO:');
-      await projectTerminal.getByTitle('Hide terminal').click();
+      await projectTerminal.getByRole('button', { name: 'Hide terminal' }).click();
       await expect(projectTerminal).toBeHidden();
       await page.getByRole('button', { name: /Terminal/ }).click();
       await expect(projectTerminal).toContainText(`AP_TERM_CWD:${firstProjectDir}`);
