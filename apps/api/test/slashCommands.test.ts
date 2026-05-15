@@ -9,6 +9,53 @@ import { StaticSlashCommandRegistry } from '../src/application/slashCommands/reg
 import { runSlashCommand } from '../src/application/slashCommands/runSlashCommand.js';
 import type { SlashCommandDefinition } from '../src/application/slashCommands/types.js';
 
+const CUSTOM_HELP_TEXT = [
+  'Available slash commands:',
+  '',
+  '- **/echo** - Echo a value.',
+  '  - Usage: `/echo <value>`',
+  '  - Scope: Current chat',
+  '  - State: Does not change Project state.',
+  '- **/help** - Show available slash commands.',
+  '  - Usage: `/help [command]`',
+  '  - Scope: Current chat',
+  '  - State: Does not change Project state.',
+].join('\n');
+
+const BUILTIN_HELP_TEXT = [
+  'Available slash commands:',
+  '',
+  '- **/help** - Show available slash commands.',
+  '  - Usage: `/help [command]`',
+  '  - Scope: Current chat',
+  '  - State: Does not change Project state.',
+  '- **/init** - Set up Project instructions for the selected Project.',
+  '  - Usage: `/init`',
+  '  - Scope: Selected Project',
+  '  - State: May update Project setup.',
+].join('\n');
+
+const ECHO_HELP_TEXT = [
+  '### /echo',
+  '',
+  'Echo a value.',
+  '',
+  '- Usage: `/echo <value>`',
+  '- Scope: Current chat',
+  '- State: Does not change Project state.',
+  '- Aliases: `/say`',
+].join('\n');
+
+const INIT_HELP_TEXT = [
+  '### /init',
+  '',
+  'Set up Project instructions for the selected Project.',
+  '',
+  '- Usage: `/init`',
+  '- Scope: Selected Project',
+  '- State: May update Project setup.',
+].join('\n');
+
 const session = {
   id: 'session-1',
   agentId: 'agent-1',
@@ -108,8 +155,7 @@ describe('slash command dispatch', () => {
     ).toEqual({
       kind: 'handled',
       status: 'handled',
-      message:
-        'Available slash commands:\n/echo - Echo a value.\n/help - Show available slash commands.',
+      message: CUSTOM_HELP_TEXT,
     });
   });
 
@@ -125,8 +171,7 @@ describe('slash command dispatch', () => {
     ).toEqual({
       kind: 'handled',
       status: 'handled',
-      message:
-        '/echo - Echo a value.\nUsage: /echo <value>\nScope: session\nDoes not change state.\nAliases: /say',
+      message: ECHO_HELP_TEXT,
     });
   });
 
@@ -213,9 +258,25 @@ describe('slash command dispatch', () => {
     ).toEqual({
       kind: 'handled',
       status: 'handled',
-      message:
-        '/init - Set up Project instructions for the selected Project.\nUsage: /init\nScope: project\nMay change Project state.',
+      message: INIT_HELP_TEXT,
     });
+  });
+
+  it('uses structured metadata-backed help that renders as separate entries', () => {
+    const result = runSlashCommand(
+      '/help',
+      { session, startProjectOnboarding: () => unreachable() },
+      { registry: builtinRegistry },
+    );
+
+    expect(result).toEqual({
+      kind: 'handled',
+      status: 'handled',
+      message: BUILTIN_HELP_TEXT,
+    });
+    expect(result.message).toContain('- **/help**');
+    expect(result.message).toContain('- **/init**');
+    expect(result.message).toContain('  - Usage: `/init`');
   });
 
   it('returns usage copy for invalid /init arguments', () => {

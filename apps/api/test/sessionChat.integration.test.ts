@@ -52,6 +52,29 @@ vi.mock('@ai-sdk/openai-compatible', () => ({
     (model: string) => ({ provider: name, modelId: model, apiKey, baseURL }),
 }));
 
+const BUILTIN_SLASH_HELP_TEXT = [
+  'Available slash commands:',
+  '',
+  '- **/help** - Show available slash commands.',
+  '  - Usage: `/help [command]`',
+  '  - Scope: Current chat',
+  '  - State: Does not change Project state.',
+  '- **/init** - Set up Project instructions for the selected Project.',
+  '  - Usage: `/init`',
+  '  - Scope: Selected Project',
+  '  - State: May update Project setup.',
+].join('\n');
+
+const INIT_SLASH_HELP_TEXT = [
+  '### /init',
+  '',
+  'Set up Project instructions for the selected Project.',
+  '',
+  '- Usage: `/init`',
+  '- Scope: Selected Project',
+  '- State: May update Project setup.',
+].join('\n');
+
 async function createSeededApp(
   dirs: string[],
   options: {
@@ -374,13 +397,7 @@ describe('POST /v1/chat (session-aware)', () => {
         'Command not recognised. Available commands: /help, /init. Run /help for details.',
       );
 
-      await expectHandledSlashMessage(
-        app,
-        db,
-        sessionId,
-        '/help',
-        'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
-      );
+      await expectHandledSlashMessage(app, db, sessionId, '/help', BUILTIN_SLASH_HELP_TEXT);
     });
   });
 
@@ -420,8 +437,7 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(parseNdjsonEvents(res.text)).toEqual([
         {
           type: 'text',
-          content:
-            'Available slash commands:\n/help - Show available slash commands.\n/init - Set up Project instructions for the selected Project.',
+          content: BUILTIN_SLASH_HELP_TEXT,
         },
       ]);
       expect(mockToolCalls).not.toHaveBeenCalled();
@@ -483,7 +499,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.session.id,
         '/help init',
-        '/init - Set up Project instructions for the selected Project.\nUsage: /init\nScope: project\nMay change Project state.',
+        INIT_SLASH_HELP_TEXT,
       );
 
       await expectHandledSlashMessage(
