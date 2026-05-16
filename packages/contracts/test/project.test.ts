@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ProjectModeSchema,
   ProjectBranchCheckoutBodySchema,
+  ProjectGitStatusResultSchema,
   ProjectBranchListResultSchema,
   ProjectOpenBodySchema,
   ProjectWorkspaceBindingSchema,
@@ -53,6 +54,65 @@ describe('Project mode and workspace binding contracts', () => {
     });
     expect(() => ProjectBranchCheckoutBodySchema.parse({ branch: '-bad' })).toThrow();
     expect(() => ProjectBranchCheckoutBodySchema.parse({ branch: '../bad' })).toThrow();
+  });
+
+  it('validates Project Git status contracts', () => {
+    expect(
+      ProjectGitStatusResultSchema.parse({
+        available: true,
+        repositoryName: 'agent-platform',
+        remoteUrl: 'https://github.com/jwill9999/agent-platform.git',
+        currentBranch: 'task/git-panel',
+        upstreamBranch: 'origin/task/git-panel',
+        baseBranch: 'task/git-panel',
+        headSha: 'abc123',
+        ahead: 2,
+        behind: 1,
+        clean: false,
+        githubRemoteDetected: true,
+        workingTree: {
+          total: 3,
+          staged: 1,
+          unstaged: 1,
+          added: 1,
+          modified: 1,
+          deleted: 0,
+          renamed: 0,
+          untracked: 1,
+          conflicts: 0,
+        },
+        recentCommit: {
+          sha: 'abc123',
+          subject: 'Add Git panel',
+          authorName: 'Test User',
+          committedAt: '2026-05-16T15:00:00+00:00',
+        },
+      }),
+    ).toMatchObject({
+      available: true,
+      ahead: 2,
+      behind: 1,
+      githubRemoteDetected: true,
+    });
+
+    expect(
+      ProjectGitStatusResultSchema.parse({
+        available: false,
+        reason: 'Project is not a Git repository.',
+        clean: true,
+        workingTree: {
+          total: 0,
+          staged: 0,
+          unstaged: 0,
+          added: 0,
+          modified: 0,
+          deleted: 0,
+          renamed: 0,
+          untracked: 0,
+          conflicts: 0,
+        },
+      }),
+    ).toMatchObject({ available: false, clean: true });
   });
 
   it('captures backend-accessible Project working-tree metadata without conflating chat workspace', () => {

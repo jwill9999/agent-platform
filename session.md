@@ -8,11 +8,11 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-16
-- **Session:** Implemented `agent-platform-5fo` on `task/agent-platform-project-git-state-refresh`: Project Chat now refreshes local Git capability and branch/dirty state while a Project is open.
-- **Today’s outputs:** Added a Project refresh endpoint that re-detects backend root and Git metadata without stripping Project Chat onboarding state; the branch selector now hides for non-Git folders and reloads on refresh signals; Project Chat refreshes on open, focus/visibility return, and debounced terminal output/exit. Electron E2E now verifies a clean selector branch switch, then a terminal-created dirty file disables the selector with the explanatory message.
-- **Validation:** Passed web/api/desktop typecheck, web lint, elevated focused API project router tests, elevated Electron E2E, `pnpm format:check`, and `git diff --check`.
-- **Current state:** Bead `agent-platform-5fo` is in progress locally. Branch is `task/agent-platform-project-git-state-refresh`; `output/` remains unrelated/untracked and must not be committed.
-- **Next:** Close the bead, push Beads, commit, and push the task branch.
+- **Session:** Implemented `agent-platform-za3` on `task/agent-platform-project-git-github-panel`: Project Chat now has a right-side Git & GitHub panel backed by local Git state.
+- **Today’s outputs:** Added a Project Git status API, contracts, router coverage, a collapsible Git & GitHub panel with Overview/Changes/Commits/PRs/Checks tabs, explicit GitHub placeholder states, Electron E2E coverage, and hid the legacy Sensors rail in Project Chat. Stabilized API pre-push tests by running API Vitest in one fork to avoid Supertest listener interference.
+- **Validation:** Passed contracts project tests, focused and full API tests, API/web/desktop typecheck, web lint, elevated Electron E2E, `pnpm format:check`, and `git diff --check`. Pre-push initially exposed API Supertest concurrency flakes; the one-fork config fixed the full API suite locally.
+- **Current state:** Bead `agent-platform-za3` is closed locally. Branch is `task/agent-platform-project-git-github-panel`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Amend the session note into the task commit, push the branch, then scope local Changes and Commits detail views inside the Git & GitHub panel.
 - **Date:** 2026-05-16
 - **Session:** Implemented `agent-platform-8ib` on `task/agent-platform-branch-selector-git-switch`: Project Chat branch selector now explains why branch switching is blocked when the Project worktree is dirty.
 - **Today’s outputs:** Kept conservative dirty-worktree branch blocking, added a clear disabled-state tooltip/accessibility label telling users to commit, stash, or use the terminal manually, and documented the scoped task. API coverage keeps dirty checkout blocking, and Electron E2E now opens a dirty Git Project and verifies the selector is disabled with the explanatory label.
@@ -1838,6 +1838,31 @@ Tracked in Beads: `agent-platform-lt6`
   GitGuardian, and SonarCloud. Sourcery skipped because the account weekly diff limit was reached and
   posted no actionable inline comments. The PR was merged into
   `feature/agent-platform-electron-stabilisation`, and Beads task `.15` was closed.
+
+## 2026-05-16 Project Git and GitHub Panel
+
+- Task `agent-platform-za3` started on `task/agent-platform-project-git-github-panel`.
+- Added the first Project Git/GitHub side panel shell:
+  - API now exposes local Git status for a Project, including repository name, origin remote,
+    current/upstream branch, ahead/behind counts, working tree summary, recent commit, and GitHub
+    remote detection.
+  - Web Project Chat can render a collapsible right-side Git & GitHub panel with Overview, Changes,
+    Commits, PRs, and Checks tabs.
+  - The legacy Sensors rail is hidden in Project Chat so Git/GitHub state has a single right-side
+    home.
+  - PRs and Checks are explicit placeholders until GitHub sensors are wired; the panel does not
+    infer unavailable remote state.
+  - Electron E2E coverage verifies the panel appears for Project Chat and reacts to local Git changes.
+- Focused verification passed:
+  - `pnpm --filter @agent-platform/contracts test -- test/project.test.ts`
+  - `pnpm --filter @agent-platform/api test -- test/projectsRouter.test.ts`
+  - `pnpm --filter @agent-platform/api typecheck`
+  - `pnpm --filter @agent-platform/web typecheck`
+  - `pnpm --filter @agent-platform/web lint`
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop test:e2e`
+  - `pnpm format:check`
+  - `git diff --check`
 
 ## 2026-05-12 Electron Security `.5`
 

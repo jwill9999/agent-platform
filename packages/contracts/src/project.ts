@@ -539,6 +539,45 @@ export const ProjectBranchCheckoutBodySchema = z.object({
 });
 export type ProjectBranchCheckoutBody = z.infer<typeof ProjectBranchCheckoutBodySchema>;
 
+export const ProjectGitWorkingTreeSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  staged: z.number().int().nonnegative(),
+  unstaged: z.number().int().nonnegative(),
+  added: z.number().int().nonnegative(),
+  modified: z.number().int().nonnegative(),
+  deleted: z.number().int().nonnegative(),
+  renamed: z.number().int().nonnegative(),
+  untracked: z.number().int().nonnegative(),
+  conflicts: z.number().int().nonnegative(),
+});
+export type ProjectGitWorkingTreeSummary = z.infer<typeof ProjectGitWorkingTreeSummarySchema>;
+
+export const ProjectGitRecentCommitSchema = z.object({
+  sha: z.string().min(1).max(80),
+  subject: z.string().min(1).max(500),
+  authorName: z.string().min(1).max(200).optional(),
+  committedAt: z.string().min(1).max(100).optional(),
+});
+export type ProjectGitRecentCommit = z.infer<typeof ProjectGitRecentCommitSchema>;
+
+export const ProjectGitStatusResultSchema = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).max(500).optional(),
+  repositoryName: z.string().min(1).max(200).optional(),
+  remoteUrl: z.string().min(1).max(1000).optional(),
+  currentBranch: z.string().min(1).max(300).optional(),
+  upstreamBranch: z.string().min(1).max(300).optional(),
+  baseBranch: z.string().min(1).max(300).optional(),
+  headSha: z.string().min(1).max(80).optional(),
+  ahead: z.number().int().nonnegative().default(0),
+  behind: z.number().int().nonnegative().default(0),
+  clean: z.boolean(),
+  workingTree: ProjectGitWorkingTreeSummarySchema,
+  recentCommit: ProjectGitRecentCommitSchema.optional(),
+  githubRemoteDetected: z.boolean().default(false),
+});
+export type ProjectGitStatusResult = z.infer<typeof ProjectGitStatusResultSchema>;
+
 export type ProjectFileNode = {
   name: string;
   path: string;

@@ -258,6 +258,56 @@ describe('projectsRouter', () => {
     ).toBe('feature/chat-input-branch');
   });
 
+  it('summarizes local Project Git status for the Git and GitHub panel', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-git-status-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', 'git@github.com:user/repo.git'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), 'modified\n');
+    writeFileSync(path.join(repoDir, 'notes.md'), 'untracked\n');
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Git Status Repo' })
+      .expect(201);
+
+    const status = await request(app)
+      .get(`/v1/projects/${registered.body.data.project.id}/git/status`)
+      .expect(200);
+
+    expect(status.body.data).toMatchObject({
+      available: true,
+      repositoryName: 'desktop-git-status-repo',
+      remoteUrl: 'git@github.com:user/repo.git',
+      currentBranch: 'main',
+      clean: false,
+      githubRemoteDetected: true,
+      workingTree: expect.objectContaining({
+        total: 2,
+        modified: 1,
+        untracked: 1,
+      }),
+      recentCommit: expect.objectContaining({
+        subject: 'initial',
+        authorName: 'Test User',
+      }),
+    });
+  });
+
   it('blocks Project branch switching when the working tree is dirty', async () => {
     const repoDir = path.join(tmpDir, 'desktop-dirty-branches-repo');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
@@ -966,6 +1016,15 @@ describe('projectsRouter', () => {
         status: 'in_progress',
         display: expect.not.objectContaining({ branchLabel: expect.anything() }),
       }),
+    });
+
+    const status = await request(app)
+      .get(`/v1/projects/${openedProject.body.data.id}/git/status`)
+      .expect(200);
+    expect(status.body.data).toMatchObject({
+      available: false,
+      reason: 'Project is not a Git repository.',
+      clean: true,
     });
   });
 

@@ -5,6 +5,7 @@ import {
   ProjectDesktopRegistrationResultSchema,
   ProjectBranchCheckoutBodySchema,
   ProjectBranchListResultSchema,
+  ProjectGitStatusResultSchema,
   ProjectFileReadResultSchema,
   ProjectFileTreeResultSchema,
   type ProjectOpenBody,
@@ -25,6 +26,7 @@ import {
   type ProjectFileNode,
   type ProjectRecord,
   type ProjectBranchListResult,
+  type ProjectGitWorkingTreeSummary,
   ProjectUpdateBodySchema,
 } from '@agent-platform/contracts';
 import {
@@ -716,6 +718,135 @@ function projectBranchList(project: ProjectRecord): ProjectBranchListResult {
   });
 }
 
+const EMPTY_GIT_WORKING_TREE: ProjectGitWorkingTreeSummary = {
+  total: 0,
+  staged: 0,
+  unstaged: 0,
+  added: 0,
+  modified: 0,
+  deleted: 0,
+  renamed: 0,
+  untracked: 0,
+  conflicts: 0,
+};
+
+const CONFLICT_STATUS_CODES = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU']);
+
+function githubRemoteDetected(remoteUrl: string | undefined): boolean {
+  return Boolean(remoteUrl && /github\.com[:/]/i.test(remoteUrl));
+}
+
+function baseBranchFromUpstream(upstreamBranch: string | undefined): string | undefined {
+  if (!upstreamBranch) return undefined;
+  const slashIndex = upstreamBranch.indexOf('/');
+  return slashIndex >= 0 ? upstreamBranch.slice(slashIndex + 1) : upstreamBranch;
+}
+
+function parseAheadBehind(statusLine: string | undefined): { ahead: number; behind: number } {
+  if (!statusLine) return { ahead: 0, behind: 0 };
+  const ahead = /\bahead (\d+)/.exec(statusLine)?.[1];
+  const behind = /\bbehind (\d+)/.exec(statusLine)?.[1];
+  return {
+    ahead: ahead ? Number.parseInt(ahead, 10) : 0,
+    behind: behind ? Number.parseInt(behind, 10) : 0,
+  };
+}
+
+function parseWorkingTree(statusOutput: string): ProjectGitWorkingTreeSummary {
+  const summary = { ...EMPTY_GIT_WORKING_TREE };
+  for (const line of statusOutput.split('\n')) {
+    if (!line || line.startsWith('## ')) continue;
+    const code = line.slice(0, 2);
+    const indexStatus = code[0] ?? ' ';
+    const worktreeStatus = code[1] ?? ' ';
+    if (code === '??') {
+      summary.untracked += 1;
+      summary.total += 1;
+      continue;
+    }
+    if (CONFLICT_STATUS_CODES.has(code)) {
+      summary.conflicts += 1;
+    }
+    if (indexStatus !== ' ') summary.staged += 1;
+    if (worktreeStatus !== ' ') summary.unstaged += 1;
+    if (indexStatus === 'A' || worktreeStatus === 'A') summary.added += 1;
+    if (indexStatus === 'M' || worktreeStatus === 'M') summary.modified += 1;
+    if (indexStatus === 'D' || worktreeStatus === 'D') summary.deleted += 1;
+    if (indexStatus === 'R' || worktreeStatus === 'R') summary.renamed += 1;
+    summary.total += 1;
+  }
+  return summary;
+}
+
+function latestCommit(repositoryRoot: string) {
+  const output = gitValue(repositoryRoot, ['log', '-1', '--format=%H%x1f%s%x1f%an%x1f%cI']);
+  if (!output) return undefined;
+  const [sha, subject, authorName, committedAt] = output.split('\x1f');
+  if (!sha || !subject) return undefined;
+  return {
+    sha: sha.slice(0, 12),
+    subject,
+    ...(authorName ? { authorName } : {}),
+    ...(committedAt ? { committedAt } : {}),
+  };
+}
+
+function projectGitStatus(project: ProjectRecord) {
+  let projectRoot: string;
+  try {
+    projectRoot = projectRootForBackendRead(project);
+  } catch {
+    return ProjectGitStatusResultSchema.parse({
+      available: false,
+      reason: 'Project folder is not available.',
+      clean: true,
+      workingTree: EMPTY_GIT_WORKING_TREE,
+    });
+  }
+
+  const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']);
+  if (!repositoryRoot) {
+    return ProjectGitStatusResultSchema.parse({
+      available: false,
+      reason: 'Project is not a Git repository.',
+      clean: true,
+      workingTree: EMPTY_GIT_WORKING_TREE,
+    });
+  }
+
+  const statusOutput = gitOutput(repositoryRoot, ['status', '--porcelain=v1', '--branch']);
+  const branchLine = statusOutput.split('\n').find((line) => line.startsWith('## '));
+  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
+  const upstreamBranch = gitValue(repositoryRoot, [
+    'rev-parse',
+    '--abbrev-ref',
+    '--symbolic-full-name',
+    '@{u}',
+  ]);
+  const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
+  const workingTree = parseWorkingTree(statusOutput);
+  const { ahead, behind } = parseAheadBehind(branchLine);
+  const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD']);
+
+  return ProjectGitStatusResultSchema.parse({
+    available: true,
+    repositoryName: basename(repositoryRoot),
+    ...(remoteUrl ? { remoteUrl } : {}),
+    ...(currentBranch ? { currentBranch } : {}),
+    ...(upstreamBranch ? { upstreamBranch } : {}),
+    ...(baseBranchFromUpstream(upstreamBranch)
+      ? { baseBranch: baseBranchFromUpstream(upstreamBranch) }
+      : {}),
+    ...(headSha ? { headSha: headSha.slice(0, 12) } : {}),
+    ahead,
+    behind,
+    clean: workingTree.total === 0,
+    workingTree,
+    recentCommit: latestCommit(repositoryRoot),
+    githubRemoteDetected: githubRemoteDetected(remoteUrl),
+  });
+}
+
 function refreshProjectGitMetadata(db: DrizzleDb, id: string): ProjectRecord {
   const project = findProject(db, id);
   if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
@@ -1328,6 +1459,15 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: projectBranchList(project) });
+    }),
+  );
+
+  router.get(
+    '/:id/git/status',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: projectGitStatus(project) });
     }),
   );
 

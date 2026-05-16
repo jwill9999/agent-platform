@@ -4,11 +4,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/**/*.test.ts'],
-    // Cap concurrent forks to prevent ephemeral-port exhaustion when many
-    // test files open supertest HTTP servers simultaneously (e.g. pre-push hook).
+    // Run API tests in one fork to prevent Supertest listener interference when
+    // many test files open ephemeral HTTP servers simultaneously (e.g. pre-push hook).
     pool: 'forks',
     poolOptions: {
-      forks: { minForks: 1, maxForks: 4 },
+      forks: { minForks: 1, maxForks: 1 },
     },
   },
 });

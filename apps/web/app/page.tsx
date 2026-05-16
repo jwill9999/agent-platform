@@ -38,6 +38,7 @@ import {
   ProjectInstructionsReview,
 } from '@/components/project/project-instructions-review';
 import { ProjectBranchSelector } from '@/components/project/project-branch-selector';
+import { ProjectGitHubPanel } from '@/components/project/project-git-github-panel';
 import { ProjectTerminalDock } from '@/components/project/project-terminal-dock';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
@@ -1279,7 +1280,7 @@ export default function HomePage() {
               toolEventsByMessage={toolEventsByMessage}
               approvalEventsByMessage={approvalEventsByMessage}
               onApprovalDecision={handleApprovalDecision}
-              showSensors={selectedMode === 'project-chat'}
+              showSensors={false}
               sensorDashboard={sensorDashboard}
               sensorLoading={sensorLoading}
               sensorError={sensorError}
@@ -1327,6 +1328,14 @@ export default function HomePage() {
                     open={projectTerminalOpen}
                     onOpenChange={setProjectTerminalOpen}
                     onActivity={scheduleProjectGitRefresh}
+                  />
+                ) : null
+              }
+              sideAccessory={
+                selectedMode === 'project-chat' ? (
+                  <ProjectGitHubPanel
+                    projectId={activeProject?.id ?? null}
+                    refreshKey={projectGitRefreshKey}
                   />
                 ) : null
               }

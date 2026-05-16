@@ -52,6 +52,8 @@ export interface ChatProps {
   conversationAccessory?: ReactNode;
   /** Optional dock rendered below the composer without entering the chat transcript. */
   bottomAccessory?: ReactNode;
+  /** Optional right-side operational panel rendered outside the chat transcript. */
+  sideAccessory?: ReactNode;
   /** Optional control rendered beside the composer agent/model selectors. */
   inputSelectorAccessory?: ReactNode;
 }
@@ -82,6 +84,7 @@ export function Chat({
   onRetrySensors,
   conversationAccessory,
   bottomAccessory,
+  sideAccessory,
   inputSelectorAccessory,
 }: Readonly<ChatProps>) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -161,6 +164,8 @@ export function Chat({
 
         {bottomAccessory}
       </div>
+
+      {sideAccessory}
 
       {showSensors && (
         <SensorStatusPanel

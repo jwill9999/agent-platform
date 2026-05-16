@@ -200,6 +200,20 @@ test.describe('Electron Project access', () => {
           name: /Branch switching is disabled because this Project has uncommitted changes/,
         }),
       ).toBeDisabled({ timeout: 10_000 });
+      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
+      await expect(gitPanel).toBeVisible();
+      await expect(gitPanel.getByText('Git & GitHub')).toBeVisible();
+      await expect(gitPanel.getByText('agent-platform')).toBeVisible();
+      await expect(gitPanel.getByText('feature/e2e-branch')).toBeVisible();
+      await expect(gitPanel.getByText('1 change')).toBeVisible();
+      await expect(gitPanel.getByText('No GitHub remote detected.')).toBeVisible();
+      await gitPanel.getByRole('button', { name: 'PRs' }).click();
+      await expect(gitPanel.getByText('Pull request state is not connected yet.')).toBeVisible();
+      await gitPanel.getByRole('button', { name: 'Checks' }).click();
+      await expect(
+        gitPanel.getByText('GitHub Actions, check runs, Sonar, and CodeQL are not connected yet.'),
+      ).toBeVisible();
+      await gitPanel.getByRole('button', { name: 'Overview' }).click();
       await projectTerminal.getByTitle('New terminal').click();
       await expect(
         projectTerminal.getByRole('button', { name: 'Terminal 2', exact: true }),
