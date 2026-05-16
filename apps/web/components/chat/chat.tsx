@@ -56,6 +56,8 @@ export interface ChatProps {
   sideAccessory?: ReactNode;
   /** Optional control rendered beside the composer agent/model selectors. */
   inputSelectorAccessory?: ReactNode;
+  /** Resets the transcript scroll position when the logical chat changes. */
+  resetKey?: string;
 }
 
 export function Chat({
@@ -86,22 +88,34 @@ export function Chat({
   bottomAccessory,
   sideAccessory,
   inputSelectorAccessory,
+  resetKey,
 }: Readonly<ChatProps>) {
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const scrollContainer = messagesScrollRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior });
   }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, approvalEventsByMessage, scrollToBottom]);
 
+  useEffect(() => {
+    const firstFrame = requestAnimationFrame(() => {
+      scrollToBottom('auto');
+      requestAnimationFrame(() => scrollToBottom('auto'));
+    });
+    return () => cancelAnimationFrame(firstFrame);
+  }, [resetKey, scrollToBottom]);
+
   return (
-    <div className="grid h-full min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] overflow-hidden bg-gradient-to-b from-background to-secondary/20">
-      <div className="grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden">
+    <div className="grid h-full max-h-full min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] overflow-hidden bg-gradient-to-b from-background to-secondary/20">
+      <div className="grid h-full max-h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden">
         {/* Messages */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto min-h-full max-w-3xl px-4 pb-8">
             {messages.length === 0 ? (
               <>

@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-16
+- **Session:** Implemented `agent-platform-67u` on `task/agent-platform-project-instructions-cta`: Project Chat now gives a clear path to prepare missing Project instructions and hides raw provider/runtime error syntax from the user.
+- **Today’s outputs:** Added a `Generate AGENTS.md` CTA in the Git & GitHub panel that uses the existing Project onboarding draft flow, mapped missing `AGENTS.md`, invalid request body, and tool-state provider failures to user-facing chat copy, and reset the Project Chat transcript viewport when switching Projects/sessions so old Project records are less likely to reopen with the composer stranded at the top.
+- **Validation:** Passed focused harness chat parser tests, full web tests, web typecheck, web lint, `pnpm format:check`, and `git diff --check`. Electron E2E was attempted during the task and reached the built app, but the long Project access flow failed on existing flaky reopen assertions unrelated to the focused CTA/error-copy changes.
+- **Current state:** Bead `agent-platform-67u` is ready to close locally. Branch is `task/agent-platform-project-instructions-cta`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit and push this task branch, then owner can manually test the Git panel CTA, friendly error copy, and Project reopen scroll behavior in Electron.
+- **Date:** 2026-05-16
 - **Session:** Implemented `agent-platform-za3` on `task/agent-platform-project-git-github-panel`: Project Chat now has a right-side Git & GitHub panel backed by local Git state.
 - **Today’s outputs:** Added a Project Git status API, contracts, router coverage, a collapsible Git & GitHub panel with Overview/Changes/Commits/PRs/Checks tabs, explicit GitHub placeholder states, Electron E2E coverage, and hid the legacy Sensors rail in Project Chat. Stabilized API pre-push tests by running API Vitest in one fork to avoid Supertest listener interference.
 - **Validation:** Passed contracts project tests, focused and full API tests, API/web/desktop typecheck, web lint, elevated Electron E2E, `pnpm format:check`, and `git diff --check`. Pre-push initially exposed API Supertest concurrency flakes; the one-fork config fixed the full API suite locally.

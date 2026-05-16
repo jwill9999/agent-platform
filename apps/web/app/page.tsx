@@ -529,6 +529,7 @@ export default function HomePage() {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
   const [isRejectingProjectInstructions, setIsRejectingProjectInstructions] = useState(false);
+  const [isStartingProjectInstructions, setIsStartingProjectInstructions] = useState(false);
   const [approvedProjectInstructions, setApprovedProjectInstructions] =
     useState<ProjectInstructionsDecision | null>(null);
   const [rejectedProjectInstructions, setRejectedProjectInstructions] =
@@ -981,6 +982,31 @@ export default function HomePage() {
     }
   }, [activeProject]);
 
+  const handleStartProjectInstructions = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsStartingProjectInstructions(true);
+    setSessionError(null);
+    try {
+      const project = await apiPost<ProjectDesktopRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'draft'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to prepare Project instructions', 500);
+      setActiveProject(project);
+      setApprovedProjectInstructions(null);
+      setRejectedProjectInstructions(null);
+      if (globalThis.window !== undefined) {
+        globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+      }
+    } catch (error) {
+      setSessionError(
+        error instanceof ApiRequestError ? error.message : 'Failed to prepare Project instructions',
+      );
+    } finally {
+      setIsStartingProjectInstructions(false);
+    }
+  }, [activeProject?.id]);
+
   useEffect(() => {
     if (!approvedProjectInstructions) return;
     if (approvedProjectInstructions.projectId !== activeProject?.id) {
@@ -1265,6 +1291,8 @@ export default function HomePage() {
             }}
           >
             <Chat
+              key={`${selectedMode}:${activeProject?.id ?? 'none'}:${sessionId ?? 'none'}`}
+              resetKey={`${selectedMode}:${activeProject?.id ?? 'none'}:${sessionId ?? 'none'}`}
               messages={messages}
               onSend={handleSend}
               isLoading={isLoading}
@@ -1336,6 +1364,15 @@ export default function HomePage() {
                   <ProjectGitHubPanel
                     projectId={activeProject?.id ?? null}
                     refreshKey={projectGitRefreshKey}
+                    projectInstructionsStatus={
+                      projectOnboardingIsApproved(activeProject)
+                        ? 'approved'
+                        : onboardingDraft
+                          ? 'draft_ready'
+                          : 'missing'
+                    }
+                    isStartingProjectInstructions={isStartingProjectInstructions}
+                    onStartProjectInstructions={handleStartProjectInstructions}
                   />
                 ) : null
               }

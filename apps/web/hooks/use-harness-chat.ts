@@ -27,6 +27,24 @@ function redactDisplayText(text: string): string {
   );
 }
 
+function friendlyChatErrorMessage(message: string): string {
+  const redacted = redactDisplayText(message);
+  if (/messages with role ['"]tool['"].*tool_calls/i.test(redacted)) {
+    return 'The agent could not continue because the conversation tool state is out of sync. Start a new Project chat or retry after preparing Project instructions.';
+  }
+  if (/ENOENT: no such file or directory.*AGENTS\.md/i.test(redacted)) {
+    return 'Project instructions are missing. Run /init or use Generate AGENTS.md before asking the agent to edit Project files.';
+  }
+  if (/^Invalid request body$/i.test(redacted)) {
+    return 'The agent request could not be sent because the chat payload was invalid. Retry the message, or start a new Project chat if it persists.';
+  }
+  return redacted;
+}
+
+function failedRunMessage(errorMessage: string): string {
+  return `The agent run failed before returning a response.\n\n${friendlyChatErrorMessage(errorMessage)}`;
+}
+
 function makeTextParts(text: string): NonNullable<UIMessage['parts']> {
   return [{ type: 'text', text }];
 }
@@ -179,10 +197,10 @@ function renderErrorEvent(o: StreamEvent): StreamRenderResult {
     return { text: `\n\n[${code}] ${message}\n` };
   }
   if (code === 'MODEL_AUTH_FAILED') {
-    return { error: message };
+    return { error: friendlyChatErrorMessage(message) };
   }
   if (isRecoverableToolErrorCode(code)) return { toolTrace: { type: 'error', code, message } };
-  return { error: message };
+  return { error: friendlyChatErrorMessage(message) };
 }
 
 export type StreamRenderResult =
@@ -600,7 +618,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         const finalText =
           result.text.trim() || !result.errorMessage
             ? result.text
-            : `The agent run failed before returning a response.\n\n${result.errorMessage}`;
+            : failedRunMessage(result.errorMessage);
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
         updateAssistantMessage(assistantId, finalText);
@@ -614,7 +632,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           return prev;
         });
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(friendlyChatErrorMessage(e instanceof Error ? e.message : String(e)));
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         setCriticEventsByMessage((prev) => {
           if (!(assistantId in prev)) return prev;
@@ -687,7 +705,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           accumulated =
             result.text.trim() || !result.errorMessage
               ? result.text
-              : `The agent run failed before returning a response.\n\n${result.errorMessage}`;
+              : failedRunMessage(result.errorMessage);
         }
 
         updateAssistantMessage(assistantId, accumulated);

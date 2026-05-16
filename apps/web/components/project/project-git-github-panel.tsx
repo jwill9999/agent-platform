@@ -22,6 +22,9 @@ import { cn } from '@/lib/cn';
 type ProjectGitHubPanelProps = Readonly<{
   projectId: string | null;
   refreshKey?: number;
+  projectInstructionsStatus?: 'approved' | 'draft_ready' | 'missing';
+  isStartingProjectInstructions?: boolean;
+  onStartProjectInstructions?: () => void;
 }>;
 
 type PanelTab = 'overview' | 'changes' | 'commits' | 'prs' | 'checks';
@@ -112,7 +115,50 @@ function GitCard({ title, children }: Readonly<{ title: string; children: React.
   );
 }
 
-export function ProjectGitHubPanel({ projectId, refreshKey }: ProjectGitHubPanelProps) {
+function ProjectInstructionsCard({
+  status,
+  isStarting,
+  onStart,
+}: Readonly<{
+  status: 'approved' | 'draft_ready' | 'missing';
+  isStarting: boolean;
+  onStart?: () => void;
+}>) {
+  if (status === 'approved') return null;
+  return (
+    <GitCard title="Project Instructions">
+      <div className="space-y-3">
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <span>
+            {status === 'draft_ready'
+              ? 'An AGENTS.md draft is ready for review in Project Chat.'
+              : 'AGENTS.md has not been prepared for this Project yet.'}
+          </span>
+        </div>
+        {status === 'missing' && (
+          <Button
+            type="button"
+            size="sm"
+            className="w-full"
+            onClick={onStart}
+            disabled={!onStart || isStarting}
+          >
+            {isStarting ? 'Preparing...' : 'Generate AGENTS.md'}
+          </Button>
+        )}
+      </div>
+    </GitCard>
+  );
+}
+
+export function ProjectGitHubPanel({
+  projectId,
+  refreshKey,
+  projectInstructionsStatus = 'approved',
+  isStartingProjectInstructions = false,
+  onStartProjectInstructions,
+}: ProjectGitHubPanelProps) {
   const [open, setOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
   const [status, setStatus] = useState<ProjectGitStatusResult | null>(null);
@@ -256,14 +302,27 @@ export function ProjectGitHubPanel({ projectId, refreshKey }: ProjectGitHubPanel
             )}
 
             {!currentStatus.available ? (
-              <GitCard title="Repository">
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                  <span>{currentStatus.reason ?? 'This Project is not a Git repository.'}</span>
-                </div>
-              </GitCard>
+              <>
+                <ProjectInstructionsCard
+                  status={projectInstructionsStatus}
+                  isStarting={isStartingProjectInstructions}
+                  onStart={onStartProjectInstructions}
+                />
+                <GitCard title="Repository">
+                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <span>{currentStatus.reason ?? 'This Project is not a Git repository.'}</span>
+                  </div>
+                </GitCard>
+              </>
             ) : activeTab === 'overview' ? (
               <>
+                <ProjectInstructionsCard
+                  status={projectInstructionsStatus}
+                  isStarting={isStartingProjectInstructions}
+                  onStart={onStartProjectInstructions}
+                />
+
                 <GitCard title="Repository">
                   <div className="space-y-2">
                     <div className="font-medium">{currentStatus.repositoryName}</div>

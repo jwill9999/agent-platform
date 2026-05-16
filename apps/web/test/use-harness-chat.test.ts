@@ -117,6 +117,43 @@ describe('harness chat stream parser', () => {
     });
   });
 
+  it('normalizes internal tool-state provider errors before displaying them', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      message:
+        "Invalid parameter: messages with role 'tool' must be a response to a preceding message with 'tool_calls'.",
+    });
+
+    expect(result).toEqual({
+      error:
+        'The agent could not continue because the conversation tool state is out of sync. Start a new Project chat or retry after preparing Project instructions.',
+    });
+  });
+
+  it('normalizes missing Project instructions failures before displaying them', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      message: "ENOENT: no such file or directory, open '/Users/example/project/AGENTS.md'",
+    });
+
+    expect(result).toEqual({
+      error:
+        'Project instructions are missing. Run /init or use Generate AGENTS.md before asking the agent to edit Project files.',
+    });
+  });
+
+  it('normalizes invalid request body failures before displaying them', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      message: 'Invalid request body',
+    });
+
+    expect(result).toEqual({
+      error:
+        'The agent request could not be sent because the chat payload was invalid. Retry the message, or start a new Project chat if it persists.',
+    });
+  });
+
   it('redacts masked API keys from streamed error messages', () => {
     const masked = ['sk-proj-', '*'.repeat(32), 'abcd'].join('');
     const result = renderStreamEvent({
