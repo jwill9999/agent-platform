@@ -4,6 +4,7 @@ import {
   ProjectModeSchema,
   ProjectBranchCheckoutBodySchema,
   ProjectGitChecksResultSchema,
+  ProjectGitPullRequestsResultSchema,
   ProjectGitStatusResultSchema,
   ProjectBranchListResultSchema,
   ProjectOpenBodySchema,
@@ -185,6 +186,61 @@ describe('Project mode and workspace binding contracts', () => {
           unknown: 0,
         },
         checks: [],
+      }),
+    ).toMatchObject({ available: false, authenticated: false });
+  });
+
+  it('validates Project GitHub pull request contracts', () => {
+    expect(
+      ProjectGitPullRequestsResultSchema.parse({
+        available: true,
+        repositoryName: 'agent-platform',
+        remoteUrl: 'git@github.com:jwill9999/agent-platform.git',
+        currentBranch: 'task/prs',
+        headSha: 'abc123',
+        githubRemoteDetected: true,
+        ghAvailable: true,
+        authenticated: true,
+        checkedAt: '2026-05-16T16:00:00.000Z',
+        pullRequests: [
+          {
+            number: 42,
+            title: 'Add PR view',
+            state: 'open',
+            url: 'https://github.com/jwill9999/agent-platform/pull/42',
+            headRefName: 'task/prs',
+            baseRefName: 'feature/git-panel',
+            authorLogin: 'jwill9999',
+            isDraft: false,
+            currentBranch: true,
+            reviewDecision: 'review_required',
+            mergeable: 'MERGEABLE',
+            createdAt: '2026-05-16T15:00:00.000Z',
+            updatedAt: '2026-05-16T15:30:00.000Z',
+            checks: {
+              total: 2,
+              success: 1,
+              failure: 1,
+              pending: 0,
+              unknown: 0,
+            },
+          },
+        ],
+      }),
+    ).toMatchObject({
+      available: true,
+      pullRequests: [{ number: 42, currentBranch: true, checks: { total: 2 } }],
+    });
+
+    expect(
+      ProjectGitPullRequestsResultSchema.parse({
+        available: false,
+        reason: 'GitHub CLI is not authenticated.',
+        githubRemoteDetected: true,
+        ghAvailable: true,
+        authenticated: false,
+        checkedAt: '2026-05-16T16:00:00.000Z',
+        pullRequests: [],
       }),
     ).toMatchObject({ available: false, authenticated: false });
   });

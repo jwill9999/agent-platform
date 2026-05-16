@@ -224,6 +224,11 @@ describe('projectsRouter', () => {
     writeFileSync(path.join(repoDir, 'README.md'), 'feature\n');
     execFileSync(GIT_BINARY, ['commit', '-am', 'feature'], { cwd: repoDir, stdio: 'ignore' });
     execFileSync(GIT_BINARY, ['switch', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    mkdirSync(path.join(repoDir, '.agent-platform', 'browser', 'session-1'), { recursive: true });
+    writeFileSync(
+      path.join(repoDir, '.agent-platform', 'browser', 'session-1', 'artifact.json'),
+      '{}\n',
+    );
 
     const registered = await request(app)
       .post('/v1/projects/desktop/register')
@@ -280,6 +285,11 @@ describe('projectsRouter', () => {
     execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
     writeFileSync(path.join(repoDir, 'README.md'), 'modified\n');
     writeFileSync(path.join(repoDir, 'notes.md'), 'untracked\n');
+    mkdirSync(path.join(repoDir, '.agent-platform', 'browser', 'session-1'), { recursive: true });
+    writeFileSync(
+      path.join(repoDir, '.agent-platform', 'browser', 'session-1', 'artifact.json'),
+      '{}\n',
+    );
 
     const registered = await request(app)
       .post('/v1/projects/desktop/register')
@@ -327,6 +337,11 @@ describe('projectsRouter', () => {
     execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
     writeFileSync(path.join(repoDir, 'README.md'), 'main\nchanged\n');
     writeFileSync(path.join(repoDir, 'notes.md'), 'untracked\n');
+    mkdirSync(path.join(repoDir, '.agent-platform', 'browser', 'session-1'), { recursive: true });
+    writeFileSync(
+      path.join(repoDir, '.agent-platform', 'browser', 'session-1', 'artifact.json'),
+      '{}\n',
+    );
     rmSync(path.join(repoDir, 'remove-me.md'), { force: true });
 
     const registered = await request(app)
@@ -352,6 +367,11 @@ describe('projectsRouter', () => {
         expect.objectContaining({ path: 'notes.md', status: 'untracked', unstaged: true }),
       ]),
     });
+    expect(changes.body.data.files).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: expect.stringContaining('.agent-platform') }),
+      ]),
+    );
 
     const diff = await request(app)
       .get(`/v1/projects/${projectId}/git/diff`)
@@ -394,6 +414,12 @@ describe('projectsRouter', () => {
       .send({ all: true })
       .expect(200);
     expect(stageAll.body.data.workingTree.staged).toBe(3);
+    expect(
+      execFileSync(GIT_BINARY, ['status', '--porcelain=v1', '--', '.agent-platform'], {
+        cwd: repoDir,
+        encoding: 'utf8',
+      }).trim(),
+    ).toBe('?? .agent-platform/');
 
     const committed = await request(app)
       .post(`/v1/projects/${projectId}/git/commit`)
@@ -533,6 +559,129 @@ exit 1
           name: 'Lint',
           status: 'completed',
           conclusion: 'failure',
+        }),
+      ],
+    });
+  });
+
+  it('reports unavailable GitHub pull requests when no GitHub remote is configured', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-prs-no-remote-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop GitHub PRs No Remote Repo' })
+      .expect(201);
+
+    const pullRequests = await request(app)
+      .get(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
+      .expect(200);
+
+    expect(pullRequests.body.data).toMatchObject({
+      available: false,
+      reason: 'No GitHub origin remote is configured for this Project.',
+      githubRemoteDetected: false,
+      ghAvailable: false,
+      authenticated: false,
+      pullRequests: [],
+    });
+  });
+
+  it('loads read-only GitHub pull requests through the configured GitHub CLI binary', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-prs-repo');
+    const ghBinary = path.join(tmpDir, 'fake-gh-prs');
+    writeFileSync(
+      ghBinary,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "gh version 2.0.0"
+  exit 0
+fi
+if [ "$1" = "auth" ]; then
+  echo "Logged in to github.com"
+  exit 0
+fi
+if [ "$1" = "pr" ]; then
+  printf '%s\\n' '[{"number":42,"title":"Add PRs view","state":"OPEN","url":"https://github.com/user/repo/pull/42","headRefName":"task/prs","baseRefName":"main","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"MERGEABLE","createdAt":"2026-05-16T15:00:00Z","updatedAt":"2026-05-16T15:30:00Z","statusCheckRollup":[{"status":"COMPLETED","conclusion":"SUCCESS"},{"status":"COMPLETED","conclusion":"FAILURE"},{"status":"IN_PROGRESS","conclusion":null}]},{"number":41,"title":"Other branch","state":"OPEN","url":"https://github.com/user/repo/pull/41","headRefName":"task/other","baseRefName":"main","author":{"login":"agent-bot"},"isDraft":true,"reviewDecision":"APPROVED","mergeable":"UNKNOWN","createdAt":"2026-05-15T15:00:00Z","updatedAt":"2026-05-15T15:30:00Z","statusCheckRollup":[]}]'
+  exit 0
+fi
+exit 1
+`,
+    );
+    chmodSync(ghBinary, 0o755);
+    process.env['AGENT_PLATFORM_GH_BINARY'] = ghBinary;
+
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', 'git@github.com:user/repo.git'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['switch', '-c', 'task/prs'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop GitHub PRs Repo' })
+      .expect(201);
+
+    const pullRequests = await request(app)
+      .get(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
+      .expect(200);
+
+    expect(pullRequests.body.data).toMatchObject({
+      available: true,
+      repositoryName: 'desktop-github-prs-repo',
+      remoteUrl: 'git@github.com:user/repo.git',
+      currentBranch: 'task/prs',
+      githubRemoteDetected: true,
+      ghAvailable: true,
+      authenticated: true,
+      pullRequests: [
+        expect.objectContaining({
+          number: 42,
+          title: 'Add PRs view',
+          state: 'open',
+          headRefName: 'task/prs',
+          baseRefName: 'main',
+          authorLogin: 'jwill9999',
+          currentBranch: true,
+          reviewDecision: 'review_required',
+          checks: {
+            total: 3,
+            success: 1,
+            failure: 1,
+            pending: 1,
+            unknown: 0,
+          },
+        }),
+        expect.objectContaining({
+          number: 41,
+          isDraft: true,
+          currentBranch: false,
+          reviewDecision: 'approved',
         }),
       ],
     });

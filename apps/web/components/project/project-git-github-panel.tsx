@@ -6,6 +6,8 @@ import type {
   ProjectGitChecksResult,
   ProjectGitDiffMode,
   ProjectGitFileDiffResult,
+  ProjectGitPullRequestSummary,
+  ProjectGitPullRequestsResult,
   ProjectGitStatusResult,
 } from '@agent-platform/contracts';
 import {
@@ -236,6 +238,57 @@ function CheckStateBadge({ check }: Readonly<{ check: ProjectGitChecksResult['ch
   return <Badge variant="outline">{check.conclusion ?? check.status}</Badge>;
 }
 
+function PullRequestStateBadge({
+  pullRequest,
+}: Readonly<{ pullRequest: ProjectGitPullRequestSummary }>) {
+  if (pullRequest.isDraft) {
+    return <Badge variant="outline">Draft</Badge>;
+  }
+  if (pullRequest.state === 'open') {
+    return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Open</Badge>;
+  }
+  if (pullRequest.state === 'merged') {
+    return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">Merged</Badge>;
+  }
+  if (pullRequest.state === 'closed') {
+    return <Badge variant="outline">Closed</Badge>;
+  }
+  return <Badge variant="outline">Unknown</Badge>;
+}
+
+function reviewDecisionLabel(
+  reviewDecision: ProjectGitPullRequestSummary['reviewDecision'],
+): string {
+  if (reviewDecision === 'approved') return 'Approved';
+  if (reviewDecision === 'changes_requested') return 'Changes requested';
+  if (reviewDecision === 'review_required') return 'Review required';
+  return 'Review unknown';
+}
+
+function reviewDecisionTone(
+  reviewDecision: ProjectGitPullRequestSummary['reviewDecision'],
+): string {
+  if (reviewDecision === 'approved') return 'text-emerald-700';
+  if (reviewDecision === 'changes_requested') return 'text-red-700';
+  if (reviewDecision === 'review_required') return 'text-amber-700';
+  return 'text-muted-foreground';
+}
+
+function checkSummaryLabel(checks: ProjectGitPullRequestSummary['checks']): string {
+  if (checks.total === 0) return 'No checks';
+  if (checks.failure > 0) return `${checks.failure} failing`;
+  if (checks.pending > 0) return `${checks.pending} pending`;
+  if (checks.success === checks.total) return 'Checks passing';
+  return `${checks.total} checks`;
+}
+
+function checkSummaryTone(checks: ProjectGitPullRequestSummary['checks']): string {
+  if (checks.failure > 0) return 'text-red-700';
+  if (checks.pending > 0) return 'text-amber-700';
+  if (checks.total > 0 && checks.success === checks.total) return 'text-emerald-700';
+  return 'text-muted-foreground';
+}
+
 function ChangeFileRow({
   file,
   selected,
@@ -291,18 +344,21 @@ export function ProjectGitHubPanel({
   const [status, setStatus] = useState<ProjectGitStatusResult | null>(null);
   const [changes, setChanges] = useState<ProjectGitChangesResult | null>(null);
   const [checks, setChecks] = useState<ProjectGitChecksResult | null>(null);
+  const [pullRequests, setPullRequests] = useState<ProjectGitPullRequestsResult | null>(null);
   const [selectedChange, setSelectedChange] = useState<ProjectGitChangedFile | null>(null);
   const [selectedDiffMode, setSelectedDiffMode] = useState<ProjectGitDiffMode>('unstaged');
   const [diff, setDiff] = useState<ProjectGitFileDiffResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [changesLoading, setChangesLoading] = useState(false);
   const [checksLoading, setChecksLoading] = useState(false);
+  const [pullRequestsLoading, setPullRequestsLoading] = useState(false);
   const [diffLoading, setDiffLoading] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [changesError, setChangesError] = useState<string | null>(null);
   const [checksError, setChecksError] = useState<string | null>(null);
+  const [pullRequestsError, setPullRequestsError] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     if (!projectId) {
@@ -376,6 +432,29 @@ export function ProjectGitHubPanel({
     }
   }, [projectId]);
 
+  const loadPullRequests = useCallback(async () => {
+    if (!projectId) {
+      setPullRequests(null);
+      setPullRequestsError(null);
+      return;
+    }
+    setPullRequestsLoading(true);
+    try {
+      const next = await apiGet<ProjectGitPullRequestsResult>(
+        apiPath('projects', projectId, 'github', 'pull-requests'),
+      );
+      setPullRequests(next ?? null);
+      setPullRequestsError(null);
+    } catch (cause) {
+      setPullRequests(null);
+      setPullRequestsError(
+        cause instanceof ApiRequestError ? cause.message : 'Failed to load pull requests.',
+      );
+    } finally {
+      setPullRequestsLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     void loadStatus();
   }, [loadStatus, refreshKey]);
@@ -387,6 +466,10 @@ export function ProjectGitHubPanel({
   useEffect(() => {
     if (activeTab === 'checks') void loadChecks();
   }, [activeTab, loadChecks, refreshKey]);
+
+  useEffect(() => {
+    if (activeTab === 'prs') void loadPullRequests();
+  }, [activeTab, loadPullRequests, refreshKey]);
 
   useEffect(() => {
     if (!projectId || activeTab !== 'changes' || !selectedChange) {
@@ -422,8 +505,13 @@ export function ProjectGitHubPanel({
   }, [activeTab, projectId, selectedChange, selectedDiffMode]);
 
   const refreshGitViews = useCallback(async () => {
-    await Promise.all([loadStatus(), loadChanges(), activeTab === 'checks' ? loadChecks() : null]);
-  }, [activeTab, loadChanges, loadChecks, loadStatus]);
+    await Promise.all([
+      loadStatus(),
+      loadChanges(),
+      activeTab === 'prs' ? loadPullRequests() : null,
+      activeTab === 'checks' ? loadChecks() : null,
+    ]);
+  }, [activeTab, loadChanges, loadChecks, loadPullRequests, loadStatus]);
 
   const stagePaths = useCallback(
     async (paths: string[] | 'all') => {
@@ -517,7 +605,12 @@ export function ProjectGitHubPanel({
     currentChanges?.files.filter((file) => file.unstaged && file.status !== 'untracked') ?? [];
   const githubUrl = normalizeGitHubUrl(currentStatus.remoteUrl);
   const changesBadge = currentStatus.workingTree.total;
-  const prsBadge = currentStatus.githubRemoteDetected ? 0 : undefined;
+  const prsBadge =
+    pullRequests?.pullRequests.length && pullRequests.pullRequests.length > 0
+      ? pullRequests.pullRequests.length
+      : currentStatus.githubRemoteDetected
+        ? 0
+        : undefined;
   const checksBadge =
     checks?.summary.total && checks.summary.total > 0
       ? checks.summary.total
@@ -541,7 +634,7 @@ export function ProjectGitHubPanel({
   return (
     <aside
       className={cn(
-        'hidden shrink-0 border-l border-border bg-background/95 lg:flex',
+        'hidden h-full max-h-full min-h-0 shrink-0 overflow-hidden border-l border-border bg-background/95 lg:flex',
         open ? 'w-[360px] max-w-[30vw]' : 'w-12',
       )}
       aria-label="Git and GitHub"
@@ -560,8 +653,8 @@ export function ProjectGitHubPanel({
           </span>
         </button>
       ) : (
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center gap-2 border-b border-border px-3 py-3">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
             <GitBranch className="h-4 w-4 shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -581,14 +674,15 @@ export function ProjectGitHubPanel({
               variant="ghost"
               className="h-7 w-7"
               onClick={() => void refreshGitViews()}
-              disabled={loading || changesLoading || checksLoading}
+              disabled={loading || changesLoading || pullRequestsLoading || checksLoading}
               title="Refresh Git state"
               aria-label="Refresh Git state"
             >
               <RefreshCw
                 className={cn(
                   'h-4 w-4',
-                  (loading || changesLoading || checksLoading) && 'animate-spin',
+                  (loading || changesLoading || pullRequestsLoading || checksLoading) &&
+                    'animate-spin',
                 )}
               />
             </Button>
@@ -605,7 +699,7 @@ export function ProjectGitHubPanel({
             </Button>
           </div>
 
-          <div className="flex gap-1 border-b border-border px-2 pt-2 text-xs">
+          <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 pt-2 text-xs">
             {tabs.map(([id, label, badge]) => (
               <button
                 key={id}
@@ -628,7 +722,7 @@ export function ProjectGitHubPanel({
             ))}
           </div>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 text-sm">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 text-sm">
             {error && (
               <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {error}
@@ -642,6 +736,11 @@ export function ProjectGitHubPanel({
             {checksError && activeTab === 'checks' && (
               <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {checksError}
+              </div>
+            )}
+            {pullRequestsError && activeTab === 'prs' && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {pullRequestsError}
               </div>
             )}
 
@@ -792,7 +891,7 @@ export function ProjectGitHubPanel({
             ) : activeTab === 'changes' ? (
               <>
                 <GitCard title="Changes">
-                  <div className="space-y-3">
+                  <div className="flex min-h-0 flex-col gap-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-sm font-medium">
                         {currentStatus.clean
@@ -867,69 +966,72 @@ export function ProjectGitHubPanel({
                       </div>
                     )}
 
-                    {stagedFiles.length > 0 && (
-                      <div className="space-y-1.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Staged
+                    <div className="max-h-[45vh] min-h-0 space-y-3 overflow-y-auto pr-1">
+                      {stagedFiles.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Staged
+                          </div>
+                          {stagedFiles.map((file) => (
+                            <ChangeFileRow
+                              key={`staged:${file.path}`}
+                              file={file}
+                              mode="staged"
+                              selected={
+                                selectedChange?.path === file.path && selectedDiffMode === 'staged'
+                              }
+                              onSelect={(nextFile, mode) => {
+                                setSelectedChange(nextFile);
+                                setSelectedDiffMode(mode);
+                              }}
+                            />
+                          ))}
                         </div>
-                        {stagedFiles.map((file) => (
-                          <ChangeFileRow
-                            key={`staged:${file.path}`}
-                            file={file}
-                            mode="staged"
-                            selected={
-                              selectedChange?.path === file.path && selectedDiffMode === 'staged'
-                            }
-                            onSelect={(nextFile, mode) => {
-                              setSelectedChange(nextFile);
-                              setSelectedDiffMode(mode);
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
+                      )}
 
-                    {unstagedFiles.length > 0 && (
-                      <div className="space-y-1.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Unstaged
+                      {unstagedFiles.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Unstaged
+                          </div>
+                          {unstagedFiles.map((file) => (
+                            <ChangeFileRow
+                              key={`unstaged:${file.path}`}
+                              file={file}
+                              mode="unstaged"
+                              selected={
+                                selectedChange?.path === file.path &&
+                                selectedDiffMode === 'unstaged'
+                              }
+                              onSelect={(nextFile, mode) => {
+                                setSelectedChange(nextFile);
+                                setSelectedDiffMode(mode);
+                              }}
+                            />
+                          ))}
                         </div>
-                        {unstagedFiles.map((file) => (
-                          <ChangeFileRow
-                            key={`unstaged:${file.path}`}
-                            file={file}
-                            mode="unstaged"
-                            selected={
-                              selectedChange?.path === file.path && selectedDiffMode === 'unstaged'
-                            }
-                            onSelect={(nextFile, mode) => {
-                              setSelectedChange(nextFile);
-                              setSelectedDiffMode(mode);
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
+                      )}
 
-                    {untrackedFiles.length > 0 && (
-                      <div className="space-y-1.5">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Untracked
+                      {untrackedFiles.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Untracked
+                          </div>
+                          {untrackedFiles.map((file) => (
+                            <ChangeFileRow
+                              key={`untracked:${file.path}`}
+                              file={file}
+                              mode="unstaged"
+                              selected={selectedChange?.path === file.path}
+                              onSelect={(nextFile, mode) => {
+                                setSelectedChange(nextFile);
+                                setSelectedDiffMode(mode);
+                              }}
+                            />
+                          ))}
                         </div>
-                        {untrackedFiles.map((file) => (
-                          <ChangeFileRow
-                            key={`untracked:${file.path}`}
-                            file={file}
-                            mode="unstaged"
-                            selected={selectedChange?.path === file.path}
-                            onSelect={(nextFile, mode) => {
-                              setSelectedChange(nextFile);
-                              setSelectedDiffMode(mode);
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </GitCard>
 
@@ -1008,15 +1110,170 @@ export function ProjectGitHubPanel({
                 )}
               </GitCard>
             ) : activeTab === 'prs' ? (
-              <GitCard title="Pull Requests">
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <GitPullRequest className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Pull request state is not connected yet. This panel will use GitHub sensors
-                    keyed by the current branch and remote.
-                  </span>
-                </div>
-              </GitCard>
+              <>
+                <GitCard title="Pull Requests">
+                  <div className="space-y-3">
+                    {pullRequestsLoading && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Loading GitHub pull requests...
+                      </div>
+                    )}
+
+                    {!pullRequestsLoading && pullRequests && !pullRequests.available && (
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        {pullRequests.githubRemoteDetected ? (
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        ) : (
+                          <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                        )}
+                        <div className="space-y-1">
+                          <div>
+                            {pullRequests.reason ?? 'GitHub pull requests are unavailable.'}
+                          </div>
+                          {pullRequests.githubRemoteDetected && !pullRequests.authenticated && (
+                            <div className="text-xs">
+                              Authenticate with GitHub CLI in the terminal to enable live PRs.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {!pullRequestsLoading && !pullRequests && (
+                      <div className="text-sm text-muted-foreground">
+                        Select refresh or open this tab again to load pull request state.
+                      </div>
+                    )}
+
+                    {!pullRequestsLoading && pullRequests?.available && (
+                      <>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                            <div className="text-muted-foreground">Open PRs</div>
+                            <div className="text-lg font-semibold">
+                              {pullRequests.pullRequests.length}
+                            </div>
+                          </div>
+                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                            <div className="text-muted-foreground">Current branch</div>
+                            <div className="truncate text-sm font-semibold">
+                              {pullRequests.currentBranch ?? 'Detached HEAD'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {pullRequests.pullRequests.length === 0 ? (
+                          <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                            No open GitHub pull requests were found for this repository.
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {pullRequests.pullRequests.map((pullRequest) => (
+                              <div
+                                key={pullRequest.number}
+                                className={cn(
+                                  'rounded border bg-background px-3 py-2',
+                                  pullRequest.currentBranch
+                                    ? 'border-primary bg-primary/5'
+                                    : 'border-border',
+                                )}
+                              >
+                                <div className="flex min-w-0 items-start gap-2">
+                                  <GitPullRequest className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                  <div className="min-w-0 flex-1 space-y-2">
+                                    <div className="flex min-w-0 items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <div className="flex min-w-0 items-center gap-2">
+                                          <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                                            #{pullRequest.number}
+                                          </span>
+                                          <a
+                                            href={pullRequest.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="truncate text-sm font-medium hover:underline"
+                                          >
+                                            {pullRequest.title}
+                                          </a>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                          <span className="font-mono">
+                                            {pullRequest.headRefName} → {pullRequest.baseRefName}
+                                          </span>
+                                          {pullRequest.authorLogin && (
+                                            <span>{pullRequest.authorLogin}</span>
+                                          )}
+                                          {pullRequest.updatedAt && (
+                                            <span>
+                                              {relativeCommitLabel(pullRequest.updatedAt)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <PullRequestStateBadge pullRequest={pullRequest} />
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                                      {pullRequest.currentBranch && (
+                                        <Badge
+                                          variant="outline"
+                                          className="border-primary/40 text-primary"
+                                        >
+                                          Current branch
+                                        </Badge>
+                                      )}
+                                      <span
+                                        className={reviewDecisionTone(pullRequest.reviewDecision)}
+                                      >
+                                        {reviewDecisionLabel(pullRequest.reviewDecision)}
+                                      </span>
+                                      <span className={checkSummaryTone(pullRequest.checks)}>
+                                        {checkSummaryLabel(pullRequest.checks)}
+                                      </span>
+                                      <a
+                                        href={pullRequest.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                      >
+                                        Open on GitHub
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </GitCard>
+
+                <GitCard title="Source">
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <div>
+                      {pullRequests?.repositoryName ?? currentStatus.repositoryName ?? 'Repository'}{' '}
+                      {(pullRequests?.currentBranch ?? currentStatus.currentBranch)
+                        ? `· ${pullRequests?.currentBranch ?? currentStatus.currentBranch}`
+                        : ''}
+                    </div>
+                    <div>
+                      {pullRequests?.ghAvailable
+                        ? 'GitHub CLI detected'
+                        : 'GitHub CLI not confirmed for this Project'}
+                    </div>
+                    <div>
+                      {pullRequests?.authenticated
+                        ? 'Authenticated with github.com'
+                        : 'GitHub authentication not confirmed'}
+                    </div>
+                    <div>Read-only PR visibility. PR actions are planned separately.</div>
+                  </div>
+                </GitCard>
+              </>
             ) : (
               <>
                 <GitCard title="Checks">

@@ -704,6 +704,63 @@ export const ProjectGitChecksResultSchema = z.object({
 });
 export type ProjectGitChecksResult = z.infer<typeof ProjectGitChecksResultSchema>;
 
+export const ProjectGitPullRequestStateSchema = z.enum(['open', 'closed', 'merged', 'unknown']);
+export type ProjectGitPullRequestState = z.infer<typeof ProjectGitPullRequestStateSchema>;
+
+export const ProjectGitPullRequestReviewDecisionSchema = z.enum([
+  'approved',
+  'changes_requested',
+  'review_required',
+  'unknown',
+]);
+export type ProjectGitPullRequestReviewDecision = z.infer<
+  typeof ProjectGitPullRequestReviewDecisionSchema
+>;
+
+export const ProjectGitPullRequestCheckSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  success: z.number().int().nonnegative(),
+  failure: z.number().int().nonnegative(),
+  pending: z.number().int().nonnegative(),
+  unknown: z.number().int().nonnegative(),
+});
+export type ProjectGitPullRequestCheckSummary = z.infer<
+  typeof ProjectGitPullRequestCheckSummarySchema
+>;
+
+export const ProjectGitPullRequestSummarySchema = z.object({
+  number: z.number().int().positive(),
+  title: z.string().min(1).max(500),
+  state: ProjectGitPullRequestStateSchema,
+  url: z.string().url(),
+  headRefName: z.string().min(1).max(300),
+  baseRefName: z.string().min(1).max(300),
+  authorLogin: z.string().min(1).max(200).optional(),
+  isDraft: z.boolean().default(false),
+  currentBranch: z.boolean().default(false),
+  reviewDecision: ProjectGitPullRequestReviewDecisionSchema.optional(),
+  mergeable: z.string().min(1).max(100).optional(),
+  createdAt: z.string().min(1).max(100).optional(),
+  updatedAt: z.string().min(1).max(100).optional(),
+  checks: ProjectGitPullRequestCheckSummarySchema,
+});
+export type ProjectGitPullRequestSummary = z.infer<typeof ProjectGitPullRequestSummarySchema>;
+
+export const ProjectGitPullRequestsResultSchema = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).max(500).optional(),
+  repositoryName: z.string().min(1).max(200).optional(),
+  remoteUrl: z.string().min(1).max(1000).optional(),
+  currentBranch: z.string().min(1).max(300).optional(),
+  headSha: z.string().min(1).max(80).optional(),
+  githubRemoteDetected: z.boolean().default(false),
+  ghAvailable: z.boolean().default(false),
+  authenticated: z.boolean().default(false),
+  checkedAt: z.string().min(1).max(100),
+  pullRequests: z.array(ProjectGitPullRequestSummarySchema),
+});
+export type ProjectGitPullRequestsResult = z.infer<typeof ProjectGitPullRequestsResultSchema>;
+
 export type ProjectFileNode = {
   name: string;
   path: string;

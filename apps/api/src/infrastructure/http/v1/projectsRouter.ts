@@ -9,6 +9,7 @@ import {
   ProjectGitChecksResultSchema,
   ProjectGitChangesResultSchema,
   ProjectGitFileDiffResultSchema,
+  ProjectGitPullRequestsResultSchema,
   ProjectGitStageBodySchema,
   ProjectGitStatusResultSchema,
   ProjectFileReadResultSchema,
@@ -38,6 +39,10 @@ import {
   type ProjectGitChecksSummary,
   type ProjectGitCommitBody,
   type ProjectGitFileStatus,
+  type ProjectGitPullRequestCheckSummary,
+  type ProjectGitPullRequestReviewDecision,
+  type ProjectGitPullRequestState,
+  type ProjectGitPullRequestSummary,
   type ProjectGitStageBody,
   type ProjectGitWorkingTreeSummary,
   ProjectUpdateBodySchema,
@@ -133,6 +138,7 @@ type BackendProjectMetadata = {
 
 const GIT_BINARY = '/usr/bin/git';
 const DESKTOP_PROJECT_REGISTRATION_HEADER = 'x-agent-platform-desktop-bridge';
+const GIT_USER_PATHS = ['--', '.', ':(exclude).agent-platform', ':(exclude).agent-platform/**'];
 const EMPTY_GIT_CHECKS_SUMMARY: ProjectGitChecksSummary = {
   total: 0,
   success: 0,
@@ -141,6 +147,13 @@ const EMPTY_GIT_CHECKS_SUMMARY: ProjectGitChecksSummary = {
   queued: 0,
   cancelled: 0,
   skipped: 0,
+  unknown: 0,
+};
+const EMPTY_PR_CHECK_SUMMARY: ProjectGitPullRequestCheckSummary = {
+  total: 0,
+  success: 0,
+  failure: 0,
+  pending: 0,
   unknown: 0,
 };
 
@@ -771,7 +784,7 @@ function projectBranchList(project: ProjectRecord): ProjectBranchListResult {
     '--format=%(refname:short)',
     'refs/heads',
   ]);
-  const clean = gitOutput(repositoryRoot, ['status', '--porcelain']) === '';
+  const clean = gitOutput(repositoryRoot, ['status', '--porcelain', ...GIT_USER_PATHS]) === '';
   const branchNames = branchOutput
     .split('\n')
     .map((branch) => branch.trim())
@@ -925,9 +938,11 @@ function parseNumstat(
 }
 
 function enrichChangeStats(repositoryRoot: string, files: ProjectGitChangedFile[]) {
-  const unstagedStats = parseNumstat(gitValue(repositoryRoot, ['diff', '--numstat']) ?? '');
+  const unstagedStats = parseNumstat(
+    gitValue(repositoryRoot, ['diff', '--numstat', ...GIT_USER_PATHS]) ?? '',
+  );
   const stagedStats = parseNumstat(
-    gitValue(repositoryRoot, ['diff', '--cached', '--numstat']) ?? '',
+    gitValue(repositoryRoot, ['diff', '--cached', '--numstat', ...GIT_USER_PATHS]) ?? '',
   );
   return files.map((file) => {
     const stats = stagedStats.get(file.path) ?? unstagedStats.get(file.path);
@@ -956,9 +971,16 @@ function projectGitChanges(project: ProjectRecord) {
   const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']);
   if (!repositoryRoot) return unavailableGitChanges('Project is not a Git repository.');
 
-  const statusOutput = gitRawOutput(repositoryRoot, ['status', '--porcelain=v1', '-z']);
+  const statusOutput = gitRawOutput(repositoryRoot, [
+    'status',
+    '--porcelain=v1',
+    '-z',
+    ...GIT_USER_PATHS,
+  ]);
   const files = enrichChangeStats(repositoryRoot, parseStatusZ(statusOutput));
-  const workingTree = parseWorkingTree(gitRawOutput(repositoryRoot, ['status', '--porcelain=v1']));
+  const workingTree = parseWorkingTree(
+    gitRawOutput(repositoryRoot, ['status', '--porcelain=v1', ...GIT_USER_PATHS]),
+  );
 
   return ProjectGitChangesResultSchema.parse({
     available: true,
@@ -1033,7 +1055,10 @@ function gitPathArgs(body: ProjectGitStageBody): string[] {
 function stageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
   const body = parseBody(ProjectGitStageBodySchema, rawBody);
   const repositoryRoot = repositoryRootForBranchOperations(project);
-  gitOutput(repositoryRoot, ['add', '-A', '--', ...gitPathArgs(body)]);
+  gitOutput(
+    repositoryRoot,
+    body.all ? ['add', '-A', ...GIT_USER_PATHS] : ['add', '-A', '--', ...gitPathArgs(body)],
+  );
   return projectGitChanges(project);
 }
 
@@ -1047,7 +1072,12 @@ function unstageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
 function commitProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
   const body: ProjectGitCommitBody = parseBody(ProjectGitCommitBodySchema, rawBody);
   const repositoryRoot = repositoryRootForBranchOperations(project);
-  const stagedOutput = gitRawOutput(repositoryRoot, ['diff', '--cached', '--name-only']);
+  const stagedOutput = gitRawOutput(repositoryRoot, [
+    'diff',
+    '--cached',
+    '--name-only',
+    ...GIT_USER_PATHS,
+  ]);
   if (stagedOutput.trim() === '') {
     throw new HttpError(409, 'PROJECT_GIT_NOTHING_STAGED', 'Stage changes before committing.');
   }
@@ -1091,7 +1121,12 @@ function projectGitStatus(project: ProjectRecord) {
     });
   }
 
-  const statusOutput = gitOutput(repositoryRoot, ['status', '--porcelain=v1', '--branch']);
+  const statusOutput = gitOutput(repositoryRoot, [
+    'status',
+    '--porcelain=v1',
+    '--branch',
+    ...GIT_USER_PATHS,
+  ]);
   const branchLine = statusOutput.split('\n').find((line) => line.startsWith('## '));
   const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
   const upstreamBranch = gitValue(repositoryRoot, [
@@ -1346,6 +1381,238 @@ function projectGitChecks(project: ProjectRecord) {
     checkedAt: new Date().toISOString(),
     summary: summarizeChecks(checks),
     checks,
+  });
+}
+
+function unavailableGitPullRequests(
+  reason: string,
+  options: Partial<{
+    repositoryName: string;
+    remoteUrl: string;
+    currentBranch: string;
+    headSha: string;
+    githubRemoteDetected: boolean;
+    ghAvailable: boolean;
+    authenticated: boolean;
+  }> = {},
+) {
+  return ProjectGitPullRequestsResultSchema.parse({
+    available: false,
+    reason,
+    ...(options.repositoryName ? { repositoryName: options.repositoryName } : {}),
+    ...(options.remoteUrl ? { remoteUrl: options.remoteUrl } : {}),
+    ...(options.currentBranch ? { currentBranch: options.currentBranch } : {}),
+    ...(options.headSha ? { headSha: options.headSha } : {}),
+    githubRemoteDetected: options.githubRemoteDetected ?? false,
+    ghAvailable: options.ghAvailable ?? false,
+    authenticated: options.authenticated ?? false,
+    checkedAt: new Date().toISOString(),
+    pullRequests: [],
+  });
+}
+
+type GhPullRequest = {
+  number?: number;
+  title?: string;
+  state?: string;
+  url?: string;
+  headRefName?: string;
+  baseRefName?: string;
+  author?: { login?: string } | null;
+  isDraft?: boolean;
+  reviewDecision?: string;
+  mergeable?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  statusCheckRollup?: Array<{
+    status?: string;
+    conclusion?: string;
+  }>;
+};
+
+function normalizePullRequestState(state: string | undefined): ProjectGitPullRequestState {
+  const normalized = state?.toLowerCase();
+  if (normalized === 'open' || normalized === 'closed' || normalized === 'merged') {
+    return normalized;
+  }
+  return 'unknown';
+}
+
+function normalizeReviewDecision(
+  decision: string | undefined,
+): ProjectGitPullRequestReviewDecision | undefined {
+  if (!decision) return undefined;
+  const normalized = decision.toLowerCase();
+  if (
+    normalized === 'approved' ||
+    normalized === 'changes_requested' ||
+    normalized === 'review_required'
+  ) {
+    return normalized;
+  }
+  return 'unknown';
+}
+
+function summarizePullRequestChecks(
+  checks: GhPullRequest['statusCheckRollup'],
+): ProjectGitPullRequestCheckSummary {
+  const summary = { ...EMPTY_PR_CHECK_SUMMARY, total: checks?.length ?? 0 };
+  for (const check of checks ?? []) {
+    const status = check.status?.toLowerCase();
+    const conclusion = check.conclusion?.toLowerCase();
+    if (status && status !== 'completed') {
+      summary.pending += 1;
+    } else if (conclusion === 'success' || conclusion === 'neutral' || conclusion === 'skipped') {
+      summary.success += 1;
+    } else if (
+      conclusion === 'failure' ||
+      conclusion === 'timed_out' ||
+      conclusion === 'cancelled' ||
+      conclusion === 'action_required'
+    ) {
+      summary.failure += 1;
+    } else {
+      summary.unknown += 1;
+    }
+  }
+  return summary;
+}
+
+function parseGhPullRequests(
+  output: string,
+  currentBranch: string | undefined,
+): ProjectGitPullRequestSummary[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    throw new HttpError(
+      502,
+      'PROJECT_GITHUB_PULL_REQUESTS_INVALID',
+      'GitHub pull requests response was invalid.',
+    );
+  }
+  if (!Array.isArray(parsed)) {
+    throw new HttpError(
+      502,
+      'PROJECT_GITHUB_PULL_REQUESTS_INVALID',
+      'GitHub pull requests response was invalid.',
+    );
+  }
+
+  return parsed.flatMap((value): ProjectGitPullRequestSummary[] => {
+    const pullRequest = value as GhPullRequest;
+    if (
+      !pullRequest.number ||
+      !pullRequest.title ||
+      !pullRequest.url ||
+      !pullRequest.headRefName ||
+      !pullRequest.baseRefName
+    ) {
+      return [];
+    }
+    return [
+      {
+        number: pullRequest.number,
+        title: pullRequest.title,
+        state: normalizePullRequestState(pullRequest.state),
+        url: pullRequest.url,
+        headRefName: pullRequest.headRefName,
+        baseRefName: pullRequest.baseRefName,
+        ...(pullRequest.author?.login ? { authorLogin: pullRequest.author.login } : {}),
+        isDraft: pullRequest.isDraft ?? false,
+        currentBranch: Boolean(currentBranch && pullRequest.headRefName === currentBranch),
+        ...(normalizeReviewDecision(pullRequest.reviewDecision)
+          ? { reviewDecision: normalizeReviewDecision(pullRequest.reviewDecision) }
+          : {}),
+        ...(pullRequest.mergeable ? { mergeable: pullRequest.mergeable } : {}),
+        ...(pullRequest.createdAt ? { createdAt: pullRequest.createdAt } : {}),
+        ...(pullRequest.updatedAt ? { updatedAt: pullRequest.updatedAt } : {}),
+        checks: summarizePullRequestChecks(pullRequest.statusCheckRollup),
+      },
+    ];
+  });
+}
+
+function projectGithubPullRequests(project: ProjectRecord) {
+  let projectRoot: string;
+  try {
+    projectRoot = projectRootForBackendRead(project);
+  } catch {
+    return unavailableGitPullRequests('Project folder is not available.');
+  }
+
+  const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']);
+  if (!repositoryRoot) return unavailableGitPullRequests('Project is not a Git repository.');
+
+  const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
+  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
+  const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD'])?.slice(0, 12);
+  const repositoryName = basename(repositoryRoot);
+  const githubDetected = githubRemoteDetected(remoteUrl);
+  const repositorySlug = githubRepositorySlug(remoteUrl);
+
+  const baseOptions = {
+    repositoryName,
+    ...(remoteUrl ? { remoteUrl } : {}),
+    ...(currentBranch ? { currentBranch } : {}),
+    ...(headSha ? { headSha } : {}),
+    githubRemoteDetected: githubDetected,
+  };
+
+  if (!githubDetected || !repositorySlug) {
+    return unavailableGitPullRequests(
+      'No GitHub origin remote is configured for this Project.',
+      baseOptions,
+    );
+  }
+
+  const ghVersion = ghValue(repositoryRoot, ['--version']);
+  if (!ghVersion) {
+    return unavailableGitPullRequests('GitHub CLI is not installed or is not available on PATH.', {
+      ...baseOptions,
+      ghAvailable: false,
+    });
+  }
+
+  if (!ghSuccess(repositoryRoot, ['auth', 'status', '--hostname', 'github.com'])) {
+    return unavailableGitPullRequests('GitHub CLI is not authenticated for github.com.', {
+      ...baseOptions,
+      ghAvailable: true,
+      authenticated: false,
+    });
+  }
+
+  const pullRequestsOutput = ghValue(repositoryRoot, [
+    'pr',
+    'list',
+    '--repo',
+    repositorySlug,
+    '--state',
+    'open',
+    '--limit',
+    '30',
+    '--json',
+    'number,title,state,url,headRefName,baseRefName,author,isDraft,reviewDecision,mergeable,createdAt,updatedAt,statusCheckRollup',
+  ]);
+  if (pullRequestsOutput === undefined) {
+    return unavailableGitPullRequests(
+      'GitHub pull requests could not be loaded for this Project.',
+      {
+        ...baseOptions,
+        ghAvailable: true,
+        authenticated: true,
+      },
+    );
+  }
+
+  return ProjectGitPullRequestsResultSchema.parse({
+    available: true,
+    ...baseOptions,
+    ghAvailable: true,
+    authenticated: true,
+    checkedAt: new Date().toISOString(),
+    pullRequests: parseGhPullRequests(pullRequestsOutput, currentBranch),
   });
 }
 
@@ -2024,6 +2291,15 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: projectGitChecks(project) });
+    }),
+  );
+
+  router.get(
+    '/:id/github/pull-requests',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: projectGithubPullRequests(project) });
     }),
   );
 
