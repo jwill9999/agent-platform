@@ -716,6 +716,50 @@ function projectBranchList(project: ProjectRecord): ProjectBranchListResult {
   });
 }
 
+function refreshProjectGitMetadata(db: DrizzleDb, id: string): ProjectRecord {
+  const project = findProject(db, id);
+  if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+  const backendProjectRoot = project.metadata['backendProjectRoot'];
+  if (typeof backendProjectRoot !== 'string' || !backendProjectRoot.trim()) {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project folder is not available');
+  }
+
+  let projectRoot: string;
+  try {
+    projectRoot = realpathSync(backendProjectRoot);
+    if (!statSync(projectRoot).isDirectory()) {
+      throw new Error('Project root is not a directory');
+    }
+    readdirSync(projectRoot);
+  } catch {
+    throw new HttpError(409, 'PROJECT_UNAVAILABLE', 'Project folder could not be inspected');
+  }
+
+  const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']) ?? projectRoot;
+  const insideWorkTree =
+    gitValue(repositoryRoot, ['rev-parse', '--is-inside-work-tree']) === 'true';
+  const activeBranch = insideWorkTree
+    ? gitValue(repositoryRoot, ['branch', '--show-current'])
+    : undefined;
+  const headSha = insideWorkTree ? gitValue(repositoryRoot, ['rev-parse', 'HEAD']) : undefined;
+  const metadata = { ...project.metadata };
+  metadata.backendProjectRoot = projectRoot;
+  metadata.repositoryRoot = repositoryRoot;
+  metadata.capabilityState = 'backend_accessible';
+  if (activeBranch) {
+    metadata.activeBranch = activeBranch;
+  } else {
+    delete metadata.activeBranch;
+  }
+  if (insideWorkTree) {
+    metadata.activeWorktreeId = headSha ? `${repositoryRoot}:${headSha}` : repositoryRoot;
+  } else {
+    delete metadata.activeWorktreeId;
+  }
+
+  return updateProject(db, id, { metadata });
+}
+
 function checkoutProjectBranch(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
   const project = findProject(db, id);
   if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
@@ -1294,6 +1338,17 @@ export function createProjectsRouter(db: DrizzleDb): Router {
         res.json({
           data: checkoutProjectBranch(db, requireParam(req.params, 'id'), req.body),
         });
+      } catch (error) {
+        mapProjectError(error);
+      }
+    }),
+  );
+
+  router.post(
+    '/:id/refresh',
+    asyncHandler(async (req, res) => {
+      try {
+        res.json({ data: refreshProjectGitMetadata(db, requireParam(req.params, 'id')) });
       } catch (error) {
         mapProjectError(error);
       }

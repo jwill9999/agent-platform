@@ -16,6 +16,7 @@ type ProjectBranchSelectorProps = Readonly<{
   projectId: string | null;
   activeBranch?: string;
   disabled?: boolean;
+  refreshKey?: number;
   onProjectChanged: (project: ProjectDesktopRecord) => void;
   onError?: (message: string) => void;
 }>;
@@ -24,6 +25,7 @@ export function ProjectBranchSelector({
   projectId,
   activeBranch,
   disabled,
+  refreshKey,
   onProjectChanged,
   onError,
 }: ProjectBranchSelectorProps) {
@@ -40,11 +42,17 @@ export function ProjectBranchSelector({
     }
     setLoading(true);
     try {
-      const result = await apiGet<ProjectBranchListResult>(apiPath('projects', projectId, 'branches'));
+      const result = await apiGet<ProjectBranchListResult>(
+        apiPath('projects', projectId, 'branches'),
+      );
       setBranches(result ?? null);
       setUnavailableReason(null);
     } catch (error) {
       setBranches(null);
+      if (error instanceof ApiRequestError && error.code === 'PROJECT_GIT_UNAVAILABLE') {
+        setUnavailableReason(null);
+        return;
+      }
       setUnavailableReason(
         error instanceof ApiRequestError ? error.message : 'Branch information is unavailable.',
       );
@@ -55,7 +63,7 @@ export function ProjectBranchSelector({
 
   useEffect(() => {
     void loadBranches();
-  }, [loadBranches]);
+  }, [loadBranches, refreshKey]);
 
   const currentBranch = branches?.currentBranch ?? activeBranch;
   const branchItems = useMemo(() => branches?.branches ?? [], [branches?.branches]);

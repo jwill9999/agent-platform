@@ -508,6 +508,7 @@ export default function HomePage() {
   const [selectedMode, setSelectedMode] = useState<WorkspaceMode | null>(null);
   const [activeProject, setActiveProject] = useState<ProjectDesktopRecord | null>(null);
   const [projectTerminalOpen, setProjectTerminalOpen] = useState(false);
+  const [projectGitRefreshKey, setProjectGitRefreshKey] = useState(0);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -532,6 +533,7 @@ export default function HomePage() {
   const [rejectedProjectInstructions, setRejectedProjectInstructions] =
     useState<ProjectInstructionsDecision | null>(null);
   const attemptedProjectReopenIdRef = useRef<string | null>(null);
+  const projectGitRefreshTimeoutRef = useRef<number | null>(null);
 
   const {
     messages,
@@ -869,9 +871,53 @@ export default function HomePage() {
 
   const refreshActiveProject = useCallback(async () => {
     if (!activeProject?.id) return;
-    const project = await apiGet<ProjectDesktopRecord>(apiPath('projects', activeProject.id));
-    if (project) setActiveProject(project);
+    const project = await apiPost<ProjectDesktopRecord>(
+      apiPath('projects', activeProject.id, 'refresh'),
+      {},
+    );
+    if (project) {
+      setActiveProject(project);
+      setProjectGitRefreshKey((value) => value + 1);
+    }
   }, [activeProject?.id]);
+
+  useEffect(() => {
+    if (selectedMode !== 'project-chat' || !activeProject?.id) return;
+    refreshActiveProject().catch(() => {});
+  }, [activeProject?.id, refreshActiveProject, selectedMode]);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    if (selectedMode !== 'project-chat' || !activeProject?.id) return;
+    const handleRefresh = () => {
+      if (globalThis.document.visibilityState === 'hidden') return;
+      refreshActiveProject().catch(() => {});
+    };
+    globalThis.window.addEventListener('focus', handleRefresh);
+    globalThis.document.addEventListener('visibilitychange', handleRefresh);
+    return () => {
+      globalThis.window.removeEventListener('focus', handleRefresh);
+      globalThis.document.removeEventListener('visibilitychange', handleRefresh);
+    };
+  }, [activeProject?.id, refreshActiveProject, selectedMode]);
+
+  const scheduleProjectGitRefresh = useCallback(() => {
+    if (globalThis.window === undefined) return;
+    if (projectGitRefreshTimeoutRef.current !== null) {
+      globalThis.window.clearTimeout(projectGitRefreshTimeoutRef.current);
+    }
+    projectGitRefreshTimeoutRef.current = globalThis.window.setTimeout(() => {
+      projectGitRefreshTimeoutRef.current = null;
+      refreshActiveProject().catch(() => {});
+    }, 350);
+  }, [refreshActiveProject]);
+
+  useEffect(() => {
+    return () => {
+      if (globalThis.window === undefined || projectGitRefreshTimeoutRef.current === null) return;
+      globalThis.window.clearTimeout(projectGitRefreshTimeoutRef.current);
+    };
+  }, []);
 
   const handleApproveProjectInstructions = useCallback(async () => {
     if (!activeProject?.id) return;
@@ -1251,6 +1297,7 @@ export default function HomePage() {
                     projectId={activeProject?.id ?? null}
                     activeBranch={activeProject?.metadata.activeBranch}
                     disabled={isLoading}
+                    refreshKey={projectGitRefreshKey}
                     onProjectChanged={setActiveProject}
                     onError={setSessionError}
                   />
@@ -1279,6 +1326,7 @@ export default function HomePage() {
                     activeBranch={activeProject?.metadata.activeBranch}
                     open={projectTerminalOpen}
                     onOpenChange={setProjectTerminalOpen}
+                    onActivity={scheduleProjectGitRefresh}
                   />
                 ) : null
               }

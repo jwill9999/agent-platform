@@ -82,10 +82,6 @@ test.describe('Electron Project access', () => {
       cwd: firstProjectDir,
       stdio: 'ignore',
     });
-    writeFileSync(
-      join(firstProjectDir, 'scratch.txt'),
-      'local work should explain disabled branch switching\n',
-    );
     writeFileSync(join(secondProjectDir, 'README.md'), '# Electron E2E Project Two\n');
     writeFileSync(
       join(secondProjectDir, 'docs', 'guide.md'),
@@ -171,11 +167,16 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('/workspace')).toHaveCount(0);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
       await expect(page.getByRole('combobox', { name: 'Active branch' })).toContainText('main');
+      await page.getByRole('combobox', { name: 'Active branch' }).click();
+      await page.getByRole('option', { name: 'feature/e2e-branch' }).click();
+      await expect(page.getByRole('combobox', { name: 'Active branch' })).toContainText(
+        'feature/e2e-branch',
+      );
       await expect(
         page.getByRole('combobox', {
           name: /Branch switching is disabled because this Project has uncommitted changes/,
         }),
-      ).toBeDisabled();
+      ).toHaveCount(0);
 
       await page.getByRole('button', { name: /Terminal/ }).click();
       const projectTerminal = page.getByRole('region', { name: 'Project terminal' });
@@ -192,6 +193,13 @@ test.describe('Electron Project access', () => {
       await expect(projectTerminal).toContainText(`AP_TERM_CWD:${firstProjectDir}`, {
         timeout: 10_000,
       });
+      await page.keyboard.type('touch scratch.txt');
+      await page.keyboard.press('Enter');
+      await expect(
+        page.getByRole('combobox', {
+          name: /Branch switching is disabled because this Project has uncommitted changes/,
+        }),
+      ).toBeDisabled({ timeout: 10_000 });
       await projectTerminal.getByTitle('New terminal').click();
       await expect(
         projectTerminal.getByRole('button', { name: 'Terminal 2', exact: true }),
@@ -238,7 +246,7 @@ test.describe('Electron Project access', () => {
       const project = await findRecentProject(backendPort, firstProjectName);
       expect(project.metadata.source).toBe('desktop');
       expect(project.metadata.folderName).toBe(firstProjectName);
-      expect(project.metadata.activeBranch).toBe('main');
+      expect(project.metadata.activeBranch).toBe('feature/e2e-branch');
       const session = await findProjectSession(backendPort, project.id);
       expect(session.mode).toBe('project');
       await expect(page.getByRole('link', { name: 'Open IDE' })).toHaveAttribute(

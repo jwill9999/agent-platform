@@ -969,6 +969,47 @@ describe('projectsRouter', () => {
     });
   });
 
+  it('refreshes Project Git metadata when a plain folder becomes a Git repo', async () => {
+    const folderDir = path.join(tmpDir, 'plain-to-git-folder');
+    mkdirSync(folderDir, { recursive: true });
+    writeFileSync(path.join(folderDir, 'README.md'), 'plain workspace\n');
+
+    const openedProject = await request(app)
+      .post('/v1/projects/open')
+      .send({ path: folderDir, name: 'Plain To Git Folder' })
+      .expect(201);
+
+    expect(openedProject.body.data.metadata.activeBranch).toBeUndefined();
+    await request(app).get(`/v1/projects/${openedProject.body.data.id}/branches`).expect(409);
+
+    execFileSync(GIT_BINARY, ['init', '-b', 'main'], { cwd: folderDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: folderDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: folderDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: folderDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: folderDir, stdio: 'ignore' });
+
+    const refreshed = await request(app)
+      .post(`/v1/projects/${openedProject.body.data.id}/refresh`)
+      .send({})
+      .expect(200);
+
+    expect(refreshed.body.data.metadata.activeBranch).toBe('main');
+    const branches = await request(app)
+      .get(`/v1/projects/${openedProject.body.data.id}/branches`)
+      .expect(200);
+    expect(branches.body.data).toMatchObject({
+      currentBranch: 'main',
+      clean: true,
+      branches: [{ name: 'main', current: true }],
+    });
+  });
+
   it('auto-approves sufficient existing AGENTS.md instructions during assessment', async () => {
     const repoDir = path.join(tmpDir, 'repo-with-sufficient-agents');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });

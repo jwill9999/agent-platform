@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-16
+- **Session:** Implemented `agent-platform-5fo` on `task/agent-platform-project-git-state-refresh`: Project Chat now refreshes local Git capability and branch/dirty state while a Project is open.
+- **Today’s outputs:** Added a Project refresh endpoint that re-detects backend root and Git metadata without stripping Project Chat onboarding state; the branch selector now hides for non-Git folders and reloads on refresh signals; Project Chat refreshes on open, focus/visibility return, and debounced terminal output/exit. Electron E2E now verifies a clean selector branch switch, then a terminal-created dirty file disables the selector with the explanatory message.
+- **Validation:** Passed web/api/desktop typecheck, web lint, elevated focused API project router tests, elevated Electron E2E, `pnpm format:check`, and `git diff --check`.
+- **Current state:** Bead `agent-platform-5fo` is in progress locally. Branch is `task/agent-platform-project-git-state-refresh`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit, and push the task branch.
+- **Date:** 2026-05-16
 - **Session:** Implemented `agent-platform-8ib` on `task/agent-platform-branch-selector-git-switch`: Project Chat branch selector now explains why branch switching is blocked when the Project worktree is dirty.
 - **Today’s outputs:** Kept conservative dirty-worktree branch blocking, added a clear disabled-state tooltip/accessibility label telling users to commit, stash, or use the terminal manually, and documented the scoped task. API coverage keeps dirty checkout blocking, and Electron E2E now opens a dirty Git Project and verifies the selector is disabled with the explanatory label.
 - **Validation:** Passed web typecheck, web lint, desktop typecheck, API typecheck, elevated focused API router tests, and elevated Electron E2E. Initial sandboxed API test failed because supertest could not bind a local socket (`listen EPERM`), then passed outside the sandbox.

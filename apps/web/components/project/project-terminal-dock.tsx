@@ -23,6 +23,7 @@ export interface ProjectTerminalDockProps {
   readonly activeBranch?: string;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  readonly onActivity?: () => void;
 }
 
 type TerminalState = 'starting' | 'open' | 'closed' | 'error' | 'unavailable';
@@ -81,6 +82,7 @@ export function ProjectTerminalDock({
   activeBranch,
   open,
   onOpenChange,
+  onActivity,
 }: ProjectTerminalDockProps) {
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -182,11 +184,13 @@ export function ProjectTerminalDock({
       const unsubscribeData = bridge.onData((event) => {
         if (event.terminalId === terminalId) {
           term.write(event.data);
+          onActivity?.();
         }
       });
       const unsubscribeExit = bridge.onExit((event) => {
         if (event.terminalId === terminalId) {
           updateTab(tab.id, { state: 'closed', terminalId: undefined });
+          onActivity?.();
         }
       });
       const inputDisposable = term.onData((data) => {
@@ -236,7 +240,7 @@ export function ProjectTerminalDock({
           });
         });
     },
-    [projectId, terminalFont, updateTab],
+    [onActivity, projectId, terminalFont, updateTab],
   );
 
   useEffect(() => {
