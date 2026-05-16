@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ProjectModeSchema,
   ProjectBranchCheckoutBodySchema,
+  ProjectGitChecksResultSchema,
   ProjectGitStatusResultSchema,
   ProjectBranchListResultSchema,
   ProjectOpenBodySchema,
@@ -113,6 +114,79 @@ describe('Project mode and workspace binding contracts', () => {
         },
       }),
     ).toMatchObject({ available: false, clean: true });
+  });
+
+  it('validates Project Git checks contracts', () => {
+    expect(
+      ProjectGitChecksResultSchema.parse({
+        available: true,
+        repositoryName: 'agent-platform',
+        remoteUrl: 'git@github.com:jwill9999/agent-platform.git',
+        currentBranch: 'task/checks',
+        headSha: 'abc123',
+        githubRemoteDetected: true,
+        ghAvailable: true,
+        authenticated: true,
+        checkedAt: '2026-05-16T16:00:00.000Z',
+        summary: {
+          total: 2,
+          success: 1,
+          failure: 1,
+          inProgress: 0,
+          queued: 0,
+          cancelled: 0,
+          skipped: 0,
+          unknown: 0,
+        },
+        checks: [
+          {
+            id: '123',
+            name: 'CI / build',
+            workflowName: 'CI',
+            displayTitle: 'build',
+            status: 'completed',
+            conclusion: 'success',
+            event: 'push',
+            headSha: 'abc123',
+            url: 'https://github.com/jwill9999/agent-platform/actions/runs/123',
+            startedAt: '2026-05-16T15:55:00.000Z',
+            completedAt: '2026-05-16T15:58:00.000Z',
+          },
+          {
+            id: '124',
+            name: 'Tests',
+            status: 'completed',
+            conclusion: 'failure',
+          },
+        ],
+      }),
+    ).toMatchObject({
+      available: true,
+      githubRemoteDetected: true,
+      summary: { total: 2, success: 1, failure: 1 },
+    });
+
+    expect(
+      ProjectGitChecksResultSchema.parse({
+        available: false,
+        reason: 'GitHub CLI is not authenticated.',
+        githubRemoteDetected: true,
+        ghAvailable: true,
+        authenticated: false,
+        checkedAt: '2026-05-16T16:00:00.000Z',
+        summary: {
+          total: 0,
+          success: 0,
+          failure: 0,
+          inProgress: 0,
+          queued: 0,
+          cancelled: 0,
+          skipped: 0,
+          unknown: 0,
+        },
+        checks: [],
+      }),
+    ).toMatchObject({ available: false, authenticated: false });
   });
 
   it('captures backend-accessible Project working-tree metadata without conflating chat workspace', () => {

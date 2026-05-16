@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-16
+- **Session:** Implementing `agent-platform-github-checks-view` on `task/agent-platform-github-checks-view`: Git & GitHub Checks tab backed by local GitHub remote detection and GitHub CLI data when available.
+- **Today’s outputs:** Added shared checks contracts, `GET /v1/projects/:id/git/checks`, GitHub remote slug parsing, `gh` availability/auth handling, check-run normalization and summaries, focused API coverage with a fake `gh` binary, and a real Checks tab UI with loading, unavailable, summary, run list, status badges, and GitHub links. Data remains explicit: no inferred checks when GitHub CLI/auth is unavailable.
+- **Validation:** Passed contracts build/typecheck/test, API typecheck, focused API router tests outside the sandbox after the expected Supertest socket restriction in sandbox, full API test suite, web typecheck, web lint, web unit tests, `pnpm format:check`, and `git diff --check`. SonarQube MCP was not available via tool discovery, so the documented fallback gate was used.
+- **Current state:** Bead `agent-platform-github-checks-view` is implemented locally and ready to close. Branch is `task/agent-platform-github-checks-view`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit and push this branch, then owner can later manually test the Checks tab in Electron with a GitHub repo and authenticated `gh`.
+- **Date:** 2026-05-16
 - **Session:** Implementing `agent-platform-cem` on `task/agent-platform-cem`: local Git commit flow from the Git & GitHub Changes tab.
 - **Today’s outputs:** Added a shared commit body contract, `POST /v1/projects/:id/git/commit`, staged-change validation, refreshed Git status after commit, and a Changes-tab commit message/action UI. Commit remains local-only; push, PR creation, and GitHub auth are out of scope.
 - **Validation:** Passed contracts test/typecheck/build, API typecheck, focused API router test outside the sandbox after the expected Supertest socket restriction in sandbox, web typecheck, web lint, web unit tests, `pnpm format:check`, and `git diff --check`. SonarQube MCP was not available via tool discovery, so the documented fallback gate was used.

@@ -637,6 +637,73 @@ export const ProjectGitCommitBodySchema = z.object({
 });
 export type ProjectGitCommitBody = z.infer<typeof ProjectGitCommitBodySchema>;
 
+export const ProjectGitCheckStatusSchema = z.enum([
+  'queued',
+  'in_progress',
+  'completed',
+  'waiting',
+  'pending',
+  'requested',
+  'unknown',
+]);
+export type ProjectGitCheckStatus = z.infer<typeof ProjectGitCheckStatusSchema>;
+
+export const ProjectGitCheckConclusionSchema = z.enum([
+  'success',
+  'failure',
+  'cancelled',
+  'skipped',
+  'timed_out',
+  'action_required',
+  'neutral',
+  'stale',
+  'unknown',
+]);
+export type ProjectGitCheckConclusion = z.infer<typeof ProjectGitCheckConclusionSchema>;
+
+export const ProjectGitCheckRunSchema = z.object({
+  id: z.string().min(1).max(200),
+  name: z.string().min(1).max(300),
+  workflowName: z.string().min(1).max(300).optional(),
+  displayTitle: z.string().min(1).max(500).optional(),
+  status: ProjectGitCheckStatusSchema,
+  conclusion: ProjectGitCheckConclusionSchema.optional(),
+  event: z.string().min(1).max(100).optional(),
+  headSha: z.string().min(1).max(80).optional(),
+  url: z.string().url().optional(),
+  startedAt: z.string().min(1).max(100).optional(),
+  completedAt: z.string().min(1).max(100).optional(),
+});
+export type ProjectGitCheckRun = z.infer<typeof ProjectGitCheckRunSchema>;
+
+export const ProjectGitChecksSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  success: z.number().int().nonnegative(),
+  failure: z.number().int().nonnegative(),
+  inProgress: z.number().int().nonnegative(),
+  queued: z.number().int().nonnegative(),
+  cancelled: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  unknown: z.number().int().nonnegative(),
+});
+export type ProjectGitChecksSummary = z.infer<typeof ProjectGitChecksSummarySchema>;
+
+export const ProjectGitChecksResultSchema = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).max(500).optional(),
+  repositoryName: z.string().min(1).max(200).optional(),
+  remoteUrl: z.string().min(1).max(1000).optional(),
+  currentBranch: z.string().min(1).max(300).optional(),
+  headSha: z.string().min(1).max(80).optional(),
+  githubRemoteDetected: z.boolean().default(false),
+  ghAvailable: z.boolean().default(false),
+  authenticated: z.boolean().default(false),
+  checkedAt: z.string().min(1).max(100),
+  summary: ProjectGitChecksSummarySchema,
+  checks: z.array(ProjectGitCheckRunSchema),
+});
+export type ProjectGitChecksResult = z.infer<typeof ProjectGitChecksResultSchema>;
+
 export type ProjectFileNode = {
   name: string;
   path: string;

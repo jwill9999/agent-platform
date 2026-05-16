@@ -6,6 +6,7 @@ import {
   ProjectBranchCheckoutBodySchema,
   ProjectBranchListResultSchema,
   ProjectGitCommitBodySchema,
+  ProjectGitChecksResultSchema,
   ProjectGitChangesResultSchema,
   ProjectGitFileDiffResultSchema,
   ProjectGitStageBodySchema,
@@ -31,6 +32,10 @@ import {
   type ProjectRecord,
   type ProjectBranchListResult,
   type ProjectGitChangedFile,
+  type ProjectGitCheckConclusion,
+  type ProjectGitCheckRun,
+  type ProjectGitCheckStatus,
+  type ProjectGitChecksSummary,
   type ProjectGitCommitBody,
   type ProjectGitFileStatus,
   type ProjectGitStageBody,
@@ -128,6 +133,20 @@ type BackendProjectMetadata = {
 
 const GIT_BINARY = '/usr/bin/git';
 const DESKTOP_PROJECT_REGISTRATION_HEADER = 'x-agent-platform-desktop-bridge';
+const EMPTY_GIT_CHECKS_SUMMARY: ProjectGitChecksSummary = {
+  total: 0,
+  success: 0,
+  failure: 0,
+  inProgress: 0,
+  queued: 0,
+  cancelled: 0,
+  skipped: 0,
+  unknown: 0,
+};
+
+function githubCliBinary(): string {
+  return process.env['AGENT_PLATFORM_GH_BINARY'] ?? 'gh';
+}
 
 function gitValue(cwd: string, args: string[]): string | undefined {
   try {
@@ -138,6 +157,34 @@ function gitValue(cwd: string, args: string[]): string | undefined {
     return output || undefined;
   } catch {
     return undefined;
+  }
+}
+
+function ghValue(cwd: string, args: string[]): string | undefined {
+  try {
+    const output = execFileSync(githubCliBinary(), args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 10000,
+    }).trim();
+    return output || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function ghSuccess(cwd: string, args: string[]): boolean {
+  try {
+    execFileSync(githubCliBinary(), args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'ignore', 'ignore'],
+      timeout: 10000,
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -756,6 +803,15 @@ function githubRemoteDetected(remoteUrl: string | undefined): boolean {
   return Boolean(remoteUrl && /github\.com[:/]/i.test(remoteUrl));
 }
 
+function githubRepositorySlug(remoteUrl: string | undefined): string | undefined {
+  if (!remoteUrl) return undefined;
+  const sshMatch = /^git@github\.com:([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remoteUrl);
+  if (sshMatch?.[1]) return sshMatch[1];
+  const httpsMatch = /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remoteUrl);
+  if (httpsMatch?.[1]) return httpsMatch[1];
+  return undefined;
+}
+
 function baseBranchFromUpstream(upstreamBranch: string | undefined): string | undefined {
   if (!upstreamBranch) return undefined;
   const slashIndex = upstreamBranch.indexOf('/');
@@ -1065,6 +1121,231 @@ function projectGitStatus(project: ProjectRecord) {
     workingTree,
     recentCommit: latestCommit(repositoryRoot),
     githubRemoteDetected: githubRemoteDetected(remoteUrl),
+  });
+}
+
+function unavailableGitChecks(
+  reason: string,
+  options: Partial<{
+    repositoryName: string;
+    remoteUrl: string;
+    currentBranch: string;
+    headSha: string;
+    githubRemoteDetected: boolean;
+    ghAvailable: boolean;
+    authenticated: boolean;
+  }> = {},
+) {
+  return ProjectGitChecksResultSchema.parse({
+    available: false,
+    reason,
+    ...(options.repositoryName ? { repositoryName: options.repositoryName } : {}),
+    ...(options.remoteUrl ? { remoteUrl: options.remoteUrl } : {}),
+    ...(options.currentBranch ? { currentBranch: options.currentBranch } : {}),
+    ...(options.headSha ? { headSha: options.headSha } : {}),
+    githubRemoteDetected: options.githubRemoteDetected ?? false,
+    ghAvailable: options.ghAvailable ?? false,
+    authenticated: options.authenticated ?? false,
+    checkedAt: new Date().toISOString(),
+    summary: EMPTY_GIT_CHECKS_SUMMARY,
+    checks: [],
+  });
+}
+
+type GhWorkflowRun = {
+  databaseId?: number;
+  name?: string;
+  displayTitle?: string;
+  workflowName?: string;
+  status?: string;
+  conclusion?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  url?: string;
+  headSha?: string;
+  event?: string;
+};
+
+function normalizeCheckStatus(status: string | undefined): ProjectGitCheckStatus {
+  if (
+    status === 'queued' ||
+    status === 'in_progress' ||
+    status === 'completed' ||
+    status === 'waiting' ||
+    status === 'pending' ||
+    status === 'requested'
+  ) {
+    return status;
+  }
+  return 'unknown';
+}
+
+function normalizeCheckConclusion(
+  conclusion: string | undefined,
+): ProjectGitCheckConclusion | undefined {
+  if (!conclusion) return undefined;
+  if (
+    conclusion === 'success' ||
+    conclusion === 'failure' ||
+    conclusion === 'cancelled' ||
+    conclusion === 'skipped' ||
+    conclusion === 'timed_out' ||
+    conclusion === 'action_required' ||
+    conclusion === 'neutral' ||
+    conclusion === 'stale'
+  ) {
+    return conclusion;
+  }
+  return 'unknown';
+}
+
+function summarizeChecks(checks: ProjectGitCheckRun[]): ProjectGitChecksSummary {
+  const summary = { ...EMPTY_GIT_CHECKS_SUMMARY, total: checks.length };
+  for (const check of checks) {
+    if (check.status === 'queued' || check.status === 'waiting' || check.status === 'pending') {
+      summary.queued += 1;
+      continue;
+    }
+    if (check.status === 'in_progress' || check.status === 'requested') {
+      summary.inProgress += 1;
+      continue;
+    }
+    if (check.conclusion === 'success') {
+      summary.success += 1;
+    } else if (check.conclusion === 'failure' || check.conclusion === 'timed_out') {
+      summary.failure += 1;
+    } else if (check.conclusion === 'cancelled') {
+      summary.cancelled += 1;
+    } else if (check.conclusion === 'skipped') {
+      summary.skipped += 1;
+    } else {
+      summary.unknown += 1;
+    }
+  }
+  return summary;
+}
+
+function parseGhWorkflowRuns(output: string): ProjectGitCheckRun[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    throw new HttpError(
+      502,
+      'PROJECT_GITHUB_CHECKS_INVALID',
+      'GitHub checks response was invalid.',
+    );
+  }
+  if (!Array.isArray(parsed)) {
+    throw new HttpError(
+      502,
+      'PROJECT_GITHUB_CHECKS_INVALID',
+      'GitHub checks response was invalid.',
+    );
+  }
+  return parsed.flatMap((value): ProjectGitCheckRun[] => {
+    const run = value as GhWorkflowRun;
+    const id = run.databaseId ? String(run.databaseId) : undefined;
+    const name = run.workflowName ?? run.name ?? run.displayTitle;
+    if (!id || !name) return [];
+    return [
+      {
+        id,
+        name,
+        ...(run.workflowName ? { workflowName: run.workflowName } : {}),
+        ...(run.displayTitle ? { displayTitle: run.displayTitle } : {}),
+        status: normalizeCheckStatus(run.status),
+        ...(normalizeCheckConclusion(run.conclusion)
+          ? { conclusion: normalizeCheckConclusion(run.conclusion) }
+          : {}),
+        ...(run.event ? { event: run.event } : {}),
+        ...(run.headSha ? { headSha: run.headSha.slice(0, 12) } : {}),
+        ...(run.url ? { url: run.url } : {}),
+        ...(run.createdAt ? { startedAt: run.createdAt } : {}),
+        ...(run.updatedAt ? { completedAt: run.updatedAt } : {}),
+      },
+    ];
+  });
+}
+
+function projectGitChecks(project: ProjectRecord) {
+  let projectRoot: string;
+  try {
+    projectRoot = projectRootForBackendRead(project);
+  } catch {
+    return unavailableGitChecks('Project folder is not available.');
+  }
+
+  const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']);
+  if (!repositoryRoot) return unavailableGitChecks('Project is not a Git repository.');
+
+  const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
+  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
+  const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD'])?.slice(0, 12);
+  const repositoryName = basename(repositoryRoot);
+  const githubDetected = githubRemoteDetected(remoteUrl);
+  const repositorySlug = githubRepositorySlug(remoteUrl);
+
+  const baseOptions = {
+    repositoryName,
+    ...(remoteUrl ? { remoteUrl } : {}),
+    ...(currentBranch ? { currentBranch } : {}),
+    ...(headSha ? { headSha } : {}),
+    githubRemoteDetected: githubDetected,
+  };
+
+  if (!githubDetected || !repositorySlug) {
+    return unavailableGitChecks(
+      'No GitHub origin remote is configured for this Project.',
+      baseOptions,
+    );
+  }
+
+  const ghVersion = ghValue(repositoryRoot, ['--version']);
+  if (!ghVersion) {
+    return unavailableGitChecks('GitHub CLI is not installed or is not available on PATH.', {
+      ...baseOptions,
+      ghAvailable: false,
+    });
+  }
+
+  if (!ghSuccess(repositoryRoot, ['auth', 'status', '--hostname', 'github.com'])) {
+    return unavailableGitChecks('GitHub CLI is not authenticated for github.com.', {
+      ...baseOptions,
+      ghAvailable: true,
+      authenticated: false,
+    });
+  }
+
+  const args = [
+    'run',
+    'list',
+    '--repo',
+    repositorySlug,
+    '--limit',
+    '20',
+    '--json',
+    'databaseId,name,displayTitle,workflowName,status,conclusion,createdAt,updatedAt,url,headSha,event',
+  ];
+  if (currentBranch) args.push('--branch', currentBranch);
+  const runsOutput = ghValue(repositoryRoot, args);
+  if (runsOutput === undefined) {
+    return unavailableGitChecks('GitHub checks could not be loaded for this Project.', {
+      ...baseOptions,
+      ghAvailable: true,
+      authenticated: true,
+    });
+  }
+
+  const checks = parseGhWorkflowRuns(runsOutput);
+  return ProjectGitChecksResultSchema.parse({
+    available: true,
+    ...baseOptions,
+    ghAvailable: true,
+    authenticated: true,
+    checkedAt: new Date().toISOString(),
+    summary: summarizeChecks(checks),
+    checks,
   });
 }
 
@@ -1734,6 +2015,15 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: commitProjectGitChanges(project, req.body) });
+    }),
+  );
+
+  router.get(
+    '/:id/git/checks',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: projectGitChecks(project) });
     }),
   );
 

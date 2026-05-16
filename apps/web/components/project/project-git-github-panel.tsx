@@ -3,6 +3,7 @@
 import type {
   ProjectGitChangedFile,
   ProjectGitChangesResult,
+  ProjectGitChecksResult,
   ProjectGitDiffMode,
   ProjectGitFileDiffResult,
   ProjectGitStatusResult,
@@ -198,6 +199,43 @@ function DiffPreview({ diff }: Readonly<{ diff: string }>) {
   );
 }
 
+function CheckStateIcon({ check }: Readonly<{ check: ProjectGitChecksResult['checks'][number] }>) {
+  if (check.status === 'in_progress' || check.status === 'queued' || check.status === 'requested') {
+    return <RefreshCw className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600" />;
+  }
+  if (check.conclusion === 'success' || check.conclusion === 'skipped') {
+    return <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />;
+  }
+  if (
+    check.conclusion === 'failure' ||
+    check.conclusion === 'timed_out' ||
+    check.conclusion === 'cancelled' ||
+    check.conclusion === 'action_required'
+  ) {
+    return <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />;
+  }
+  return <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />;
+}
+
+function CheckStateBadge({ check }: Readonly<{ check: ProjectGitChecksResult['checks'][number] }>) {
+  if (check.status === 'in_progress' || check.status === 'queued' || check.status === 'requested') {
+    return <Badge variant="outline">Running</Badge>;
+  }
+  if (check.conclusion === 'success') {
+    return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Success</Badge>;
+  }
+  if (check.conclusion === 'failure' || check.conclusion === 'timed_out') {
+    return <Badge variant="destructive">Failed</Badge>;
+  }
+  if (check.conclusion === 'cancelled') {
+    return <Badge variant="outline">Cancelled</Badge>;
+  }
+  if (check.conclusion === 'skipped') {
+    return <Badge variant="outline">Skipped</Badge>;
+  }
+  return <Badge variant="outline">{check.conclusion ?? check.status}</Badge>;
+}
+
 function ChangeFileRow({
   file,
   selected,
@@ -252,16 +290,19 @@ export function ProjectGitHubPanel({
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
   const [status, setStatus] = useState<ProjectGitStatusResult | null>(null);
   const [changes, setChanges] = useState<ProjectGitChangesResult | null>(null);
+  const [checks, setChecks] = useState<ProjectGitChecksResult | null>(null);
   const [selectedChange, setSelectedChange] = useState<ProjectGitChangedFile | null>(null);
   const [selectedDiffMode, setSelectedDiffMode] = useState<ProjectGitDiffMode>('unstaged');
   const [diff, setDiff] = useState<ProjectGitFileDiffResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [changesLoading, setChangesLoading] = useState(false);
+  const [checksLoading, setChecksLoading] = useState(false);
   const [diffLoading, setDiffLoading] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [changesError, setChangesError] = useState<string | null>(null);
+  const [checksError, setChecksError] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     if (!projectId) {
@@ -314,6 +355,27 @@ export function ProjectGitHubPanel({
     }
   }, [projectId]);
 
+  const loadChecks = useCallback(async () => {
+    if (!projectId) {
+      setChecks(null);
+      setChecksError(null);
+      return;
+    }
+    setChecksLoading(true);
+    try {
+      const next = await apiGet<ProjectGitChecksResult>(
+        apiPath('projects', projectId, 'git', 'checks'),
+      );
+      setChecks(next ?? null);
+      setChecksError(null);
+    } catch (cause) {
+      setChecks(null);
+      setChecksError(cause instanceof ApiRequestError ? cause.message : 'Failed to load checks.');
+    } finally {
+      setChecksLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     void loadStatus();
   }, [loadStatus, refreshKey]);
@@ -321,6 +383,10 @@ export function ProjectGitHubPanel({
   useEffect(() => {
     if (activeTab === 'changes') void loadChanges();
   }, [activeTab, loadChanges, refreshKey]);
+
+  useEffect(() => {
+    if (activeTab === 'checks') void loadChecks();
+  }, [activeTab, loadChecks, refreshKey]);
 
   useEffect(() => {
     if (!projectId || activeTab !== 'changes' || !selectedChange) {
@@ -356,8 +422,8 @@ export function ProjectGitHubPanel({
   }, [activeTab, projectId, selectedChange, selectedDiffMode]);
 
   const refreshGitViews = useCallback(async () => {
-    await Promise.all([loadStatus(), loadChanges()]);
-  }, [loadChanges, loadStatus]);
+    await Promise.all([loadStatus(), loadChanges(), activeTab === 'checks' ? loadChecks() : null]);
+  }, [activeTab, loadChanges, loadChecks, loadStatus]);
 
   const stagePaths = useCallback(
     async (paths: string[] | 'all') => {
@@ -452,7 +518,12 @@ export function ProjectGitHubPanel({
   const githubUrl = normalizeGitHubUrl(currentStatus.remoteUrl);
   const changesBadge = currentStatus.workingTree.total;
   const prsBadge = currentStatus.githubRemoteDetected ? 0 : undefined;
-  const checksBadge = currentStatus.githubRemoteDetected ? 0 : undefined;
+  const checksBadge =
+    checks?.summary.total && checks.summary.total > 0
+      ? checks.summary.total
+      : currentStatus.githubRemoteDetected
+        ? 0
+        : undefined;
   const tabs = useMemo(
     () =>
       [
@@ -510,11 +581,16 @@ export function ProjectGitHubPanel({
               variant="ghost"
               className="h-7 w-7"
               onClick={() => void refreshGitViews()}
-              disabled={loading || changesLoading}
+              disabled={loading || changesLoading || checksLoading}
               title="Refresh Git state"
               aria-label="Refresh Git state"
             >
-              <RefreshCw className={cn('h-4 w-4', (loading || changesLoading) && 'animate-spin')} />
+              <RefreshCw
+                className={cn(
+                  'h-4 w-4',
+                  (loading || changesLoading || checksLoading) && 'animate-spin',
+                )}
+              />
             </Button>
             <Button
               type="button"
@@ -561,6 +637,11 @@ export function ProjectGitHubPanel({
             {changesError && activeTab === 'changes' && (
               <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {changesError}
+              </div>
+            )}
+            {checksError && activeTab === 'checks' && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {checksError}
               </div>
             )}
 
@@ -937,15 +1018,136 @@ export function ProjectGitHubPanel({
                 </div>
               </GitCard>
             ) : (
-              <GitCard title="Checks">
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <X className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    GitHub Actions, check runs, Sonar, and CodeQL are not connected yet. No check
-                    data is being inferred.
-                  </span>
-                </div>
-              </GitCard>
+              <>
+                <GitCard title="Checks">
+                  <div className="space-y-3">
+                    {checksLoading && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Loading GitHub checks...
+                      </div>
+                    )}
+
+                    {!checksLoading && checks && !checks.available && (
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        {checks.githubRemoteDetected ? (
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        ) : (
+                          <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                        )}
+                        <div className="space-y-1">
+                          <div>{checks.reason ?? 'GitHub checks are unavailable.'}</div>
+                          {checks.githubRemoteDetected && !checks.authenticated && (
+                            <div className="text-xs">
+                              Authenticate with GitHub CLI in the terminal to enable live checks.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {!checksLoading && !checks && (
+                      <div className="text-sm text-muted-foreground">
+                        Select refresh or open this tab again to load check state.
+                      </div>
+                    )}
+
+                    {!checksLoading && checks?.available && (
+                      <>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                            <div className="text-muted-foreground">Total</div>
+                            <div className="text-lg font-semibold">{checks.summary.total}</div>
+                          </div>
+                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                            <div className="text-muted-foreground">Passing</div>
+                            <div className="text-lg font-semibold text-emerald-700">
+                              {checks.summary.success}
+                            </div>
+                          </div>
+                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                            <div className="text-muted-foreground">Failing</div>
+                            <div className="text-lg font-semibold text-red-700">
+                              {checks.summary.failure}
+                            </div>
+                          </div>
+                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                            <div className="text-muted-foreground">Running</div>
+                            <div className="text-lg font-semibold text-blue-700">
+                              {checks.summary.inProgress + checks.summary.queued}
+                            </div>
+                          </div>
+                        </div>
+
+                        {checks.checks.length === 0 ? (
+                          <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                            No GitHub Actions runs were found for this branch.
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {checks.checks.map((check) => (
+                              <div
+                                key={check.id}
+                                className="rounded border border-border bg-background px-3 py-2"
+                              >
+                                <div className="flex min-w-0 items-start gap-2">
+                                  <CheckStateIcon check={check} />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <div className="truncate text-sm font-medium">
+                                        {check.name}
+                                      </div>
+                                      {check.url && (
+                                        <a
+                                          href={check.url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          aria-label={`Open ${check.name} on GitHub`}
+                                        >
+                                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                                        </a>
+                                      )}
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                      {check.displayTitle && <span>{check.displayTitle}</span>}
+                                      {check.workflowName && <span>{check.workflowName}</span>}
+                                      {check.completedAt && (
+                                        <span>{relativeCommitLabel(check.completedAt)}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <CheckStateBadge check={check} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </GitCard>
+
+                <GitCard title="Source">
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <div>
+                      {checks?.repositoryName ?? currentStatus.repositoryName ?? 'Repository'}{' '}
+                      {(checks?.currentBranch ?? currentStatus.currentBranch)
+                        ? `· ${checks?.currentBranch ?? currentStatus.currentBranch}`
+                        : ''}
+                    </div>
+                    <div>
+                      {checks?.ghAvailable
+                        ? 'GitHub CLI detected'
+                        : 'GitHub CLI not confirmed for this Project'}
+                    </div>
+                    <div>
+                      {checks?.authenticated
+                        ? 'Authenticated with github.com'
+                        : 'GitHub authentication not confirmed'}
+                    </div>
+                  </div>
+                </GitCard>
+              </>
             )}
           </div>
         </div>
