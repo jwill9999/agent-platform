@@ -308,6 +308,92 @@ describe('projectsRouter', () => {
     });
   });
 
+  it('lists changed files, returns diffs, and stages/unstages Project Git changes', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-git-changes-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    writeFileSync(path.join(repoDir, 'remove-me.md'), 'delete me\n');
+    execFileSync(GIT_BINARY, ['add', '.'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\nchanged\n');
+    writeFileSync(path.join(repoDir, 'notes.md'), 'untracked\n');
+    rmSync(path.join(repoDir, 'remove-me.md'), { force: true });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Git Changes Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const changes = await request(app).get(`/v1/projects/${projectId}/git/changes`).expect(200);
+    expect(changes.body.data).toMatchObject({
+      available: true,
+      clean: false,
+      workingTree: expect.objectContaining({
+        total: 3,
+        modified: 1,
+        deleted: 1,
+        untracked: 1,
+      }),
+      files: expect.arrayContaining([
+        expect.objectContaining({ path: 'README.md', status: 'modified', unstaged: true }),
+        expect.objectContaining({ path: 'remove-me.md', status: 'deleted', unstaged: true }),
+        expect.objectContaining({ path: 'notes.md', status: 'untracked', unstaged: true }),
+      ]),
+    });
+
+    const diff = await request(app)
+      .get(`/v1/projects/${projectId}/git/diff`)
+      .query({ path: 'README.md', mode: 'unstaged' })
+      .expect(200);
+    expect(diff.body.data).toMatchObject({
+      path: 'README.md',
+      mode: 'unstaged',
+      status: 'modified',
+    });
+    expect(diff.body.data.diff).toContain('+changed');
+
+    const untrackedDiff = await request(app)
+      .get(`/v1/projects/${projectId}/git/diff`)
+      .query({ path: 'notes.md', mode: 'unstaged' })
+      .expect(200);
+    expect(untrackedDiff.body.data.diff).toContain('--- /dev/null');
+    expect(untrackedDiff.body.data.diff).toContain('+untracked');
+
+    const staged = await request(app)
+      .post(`/v1/projects/${projectId}/git/stage`)
+      .send({ paths: ['README.md'] })
+      .expect(200);
+    expect(staged.body.data.files).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'README.md', staged: true })]),
+    );
+
+    const unstaged = await request(app)
+      .post(`/v1/projects/${projectId}/git/unstage`)
+      .send({ paths: ['README.md'] })
+      .expect(200);
+    expect(unstaged.body.data.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'README.md', staged: false, unstaged: true }),
+      ]),
+    );
+
+    const stageAll = await request(app)
+      .post(`/v1/projects/${projectId}/git/stage`)
+      .send({ all: true })
+      .expect(200);
+    expect(stageAll.body.data.workingTree.staged).toBe(3);
+  });
+
   it('blocks Project branch switching when the working tree is dirty', async () => {
     const repoDir = path.join(tmpDir, 'desktop-dirty-branches-repo');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });

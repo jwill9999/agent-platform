@@ -578,6 +578,60 @@ export const ProjectGitStatusResultSchema = z.object({
 });
 export type ProjectGitStatusResult = z.infer<typeof ProjectGitStatusResultSchema>;
 
+export const ProjectGitFileStatusSchema = z.enum([
+  'added',
+  'modified',
+  'deleted',
+  'renamed',
+  'untracked',
+  'conflict',
+]);
+export type ProjectGitFileStatus = z.infer<typeof ProjectGitFileStatusSchema>;
+
+export const ProjectGitChangedFileSchema = z.object({
+  path: z.string().min(1).max(1000),
+  originalPath: z.string().min(1).max(1000).optional(),
+  status: ProjectGitFileStatusSchema,
+  indexStatus: z.string().min(1).max(2),
+  worktreeStatus: z.string().min(1).max(2),
+  staged: z.boolean(),
+  unstaged: z.boolean(),
+  additions: z.number().int().nonnegative().optional(),
+  deletions: z.number().int().nonnegative().optional(),
+});
+export type ProjectGitChangedFile = z.infer<typeof ProjectGitChangedFileSchema>;
+
+export const ProjectGitChangesResultSchema = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).max(500).optional(),
+  clean: z.boolean(),
+  workingTree: ProjectGitWorkingTreeSummarySchema,
+  files: z.array(ProjectGitChangedFileSchema),
+});
+export type ProjectGitChangesResult = z.infer<typeof ProjectGitChangesResultSchema>;
+
+export const ProjectGitDiffModeSchema = z.enum(['unstaged', 'staged']);
+export type ProjectGitDiffMode = z.infer<typeof ProjectGitDiffModeSchema>;
+
+export const ProjectGitFileDiffResultSchema = z.object({
+  path: z.string().min(1).max(1000),
+  mode: ProjectGitDiffModeSchema,
+  status: ProjectGitFileStatusSchema.optional(),
+  diff: z.string(),
+  truncated: z.boolean().default(false),
+});
+export type ProjectGitFileDiffResult = z.infer<typeof ProjectGitFileDiffResultSchema>;
+
+export const ProjectGitStageBodySchema = z
+  .object({
+    all: z.boolean().optional(),
+    paths: z.array(z.string().min(1).max(1000)).max(100).optional(),
+  })
+  .refine((value) => value.all === true || Boolean(value.paths?.length), {
+    message: 'Specify all=true or at least one path',
+  });
+export type ProjectGitStageBody = z.infer<typeof ProjectGitStageBodySchema>;
+
 export type ProjectFileNode = {
   name: string;
   path: string;

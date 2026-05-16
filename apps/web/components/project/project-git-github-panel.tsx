@@ -1,10 +1,17 @@
 'use client';
 
-import type { ProjectGitStatusResult } from '@agent-platform/contracts';
+import type {
+  ProjectGitChangedFile,
+  ProjectGitChangesResult,
+  ProjectGitDiffMode,
+  ProjectGitFileDiffResult,
+  ProjectGitStatusResult,
+} from '@agent-platform/contracts';
 import {
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
+  FileCode2,
   GitBranch,
   GitCommitHorizontal,
   GitPullRequest,
@@ -16,7 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { apiGet, apiPath, ApiRequestError } from '@/lib/apiClient';
+import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { cn } from '@/lib/cn';
 
 type ProjectGitHubPanelProps = Readonly<{
@@ -152,6 +159,87 @@ function ProjectInstructionsCard({
   );
 }
 
+function shortPath(path: string): string {
+  const parts = path.split('/');
+  if (parts.length <= 2) return path;
+  return `${parts[0]}/.../${parts.at(-1)}`;
+}
+
+function statusLabel(file: ProjectGitChangedFile): string {
+  if (file.status === 'untracked') return 'U';
+  if (file.status === 'modified') return 'M';
+  if (file.status === 'deleted') return 'D';
+  if (file.status === 'added') return 'A';
+  if (file.status === 'renamed') return 'R';
+  return '!';
+}
+
+function statusTone(file: ProjectGitChangedFile): string {
+  if (file.status === 'deleted' || file.status === 'conflict') return 'text-red-700 bg-red-50';
+  if (file.status === 'added' || file.status === 'untracked')
+    return 'text-emerald-700 bg-emerald-50';
+  if (file.status === 'renamed') return 'text-blue-700 bg-blue-50';
+  return 'text-amber-700 bg-amber-50';
+}
+
+function DiffPreview({ diff }: Readonly<{ diff: string }>) {
+  if (!diff.trim()) {
+    return (
+      <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+        No diff available for this selection.
+      </div>
+    );
+  }
+  return (
+    <pre className="max-h-[360px] overflow-auto rounded border border-border bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
+      <code>{diff}</code>
+    </pre>
+  );
+}
+
+function ChangeFileRow({
+  file,
+  selected,
+  mode,
+  onSelect,
+}: Readonly<{
+  file: ProjectGitChangedFile;
+  selected: boolean;
+  mode: ProjectGitDiffMode;
+  onSelect: (file: ProjectGitChangedFile, mode: ProjectGitDiffMode) => void;
+}>) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'flex w-full min-w-0 items-center gap-2 rounded border px-2 py-2 text-left text-xs transition-colors',
+        selected
+          ? 'border-primary bg-primary/5 text-foreground'
+          : 'border-border bg-background hover:bg-secondary/50',
+      )}
+      onClick={() => onSelect(file, mode)}
+    >
+      <span
+        className={cn(
+          'flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold',
+          statusTone(file),
+        )}
+      >
+        {statusLabel(file)}
+      </span>
+      <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
+        {shortPath(file.path)}
+      </span>
+      {(file.additions !== undefined || file.deletions !== undefined) && (
+        <span className="shrink-0 text-[10px] text-muted-foreground">
+          <span className="text-emerald-700">+{file.additions ?? 0}</span>{' '}
+          <span className="text-red-700">-{file.deletions ?? 0}</span>
+        </span>
+      )}
+    </button>
+  );
+}
+
 export function ProjectGitHubPanel({
   projectId,
   refreshKey,
@@ -162,8 +250,16 @@ export function ProjectGitHubPanel({
   const [open, setOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
   const [status, setStatus] = useState<ProjectGitStatusResult | null>(null);
+  const [changes, setChanges] = useState<ProjectGitChangesResult | null>(null);
+  const [selectedChange, setSelectedChange] = useState<ProjectGitChangedFile | null>(null);
+  const [selectedDiffMode, setSelectedDiffMode] = useState<ProjectGitDiffMode>('unstaged');
+  const [diff, setDiff] = useState<ProjectGitFileDiffResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [changesLoading, setChangesLoading] = useState(false);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [actionPending, setActionPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [changesError, setChangesError] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     if (!projectId) {
@@ -186,11 +282,144 @@ export function ProjectGitHubPanel({
     }
   }, [projectId]);
 
+  const loadChanges = useCallback(async () => {
+    if (!projectId) {
+      setChanges(null);
+      setSelectedChange(null);
+      setDiff(null);
+      setChangesError(null);
+      return;
+    }
+    setChangesLoading(true);
+    try {
+      const next = await apiGet<ProjectGitChangesResult>(
+        apiPath('projects', projectId, 'git', 'changes'),
+      );
+      setChanges(next ?? null);
+      setChangesError(null);
+      setSelectedChange((current) => {
+        if (!next?.files.length) return null;
+        if (current && next.files.some((file) => file.path === current.path)) return current;
+        return next.files[0] ?? null;
+      });
+    } catch (cause) {
+      setChanges(null);
+      setSelectedChange(null);
+      setDiff(null);
+      setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to load changes.');
+    } finally {
+      setChangesLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     void loadStatus();
   }, [loadStatus, refreshKey]);
 
+  useEffect(() => {
+    if (activeTab === 'changes') void loadChanges();
+  }, [activeTab, loadChanges, refreshKey]);
+
+  useEffect(() => {
+    if (!projectId || activeTab !== 'changes' || !selectedChange) {
+      setDiff(null);
+      return;
+    }
+    const params = new URLSearchParams({
+      path: selectedChange.path,
+      mode: selectedDiffMode,
+    });
+    let cancelled = false;
+    setDiffLoading(true);
+    apiGet<ProjectGitFileDiffResult>(
+      `${apiPath('projects', projectId, 'git', 'diff')}?${params.toString()}`,
+    )
+      .then((next) => {
+        if (!cancelled) setDiff(next ?? null);
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          setDiff(null);
+          setChangesError(
+            cause instanceof ApiRequestError ? cause.message : 'Failed to load file diff.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDiffLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, projectId, selectedChange, selectedDiffMode]);
+
+  const refreshGitViews = useCallback(async () => {
+    await Promise.all([loadStatus(), loadChanges()]);
+  }, [loadChanges, loadStatus]);
+
+  const stagePaths = useCallback(
+    async (paths: string[] | 'all') => {
+      if (!projectId) return;
+      setActionPending(paths === 'all' ? 'stage-all' : `stage:${paths.join('\0')}`);
+      try {
+        const next = await apiPost<ProjectGitChangesResult>(
+          apiPath('projects', projectId, 'git', 'stage'),
+          paths === 'all' ? { all: true } : { paths },
+        );
+        setChanges(next ?? null);
+        setSelectedChange((current) =>
+          current && next
+            ? (next.files.find((file) => file.path === current.path) ?? null)
+            : current,
+        );
+        if (paths !== 'all') setSelectedDiffMode('staged');
+        setChangesError(null);
+        await loadStatus();
+      } catch (cause) {
+        setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to stage file.');
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [loadStatus, projectId],
+  );
+
+  const unstagePaths = useCallback(
+    async (paths: string[]) => {
+      if (!projectId) return;
+      setActionPending(`unstage:${paths.join('\0')}`);
+      try {
+        const next = await apiPost<ProjectGitChangesResult>(
+          apiPath('projects', projectId, 'git', 'unstage'),
+          { paths },
+        );
+        setChanges(next ?? null);
+        setSelectedChange((current) =>
+          current && next
+            ? (next.files.find((file) => file.path === current.path) ?? null)
+            : current,
+        );
+        setSelectedDiffMode('unstaged');
+        setChangesError(null);
+        await loadStatus();
+      } catch (cause) {
+        setChangesError(
+          cause instanceof ApiRequestError ? cause.message : 'Failed to unstage file.',
+        );
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [loadStatus, projectId],
+  );
+
   const currentStatus = status ?? EmptyGitStatus();
+  const currentChanges = changes;
+  const stagedFiles = currentChanges?.files.filter((file) => file.staged) ?? [];
+  const untrackedFiles =
+    currentChanges?.files.filter((file) => file.status === 'untracked' && !file.staged) ?? [];
+  const unstagedFiles =
+    currentChanges?.files.filter((file) => file.unstaged && file.status !== 'untracked') ?? [];
   const githubUrl = normalizeGitHubUrl(currentStatus.remoteUrl);
   const changesBadge = currentStatus.workingTree.total;
   const prsBadge = currentStatus.githubRemoteDetected ? 0 : undefined;
@@ -251,12 +480,12 @@ export function ProjectGitHubPanel({
               size="icon"
               variant="ghost"
               className="h-7 w-7"
-              onClick={() => void loadStatus()}
-              disabled={loading}
+              onClick={() => void refreshGitViews()}
+              disabled={loading || changesLoading}
               title="Refresh Git state"
               aria-label="Refresh Git state"
             >
-              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+              <RefreshCw className={cn('h-4 w-4', (loading || changesLoading) && 'animate-spin')} />
             </Button>
             <Button
               type="button"
@@ -300,6 +529,11 @@ export function ProjectGitHubPanel({
                 {error}
               </div>
             )}
+            {changesError && activeTab === 'changes' && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {changesError}
+              </div>
+            )}
 
             {!currentStatus.available ? (
               <>
@@ -341,7 +575,9 @@ export function ProjectGitHubPanel({
                         )}
                       </div>
                     ) : (
-                      <div className="text-xs text-muted-foreground">No origin remote configured.</div>
+                      <div className="text-xs text-muted-foreground">
+                        No origin remote configured.
+                      </div>
                     )}
                     <div className="flex items-center gap-2">
                       <StatusPill status={currentStatus} />
@@ -356,10 +592,13 @@ export function ProjectGitHubPanel({
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 font-mono text-sm">
                       <GitBranch className="h-4 w-4 text-muted-foreground" />
-                      <span className="truncate">{currentStatus.currentBranch ?? 'Detached HEAD'}</span>
+                      <span className="truncate">
+                        {currentStatus.currentBranch ?? 'Detached HEAD'}
+                      </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Base: {currentStatus.baseBranch ?? currentStatus.upstreamBranch ?? 'No upstream'}
+                      Base:{' '}
+                      {currentStatus.baseBranch ?? currentStatus.upstreamBranch ?? 'No upstream'}
                     </div>
                     <div className="flex gap-3 text-xs">
                       <span className="text-emerald-700">↑ {currentStatus.ahead}</span>
@@ -380,18 +619,36 @@ export function ProjectGitHubPanel({
                             currentStatus.workingTree.total === 1 ? '' : 's'
                           }`}
                     </div>
-                    <StatRow label="Added" value={currentStatus.workingTree.added} tone="text-emerald-700" />
-                    <StatRow label="Modified" value={currentStatus.workingTree.modified} tone="text-amber-700" />
-                    <StatRow label="Deleted" value={currentStatus.workingTree.deleted} tone="text-red-700" />
+                    <StatRow
+                      label="Added"
+                      value={currentStatus.workingTree.added}
+                      tone="text-emerald-700"
+                    />
+                    <StatRow
+                      label="Modified"
+                      value={currentStatus.workingTree.modified}
+                      tone="text-amber-700"
+                    />
+                    <StatRow
+                      label="Deleted"
+                      value={currentStatus.workingTree.deleted}
+                      tone="text-red-700"
+                    />
                     <StatRow label="Untracked" value={currentStatus.workingTree.untracked} />
-                    <StatRow label="Conflicts" value={currentStatus.workingTree.conflicts} tone="text-red-700" />
+                    <StatRow
+                      label="Conflicts"
+                      value={currentStatus.workingTree.conflicts}
+                      tone="text-red-700"
+                    />
                   </div>
                 </GitCard>
 
                 <GitCard title="Recent Commit">
                   {currentStatus.recentCommit ? (
                     <div className="space-y-2">
-                      <div className="font-mono text-xs">{shortSha(currentStatus.recentCommit.sha)}</div>
+                      <div className="font-mono text-xs">
+                        {shortSha(currentStatus.recentCommit.sha)}
+                      </div>
                       <div className="font-medium">{currentStatus.recentCommit.subject}</div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <GitCommitHorizontal className="h-3.5 w-3.5" />
@@ -423,22 +680,173 @@ export function ProjectGitHubPanel({
                 </GitCard>
               </>
             ) : activeTab === 'changes' ? (
-              <GitCard title="Changes">
-                <div className="space-y-1">
-                  <StatRow label="Staged" value={currentStatus.workingTree.staged} />
-                  <StatRow label="Unstaged" value={currentStatus.workingTree.unstaged} />
-                  <StatRow label="Added" value={currentStatus.workingTree.added} tone="text-emerald-700" />
-                  <StatRow label="Modified" value={currentStatus.workingTree.modified} tone="text-amber-700" />
-                  <StatRow label="Deleted" value={currentStatus.workingTree.deleted} tone="text-red-700" />
-                  <StatRow label="Renamed" value={currentStatus.workingTree.renamed} />
-                  <StatRow label="Untracked" value={currentStatus.workingTree.untracked} />
-                </div>
-              </GitCard>
+              <>
+                <GitCard title="Changes">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-medium">
+                        {currentStatus.clean
+                          ? 'Working tree clean'
+                          : `${currentStatus.workingTree.total} changed file${
+                              currentStatus.workingTree.total === 1 ? '' : 's'
+                            }`}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          changesLoading ||
+                          actionPending !== null ||
+                          currentStatus.workingTree.total === 0
+                        }
+                        onClick={() => void stagePaths('all')}
+                      >
+                        {actionPending === 'stage-all' ? 'Staging...' : 'Stage all'}
+                      </Button>
+                    </div>
+
+                    {changesLoading && (
+                      <div className="text-xs text-muted-foreground">Loading changed files...</div>
+                    )}
+
+                    {!changesLoading && currentChanges?.files.length === 0 && (
+                      <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                        No local changes detected.
+                      </div>
+                    )}
+
+                    {stagedFiles.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Staged
+                        </div>
+                        {stagedFiles.map((file) => (
+                          <ChangeFileRow
+                            key={`staged:${file.path}`}
+                            file={file}
+                            mode="staged"
+                            selected={
+                              selectedChange?.path === file.path && selectedDiffMode === 'staged'
+                            }
+                            onSelect={(nextFile, mode) => {
+                              setSelectedChange(nextFile);
+                              setSelectedDiffMode(mode);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {unstagedFiles.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Unstaged
+                        </div>
+                        {unstagedFiles.map((file) => (
+                          <ChangeFileRow
+                            key={`unstaged:${file.path}`}
+                            file={file}
+                            mode="unstaged"
+                            selected={
+                              selectedChange?.path === file.path && selectedDiffMode === 'unstaged'
+                            }
+                            onSelect={(nextFile, mode) => {
+                              setSelectedChange(nextFile);
+                              setSelectedDiffMode(mode);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {untrackedFiles.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Untracked
+                        </div>
+                        {untrackedFiles.map((file) => (
+                          <ChangeFileRow
+                            key={`untracked:${file.path}`}
+                            file={file}
+                            mode="unstaged"
+                            selected={selectedChange?.path === file.path}
+                            onSelect={(nextFile, mode) => {
+                              setSelectedChange(nextFile);
+                              setSelectedDiffMode(mode);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </GitCard>
+
+                <GitCard title="Diff">
+                  {selectedChange ? (
+                    <div className="space-y-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <FileCode2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div
+                          className="min-w-0 flex-1 truncate font-mono text-xs"
+                          title={selectedChange.path}
+                        >
+                          {selectedChange.path}
+                        </div>
+                        <Badge variant="outline">{selectedDiffMode}</Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedChange.unstaged && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => void stagePaths([selectedChange.path])}
+                            disabled={actionPending !== null}
+                          >
+                            {actionPending === `stage:${selectedChange.path}`
+                              ? 'Staging...'
+                              : 'Stage file'}
+                          </Button>
+                        )}
+                        {selectedChange.staged && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void unstagePaths([selectedChange.path])}
+                            disabled={actionPending !== null}
+                          >
+                            {actionPending === `unstage:${selectedChange.path}`
+                              ? 'Unstaging...'
+                              : 'Unstage file'}
+                          </Button>
+                        )}
+                      </div>
+                      {diffLoading ? (
+                        <div className="text-xs text-muted-foreground">Loading diff...</div>
+                      ) : (
+                        <DiffPreview diff={diff?.diff ?? ''} />
+                      )}
+                      {diff?.truncated && (
+                        <div className="text-xs text-amber-700">
+                          Diff preview truncated to keep the panel responsive.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                      Select a changed file to review its diff.
+                    </div>
+                  )}
+                </GitCard>
+              </>
             ) : activeTab === 'commits' ? (
               <GitCard title="Commits">
                 {currentStatus.recentCommit ? (
                   <div className="space-y-2">
-                    <div className="font-mono text-xs">{shortSha(currentStatus.recentCommit.sha)}</div>
+                    <div className="font-mono text-xs">
+                      {shortSha(currentStatus.recentCommit.sha)}
+                    </div>
                     <div className="font-medium">{currentStatus.recentCommit.subject}</div>
                     <div className="text-xs text-muted-foreground">
                       Full commit history is planned for the GitHub-aware sensor layer.
@@ -453,8 +861,8 @@ export function ProjectGitHubPanel({
                 <div className="flex items-start gap-2 text-sm text-muted-foreground">
                   <GitPullRequest className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>
-                    Pull request state is not connected yet. This panel will use GitHub sensors keyed
-                    by the current branch and remote.
+                    Pull request state is not connected yet. This panel will use GitHub sensors
+                    keyed by the current branch and remote.
                   </span>
                 </div>
               </GitCard>
@@ -463,8 +871,8 @@ export function ProjectGitHubPanel({
                 <div className="flex items-start gap-2 text-sm text-muted-foreground">
                   <X className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>
-                    GitHub Actions, check runs, Sonar, and CodeQL are not connected yet. No check data
-                    is being inferred.
+                    GitHub Actions, check runs, Sonar, and CodeQL are not connected yet. No check
+                    data is being inferred.
                   </span>
                 </div>
               </GitCard>

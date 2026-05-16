@@ -5,6 +5,9 @@ import {
   ProjectDesktopRegistrationResultSchema,
   ProjectBranchCheckoutBodySchema,
   ProjectBranchListResultSchema,
+  ProjectGitChangesResultSchema,
+  ProjectGitFileDiffResultSchema,
+  ProjectGitStageBodySchema,
   ProjectGitStatusResultSchema,
   ProjectFileReadResultSchema,
   ProjectFileTreeResultSchema,
@@ -26,6 +29,9 @@ import {
   type ProjectFileNode,
   type ProjectRecord,
   type ProjectBranchListResult,
+  type ProjectGitChangedFile,
+  type ProjectGitFileStatus,
+  type ProjectGitStageBody,
   type ProjectGitWorkingTreeSummary,
   ProjectUpdateBodySchema,
 } from '@agent-platform/contracts';
@@ -139,6 +145,17 @@ function gitOutput(cwd: string, args: string[]): string {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
+  } catch {
+    throw new HttpError(409, 'PROJECT_GIT_UNAVAILABLE', 'Git is not available for this Project.');
+  }
+}
+
+function gitRawOutput(cwd: string, args: string[]): string {
+  try {
+    return execFileSync(GIT_BINARY, ['-C', cwd, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
   } catch {
     throw new HttpError(409, 'PROJECT_GIT_UNAVAILABLE', 'Git is not available for this Project.');
   }
@@ -731,6 +748,7 @@ const EMPTY_GIT_WORKING_TREE: ProjectGitWorkingTreeSummary = {
 };
 
 const CONFLICT_STATUS_CODES = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU']);
+const MAX_GIT_DIFF_BYTES = 256 * 1024;
 
 function githubRemoteDetected(remoteUrl: string | undefined): boolean {
   return Boolean(remoteUrl && /github\.com[:/]/i.test(remoteUrl));
@@ -776,6 +794,196 @@ function parseWorkingTree(statusOutput: string): ProjectGitWorkingTreeSummary {
     summary.total += 1;
   }
   return summary;
+}
+
+function validateGitRelativePath(pathValue: string): string {
+  if (
+    !pathValue ||
+    pathValue.length > 1000 ||
+    isAbsolute(pathValue) ||
+    pathValue.includes('\\') ||
+    pathValue.includes('\0')
+  ) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Path must be repository-relative.');
+  }
+  const segments = pathValue.split('/');
+  if (segments.some((segment) => segment.length === 0 || segment === '..')) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Path must be repository-relative.');
+  }
+  return pathValue;
+}
+
+function statusKind(code: string): ProjectGitFileStatus {
+  if (CONFLICT_STATUS_CODES.has(code)) return 'conflict';
+  if (code === '??') return 'untracked';
+  const indexStatus = code[0] ?? ' ';
+  const worktreeStatus = code[1] ?? ' ';
+  if (indexStatus === 'R' || worktreeStatus === 'R') return 'renamed';
+  if (indexStatus === 'D' || worktreeStatus === 'D') return 'deleted';
+  if (indexStatus === 'A' || worktreeStatus === 'A') return 'added';
+  return 'modified';
+}
+
+function parseStatusZ(statusOutput: string): ProjectGitChangedFile[] {
+  const entries = statusOutput.split('\0').filter(Boolean);
+  const files: ProjectGitChangedFile[] = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    if (!entry || entry.length < 4) continue;
+    const code = entry.slice(0, 2);
+    const indexStatus = code[0] ?? ' ';
+    const worktreeStatus = code[1] ?? ' ';
+    const pathValue = validateGitRelativePath(entry.slice(3));
+    const renamed = indexStatus === 'R' || worktreeStatus === 'R';
+    const originalPath = renamed ? entries[index + 1] : undefined;
+    if (renamed) index += 1;
+
+    files.push({
+      path: pathValue,
+      ...(originalPath ? { originalPath: validateGitRelativePath(originalPath) } : {}),
+      status: statusKind(code),
+      indexStatus,
+      worktreeStatus,
+      staged: indexStatus !== ' ' && indexStatus !== '?',
+      unstaged: worktreeStatus !== ' ' || code === '??',
+    });
+  }
+  return files;
+}
+
+function parseNumstat(
+  output: string,
+): Map<string, Pick<ProjectGitChangedFile, 'additions' | 'deletions'>> {
+  const result = new Map<string, Pick<ProjectGitChangedFile, 'additions' | 'deletions'>>();
+  for (const line of output.split('\n')) {
+    const [added, deleted, filePath] = line.split('\t');
+    if (!added || !deleted || !filePath || added === '-' || deleted === '-') continue;
+    result.set(filePath, {
+      additions: Number.parseInt(added, 10),
+      deletions: Number.parseInt(deleted, 10),
+    });
+  }
+  return result;
+}
+
+function enrichChangeStats(repositoryRoot: string, files: ProjectGitChangedFile[]) {
+  const unstagedStats = parseNumstat(gitValue(repositoryRoot, ['diff', '--numstat']) ?? '');
+  const stagedStats = parseNumstat(
+    gitValue(repositoryRoot, ['diff', '--cached', '--numstat']) ?? '',
+  );
+  return files.map((file) => {
+    const stats = stagedStats.get(file.path) ?? unstagedStats.get(file.path);
+    return stats ? { ...file, ...stats } : file;
+  });
+}
+
+function unavailableGitChanges(reason: string) {
+  return ProjectGitChangesResultSchema.parse({
+    available: false,
+    reason,
+    clean: true,
+    workingTree: EMPTY_GIT_WORKING_TREE,
+    files: [],
+  });
+}
+
+function projectGitChanges(project: ProjectRecord) {
+  let projectRoot: string;
+  try {
+    projectRoot = projectRootForBackendRead(project);
+  } catch {
+    return unavailableGitChanges('Project folder is not available.');
+  }
+
+  const repositoryRoot = gitValue(projectRoot, ['rev-parse', '--show-toplevel']);
+  if (!repositoryRoot) return unavailableGitChanges('Project is not a Git repository.');
+
+  const statusOutput = gitRawOutput(repositoryRoot, ['status', '--porcelain=v1', '-z']);
+  const files = enrichChangeStats(repositoryRoot, parseStatusZ(statusOutput));
+  const workingTree = parseWorkingTree(gitRawOutput(repositoryRoot, ['status', '--porcelain=v1']));
+
+  return ProjectGitChangesResultSchema.parse({
+    available: true,
+    clean: files.length === 0,
+    workingTree,
+    files,
+  });
+}
+
+function gitDiffOutput(
+  repositoryRoot: string,
+  pathValue: string,
+  mode: 'staged' | 'unstaged',
+): string {
+  const args =
+    mode === 'staged' ? ['diff', '--cached', '--', pathValue] : ['diff', '--', pathValue];
+  return gitRawOutput(repositoryRoot, args);
+}
+
+function syntheticUntrackedDiff(repositoryRoot: string, pathValue: string): string {
+  const target = resolve(repositoryRoot, pathValue);
+  const relativePath = relative(repositoryRoot, target);
+  if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Path must be repository-relative.');
+  }
+  let content: string;
+  try {
+    const stats = statSync(target);
+    if (!stats.isFile() || stats.size > MAX_PROJECT_FILE_READ_BYTES) {
+      return `Untracked file ${pathValue} is too large or cannot be previewed.`;
+    }
+    content = readFileSync(target, 'utf8');
+  } catch {
+    return '';
+  }
+  const lines = content.split('\n');
+  const added = lines.map((line) => `+${line}`).join('\n');
+  return [
+    `diff --git a/${pathValue} b/${pathValue}`,
+    'new file mode 100644',
+    '--- /dev/null',
+    `+++ b/${pathValue}`,
+    `@@ -0,0 +1,${lines.length} @@`,
+    added,
+  ].join('\n');
+}
+
+function projectGitFileDiff(project: ProjectRecord, rawPath: unknown, rawMode: unknown) {
+  const pathValue = validateGitRelativePath(typeof rawPath === 'string' ? rawPath : '');
+  const mode = rawMode === 'staged' ? 'staged' : 'unstaged';
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const file = projectGitChanges(project).files.find((change) => change.path === pathValue);
+  const diff =
+    file?.status === 'untracked' && mode === 'unstaged'
+      ? syntheticUntrackedDiff(repositoryRoot, pathValue)
+      : gitDiffOutput(repositoryRoot, pathValue, mode);
+  const truncated = Buffer.byteLength(diff, 'utf8') > MAX_GIT_DIFF_BYTES;
+  return ProjectGitFileDiffResultSchema.parse({
+    path: pathValue,
+    mode,
+    ...(file ? { status: file.status } : {}),
+    diff: truncated ? diff.slice(0, MAX_GIT_DIFF_BYTES) : diff,
+    truncated,
+  });
+}
+
+function gitPathArgs(body: ProjectGitStageBody): string[] {
+  if (body.all) return ['.'];
+  return (body.paths ?? []).map(validateGitRelativePath);
+}
+
+function stageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
+  const body = parseBody(ProjectGitStageBodySchema, rawBody);
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  gitOutput(repositoryRoot, ['add', '-A', '--', ...gitPathArgs(body)]);
+  return projectGitChanges(project);
+}
+
+function unstageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
+  const body = parseBody(ProjectGitStageBodySchema, rawBody);
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  gitOutput(repositoryRoot, ['restore', '--staged', '--', ...gitPathArgs(body)]);
+  return projectGitChanges(project);
 }
 
 function latestCommit(repositoryRoot: string) {
@@ -1468,6 +1676,42 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: projectGitStatus(project) });
+    }),
+  );
+
+  router.get(
+    '/:id/git/changes',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: projectGitChanges(project) });
+    }),
+  );
+
+  router.get(
+    '/:id/git/diff',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: projectGitFileDiff(project, req.query.path, req.query.mode) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/stage',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: stageProjectGitChanges(project, req.body) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/unstage',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: unstageProjectGitChanges(project, req.body) });
     }),
   );
 

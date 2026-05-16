@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-16
+- **Session:** Implemented `agent-platform-xlg` on `task/agent-platform-xlg`: Git & GitHub panel now has a local-only Changes review view.
+- **Today’s outputs:** Added shared contracts and Project API endpoints for changed-file listing, file diff loading, staging, unstaging, and stage-all. Replaced the placeholder Changes tab with grouped staged/unstaged/untracked file rows, read-only diff previews, and safe staging actions. Destructive Git actions remain intentionally out of scope.
+- **Validation:** Passed contracts project tests/typecheck, API typecheck, focused API Project router tests outside the sandbox due Supertest socket binding, web typecheck, web lint, full web tests, `pnpm format:check`, and `git diff --check`.
+- **Current state:** Bead `agent-platform-xlg` is ready to close locally. Branch is `task/agent-platform-xlg`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit and push the task branch, then owner can manually test editing files, reviewing diffs, staging/unstaging, and stage-all in Electron.
+- **Date:** 2026-05-16
 - **Session:** Implemented `agent-platform-67u` on `task/agent-platform-project-instructions-cta`: Project Chat now gives a clear path to prepare missing Project instructions and hides raw provider/runtime error syntax from the user.
 - **Today’s outputs:** Added a `Generate AGENTS.md` CTA in the Git & GitHub panel that uses the existing Project onboarding draft flow, mapped missing `AGENTS.md`, invalid request body, and tool-state provider failures to user-facing chat copy, and reset the Project Chat transcript viewport when switching Projects/sessions so old Project records are less likely to reopen with the composer stranded at the top.
 - **Validation:** Passed focused harness chat parser tests, full web tests, web typecheck, web lint, `pnpm format:check`, and `git diff --check`. Electron E2E was attempted during the task and reached the built app, but the long Project access flow failed on existing flaky reopen assertions unrelated to the focused CTA/error-copy changes.
