@@ -5,6 +5,7 @@ import {
   ProjectDesktopRegistrationResultSchema,
   ProjectBranchCheckoutBodySchema,
   ProjectBranchListResultSchema,
+  ProjectGitCommitBodySchema,
   ProjectGitChangesResultSchema,
   ProjectGitFileDiffResultSchema,
   ProjectGitStageBodySchema,
@@ -30,6 +31,7 @@ import {
   type ProjectRecord,
   type ProjectBranchListResult,
   type ProjectGitChangedFile,
+  type ProjectGitCommitBody,
   type ProjectGitFileStatus,
   type ProjectGitStageBody,
   type ProjectGitWorkingTreeSummary,
@@ -986,6 +988,17 @@ function unstageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
   return projectGitChanges(project);
 }
 
+function commitProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
+  const body: ProjectGitCommitBody = parseBody(ProjectGitCommitBodySchema, rawBody);
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const stagedOutput = gitRawOutput(repositoryRoot, ['diff', '--cached', '--name-only']);
+  if (stagedOutput.trim() === '') {
+    throw new HttpError(409, 'PROJECT_GIT_NOTHING_STAGED', 'Stage changes before committing.');
+  }
+  gitOutput(repositoryRoot, ['commit', '-m', body.message]);
+  return projectGitStatus(project);
+}
+
 function latestCommit(repositoryRoot: string) {
   const output = gitValue(repositoryRoot, ['log', '-1', '--format=%H%x1f%s%x1f%an%x1f%cI']);
   if (!output) return undefined;
@@ -1712,6 +1725,15 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: unstageProjectGitChanges(project, req.body) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/commit',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: commitProjectGitChanges(project, req.body) });
     }),
   );
 

@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { cn } from '@/lib/cn';
 
@@ -258,6 +259,7 @@ export function ProjectGitHubPanel({
   const [changesLoading, setChangesLoading] = useState(false);
   const [diffLoading, setDiffLoading] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
+  const [commitMessage, setCommitMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [changesError, setChangesError] = useState<string | null>(null);
 
@@ -412,6 +414,33 @@ export function ProjectGitHubPanel({
     },
     [loadStatus, projectId],
   );
+
+  const commitStagedChanges = useCallback(async () => {
+    if (!projectId) return;
+    const message = commitMessage.trim();
+    if (!message) {
+      setChangesError('Enter a commit message before committing staged changes.');
+      return;
+    }
+    setActionPending('commit');
+    try {
+      const nextStatus = await apiPost<ProjectGitStatusResult>(
+        apiPath('projects', projectId, 'git', 'commit'),
+        { message },
+      );
+      setStatus(nextStatus ?? null);
+      setCommitMessage('');
+      setSelectedChange(null);
+      setDiff(null);
+      setSelectedDiffMode('unstaged');
+      setChangesError(null);
+      await loadChanges();
+    } catch (cause) {
+      setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to commit files.');
+    } finally {
+      setActionPending(null);
+    }
+  }, [commitMessage, loadChanges, projectId]);
 
   const currentStatus = status ?? EmptyGitStatus();
   const currentChanges = changes;
@@ -704,6 +733,47 @@ export function ProjectGitHubPanel({
                       >
                         {actionPending === 'stage-all' ? 'Staging...' : 'Stage all'}
                       </Button>
+                    </div>
+
+                    <div className="rounded border border-border bg-muted/20 p-2">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div>
+                          <div className="text-xs font-medium">Commit staged changes</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {stagedFiles.length === 0
+                              ? 'Stage files before committing.'
+                              : `${stagedFiles.length} staged file${
+                                  stagedFiles.length === 1 ? '' : 's'
+                                } ready.`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={commitMessage}
+                          onChange={(event) => setCommitMessage(event.target.value)}
+                          placeholder="Commit message"
+                          disabled={actionPending !== null}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                              event.preventDefault();
+                              void commitStagedChanges();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={
+                            stagedFiles.length === 0 ||
+                            actionPending !== null ||
+                            commitMessage.trim().length === 0
+                          }
+                          onClick={() => void commitStagedChanges()}
+                        >
+                          {actionPending === 'commit' ? 'Committing...' : 'Commit'}
+                        </Button>
+                      </div>
                     </div>
 
                     {changesLoading && (

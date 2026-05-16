@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-16
+- **Session:** Implementing `agent-platform-cem` on `task/agent-platform-cem`: local Git commit flow from the Git & GitHub Changes tab.
+- **Today’s outputs:** Added a shared commit body contract, `POST /v1/projects/:id/git/commit`, staged-change validation, refreshed Git status after commit, and a Changes-tab commit message/action UI. Commit remains local-only; push, PR creation, and GitHub auth are out of scope.
+- **Validation:** Passed contracts test/typecheck/build, API typecheck, focused API router test outside the sandbox after the expected Supertest socket restriction in sandbox, web typecheck, web lint, web unit tests, `pnpm format:check`, and `git diff --check`. SonarQube MCP was not available via tool discovery, so the documented fallback gate was used.
+- **Current state:** Bead `agent-platform-cem` is closed and pushed. Branch is `task/agent-platform-cem`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Owner can manually test edit → stage → commit in Electron, then the next Git slice can add push/remote sync.
+- **Date:** 2026-05-16
 - **Session:** Implemented `agent-platform-xlg` on `task/agent-platform-xlg`: Git & GitHub panel now has a local-only Changes review view.
 - **Today’s outputs:** Added shared contracts and Project API endpoints for changed-file listing, file diff loading, staging, unstaging, and stage-all. Replaced the placeholder Changes tab with grouped staged/unstaged/untracked file rows, read-only diff previews, and safe staging actions. Destructive Git actions remain intentionally out of scope.
 - **Validation:** Passed contracts project tests/typecheck, API typecheck, focused API Project router tests outside the sandbox due Supertest socket binding, web typecheck, web lint, full web tests, `pnpm format:check`, and `git diff --check`.

@@ -392,6 +392,30 @@ describe('projectsRouter', () => {
       .send({ all: true })
       .expect(200);
     expect(stageAll.body.data.workingTree.staged).toBe(3);
+
+    const committed = await request(app)
+      .post(`/v1/projects/${projectId}/git/commit`)
+      .send({ message: 'update project docs' })
+      .expect(200);
+
+    expect(committed.body.data).toMatchObject({
+      available: true,
+      clean: true,
+      recentCommit: expect.objectContaining({
+        subject: 'update project docs',
+        authorName: 'Test User',
+      }),
+      workingTree: expect.objectContaining({
+        total: 0,
+        staged: 0,
+      }),
+    });
+    expect(
+      execFileSync(GIT_BINARY, ['log', '-1', '--format=%s'], {
+        cwd: repoDir,
+        encoding: 'utf8',
+      }).trim(),
+    ).toBe('update project docs');
   });
 
   it('blocks Project branch switching when the working tree is dirty', async () => {
