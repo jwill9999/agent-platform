@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-17
+- **Session:** Implemented `agent-platform-hwt` on `task/agent-platform-terminal-git-panel-layout`: UI branch selector checkouts now trigger the shared Project Git refresh path.
+- **Today’s outputs:** Added a Project branch-change handler that updates the active Project record, bumps `projectGitRefreshKey`, and schedules Project Git reconciliation so the Git & GitHub side panel reloads after a branch is changed from the chat input selector. Filed `agent-platform-lkr` for terminal-driven Git state and stale-upstream branch labelling, and `agent-platform-88d` for scoping Checks to current PR/head checks instead of broad workflow history.
+- **Validation:** Passed web typecheck, web lint, web tests, `pnpm format:check`, and `git diff --check`. SonarQube MCP was not available in-session, so the documented fallback gate was used.
+- **Current state:** Bead `agent-platform-hwt` is ready to close. Branch is `task/agent-platform-terminal-git-panel-layout`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit the branch-selector refresh follow-up, and retry the branch push. The previous push attempt was blocked by unrelated harness `qualityGateTool.test.ts` timeout sensitivity in the pre-push affected-package run.
+- **Date:** 2026-05-17
 - **Session:** Implemented `agent-platform-1lg` on `task/agent-platform-terminal-git-panel-layout`: Project terminal now refits to the resized chat column when the Git & GitHub side panel is open.
 - **Today’s outputs:** Added terminal dock section-level resize observation, backend terminal resize propagation after dock width changes, and overflow/min-width guards so the terminal toolbar and xterm canvas stay bounded to the main chat column. Filed follow-up `agent-platform-88d` to scope the Checks tab to current PR/head checks and move broader workflow history behind a secondary affordance.
 - **Validation:** Passed web typecheck, web lint, web tests, `pnpm format:check`, and `git diff --check`. SonarQube MCP was not available in-session, so the documented fallback gate was used.

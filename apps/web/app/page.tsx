@@ -914,6 +914,15 @@ export default function HomePage() {
     }, 350);
   }, [refreshActiveProject]);
 
+  const handleProjectBranchChanged = useCallback(
+    (project: ProjectDesktopRecord) => {
+      setActiveProject(project);
+      setProjectGitRefreshKey((value) => value + 1);
+      scheduleProjectGitRefresh();
+    },
+    [scheduleProjectGitRefresh],
+  );
+
   useEffect(() => {
     return () => {
       if (globalThis.window === undefined || projectGitRefreshTimeoutRef.current === null) return;
@@ -1327,7 +1336,7 @@ export default function HomePage() {
                     activeBranch={activeProject?.metadata.activeBranch}
                     disabled={isLoading}
                     refreshKey={projectGitRefreshKey}
-                    onProjectChanged={setActiveProject}
+                    onProjectChanged={handleProjectBranchChanged}
                     onError={setSessionError}
                   />
                 ) : null
