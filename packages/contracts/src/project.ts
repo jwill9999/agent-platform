@@ -524,6 +524,8 @@ const ProjectBranchNameSchema = z
 export const ProjectBranchSummarySchema = z.object({
   name: ProjectBranchNameSchema,
   current: z.boolean(),
+  upstreamBranch: z.string().min(1).max(300).optional(),
+  upstreamState: z.enum(['none', 'active', 'missing']).default('none'),
 });
 export type ProjectBranchSummary = z.infer<typeof ProjectBranchSummarySchema>;
 
@@ -567,6 +569,7 @@ export const ProjectGitStatusResultSchema = z.object({
   remoteUrl: z.string().min(1).max(1000).optional(),
   currentBranch: z.string().min(1).max(300).optional(),
   upstreamBranch: z.string().min(1).max(300).optional(),
+  upstreamState: z.enum(['none', 'active', 'missing']).default('none'),
   baseBranch: z.string().min(1).max(300).optional(),
   headSha: z.string().min(1).max(80).optional(),
   ahead: z.number().int().nonnegative().default(0),

@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-17
+- **Session:** Implemented `agent-platform-lkr` on `task/agent-platform-terminal-git-panel-layout`: Project Git UI now labels local branches whose configured upstream no longer exists.
+- **Today’s outputs:** Added upstream state to Project branch/status contracts, detected missing remote-tracking refs with local Git, labelled stale upstreams in the chat branch selector and Git & GitHub panel, and blocked the Push CTA/API path when a branch tracks an upstream that has been pruned. Added focused API coverage that creates a real stale-upstream branch after `git fetch --prune`.
+- **Validation:** Passed contracts focused tests, contracts build, API typecheck, API lint, web typecheck, web lint, elevated focused API Project router tests after the expected Supertest listener restriction inside the sandbox, `pnpm format:check`, and `git diff --check`.
+- **Current state:** Bead `agent-platform-lkr` is implemented and ready to close. Branch is `task/agent-platform-terminal-git-panel-layout`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit and push the task branch. Later Git work can add publish/unset-upstream actions and richer PR interaction flows.
+- **Date:** 2026-05-17
 - **Session:** Implemented `agent-platform-88d` on `task/agent-platform-terminal-git-panel-layout`: Git & GitHub Checks now scope to merge-relevant checks.
 - **Today’s outputs:** Added a task spec, extended the Project Git checks contract with source metadata, changed `GET /v1/projects/:id/git/checks` to prefer the current branch PR check rollup via `gh pr view`, fall back to exact `HEAD` check runs via `gh api`, and stop using broad `gh run list` workflow history for the main Checks tab. The Checks UI now labels whether data came from the current PR or branch head.
 - **Validation:** Passed contracts project tests, contracts build, API typecheck, API lint, web typecheck, web lint, `pnpm format:check`, and `git diff --check`. Focused API Project router tests passed outside the sandbox after the expected Supertest listener restriction (`listen EPERM`) inside the sandbox.

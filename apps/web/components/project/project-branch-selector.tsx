@@ -21,6 +21,11 @@ type ProjectBranchSelectorProps = Readonly<{
   onError?: (message: string) => void;
 }>;
 
+function branchLabel(branch: ProjectBranchListResult['branches'][number]): string {
+  if (branch.upstreamState === 'missing') return `${branch.name} · upstream missing`;
+  return branch.name;
+}
+
 export function ProjectBranchSelector({
   projectId,
   activeBranch,
@@ -126,7 +131,7 @@ export function ProjectBranchSelector({
           {branchItems.length > 0 ? (
             branchItems.map((branch) => (
               <SelectItem key={branch.name} value={branch.name}>
-                {branch.name}
+                {branchLabel(branch)}
               </SelectItem>
             ))
           ) : (

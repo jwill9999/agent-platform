@@ -793,7 +793,11 @@ function projectBranchList(project: ProjectRecord): ProjectBranchListResult {
   return ProjectBranchListResultSchema.parse({
     currentBranch,
     clean,
-    branches: branchNames.map((name) => ({ name, current: name === currentBranch })),
+    branches: branchNames.map((name) => ({
+      name,
+      current: name === currentBranch,
+      ...branchUpstreamState(repositoryRoot, name),
+    })),
   });
 }
 
@@ -829,6 +833,28 @@ function baseBranchFromUpstream(upstreamBranch: string | undefined): string | un
   if (!upstreamBranch) return undefined;
   const slashIndex = upstreamBranch.indexOf('/');
   return slashIndex >= 0 ? upstreamBranch.slice(slashIndex + 1) : upstreamBranch;
+}
+
+function upstreamRefExists(repositoryRoot: string, upstreamBranch: string | undefined): boolean {
+  if (!upstreamBranch) return false;
+  return Boolean(
+    gitValue(repositoryRoot, ['show-ref', '--verify', `refs/remotes/${upstreamBranch}`]),
+  );
+}
+
+function branchUpstreamState(repositoryRoot: string, branch: string) {
+  const upstreamBranch = gitValue(repositoryRoot, [
+    'for-each-ref',
+    '--format=%(upstream:short)',
+    `refs/heads/${branch}`,
+  ]);
+  if (!upstreamBranch) return { upstreamState: 'none' as const };
+  return {
+    upstreamBranch,
+    upstreamState: upstreamRefExists(repositoryRoot, upstreamBranch)
+      ? ('active' as const)
+      : ('missing' as const),
+  };
 }
 
 function parseAheadBehind(statusLine: string | undefined): { ahead: number; behind: number } {
@@ -1095,17 +1121,20 @@ function pushProjectGitBranch(project: ProjectRecord) {
       'Project is currently on a detached Git HEAD.',
     );
   }
-  const upstreamBranch = gitValue(repositoryRoot, [
-    'rev-parse',
-    '--abbrev-ref',
-    '--symbolic-full-name',
-    '@{u}',
-  ]);
+  const upstream = branchUpstreamState(repositoryRoot, currentBranch);
+  const upstreamBranch = upstream.upstreamBranch;
   if (!upstreamBranch) {
     throw new HttpError(
       409,
       'PROJECT_GIT_NO_UPSTREAM',
       'This branch has no upstream. Push from the terminal with --set-upstream, or create a remote first.',
+    );
+  }
+  if (upstream.upstreamState === 'missing') {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_UPSTREAM_MISSING',
+      'This branch tracks an upstream that no longer exists. Publish the branch or unset the upstream from the terminal.',
     );
   }
 
@@ -1174,12 +1203,11 @@ function projectGitStatus(project: ProjectRecord) {
   ]);
   const branchLine = statusOutput.split('\n').find((line) => line.startsWith('## '));
   const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
-  const upstreamBranch = gitValue(repositoryRoot, [
-    'rev-parse',
-    '--abbrev-ref',
-    '--symbolic-full-name',
-    '@{u}',
-  ]);
+  const upstream = currentBranch
+    ? branchUpstreamState(repositoryRoot, currentBranch)
+    : { upstreamState: 'none' as const };
+  const upstreamBranch = upstream.upstreamBranch;
+  const upstreamState = upstream.upstreamState;
   const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
   const workingTree = parseWorkingTree(statusOutput);
   const { ahead, behind } = parseAheadBehind(branchLine);
@@ -1191,6 +1219,7 @@ function projectGitStatus(project: ProjectRecord) {
     ...(remoteUrl ? { remoteUrl } : {}),
     ...(currentBranch ? { currentBranch } : {}),
     ...(upstreamBranch ? { upstreamBranch } : {}),
+    upstreamState,
     ...(baseBranchFromUpstream(upstreamBranch)
       ? { baseBranch: baseBranchFromUpstream(upstreamBranch) }
       : {}),

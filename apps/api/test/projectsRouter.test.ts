@@ -241,11 +241,13 @@ describe('projectsRouter', () => {
     expect(branches.body.data).toMatchObject({
       currentBranch: 'main',
       clean: true,
-      branches: expect.arrayContaining([
-        { name: 'main', current: true },
-        { name: 'feature/chat-input-branch', current: false },
-      ]),
     });
+    expect(branches.body.data.branches).toEqual(
+      expect.arrayContaining([
+        { name: 'main', current: true, upstreamState: 'none' },
+        { name: 'feature/chat-input-branch', current: false, upstreamState: 'none' },
+      ]),
+    );
 
     const switched = await request(app)
       .post(`/v1/projects/${projectId}/branches/checkout`)
@@ -263,6 +265,89 @@ describe('projectsRouter', () => {
         encoding: 'utf8',
       }).trim(),
     ).toBe('feature/chat-input-branch');
+  });
+
+  it('labels Project branches whose configured upstream no longer exists', async () => {
+    const remoteDir = path.join(tmpDir, 'desktop-stale-upstream-remote.git');
+    const repoDir = path.join(tmpDir, 'desktop-stale-upstream-repo');
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['switch', '-c', 'stale/upstream'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'stale branch\n');
+    execFileSync(GIT_BINARY, ['commit', '-am', 'stale branch'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'stale/upstream'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['update-ref', '-d', 'refs/heads/stale/upstream'], {
+      cwd: remoteDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['fetch', '--prune'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Stale Upstream Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const branches = await request(app).get(`/v1/projects/${projectId}/branches`).expect(200);
+    expect(branches.body.data).toMatchObject({
+      currentBranch: 'stale/upstream',
+      clean: true,
+    });
+    expect(branches.body.data.branches).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'main',
+          current: false,
+          upstreamBranch: 'origin/main',
+          upstreamState: 'active',
+        },
+        {
+          name: 'stale/upstream',
+          current: true,
+          upstreamBranch: 'origin/stale/upstream',
+          upstreamState: 'missing',
+        },
+      ]),
+    );
+
+    const status = await request(app).get(`/v1/projects/${projectId}/git/status`).expect(200);
+    expect(status.body.data).toMatchObject({
+      currentBranch: 'stale/upstream',
+      upstreamBranch: 'origin/stale/upstream',
+      upstreamState: 'missing',
+      clean: true,
+    });
+
+    const push = await request(app).post(`/v1/projects/${projectId}/git/push`).send({}).expect(409);
+    expect(push.body.error).toMatchObject({
+      code: 'PROJECT_GIT_UPSTREAM_MISSING',
+    });
   });
 
   it('summarizes local Project Git status for the Git and GitHub panel', async () => {

@@ -38,16 +38,26 @@ describe('Project mode and workspace binding contracts', () => {
         currentBranch: 'main',
         clean: true,
         branches: [
-          { name: 'main', current: true },
-          { name: 'feature/chat-input-branch', current: false },
+          { name: 'main', current: true, upstreamBranch: 'origin/main', upstreamState: 'active' },
+          {
+            name: 'feature/chat-input-branch',
+            current: false,
+            upstreamBranch: 'origin/feature/chat-input-branch',
+            upstreamState: 'missing',
+          },
         ],
       }),
     ).toEqual({
       currentBranch: 'main',
       clean: true,
       branches: [
-        { name: 'main', current: true },
-        { name: 'feature/chat-input-branch', current: false },
+        { name: 'main', current: true, upstreamBranch: 'origin/main', upstreamState: 'active' },
+        {
+          name: 'feature/chat-input-branch',
+          current: false,
+          upstreamBranch: 'origin/feature/chat-input-branch',
+          upstreamState: 'missing',
+        },
       ],
     });
 
@@ -66,6 +76,7 @@ describe('Project mode and workspace binding contracts', () => {
         remoteUrl: 'https://github.com/jwill9999/agent-platform.git',
         currentBranch: 'task/git-panel',
         upstreamBranch: 'origin/task/git-panel',
+        upstreamState: 'active',
         baseBranch: 'task/git-panel',
         headSha: 'abc123',
         ahead: 2,

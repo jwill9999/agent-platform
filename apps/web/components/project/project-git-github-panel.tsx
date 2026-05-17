@@ -84,6 +84,7 @@ function EmptyGitStatus(): ProjectGitStatusResult {
     clean: true,
     ahead: 0,
     behind: 0,
+    upstreamState: 'none',
     githubRemoteDetected: false,
     workingTree: ZERO_WORKING_TREE,
   };
@@ -93,6 +94,9 @@ function StatusPill({ status }: Readonly<{ status: ProjectGitStatusResult }>) {
   if (!status.available) {
     return <Badge variant="outline">No Git</Badge>;
   }
+  if (status.upstreamState === 'missing') {
+    return <Badge variant="outline">Upstream missing</Badge>;
+  }
   if (status.workingTree.conflicts > 0) {
     return <Badge variant="destructive">Conflicts</Badge>;
   }
@@ -100,6 +104,12 @@ function StatusPill({ status }: Readonly<{ status: ProjectGitStatusResult }>) {
     return <Badge variant="outline">Changes</Badge>;
   }
   return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Synced</Badge>;
+}
+
+function upstreamStateLabel(status: ProjectGitStatusResult): string {
+  if (status.upstreamState === 'missing') return 'Upstream missing';
+  if (status.upstreamBranch) return status.upstreamBranch;
+  return 'No upstream';
 }
 
 function StatRow({
@@ -661,7 +671,10 @@ export function ProjectGitHubPanel({
       : currentStatus.githubRemoteDetected
         ? 0
         : undefined;
-  const canPushCurrentBranch = currentStatus.available && Boolean(currentStatus.upstreamBranch);
+  const canPushCurrentBranch =
+    currentStatus.available &&
+    Boolean(currentStatus.upstreamBranch) &&
+    currentStatus.upstreamState !== 'missing';
   const tabs = useMemo(
     () =>
       [
@@ -851,12 +864,14 @@ export function ProjectGitHubPanel({
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Base:{' '}
-                      {currentStatus.baseBranch ?? currentStatus.upstreamBranch ?? 'No upstream'}
+                      Base: {currentStatus.baseBranch ?? upstreamStateLabel(currentStatus)}
                     </div>
                     <div className="flex gap-3 text-xs">
                       <span className="text-emerald-700">↑ {currentStatus.ahead}</span>
                       <span className="text-red-700">↓ {currentStatus.behind}</span>
+                      {currentStatus.upstreamState === 'missing' && (
+                        <span className="text-amber-700">Upstream missing</span>
+                      )}
                       {!currentStatus.clean && (
                         <span className="text-amber-700">Working tree has changes</span>
                       )}
@@ -1168,7 +1183,9 @@ export function ProjectGitHubPanel({
                         onClick={() => void pushCurrentBranch()}
                         title={
                           !canPushCurrentBranch
-                            ? 'This branch has no upstream. Push from the terminal with --set-upstream, or create a remote first.'
+                            ? currentStatus.upstreamState === 'missing'
+                              ? 'This branch tracks an upstream that no longer exists. Publish the branch or unset the upstream from the terminal.'
+                              : 'This branch has no upstream. Push from the terminal with --set-upstream, or create a remote first.'
                             : currentStatus.ahead === 0
                               ? 'Branch is already pushed.'
                               : `Push ${currentStatus.ahead} commit${
@@ -1182,7 +1199,11 @@ export function ProjectGitHubPanel({
                             ? `Push ${currentStatus.ahead}`
                             : 'Pushed'}
                       </Button>
-                      {currentStatus.upstreamBranch ? (
+                      {currentStatus.upstreamState === 'missing' ? (
+                        <span className="text-xs text-amber-700">
+                          Upstream missing: {currentStatus.upstreamBranch}
+                        </span>
+                      ) : currentStatus.upstreamBranch ? (
                         <span className="text-xs text-muted-foreground">
                           Upstream: {currentStatus.upstreamBranch}
                         </span>
