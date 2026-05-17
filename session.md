@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-17
+- **Session:** Implemented `agent-platform-1lg` on `task/agent-platform-terminal-git-panel-layout`: Project terminal now refits to the resized chat column when the Git & GitHub side panel is open.
+- **Today’s outputs:** Added terminal dock section-level resize observation, backend terminal resize propagation after dock width changes, and overflow/min-width guards so the terminal toolbar and xterm canvas stay bounded to the main chat column. Filed follow-up `agent-platform-88d` to scope the Checks tab to current PR/head checks and move broader workflow history behind a secondary affordance.
+- **Validation:** Passed web typecheck, web lint, web tests, `pnpm format:check`, and `git diff --check`. SonarQube MCP was not available in-session, so the documented fallback gate was used.
+- **Current state:** Bead `agent-platform-1lg` is ready to close. Branch is `task/agent-platform-terminal-git-panel-layout`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit and push this branch, then owner can manually test opening/closing the Git side panel while the terminal is visible.
+- **Date:** 2026-05-17
 - **Session:** Implemented `agent-platform-0k7` on `task/agent-platform-git-push-action`: Project Git commits now surface an immediate success state and the Commits tab can push an ahead branch with an upstream.
 - **Today’s outputs:** Added `POST /v1/projects/:id/git/push`, upstream validation with explicit no-upstream copy, focused API coverage for pushing to a configured upstream, Commits-tab success messaging after local commit, automatic navigation to the Commits tab after a commit, a Push CTA for ahead branches, and bottom breathing room for the Project terminal dock. The Git side panel resize-vs-overlay behavior remains a follow-up UI polish decision; the preferred direction is to resize the main chat/terminal column and collapse the Git panel only below a usable width.
 - **Validation:** Passed focused API Project router tests, API typecheck, web typecheck, API lint, web lint, web tests, root `pnpm lint`, root `pnpm typecheck`, elevated root `pnpm test` after the expected sandbox `listen EPERM 127.0.0.1` restriction, `pnpm format:check`, and `git diff --check`. SonarQube MCP was not available via tool discovery in this session, so the documented fallback gate was used.

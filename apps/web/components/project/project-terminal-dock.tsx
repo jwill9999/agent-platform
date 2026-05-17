@@ -91,6 +91,7 @@ export function ProjectTerminalDock({
   const tabCounterRef = useRef(0);
   const runtimesRef = useRef(new Map<string, TerminalRuntime>());
   const containersRef = useRef(new Map<string, HTMLDivElement>());
+  const sectionRef = useRef<HTMLElement | null>(null);
 
   const updateTab = useCallback((tabId: string, patch: Partial<TerminalTab>) => {
     setTabs((current) => current.map((tab) => (tab.id === tabId ? { ...tab, ...patch } : tab)));
@@ -120,6 +121,22 @@ export function ProjectTerminalDock({
     containersRef.current.clear();
     setActiveTabId(null);
   }, [disposeTabRuntime]);
+
+  const fitTerminalToDock = useCallback(
+    (tabId: string | null = activeTabId) => {
+      const activeRuntime = tabId ? runtimesRef.current.get(tabId) : undefined;
+      const activeTab = tabs.find((tab) => tab.id === tabId);
+      if (!activeRuntime || !activeTab?.terminalId) return;
+
+      activeRuntime.fit.fit();
+      void getDesktopProjectBridge()?.terminal?.resize?.({
+        terminalId: activeTab.terminalId,
+        cols: Math.max(activeRuntime.term.cols, 2),
+        rows: Math.max(activeRuntime.term.rows, 2),
+      });
+    },
+    [activeTabId, tabs],
+  );
 
   const addTab = useCallback(() => {
     tabCounterRef.current += 1;
@@ -264,8 +281,8 @@ export function ProjectTerminalDock({
     if (!open) return;
     const activeRuntime = activeTabId ? runtimesRef.current.get(activeTabId) : undefined;
     if (!activeRuntime) return;
-    requestAnimationFrame(() => activeRuntime.fit.fit());
-  }, [activeTabId, open]);
+    requestAnimationFrame(() => fitTerminalToDock());
+  }, [activeTabId, fitTerminalToDock, open]);
 
   useEffect(() => {
     for (const runtime of runtimesRef.current.values()) {
@@ -277,23 +294,18 @@ export function ProjectTerminalDock({
   useEffect(() => {
     if (!open) return;
     const resizeObserver = new ResizeObserver(() => {
-      const activeRuntime = activeTabId ? runtimesRef.current.get(activeTabId) : undefined;
-      const activeTab = tabs.find((tab) => tab.id === activeTabId);
-      if (!activeRuntime || !activeTab?.terminalId) return;
-      activeRuntime.fit.fit();
-      void getDesktopProjectBridge()?.terminal?.resize?.({
-        terminalId: activeTab.terminalId,
-        cols: Math.max(activeRuntime.term.cols, 2),
-        rows: Math.max(activeRuntime.term.rows, 2),
-      });
+      requestAnimationFrame(() => fitTerminalToDock());
     });
 
+    if (sectionRef.current) {
+      resizeObserver.observe(sectionRef.current);
+    }
     for (const container of containersRef.current.values()) {
       resizeObserver.observe(container);
     }
 
     return () => resizeObserver.disconnect();
-  }, [activeTabId, height, open, tabs]);
+  }, [fitTerminalToDock, height, open, tabs]);
 
   if (!open && tabs.length === 0) return null;
 
@@ -302,8 +314,12 @@ export function ProjectTerminalDock({
 
   return (
     <section
+      ref={sectionRef}
       aria-label="Project terminal"
-      className={cn('mb-4 border-t border-border bg-slate-950 text-slate-100', !open && 'hidden')}
+      className={cn(
+        'mb-4 min-w-0 max-w-full overflow-hidden border-t border-border bg-slate-950 text-slate-100',
+        !open && 'hidden',
+      )}
       style={{ height }}
     >
       <div className="flex h-10 items-center gap-2 border-b border-slate-800 px-3 text-xs">
@@ -415,7 +431,7 @@ export function ProjectTerminalDock({
           {activeTab?.error ?? 'Terminal failed to start.'}
         </div>
       ) : (
-        <div className="h-[calc(100%-2.5rem)] min-h-0">
+        <div className="h-[calc(100%-2.5rem)] min-h-0 min-w-0 overflow-hidden">
           {tabs.map((tab) => (
             <div
               key={tab.id}
@@ -428,7 +444,10 @@ export function ProjectTerminalDock({
                 }
               }}
               data-terminal-active={tab.id === activeTabId ? 'true' : 'false'}
-              className={cn('h-full min-h-0 p-2', tab.id === activeTabId ? 'block' : 'hidden')}
+              className={cn(
+                'h-full min-h-0 min-w-0 overflow-hidden p-2',
+                tab.id === activeTabId ? 'block' : 'hidden',
+              )}
             />
           ))}
         </div>
