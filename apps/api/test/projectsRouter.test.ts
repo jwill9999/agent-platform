@@ -734,6 +734,59 @@ exit 1
     ).toBe('main');
   });
 
+  it('pushes the current Project branch when an upstream is configured', async () => {
+    const remoteDir = path.join(tmpDir, 'desktop-push-remote.git');
+    const repoDir = path.join(tmpDir, 'desktop-push-repo');
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\nupdated\n');
+    execFileSync(GIT_BINARY, ['commit', '-am', 'update readme'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Push Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const beforePush = await request(app).get(`/v1/projects/${projectId}/git/status`).expect(200);
+    expect(beforePush.body.data).toMatchObject({
+      currentBranch: 'main',
+      upstreamBranch: 'origin/main',
+      ahead: 1,
+    });
+
+    const pushed = await request(app)
+      .post(`/v1/projects/${projectId}/git/push`)
+      .send({})
+      .expect(200);
+    expect(pushed.body.data).toMatchObject({
+      currentBranch: 'main',
+      upstreamBranch: 'origin/main',
+      ahead: 0,
+      behind: 0,
+    });
+  });
+
   it('creates and resumes a Project-bound session for a registered desktop project', async () => {
     const repoDir = path.join(tmpDir, 'desktop-session-repo');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });

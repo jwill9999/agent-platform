@@ -303,7 +303,7 @@ export function ProjectTerminalDock({
   return (
     <section
       aria-label="Project terminal"
-      className={cn('border-t border-border bg-slate-950 text-slate-100', !open && 'hidden')}
+      className={cn('mb-4 border-t border-border bg-slate-950 text-slate-100', !open && 'hidden')}
       style={{ height }}
     >
       <div className="flex h-10 items-center gap-2 border-b border-slate-800 px-3 text-xs">

@@ -355,6 +355,8 @@ export function ProjectGitHubPanel({
   const [diffLoading, setDiffLoading] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState('');
+  const [commitSuccess, setCommitSuccess] = useState<string | null>(null);
+  const [pushSuccess, setPushSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [changesError, setChangesError] = useState<string | null>(null);
   const [checksError, setChecksError] = useState<string | null>(null);
@@ -584,6 +586,13 @@ export function ProjectGitHubPanel({
       );
       setStatus(nextStatus ?? null);
       setCommitMessage('');
+      setCommitSuccess(
+        nextStatus?.recentCommit
+          ? `Committed ${shortSha(nextStatus.recentCommit.sha)}: ${nextStatus.recentCommit.subject}`
+          : 'Commit completed.',
+      );
+      setPushSuccess(null);
+      setActiveTab('commits');
       setSelectedChange(null);
       setDiff(null);
       setSelectedDiffMode('unstaged');
@@ -595,6 +604,33 @@ export function ProjectGitHubPanel({
       setActionPending(null);
     }
   }, [commitMessage, loadChanges, projectId]);
+
+  const pushCurrentBranch = useCallback(async () => {
+    if (!projectId) return;
+    setActionPending('push');
+    try {
+      const nextStatus = await apiPost<ProjectGitStatusResult>(
+        apiPath('projects', projectId, 'git', 'push'),
+        {},
+      );
+      setStatus(nextStatus ?? null);
+      setPushSuccess(
+        nextStatus?.currentBranch
+          ? `Pushed ${nextStatus.currentBranch} to ${nextStatus.upstreamBranch ?? 'upstream'}.`
+          : 'Push completed.',
+      );
+      setError(null);
+      await Promise.all([
+        loadChanges(),
+        activeTab === 'checks' ? loadChecks() : Promise.resolve(),
+        activeTab === 'prs' ? loadPullRequests() : Promise.resolve(),
+      ]);
+    } catch (cause) {
+      setError(cause instanceof ApiRequestError ? cause.message : 'Failed to push branch.');
+    } finally {
+      setActionPending(null);
+    }
+  }, [activeTab, loadChanges, loadChecks, loadPullRequests, projectId]);
 
   const currentStatus = status ?? EmptyGitStatus();
   const currentChanges = changes;
@@ -617,6 +653,7 @@ export function ProjectGitHubPanel({
       : currentStatus.githubRemoteDetected
         ? 0
         : undefined;
+  const canPushCurrentBranch = currentStatus.available && Boolean(currentStatus.upstreamBranch);
   const tabs = useMemo(
     () =>
       [
@@ -1097,10 +1134,54 @@ export function ProjectGitHubPanel({
               <GitCard title="Commits">
                 {currentStatus.recentCommit ? (
                   <div className="space-y-2">
+                    {commitSuccess && (
+                      <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        {commitSuccess}
+                      </div>
+                    )}
+                    {pushSuccess && (
+                      <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        {pushSuccess}
+                      </div>
+                    )}
                     <div className="font-mono text-xs">
                       {shortSha(currentStatus.recentCommit.sha)}
                     </div>
                     <div className="font-medium">{currentStatus.recentCommit.subject}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={
+                          actionPending !== null ||
+                          !canPushCurrentBranch ||
+                          currentStatus.ahead === 0
+                        }
+                        onClick={() => void pushCurrentBranch()}
+                        title={
+                          !canPushCurrentBranch
+                            ? 'This branch has no upstream. Push from the terminal with --set-upstream, or create a remote first.'
+                            : currentStatus.ahead === 0
+                              ? 'Branch is already pushed.'
+                              : `Push ${currentStatus.ahead} commit${
+                                  currentStatus.ahead === 1 ? '' : 's'
+                                } to ${currentStatus.upstreamBranch}.`
+                        }
+                      >
+                        {actionPending === 'push'
+                          ? 'Pushing...'
+                          : currentStatus.ahead > 0
+                            ? `Push ${currentStatus.ahead}`
+                            : 'Pushed'}
+                      </Button>
+                      {currentStatus.upstreamBranch ? (
+                        <span className="text-xs text-muted-foreground">
+                          Upstream: {currentStatus.upstreamBranch}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-amber-700">No upstream configured</span>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       Full commit history is planned for the GitHub-aware sensor layer.
                     </div>

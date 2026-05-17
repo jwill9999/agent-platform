@@ -1085,6 +1085,51 @@ function commitProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
   return projectGitStatus(project);
 }
 
+function pushProjectGitBranch(project: ProjectRecord) {
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
+  if (!currentBranch) {
+    throw new HttpError(
+      409,
+      'PROJECT_BRANCH_DETACHED',
+      'Project is currently on a detached Git HEAD.',
+    );
+  }
+  const upstreamBranch = gitValue(repositoryRoot, [
+    'rev-parse',
+    '--abbrev-ref',
+    '--symbolic-full-name',
+    '@{u}',
+  ]);
+  if (!upstreamBranch) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_NO_UPSTREAM',
+      'This branch has no upstream. Push from the terminal with --set-upstream, or create a remote first.',
+    );
+  }
+
+  try {
+    execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'push'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120000,
+    });
+  } catch (cause) {
+    const stderr =
+      cause && typeof cause === 'object' && 'stderr' in cause
+        ? String((cause as { stderr?: unknown }).stderr ?? '').trim()
+        : '';
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_PUSH_FAILED',
+      stderr || 'Git push failed for this Project.',
+    );
+  }
+
+  return projectGitStatus(project);
+}
+
 function latestCommit(repositoryRoot: string) {
   const output = gitValue(repositoryRoot, ['log', '-1', '--format=%H%x1f%s%x1f%an%x1f%cI']);
   if (!output) return undefined;
@@ -2282,6 +2327,15 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: commitProjectGitChanges(project, req.body) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/push',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: pushProjectGitBranch(project) });
     }),
   );
 
