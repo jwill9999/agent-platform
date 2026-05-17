@@ -289,6 +289,14 @@ function checkSummaryTone(checks: ProjectGitPullRequestSummary['checks']): strin
   return 'text-muted-foreground';
 }
 
+function checksScopeLabel(checks: ProjectGitChecksResult): string {
+  if (checks.scope === 'pull_request' && checks.pullRequestNumber) {
+    return `Current PR #${checks.pullRequestNumber}`;
+  }
+  if (checks.scope === 'head_commit') return 'Current branch HEAD';
+  return 'Current branch';
+}
+
 function ChangeFileRow({
   file,
   selected,
@@ -1419,7 +1427,7 @@ export function ProjectGitHubPanel({
 
                         {checks.checks.length === 0 ? (
                           <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                            No GitHub Actions runs were found for this branch.
+                            No GitHub checks were found for {checksScopeLabel(checks)}.
                           </div>
                         ) : (
                           <div className="space-y-2">
@@ -1473,6 +1481,7 @@ export function ProjectGitHubPanel({
                         ? `· ${checks?.currentBranch ?? currentStatus.currentBranch}`
                         : ''}
                     </div>
+                    {checks?.available && <div>{checksScopeLabel(checks)}</div>}
                     <div>
                       {checks?.ghAvailable
                         ? 'GitHub CLI detected'

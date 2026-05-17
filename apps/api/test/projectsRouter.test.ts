@@ -482,7 +482,7 @@ describe('projectsRouter', () => {
     });
   });
 
-  it('loads GitHub checks through the configured GitHub CLI binary', async () => {
+  it('loads GitHub checks for the current branch pull request', async () => {
     const repoDir = path.join(tmpDir, 'desktop-git-checks-repo');
     const ghBinary = path.join(tmpDir, 'fake-gh');
     writeFileSync(
@@ -496,9 +496,17 @@ if [ "$1" = "auth" ]; then
   echo "Logged in to github.com"
   exit 0
 fi
-if [ "$1" = "run" ]; then
-  printf '%s\\n' '[{"databaseId":101,"name":"CI","displayTitle":"Build and test","workflowName":"CI","status":"completed","conclusion":"success","createdAt":"2026-05-16T15:55:00Z","updatedAt":"2026-05-16T15:58:00Z","url":"https://github.com/user/repo/actions/runs/101","headSha":"abcdef1234567890","event":"push"},{"databaseId":102,"name":"Lint","workflowName":"Lint","status":"completed","conclusion":"failure","createdAt":"2026-05-16T15:56:00Z","updatedAt":"2026-05-16T15:59:00Z","url":"https://github.com/user/repo/actions/runs/102","headSha":"abcdef1234567890","event":"push"}]'
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  printf '%s\\n' '{"number":42,"url":"https://github.com/user/repo/pull/42","statusCheckRollup":[{"databaseId":101,"name":"CI","displayTitle":"Build and test","workflowName":"CI","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2026-05-16T15:55:00Z","completedAt":"2026-05-16T15:58:00Z","detailsUrl":"https://github.com/user/repo/actions/runs/101"},{"databaseId":102,"name":"Lint","workflowName":"Lint","status":"COMPLETED","conclusion":"FAILURE","startedAt":"2026-05-16T15:56:00Z","completedAt":"2026-05-16T15:59:00Z","detailsUrl":"https://github.com/user/repo/actions/runs/102"}]}'
   exit 0
+fi
+if [ "$1" = "run" ]; then
+  echo "unexpected broad workflow history call" >&2
+  exit 12
+fi
+if [ "$1" = "api" ]; then
+  echo "unexpected head checks fallback" >&2
+  exit 12
 fi
 exit 1
 `,
@@ -538,6 +546,9 @@ exit 1
       repositoryName: 'desktop-git-checks-repo',
       remoteUrl: 'git@github.com:user/repo.git',
       currentBranch: 'main',
+      scope: 'pull_request',
+      pullRequestNumber: 42,
+      pullRequestUrl: 'https://github.com/user/repo/pull/42',
       githubRemoteDetected: true,
       ghAvailable: true,
       authenticated: true,
@@ -559,6 +570,96 @@ exit 1
           name: 'Lint',
           status: 'completed',
           conclusion: 'failure',
+        }),
+      ],
+    });
+  });
+
+  it('falls back to GitHub checks for the branch head commit when no PR exists', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-git-head-checks-repo');
+    const ghBinary = path.join(tmpDir, 'fake-gh-head-checks');
+    writeFileSync(
+      ghBinary,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "gh version 2.0.0"
+  exit 0
+fi
+if [ "$1" = "auth" ]; then
+  echo "Logged in to github.com"
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  echo "no pull requests found" >&2
+  exit 1
+fi
+if [ "$1" = "api" ]; then
+  printf '%s\\n' '[{"id":201,"name":"CI / build","status":"completed","conclusion":"success","html_url":"https://github.com/user/repo/runs/201","started_at":"2026-05-16T15:55:00Z","completed_at":"2026-05-16T15:58:00Z","check_suite":{"workflow_name":"CI"}},{"id":202,"name":"Tests","status":"in_progress","conclusion":null,"html_url":"https://github.com/user/repo/runs/202","check_suite":{"workflow_name":"CI"}}]'
+  exit 0
+fi
+if [ "$1" = "run" ]; then
+  echo "unexpected broad workflow history call" >&2
+  exit 12
+fi
+exit 1
+`,
+    );
+    chmodSync(ghBinary, 0o755);
+    process.env['AGENT_PLATFORM_GH_BINARY'] = ghBinary;
+
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', 'git@github.com:user/repo.git'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Git Head Checks Repo' })
+      .expect(201);
+
+    const checks = await request(app)
+      .get(`/v1/projects/${registered.body.data.project.id}/git/checks`)
+      .expect(200);
+
+    expect(checks.body.data).toMatchObject({
+      available: true,
+      repositoryName: 'desktop-git-head-checks-repo',
+      remoteUrl: 'git@github.com:user/repo.git',
+      currentBranch: 'main',
+      scope: 'head_commit',
+      githubRemoteDetected: true,
+      ghAvailable: true,
+      authenticated: true,
+      summary: {
+        total: 2,
+        success: 1,
+        inProgress: 1,
+      },
+      checks: [
+        expect.objectContaining({
+          id: '201',
+          name: 'CI / build',
+          workflowName: 'CI',
+          status: 'completed',
+          conclusion: 'success',
+        }),
+        expect.objectContaining({
+          id: '202',
+          name: 'Tests',
+          status: 'in_progress',
         }),
       ],
     });

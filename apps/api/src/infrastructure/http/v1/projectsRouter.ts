@@ -1232,30 +1232,17 @@ function unavailableGitChecks(
   });
 }
 
-type GhWorkflowRun = {
-  databaseId?: number;
-  name?: string;
-  displayTitle?: string;
-  workflowName?: string;
-  status?: string;
-  conclusion?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  url?: string;
-  headSha?: string;
-  event?: string;
-};
-
 function normalizeCheckStatus(status: string | undefined): ProjectGitCheckStatus {
+  const normalized = status?.toLowerCase();
   if (
-    status === 'queued' ||
-    status === 'in_progress' ||
-    status === 'completed' ||
-    status === 'waiting' ||
-    status === 'pending' ||
-    status === 'requested'
+    normalized === 'queued' ||
+    normalized === 'in_progress' ||
+    normalized === 'completed' ||
+    normalized === 'waiting' ||
+    normalized === 'pending' ||
+    normalized === 'requested'
   ) {
-    return status;
+    return normalized;
   }
   return 'unknown';
 }
@@ -1264,17 +1251,18 @@ function normalizeCheckConclusion(
   conclusion: string | undefined,
 ): ProjectGitCheckConclusion | undefined {
   if (!conclusion) return undefined;
+  const normalized = conclusion.toLowerCase();
   if (
-    conclusion === 'success' ||
-    conclusion === 'failure' ||
-    conclusion === 'cancelled' ||
-    conclusion === 'skipped' ||
-    conclusion === 'timed_out' ||
-    conclusion === 'action_required' ||
-    conclusion === 'neutral' ||
-    conclusion === 'stale'
+    normalized === 'success' ||
+    normalized === 'failure' ||
+    normalized === 'cancelled' ||
+    normalized === 'skipped' ||
+    normalized === 'timed_out' ||
+    normalized === 'action_required' ||
+    normalized === 'neutral' ||
+    normalized === 'stale'
   ) {
-    return conclusion;
+    return normalized;
   }
   return 'unknown';
 }
@@ -1305,7 +1293,29 @@ function summarizeChecks(checks: ProjectGitCheckRun[]): ProjectGitChecksSummary 
   return summary;
 }
 
-function parseGhWorkflowRuns(output: string): ProjectGitCheckRun[] {
+type GhPullRequestView = {
+  number?: number;
+  url?: string;
+  statusCheckRollup?: Array<{
+    databaseId?: number;
+    id?: number | string;
+    name?: string;
+    context?: string;
+    workflowName?: string;
+    displayTitle?: string;
+    detailsUrl?: string;
+    status?: string;
+    conclusion?: string;
+    startedAt?: string;
+    completedAt?: string;
+  }>;
+};
+
+function parseGhPullRequestChecks(output: string): {
+  number: number;
+  url?: string;
+  checks: ProjectGitCheckRun[];
+} {
   let parsed: unknown;
   try {
     parsed = JSON.parse(output);
@@ -1313,36 +1323,91 @@ function parseGhWorkflowRuns(output: string): ProjectGitCheckRun[] {
     throw new HttpError(
       502,
       'PROJECT_GITHUB_CHECKS_INVALID',
-      'GitHub checks response was invalid.',
+      'GitHub pull request checks response was invalid.',
+    );
+  }
+  const pullRequest = parsed as GhPullRequestView;
+  if (!pullRequest || typeof pullRequest !== 'object' || !pullRequest.number) {
+    throw new HttpError(
+      502,
+      'PROJECT_GITHUB_CHECKS_INVALID',
+      'GitHub pull request checks response was invalid.',
+    );
+  }
+
+  return {
+    number: pullRequest.number,
+    ...(pullRequest.url ? { url: pullRequest.url } : {}),
+    checks: (pullRequest.statusCheckRollup ?? []).flatMap((check, index): ProjectGitCheckRun[] => {
+      const id = check.databaseId ?? check.id ?? `${pullRequest.number}:${index}`;
+      const name = check.name ?? check.context ?? check.workflowName ?? check.displayTitle;
+      if (!name) return [];
+      return [
+        {
+          id: String(id),
+          name,
+          ...(check.workflowName ? { workflowName: check.workflowName } : {}),
+          ...(check.displayTitle ? { displayTitle: check.displayTitle } : {}),
+          status: normalizeCheckStatus(check.status),
+          ...(normalizeCheckConclusion(check.conclusion)
+            ? { conclusion: normalizeCheckConclusion(check.conclusion) }
+            : {}),
+          ...(check.detailsUrl ? { url: check.detailsUrl } : {}),
+          ...(check.startedAt ? { startedAt: check.startedAt } : {}),
+          ...(check.completedAt ? { completedAt: check.completedAt } : {}),
+        },
+      ];
+    }),
+  };
+}
+
+type GhCommitCheckRun = {
+  id?: number | string;
+  name?: string;
+  status?: string;
+  conclusion?: string;
+  html_url?: string;
+  started_at?: string;
+  completed_at?: string;
+  check_suite?: {
+    workflow_name?: string;
+  };
+};
+
+function parseGhCommitCheckRuns(output: string): ProjectGitCheckRun[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    throw new HttpError(
+      502,
+      'PROJECT_GITHUB_CHECKS_INVALID',
+      'GitHub branch head checks response was invalid.',
     );
   }
   if (!Array.isArray(parsed)) {
     throw new HttpError(
       502,
       'PROJECT_GITHUB_CHECKS_INVALID',
-      'GitHub checks response was invalid.',
+      'GitHub branch head checks response was invalid.',
     );
   }
+
   return parsed.flatMap((value): ProjectGitCheckRun[] => {
-    const run = value as GhWorkflowRun;
-    const id = run.databaseId ? String(run.databaseId) : undefined;
-    const name = run.workflowName ?? run.name ?? run.displayTitle;
-    if (!id || !name) return [];
+    const run = value as GhCommitCheckRun;
+    if (!run.id || !run.name) return [];
     return [
       {
-        id,
-        name,
-        ...(run.workflowName ? { workflowName: run.workflowName } : {}),
-        ...(run.displayTitle ? { displayTitle: run.displayTitle } : {}),
+        id: String(run.id),
+        name: run.name,
+        ...(run.check_suite?.workflow_name ? { workflowName: run.check_suite.workflow_name } : {}),
         status: normalizeCheckStatus(run.status),
         ...(normalizeCheckConclusion(run.conclusion)
           ? { conclusion: normalizeCheckConclusion(run.conclusion) }
           : {}),
-        ...(run.event ? { event: run.event } : {}),
-        ...(run.headSha ? { headSha: run.headSha.slice(0, 12) } : {}),
-        ...(run.url ? { url: run.url } : {}),
-        ...(run.createdAt ? { startedAt: run.createdAt } : {}),
-        ...(run.updatedAt ? { completedAt: run.updatedAt } : {}),
+        ...(run.html_url ? { url: run.html_url } : {}),
+        ...(run.started_at ? { startedAt: run.started_at } : {}),
+        ...(run.completed_at ? { completedAt: run.completed_at } : {}),
       },
     ];
   });
@@ -1361,7 +1426,8 @@ function projectGitChecks(project: ProjectRecord) {
 
   const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
   const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
-  const headSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD'])?.slice(0, 12);
+  const fullHeadSha = gitValue(repositoryRoot, ['rev-parse', 'HEAD']);
+  const headSha = fullHeadSha?.slice(0, 12);
   const repositoryName = basename(repositoryRoot);
   const githubDetected = githubRemoteDetected(remoteUrl);
   const repositorySlug = githubRepositorySlug(remoteUrl);
@@ -1397,19 +1463,47 @@ function projectGitChecks(project: ProjectRecord) {
     });
   }
 
-  const args = [
-    'run',
-    'list',
-    '--repo',
-    repositorySlug,
-    '--limit',
-    '20',
-    '--json',
-    'databaseId,name,displayTitle,workflowName,status,conclusion,createdAt,updatedAt,url,headSha,event',
-  ];
-  if (currentBranch) args.push('--branch', currentBranch);
-  const runsOutput = ghValue(repositoryRoot, args);
-  if (runsOutput === undefined) {
+  if (currentBranch) {
+    const pullRequestOutput = ghValue(repositoryRoot, [
+      'pr',
+      'view',
+      '--repo',
+      repositorySlug,
+      '--json',
+      'number,url,statusCheckRollup',
+    ]);
+    if (pullRequestOutput !== undefined) {
+      const pullRequestChecks = parseGhPullRequestChecks(pullRequestOutput);
+      return ProjectGitChecksResultSchema.parse({
+        available: true,
+        ...baseOptions,
+        scope: 'pull_request',
+        pullRequestNumber: pullRequestChecks.number,
+        ...(pullRequestChecks.url ? { pullRequestUrl: pullRequestChecks.url } : {}),
+        ghAvailable: true,
+        authenticated: true,
+        checkedAt: new Date().toISOString(),
+        summary: summarizeChecks(pullRequestChecks.checks),
+        checks: pullRequestChecks.checks,
+      });
+    }
+  }
+
+  if (!fullHeadSha) {
+    return unavailableGitChecks('Current branch HEAD could not be inspected.', {
+      ...baseOptions,
+      ghAvailable: true,
+      authenticated: true,
+    });
+  }
+
+  const checkRunsOutput = ghValue(repositoryRoot, [
+    'api',
+    `repos/${repositorySlug}/commits/${fullHeadSha}/check-runs`,
+    '--jq',
+    '.check_runs',
+  ]);
+  if (checkRunsOutput === undefined) {
     return unavailableGitChecks('GitHub checks could not be loaded for this Project.', {
       ...baseOptions,
       ghAvailable: true,
@@ -1417,10 +1511,11 @@ function projectGitChecks(project: ProjectRecord) {
     });
   }
 
-  const checks = parseGhWorkflowRuns(runsOutput);
+  const checks = parseGhCommitCheckRuns(checkRunsOutput);
   return ProjectGitChecksResultSchema.parse({
     available: true,
     ...baseOptions,
+    scope: 'head_commit',
     ghAvailable: true,
     authenticated: true,
     checkedAt: new Date().toISOString(),

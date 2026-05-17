@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-17
+- **Session:** Implemented `agent-platform-88d` on `task/agent-platform-terminal-git-panel-layout`: Git & GitHub Checks now scope to merge-relevant checks.
+- **Today’s outputs:** Added a task spec, extended the Project Git checks contract with source metadata, changed `GET /v1/projects/:id/git/checks` to prefer the current branch PR check rollup via `gh pr view`, fall back to exact `HEAD` check runs via `gh api`, and stop using broad `gh run list` workflow history for the main Checks tab. The Checks UI now labels whether data came from the current PR or branch head.
+- **Validation:** Passed contracts project tests, contracts build, API typecheck, API lint, web typecheck, web lint, `pnpm format:check`, and `git diff --check`. Focused API Project router tests passed outside the sandbox after the expected Supertest listener restriction (`listen EPERM`) inside the sandbox.
+- **Current state:** Bead `agent-platform-88d` is implemented and ready to close. Branch is `task/agent-platform-terminal-git-panel-layout`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit and push the task branch. Later work can add a separate "Workflow history / all runs" view and interactive PR actions.
+- **Date:** 2026-05-17
 - **Session:** Implemented `agent-platform-hwt` on `task/agent-platform-terminal-git-panel-layout`: UI branch selector checkouts now trigger the shared Project Git refresh path.
 - **Today’s outputs:** Added a Project branch-change handler that updates the active Project record, bumps `projectGitRefreshKey`, and schedules Project Git reconciliation so the Git & GitHub side panel reloads after a branch is changed from the chat input selector. Filed `agent-platform-lkr` for terminal-driven Git state and stale-upstream branch labelling, and `agent-platform-88d` for scoping Checks to current PR/head checks instead of broad workflow history.
 - **Validation:** Passed web typecheck, web lint, web tests, `pnpm format:check`, and `git diff --check`. SonarQube MCP was not available in-session, so the documented fallback gate was used.
