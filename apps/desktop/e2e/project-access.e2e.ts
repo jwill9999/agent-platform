@@ -205,14 +205,12 @@ test.describe('Electron Project access', () => {
       await expect(gitPanel.getByText('Git & GitHub')).toBeVisible();
       await expect(gitPanel.getByText('agent-platform')).toBeVisible();
       await expect(gitPanel.getByText('feature/e2e-branch')).toBeVisible();
-      await expect(gitPanel.getByText('1 change')).toBeVisible();
-      await expect(gitPanel.getByText('No GitHub remote detected.')).toBeVisible();
-      await gitPanel.getByRole('button', { name: 'PRs' }).click();
-      await expect(gitPanel.getByText('Pull request state is not connected yet.')).toBeVisible();
-      await gitPanel.getByRole('button', { name: 'Checks' }).click();
-      await expect(
-        gitPanel.getByText('GitHub Actions, check runs, Sonar, and CodeQL are not connected yet.'),
-      ).toBeVisible();
+      await expect(gitPanel.getByText('1 change', { exact: true })).toBeVisible();
+      await expect(gitPanel.getByRole('button', { name: /Changes/ })).toBeVisible();
+      await expect(gitPanel.getByRole('button', { name: 'PRs' })).toHaveCount(0);
+      await expect(gitPanel.getByRole('button', { name: 'Checks' })).toHaveCount(0);
+      await gitPanel.getByRole('button', { name: /Changes/ }).click();
+      await expect(gitPanel.getByRole('button', { name: 'Stage all' })).toBeVisible();
       await gitPanel.getByRole('button', { name: 'Overview' }).click();
       await projectTerminal.getByTitle('New terminal').click();
       await expect(

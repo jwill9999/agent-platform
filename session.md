@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-19
+- **Session:** Implemented `agent-platform-5nv` on `task/agent-platform-terminal-git-panel-layout`: Git & GitHub panel tabs now reveal progressively by workflow state instead of showing every future action at once.
+- **Today’s outputs:** Split the old Changes/Commits flow into workflow-specific Overview, Changes, Commit, Publish, PRs, and Checks steps; moved commit controls into the Commit step; auto-advances from commit success into Publish; and added focused Electron Playwright coverage that opens a real Git Project and walks clean → changed → staged → commit-ready UI states.
+- **Validation:** Passed focused web workflow tests, web typecheck, web lint, desktop lint, desktop typecheck, focused Electron Playwright `project-git-workflow.e2e.ts`, `pnpm format:check`, and `git diff --check`. The older broad `project-access.e2e.ts` still has an unrelated attachment smoke assertion failure and should be split/fixed under the Electron stabilisation epic.
+- **Current state:** Bead `agent-platform-5nv` is closed locally. Branch is `task/agent-platform-terminal-git-panel-layout`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Push this commit, then continue with `agent-platform-59i`: upstream publish and clear actions.
+- **Date:** 2026-05-19
 - **Session:** Planned the next Git workflow UI iteration after manual feedback: progressive workflow steps, upstream actions, commit/push/PR flow, checks refinement, Web Explorer handoff, and Playwright journey coverage.
 - **Today’s outputs:** Created Beads epic `agent-platform-ii1` and eight ordered P1 tasks (`agent-platform-5nv`, `agent-platform-59i`, `agent-platform-4hm`, `agent-platform-0ra`, `agent-platform-5zg`, `agent-platform-17h`, `agent-platform-e6g`, `agent-platform-7vf`). Added task specs in `docs/tasks/agent-platform-git-workflow-ui*.md` and implementation plan `docs/superpowers/plans/2026-05-19-git-workflow-ui.md`.
 - **Validation:** Ran Prettier check for the new task/plan docs and verified the dependency tree for the final Playwright task.

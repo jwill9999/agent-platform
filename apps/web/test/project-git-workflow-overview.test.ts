@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   deriveGitWorkflowOverview,
+  deriveGitWorkflowTabs,
   shouldRenderGitStatusLoader,
   shouldRequestProjectGitDiff,
 } from '@/components/project/project-git-github-panel';
@@ -84,7 +85,7 @@ describe('deriveGitWorkflowOverview', () => {
     ).toMatchObject({
       title: 'Publish this branch',
       tone: 'warning',
-      primaryAction: { label: 'Review publish options', tab: 'commits' },
+      primaryAction: { label: 'Review publish options', tab: 'push' },
     });
   });
 
@@ -95,7 +96,7 @@ describe('deriveGitWorkflowOverview', () => {
       }),
     ).toMatchObject({
       title: 'Push local commits',
-      primaryAction: { label: 'Push commits', tab: 'commits' },
+      primaryAction: { label: 'Push commits', tab: 'push' },
     });
 
     const pullRequests: ProjectGitPullRequestsResult = {
@@ -190,6 +191,153 @@ describe('deriveGitWorkflowOverview', () => {
       title: 'Pull request checks need attention',
       primaryAction: { label: 'Review checks', tab: 'checks' },
     });
+  });
+});
+
+describe('deriveGitWorkflowTabs', () => {
+  it('keeps only Overview for clean primary branches without workflow work', () => {
+    expect(deriveGitWorkflowTabs({ status: cleanStatus })).toEqual([
+      { id: 'overview', label: 'Overview' },
+    ]);
+  });
+
+  it('shows Changes for unstaged work and Commit once files are staged', () => {
+    expect(
+      deriveGitWorkflowTabs({
+        status: status({
+          clean: false,
+          workingTree: {
+            total: 2,
+            staged: 0,
+            unstaged: 2,
+            added: 1,
+            modified: 1,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 0,
+          },
+        }),
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'changes', label: 'Changes', badge: 2 },
+    ]);
+
+    expect(
+      deriveGitWorkflowTabs({
+        status: status({
+          clean: false,
+          workingTree: {
+            total: 2,
+            staged: 1,
+            unstaged: 1,
+            added: 1,
+            modified: 1,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 0,
+          },
+        }),
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'changes', label: 'Changes', badge: 2 },
+      { id: 'commit', label: 'Commit', badge: 1 },
+    ]);
+  });
+
+  it('shows Publish or Push when a clean branch needs remote publication', () => {
+    expect(
+      deriveGitWorkflowTabs({
+        status: status({ upstreamBranch: undefined, upstreamState: 'none' }),
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'push', label: 'Publish' },
+    ]);
+
+    expect(
+      deriveGitWorkflowTabs({
+        status: status({ ahead: 2 }),
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'push', label: 'Push', badge: 2 },
+    ]);
+  });
+
+  it('shows PRs and Checks only when GitHub context is useful', () => {
+    const pullRequests: ProjectGitPullRequestsResult = {
+      available: true,
+      repositoryName: 'app',
+      remoteUrl: 'git@github.com:user/app.git',
+      currentBranch: 'feature/work',
+      githubRemoteDetected: true,
+      ghAvailable: true,
+      authenticated: true,
+      checkedAt: '2026-05-19T15:00:00.000Z',
+      pullRequests: [
+        {
+          number: 42,
+          title: 'Feature work',
+          state: 'open',
+          url: 'https://github.com/user/app/pull/42',
+          headRefName: 'feature/work',
+          baseRefName: 'main',
+          isDraft: false,
+          currentBranch: true,
+          checks: {
+            total: 1,
+            success: 0,
+            failure: 0,
+            pending: 1,
+            unknown: 0,
+          },
+        },
+      ],
+    };
+    const checks: ProjectGitChecksResult = {
+      available: true,
+      repositoryName: 'app',
+      remoteUrl: 'git@github.com:user/app.git',
+      currentBranch: 'feature/work',
+      headSha: 'abc123',
+      scope: 'pull_request',
+      pullRequestNumber: 42,
+      githubRemoteDetected: true,
+      ghAvailable: true,
+      authenticated: true,
+      checkedAt: '2026-05-19T15:00:00.000Z',
+      summary: {
+        total: 1,
+        success: 0,
+        failure: 0,
+        inProgress: 1,
+        queued: 0,
+        cancelled: 0,
+        skipped: 0,
+        unknown: 0,
+      },
+      checks: [],
+    };
+
+    expect(
+      deriveGitWorkflowTabs({
+        status: status({
+          currentBranch: 'feature/work',
+          upstreamBranch: 'origin/feature/work',
+          baseBranch: 'main',
+        }),
+        pullRequests,
+        checks,
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'prs', label: 'PRs', badge: 1 },
+      { id: 'checks', label: 'Checks', badge: 1 },
+    ]);
   });
 });
 

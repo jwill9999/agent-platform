@@ -38,7 +38,13 @@ type ProjectGitHubPanelProps = Readonly<{
   onStartProjectInstructions?: () => void;
 }>;
 
-type PanelTab = 'overview' | 'changes' | 'commits' | 'prs' | 'checks';
+type PanelTab = 'overview' | 'changes' | 'commit' | 'push' | 'prs' | 'checks';
+
+type GitWorkflowTab = Readonly<{
+  id: PanelTab;
+  label: string;
+  badge?: number;
+}>;
 
 type GitWorkflowTone = 'neutral' | 'success' | 'warning' | 'danger';
 
@@ -163,7 +169,7 @@ export function deriveGitWorkflowOverview({
       description:
         'This local branch tracks a remote branch that no longer exists. Publish it again or clear the stale upstream before pushing.',
       tone: 'warning',
-      primaryAction: { label: 'Review publish options', tab: 'commits' },
+      primaryAction: { label: 'Review publish options', tab: 'push' },
       detail: status.upstreamBranch ? `Missing upstream: ${status.upstreamBranch}` : undefined,
     };
   }
@@ -180,7 +186,7 @@ export function deriveGitWorkflowOverview({
       tone: 'warning',
       primaryAction: {
         label: staged > 0 ? 'Commit changes' : 'Review changes',
-        tab: 'changes',
+        tab: staged > 0 ? 'commit' : 'changes',
       },
     };
   }
@@ -192,7 +198,7 @@ export function deriveGitWorkflowOverview({
         status.ahead === 1 ? 'is' : 'are'
       } ready to push to ${status.upstreamBranch ?? 'the upstream branch'}.`,
       tone: 'warning',
-      primaryAction: { label: 'Push commits', tab: 'commits' },
+      primaryAction: { label: 'Push commits', tab: 'push' },
     };
   }
 
@@ -265,6 +271,81 @@ export function deriveGitWorkflowOverview({
     description: 'No local changes, local commits, or pull request issues need attention.',
     tone: 'success',
   };
+}
+
+export function deriveGitWorkflowTabs({
+  status,
+  pullRequests,
+  checks,
+  commitSuccess,
+  pushSuccess,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  pullRequests?: ProjectGitPullRequestsResult | null;
+  checks?: ProjectGitChecksResult | null;
+  commitSuccess?: string | null;
+  pushSuccess?: string | null;
+}>): GitWorkflowTab[] {
+  const tabs: GitWorkflowTab[] = [{ id: 'overview', label: 'Overview' }];
+  if (!status.available) return tabs;
+
+  const workingTree = status.workingTree;
+  const hasChanges = workingTree.total > 0 || workingTree.conflicts > 0;
+  const hasStagedChanges = workingTree.staged > 0;
+  const hasPublishWork =
+    status.clean &&
+    (status.ahead > 0 || status.upstreamState === 'missing' || status.upstreamState === 'none');
+  const currentPullRequest = pullRequests?.pullRequests.find(
+    (pullRequest) => pullRequest.currentBranch,
+  );
+  const hasPullRequestStep =
+    Boolean(currentPullRequest) ||
+    Boolean(
+      status.githubRemoteDetected &&
+        status.clean &&
+        status.currentBranch &&
+        !isLikelyPrimaryBranch(status.currentBranch) &&
+        status.upstreamState === 'active',
+    ) ||
+    Boolean(pushSuccess);
+  const hasChecksStep =
+    Boolean(
+      checks?.available &&
+        (checks.scope === 'pull_request' || checks.summary.total > 0 || currentPullRequest),
+    ) || Boolean(currentPullRequest?.checks.total);
+
+  if (hasChanges) {
+    tabs.push({ id: 'changes', label: 'Changes', badge: workingTree.total });
+  }
+
+  if (hasStagedChanges || commitSuccess) {
+    tabs.push({
+      id: 'commit',
+      label: 'Commit',
+      badge: hasStagedChanges ? workingTree.staged : undefined,
+    });
+  }
+
+  if (hasPublishWork || pushSuccess) {
+    const badge = status.ahead > 0 ? status.ahead : undefined;
+    tabs.push({ id: 'push', label: status.upstreamState === 'none' ? 'Publish' : 'Push', badge });
+  }
+
+  if (hasPullRequestStep) {
+    const badge =
+      pullRequests?.pullRequests.length && pullRequests.pullRequests.length > 0
+        ? pullRequests.pullRequests.length
+        : undefined;
+    tabs.push({ id: 'prs', label: 'PRs', badge });
+  }
+
+  if (hasChecksStep) {
+    const badge =
+      checks?.summary.total && checks.summary.total > 0 ? checks.summary.total : undefined;
+    tabs.push({ id: 'checks', label: 'Checks', badge });
+  }
+
+  return tabs;
 }
 
 function StatRow({
@@ -756,7 +837,7 @@ export function ProjectGitHubPanel({
   }, [loadStatus, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'changes') void loadChanges();
+    if (activeTab === 'changes' || activeTab === 'commit') void loadChanges();
   }, [activeTab, loadChanges, refreshKey]);
 
   useEffect(() => {
@@ -900,7 +981,7 @@ export function ProjectGitHubPanel({
           : 'Commit completed.',
       );
       setPushSuccess(null);
-      setActiveTab('commits');
+      setActiveTab('push');
       setSelectedChange(null);
       setDiff(null);
       setSelectedDiffMode('unstaged');
@@ -930,7 +1011,7 @@ export function ProjectGitHubPanel({
       );
       setError(null);
       await Promise.all([
-        loadChanges(),
+        activeTab === 'changes' || activeTab === 'commit' ? loadChanges() : null,
         activeTab === 'checks' ? loadChecks() : Promise.resolve(),
         activeTab === 'prs' ? loadPullRequests() : Promise.resolve(),
       ]);
@@ -962,34 +1043,27 @@ export function ProjectGitHubPanel({
   const unstagedFiles =
     currentChanges?.files.filter((file) => file.unstaged && file.status !== 'untracked') ?? [];
   const githubUrl = normalizeGitHubUrl(currentStatus.remoteUrl);
-  const changesBadge = currentStatus.workingTree.total;
-  const prsBadge =
-    currentPullRequests?.pullRequests.length && currentPullRequests.pullRequests.length > 0
-      ? currentPullRequests.pullRequests.length
-      : currentStatus.githubRemoteDetected
-        ? 0
-        : undefined;
-  const checksBadge =
-    currentChecks?.summary.total && currentChecks.summary.total > 0
-      ? currentChecks.summary.total
-      : currentStatus.githubRemoteDetected
-        ? 0
-        : undefined;
   const canPushCurrentBranch =
     currentStatus.available &&
     Boolean(currentStatus.upstreamBranch) &&
     currentStatus.upstreamState !== 'missing';
   const tabs = useMemo(
     () =>
-      [
-        ['overview', 'Overview', undefined],
-        ['changes', 'Changes', changesBadge],
-        ['commits', 'Commits', undefined],
-        ['prs', 'PRs', prsBadge],
-        ['checks', 'Checks', checksBadge],
-      ] as const,
-    [changesBadge, checksBadge, prsBadge],
+      deriveGitWorkflowTabs({
+        status: currentStatus,
+        pullRequests: currentPullRequests,
+        checks: currentChecks,
+        commitSuccess,
+        pushSuccess,
+      }),
+    [commitSuccess, currentChecks, currentPullRequests, currentStatus, pushSuccess],
   );
+
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab('overview');
+    }
+  }, [activeTab, tabs]);
 
   if (!projectId) return null;
 
@@ -1066,7 +1140,7 @@ export function ProjectGitHubPanel({
           </div>
 
           <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 pt-2 text-xs">
-            {tabs.map(([id, label, badge]) => (
+            {tabs.map(({ id, label, badge }) => (
               <button
                 key={id}
                 type="button"
@@ -1277,47 +1351,6 @@ export function ProjectGitHubPanel({
                       </Button>
                     </div>
 
-                    <div className="rounded border border-border bg-muted/20 p-2">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div>
-                          <div className="text-xs font-medium">Commit staged changes</div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {stagedFiles.length === 0
-                              ? 'Stage files before committing.'
-                              : `${stagedFiles.length} staged file${
-                                  stagedFiles.length === 1 ? '' : 's'
-                                } ready.`}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Input
-                          value={commitMessage}
-                          onChange={(event) => setCommitMessage(event.target.value)}
-                          placeholder="Commit message"
-                          disabled={actionPending !== null}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' && !event.shiftKey) {
-                              event.preventDefault();
-                              void commitStagedChanges();
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={
-                            stagedFiles.length === 0 ||
-                            actionPending !== null ||
-                            commitMessage.trim().length === 0
-                          }
-                          onClick={() => void commitStagedChanges()}
-                        >
-                          {actionPending === 'commit' ? 'Committing...' : 'Commit'}
-                        </Button>
-                      </div>
-                    </div>
-
                     {changesLoading && (
                       <div className="text-xs text-muted-foreground">Loading changed files...</div>
                     )}
@@ -1455,8 +1488,71 @@ export function ProjectGitHubPanel({
                   )}
                 </GitCard>
               </>
-            ) : activeTab === 'commits' ? (
-              <GitCard title="Commits">
+            ) : activeTab === 'commit' ? (
+              <GitCard title="Commit">
+                <div className="space-y-3">
+                  {changesLoading && (
+                    <div className="text-xs text-muted-foreground">Loading staged files...</div>
+                  )}
+                  <div>
+                    <div className="font-medium">Commit staged changes</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {stagedFiles.length === 0
+                        ? 'Stage files before committing.'
+                        : `${stagedFiles.length} staged file${
+                            stagedFiles.length === 1 ? '' : 's'
+                          } ready.`}
+                    </div>
+                  </div>
+                  {stagedFiles.length > 0 && (
+                    <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+                      {stagedFiles.map((file) => (
+                        <ChangeFileRow
+                          key={`commit:${file.path}`}
+                          file={file}
+                          mode="staged"
+                          selected={
+                            selectedChange?.path === file.path && selectedDiffMode === 'staged'
+                          }
+                          onSelect={(nextFile, mode) => {
+                            setSelectedChange(nextFile);
+                            setSelectedDiffMode(mode);
+                            setActiveTab('changes');
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      value={commitMessage}
+                      onChange={(event) => setCommitMessage(event.target.value)}
+                      placeholder="Commit message"
+                      disabled={actionPending !== null}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          void commitStagedChanges();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={
+                        stagedFiles.length === 0 ||
+                        actionPending !== null ||
+                        commitMessage.trim().length === 0
+                      }
+                      onClick={() => void commitStagedChanges()}
+                    >
+                      {actionPending === 'commit' ? 'Committing...' : 'Commit'}
+                    </Button>
+                  </div>
+                </div>
+              </GitCard>
+            ) : activeTab === 'push' ? (
+              <GitCard title="Push">
                 {currentStatus.recentCommit ? (
                   <div className="space-y-2">
                     {commitSuccess && (
@@ -1514,7 +1610,8 @@ export function ProjectGitHubPanel({
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Full commit history is planned for the GitHub-aware sensor layer.
+                      After this branch is pushed, pull request options appear when they are
+                      available.
                     </div>
                   </div>
                 ) : (
