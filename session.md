@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-19
+- **Session:** Fixed `agent-platform-asp` on `task/agent-platform-terminal-git-panel-layout`: Git & GitHub panel loading and stale diff state after testing feedback.
+- **Today’s outputs:** Added a Project-scoped loading guard so the side panel shows `Loading Git state...` until the current Project status is loaded, reset Project-scoped Git/check/PR/change data on Project switches, and guarded diff fetches so stale selected files cannot request diffs against the wrong Project. Added focused regression coverage.
+- **Validation:** Passed focused Git workflow overview tests, full web test suite, web typecheck, web lint, `pnpm format:check`, and `git diff --check`.
+- **Current state:** Bead `agent-platform-asp` is closed and Beads has been pushed. Branch is `task/agent-platform-terminal-git-panel-layout`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Commit and push the fix. Then owner can manually retest the side-panel loading state and Changes tab before moving to item 2.
+- **Date:** 2026-05-19
 - **Session:** Implemented `agent-platform-zzm` on `task/agent-platform-terminal-git-panel-layout`: Git & GitHub Overview now shows a workflow "Next step" state instead of the placeholder GitHub Sensors card.
 - **Today’s outputs:** Added a tested workflow-state derivation for dirty worktrees, staged changes, missing upstreams, ahead commits, pushed branches without PRs, open PRs, and failing/running checks. Overview now loads PR/check summaries, renders a user-facing next-step card, and routes its CTA to the appropriate tab without adding new mutation actions yet.
 - **Validation:** Passed focused Git workflow overview tests, full web test suite, web typecheck, web lint, `pnpm format:check`, and `git diff --check`.

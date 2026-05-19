@@ -5,7 +5,11 @@ import type {
 } from '@agent-platform/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { deriveGitWorkflowOverview } from '@/components/project/project-git-github-panel';
+import {
+  deriveGitWorkflowOverview,
+  shouldRenderGitStatusLoader,
+  shouldRequestProjectGitDiff,
+} from '@/components/project/project-git-github-panel';
 
 const cleanStatus: ProjectGitStatusResult = {
   available: true,
@@ -186,5 +190,106 @@ describe('deriveGitWorkflowOverview', () => {
       title: 'Pull request checks need attention',
       primaryAction: { label: 'Review checks', tab: 'checks' },
     });
+  });
+});
+
+describe('Git panel loading and diff guards', () => {
+  it('shows the Git status loader until the current Project status has loaded', () => {
+    expect(
+      shouldRenderGitStatusLoader({
+        projectId: 'project-a',
+        statusProjectId: null,
+        loading: false,
+        error: null,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldRenderGitStatusLoader({
+        projectId: 'project-a',
+        statusProjectId: 'project-b',
+        loading: false,
+        error: null,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldRenderGitStatusLoader({
+        projectId: 'project-a',
+        statusProjectId: 'project-a',
+        loading: false,
+        error: null,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not request a diff for a stale selected file after Project changes reload', () => {
+    expect(
+      shouldRequestProjectGitDiff({
+        projectId: 'project-a',
+        activeTab: 'changes',
+        selectedChange: { path: 'old-project-file.ts' },
+        changesProjectId: 'project-a',
+        changes: {
+          available: true,
+          clean: false,
+          workingTree: {
+            total: 1,
+            staged: 0,
+            unstaged: 1,
+            added: 0,
+            modified: 1,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 0,
+          },
+          files: [
+            {
+              path: 'README.md',
+              status: 'modified',
+              indexStatus: ' ',
+              worktreeStatus: 'M',
+              staged: false,
+              unstaged: true,
+            },
+          ],
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldRequestProjectGitDiff({
+        projectId: 'project-a',
+        activeTab: 'changes',
+        selectedChange: { path: 'README.md' },
+        changesProjectId: 'project-a',
+        changes: {
+          available: true,
+          clean: false,
+          workingTree: {
+            total: 1,
+            staged: 0,
+            unstaged: 1,
+            added: 0,
+            modified: 1,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 0,
+          },
+          files: [
+            {
+              path: 'README.md',
+              status: 'modified',
+              indexStatus: ' ',
+              worktreeStatus: 'M',
+              staged: false,
+              unstaged: true,
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
   });
 });

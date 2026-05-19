@@ -126,9 +126,7 @@ function upstreamStateLabel(status: ProjectGitStatusResult): string {
 }
 
 function isLikelyPrimaryBranch(branch: string | undefined): boolean {
-  return Boolean(
-    branch && ['main', 'master', 'trunk', 'develop', 'development'].includes(branch),
-  );
+  return Boolean(branch && ['main', 'master', 'trunk', 'develop', 'development'].includes(branch));
 }
 
 export function deriveGitWorkflowOverview({
@@ -198,7 +196,9 @@ export function deriveGitWorkflowOverview({
     };
   }
 
-  const currentPullRequest = pullRequests?.pullRequests.find((pullRequest) => pullRequest.currentBranch);
+  const currentPullRequest = pullRequests?.pullRequests.find(
+    (pullRequest) => pullRequest.currentBranch,
+  );
   const failingChecks =
     checks?.available && checks.summary.failure + checks.summary.cancelled > 0
       ? checks.summary.failure + checks.summary.cancelled
@@ -330,6 +330,50 @@ function WorkflowOverviewCard({
         )}
       </div>
     </section>
+  );
+}
+
+export function shouldRenderGitStatusLoader({
+  projectId,
+  statusProjectId,
+  loading,
+  error,
+}: Readonly<{
+  projectId: string | null;
+  statusProjectId: string | null;
+  loading: boolean;
+  error: string | null;
+}>): boolean {
+  if (!projectId || error) return false;
+  return loading || statusProjectId !== projectId;
+}
+
+export function shouldRequestProjectGitDiff({
+  projectId,
+  activeTab,
+  selectedChange,
+  changesProjectId,
+  changes,
+}: Readonly<{
+  projectId: string | null;
+  activeTab: PanelTab;
+  selectedChange: Pick<ProjectGitChangedFile, 'path'> | null;
+  changesProjectId: string | null;
+  changes: ProjectGitChangesResult | null;
+}>): boolean {
+  if (!projectId || activeTab !== 'changes' || !selectedChange) return false;
+  if (changesProjectId !== projectId || !changes?.files.length) return false;
+  return changes.files.some((file) => file.path === selectedChange.path);
+}
+
+function GitStatusLoadingCard() {
+  return (
+    <GitCard title="Git state">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <RefreshCw className="h-4 w-4 animate-spin" />
+        <span>Loading Git state...</span>
+      </div>
+    </GitCard>
   );
 }
 
@@ -557,9 +601,13 @@ export function ProjectGitHubPanel({
   const [open, setOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
   const [status, setStatus] = useState<ProjectGitStatusResult | null>(null);
+  const [statusProjectId, setStatusProjectId] = useState<string | null>(null);
   const [changes, setChanges] = useState<ProjectGitChangesResult | null>(null);
+  const [changesProjectId, setChangesProjectId] = useState<string | null>(null);
   const [checks, setChecks] = useState<ProjectGitChecksResult | null>(null);
+  const [checksProjectId, setChecksProjectId] = useState<string | null>(null);
   const [pullRequests, setPullRequests] = useState<ProjectGitPullRequestsResult | null>(null);
+  const [pullRequestsProjectId, setPullRequestsProjectId] = useState<string | null>(null);
   const [selectedChange, setSelectedChange] = useState<ProjectGitChangedFile | null>(null);
   const [selectedDiffMode, setSelectedDiffMode] = useState<ProjectGitDiffMode>('unstaged');
   const [diff, setDiff] = useState<ProjectGitFileDiffResult | null>(null);
@@ -580,6 +628,7 @@ export function ProjectGitHubPanel({
   const loadStatus = useCallback(async () => {
     if (!projectId) {
       setStatus(null);
+      setStatusProjectId(null);
       setError(null);
       return;
     }
@@ -589,9 +638,11 @@ export function ProjectGitHubPanel({
         apiPath('projects', projectId, 'git', 'status'),
       );
       setStatus(next ?? EmptyGitStatus());
+      setStatusProjectId(projectId);
       setError(null);
     } catch (cause) {
       setStatus(EmptyGitStatus());
+      setStatusProjectId(projectId);
       setError(cause instanceof ApiRequestError ? cause.message : 'Failed to load Git state.');
     } finally {
       setLoading(false);
@@ -601,6 +652,7 @@ export function ProjectGitHubPanel({
   const loadChanges = useCallback(async () => {
     if (!projectId) {
       setChanges(null);
+      setChangesProjectId(null);
       setSelectedChange(null);
       setDiff(null);
       setChangesError(null);
@@ -612,6 +664,7 @@ export function ProjectGitHubPanel({
         apiPath('projects', projectId, 'git', 'changes'),
       );
       setChanges(next ?? null);
+      setChangesProjectId(projectId);
       setChangesError(null);
       setSelectedChange((current) => {
         if (!next?.files.length) return null;
@@ -620,6 +673,7 @@ export function ProjectGitHubPanel({
       });
     } catch (cause) {
       setChanges(null);
+      setChangesProjectId(projectId);
       setSelectedChange(null);
       setDiff(null);
       setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to load changes.');
@@ -631,6 +685,7 @@ export function ProjectGitHubPanel({
   const loadChecks = useCallback(async () => {
     if (!projectId) {
       setChecks(null);
+      setChecksProjectId(null);
       setChecksError(null);
       return;
     }
@@ -640,9 +695,11 @@ export function ProjectGitHubPanel({
         apiPath('projects', projectId, 'git', 'checks'),
       );
       setChecks(next ?? null);
+      setChecksProjectId(projectId);
       setChecksError(null);
     } catch (cause) {
       setChecks(null);
+      setChecksProjectId(projectId);
       setChecksError(cause instanceof ApiRequestError ? cause.message : 'Failed to load checks.');
     } finally {
       setChecksLoading(false);
@@ -652,6 +709,7 @@ export function ProjectGitHubPanel({
   const loadPullRequests = useCallback(async () => {
     if (!projectId) {
       setPullRequests(null);
+      setPullRequestsProjectId(null);
       setPullRequestsError(null);
       return;
     }
@@ -661,15 +719,36 @@ export function ProjectGitHubPanel({
         apiPath('projects', projectId, 'github', 'pull-requests'),
       );
       setPullRequests(next ?? null);
+      setPullRequestsProjectId(projectId);
       setPullRequestsError(null);
     } catch (cause) {
       setPullRequests(null);
+      setPullRequestsProjectId(projectId);
       setPullRequestsError(
         cause instanceof ApiRequestError ? cause.message : 'Failed to load pull requests.',
       );
     } finally {
       setPullRequestsLoading(false);
     }
+  }, [projectId]);
+
+  useEffect(() => {
+    setStatus(null);
+    setStatusProjectId(null);
+    setChanges(null);
+    setChangesProjectId(null);
+    setChecks(null);
+    setChecksProjectId(null);
+    setPullRequests(null);
+    setPullRequestsProjectId(null);
+    setSelectedChange(null);
+    setDiff(null);
+    setError(null);
+    setChangesError(null);
+    setChecksError(null);
+    setPullRequestsError(null);
+    setCommitSuccess(null);
+    setPushSuccess(null);
   }, [projectId]);
 
   useEffect(() => {
@@ -689,12 +768,23 @@ export function ProjectGitHubPanel({
   }, [activeTab, loadPullRequests, refreshKey]);
 
   useEffect(() => {
-    if (!projectId || activeTab !== 'changes' || !selectedChange) {
+    const selectedPath = selectedChange?.path;
+    if (
+      !projectId ||
+      !selectedPath ||
+      !shouldRequestProjectGitDiff({
+        projectId,
+        activeTab,
+        selectedChange,
+        changesProjectId,
+        changes,
+      })
+    ) {
       setDiff(null);
       return;
     }
     const params = new URLSearchParams({
-      path: selectedChange.path,
+      path: selectedPath,
       mode: selectedDiffMode,
     });
     let cancelled = false;
@@ -719,7 +809,7 @@ export function ProjectGitHubPanel({
     return () => {
       cancelled = true;
     };
-  }, [activeTab, projectId, selectedChange, selectedDiffMode]);
+  }, [activeTab, changes, changesProjectId, projectId, selectedChange, selectedDiffMode]);
 
   const refreshGitViews = useCallback(async () => {
     await Promise.all([
@@ -740,6 +830,7 @@ export function ProjectGitHubPanel({
           paths === 'all' ? { all: true } : { paths },
         );
         setChanges(next ?? null);
+        setChangesProjectId(projectId);
         setSelectedChange((current) =>
           current && next
             ? (next.files.find((file) => file.path === current.path) ?? null)
@@ -767,6 +858,7 @@ export function ProjectGitHubPanel({
           { paths },
         );
         setChanges(next ?? null);
+        setChangesProjectId(projectId);
         setSelectedChange((current) =>
           current && next
             ? (next.files.find((file) => file.path === current.path) ?? null)
@@ -800,6 +892,7 @@ export function ProjectGitHubPanel({
         { message },
       );
       setStatus(nextStatus ?? null);
+      setStatusProjectId(projectId);
       setCommitMessage('');
       setCommitSuccess(
         nextStatus?.recentCommit
@@ -829,6 +922,7 @@ export function ProjectGitHubPanel({
         {},
       );
       setStatus(nextStatus ?? null);
+      setStatusProjectId(projectId);
       setPushSuccess(
         nextStatus?.currentBranch
           ? `Pushed ${nextStatus.currentBranch} to ${nextStatus.upstreamBranch ?? 'upstream'}.`
@@ -847,12 +941,20 @@ export function ProjectGitHubPanel({
     }
   }, [activeTab, loadChanges, loadChecks, loadPullRequests, projectId]);
 
-  const currentStatus = status ?? EmptyGitStatus();
-  const currentChanges = changes;
+  const statusLoading = shouldRenderGitStatusLoader({
+    projectId,
+    statusProjectId,
+    loading,
+    error,
+  });
+  const currentStatus = statusProjectId === projectId && status ? status : EmptyGitStatus();
+  const currentChanges = changesProjectId === projectId ? changes : null;
+  const currentChecks = checksProjectId === projectId ? checks : null;
+  const currentPullRequests = pullRequestsProjectId === projectId ? pullRequests : null;
   const workflowOverview = deriveGitWorkflowOverview({
     status: currentStatus,
-    pullRequests,
-    checks,
+    pullRequests: currentPullRequests,
+    checks: currentChecks,
   });
   const stagedFiles = currentChanges?.files.filter((file) => file.staged) ?? [];
   const untrackedFiles =
@@ -862,14 +964,14 @@ export function ProjectGitHubPanel({
   const githubUrl = normalizeGitHubUrl(currentStatus.remoteUrl);
   const changesBadge = currentStatus.workingTree.total;
   const prsBadge =
-    pullRequests?.pullRequests.length && pullRequests.pullRequests.length > 0
-      ? pullRequests.pullRequests.length
+    currentPullRequests?.pullRequests.length && currentPullRequests.pullRequests.length > 0
+      ? currentPullRequests.pullRequests.length
       : currentStatus.githubRemoteDetected
         ? 0
         : undefined;
   const checksBadge =
-    checks?.summary.total && checks.summary.total > 0
-      ? checks.summary.total
+    currentChecks?.summary.total && currentChecks.summary.total > 0
+      ? currentChecks.summary.total
       : currentStatus.githubRemoteDetected
         ? 0
         : undefined;
@@ -925,7 +1027,11 @@ export function ProjectGitHubPanel({
                 </span>
               </div>
               <div className="truncate text-xs text-muted-foreground">
-                {currentStatus.available ? 'Local Git state' : 'No local Git repository'}
+                {statusLoading
+                  ? 'Loading Git state'
+                  : currentStatus.available
+                    ? 'Local Git state'
+                    : 'No local Git repository'}
               </div>
             </div>
             <Button
@@ -1004,7 +1110,16 @@ export function ProjectGitHubPanel({
               </div>
             )}
 
-            {!currentStatus.available ? (
+            {statusLoading ? (
+              <>
+                <ProjectInstructionsCard
+                  status={projectInstructionsStatus}
+                  isStarting={isStartingProjectInstructions}
+                  onStart={onStartProjectInstructions}
+                />
+                <GitStatusLoadingCard />
+              </>
+            ) : !currentStatus.available ? (
               <>
                 <ProjectInstructionsCard
                   status={projectInstructionsStatus}
@@ -1134,7 +1249,6 @@ export function ProjectGitHubPanel({
                     <div className="text-sm text-muted-foreground">No commits found.</div>
                   )}
                 </GitCard>
-
               </>
             ) : activeTab === 'changes' ? (
               <>
@@ -1418,56 +1532,60 @@ export function ProjectGitHubPanel({
                       </div>
                     )}
 
-                    {!pullRequestsLoading && pullRequests && !pullRequests.available && (
-                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                        {pullRequests.githubRemoteDetected ? (
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                        ) : (
-                          <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                        )}
-                        <div className="space-y-1">
-                          <div>
-                            {pullRequests.reason ?? 'GitHub pull requests are unavailable.'}
-                          </div>
-                          {pullRequests.githubRemoteDetected && !pullRequests.authenticated && (
-                            <div className="text-xs">
-                              Authenticate with GitHub CLI in the terminal to enable live PRs.
-                            </div>
+                    {!pullRequestsLoading &&
+                      currentPullRequests &&
+                      !currentPullRequests.available && (
+                        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                          {currentPullRequests.githubRemoteDetected ? (
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                          ) : (
+                            <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
                           )}
+                          <div className="space-y-1">
+                            <div>
+                              {currentPullRequests.reason ??
+                                'GitHub pull requests are unavailable.'}
+                            </div>
+                            {currentPullRequests.githubRemoteDetected &&
+                              !currentPullRequests.authenticated && (
+                                <div className="text-xs">
+                                  Authenticate with GitHub CLI in the terminal to enable live PRs.
+                                </div>
+                              )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {!pullRequestsLoading && !pullRequests && (
+                    {!pullRequestsLoading && !currentPullRequests && (
                       <div className="text-sm text-muted-foreground">
                         Select refresh or open this tab again to load pull request state.
                       </div>
                     )}
 
-                    {!pullRequestsLoading && pullRequests?.available && (
+                    {!pullRequestsLoading && currentPullRequests?.available && (
                       <>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="rounded border border-border bg-muted/20 px-2 py-2">
                             <div className="text-muted-foreground">Open PRs</div>
                             <div className="text-lg font-semibold">
-                              {pullRequests.pullRequests.length}
+                              {currentPullRequests.pullRequests.length}
                             </div>
                           </div>
                           <div className="rounded border border-border bg-muted/20 px-2 py-2">
                             <div className="text-muted-foreground">Current branch</div>
                             <div className="truncate text-sm font-semibold">
-                              {pullRequests.currentBranch ?? 'Detached HEAD'}
+                              {currentPullRequests.currentBranch ?? 'Detached HEAD'}
                             </div>
                           </div>
                         </div>
 
-                        {pullRequests.pullRequests.length === 0 ? (
+                        {currentPullRequests.pullRequests.length === 0 ? (
                           <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
                             No open GitHub pull requests were found for this repository.
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            {pullRequests.pullRequests.map((pullRequest) => (
+                            {currentPullRequests.pullRequests.map((pullRequest) => (
                               <div
                                 key={pullRequest.number}
                                 className={cn(
@@ -1553,18 +1671,20 @@ export function ProjectGitHubPanel({
                 <GitCard title="Source">
                   <div className="space-y-1 text-xs text-muted-foreground">
                     <div>
-                      {pullRequests?.repositoryName ?? currentStatus.repositoryName ?? 'Repository'}{' '}
-                      {(pullRequests?.currentBranch ?? currentStatus.currentBranch)
-                        ? `· ${pullRequests?.currentBranch ?? currentStatus.currentBranch}`
+                      {currentPullRequests?.repositoryName ??
+                        currentStatus.repositoryName ??
+                        'Repository'}{' '}
+                      {(currentPullRequests?.currentBranch ?? currentStatus.currentBranch)
+                        ? `· ${currentPullRequests?.currentBranch ?? currentStatus.currentBranch}`
                         : ''}
                     </div>
                     <div>
-                      {pullRequests?.ghAvailable
+                      {currentPullRequests?.ghAvailable
                         ? 'GitHub CLI detected'
                         : 'GitHub CLI not confirmed for this Project'}
                     </div>
                     <div>
-                      {pullRequests?.authenticated
+                      {currentPullRequests?.authenticated
                         ? 'Authenticated with github.com'
                         : 'GitHub authentication not confirmed'}
                     </div>
@@ -1583,16 +1703,16 @@ export function ProjectGitHubPanel({
                       </div>
                     )}
 
-                    {!checksLoading && checks && !checks.available && (
+                    {!checksLoading && currentChecks && !currentChecks.available && (
                       <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                        {checks.githubRemoteDetected ? (
+                        {currentChecks.githubRemoteDetected ? (
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                         ) : (
                           <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
                         )}
                         <div className="space-y-1">
-                          <div>{checks.reason ?? 'GitHub checks are unavailable.'}</div>
-                          {checks.githubRemoteDetected && !checks.authenticated && (
+                          <div>{currentChecks.reason ?? 'GitHub checks are unavailable.'}</div>
+                          {currentChecks.githubRemoteDetected && !currentChecks.authenticated && (
                             <div className="text-xs">
                               Authenticate with GitHub CLI in the terminal to enable live checks.
                             </div>
@@ -1601,46 +1721,48 @@ export function ProjectGitHubPanel({
                       </div>
                     )}
 
-                    {!checksLoading && !checks && (
+                    {!checksLoading && !currentChecks && (
                       <div className="text-sm text-muted-foreground">
                         Select refresh or open this tab again to load check state.
                       </div>
                     )}
 
-                    {!checksLoading && checks?.available && (
+                    {!checksLoading && currentChecks?.available && (
                       <>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="rounded border border-border bg-muted/20 px-2 py-2">
                             <div className="text-muted-foreground">Total</div>
-                            <div className="text-lg font-semibold">{checks.summary.total}</div>
+                            <div className="text-lg font-semibold">
+                              {currentChecks.summary.total}
+                            </div>
                           </div>
                           <div className="rounded border border-border bg-muted/20 px-2 py-2">
                             <div className="text-muted-foreground">Passing</div>
                             <div className="text-lg font-semibold text-emerald-700">
-                              {checks.summary.success}
+                              {currentChecks.summary.success}
                             </div>
                           </div>
                           <div className="rounded border border-border bg-muted/20 px-2 py-2">
                             <div className="text-muted-foreground">Failing</div>
                             <div className="text-lg font-semibold text-red-700">
-                              {checks.summary.failure}
+                              {currentChecks.summary.failure}
                             </div>
                           </div>
                           <div className="rounded border border-border bg-muted/20 px-2 py-2">
                             <div className="text-muted-foreground">Running</div>
                             <div className="text-lg font-semibold text-blue-700">
-                              {checks.summary.inProgress + checks.summary.queued}
+                              {currentChecks.summary.inProgress + currentChecks.summary.queued}
                             </div>
                           </div>
                         </div>
 
-                        {checks.checks.length === 0 ? (
+                        {currentChecks.checks.length === 0 ? (
                           <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                            No GitHub checks were found for {checksScopeLabel(checks)}.
+                            No GitHub checks were found for {checksScopeLabel(currentChecks)}.
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            {checks.checks.map((check) => (
+                            {currentChecks.checks.map((check) => (
                               <div
                                 key={check.id}
                                 className="rounded border border-border bg-background px-3 py-2"
@@ -1685,19 +1807,21 @@ export function ProjectGitHubPanel({
                 <GitCard title="Source">
                   <div className="space-y-1 text-xs text-muted-foreground">
                     <div>
-                      {checks?.repositoryName ?? currentStatus.repositoryName ?? 'Repository'}{' '}
-                      {(checks?.currentBranch ?? currentStatus.currentBranch)
-                        ? `· ${checks?.currentBranch ?? currentStatus.currentBranch}`
+                      {currentChecks?.repositoryName ??
+                        currentStatus.repositoryName ??
+                        'Repository'}{' '}
+                      {(currentChecks?.currentBranch ?? currentStatus.currentBranch)
+                        ? `· ${currentChecks?.currentBranch ?? currentStatus.currentBranch}`
                         : ''}
                     </div>
-                    {checks?.available && <div>{checksScopeLabel(checks)}</div>}
+                    {currentChecks?.available && <div>{checksScopeLabel(currentChecks)}</div>}
                     <div>
-                      {checks?.ghAvailable
+                      {currentChecks?.ghAvailable
                         ? 'GitHub CLI detected'
                         : 'GitHub CLI not confirmed for this Project'}
                     </div>
                     <div>
-                      {checks?.authenticated
+                      {currentChecks?.authenticated
                         ? 'Authenticated with github.com'
                         : 'GitHub authentication not confirmed'}
                     </div>
