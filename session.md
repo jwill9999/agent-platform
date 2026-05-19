@@ -7,6 +7,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-19
+- **Session:** Implemented `agent-platform-zzm` on `task/agent-platform-terminal-git-panel-layout`: Git & GitHub Overview now shows a workflow "Next step" state instead of the placeholder GitHub Sensors card.
+- **Today’s outputs:** Added a tested workflow-state derivation for dirty worktrees, staged changes, missing upstreams, ahead commits, pushed branches without PRs, open PRs, and failing/running checks. Overview now loads PR/check summaries, renders a user-facing next-step card, and routes its CTA to the appropriate tab without adding new mutation actions yet.
+- **Validation:** Passed focused Git workflow overview tests, full web test suite, web typecheck, web lint, `pnpm format:check`, and `git diff --check`.
+- **Current state:** Bead `agent-platform-zzm` is closed and Beads has been pushed. Branch is `task/agent-platform-terminal-git-panel-layout`; `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Commit and push the task branch. Then owner can manually test the Overview state before moving to item 2: missing-upstream publish/unset actions.
 - **Date:** 2026-05-17
 - **Session:** Implemented `agent-platform-lkr` on `task/agent-platform-terminal-git-panel-layout`: Project Git UI now labels local branches whose configured upstream no longer exists.
 - **Today’s outputs:** Added upstream state to Project branch/status contracts, detected missing remote-tracking refs with local Git, labelled stale upstreams in the chat branch selector and Git & GitHub panel, and blocked the Push CTA/API path when a branch tracks an upstream that has been pruned. Added focused API coverage that creates a real stale-upstream branch after `git fetch --prune`.

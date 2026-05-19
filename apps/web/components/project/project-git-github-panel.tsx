@@ -40,6 +40,19 @@ type ProjectGitHubPanelProps = Readonly<{
 
 type PanelTab = 'overview' | 'changes' | 'commits' | 'prs' | 'checks';
 
+type GitWorkflowTone = 'neutral' | 'success' | 'warning' | 'danger';
+
+type GitWorkflowOverview = Readonly<{
+  title: string;
+  description: string;
+  tone: GitWorkflowTone;
+  primaryAction?: Readonly<{
+    label: string;
+    tab: PanelTab;
+  }>;
+  detail?: string;
+}>;
+
 const ZERO_WORKING_TREE = {
   total: 0,
   staged: 0,
@@ -112,6 +125,148 @@ function upstreamStateLabel(status: ProjectGitStatusResult): string {
   return 'No upstream';
 }
 
+function isLikelyPrimaryBranch(branch: string | undefined): boolean {
+  return Boolean(
+    branch && ['main', 'master', 'trunk', 'develop', 'development'].includes(branch),
+  );
+}
+
+export function deriveGitWorkflowOverview({
+  status,
+  pullRequests,
+  checks,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  pullRequests?: ProjectGitPullRequestsResult | null;
+  checks?: ProjectGitChecksResult | null;
+}>): GitWorkflowOverview {
+  if (!status.available) {
+    return {
+      title: 'Git is unavailable',
+      description: status.reason ?? 'This Project is not currently backed by a Git repository.',
+      tone: 'warning',
+    };
+  }
+
+  if (status.workingTree.conflicts > 0) {
+    return {
+      title: 'Resolve merge conflicts',
+      description: `${status.workingTree.conflicts} conflicted file${
+        status.workingTree.conflicts === 1 ? '' : 's'
+      } need attention before this branch can continue.`,
+      tone: 'danger',
+      primaryAction: { label: 'Review changes', tab: 'changes' },
+    };
+  }
+
+  if (status.upstreamState === 'missing') {
+    return {
+      title: 'Publish this branch',
+      description:
+        'This local branch tracks a remote branch that no longer exists. Publish it again or clear the stale upstream before pushing.',
+      tone: 'warning',
+      primaryAction: { label: 'Review publish options', tab: 'commits' },
+      detail: status.upstreamBranch ? `Missing upstream: ${status.upstreamBranch}` : undefined,
+    };
+  }
+
+  if (!status.clean) {
+    const staged = status.workingTree.staged;
+    const total = status.workingTree.total;
+    return {
+      title: staged > 0 ? 'Commit staged changes' : 'Review local changes',
+      description:
+        staged > 0
+          ? `${staged} staged file${staged === 1 ? '' : 's'} ready to commit.`
+          : `${total} changed file${total === 1 ? '' : 's'} need review before committing.`,
+      tone: 'warning',
+      primaryAction: {
+        label: staged > 0 ? 'Commit changes' : 'Review changes',
+        tab: 'changes',
+      },
+    };
+  }
+
+  if (status.ahead > 0) {
+    return {
+      title: 'Push local commits',
+      description: `${status.ahead} local commit${status.ahead === 1 ? '' : 's'} ${
+        status.ahead === 1 ? 'is' : 'are'
+      } ready to push to ${status.upstreamBranch ?? 'the upstream branch'}.`,
+      tone: 'warning',
+      primaryAction: { label: 'Push commits', tab: 'commits' },
+    };
+  }
+
+  const currentPullRequest = pullRequests?.pullRequests.find((pullRequest) => pullRequest.currentBranch);
+  const failingChecks =
+    checks?.available && checks.summary.failure + checks.summary.cancelled > 0
+      ? checks.summary.failure + checks.summary.cancelled
+      : 0;
+  const runningChecks =
+    checks?.available && checks.summary.inProgress + checks.summary.queued > 0
+      ? checks.summary.inProgress + checks.summary.queued
+      : 0;
+
+  if (currentPullRequest) {
+    if (failingChecks > 0 || currentPullRequest.checks.failure > 0) {
+      return {
+        title: 'Pull request checks need attention',
+        description: `${failingChecks || currentPullRequest.checks.failure} check${
+          (failingChecks || currentPullRequest.checks.failure) === 1 ? '' : 's'
+        } failing on PR #${currentPullRequest.number}.`,
+        tone: 'danger',
+        primaryAction: { label: 'Review checks', tab: 'checks' },
+      };
+    }
+    if (runningChecks > 0 || currentPullRequest.checks.pending > 0) {
+      return {
+        title: 'Pull request checks are running',
+        description: `${runningChecks || currentPullRequest.checks.pending} check${
+          (runningChecks || currentPullRequest.checks.pending) === 1 ? '' : 's'
+        } still running on PR #${currentPullRequest.number}.`,
+        tone: 'neutral',
+        primaryAction: { label: 'View checks', tab: 'checks' },
+      };
+    }
+    return {
+      title: 'Pull request is open',
+      description: `PR #${currentPullRequest.number} is open for ${currentPullRequest.headRefName}.`,
+      tone: 'success',
+      primaryAction: { label: 'View pull request', tab: 'prs' },
+    };
+  }
+
+  if (
+    status.githubRemoteDetected &&
+    pullRequests?.available &&
+    status.currentBranch &&
+    !isLikelyPrimaryBranch(status.currentBranch)
+  ) {
+    return {
+      title: 'Create a pull request',
+      description: `${status.currentBranch} is pushed and has no open pull request yet.`,
+      tone: 'neutral',
+      primaryAction: { label: 'Review pull request options', tab: 'prs' },
+    };
+  }
+
+  if (!status.githubRemoteDetected) {
+    return {
+      title: 'Local repository only',
+      description:
+        'This repository has no GitHub remote configured, so pull requests and GitHub checks are unavailable.',
+      tone: 'neutral',
+    };
+  }
+
+  return {
+    title: 'Branch is up to date',
+    description: 'No local changes, local commits, or pull request issues need attention.',
+    tone: 'success',
+  };
+}
+
 function StatRow({
   label,
   value,
@@ -132,6 +287,48 @@ function GitCard({ title, children }: Readonly<{ title: string; children: React.
         {title}
       </h3>
       {children}
+    </section>
+  );
+}
+
+function workflowToneClass(tone: GitWorkflowTone): string {
+  if (tone === 'success') return 'border-emerald-200 bg-emerald-50/60';
+  if (tone === 'warning') return 'border-amber-200 bg-amber-50/60';
+  if (tone === 'danger') return 'border-red-200 bg-red-50/60';
+  return 'border-border bg-background';
+}
+
+function WorkflowOverviewCard({
+  overview,
+  onSelectTab,
+}: Readonly<{
+  overview: GitWorkflowOverview;
+  onSelectTab: (tab: PanelTab) => void;
+}>) {
+  return (
+    <section className={cn('rounded border px-3 py-3', workflowToneClass(overview.tone))}>
+      <div className="space-y-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Next step
+          </div>
+          <div className="mt-1 font-medium">{overview.title}</div>
+          <p className="mt-1 text-sm text-muted-foreground">{overview.description}</p>
+          {overview.detail && (
+            <p className="mt-1 text-xs text-muted-foreground">{overview.detail}</p>
+          )}
+        </div>
+        {overview.primaryAction && (
+          <Button
+            type="button"
+            size="sm"
+            className="w-full"
+            onClick={() => onSelectTab(overview.primaryAction?.tab ?? 'overview')}
+          >
+            {overview.primaryAction.label}
+          </Button>
+        )}
+      </div>
     </section>
   );
 }
@@ -484,11 +681,11 @@ export function ProjectGitHubPanel({
   }, [activeTab, loadChanges, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'checks') void loadChecks();
+    if (activeTab === 'checks' || activeTab === 'overview') void loadChecks();
   }, [activeTab, loadChecks, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'prs') void loadPullRequests();
+    if (activeTab === 'prs' || activeTab === 'overview') void loadPullRequests();
   }, [activeTab, loadPullRequests, refreshKey]);
 
   useEffect(() => {
@@ -528,8 +725,8 @@ export function ProjectGitHubPanel({
     await Promise.all([
       loadStatus(),
       loadChanges(),
-      activeTab === 'prs' ? loadPullRequests() : null,
-      activeTab === 'checks' ? loadChecks() : null,
+      activeTab === 'prs' || activeTab === 'overview' ? loadPullRequests() : null,
+      activeTab === 'checks' || activeTab === 'overview' ? loadChecks() : null,
     ]);
   }, [activeTab, loadChanges, loadChecks, loadPullRequests, loadStatus]);
 
@@ -652,6 +849,11 @@ export function ProjectGitHubPanel({
 
   const currentStatus = status ?? EmptyGitStatus();
   const currentChanges = changes;
+  const workflowOverview = deriveGitWorkflowOverview({
+    status: currentStatus,
+    pullRequests,
+    checks,
+  });
   const stagedFiles = currentChanges?.files.filter((file) => file.staged) ?? [];
   const untrackedFiles =
     currentChanges?.files.filter((file) => file.status === 'untracked' && !file.staged) ?? [];
@@ -824,6 +1026,8 @@ export function ProjectGitHubPanel({
                   onStart={onStartProjectInstructions}
                 />
 
+                <WorkflowOverviewCard overview={workflowOverview} onSelectTab={setActiveTab} />
+
                 <GitCard title="Repository">
                   <div className="space-y-2">
                     <div className="font-medium">{currentStatus.repositoryName}</div>
@@ -931,22 +1135,6 @@ export function ProjectGitHubPanel({
                   )}
                 </GitCard>
 
-                <GitCard title="GitHub Sensors">
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-start gap-2">
-                      {currentStatus.githubRemoteDetected ? (
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                      ) : (
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                      )}
-                      <span>
-                        {currentStatus.githubRemoteDetected
-                          ? 'GitHub remote detected. PRs and checks will appear after GitHub sensors are connected.'
-                          : 'No GitHub remote detected. PRs and checks are unavailable for this Project.'}
-                      </span>
-                    </div>
-                  </div>
-                </GitCard>
               </>
             ) : activeTab === 'changes' ? (
               <>
