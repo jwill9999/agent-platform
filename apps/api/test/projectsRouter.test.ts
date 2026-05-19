@@ -973,6 +973,116 @@ exit 1
     });
   });
 
+  it('publishes the current Project branch and sets upstream when origin exists', async () => {
+    const remoteDir = path.join(tmpDir, 'desktop-publish-remote.git');
+    const repoDir = path.join(tmpDir, 'desktop-publish-repo');
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Publish Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const beforePublish = await request(app)
+      .get(`/v1/projects/${projectId}/git/status`)
+      .expect(200);
+    expect(beforePublish.body.data).toMatchObject({
+      currentBranch: 'main',
+      upstreamState: 'none',
+    });
+
+    const published = await request(app)
+      .post(`/v1/projects/${projectId}/git/publish`)
+      .send({})
+      .expect(200);
+
+    expect(published.body.data).toMatchObject({
+      currentBranch: 'main',
+      upstreamBranch: 'origin/main',
+      upstreamState: 'active',
+      ahead: 0,
+      behind: 0,
+    });
+  });
+
+  it('clears stale upstream configuration without switching branches', async () => {
+    const remoteDir = path.join(tmpDir, 'desktop-clear-upstream-remote.git');
+    const repoDir = path.join(tmpDir, 'desktop-clear-upstream-repo');
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['switch', '-c', 'fix/stale-upstream'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'fix/stale-upstream'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['update-ref', '-d', 'refs/heads/fix/stale-upstream'], {
+      cwd: remoteDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['fetch', '--prune', 'origin'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Stale Upstream Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const stale = await request(app).get(`/v1/projects/${projectId}/git/status`).expect(200);
+    expect(stale.body.data).toMatchObject({
+      currentBranch: 'fix/stale-upstream',
+      upstreamBranch: 'origin/fix/stale-upstream',
+      upstreamState: 'missing',
+    });
+
+    const cleared = await request(app)
+      .post(`/v1/projects/${projectId}/git/clear-upstream`)
+      .send({})
+      .expect(200);
+
+    expect(cleared.body.data).toMatchObject({
+      currentBranch: 'fix/stale-upstream',
+      upstreamState: 'none',
+    });
+    expect(cleared.body.data).not.toHaveProperty('upstreamBranch');
+  });
+
   it('creates and resumes a Project-bound session for a registered desktop project', async () => {
     const repoDir = path.join(tmpDir, 'desktop-session-repo');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });

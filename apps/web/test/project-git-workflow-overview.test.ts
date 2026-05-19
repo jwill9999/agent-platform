@@ -6,6 +6,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  deriveGitPublishState,
   deriveGitWorkflowOverview,
   deriveGitWorkflowTabs,
   shouldRenderGitStatusLoader,
@@ -266,6 +267,69 @@ describe('deriveGitWorkflowTabs', () => {
       { id: 'overview', label: 'Overview' },
       { id: 'push', label: 'Push', badge: 2 },
     ]);
+  });
+
+  it('does not keep the Commit tab visible after a successful commit clears staged files', () => {
+    expect(
+      deriveGitWorkflowTabs({
+        status: status({
+          clean: true,
+          ahead: 1,
+          workingTree: {
+            total: 0,
+            staged: 0,
+            unstaged: 0,
+            added: 0,
+            modified: 0,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 0,
+          },
+        }),
+        commitSuccess: 'Committed 8440042: chore: test node server first commit',
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'push', label: 'Push', badge: 1 },
+    ]);
+  });
+
+  it('uses Publish tab copy that does not claim a branch was pushed before pushing', () => {
+    expect(
+      deriveGitPublishState({
+        status: status({
+          remoteUrl: undefined,
+          githubRemoteDetected: false,
+          upstreamBranch: undefined,
+          upstreamState: 'none',
+        }),
+        commitSuccess: 'Committed 8440042: chore: test node server first commit',
+        pushSuccess: null,
+      }),
+    ).toMatchObject({
+      title: 'Connect this project to GitHub',
+      actionLabel: undefined,
+      statusLabel: 'Not connected',
+      pushed: false,
+    });
+
+    expect(
+      deriveGitPublishState({
+        status: status({
+          upstreamBranch: undefined,
+          upstreamState: 'none',
+          ahead: 1,
+        }),
+        commitSuccess: null,
+        pushSuccess: null,
+      }),
+    ).toMatchObject({
+      title: 'Publish this branch',
+      actionLabel: 'Publish branch',
+      statusLabel: 'Ready to publish',
+      pushed: false,
+    });
   });
 
   it('shows PRs and Checks only when GitHub context is useful', () => {

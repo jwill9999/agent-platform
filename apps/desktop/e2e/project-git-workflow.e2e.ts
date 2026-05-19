@@ -79,6 +79,22 @@ test.describe('Electron Project Git workflow panel', () => {
       });
       await gitPanel.getByRole('button', { name: /Commit/ }).click();
       await expect(gitPanel.getByText('Commit staged changes')).toBeVisible();
+      await gitPanel.getByPlaceholder('Commit message').fill('test: add workflow scratch file');
+      await gitPanel.getByRole('button', { name: 'Commit', exact: true }).click();
+
+      await expect(gitPanel.getByRole('button', { name: 'Commit' })).toHaveCount(0, {
+        timeout: 10_000,
+      });
+      await expect(gitPanel.getByRole('button', { name: 'Publish' })).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(
+        gitPanel.getByText(/^Committed .*test: add workflow scratch file$/).first(),
+      ).toBeVisible();
+      await expect(gitPanel.getByText('Connect this project to GitHub')).toBeVisible();
+      await expect(gitPanel.getByText('Not connected', { exact: true })).toBeVisible();
+      await expect(gitPanel.getByText('Pushed')).toHaveCount(0);
+      await expect(gitPanel.getByRole('button', { name: 'Publish branch' })).toHaveCount(0);
     } finally {
       await app?.close();
       rmSync(tempRoot, { recursive: true, force: true });

@@ -59,6 +59,17 @@ type GitWorkflowOverview = Readonly<{
   detail?: string;
 }>;
 
+type GitPublishState = Readonly<{
+  title: string;
+  description: string;
+  statusLabel: string;
+  actionLabel?: string;
+  canPublish: boolean;
+  canClearStaleUpstream: boolean;
+  pushed: boolean;
+  detail?: string;
+}>;
+
 const ZERO_WORKING_TREE = {
   total: 0,
   staged: 0,
@@ -286,6 +297,7 @@ export function deriveGitWorkflowTabs({
   commitSuccess?: string | null;
   pushSuccess?: string | null;
 }>): GitWorkflowTab[] {
+  void commitSuccess;
   const tabs: GitWorkflowTab[] = [{ id: 'overview', label: 'Overview' }];
   if (!status.available) return tabs;
 
@@ -302,27 +314,27 @@ export function deriveGitWorkflowTabs({
     Boolean(currentPullRequest) ||
     Boolean(
       status.githubRemoteDetected &&
-        status.clean &&
-        status.currentBranch &&
-        !isLikelyPrimaryBranch(status.currentBranch) &&
-        status.upstreamState === 'active',
+      status.clean &&
+      status.currentBranch &&
+      !isLikelyPrimaryBranch(status.currentBranch) &&
+      status.upstreamState === 'active',
     ) ||
     Boolean(pushSuccess);
   const hasChecksStep =
     Boolean(
       checks?.available &&
-        (checks.scope === 'pull_request' || checks.summary.total > 0 || currentPullRequest),
+      (checks.scope === 'pull_request' || checks.summary.total > 0 || currentPullRequest),
     ) || Boolean(currentPullRequest?.checks.total);
 
   if (hasChanges) {
     tabs.push({ id: 'changes', label: 'Changes', badge: workingTree.total });
   }
 
-  if (hasStagedChanges || commitSuccess) {
+  if (hasStagedChanges) {
     tabs.push({
       id: 'commit',
       label: 'Commit',
-      badge: hasStagedChanges ? workingTree.staged : undefined,
+      badge: workingTree.staged,
     });
   }
 
@@ -346,6 +358,94 @@ export function deriveGitWorkflowTabs({
   }
 
   return tabs;
+}
+
+export function deriveGitPublishState({
+  status,
+  commitSuccess,
+  pushSuccess,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  commitSuccess?: string | null;
+  pushSuccess?: string | null;
+}>): GitPublishState {
+  if (pushSuccess || (status.clean && status.upstreamState === 'active' && status.ahead === 0)) {
+    return {
+      title: 'Published',
+      description: 'This branch is published and up to date with its upstream.',
+      statusLabel: 'Published',
+      canPublish: false,
+      canClearStaleUpstream: false,
+      pushed: true,
+      detail: pushSuccess ?? undefined,
+    };
+  }
+
+  if (!status.remoteUrl) {
+    return {
+      title: 'Connect this project to GitHub',
+      description:
+        'This local repository has no origin remote. You can keep working locally, or connect it to GitHub before publishing.',
+      statusLabel: 'Not connected',
+      actionLabel: undefined,
+      canPublish: false,
+      canClearStaleUpstream: false,
+      pushed: false,
+      detail: commitSuccess ?? undefined,
+    };
+  }
+
+  if (status.upstreamState === 'missing') {
+    return {
+      title: 'Publish this branch again',
+      description:
+        'This branch tracks a remote branch that no longer exists. Publish it again, or clear the stale upstream and choose another route.',
+      statusLabel: 'Stale upstream',
+      actionLabel: 'Publish branch',
+      canPublish: true,
+      canClearStaleUpstream: true,
+      pushed: false,
+      detail: status.upstreamBranch ? `Missing upstream: ${status.upstreamBranch}` : undefined,
+    };
+  }
+
+  if (status.upstreamState === 'none') {
+    return {
+      title: 'Publish this branch',
+      description:
+        'This branch has not been published yet. Publishing creates the remote branch and links future pushes to it.',
+      statusLabel: 'Ready to publish',
+      actionLabel: 'Publish branch',
+      canPublish: true,
+      canClearStaleUpstream: false,
+      pushed: false,
+      detail: commitSuccess ?? undefined,
+    };
+  }
+
+  if (status.ahead > 0) {
+    return {
+      title: 'Push local commits',
+      description: `${status.ahead} local commit${status.ahead === 1 ? '' : 's'} ${
+        status.ahead === 1 ? 'is' : 'are'
+      } ready to push.`,
+      statusLabel: 'Ready to push',
+      actionLabel: `Push ${status.ahead}`,
+      canPublish: true,
+      canClearStaleUpstream: false,
+      pushed: false,
+      detail: status.upstreamBranch ? `Upstream: ${status.upstreamBranch}` : undefined,
+    };
+  }
+
+  return {
+    title: 'Nothing to publish',
+    description: 'There are no unpublished commits on this branch.',
+    statusLabel: 'Up to date',
+    canPublish: false,
+    canClearStaleUpstream: false,
+    pushed: false,
+  };
 }
 
 function StatRow({
@@ -1022,6 +1122,53 @@ export function ProjectGitHubPanel({
     }
   }, [activeTab, loadChanges, loadChecks, loadPullRequests, projectId]);
 
+  const publishCurrentBranch = useCallback(async () => {
+    if (!projectId) return;
+    setActionPending('publish');
+    try {
+      const nextStatus = await apiPost<ProjectGitStatusResult>(
+        apiPath('projects', projectId, 'git', 'publish'),
+        {},
+      );
+      setStatus(nextStatus ?? null);
+      setStatusProjectId(projectId);
+      setPushSuccess(
+        nextStatus?.currentBranch
+          ? `Published ${nextStatus.currentBranch} to ${nextStatus.upstreamBranch ?? 'origin'}.`
+          : 'Branch published.',
+      );
+      setCommitSuccess(null);
+      setError(null);
+      await Promise.all([
+        activeTab === 'checks' ? loadChecks() : Promise.resolve(),
+        activeTab === 'prs' ? loadPullRequests() : Promise.resolve(),
+      ]);
+    } catch (cause) {
+      setError(cause instanceof ApiRequestError ? cause.message : 'Failed to publish branch.');
+    } finally {
+      setActionPending(null);
+    }
+  }, [activeTab, loadChecks, loadPullRequests, projectId]);
+
+  const clearStaleUpstream = useCallback(async () => {
+    if (!projectId) return;
+    setActionPending('clear-upstream');
+    try {
+      const nextStatus = await apiPost<ProjectGitStatusResult>(
+        apiPath('projects', projectId, 'git', 'clear-upstream'),
+        {},
+      );
+      setStatus(nextStatus ?? null);
+      setStatusProjectId(projectId);
+      setPushSuccess(null);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof ApiRequestError ? cause.message : 'Failed to clear upstream.');
+    } finally {
+      setActionPending(null);
+    }
+  }, [projectId]);
+
   const statusLoading = shouldRenderGitStatusLoader({
     projectId,
     statusProjectId,
@@ -1043,10 +1190,11 @@ export function ProjectGitHubPanel({
   const unstagedFiles =
     currentChanges?.files.filter((file) => file.unstaged && file.status !== 'untracked') ?? [];
   const githubUrl = normalizeGitHubUrl(currentStatus.remoteUrl);
-  const canPushCurrentBranch =
-    currentStatus.available &&
-    Boolean(currentStatus.upstreamBranch) &&
-    currentStatus.upstreamState !== 'missing';
+  const publishState = deriveGitPublishState({
+    status: currentStatus,
+    commitSuccess,
+    pushSuccess,
+  });
   const tabs = useMemo(
     () =>
       deriveGitWorkflowTabs({
@@ -1552,9 +1700,9 @@ export function ProjectGitHubPanel({
                 </div>
               </GitCard>
             ) : activeTab === 'push' ? (
-              <GitCard title="Push">
+              <GitCard title="Publish">
                 {currentStatus.recentCommit ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {commitSuccess && (
                       <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                         {commitSuccess}
@@ -1569,48 +1717,82 @@ export function ProjectGitHubPanel({
                       {shortSha(currentStatus.recentCommit.sha)}
                     </div>
                     <div className="font-medium">{currentStatus.recentCommit.subject}</div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="rounded border border-border bg-muted/20 px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium">{publishState.title}</div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {publishState.description}
+                          </p>
+                          {publishState.detail && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {publishState.detail}
+                            </p>
+                          )}
+                        </div>
+                        <Badge variant={publishState.pushed ? 'default' : 'outline'}>
+                          {publishState.statusLabel}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {publishState.actionLabel && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={actionPending !== null || !publishState.canPublish}
+                          onClick={() =>
+                            currentStatus.upstreamState === 'active'
+                              ? void pushCurrentBranch()
+                              : void publishCurrentBranch()
+                          }
+                        >
+                          {actionPending === 'push' || actionPending === 'publish'
+                            ? 'Publishing...'
+                            : publishState.actionLabel}
+                        </Button>
+                      )}
+                      {publishState.canClearStaleUpstream && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={actionPending !== null}
+                          onClick={() => void clearStaleUpstream()}
+                        >
+                          {actionPending === 'clear-upstream'
+                            ? 'Clearing...'
+                            : 'Clear stale upstream'}
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         size="sm"
-                        disabled={
-                          actionPending !== null ||
-                          !canPushCurrentBranch ||
-                          currentStatus.ahead === 0
-                        }
-                        onClick={() => void pushCurrentBranch()}
-                        title={
-                          !canPushCurrentBranch
-                            ? currentStatus.upstreamState === 'missing'
-                              ? 'This branch tracks an upstream that no longer exists. Publish the branch or unset the upstream from the terminal.'
-                              : 'This branch has no upstream. Push from the terminal with --set-upstream, or create a remote first.'
-                            : currentStatus.ahead === 0
-                              ? 'Branch is already pushed.'
-                              : `Push ${currentStatus.ahead} commit${
-                                  currentStatus.ahead === 1 ? '' : 's'
-                                } to ${currentStatus.upstreamBranch}.`
-                        }
+                        variant="ghost"
+                        onClick={() => setActiveTab('overview')}
                       >
-                        {actionPending === 'push'
-                          ? 'Pushing...'
-                          : currentStatus.ahead > 0
-                            ? `Push ${currentStatus.ahead}`
-                            : 'Pushed'}
+                        Back to overview
                       </Button>
-                      {currentStatus.upstreamState === 'missing' ? (
-                        <span className="text-xs text-amber-700">
-                          Upstream missing: {currentStatus.upstreamBranch}
-                        </span>
-                      ) : currentStatus.upstreamBranch ? (
-                        <span className="text-xs text-muted-foreground">
-                          Upstream: {currentStatus.upstreamBranch}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-amber-700">No upstream configured</span>
-                      )}
                     </div>
+                    {!publishState.pushed &&
+                      !publishState.canPublish &&
+                      !currentStatus.remoteUrl && (
+                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          GitHub access is not connected for this Project yet. Use the terminal to
+                          add an origin remote, or continue working locally until the GitHub
+                          connection flow is available.
+                        </div>
+                      )}
+                    {!publishState.pushed && (
+                      <div className="rounded border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                        Not ready to publish? You can undo the last local commit from the terminal
+                        with <span className="font-mono">git reset --soft HEAD~1</span> to keep
+                        files staged, or <span className="font-mono">git reset HEAD~1</span> to keep
+                        them unstaged.
+                      </div>
+                    )}
                     <div className="text-xs text-muted-foreground">
-                      After this branch is pushed, pull request options appear when they are
+                      After this branch is published, pull request options appear when they are
                       available.
                     </div>
                   </div>

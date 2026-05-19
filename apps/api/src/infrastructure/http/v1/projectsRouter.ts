@@ -1159,6 +1159,76 @@ function pushProjectGitBranch(project: ProjectRecord) {
   return projectGitStatus(project);
 }
 
+function requireCurrentBranch(repositoryRoot: string) {
+  const currentBranch = gitValue(repositoryRoot, ['branch', '--show-current']);
+  if (!currentBranch) {
+    throw new HttpError(
+      409,
+      'PROJECT_BRANCH_DETACHED',
+      'Project is currently on a detached Git HEAD.',
+    );
+  }
+  return currentBranch;
+}
+
+function publishProjectGitBranch(project: ProjectRecord) {
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const currentBranch = requireCurrentBranch(repositoryRoot);
+  const originUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
+  if (!originUrl) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_NO_REMOTE',
+      'This Project is not connected to GitHub yet. Add an origin remote or create a GitHub repository before publishing.',
+    );
+  }
+
+  try {
+    execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'push', '-u', 'origin', currentBranch], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120000,
+    });
+  } catch (cause) {
+    const stderr =
+      cause && typeof cause === 'object' && 'stderr' in cause
+        ? String((cause as { stderr?: unknown }).stderr ?? '').trim()
+        : '';
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_PUBLISH_FAILED',
+      stderr || 'Git could not publish this Project branch.',
+    );
+  }
+
+  return projectGitStatus(project);
+}
+
+function clearProjectGitUpstream(project: ProjectRecord) {
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  requireCurrentBranch(repositoryRoot);
+
+  try {
+    execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'branch', '--unset-upstream'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 30000,
+    });
+  } catch (cause) {
+    const stderr =
+      cause && typeof cause === 'object' && 'stderr' in cause
+        ? String((cause as { stderr?: unknown }).stderr ?? '').trim()
+        : '';
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_CLEAR_UPSTREAM_FAILED',
+      stderr || 'Git could not clear the upstream for this Project branch.',
+    );
+  }
+
+  return projectGitStatus(project);
+}
+
 function latestCommit(repositoryRoot: string) {
   const output = gitValue(repositoryRoot, ['log', '-1', '--format=%H%x1f%s%x1f%an%x1f%cI']);
   if (!output) return undefined;
@@ -2460,6 +2530,24 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: pushProjectGitBranch(project) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/publish',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: publishProjectGitBranch(project) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/clear-upstream',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: clearProjectGitUpstream(project) });
     }),
   );
 
