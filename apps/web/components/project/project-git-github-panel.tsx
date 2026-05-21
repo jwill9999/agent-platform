@@ -360,6 +360,20 @@ export function deriveGitWorkflowTabs({
   return tabs;
 }
 
+export function resolveGitWorkflowActiveTab({
+  activeTab,
+  tabs,
+  preferredTab,
+}: Readonly<{
+  activeTab: PanelTab;
+  tabs: readonly GitWorkflowTab[];
+  preferredTab?: PanelTab | null;
+}>): PanelTab {
+  if (tabs.some((tab) => tab.id === activeTab)) return activeTab;
+  if (preferredTab && tabs.some((tab) => tab.id === preferredTab)) return preferredTab;
+  return 'overview';
+}
+
 export function deriveGitPublishState({
   status,
   commitSuccess,
@@ -556,6 +570,10 @@ function GitStatusLoadingCard() {
       </div>
     </GitCard>
   );
+}
+
+function canContinueToCommit(stagedFileCount: number, actionPending: string | null): boolean {
+  return stagedFileCount > 0 && actionPending === null;
 }
 
 function ProjectInstructionsCard({
@@ -781,6 +799,7 @@ export function ProjectGitHubPanel({
 }: ProjectGitHubPanelProps) {
   const [open, setOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<PanelTab>('overview');
+  const [preferredTab, setPreferredTab] = useState<PanelTab | null>(null);
   const [status, setStatus] = useState<ProjectGitStatusResult | null>(null);
   const [statusProjectId, setStatusProjectId] = useState<string | null>(null);
   const [changes, setChanges] = useState<ProjectGitChangesResult | null>(null);
@@ -1059,6 +1078,39 @@ export function ProjectGitHubPanel({
     [loadStatus, projectId],
   );
 
+  const stashPaths = useCallback(
+    async (paths: string[]) => {
+      if (!projectId || paths.length === 0) return;
+      setActionPending(`stash:${paths.join('\0')}`);
+      try {
+        const next = await apiPost<ProjectGitChangesResult>(
+          apiPath('projects', projectId, 'git', 'stash'),
+          { paths },
+        );
+        setChanges(next ?? null);
+        setChangesProjectId(projectId);
+        setSelectedChange((current) =>
+          current && next
+            ? (next.files.find((file) => file.path === current.path) ?? null)
+            : current,
+        );
+        setDiff((current) =>
+          current && next?.files.some((file) => file.path === current.path) ? current : null,
+        );
+        setSelectedDiffMode('unstaged');
+        setChangesError(null);
+        await loadStatus();
+      } catch (cause) {
+        setChangesError(
+          cause instanceof ApiRequestError ? cause.message : 'Failed to stash file.',
+        );
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [loadStatus, projectId],
+  );
+
   const commitStagedChanges = useCallback(async () => {
     if (!projectId) return;
     const message = commitMessage.trim();
@@ -1081,6 +1133,7 @@ export function ProjectGitHubPanel({
           : 'Commit completed.',
       );
       setPushSuccess(null);
+      setPreferredTab('push');
       setActiveTab('push');
       setSelectedChange(null);
       setDiff(null);
@@ -1208,10 +1261,14 @@ export function ProjectGitHubPanel({
   );
 
   useEffect(() => {
-    if (!tabs.some((tab) => tab.id === activeTab)) {
-      setActiveTab('overview');
+    const nextTab = resolveGitWorkflowActiveTab({ activeTab, tabs, preferredTab });
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab);
     }
-  }, [activeTab, tabs]);
+    if (preferredTab && tabs.some((tab) => tab.id === preferredTab)) {
+      setPreferredTab(null);
+    }
+  }, [activeTab, preferredTab, tabs]);
 
   if (!projectId) return null;
 
@@ -1317,6 +1374,11 @@ export function ProjectGitHubPanel({
               </div>
             )}
             {changesError && activeTab === 'changes' && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {changesError}
+              </div>
+            )}
+            {changesError && activeTab === 'commit' && (
               <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {changesError}
               </div>
@@ -1575,6 +1637,24 @@ export function ProjectGitHubPanel({
                         </div>
                       )}
                     </div>
+
+                    {stagedFiles.length > 0 && (
+                      <div className="rounded border border-primary/20 bg-primary/5 px-3 py-3">
+                        <div className="mb-2 text-xs text-muted-foreground">
+                          {stagedFiles.length} staged file{stagedFiles.length === 1 ? '' : 's'}{' '}
+                          ready to commit.
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="w-full"
+                          disabled={!canContinueToCommit(stagedFiles.length, actionPending)}
+                          onClick={() => setActiveTab('commit')}
+                        >
+                          Continue to commit
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </GitCard>
 
@@ -1602,6 +1682,19 @@ export function ProjectGitHubPanel({
                             {actionPending === `stage:${selectedChange.path}`
                               ? 'Staging...'
                               : 'Stage file'}
+                          </Button>
+                        )}
+                        {selectedChange.unstaged && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void stashPaths([selectedChange.path])}
+                            disabled={actionPending !== null}
+                          >
+                            {actionPending === `stash:${selectedChange.path}`
+                              ? 'Stashing...'
+                              : 'Stash file'}
                           </Button>
                         )}
                         {selectedChange.staged && (
@@ -1642,41 +1735,44 @@ export function ProjectGitHubPanel({
                   {changesLoading && (
                     <div className="text-xs text-muted-foreground">Loading staged files...</div>
                   )}
-                  <div>
-                    <div className="font-medium">Commit staged changes</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {stagedFiles.length === 0
-                        ? 'Stage files before committing.'
-                        : `${stagedFiles.length} staged file${
-                            stagedFiles.length === 1 ? '' : 's'
-                          } ready.`}
+                  {stagedFiles.length === 0 ? (
+                    <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                      No staged files are ready to commit. Go back to Changes to choose files.
                     </div>
-                  </div>
-                  {stagedFiles.length > 0 && (
-                    <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
-                      {stagedFiles.map((file) => (
-                        <ChangeFileRow
-                          key={`commit:${file.path}`}
-                          file={file}
-                          mode="staged"
-                          selected={
-                            selectedChange?.path === file.path && selectedDiffMode === 'staged'
-                          }
-                          onSelect={(nextFile, mode) => {
-                            setSelectedChange(nextFile);
-                            setSelectedDiffMode(mode);
-                            setActiveTab('changes');
-                          }}
-                        />
-                      ))}
-                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <div className="font-medium">Commit staged changes</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {stagedFiles.length} staged file{stagedFiles.length === 1 ? '' : 's'}{' '}
+                          ready.
+                        </div>
+                      </div>
+                      <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+                        {stagedFiles.map((file) => (
+                          <ChangeFileRow
+                            key={`commit:${file.path}`}
+                            file={file}
+                            mode="staged"
+                            selected={
+                              selectedChange?.path === file.path && selectedDiffMode === 'staged'
+                            }
+                            onSelect={(nextFile, mode) => {
+                              setSelectedChange(nextFile);
+                              setSelectedDiffMode(mode);
+                              setActiveTab('changes');
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </>
                   )}
                   <div className="flex gap-2">
                     <Input
                       value={commitMessage}
                       onChange={(event) => setCommitMessage(event.target.value)}
                       placeholder="Commit message"
-                      disabled={actionPending !== null}
+                      disabled={stagedFiles.length === 0 || actionPending !== null}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' && !event.shiftKey) {
                           event.preventDefault();
@@ -1697,6 +1793,19 @@ export function ProjectGitHubPanel({
                       {actionPending === 'commit' ? 'Committing...' : 'Commit'}
                     </Button>
                   </div>
+                  {stagedFiles.length > 0 && (
+                    <div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setActiveTab('changes')}
+                        disabled={actionPending !== null}
+                      >
+                        Back to changes
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </GitCard>
             ) : activeTab === 'push' ? (

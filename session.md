@@ -7,6 +7,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-21
+- **Session:** Implemented the Git workflow continuation and safe cleanup pass on `task/agent-platform-terminal-git-panel-layout`: post-commit workflow now lands on Publish and unwanted local files can be stashed safely from Changes.
+- **Today’s outputs:** Added `POST /v1/projects/:id/git/stash`, stash request contracts, local Git stash handling with repository-relative path validation, `Stash file` in the Changes diff actions, stale diff-selection cleanup after stash, and preferred-tab routing so Commit disappearing after success does not bounce the user back to Overview.
+- **Validation:** Passed focused web Git workflow tests, elevated API Project router tests, elevated Electron Playwright `project-git-workflow.e2e.ts`, desktop/web/API builds during E2E, and `git diff --check`. The first API run failed only because sandboxed Supertest socket binding is blocked and passed with approved escalation.
+- **Current state:** The Git workflow stash cleanup commit is on `task/agent-platform-terminal-git-panel-layout`; branch is ready to push after this session handoff update is included. `output/` remains unrelated/untracked and must not be committed.
+- **Next:** Push this branch, then resume tomorrow with the next Git workflow improvement after manual review.
 - **Date:** 2026-05-19
 - **Session:** Implemented `agent-platform-59i` on `task/agent-platform-terminal-git-panel-layout`: the Git workflow now has explicit publish and stale-upstream recovery actions after local commits.
 - **Today’s outputs:** Added API routes for `POST /projects/:id/git/publish` and `POST /projects/:id/git/clear-upstream`; Publish now creates/sets upstream with `git push -u origin <branch>` when an origin exists, no longer labels unpushed local commits as pushed, explains no-remote projects clearly, offers stale-upstream clearing, and keeps backtracking instructions visible for undoing the last local commit from the terminal. The Commit tab now disappears once staged files are committed and the workflow advances into Publish.

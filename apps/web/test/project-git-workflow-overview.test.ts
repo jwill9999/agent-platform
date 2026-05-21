@@ -9,6 +9,7 @@ import {
   deriveGitPublishState,
   deriveGitWorkflowOverview,
   deriveGitWorkflowTabs,
+  resolveGitWorkflowActiveTab,
   shouldRenderGitStatusLoader,
   shouldRequestProjectGitDiff,
 } from '@/components/project/project-git-github-panel';
@@ -297,6 +298,34 @@ describe('deriveGitWorkflowTabs', () => {
 
   it('uses Publish tab copy that does not claim a branch was pushed before pushing', () => {
     expect(
+      deriveGitWorkflowTabs({
+        status: status({
+          clean: true,
+          remoteUrl: undefined,
+          githubRemoteDetected: false,
+          upstreamBranch: undefined,
+          upstreamState: 'none',
+          ahead: 1,
+          workingTree: {
+            total: 0,
+            staged: 0,
+            unstaged: 0,
+            added: 0,
+            modified: 0,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 0,
+          },
+        }),
+        commitSuccess: 'Committed 8440042: chore: test node server first commit',
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'push', label: 'Publish', badge: 1 },
+    ]);
+
+    expect(
       deriveGitPublishState({
         status: status({
           remoteUrl: undefined,
@@ -402,6 +431,31 @@ describe('deriveGitWorkflowTabs', () => {
       { id: 'prs', label: 'PRs', badge: 1 },
       { id: 'checks', label: 'Checks', badge: 1 },
     ]);
+  });
+});
+
+describe('resolveGitWorkflowActiveTab', () => {
+  it('preserves the intended publish tab when the commit tab disappears after refresh', () => {
+    expect(
+      resolveGitWorkflowActiveTab({
+        activeTab: 'commit',
+        preferredTab: 'push',
+        tabs: [
+          { id: 'overview', label: 'Overview' },
+          { id: 'push', label: 'Publish', badge: 1 },
+        ],
+      }),
+    ).toBe('push');
+  });
+
+  it('falls back to Overview only when the current and preferred tabs are unavailable', () => {
+    expect(
+      resolveGitWorkflowActiveTab({
+        activeTab: 'commit',
+        preferredTab: 'push',
+        tabs: [{ id: 'overview', label: 'Overview' }],
+      }),
+    ).toBe('overview');
   });
 });
 

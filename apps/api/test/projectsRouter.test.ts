@@ -531,6 +531,57 @@ describe('projectsRouter', () => {
     ).toBe('update project docs');
   });
 
+  it('stashes selected Project Git files and validates repository-relative paths', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-git-stash-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'server.log'), 'started\n');
+    writeFileSync(path.join(repoDir, 'server.pid'), '12345\n');
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Git Stash Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    await request(app).post(`/v1/projects/${projectId}/git/stash`).send({ paths: [] }).expect(400);
+    await request(app)
+      .post(`/v1/projects/${projectId}/git/stash`)
+      .send({ paths: ['../outside.log'] })
+      .expect(400);
+
+    const stashed = await request(app)
+      .post(`/v1/projects/${projectId}/git/stash`)
+      .send({ paths: ['server.log'] })
+      .expect(200);
+
+    expect(stashed.body.data.files).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'server.log' })]),
+    );
+    expect(stashed.body.data.files).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'server.pid' })]),
+    );
+    expect(existsSync(path.join(repoDir, 'server.log'))).toBe(false);
+    expect(existsSync(path.join(repoDir, 'server.pid'))).toBe(true);
+    expect(
+      execFileSync(GIT_BINARY, ['stash', 'list', '--format=%s'], {
+        cwd: repoDir,
+        encoding: 'utf8',
+      }),
+    ).toContain('AI Studio: stash selected Project files');
+  });
+
   it('reports unavailable GitHub checks when no GitHub remote is configured', async () => {
     const repoDir = path.join(tmpDir, 'desktop-git-checks-no-remote-repo');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });

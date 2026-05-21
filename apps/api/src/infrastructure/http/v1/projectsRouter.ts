@@ -11,6 +11,7 @@ import {
   ProjectGitFileDiffResultSchema,
   ProjectGitPullRequestsResultSchema,
   ProjectGitStageBodySchema,
+  ProjectGitStashBodySchema,
   ProjectGitStatusResultSchema,
   ProjectFileReadResultSchema,
   ProjectFileTreeResultSchema,
@@ -44,6 +45,7 @@ import {
   type ProjectGitPullRequestState,
   type ProjectGitPullRequestSummary,
   type ProjectGitStageBody,
+  type ProjectGitStashBody,
   type ProjectGitWorkingTreeSummary,
   ProjectUpdateBodySchema,
 } from '@agent-platform/contracts';
@@ -1078,6 +1080,10 @@ function gitPathArgs(body: ProjectGitStageBody): string[] {
   return (body.paths ?? []).map(validateGitRelativePath);
 }
 
+function gitSelectedPathArgs(body: ProjectGitStashBody): string[] {
+  return body.paths.map(validateGitRelativePath);
+}
+
 function stageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
   const body = parseBody(ProjectGitStageBodySchema, rawBody);
   const repositoryRoot = repositoryRootForBranchOperations(project);
@@ -1092,6 +1098,22 @@ function unstageProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
   const body = parseBody(ProjectGitStageBodySchema, rawBody);
   const repositoryRoot = repositoryRootForBranchOperations(project);
   gitOutput(repositoryRoot, ['restore', '--staged', '--', ...gitPathArgs(body)]);
+  return projectGitChanges(project);
+}
+
+function stashProjectGitChanges(project: ProjectRecord, rawBody: unknown) {
+  const body: ProjectGitStashBody = parseBody(ProjectGitStashBodySchema, rawBody);
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const paths = gitSelectedPathArgs(body);
+  gitOutput(repositoryRoot, [
+    'stash',
+    'push',
+    '--include-untracked',
+    '-m',
+    'AI Studio: stash selected Project files',
+    '--',
+    ...paths,
+  ]);
   return projectGitChanges(project);
 }
 
@@ -2512,6 +2534,15 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: unstageProjectGitChanges(project, req.body) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/stash',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: stashProjectGitChanges(project, req.body) });
     }),
   );
 

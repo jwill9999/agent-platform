@@ -74,10 +74,13 @@ test.describe('Electron Project Git workflow panel', () => {
 
       await gitPanel.getByRole('button', { name: /Changes/ }).click();
       await gitPanel.getByRole('button', { name: 'Stage all' }).click();
+      await expect(gitPanel.getByRole('button', { name: 'Continue to commit' })).toBeVisible({
+        timeout: 10_000,
+      });
       await expect(gitPanel.getByRole('button', { name: /Commit/ })).toBeVisible({
         timeout: 10_000,
       });
-      await gitPanel.getByRole('button', { name: /Commit/ }).click();
+      await gitPanel.getByRole('button', { name: 'Continue to commit' }).click();
       await expect(gitPanel.getByText('Commit staged changes')).toBeVisible();
       await gitPanel.getByPlaceholder('Commit message').fill('test: add workflow scratch file');
       await gitPanel.getByRole('button', { name: 'Commit', exact: true }).click();
@@ -95,6 +98,22 @@ test.describe('Electron Project Git workflow panel', () => {
       await expect(gitPanel.getByText('Not connected', { exact: true })).toBeVisible();
       await expect(gitPanel.getByText('Pushed')).toHaveCount(0);
       await expect(gitPanel.getByRole('button', { name: 'Publish branch' })).toHaveCount(0);
+
+      writeFileSync(join(projectDir, 'server.log'), 'generated runtime log\n');
+      await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
+      await expect(gitPanel.getByRole('button', { name: /Changes/ })).toBeVisible({
+        timeout: 10_000,
+      });
+      await gitPanel.getByRole('button', { name: /Changes/ }).click();
+      await gitPanel.getByRole('button', { name: /server\.log/ }).click();
+      await expect(gitPanel.getByRole('button', { name: 'Stash file' })).toBeVisible({
+        timeout: 10_000,
+      });
+      await gitPanel.getByRole('button', { name: 'Stash file' }).click();
+      await expect(gitPanel.getByText('server.log')).toHaveCount(0, { timeout: 10_000 });
+      await expect(gitPanel.getByRole('button', { name: /Changes/ })).toHaveCount(0, {
+        timeout: 10_000,
+      });
     } finally {
       await app?.close();
       rmSync(tempRoot, { recursive: true, force: true });

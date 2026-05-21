@@ -635,6 +635,11 @@ export const ProjectGitStageBodySchema = z
   });
 export type ProjectGitStageBody = z.infer<typeof ProjectGitStageBodySchema>;
 
+export const ProjectGitStashBodySchema = z.object({
+  paths: z.array(z.string().min(1).max(1000)).min(1).max(100),
+});
+export type ProjectGitStashBody = z.infer<typeof ProjectGitStashBodySchema>;
+
 export const ProjectGitCommitBodySchema = z.object({
   message: z.string().trim().min(1).max(1000),
 });
