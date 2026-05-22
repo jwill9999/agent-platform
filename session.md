@@ -8,11 +8,11 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-22
-- **Session:** Implemented the GitHub repository create/connect flow on `task/divergent-pull-merge-resolver` and committed the completed Git workflow work.
-- **Today’s outputs:** Added GitHub CLI-backed create/connect repository API routes, shared contracts, no-remote Publish UI with Create Repository and Connect Existing Repository actions, repository connection modal states, refreshed publish/PR/check routing after connection, task specs for the divergent resolver and repository connection work, and Electron/API/web regression coverage.
-- **Validation:** Passed focused API Project router tests, focused web Git workflow tests, API/web/desktop typechecks, focused Electron Playwright `project-git-workflow.e2e.ts`, root lint, and desktop/web/API builds during E2E. SonarQube MCP analysis was not available through the current tool surface, so the documented fallback gate was used.
-- **Current state:** Bead `agent-platform-y4u` is closed. Branch is `task/divergent-pull-merge-resolver`; commit `0b36ef6` contains the completed create/connect flow. `output/` remains unrelated/untracked and must not be committed.
-- **Next:** Commit this session handoff update, push the branch, then start the next GitHub workflow slice: in-app pull request creation and monitoring.
+- **Session:** Implemented `agent-platform-0ra` on `task/divergent-pull-merge-resolver`: in-app GitHub pull request creation and monitoring after branch publish.
+- **Today’s outputs:** Added create-PR contracts, `POST /v1/projects/:id/github/pull-requests`, GitHub CLI-backed PR creation, refreshed PR/check state after creation, Publish success GitHub links, PR-tab create form/fallback links/current-branch PR prioritisation, and focused API/web/Electron coverage with a fake `gh`.
+- **Validation:** Passed contracts PR tests, focused API Project router tests, focused web Git workflow tests, API/web/desktop typechecks and lint, focused Electron Playwright create-PR flow, desktop/web/API builds during E2E, and `git diff --check`. SonarQube MCP analysis was not available through the current tool surface, so the documented fallback gate was used.
+- **Current state:** Bead `agent-platform-0ra` is implemented and ready to close. Branch is `task/divergent-pull-merge-resolver`; commit `3d31a71` contains the PR creation flow. `docs/reviews/*.md` and `output/` remain unrelated/untracked and must not be committed.
+- **Next:** Close the bead, push Beads, commit this session handoff update, push the branch, then continue with `agent-platform-5zg`: focused PR review view.
 - **Date:** 2026-05-21
 - **Session:** Implemented the Git workflow continuation and safe cleanup pass on `task/agent-platform-terminal-git-panel-layout`: post-commit workflow now lands on Publish and unwanted local files can be stashed safely from Changes.
 - **Today’s outputs:** Added `POST /v1/projects/:id/git/stash`, stash request contracts, local Git stash handling with repository-relative path validation, `Stash file` in the Changes diff actions, stale diff-selection cleanup after stash, and preferred-tab routing so Commit disappearing after success does not bounce the user back to Overview.
