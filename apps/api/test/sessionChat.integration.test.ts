@@ -152,6 +152,7 @@ type ChatEvent = {
   approvalRequestId?: string;
   toolName?: string;
   riskTier?: string;
+  argsPreview?: unknown;
   code?: string;
   message?: string;
 };
@@ -884,6 +885,38 @@ describe('POST /v1/chat (session-aware)', () => {
       ]);
       await expectToolExecutionCount(db, sessionId, 'pending', 1);
       await expectToolExecutionCount(db, sessionId, 'success', 0);
+    } finally {
+      restoreChatEnv(envSnap);
+      closeDatabase(sqlite);
+    }
+  });
+
+  it('streams approval_required with policy metadata for unknown shell commands', async () => {
+    const envSnap = snapshotChatEnv();
+    const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+
+      const sessionId = await createDefaultSession(app);
+      mockToolCallStream('sys_bash', { command: 'gh repo create test --private' });
+      const chatRes = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Create a GitHub repository' })
+        .expect(200);
+
+      const events = parseNdjsonEvents(chatRes.text);
+      expect(events.find((event) => event.type === 'approval_required')).toMatchObject({
+        type: 'approval_required',
+        toolName: 'sys_bash',
+        riskTier: 'high',
+        argsPreview: {
+          command: 'gh repo create test --private',
+          __policy: {
+            category: 'unknown',
+            decision: 'approval_required',
+          },
+        },
+      });
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);

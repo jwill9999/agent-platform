@@ -1,10 +1,14 @@
-import type { RiskTier } from '@agent-platform/contracts';
+import type {
+  ExecutionPolicyCategory,
+  ExecutionPolicySettings,
+  RiskTier,
+} from '@agent-platform/contracts';
 
 export type BashCommandPolicyDecision =
   | { state: 'allowed'; category: 'read_only'; reason: string }
   | {
       state: 'approval_required';
-      category: 'write' | 'script' | 'chain';
+      category: Exclude<ExecutionPolicyCategory, 'read_only' | 'destructive'>;
       riskTier: RiskTier;
       reason: string;
       code: string;
@@ -46,16 +50,10 @@ const READ_ONLY_COMMANDS = new Set([
 
 const READ_ONLY_GIT_SUBCOMMANDS = new Set(['status', 'diff', 'log', 'branch', 'show', 'rev-parse']);
 const WRITE_COMMANDS = new Set(['touch', 'mkdir', 'cp', 'mv', 'ln', 'tee']);
-const PACKAGE_OR_SCRIPT_COMMANDS = new Set([
-  'npm',
-  'npx',
-  'pnpm',
-  'yarn',
-  'node',
-  'tsx',
-  'tsc',
-  'make',
-]);
+const PACKAGE_OR_SCRIPT_COMMANDS = new Set(['npm', 'npx', 'pnpm', 'yarn', 'pip', 'pip3']);
+const SCRIPT_COMMANDS = new Set(['node', 'tsx', 'tsc', 'make']);
+const NETWORK_COMMANDS = new Set(['curl', 'wget', 'ping', 'host', 'dig', 'nslookup']);
+const CONTAINER_COMMANDS = new Set(['docker', 'docker-compose', 'podman', 'kubectl']);
 const DESTRUCTIVE_COMMANDS = new Set([
   'chmod',
   'chown',
@@ -99,10 +97,14 @@ function readOnlyDecision(): BashCommandPolicyDecision {
 }
 
 function approvalDecision(
-  category: 'write' | 'script' | 'chain',
+  category: Exclude<ExecutionPolicyCategory, 'read_only' | 'destructive'>,
   code: string,
   reason: string,
+  options?: { policy?: ExecutionPolicySettings },
 ): BashCommandPolicyDecision {
+  if (policyModeForCategory(category, options?.policy) === 'block') {
+    return deniedDecision(code, reason);
+  }
   return {
     state: 'approval_required',
     category,
@@ -110,6 +112,19 @@ function approvalDecision(
     riskTier: 'high',
     reason,
   };
+}
+
+function policyModeForCategory(
+  category: Exclude<ExecutionPolicyCategory, 'read_only' | 'destructive'>,
+  policy: ExecutionPolicySettings | undefined,
+): 'ask' | 'block' | 'auto' {
+  if (!policy) return 'ask';
+  if (category === 'workspace_write') return policy.workspaceWrite;
+  if (category === 'package_install') return policy.packageInstall;
+  if (category === 'network') return policy.network;
+  if (category === 'git_mutation') return policy.gitMutation;
+  if (category === 'container') return policy.container;
+  return policy.unknownCommandPolicy;
 }
 
 function deniedDecision(code: string, reason: string): BashCommandPolicyDecision {
@@ -121,7 +136,10 @@ function deniedDecision(code: string, reason: string): BashCommandPolicyDecision
   };
 }
 
-export function classifyBashCommand(command: string): BashCommandPolicyDecision {
+export function classifyBashCommand(
+  command: string,
+  options: { policy?: ExecutionPolicySettings } = {},
+): BashCommandPolicyDecision {
   const trimmed = command.trim();
   const [rawCommand, subcommand] = shellTokens(trimmed);
   const name = commandName(rawCommand);
@@ -146,17 +164,19 @@ export function classifyBashCommand(command: string): BashCommandPolicyDecision 
 
   if (SHELL_CHAIN_PATTERN.test(trimmed)) {
     return approvalDecision(
-      'chain',
+      'unknown',
       'shell_chaining',
       'Shell chaining or pipelines require human approval before execution.',
+      options,
     );
   }
 
   if (SHELL_REDIRECT_PATTERN.test(trimmed)) {
     return approvalDecision(
-      'write',
+      'workspace_write',
       'shell_redirection',
       'Shell redirection can write files and requires human approval before execution.',
+      options,
     );
   }
 
@@ -164,9 +184,10 @@ export function classifyBashCommand(command: string): BashCommandPolicyDecision 
     return subcommand && READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)
       ? readOnlyDecision()
       : approvalDecision(
-          'write',
+          'git_mutation',
           'git_mutation',
           'Git commands that are not read-only require human approval before execution.',
+          options,
         );
   }
 
@@ -174,33 +195,64 @@ export function classifyBashCommand(command: string): BashCommandPolicyDecision 
     return subcommand === '-n'
       ? readOnlyDecision()
       : approvalDecision(
-          'write',
+          'workspace_write',
           'sed_mutation',
           'sed commands that may edit files require human approval before execution.',
+          options,
         );
   }
 
   if (WRITE_COMMANDS.has(name)) {
     return approvalDecision(
-      'write',
+      'workspace_write',
       'write_command',
       `Command "${name}" can write files and requires human approval before execution.`,
+      options,
     );
   }
 
   if (PACKAGE_OR_SCRIPT_COMMANDS.has(name)) {
     return approvalDecision(
-      'script',
+      'package_install',
       'package_or_script_execution',
       `Command "${name}" can run project scripts and requires human approval before execution.`,
+      options,
+    );
+  }
+
+  if (SCRIPT_COMMANDS.has(name)) {
+    return approvalDecision(
+      'unknown',
+      'script_execution',
+      `Command "${name}" can run project code and requires human approval before execution.`,
+      options,
+    );
+  }
+
+  if (NETWORK_COMMANDS.has(name)) {
+    return approvalDecision(
+      'network',
+      'network_command',
+      `Command "${name}" can access the network and requires human approval before execution.`,
+      options,
+    );
+  }
+
+  if (CONTAINER_COMMANDS.has(name)) {
+    return approvalDecision(
+      'container',
+      'container_command',
+      `Command "${name}" can manage containers or external runtime resources and requires human approval before execution.`,
+      options,
     );
   }
 
   if (READ_ONLY_COMMANDS.has(name)) return readOnlyDecision();
 
   return approvalDecision(
-    'script',
+    'unknown',
     'unknown_command_effect',
     `Command "${name}" is not classified as read-only and requires human approval before execution.`,
+    options,
   );
 }

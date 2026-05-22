@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-22
+- **Session:** Implemented less-rigid execution policy on `task/less-rigid-execution-policy`.
+- **Today’s outputs:** Added workspace `executionPolicy` settings/contracts and persistence coverage; split shell validation so `bashGuard` only handles hard-deny patterns while `bashCommandPolicy` classifies read-only, workspace-write, package/script, network, git mutation, container, unknown, and destructive commands; routed reviewable unknown/state-changing shell commands and registered unallowlisted tools through one-shot durable HITL approvals; kept destructive commands non-approvable and missing tools/providers on capability recovery; passed execution policy into chat tool dispatch; added policy metadata/copy to approvals; and exposed policy controls on the Workspace page.
+- **Validation:** SonarQube MCP was not callable through the current tool surface, so the documented fallback gate was used. Passed focused contracts/db/harness/API/web tests, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm docs:lint`, and full `pnpm test` after updating the settings router default assertions for `executionPolicy`.
+- **Current state:** Bead `agent-platform-ld3` is ready to close. Branch is `task/less-rigid-execution-policy`; this branch chains after `task/capability-recovery-ux`.
+- **Next:** Close/push Beads, commit, and push the branch. Follow-up work can add session/workspace-scoped approvals, richer provider discovery, and interactive recovery actions.
+- **Date:** 2026-05-22
 - **Session:** Implemented capability recovery UX for allowlist failures on `task/capability-recovery-ux`.
 - **Today’s outputs:** Added shared capability recovery schemas, emitted structured recovery metadata for `TOOL_NOT_ALLOWED` dispatch failures, preserved recovery data through the web stream parser, rendered capability-oriented statuses/options in the operator tool trace, and documented/closed bead `agent-platform-fxi`.
 - **Validation:** Passed focused web/contracts/harness tests, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm docs:lint`, and a rerun of `projectsRouter.test.ts`. Full `pnpm test` passed all packages except one unrelated API `projectsRouter.test.ts` timeout on first run; the same file passed immediately on rerun. SonarQube MCP analysis was not available through the current tool surface, so the documented fallback gate was used.

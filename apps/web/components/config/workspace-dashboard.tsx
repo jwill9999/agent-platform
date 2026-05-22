@@ -1,10 +1,24 @@
 'use client';
 
-import type { WorkspaceAreaListing, WorkspaceFilesResponse } from '@agent-platform/contracts';
+import type {
+  ExecutionPolicyMode,
+  ExecutionPolicySettings,
+  PlatformSettings,
+  WorkspaceAreaListing,
+  WorkspaceFilesResponse,
+} from '@agent-platform/contracts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Download, FileText, Folder, Loader2, RefreshCw } from 'lucide-react';
+import {
+  AlertCircle,
+  Download,
+  FileText,
+  Folder,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react';
 
-import { apiGet, apiPath, ApiRequestError } from '@/lib/apiClient';
+import { apiGet, apiPath, apiPut, ApiRequestError } from '@/lib/apiClient';
 import {
   flattenWorkspaceFiles,
   formatFileSize,
@@ -21,16 +35,46 @@ function areaCount(area: WorkspaceAreaListing): number {
   return area.files.filter((file) => file.kind === 'file').length;
 }
 
+const DEFAULT_EXECUTION_POLICY: ExecutionPolicySettings = {
+  unknownToolPolicy: 'ask',
+  unknownCommandPolicy: 'ask',
+  workspaceWrite: 'ask',
+  packageInstall: 'ask',
+  network: 'ask',
+  gitMutation: 'ask',
+  container: 'ask',
+};
+
+const POLICY_OPTIONS: Array<{ value: ExecutionPolicyMode | 'ask' | 'block'; label: string }> = [
+  { value: 'ask', label: 'Ask approval' },
+  { value: 'block', label: 'Block' },
+  { value: 'auto', label: 'Auto-run' },
+];
+
+function policyLabel(value: string): string {
+  if (value === 'auto') return 'Auto-run';
+  if (value === 'block') return 'Block';
+  return 'Ask approval';
+}
+
 export function WorkspaceDashboard() {
   const [data, setData] = useState<WorkspaceFilesResponse | undefined>();
+  const [executionPolicy, setExecutionPolicy] =
+    useState<ExecutionPolicySettings>(DEFAULT_EXECUTION_POLICY);
   const [loading, setLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setData(await apiGet<WorkspaceFilesResponse>(apiPath('workspace', 'files')));
+      const [files, settings] = await Promise.all([
+        apiGet<WorkspaceFilesResponse>(apiPath('workspace', 'files')),
+        apiGet<PlatformSettings>(apiPath('settings')),
+      ]);
+      setData(files);
+      setExecutionPolicy(settings?.executionPolicy ?? DEFAULT_EXECUTION_POLICY);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : String(err));
     } finally {
@@ -43,6 +87,79 @@ export function WorkspaceDashboard() {
   }, [load]);
 
   const rows = useMemo(() => flattenWorkspaceFiles(data), [data]);
+
+  const updateExecutionPolicy = useCallback(
+    async (patch: Partial<ExecutionPolicySettings>) => {
+      const next = { ...executionPolicy, ...patch };
+      setExecutionPolicy(next);
+      setSettingsSaving(true);
+      setError(null);
+      try {
+        const updated = await apiPut<PlatformSettings>(apiPath('settings'), {
+          executionPolicy: patch,
+        });
+        setExecutionPolicy(updated?.executionPolicy ?? next);
+      } catch (err) {
+        setExecutionPolicy(executionPolicy);
+        setError(err instanceof ApiRequestError ? err.message : String(err));
+      } finally {
+        setSettingsSaving(false);
+      }
+    },
+    [executionPolicy],
+  );
+
+  const policyRows = [
+    {
+      id: 'unknownCommandPolicy',
+      label: 'Unknown commands',
+      description: 'Commands that are not clearly read-only or destructive.',
+      value: executionPolicy.unknownCommandPolicy,
+      values: POLICY_OPTIONS.filter((option) => option.value !== 'auto'),
+    },
+    {
+      id: 'unknownToolPolicy',
+      label: 'Unknown tools',
+      description: 'Registered tools that are not auto-approved by the agent allowlist.',
+      value: executionPolicy.unknownToolPolicy,
+      values: POLICY_OPTIONS.filter((option) => option.value !== 'auto'),
+    },
+    {
+      id: 'workspaceWrite',
+      label: 'Workspace writes',
+      description: 'Commands that create, edit, move, or remove Project files.',
+      value: executionPolicy.workspaceWrite,
+      values: POLICY_OPTIONS,
+    },
+    {
+      id: 'packageInstall',
+      label: 'Package and script commands',
+      description: 'Package managers and project script execution.',
+      value: executionPolicy.packageInstall,
+      values: POLICY_OPTIONS,
+    },
+    {
+      id: 'network',
+      label: 'Network commands',
+      description: 'Commands that access external hosts or services.',
+      value: executionPolicy.network,
+      values: POLICY_OPTIONS,
+    },
+    {
+      id: 'gitMutation',
+      label: 'Git mutations',
+      description: 'Git commands that modify local or remote repository state.',
+      value: executionPolicy.gitMutation,
+      values: POLICY_OPTIONS,
+    },
+    {
+      id: 'container',
+      label: 'Container commands',
+      description: 'Docker, container, and runtime orchestration commands.',
+      value: executionPolicy.container,
+      values: POLICY_OPTIONS,
+    },
+  ] as const;
 
   return (
     <div className="flex flex-col h-full">
@@ -71,6 +188,52 @@ export function WorkspaceDashboard() {
       )}
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <section className="border border-border rounded-lg bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <h2 className="font-medium text-foreground">Execution policy</h2>
+            </div>
+            <Badge variant="outline">{settingsSaving ? 'Saving' : 'Workspace'}</Badge>
+          </div>
+          <div className="divide-y divide-border">
+            {policyRows.map((row) => (
+              <label
+                key={row.id}
+                className="grid gap-3 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_12rem]"
+              >
+                <span>
+                  <span className="font-medium text-foreground">{row.label}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {row.description}
+                  </span>
+                </span>
+                <select
+                  className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+                  value={row.value}
+                  disabled={settingsSaving}
+                  onChange={(event) => {
+                    const value = event.target.value as ExecutionPolicySettings[typeof row.id];
+                    updateExecutionPolicy({
+                      [row.id]: value,
+                    } as Partial<ExecutionPolicySettings>).catch(() => {});
+                  }}
+                >
+                  {row.values.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+          <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+            Destructive host actions are always blocked. Current default:{' '}
+            {policyLabel(executionPolicy.unknownCommandPolicy)} for unknown commands.
+          </p>
+        </section>
+
         {data && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {data.areas.map((area) => (

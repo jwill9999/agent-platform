@@ -25,6 +25,7 @@ import {
   retrievePromptMemories,
   formatPromptMemoryBundle,
   findProject,
+  loadSettings,
 } from '@agent-platform/db';
 import type {
   ApprovalRequest,
@@ -921,6 +922,7 @@ function createRuntimeToolDispatchNode({
     skillResolver: (id: string) => getSkill(db, id),
     projectAccessPolicy,
     projectWriteBlockHandler: createProjectWriteBlockHandler(db, sessionId),
+    executionPolicy: loadSettings(db).executionPolicy,
   });
 }
 

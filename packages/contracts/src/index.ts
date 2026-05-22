@@ -441,10 +441,18 @@ export { openApiToToolDefinitions, type OpenApiToolDefinition } from './openapi.
 export {
   RateLimitSettingsSchema,
   CostBudgetSettingsSchema,
+  ExecutionPolicyCategorySchema,
+  ExecutionPolicyDecisionSchema,
+  ExecutionPolicyModeSchema,
+  ExecutionPolicySettingsSchema,
   PlatformSettingsSchema,
   PlatformSettingsUpdateSchema,
   type RateLimitSettings,
   type CostBudgetSettings,
+  type ExecutionPolicyCategory,
+  type ExecutionPolicyDecision,
+  type ExecutionPolicyMode,
+  type ExecutionPolicySettings,
   type PlatformSettings,
   type PlatformSettingsUpdate,
 } from './settings.js';
