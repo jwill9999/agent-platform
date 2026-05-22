@@ -483,13 +483,28 @@ describe('toolDispatchNode', () => {
       expect(emitted).toContainEqual(
         expect.objectContaining({
           type: 'approval_required',
-          argsPreview: { command: 'touch /workspace/generated/report.md' },
+          argsPreview: expect.objectContaining({
+            command: 'touch /workspace/generated/report.md',
+            __policy: expect.objectContaining({
+              category: 'workspace_write',
+              decision: 'approval_required',
+              toolId: 'sys_bash',
+              target: 'touch /workspace/generated/report.md',
+            }),
+          }),
         }),
       );
       expect(JSON.stringify(emitted)).not.toContain(realWorkspace);
       expect(approvalRequests.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          args: { command: 'touch /workspace/generated/report.md' },
+          args: expect.objectContaining({
+            command: 'touch /workspace/generated/report.md',
+            __policy: expect.objectContaining({
+              category: 'workspace_write',
+              decision: 'approval_required',
+              target: 'touch /workspace/generated/report.md',
+            }),
+          }),
           executionPayloadJson: JSON.stringify({
             toolCallId: 'tc-bash-preview',
             toolName: 'sys_bash',
@@ -793,7 +808,15 @@ describe('toolDispatchNode', () => {
     expect(approvalRequests.create).toHaveBeenCalledWith(
       expect.objectContaining({
         toolName: 'sys_bash',
-        args: { command: 'touch notes.md' },
+        args: expect.objectContaining({
+          command: 'touch notes.md',
+          __policy: expect.objectContaining({
+            category: 'workspace_write',
+            decision: 'approval_required',
+            toolId: 'sys_bash',
+            target: 'touch notes.md',
+          }),
+        }),
         riskTier: 'high',
       }),
     );
@@ -809,7 +832,67 @@ describe('toolDispatchNode', () => {
     );
   });
 
-  it('rejects tool not in agent allowlist', async () => {
+  it('requests approval for a registered tool not in the agent allowlist when workspace policy allows it', async () => {
+    const emitted: Output[] = [];
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(
+        makeApprovalRequest({
+          toolName: 'publish',
+          argsJson:
+            '{"repo":"agent-platform","__policy":{"category":"unknown","decision":"approval_required","reason":"Tool is registered but not auto-approved by the agent allowlist.","toolId":"publish","outsideAgentAllowlist":true}}',
+        }),
+      ),
+    };
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: [], allowedMcpServerIds: [] }),
+      tools: [makeTool({ id: 'publish', name: 'Publish', riskTier: 'high' })],
+      mcpManager: makeMcpManager(),
+      emitter: { emit: (event) => emitted.push(event), end: vi.fn() },
+      approvalRequests,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-unallowlisted-tool',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-3', name: 'publish', args: { repo: 'agent-platform' } }],
+        },
+      }),
+    );
+
+    expect(result.halted).toBe(true);
+    expect(approvalRequests.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'publish',
+        riskTier: 'high',
+        args: expect.objectContaining({
+          repo: 'agent-platform',
+          __policy: expect.objectContaining({
+            category: 'unknown',
+            outsideAgentAllowlist: true,
+          }),
+        }),
+        executionPayloadJson: JSON.stringify({
+          toolCallId: 'tc-3',
+          toolName: 'publish',
+          args: { repo: 'agent-platform' },
+        }),
+      }),
+    );
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: 'approval_required',
+        toolName: 'publish',
+        argsPreview: expect.objectContaining({
+          __policy: expect.objectContaining({ outsideAgentAllowlist: true }),
+        }),
+      }),
+    );
+  });
+
+  it('keeps missing tools on capability recovery instead of approval', async () => {
     const ctx: ToolDispatchContext = {
       agent: makeAgent({ allowedToolIds: [], allowedMcpServerIds: [] }),
       mcpManager: makeMcpManager(),

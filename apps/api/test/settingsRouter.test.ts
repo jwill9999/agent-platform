@@ -5,14 +5,12 @@ import path from 'node:path';
 import express from 'express';
 import request from 'supertest';
 import { openDatabase, closeDatabase } from '@agent-platform/db';
+import { PlatformSettingsSchema } from '@agent-platform/contracts';
 
 import { createSettingsRouter } from '../src/infrastructure/http/v1/settingsRouter.js';
 import { errorMiddleware } from '../src/infrastructure/http/errorMiddleware.js';
 
-const DEFAULTS = {
-  rateLimits: { windowMs: 60_000, max: 100 },
-  costBudget: { globalMaxCostUnits: null, warnThreshold: 0.8 },
-};
+const DEFAULTS = PlatformSettingsSchema.parse({});
 
 function buildTestApp() {
   const tmpDir = mkdtempSync(path.join(tmpdir(), 'settings-test-'));

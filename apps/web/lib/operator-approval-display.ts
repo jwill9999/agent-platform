@@ -68,6 +68,10 @@ function targetFromArgs(args: unknown): string | undefined {
 
 function approvalReason(approval: ApprovalCardState): string {
   const message = approval.message ?? '';
+  if (isRecord(approval.argsPreview) && isRecord(approval.argsPreview.__policy)) {
+    const reason = stringValue(approval.argsPreview.__policy.reason);
+    return reason ?? 'This action is not auto-approved by workspace policy';
+  }
   if (/external domain/i.test(message) || /not allowlisted/i.test(message)) {
     return 'External domain is not allowlisted';
   }
@@ -94,6 +98,7 @@ export function displayApproval(approval: ApprovalCardState): OperatorApprovalDi
   const action = toolActionLabel(approval.toolName);
   const target = targetFromArgs(approval.argsPreview);
   const targetSuffix = target ? ` for ${target}` : '';
+  const hasPolicy = isRecord(approval.argsPreview) && isRecord(approval.argsPreview.__policy);
   return {
     action,
     title: titleForStatus(approval.status, action),
@@ -101,7 +106,9 @@ export function displayApproval(approval: ApprovalCardState): OperatorApprovalDi
     reason: approvalReason(approval),
     riskLabel: approval.riskTier?.toUpperCase(),
     statusLabel: STATUS_LABELS[approval.status],
-    allowText: `Approving allows the agent to ${action.toLowerCase()}${targetSuffix}.`,
+    allowText: hasPolicy
+      ? `Approving allows this one action to run despite not being auto-approved by workspace policy.`
+      : `Approving allows the agent to ${action.toLowerCase()}${targetSuffix}.`,
     denyText: `Denying prevents this action from running.`,
     details: technicalPayload(approval),
   };

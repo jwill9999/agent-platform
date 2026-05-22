@@ -19,19 +19,38 @@ describe('bash command policy', () => {
   });
 
   it('approval-gates writes, redirects, shell chaining, and package scripts', () => {
-    for (const command of [
-      'touch notes.md',
-      'mkdir -p generated',
-      'cp README.md generated/README.md',
-      'cat README.md > generated/README.md',
-      'git status && git diff',
-      'pnpm test',
-      'npm run build',
-    ]) {
-      expect(classifyBashCommand(command)).toMatchObject({
-        state: 'approval_required',
-      });
-    }
+    expect(classifyBashCommand('touch notes.md')).toMatchObject({
+      state: 'approval_required',
+      category: 'workspace_write',
+    });
+    expect(classifyBashCommand('cat README.md > generated/README.md')).toMatchObject({
+      state: 'approval_required',
+      category: 'workspace_write',
+    });
+    expect(classifyBashCommand('git status && git diff')).toMatchObject({
+      state: 'approval_required',
+      category: 'unknown',
+    });
+    expect(classifyBashCommand('pnpm test')).toMatchObject({
+      state: 'approval_required',
+      category: 'package_install',
+    });
+    expect(classifyBashCommand('git push')).toMatchObject({
+      state: 'approval_required',
+      category: 'git_mutation',
+    });
+    expect(classifyBashCommand('curl https://api.example.com')).toMatchObject({
+      state: 'approval_required',
+      category: 'network',
+    });
+    expect(classifyBashCommand('docker compose up')).toMatchObject({
+      state: 'approval_required',
+      category: 'container',
+    });
+    expect(classifyBashCommand('gh repo create test --private')).toMatchObject({
+      state: 'approval_required',
+      category: 'unknown',
+    });
   });
 
   it('blocks destructive removals and host-level mutations', () => {

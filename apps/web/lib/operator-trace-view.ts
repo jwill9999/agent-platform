@@ -74,7 +74,13 @@ export function traceSummary(entries: readonly OperatorTraceEntry[]): string {
   if (entries.length === 0) return 'No trace events captured';
   const failed = entries.filter((entry) => entry.status === 'failed').length;
   const blocked = entries.filter(
-    (entry) => entry.status === 'blocked' || entry.status === 'approval_required',
+    (entry) =>
+      entry.status === 'blocked' ||
+      entry.status === 'approval_required' ||
+      entry.status === 'capability_missing' ||
+      entry.status === 'provider_required' ||
+      entry.status === 'approval_escalation' ||
+      entry.status === 'sandbox_available',
   ).length;
   const artifacts = entries.reduce((count, entry) => count + entry.artifactCount, 0);
   const parts = [`${entries.length} event${entries.length === 1 ? '' : 's'}`];

@@ -22,7 +22,14 @@ export {
   type McpServer,
   type McpServerCreateBody,
 } from './mcpServer.js';
-export { OutputSchema, type Output } from './output.js';
+export {
+  CapabilityRecoveryOptionSchema,
+  CapabilityRecoverySchema,
+  OutputSchema,
+  type CapabilityRecovery,
+  type CapabilityRecoveryOption,
+  type Output,
+} from './output.js';
 export {
   MessageRecordSchema,
   MessageCreateBodySchema,
@@ -438,10 +445,18 @@ export { openApiToToolDefinitions, type OpenApiToolDefinition } from './openapi.
 export {
   RateLimitSettingsSchema,
   CostBudgetSettingsSchema,
+  ExecutionPolicyCategorySchema,
+  ExecutionPolicyDecisionSchema,
+  ExecutionPolicyModeSchema,
+  ExecutionPolicySettingsSchema,
   PlatformSettingsSchema,
   PlatformSettingsUpdateSchema,
   type RateLimitSettings,
   type CostBudgetSettings,
+  type ExecutionPolicyCategory,
+  type ExecutionPolicyDecision,
+  type ExecutionPolicyMode,
+  type ExecutionPolicySettings,
   type PlatformSettings,
   type PlatformSettingsUpdate,
 } from './settings.js';

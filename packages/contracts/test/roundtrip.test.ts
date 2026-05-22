@@ -50,11 +50,25 @@ import {
 
 describe('contracts round-trip', () => {
   it('OutputSchema', () => {
+    const capabilityRecoveryError = {
+      type: 'error' as const,
+      message: 'Tool "gh_repo_create" does not have an approved provider.',
+      code: 'TOOL_NOT_ALLOWED',
+      recovery: {
+        status: 'capability_missing',
+        summary: 'Repository creation needs an approved capability provider.',
+        options: [
+          { id: 'request-approval', label: 'Request approval', action: 'approve' },
+          { id: 'manual', label: 'Show manual steps', action: 'manual' },
+        ],
+      },
+    };
     const samples = [
       { type: 'text' as const, content: 'hi' },
       { type: 'code' as const, language: 'ts', content: 'const x = 1' },
       { type: 'tool_result' as const, toolId: 't1', data: { ok: true } },
       { type: 'error' as const, message: 'bad', code: 'E1' },
+      capabilityRecoveryError,
       { type: 'thinking' as const, content: '...' },
       {
         type: 'approval_required' as const,
@@ -69,6 +83,14 @@ describe('contracts round-trip', () => {
       const parsed = OutputSchema.parse(s);
       expect(OutputSchema.parse(structuredClone(parsed))).toEqual(parsed);
     }
+    expect(OutputSchema.parse(capabilityRecoveryError)).toMatchObject({
+      recovery: {
+        status: 'capability_missing',
+        options: expect.arrayContaining([
+          expect.objectContaining({ id: 'request-approval', action: 'approve' }),
+        ]),
+      },
+    });
   });
 
   it('SkillSchema + AgentSchema + limits', () => {

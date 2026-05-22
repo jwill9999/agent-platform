@@ -18,6 +18,15 @@ const pkgRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULTS = {
   rateLimits: { windowMs: 60_000, max: 100 },
   costBudget: { globalMaxCostUnits: null, warnThreshold: 0.8 },
+  executionPolicy: {
+    unknownToolPolicy: 'ask',
+    unknownCommandPolicy: 'ask',
+    workspaceWrite: 'ask',
+    packageInstall: 'ask',
+    network: 'ask',
+    gitMutation: 'ask',
+    container: 'ask',
+  },
 };
 
 function openTestDb() {
@@ -53,11 +62,14 @@ describe('settings repository', () => {
     updateSettings(ctx.db, {
       rateLimits: { windowMs: 30_000, max: 200 },
       costBudget: { globalMaxCostUnits: 1000 },
+      executionPolicy: { network: 'block' },
     });
     const result = loadSettings(ctx.db);
     expect(result.rateLimits).toEqual({ windowMs: 30_000, max: 200 });
     expect(result.costBudget.globalMaxCostUnits).toBe(1000);
     expect(result.costBudget.warnThreshold).toBe(DEFAULTS.costBudget.warnThreshold);
+    expect(result.executionPolicy.network).toBe('block');
+    expect(result.executionPolicy.unknownCommandPolicy).toBe('ask');
   });
 
   it('updateSettings overwrites previous values', () => {
