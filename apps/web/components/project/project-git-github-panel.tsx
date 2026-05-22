@@ -6,6 +6,7 @@ import type {
   ProjectGitChecksResult,
   ProjectGitConflictFileResult,
   ProjectGitConflictSummary,
+  ProjectGitCreatePullRequestResult,
   ProjectGitDiffMode,
   ProjectGitFileDiffResult,
   ProjectGitHubRepositoryConnectionResult,
@@ -78,6 +79,15 @@ type GitPublishState = Readonly<{
   detail?: string;
 }>;
 
+type GitPullRequestCreateState = Readonly<{
+  canCreate: boolean;
+  currentPullRequest: ProjectGitPullRequestSummary | null;
+  defaultTitle: string;
+  baseBranch: string;
+  repositoryUrl: string | null;
+  reason?: string;
+}>;
+
 type RepositoryConnectionMode = 'create' | 'connect';
 
 const ZERO_WORKING_TREE = {
@@ -99,6 +109,94 @@ function normalizeGitHubUrl(remoteUrl: string | undefined): string | null {
   const httpsMatch = /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i.exec(remoteUrl);
   if (httpsMatch?.[1]) return `https://github.com/${httpsMatch[1]}`;
   return null;
+}
+
+export function deriveGitPullRequestCreateState({
+  status,
+  pullRequests,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  pullRequests?: ProjectGitPullRequestsResult | null;
+}>): GitPullRequestCreateState {
+  const currentPullRequest =
+    pullRequests?.pullRequests.find((pullRequest) => pullRequest.currentBranch) ?? null;
+  const defaultTitle =
+    status.recentCommit?.subject ?? status.currentBranch ?? pullRequests?.currentBranch ?? 'Pull request';
+  const baseBranch =
+    status.baseBranch && status.baseBranch !== status.currentBranch ? status.baseBranch : 'main';
+  const repositoryUrl = normalizeGitHubUrl(status.remoteUrl ?? pullRequests?.remoteUrl);
+
+  if (!status.available) {
+    return {
+      canCreate: false,
+      currentPullRequest,
+      defaultTitle,
+      baseBranch,
+      repositoryUrl,
+      reason: status.reason ?? 'Git state is unavailable.',
+    };
+  }
+
+  if (currentPullRequest) {
+    return { canCreate: false, currentPullRequest, defaultTitle, baseBranch, repositoryUrl };
+  }
+
+  if (!status.githubRemoteDetected || !repositoryUrl) {
+    return {
+      canCreate: false,
+      currentPullRequest,
+      defaultTitle,
+      baseBranch,
+      repositoryUrl,
+      reason: 'Connect this Project to GitHub before creating a pull request.',
+    };
+  }
+
+  if (!pullRequests?.available) {
+    return {
+      canCreate: false,
+      currentPullRequest,
+      defaultTitle,
+      baseBranch,
+      repositoryUrl,
+      reason: pullRequests?.reason ?? 'GitHub pull requests are unavailable.',
+    };
+  }
+
+  if (!status.currentBranch || isLikelyPrimaryBranch(status.currentBranch)) {
+    return {
+      canCreate: false,
+      currentPullRequest,
+      defaultTitle,
+      baseBranch,
+      repositoryUrl,
+      reason: 'Create pull requests from feature branches after publishing them.',
+    };
+  }
+
+  if (status.upstreamState !== 'active') {
+    return {
+      canCreate: false,
+      currentPullRequest,
+      defaultTitle,
+      baseBranch,
+      repositoryUrl,
+      reason: 'Publish this branch before creating a pull request.',
+    };
+  }
+
+  if (status.ahead > 0) {
+    return {
+      canCreate: false,
+      currentPullRequest,
+      defaultTitle,
+      baseBranch,
+      repositoryUrl,
+      reason: 'Push local commits before creating a pull request.',
+    };
+  }
+
+  return { canCreate: true, currentPullRequest, defaultTitle, baseBranch, repositoryUrl };
 }
 
 function shortSha(sha: string | undefined): string {
@@ -923,6 +1021,9 @@ export function ProjectGitHubPanel({
   const [checksError, setChecksError] = useState<string | null>(null);
   const [pullRequestsError, setPullRequestsError] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const [pullRequestTitle, setPullRequestTitle] = useState('');
+  const [pullRequestBody, setPullRequestBody] = useState('');
+  const [pullRequestSuccess, setPullRequestSuccess] = useState<string | null>(null);
   const [mergeCommitMessage, setMergeCommitMessage] = useState('Resolve merge conflicts');
   const [repositoryDialogOpen, setRepositoryDialogOpen] = useState(false);
   const [repositoryDialogMode, setRepositoryDialogMode] =
@@ -936,6 +1037,7 @@ export function ProjectGitHubPanel({
   const [connectRepository, setConnectRepository] = useState('');
   const [repositoryActionError, setRepositoryActionError] = useState<string | null>(null);
   const [repositoryActionSuccess, setRepositoryActionSuccess] = useState<string | null>(null);
+  const [lastRepositoryUrl, setLastRepositoryUrl] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     if (!projectId) {
@@ -1094,8 +1196,12 @@ export function ProjectGitHubPanel({
     setChecksError(null);
     setPullRequestsError(null);
     setConflictError(null);
+    setPullRequestTitle('');
+    setPullRequestBody('');
+    setPullRequestSuccess(null);
     setCommitSuccess(null);
     setPushSuccess(null);
+    setLastRepositoryUrl(null);
     setRepositoryDialogOpen(false);
     setRepositoryActionError(null);
     setRepositoryActionSuccess(null);
@@ -1356,11 +1462,24 @@ export function ProjectGitHubPanel({
           ? `Pushed ${nextStatus.currentBranch} to ${nextStatus.upstreamBranch ?? 'upstream'}.`
           : 'Push completed.',
       );
+      setCommitSuccess(null);
+      setPullRequestSuccess(null);
+      setLastRepositoryUrl(normalizeGitHubUrl(nextStatus?.remoteUrl));
+      if (
+        nextStatus?.githubRemoteDetected &&
+        nextStatus.currentBranch &&
+        !isLikelyPrimaryBranch(nextStatus.currentBranch)
+      ) {
+        setPreferredTab('prs');
+        setActiveTab('prs');
+      } else {
+        setPreferredTab('push');
+      }
       setError(null);
       await Promise.all([
         activeTab === 'changes' || activeTab === 'commit' ? loadChanges() : null,
-        activeTab === 'checks' ? loadChecks() : Promise.resolve(),
-        activeTab === 'prs' ? loadPullRequests() : Promise.resolve(),
+        loadChecks(),
+        loadPullRequests(),
       ]);
     } catch (cause) {
       setError(cause instanceof ApiRequestError ? cause.message : 'Failed to push branch.');
@@ -1385,11 +1504,20 @@ export function ProjectGitHubPanel({
           : 'Branch published.',
       );
       setCommitSuccess(null);
+      setPullRequestSuccess(null);
+      setLastRepositoryUrl(normalizeGitHubUrl(nextStatus?.remoteUrl));
+      if (
+        nextStatus?.githubRemoteDetected &&
+        nextStatus.currentBranch &&
+        !isLikelyPrimaryBranch(nextStatus.currentBranch)
+      ) {
+        setPreferredTab('prs');
+        setActiveTab('prs');
+      } else {
+        setPreferredTab('push');
+      }
       setError(null);
-      await Promise.all([
-        activeTab === 'checks' ? loadChecks() : Promise.resolve(),
-        activeTab === 'prs' ? loadPullRequests() : Promise.resolve(),
-      ]);
+      await Promise.all([loadChecks(), loadPullRequests()]);
     } catch (cause) {
       setError(cause instanceof ApiRequestError ? cause.message : 'Failed to publish branch.');
     } finally {
@@ -1439,11 +1567,22 @@ export function ProjectGitHubPanel({
           : `Created ${result?.repositoryUrl ?? 'GitHub repository'}.`,
       );
       setCommitSuccess(null);
+      setPullRequestSuccess(null);
+      setLastRepositoryUrl(result?.repositoryUrl ?? null);
       setRepositoryActionSuccess('Repository connected successfully.');
       setRepositoryActionError(null);
       setRepositoryDialogOpen(false);
-      setPreferredTab('push');
-      setActiveTab('push');
+      if (
+        result?.pushed &&
+        result.status?.currentBranch &&
+        !isLikelyPrimaryBranch(result.status.currentBranch)
+      ) {
+        setPreferredTab('prs');
+        setActiveTab('prs');
+      } else {
+        setPreferredTab('push');
+        setActiveTab('push');
+      }
       await Promise.all([loadChanges(), loadChecks(), loadPullRequests()]);
     } catch (cause) {
       setRepositoryActionError(
@@ -1480,6 +1619,8 @@ export function ProjectGitHubPanel({
         setStatusProjectId(projectId);
       }
       setPushSuccess(null);
+      setPullRequestSuccess(null);
+      setLastRepositoryUrl(result?.repositoryUrl ?? normalizeGitHubUrl(result?.status.remoteUrl));
       setCommitSuccess(
         result?.status.behind
           ? 'Repository connected. Pull remote changes before pushing.'
@@ -1641,6 +1782,18 @@ export function ProjectGitHubPanel({
   const unstagedFiles =
     currentChanges?.files.filter((file) => file.unstaged && file.status !== 'untracked') ?? [];
   const githubUrl = normalizeGitHubUrl(currentStatus.remoteUrl);
+  const currentGitHubUrl = lastRepositoryUrl ?? githubUrl;
+  const pullRequestCreateState = deriveGitPullRequestCreateState({
+    status: currentStatus,
+    pullRequests: currentPullRequests,
+  });
+  const currentBranchPullRequest = pullRequestCreateState.currentPullRequest;
+  const sortedPullRequests = currentPullRequests?.pullRequests
+    ? [
+        ...currentPullRequests.pullRequests.filter((pullRequest) => pullRequest.currentBranch),
+        ...currentPullRequests.pullRequests.filter((pullRequest) => !pullRequest.currentBranch),
+      ]
+    : [];
   const publishState = deriveGitPublishState({
     status: currentStatus,
     commitSuccess,
@@ -1660,6 +1813,65 @@ export function ProjectGitHubPanel({
   const conflictFiles = conflicts?.files ?? [];
   const unresolvedConflictFiles = conflictFiles.filter((file) => !file.resolved);
   const conflictResolved = currentStatus.available && currentStatus.workingTree.conflicts === 0;
+
+  const createPullRequest = useCallback(async () => {
+    if (!projectId) return;
+    const title = (pullRequestTitle || pullRequestCreateState.defaultTitle).trim();
+    if (!title) {
+      setPullRequestsError('Enter a pull request title.');
+      return;
+    }
+    setActionPending('create-pull-request');
+    try {
+      const result = await apiPost<ProjectGitCreatePullRequestResult>(
+        apiPath('projects', projectId, 'github', 'pull-requests'),
+        {
+          title,
+          body: pullRequestBody.trim() || undefined,
+          baseBranch: pullRequestCreateState.baseBranch,
+          draft: false,
+        },
+      );
+      if (result?.pullRequests) {
+        setPullRequests(result.pullRequests);
+        setPullRequestsProjectId(projectId);
+      }
+      if (result?.checks) {
+        setChecks(result.checks);
+        setChecksProjectId(projectId);
+      }
+      setPullRequestSuccess(
+        result?.pullRequest
+          ? `Created PR #${result.pullRequest.number}: ${result.pullRequest.title}`
+          : 'Pull request created.',
+      );
+      setPullRequestsError(null);
+      setPullRequestBody('');
+      setPreferredTab('prs');
+      setActiveTab('prs');
+      await Promise.all([loadStatus(), loadChecks()]);
+    } catch (cause) {
+      setPullRequestsError(
+        cause instanceof ApiRequestError ? cause.message : 'Failed to create pull request.',
+      );
+    } finally {
+      setActionPending(null);
+    }
+  }, [
+    loadChecks,
+    loadStatus,
+    projectId,
+    pullRequestBody,
+    pullRequestCreateState.baseBranch,
+    pullRequestCreateState.defaultTitle,
+    pullRequestTitle,
+  ]);
+
+  useEffect(() => {
+    if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestTitle) {
+      setPullRequestTitle(pullRequestCreateState.defaultTitle);
+    }
+  }, [activeTab, pullRequestCreateState.canCreate, pullRequestCreateState.defaultTitle, pullRequestTitle]);
 
   useEffect(() => {
     const nextTab = resolveGitWorkflowActiveTab({ activeTab, tabs, preferredTab });
@@ -2702,8 +2914,19 @@ export function ProjectGitHubPanel({
                       </div>
                     )}
                     {pushSuccess && (
-                      <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                        {pushSuccess}
+                      <div className="space-y-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        <div>{pushSuccess}</div>
+                        {currentGitHubUrl && (
+                          <a
+                            href={currentGitHubUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-emerald-900 hover:underline"
+                          >
+                            Open GitHub
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        )}
                       </div>
                     )}
                     <div className="font-mono text-xs">
@@ -2842,6 +3065,20 @@ export function ProjectGitHubPanel({
                     <div className="text-xs text-muted-foreground">
                       After this branch is published, pull request options appear when they are
                       available.
+                      {currentGitHubUrl && (
+                        <>
+                          {' '}
+                          <a
+                            href={currentGitHubUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                          >
+                            Open GitHub
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -2879,6 +3116,17 @@ export function ProjectGitHubPanel({
                                   Authenticate with GitHub CLI in the terminal to enable live PRs.
                                 </div>
                               )}
+                            {currentGitHubUrl && (
+                              <a
+                                href={currentGitHubUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                Open GitHub
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
                           </div>
                         </div>
                       )}
@@ -2906,13 +3154,97 @@ export function ProjectGitHubPanel({
                           </div>
                         </div>
 
-                        {currentPullRequests.pullRequests.length === 0 ? (
-                          <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                            No open GitHub pull requests were found for this repository.
+                        {pullRequestSuccess && (
+                          <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                            {pullRequestSuccess}
                           </div>
-                        ) : (
+                        )}
+
+                        {pullRequestCreateState.canCreate && !currentBranchPullRequest && (
+                          <div className="space-y-3 rounded border border-border bg-background px-3 py-3">
+                            <div>
+                              <div className="font-medium">Create a pull request</div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {currentStatus.currentBranch} is published. Open a pull request to
+                                review checks and collaborate from this panel.
+                              </p>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="block text-xs font-medium text-muted-foreground">
+                                Title
+                              </label>
+                              <Input
+                                value={pullRequestTitle}
+                                onChange={(event) => setPullRequestTitle(event.target.value)}
+                                placeholder={pullRequestCreateState.defaultTitle}
+                                disabled={actionPending !== null}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="block text-xs font-medium text-muted-foreground">
+                                Description
+                              </label>
+                              <textarea
+                                value={pullRequestBody}
+                                onChange={(event) => setPullRequestBody(event.target.value)}
+                                disabled={actionPending !== null}
+                                rows={3}
+                                placeholder="Optional summary for reviewers"
+                                className="min-h-20 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={actionPending !== null}
+                                onClick={() => void createPullRequest()}
+                              >
+                                {actionPending === 'create-pull-request'
+                                  ? 'Creating...'
+                                  : 'Create pull request'}
+                              </Button>
+                              {currentGitHubUrl && (
+                                <Button type="button" size="sm" variant="outline" asChild>
+                                  <a
+                                    href={currentGitHubUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    Open GitHub
+                                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {!pullRequestCreateState.canCreate &&
+                          !currentBranchPullRequest &&
+                          sortedPullRequests.length === 0 && (
+                            <div className="space-y-2 rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                              <div>
+                                {pullRequestCreateState.reason ??
+                                  'No open GitHub pull requests were found for this repository.'}
+                              </div>
+                              {currentGitHubUrl && (
+                                <a
+                                  href={currentGitHubUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  Open GitHub
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          )}
+
+                        {sortedPullRequests.length > 0 && (
                           <div className="space-y-2">
-                            {currentPullRequests.pullRequests.map((pullRequest) => (
+                            {sortedPullRequests.map((pullRequest) => (
                               <div
                                 key={pullRequest.number}
                                 className={cn(
@@ -2983,6 +3315,17 @@ export function ProjectGitHubPanel({
                                         Open on GitHub
                                         <ExternalLink className="h-3.5 w-3.5" />
                                       </a>
+                                      {(pullRequest.currentBranch &&
+                                        (pullRequest.checks.failure > 0 ||
+                                          pullRequest.checks.pending > 0)) && (
+                                        <button
+                                          type="button"
+                                          className="text-primary hover:underline"
+                                          onClick={() => setActiveTab('checks')}
+                                        >
+                                          View checks
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -3015,7 +3358,7 @@ export function ProjectGitHubPanel({
                         ? 'Authenticated with github.com'
                         : 'GitHub authentication not confirmed'}
                     </div>
-                    <div>Read-only PR visibility. PR actions are planned separately.</div>
+                    <div>Create and monitor pull requests from this Project.</div>
                   </div>
                 </GitCard>
               </>

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -235,6 +235,106 @@ test.describe('Electron Project Git workflow panel', () => {
       rmSync(tempRoot, { recursive: true, force: true });
     }
   });
+
+  test('creates a pull request for a published feature branch from the PR tab', async () => {
+    const tempRoot = join(repoRoot, '.agent-platform', 'electron-git-e2e', String(Date.now()));
+    const runtimeDir = join(tempRoot, 'runtime');
+    const remoteDir = join(tempRoot, 'remote.git');
+    const projectDir = join(tempRoot, 'client', 'pr-project');
+    const ghStatePath = join(tempRoot, 'fake-gh-state.json');
+    const ghBinary = join(tempRoot, 'fake-gh.js');
+    const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
+    const backendPort = await getOpenPort();
+    const rendererPort = await getOpenPort();
+    let app: ElectronApplication | undefined;
+
+    mkdirSync(tempRoot, { recursive: true });
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    mkdirSync(projectDir, { recursive: true });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main'], { cwd: projectDir, stdio: 'ignore' });
+    configureGitUser(projectDir);
+    writeFileSync(join(projectDir, 'README.md'), '# PR Project\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: projectDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: projectDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: projectDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], {
+      cwd: projectDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['checkout', '-b', 'task/e2e-pr'], {
+      cwd: projectDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(join(projectDir, 'feature.txt'), 'feature work\n');
+    execFileSync(GIT_BINARY, ['add', 'feature.txt'], { cwd: projectDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'feat: add feature work'], {
+      cwd: projectDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'task/e2e-pr'], {
+      cwd: projectDir,
+      stdio: 'ignore',
+    });
+    execFileSync(
+      GIT_BINARY,
+      ['remote', 'set-url', 'origin', 'git@github.com:user/pr-project.git'],
+      {
+        cwd: projectDir,
+        stdio: 'ignore',
+      },
+    );
+    writeFakeGitHubCli(ghBinary, ghStatePath);
+    seedDesktopDatabase(sqlitePath);
+
+    try {
+      app = await electron.launch({
+        cwd: desktopDir,
+        args: ['.'],
+        env: {
+          ...process.env,
+          AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(backendPort),
+          AGENT_PLATFORM_DESKTOP_NODE_PATH: process.execPath,
+          AGENT_PLATFORM_DESKTOP_RENDERER: 'standalone',
+          AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
+          AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
+          AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
+          AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
+          AGENT_PLATFORM_GH_BINARY: ghBinary,
+          CI: process.env.CI,
+        },
+      });
+
+      const page = await app.firstWindow();
+      await openProject(page);
+
+      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
+      await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
+      await expect(gitPanel.getByRole('button', { name: 'PRs' })).toBeVisible({
+        timeout: 10_000,
+      });
+      await gitPanel.getByRole('button', { name: 'PRs' }).click();
+      await expect(gitPanel.getByText('Create a pull request')).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(gitPanel.getByRole('link', { name: /Open GitHub/ })).toBeVisible();
+
+      await gitPanel.getByRole('button', { name: 'Create pull request' }).click();
+
+      await expect(gitPanel.getByText('Created PR #17')).toBeVisible({ timeout: 10_000 });
+      await expect(gitPanel.getByText('#17', { exact: true })).toBeVisible();
+      await expect(gitPanel.getByRole('link', { name: /Open on GitHub/ })).toBeVisible();
+      await expect(gitPanel.getByRole('button', { name: /Checks/ })).toBeVisible({
+        timeout: 10_000,
+      });
+    } finally {
+      await app?.close();
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 function configureGitUser(cwd: string): void {
@@ -265,6 +365,44 @@ function seedDesktopDatabase(sqlitePath: string): void {
     },
     stdio: 'inherit',
   });
+}
+
+function writeFakeGitHubCli(path: string, statePath: string): void {
+  writeFileSync(
+    path,
+    `#!/bin/sh
+STATE=${JSON.stringify(statePath)}
+PR='{"number":17,"title":"feat: add feature work","state":"OPEN","url":"https://github.com/user/pr-project/pull/17","headRefName":"task/e2e-pr","baseRefName":"main","author":{"login":"e2e-user"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"MERGEABLE","createdAt":"2026-05-22T10:00:00Z","updatedAt":"2026-05-22T10:00:00Z","statusCheckRollup":[{"databaseId":1,"name":"CI","workflowName":"CI","status":"COMPLETED","conclusion":"SUCCESS"}]}'
+if [ "$1" = "--version" ]; then
+  echo "gh version 2.0.0"
+  exit 0
+fi
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
+  echo "Logged in to github.com"
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
+  if [ -f "$STATE" ]; then
+    echo "[$PR]"
+  else
+    echo "[]"
+  fi
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "create" ]; then
+  echo "created" > "$STATE"
+  echo "$PR"
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  echo '{"number":17,"url":"https://github.com/user/pr-project/pull/17","statusCheckRollup":[{"databaseId":1,"name":"CI","workflowName":"CI","status":"COMPLETED","conclusion":"SUCCESS"}]}'
+  exit 0
+fi
+echo "unexpected gh invocation: $*" >&2
+exit 1
+`,
+  );
+  chmodSync(path, 0o755);
 }
 
 function getOpenPort(): Promise<number> {

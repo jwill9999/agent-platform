@@ -6,6 +6,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  deriveGitPullRequestCreateState,
   deriveGitPublishState,
   deriveGitWorkflowOverview,
   deriveGitWorkflowTabs,
@@ -597,6 +598,96 @@ describe('deriveGitWorkflowTabs', () => {
       { id: 'prs', label: 'PRs', badge: 1 },
       { id: 'checks', label: 'Checks', badge: 1 },
     ]);
+  });
+});
+
+describe('deriveGitPullRequestCreateState', () => {
+  it('allows creating a pull request for a published feature branch without an open PR', () => {
+    expect(
+      deriveGitPullRequestCreateState({
+        status: status({
+          currentBranch: 'feature/work',
+          upstreamBranch: 'origin/feature/work',
+          baseBranch: 'main',
+        }),
+        pullRequests: {
+          available: true,
+          repositoryName: 'app',
+          remoteUrl: 'git@github.com:user/app.git',
+          currentBranch: 'feature/work',
+          githubRemoteDetected: true,
+          ghAvailable: true,
+          authenticated: true,
+          pullRequests: [],
+          checkedAt: '2026-05-22T10:00:00.000Z',
+        },
+      }),
+    ).toMatchObject({
+      canCreate: true,
+      defaultTitle: 'feature/work',
+      baseBranch: 'main',
+      repositoryUrl: 'https://github.com/user/app',
+    });
+  });
+
+  it('does not offer create PR for primary branches or branches with a current PR', () => {
+    expect(
+      deriveGitPullRequestCreateState({
+        status: cleanStatus,
+        pullRequests: {
+          available: true,
+          repositoryName: 'app',
+          remoteUrl: 'git@github.com:user/app.git',
+          currentBranch: 'main',
+          githubRemoteDetected: true,
+          ghAvailable: true,
+          authenticated: true,
+          pullRequests: [],
+          checkedAt: '2026-05-22T10:00:00.000Z',
+        },
+      }).canCreate,
+    ).toBe(false);
+
+    expect(
+      deriveGitPullRequestCreateState({
+        status: status({
+          currentBranch: 'feature/work',
+          upstreamBranch: 'origin/feature/work',
+          baseBranch: 'main',
+        }),
+        pullRequests: {
+          available: true,
+          repositoryName: 'app',
+          remoteUrl: 'git@github.com:user/app.git',
+          currentBranch: 'feature/work',
+          githubRemoteDetected: true,
+          ghAvailable: true,
+          authenticated: true,
+          checkedAt: '2026-05-22T10:00:00.000Z',
+          pullRequests: [
+            {
+              number: 7,
+              title: 'Feature work',
+              url: 'https://github.com/user/app/pull/7',
+              state: 'open',
+              isDraft: false,
+              authorLogin: 'user',
+              headRefName: 'feature/work',
+              baseRefName: 'main',
+              currentBranch: true,
+              reviewDecision: 'unknown',
+              checks: {
+                total: 0,
+                success: 0,
+                failure: 0,
+                pending: 0,
+                unknown: 0,
+              },
+            },
+          ],
+        },
+      }).canCreate,
+    ).toBe(false);
   });
 });
 

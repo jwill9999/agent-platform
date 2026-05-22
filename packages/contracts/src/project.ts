@@ -880,6 +880,23 @@ export const ProjectGitPullRequestsResultSchema = z.object({
 });
 export type ProjectGitPullRequestsResult = z.infer<typeof ProjectGitPullRequestsResultSchema>;
 
+export const ProjectGitCreatePullRequestBodySchema = z.object({
+  title: z.string().trim().min(1).max(500),
+  body: z.string().trim().max(10000).optional(),
+  baseBranch: z.string().trim().min(1).max(300).optional(),
+  draft: z.boolean().default(false),
+});
+export type ProjectGitCreatePullRequestBody = z.infer<typeof ProjectGitCreatePullRequestBodySchema>;
+
+export const ProjectGitCreatePullRequestResultSchema = z.object({
+  pullRequest: ProjectGitPullRequestSummarySchema,
+  pullRequests: ProjectGitPullRequestsResultSchema,
+  checks: ProjectGitChecksResultSchema.optional(),
+});
+export type ProjectGitCreatePullRequestResult = z.infer<
+  typeof ProjectGitCreatePullRequestResultSchema
+>;
+
 export type ProjectFileNode = {
   name: string;
   path: string;

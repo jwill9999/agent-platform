@@ -6,6 +6,8 @@ import {
   ProjectBranchCheckoutBodySchema,
   ProjectBranchListResultSchema,
   ProjectGitCommitBodySchema,
+  ProjectGitCreatePullRequestBodySchema,
+  ProjectGitCreatePullRequestResultSchema,
   ProjectGitConflictFileResultSchema,
   ProjectGitConflictMarkResolvedBodySchema,
   ProjectGitConflictResolveBodySchema,
@@ -48,6 +50,7 @@ import {
   type ProjectGitCheckStatus,
   type ProjectGitChecksSummary,
   type ProjectGitCommitBody,
+  type ProjectGitCreatePullRequestBody,
   type ProjectGitConflictFile,
   type ProjectGitConflictHunk,
   type ProjectGitConflictMarkResolvedBody,
@@ -2237,6 +2240,119 @@ function parseGhPullRequests(
   });
 }
 
+function parseGhPullRequest(output: string, currentBranch: string | undefined) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    const urlMatch = /https:\/\/github\.com\/[^/\s"']+\/[^/\s"']+\/pull\/(\d+)/i.exec(output);
+    if (urlMatch?.[0] && urlMatch[1]) {
+      return {
+        number: Number.parseInt(urlMatch[1], 10),
+        title: `Pull request #${urlMatch[1]}`,
+        state: 'open' as const,
+        url: urlMatch[0],
+        headRefName: currentBranch ?? 'branch',
+        baseRefName: 'main',
+        isDraft: false,
+        currentBranch: true,
+        checks: EMPTY_PR_CHECK_SUMMARY,
+      };
+    }
+    throw new HttpError(
+      502,
+      'PROJECT_GITHUB_PULL_REQUEST_CREATE_INVALID',
+      'GitHub pull request creation response was invalid.',
+    );
+  }
+  const pullRequests = parseGhPullRequests(JSON.stringify([parsed]), currentBranch);
+  const pullRequest = pullRequests[0];
+  if (!pullRequest) {
+    throw new HttpError(
+      502,
+      'PROJECT_GITHUB_PULL_REQUEST_CREATE_INVALID',
+      'GitHub pull request creation response was invalid.',
+    );
+  }
+  return pullRequest;
+}
+
+function createProjectGithubPullRequest(project: ProjectRecord, rawBody: unknown) {
+  const body: ProjectGitCreatePullRequestBody = parseBody(
+    ProjectGitCreatePullRequestBodySchema,
+    rawBody,
+  );
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const currentBranch = requireCurrentBranch(repositoryRoot);
+  const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
+  const repositorySlug = githubRepositorySlug(remoteUrl);
+  if (!repositorySlug) {
+    throw new HttpError(
+      409,
+      'PROJECT_GITHUB_REMOTE_REQUIRED',
+      'Connect this Project to a GitHub repository before creating a pull request.',
+    );
+  }
+
+  requireGitHubCli(repositoryRoot);
+
+  const upstream = branchUpstreamState(repositoryRoot, currentBranch);
+  if (!upstream.upstreamBranch || upstream.upstreamState !== 'active') {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_UPSTREAM_REQUIRED',
+      'Publish this branch to GitHub before creating a pull request.',
+    );
+  }
+
+  const status = projectGitStatus(project);
+  if (status.available && status.ahead > 0) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_UNPUBLISHED_COMMITS',
+      'Push local commits to GitHub before creating a pull request.',
+    );
+  }
+
+  const baseBranch = body.baseBranch ?? 'main';
+  const args = [
+    'pr',
+    'create',
+    '--repo',
+    repositorySlug,
+    '--title',
+    body.title,
+    '--base',
+    baseBranch,
+    '--head',
+    currentBranch,
+  ];
+  args.push('--body', body.body || `Created from AI Studio for ${currentBranch}.`);
+  if (body.draft) args.push('--draft');
+
+  const output = gitHubExec(
+    repositoryRoot,
+    args,
+    'PROJECT_GITHUB_PULL_REQUEST_CREATE_FAILED',
+    'GitHub pull request could not be created.',
+  );
+  const createdPullRequest = parseGhPullRequest(output, currentBranch);
+  const pullRequests = projectGithubPullRequests(project);
+  const refreshedPullRequest =
+    pullRequests.pullRequests.find(
+      (pullRequest) => pullRequest.number === createdPullRequest.number,
+    ) ??
+    pullRequests.pullRequests.find((pullRequest) => pullRequest.currentBranch) ??
+    createdPullRequest;
+  const checks = projectGitChecks(project);
+
+  return ProjectGitCreatePullRequestResultSchema.parse({
+    pullRequest: refreshedPullRequest,
+    pullRequests,
+    ...(checks.available ? { checks } : {}),
+  });
+}
+
 function projectGithubPullRequests(project: ProjectRecord) {
   let projectRoot: string;
   try {
@@ -3111,6 +3227,15 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: projectGithubPullRequests(project) });
+    }),
+  );
+
+  router.post(
+    '/:id/github/pull-requests',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: createProjectGithubPullRequest(project, req.body) });
     }),
   );
 

@@ -1131,6 +1131,246 @@ exit 1
     });
   });
 
+  it('creates a GitHub pull request for a published branch using the configured GitHub CLI binary', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-create-pr-repo');
+    const bareRemoteDir = path.join(tmpDir, 'desktop-github-create-pr-remote.git');
+    const ghBinary = path.join(tmpDir, 'fake-gh-create-pr');
+    writeFileSync(
+      ghBinary,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "gh version 2.0.0"
+  exit 0
+fi
+if [ "$1" = "auth" ]; then
+  echo "Logged in to github.com"
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "create" ]; then
+  printf '%s\\n' '{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"main","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}'
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
+  printf '%s\\n' '[{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"main","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}]'
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+  printf '%s\\n' '{"number":43,"url":"https://github.com/user/repo/pull/43","statusCheckRollup":[{"__typename":"CheckRun","name":"CI","workflowName":"CI","status":"IN_PROGRESS","conclusion":null,"detailsUrl":"https://github.com/user/repo/actions/runs/1"}]}'
+  exit 0
+fi
+exit 1
+`,
+    );
+    chmodSync(ghBinary, 0o755);
+    process.env['AGENT_PLATFORM_GH_BINARY'] = ghBinary;
+
+    execFileSync(GIT_BINARY, ['init', '--bare', bareRemoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', bareRemoteDir], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['switch', '-c', 'task/pr-flow'], { cwd: repoDir, stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'feature.txt'), 'feature\n');
+    execFileSync(GIT_BINARY, ['add', 'feature.txt'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'Add PR creation flow'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'task/pr-flow'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'set-url', 'origin', 'git@github.com:user/repo.git'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop GitHub Create PR Repo' })
+      .expect(201);
+
+    const created = await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
+      .send({ title: 'Add PR creation flow', baseBranch: 'main' })
+      .expect(200);
+
+    expect(created.body.data).toMatchObject({
+      pullRequest: {
+        number: 43,
+        title: 'Add PR creation flow',
+        url: 'https://github.com/user/repo/pull/43',
+        headRefName: 'task/pr-flow',
+        baseRefName: 'main',
+        currentBranch: true,
+      },
+      pullRequests: {
+        available: true,
+        pullRequests: [expect.objectContaining({ number: 43, currentBranch: true })],
+      },
+      checks: {
+        available: true,
+        scope: 'pull_request',
+        pullRequestNumber: 43,
+        summary: expect.objectContaining({ total: 1, inProgress: 1 }),
+      },
+    });
+  });
+
+  it('rejects GitHub pull request creation without a GitHub remote', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-create-pr-no-remote-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop GitHub Create PR No Remote Repo' })
+      .expect(201);
+
+    const rejected = await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
+      .send({ title: 'Add PR creation flow' })
+      .expect(409);
+
+    expect(rejected.body.error).toMatchObject({
+      code: 'PROJECT_GITHUB_REMOTE_REQUIRED',
+    });
+  });
+
+  it('rejects GitHub pull request creation when gh is missing or unauthenticated', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-create-pr-auth-repo');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', 'git@github.com:user/repo.git'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop GitHub Create PR Auth Repo' })
+      .expect(201);
+
+    process.env['AGENT_PLATFORM_GH_BINARY'] = path.join(tmpDir, 'missing-gh');
+    const missingGh = await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
+      .send({ title: 'Add PR creation flow' })
+      .expect(409);
+    expect(missingGh.body.error).toMatchObject({ code: 'PROJECT_GITHUB_CLI_UNAVAILABLE' });
+
+    const ghBinary = path.join(tmpDir, 'fake-gh-create-pr-unauth');
+    writeFileSync(
+      ghBinary,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "gh version 2.0.0"
+  exit 0
+fi
+if [ "$1" = "auth" ]; then
+  echo "not logged in" >&2
+  exit 1
+fi
+exit 1
+`,
+    );
+    chmodSync(ghBinary, 0o755);
+    process.env['AGENT_PLATFORM_GH_BINARY'] = ghBinary;
+    const unauthenticated = await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
+      .send({ title: 'Add PR creation flow' })
+      .expect(409);
+    expect(unauthenticated.body.error).toMatchObject({ code: 'PROJECT_GITHUB_AUTH_REQUIRED' });
+  });
+
+  it('rejects GitHub pull request creation before the branch is published', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-create-pr-unpublished-repo');
+    const ghBinary = path.join(tmpDir, 'fake-gh-create-pr-unpublished');
+    writeFileSync(
+      ghBinary,
+      `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  echo "gh version 2.0.0"
+  exit 0
+fi
+if [ "$1" = "auth" ]; then
+  echo "Logged in to github.com"
+  exit 0
+fi
+exit 1
+`,
+    );
+    chmodSync(ghBinary, 0o755);
+    process.env['AGENT_PLATFORM_GH_BINARY'] = ghBinary;
+
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', 'git@github.com:user/repo.git'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['switch', '-c', 'task/pr-flow'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop GitHub Create PR Unpublished Repo' })
+      .expect(201);
+
+    const rejected = await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
+      .send({ title: 'Add PR creation flow' })
+      .expect(409);
+
+    expect(rejected.body.error).toMatchObject({
+      code: 'PROJECT_GIT_UPSTREAM_REQUIRED',
+    });
+  });
+
   it('blocks Project branch switching when the working tree is dirty', async () => {
     const repoDir = path.join(tmpDir, 'desktop-dirty-branches-repo');
     execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });

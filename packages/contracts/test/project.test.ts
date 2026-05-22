@@ -4,6 +4,8 @@ import {
   ProjectModeSchema,
   ProjectBranchCheckoutBodySchema,
   ProjectGitChecksResultSchema,
+  ProjectGitCreatePullRequestBodySchema,
+  ProjectGitCreatePullRequestResultSchema,
   ProjectGitPullRequestsResultSchema,
   ProjectGitStatusResultSchema,
   ProjectBranchListResultSchema,
@@ -206,6 +208,29 @@ describe('Project mode and workspace binding contracts', () => {
 
   it('validates Project GitHub pull request contracts', () => {
     expect(
+      ProjectGitCreatePullRequestBodySchema.parse({
+        title: 'Add PR creation flow',
+        body: 'Creates the first in-app pull request.',
+        baseBranch: 'main',
+        draft: true,
+      }),
+    ).toEqual({
+      title: 'Add PR creation flow',
+      body: 'Creates the first in-app pull request.',
+      baseBranch: 'main',
+      draft: true,
+    });
+
+    expect(
+      ProjectGitCreatePullRequestBodySchema.parse({
+        title: 'Add PR creation flow',
+      }),
+    ).toEqual({
+      title: 'Add PR creation flow',
+      draft: false,
+    });
+
+    expect(
       ProjectGitPullRequestsResultSchema.parse({
         available: true,
         repositoryName: 'agent-platform',
@@ -257,6 +282,65 @@ describe('Project mode and workspace binding contracts', () => {
         pullRequests: [],
       }),
     ).toMatchObject({ available: false, authenticated: false });
+
+    expect(
+      ProjectGitCreatePullRequestResultSchema.parse({
+        pullRequest: {
+          number: 43,
+          title: 'Add PR creation flow',
+          state: 'open',
+          url: 'https://github.com/jwill9999/agent-platform/pull/43',
+          headRefName: 'task/pr-flow',
+          baseRefName: 'main',
+          isDraft: false,
+          currentBranch: true,
+          checks: {
+            total: 1,
+            success: 0,
+            failure: 0,
+            pending: 1,
+            unknown: 0,
+          },
+        },
+        pullRequests: {
+          available: true,
+          repositoryName: 'agent-platform',
+          remoteUrl: 'git@github.com:jwill9999/agent-platform.git',
+          currentBranch: 'task/pr-flow',
+          githubRemoteDetected: true,
+          ghAvailable: true,
+          authenticated: true,
+          checkedAt: '2026-05-22T12:00:00.000Z',
+          pullRequests: [],
+        },
+        checks: {
+          available: true,
+          repositoryName: 'agent-platform',
+          remoteUrl: 'git@github.com:jwill9999/agent-platform.git',
+          currentBranch: 'task/pr-flow',
+          scope: 'pull_request',
+          githubRemoteDetected: true,
+          ghAvailable: true,
+          authenticated: true,
+          checkedAt: '2026-05-22T12:00:00.000Z',
+          summary: {
+            total: 1,
+            success: 0,
+            failure: 0,
+            inProgress: 1,
+            queued: 0,
+            cancelled: 0,
+            skipped: 0,
+            unknown: 0,
+          },
+          checks: [],
+        },
+      }),
+    ).toMatchObject({
+      pullRequest: { number: 43, currentBranch: true },
+      pullRequests: { available: true },
+      checks: { available: true },
+    });
   });
 
   it('captures backend-accessible Project working-tree metadata without conflating chat workspace', () => {
