@@ -645,6 +645,114 @@ export const ProjectGitCommitBodySchema = z.object({
 });
 export type ProjectGitCommitBody = z.infer<typeof ProjectGitCommitBodySchema>;
 
+export const ProjectGitConflictFileSchema = z.object({
+  path: z.string().min(1).max(1000),
+  conflictCount: z.number().int().nonnegative(),
+  resolved: z.boolean(),
+});
+export type ProjectGitConflictFile = z.infer<typeof ProjectGitConflictFileSchema>;
+
+export const ProjectGitConflictSummarySchema = z.object({
+  totalFiles: z.number().int().nonnegative(),
+  totalConflicts: z.number().int().nonnegative(),
+  files: z.array(ProjectGitConflictFileSchema),
+});
+export type ProjectGitConflictSummary = z.infer<typeof ProjectGitConflictSummarySchema>;
+
+export const ProjectGitPullResultSchema = z.object({
+  outcome: z.enum(['clean', 'conflicts']),
+  status: ProjectGitStatusResultSchema,
+  conflicts: ProjectGitConflictSummarySchema.optional(),
+});
+export type ProjectGitPullResult = z.infer<typeof ProjectGitPullResultSchema>;
+
+export const ProjectGitConflictHunkSchema = z.object({
+  index: z.number().int().nonnegative(),
+  currentLabel: z.string().min(1).max(300).optional(),
+  incomingLabel: z.string().min(1).max(300).optional(),
+  before: z.string(),
+  current: z.string(),
+  incoming: z.string(),
+  after: z.string(),
+});
+export type ProjectGitConflictHunk = z.infer<typeof ProjectGitConflictHunkSchema>;
+
+export const ProjectGitConflictFileResultSchema = z.object({
+  path: z.string().min(1).max(1000),
+  conflictCount: z.number().int().nonnegative(),
+  resolved: z.boolean(),
+  hunks: z.array(ProjectGitConflictHunkSchema),
+  content: z.string(),
+});
+export type ProjectGitConflictFileResult = z.infer<typeof ProjectGitConflictFileResultSchema>;
+
+export const ProjectGitConflictResolveBodySchema = z.object({
+  path: z.string().min(1).max(1000),
+  strategy: z.enum(['current', 'incoming', 'both']),
+});
+export type ProjectGitConflictResolveBody = z.infer<typeof ProjectGitConflictResolveBodySchema>;
+
+export const ProjectGitConflictMarkResolvedBodySchema = z.object({
+  path: z.string().min(1).max(1000),
+});
+export type ProjectGitConflictMarkResolvedBody = z.infer<
+  typeof ProjectGitConflictMarkResolvedBodySchema
+>;
+
+export const ProjectGitMergeCommitBodySchema = z.object({
+  message: z.string().trim().min(1).max(1000),
+  push: z.boolean().optional(),
+});
+export type ProjectGitMergeCommitBody = z.infer<typeof ProjectGitMergeCommitBodySchema>;
+
+export const ProjectGitHubRepositoryVisibilitySchema = z.enum(['private', 'public']);
+export type ProjectGitHubRepositoryVisibility = z.infer<
+  typeof ProjectGitHubRepositoryVisibilitySchema
+>;
+
+export const ProjectGitHubCreateRepositoryBodySchema = z.object({
+  owner: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9-]*$/, {
+      message: 'Owner must be a GitHub user or organization name',
+    }),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .regex(/^[A-Za-z0-9._-]+$/, {
+      message: 'Repository name must contain only letters, numbers, dots, underscores, or dashes',
+    }),
+  description: z.string().trim().max(500).optional(),
+  visibility: ProjectGitHubRepositoryVisibilitySchema.default('private'),
+  pushCurrentBranch: z.boolean().default(true),
+});
+export type ProjectGitHubCreateRepositoryBody = z.infer<
+  typeof ProjectGitHubCreateRepositoryBodySchema
+>;
+
+export const ProjectGitHubConnectRepositoryBodySchema = z.object({
+  repository: z.string().trim().min(1).max(1000),
+  remoteUrl: z.string().trim().min(1).max(1000).optional(),
+});
+export type ProjectGitHubConnectRepositoryBody = z.infer<
+  typeof ProjectGitHubConnectRepositoryBodySchema
+>;
+
+export const ProjectGitHubRepositoryConnectionResultSchema = z.object({
+  repositoryUrl: z.string().min(1).max(1000),
+  remoteUrl: z.string().min(1).max(1000),
+  pushed: z.boolean(),
+  status: ProjectGitStatusResultSchema,
+});
+export type ProjectGitHubRepositoryConnectionResult = z.infer<
+  typeof ProjectGitHubRepositoryConnectionResultSchema
+>;
+
 export const ProjectGitCheckStatusSchema = z.enum([
   'queued',
   'in_progress',

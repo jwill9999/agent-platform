@@ -6,6 +6,15 @@ import {
   ProjectBranchCheckoutBodySchema,
   ProjectBranchListResultSchema,
   ProjectGitCommitBodySchema,
+  ProjectGitConflictFileResultSchema,
+  ProjectGitConflictMarkResolvedBodySchema,
+  ProjectGitConflictResolveBodySchema,
+  ProjectGitConflictSummarySchema,
+  ProjectGitHubConnectRepositoryBodySchema,
+  ProjectGitHubCreateRepositoryBodySchema,
+  ProjectGitHubRepositoryConnectionResultSchema,
+  ProjectGitMergeCommitBodySchema,
+  ProjectGitPullResultSchema,
   ProjectGitChecksResultSchema,
   ProjectGitChangesResultSchema,
   ProjectGitFileDiffResultSchema,
@@ -39,6 +48,13 @@ import {
   type ProjectGitCheckStatus,
   type ProjectGitChecksSummary,
   type ProjectGitCommitBody,
+  type ProjectGitConflictFile,
+  type ProjectGitConflictHunk,
+  type ProjectGitConflictMarkResolvedBody,
+  type ProjectGitConflictResolveBody,
+  type ProjectGitHubConnectRepositoryBody,
+  type ProjectGitHubCreateRepositoryBody,
+  type ProjectGitMergeCommitBody,
   type ProjectGitFileStatus,
   type ProjectGitPullRequestCheckSummary,
   type ProjectGitPullRequestReviewDecision,
@@ -1226,6 +1242,210 @@ function publishProjectGitBranch(project: ProjectRecord) {
   return projectGitStatus(project);
 }
 
+function requireGitHubCli(repositoryRoot: string) {
+  const ghVersion = ghValue(repositoryRoot, ['--version']);
+  if (!ghVersion) {
+    throw new HttpError(
+      409,
+      'PROJECT_GITHUB_CLI_UNAVAILABLE',
+      'GitHub CLI is not installed or is not available on PATH.',
+    );
+  }
+  if (!ghSuccess(repositoryRoot, ['auth', 'status', '--hostname', 'github.com'])) {
+    throw new HttpError(
+      409,
+      'PROJECT_GITHUB_AUTH_REQUIRED',
+      'GitHub CLI is not authenticated for github.com. Run gh auth login in the terminal, then try again.',
+    );
+  }
+}
+
+function gitHubRepositorySlugFromInput(value: string): string {
+  const trimmed = value.trim();
+  const sshMatch = /^git@github\.com:([^/]+\/[^/]+?)(?:\.git)?$/i.exec(trimmed);
+  if (sshMatch?.[1]) return sshMatch[1];
+  const httpsMatch = /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/i.exec(trimmed);
+  if (httpsMatch?.[1]) return httpsMatch[1];
+  if (/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/.test(trimmed)) return trimmed;
+  throw new HttpError(
+    400,
+    'VALIDATION_ERROR',
+    'Repository must be a GitHub owner/repository name or GitHub URL.',
+  );
+}
+
+function gitHubRepositoryUrlFromOutput(output: string | undefined, slug: string): string {
+  const trimmed = output?.trim();
+  if (trimmed) {
+    try {
+      const parsed = JSON.parse(trimmed) as { url?: unknown };
+      if (typeof parsed.url === 'string' && parsed.url.trim()) return parsed.url.trim();
+    } catch {
+      const urlMatch = /https:\/\/github\.com\/[^\s"']+/i.exec(trimmed);
+      if (urlMatch?.[0]) return urlMatch[0].replace(/\.git$/, '');
+    }
+  }
+  return `https://github.com/${slug}`;
+}
+
+function githubRepositorySshUrl(slug: string): string {
+  return `git@github.com:${slug}.git`;
+}
+
+function gitHubExec(repositoryRoot: string, args: string[], errorCode: string, message: string) {
+  try {
+    return execFileSync(githubCliBinary(), args, {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120000,
+    }).trim();
+  } catch (cause) {
+    const stderr =
+      cause && typeof cause === 'object' && 'stderr' in cause
+        ? String((cause as { stderr?: unknown }).stderr ?? '').trim()
+        : '';
+    throw new HttpError(409, errorCode, stderr || message);
+  }
+}
+
+function setUpstreamToOriginBranch(repositoryRoot: string, currentBranch: string): void {
+  const remoteBranch = `refs/remotes/origin/${currentBranch}`;
+  if (!gitValue(repositoryRoot, ['show-ref', '--verify', remoteBranch])) return;
+  try {
+    execFileSync(
+      GIT_BINARY,
+      [
+        '-C',
+        repositoryRoot,
+        'branch',
+        '--set-upstream-to',
+        `origin/${currentBranch}`,
+        currentBranch,
+      ],
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 30000,
+      },
+    );
+  } catch {
+    // Status can still be inspected without an upstream; leave recovery to the UI.
+  }
+}
+
+function createProjectGitHubRepository(project: ProjectRecord, rawBody: unknown) {
+  const body: ProjectGitHubCreateRepositoryBody = parseBody(
+    ProjectGitHubCreateRepositoryBodySchema,
+    rawBody,
+  );
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  requireCurrentBranch(repositoryRoot);
+  const existingOrigin = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
+  if (existingOrigin) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_REMOTE_EXISTS',
+      'This Project already has an origin remote configured.',
+    );
+  }
+  requireGitHubCli(repositoryRoot);
+
+  const slug = `${body.owner}/${body.name}`;
+  const args = [
+    'repo',
+    'create',
+    slug,
+    body.visibility === 'public' ? '--public' : '--private',
+    '--source',
+    repositoryRoot,
+    '--remote',
+    'origin',
+  ];
+  if (body.description) args.push('--description', body.description);
+  if (body.pushCurrentBranch) args.push('--push');
+
+  const output = gitHubExec(
+    repositoryRoot,
+    args,
+    'PROJECT_GITHUB_REPOSITORY_CREATE_FAILED',
+    'GitHub repository could not be created.',
+  );
+  const remoteUrl = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
+  if (!remoteUrl) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_REMOTE_MISSING',
+      'GitHub repository was created, but the origin remote was not configured.',
+    );
+  }
+
+  return ProjectGitHubRepositoryConnectionResultSchema.parse({
+    repositoryUrl: gitHubRepositoryUrlFromOutput(output, slug),
+    remoteUrl,
+    pushed: body.pushCurrentBranch,
+    status: projectGitStatus(project),
+  });
+}
+
+function connectProjectGitHubRepository(project: ProjectRecord, rawBody: unknown) {
+  const body: ProjectGitHubConnectRepositoryBody = parseBody(
+    ProjectGitHubConnectRepositoryBodySchema,
+    rawBody,
+  );
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const currentBranch = requireCurrentBranch(repositoryRoot);
+  const existingOrigin = gitValue(repositoryRoot, ['remote', 'get-url', 'origin']);
+  if (existingOrigin) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_REMOTE_EXISTS',
+      'This Project already has an origin remote configured.',
+    );
+  }
+  requireGitHubCli(repositoryRoot);
+
+  const slug = gitHubRepositorySlugFromInput(body.repository);
+  const output = gitHubExec(
+    repositoryRoot,
+    ['repo', 'view', slug, '--json', 'url'],
+    'PROJECT_GITHUB_REPOSITORY_NOT_FOUND',
+    'GitHub repository could not be found or accessed.',
+  );
+  const remoteUrl = body.remoteUrl ?? githubRepositorySshUrl(slug);
+  try {
+    execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'remote', 'add', 'origin', remoteUrl], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 30000,
+    });
+    execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'fetch', 'origin'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120000,
+    });
+  } catch (cause) {
+    const stderr =
+      cause && typeof cause === 'object' && 'stderr' in cause
+        ? String((cause as { stderr?: unknown }).stderr ?? '').trim()
+        : '';
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_REMOTE_CONNECT_FAILED',
+      stderr || 'Git could not connect this Project to the selected repository.',
+    );
+  }
+
+  setUpstreamToOriginBranch(repositoryRoot, currentBranch);
+
+  return ProjectGitHubRepositoryConnectionResultSchema.parse({
+    repositoryUrl: gitHubRepositoryUrlFromOutput(output, slug),
+    remoteUrl,
+    pushed: false,
+    status: projectGitStatus(project),
+  });
+}
+
 function clearProjectGitUpstream(project: ProjectRecord) {
   const repositoryRoot = repositoryRootForBranchOperations(project);
   requireCurrentBranch(repositoryRoot);
@@ -1248,6 +1468,228 @@ function clearProjectGitUpstream(project: ProjectRecord) {
     );
   }
 
+  return projectGitStatus(project);
+}
+
+function gitErrorMessage(cause: unknown): string {
+  return cause && typeof cause === 'object' && 'stderr' in cause
+    ? String((cause as { stderr?: unknown }).stderr ?? '').trim()
+    : '';
+}
+
+function projectGitConflictSummary(repositoryRoot: string): {
+  totalFiles: number;
+  totalConflicts: number;
+  files: ProjectGitConflictFile[];
+} {
+  const conflictFiles = parseStatusZ(
+    gitRawOutput(repositoryRoot, ['status', '--porcelain=v1', '-z']),
+  ).filter((file) => file.status === 'conflict');
+  const files = conflictFiles.map((file) => {
+    const content = readFileSync(resolve(repositoryRoot, file.path), 'utf8');
+    const conflictCount = (content.match(/^<<<<<<< /gm) ?? []).length;
+    return {
+      path: file.path,
+      conflictCount,
+      resolved: conflictCount === 0,
+    };
+  });
+  return ProjectGitConflictSummarySchema.parse({
+    totalFiles: files.filter((file) => !file.resolved).length,
+    totalConflicts: files.reduce((total, file) => total + file.conflictCount, 0),
+    files,
+  });
+}
+
+function projectGitConflicts(project: ProjectRecord) {
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  return ProjectGitConflictSummarySchema.parse(projectGitConflictSummary(repositoryRoot));
+}
+
+function parseConflictHunks(content: string): ProjectGitConflictHunk[] {
+  const hunks: ProjectGitConflictHunk[] = [];
+  const pattern = /^<<<<<<< ([^\n]*)\n([\s\S]*?)^=======\n([\s\S]*?)^>>>>>>> ([^\n]*)\n?/gm;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(content)) !== null) {
+    hunks.push({
+      index: hunks.length,
+      currentLabel: match[1]?.trim() || undefined,
+      incomingLabel: match[4]?.trim() || undefined,
+      before: content.slice(0, match.index),
+      current: match[2] ?? '',
+      incoming: match[3] ?? '',
+      after: content.slice(pattern.lastIndex),
+    });
+  }
+  return hunks;
+}
+
+function projectGitConflictFile(project: ProjectRecord, rawPath: unknown) {
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const pathValue = validateGitRelativePath(typeof rawPath === 'string' ? rawPath : '');
+  const target = resolve(repositoryRoot, pathValue);
+  const relativePath = relative(repositoryRoot, target);
+  if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Path must be repository-relative.');
+  }
+  const content = readFileSync(target, 'utf8');
+  const hunks = parseConflictHunks(content);
+  return ProjectGitConflictFileResultSchema.parse({
+    path: pathValue,
+    conflictCount: hunks.length,
+    resolved: hunks.length === 0,
+    hunks,
+    content,
+  });
+}
+
+function replaceConflictHunks(
+  content: string,
+  strategy: ProjectGitConflictResolveBody['strategy'],
+) {
+  return content.replace(
+    /^<<<<<<< ([^\n]*)\n([\s\S]*?)^=======\n([\s\S]*?)^>>>>>>> ([^\n]*)\n?/gm,
+    (_match, _currentLabel: string, current: string, incoming: string) => {
+      if (strategy === 'current') return current;
+      if (strategy === 'incoming') return incoming;
+      return `${current}${incoming}`;
+    },
+  );
+}
+
+function resolveProjectGitConflict(project: ProjectRecord, rawBody: unknown) {
+  const body: ProjectGitConflictResolveBody = parseBody(
+    ProjectGitConflictResolveBodySchema,
+    rawBody,
+  );
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const pathValue = validateGitRelativePath(body.path);
+  const target = resolve(repositoryRoot, pathValue);
+  const relativePath = relative(repositoryRoot, target);
+  if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Path must be repository-relative.');
+  }
+  const content = readFileSync(target, 'utf8');
+  const nextContent = replaceConflictHunks(content, body.strategy);
+  writeFileSync(target, nextContent, 'utf8');
+  gitOutput(repositoryRoot, ['add', '--', pathValue]);
+  const remainingConflictCount = parseConflictHunks(nextContent).length;
+  return ProjectGitConflictSummarySchema.parse({
+    totalFiles: remainingConflictCount > 0 ? 1 : 0,
+    totalConflicts: remainingConflictCount,
+    files: [
+      {
+        path: pathValue,
+        conflictCount: remainingConflictCount,
+        resolved: remainingConflictCount === 0,
+      },
+    ],
+  });
+}
+
+function markProjectGitConflictResolved(project: ProjectRecord, rawBody: unknown) {
+  const body: ProjectGitConflictMarkResolvedBody = parseBody(
+    ProjectGitConflictMarkResolvedBodySchema,
+    rawBody,
+  );
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const pathValue = validateGitRelativePath(body.path);
+  const content = readFileSync(resolve(repositoryRoot, pathValue), 'utf8');
+  const conflictCount = parseConflictHunks(content).length;
+  if (conflictCount > 0) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_CONFLICT_UNRESOLVED',
+      'Resolve conflict markers before marking this file resolved.',
+    );
+  }
+  gitOutput(repositoryRoot, ['add', '--', pathValue]);
+  return projectGitConflicts(project);
+}
+
+function pullProjectGitRemoteChanges(project: ProjectRecord) {
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const status = projectGitStatus(project);
+  if (!status.clean) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_DIRTY',
+      'Commit, stash, or discard local changes before pulling remote changes.',
+    );
+  }
+  const currentBranch = requireCurrentBranch(repositoryRoot);
+  const upstream = branchUpstreamState(repositoryRoot, currentBranch);
+  if (!upstream.upstreamBranch || upstream.upstreamState !== 'active') {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_NO_UPSTREAM',
+      'This branch needs an active upstream before remote changes can be pulled.',
+    );
+  }
+
+  try {
+    execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'pull', '--no-rebase', '--no-edit'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120000,
+    });
+  } catch (cause) {
+    const nextStatus = projectGitStatus(project);
+    if (nextStatus.workingTree.conflicts > 0) {
+      return ProjectGitPullResultSchema.parse({
+        outcome: 'conflicts',
+        status: nextStatus,
+        conflicts: projectGitConflictSummary(repositoryRoot),
+      });
+    }
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_PULL_FAILED',
+      gitErrorMessage(cause) || 'Git pull failed for this Project.',
+    );
+  }
+
+  return ProjectGitPullResultSchema.parse({
+    outcome: 'clean',
+    status: projectGitStatus(project),
+  });
+}
+
+function commitProjectGitMergeResolution(project: ProjectRecord, rawBody: unknown) {
+  const body: ProjectGitMergeCommitBody = parseBody(ProjectGitMergeCommitBodySchema, rawBody);
+  const repositoryRoot = repositoryRootForBranchOperations(project);
+  const conflicts = projectGitConflictSummary(repositoryRoot);
+  if (conflicts.totalConflicts > 0) {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_CONFLICT_UNRESOLVED',
+      'Resolve all merge conflicts before committing.',
+    );
+  }
+  const stagedOutput = gitRawOutput(repositoryRoot, ['diff', '--cached', '--name-only']);
+  if (stagedOutput.trim() === '') {
+    throw new HttpError(
+      409,
+      'PROJECT_GIT_NOTHING_STAGED',
+      'Stage resolved files before committing.',
+    );
+  }
+  gitOutput(repositoryRoot, ['commit', '-m', body.message]);
+  if (body.push) {
+    try {
+      execFileSync(GIT_BINARY, ['-C', repositoryRoot, 'push'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 120000,
+      });
+    } catch (cause) {
+      throw new HttpError(
+        409,
+        'PROJECT_GIT_PUSH_FAILED',
+        gitErrorMessage(cause) || 'Merge resolution committed, but push failed.',
+      );
+    }
+  }
   return projectGitStatus(project);
 }
 
@@ -2574,11 +3016,83 @@ export function createProjectsRouter(db: DrizzleDb): Router {
   );
 
   router.post(
+    '/:id/git/github/create-repository',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: createProjectGitHubRepository(project, req.body) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/github/connect-repository',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: connectProjectGitHubRepository(project, req.body) });
+    }),
+  );
+
+  router.post(
     '/:id/git/clear-upstream',
     asyncHandler(async (req, res) => {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: clearProjectGitUpstream(project) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/pull',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: pullProjectGitRemoteChanges(project) });
+    }),
+  );
+
+  router.get(
+    '/:id/git/conflicts',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: projectGitConflicts(project) });
+    }),
+  );
+
+  router.get(
+    '/:id/git/conflicts/file',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: projectGitConflictFile(project, req.query.path) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/conflicts/resolve',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: resolveProjectGitConflict(project, req.body) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/conflicts/mark-resolved',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: markProjectGitConflictResolved(project, req.body) });
+    }),
+  );
+
+  router.post(
+    '/:id/git/conflicts/commit',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      res.json({ data: commitProjectGitMergeResolution(project, req.body) });
     }),
   );
 

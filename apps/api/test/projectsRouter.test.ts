@@ -618,6 +618,213 @@ describe('projectsRouter', () => {
     });
   });
 
+  it('creates a GitHub repository for a local Project without an origin remote', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-create-repo');
+    const remoteDir = path.join(tmpDir, 'created-remote.git');
+    const ghLog = path.join(tmpDir, 'fake-gh-create.log');
+    const ghBinary = path.join(tmpDir, 'fake-gh-create');
+    writeFileSync(
+      ghBinary,
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "${ghLog}"
+if [ "$1" = "--version" ]; then
+  echo "gh version 2.0.0"
+  exit 0
+fi
+if [ "$1" = "auth" ]; then
+  echo "Logged in to github.com"
+  exit 0
+fi
+if [ "$1" = "repo" ] && [ "$2" = "create" ]; then
+  git init --bare "${remoteDir}" >/dev/null 2>&1
+  git -C "$PWD" remote add origin "${remoteDir}"
+  git -C "$PWD" push -u origin main >/dev/null 2>&1
+  echo "https://github.com/jwill9999/desktop-github-create-repo"
+  exit 0
+fi
+exit 1
+`,
+    );
+    chmodSync(ghBinary, 0o755);
+    process.env['AGENT_PLATFORM_GH_BINARY'] = ghBinary;
+
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop GitHub Create Repo' })
+      .expect(201);
+
+    const created = await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/git/github/create-repository`)
+      .send({
+        owner: 'jwill9999',
+        name: 'desktop-github-create-repo',
+        description: 'Created from AI Studio',
+        visibility: 'private',
+        pushCurrentBranch: true,
+      })
+      .expect(200);
+
+    expect(created.body.data).toMatchObject({
+      repositoryUrl: 'https://github.com/jwill9999/desktop-github-create-repo',
+      remoteUrl: remoteDir,
+      pushed: true,
+      status: {
+        currentBranch: 'main',
+        upstreamBranch: 'origin/main',
+        upstreamState: 'active',
+        ahead: 0,
+      },
+    });
+    expect(readFileSync(ghLog, 'utf8')).toContain(
+      'repo create jwill9999/desktop-github-create-repo',
+    );
+  });
+
+  it('connects an existing GitHub repository as origin and exposes pull state', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-connect-repo');
+    const remoteDir = path.join(tmpDir, 'existing-remote.git');
+    const seedDir = path.join(tmpDir, 'existing-seed');
+    const ghLog = path.join(tmpDir, 'fake-gh-connect.log');
+    const ghBinary = path.join(tmpDir, 'fake-gh-connect');
+    writeFileSync(
+      ghBinary,
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "${ghLog}"
+if [ "$1" = "--version" ]; then
+  echo "gh version 2.0.0"
+  exit 0
+fi
+if [ "$1" = "auth" ]; then
+  echo "Logged in to github.com"
+  exit 0
+fi
+if [ "$1" = "repo" ] && [ "$2" = "view" ]; then
+  echo "https://github.com/jwill9999/existing-repo"
+  exit 0
+fi
+exit 1
+`,
+    );
+    chmodSync(ghBinary, 0o755);
+    process.env['AGENT_PLATFORM_GH_BINARY'] = ghBinary;
+
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', seedDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: seedDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: seedDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(seedDir, 'README.md'), 'remote\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: seedDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'remote initial'], { cwd: seedDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: seedDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: seedDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['symbolic-ref', 'HEAD', 'refs/heads/main'], {
+      cwd: remoteDir,
+      stdio: 'ignore',
+    });
+
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'local\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'local initial'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop GitHub Connect Repo' })
+      .expect(201);
+
+    const connected = await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/git/github/connect-repository`)
+      .send({
+        repository: 'jwill9999/existing-repo',
+        remoteUrl: remoteDir,
+      })
+      .expect(200);
+
+    expect(connected.body.data).toMatchObject({
+      repositoryUrl: 'https://github.com/jwill9999/existing-repo',
+      remoteUrl: remoteDir,
+      pushed: false,
+      status: {
+        currentBranch: 'main',
+        upstreamBranch: 'origin/main',
+        upstreamState: 'active',
+        ahead: 1,
+        behind: 1,
+      },
+    });
+    expect(readFileSync(ghLog, 'utf8')).toContain('repo view jwill9999/existing-repo');
+  });
+
+  it('returns a clear error when GitHub CLI is missing for repository creation', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-github-create-missing-gh');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'main\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    process.env['AGENT_PLATFORM_GH_BINARY'] = path.join(tmpDir, 'missing-gh');
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Missing GH Repo' })
+      .expect(201);
+
+    const response = await request(app)
+      .post(`/v1/projects/${registered.body.data.project.id}/git/github/create-repository`)
+      .send({
+        owner: 'jwill9999',
+        name: 'desktop-missing-gh',
+        visibility: 'private',
+        pushCurrentBranch: true,
+      })
+      .expect(409);
+
+    expect(response.body.error).toMatchObject({
+      code: 'PROJECT_GITHUB_CLI_UNAVAILABLE',
+      message: 'GitHub CLI is not installed or is not available on PATH.',
+    });
+  });
+
   it('loads GitHub checks for the current branch pull request', async () => {
     const repoDir = path.join(tmpDir, 'desktop-git-checks-repo');
     const ghBinary = path.join(tmpDir, 'fake-gh');
@@ -1071,6 +1278,229 @@ exit 1
       upstreamState: 'active',
       ahead: 0,
       behind: 0,
+    });
+  });
+
+  it('pulls remote commits for a clean behind Project branch', async () => {
+    const remoteDir = path.join(tmpDir, 'desktop-pull-remote.git');
+    const repoDir = path.join(tmpDir, 'desktop-pull-repo');
+    const collaboratorDir = path.join(tmpDir, 'desktop-pull-collaborator');
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'initial\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['clone', remoteDir, collaboratorDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'collab@example.com'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Collaborator'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(collaboratorDir, 'remote.txt'), 'remote change\n');
+    execFileSync(GIT_BINARY, ['add', 'remote.txt'], { cwd: collaboratorDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'remote change'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push'], { cwd: collaboratorDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['fetch', 'origin'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Pull Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const beforePull = await request(app).get(`/v1/projects/${projectId}/git/status`).expect(200);
+    expect(beforePull.body.data).toMatchObject({ currentBranch: 'main', ahead: 0, behind: 1 });
+
+    const pulled = await request(app)
+      .post(`/v1/projects/${projectId}/git/pull`)
+      .send({})
+      .expect(200);
+    expect(pulled.body.data).toMatchObject({
+      outcome: 'clean',
+      status: { currentBranch: 'main', ahead: 0, behind: 0 },
+    });
+    expect(readFileSync(path.join(repoDir, 'remote.txt'), 'utf8')).toBe('remote change\n');
+  });
+
+  it('rejects pulling remote commits when local changes need user review first', async () => {
+    const remoteDir = path.join(tmpDir, 'desktop-pull-dirty-remote.git');
+    const repoDir = path.join(tmpDir, 'desktop-pull-dirty-repo');
+    const collaboratorDir = path.join(tmpDir, 'desktop-pull-dirty-collaborator');
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'initial\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['clone', remoteDir, collaboratorDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'collab@example.com'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Collaborator'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(collaboratorDir, 'remote.txt'), 'remote change\n');
+    execFileSync(GIT_BINARY, ['add', 'remote.txt'], { cwd: collaboratorDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'remote change'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push'], { cwd: collaboratorDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['fetch', 'origin'], { cwd: repoDir, stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'local.txt'), 'local unsaved work\n');
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Dirty Pull Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const response = await request(app)
+      .post(`/v1/projects/${projectId}/git/pull`)
+      .send({})
+      .expect(409);
+    expect(response.body.error).toMatchObject({
+      code: 'PROJECT_GIT_DIRTY',
+      message: 'Commit, stash, or discard local changes before pulling remote changes.',
+    });
+  });
+
+  it('detects pull conflicts and resolves them with file-level choices before merge commit', async () => {
+    const remoteDir = path.join(tmpDir, 'desktop-conflict-remote.git');
+    const repoDir = path.join(tmpDir, 'desktop-conflict-repo');
+    const collaboratorDir = path.join(tmpDir, 'desktop-conflict-collaborator');
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'test@example.com'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Test User'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(repoDir, 'README.md'), 'line one\nshared\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['clone', remoteDir, collaboratorDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['config', 'user.email', 'collab@example.com'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['config', 'user.name', 'Collaborator'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    writeFileSync(path.join(collaboratorDir, 'README.md'), 'line one\nincoming\n');
+    execFileSync(GIT_BINARY, ['commit', '-am', 'remote readme'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push'], { cwd: collaboratorDir, stdio: 'ignore' });
+    writeFileSync(path.join(repoDir, 'README.md'), 'line one\ncurrent\n');
+    execFileSync(GIT_BINARY, ['commit', '-am', 'local readme'], {
+      cwd: repoDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['fetch', 'origin'], { cwd: repoDir, stdio: 'ignore' });
+
+    const registered = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Conflict Repo' })
+      .expect(201);
+    const projectId = registered.body.data.project.id;
+
+    const pulled = await request(app)
+      .post(`/v1/projects/${projectId}/git/pull`)
+      .send({})
+      .expect(200);
+    expect(pulled.body.data).toMatchObject({
+      outcome: 'conflicts',
+      conflicts: { totalFiles: 1, totalConflicts: 1 },
+    });
+
+    const blockedCommit = await request(app)
+      .post(`/v1/projects/${projectId}/git/conflicts/commit`)
+      .send({ message: 'Merge remote changes' })
+      .expect(409);
+    expect(blockedCommit.body.error).toMatchObject({
+      code: 'PROJECT_GIT_CONFLICT_UNRESOLVED',
+      message: 'Resolve all merge conflicts before committing.',
+    });
+
+    const conflicts = await request(app).get(`/v1/projects/${projectId}/git/conflicts`).expect(200);
+    expect(conflicts.body.data).toMatchObject({
+      totalFiles: 1,
+      totalConflicts: 1,
+      files: [{ path: 'README.md', conflictCount: 1, resolved: false }],
+    });
+
+    const detail = await request(app)
+      .get(`/v1/projects/${projectId}/git/conflicts/file`)
+      .query({ path: 'README.md' })
+      .expect(200);
+    expect(detail.body.data.hunks[0]).toMatchObject({
+      current: 'current\n',
+      incoming: 'incoming\n',
+    });
+
+    const resolved = await request(app)
+      .post(`/v1/projects/${projectId}/git/conflicts/resolve`)
+      .send({ path: 'README.md', strategy: 'both' })
+      .expect(200);
+    expect(resolved.body.data.files[0]).toMatchObject({ path: 'README.md', resolved: true });
+    expect(readFileSync(path.join(repoDir, 'README.md'), 'utf8')).toBe(
+      'line one\ncurrent\nincoming\n',
+    );
+
+    const committed = await request(app)
+      .post(`/v1/projects/${projectId}/git/conflicts/commit`)
+      .send({ message: 'Merge remote changes' })
+      .expect(200);
+    expect(committed.body.data).toMatchObject({
+      currentBranch: 'main',
+      workingTree: { conflicts: 0 },
     });
   });
 

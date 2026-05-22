@@ -94,8 +94,11 @@ test.describe('Electron Project Git workflow panel', () => {
       await expect(
         gitPanel.getByText(/^Committed .*test: add workflow scratch file$/).first(),
       ).toBeVisible();
-      await expect(gitPanel.getByText('Connect this project to GitHub')).toBeVisible();
-      await expect(gitPanel.getByText('Not connected', { exact: true })).toBeVisible();
+      await expect(gitPanel.getByText('No repository connected')).toBeVisible();
+      await expect(gitPanel.getByRole('button', { name: 'Create Repository' })).toBeVisible();
+      await expect(
+        gitPanel.getByRole('button', { name: 'Connect Existing Repository' }),
+      ).toBeVisible();
       await expect(gitPanel.getByText('Pushed')).toHaveCount(0);
       await expect(gitPanel.getByRole('button', { name: 'Publish branch' })).toHaveCount(0);
 
@@ -119,7 +122,131 @@ test.describe('Electron Project Git workflow panel', () => {
       rmSync(tempRoot, { recursive: true, force: true });
     }
   });
+
+  test('pulls divergent remote changes into the full-screen merge resolver', async () => {
+    const tempRoot = join(repoRoot, '.agent-platform', 'electron-git-e2e', String(Date.now()));
+    const runtimeDir = join(tempRoot, 'runtime');
+    const remoteDir = join(tempRoot, 'remote.git');
+    const seedDir = join(tempRoot, 'seed');
+    const projectDir = join(tempRoot, 'client', 'conflict-project');
+    const collaboratorDir = join(tempRoot, 'collaborator');
+    const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
+    const backendPort = await getOpenPort();
+    const rendererPort = await getOpenPort();
+    let app: ElectronApplication | undefined;
+
+    mkdirSync(tempRoot, { recursive: true });
+    execFileSync(GIT_BINARY, ['init', '--bare', remoteDir], { stdio: 'ignore' });
+
+    mkdirSync(seedDir, { recursive: true });
+    execFileSync(GIT_BINARY, ['init', '-b', 'main'], { cwd: seedDir, stdio: 'ignore' });
+    configureGitUser(seedDir);
+    writeFileSync(join(seedDir, 'README.md'), 'Shared line\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: seedDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: seedDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['remote', 'add', 'origin', remoteDir], {
+      cwd: seedDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: seedDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['symbolic-ref', 'HEAD', 'refs/heads/main'], {
+      cwd: remoteDir,
+      stdio: 'ignore',
+    });
+
+    execFileSync(GIT_BINARY, ['clone', remoteDir, projectDir], { stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['clone', remoteDir, collaboratorDir], { stdio: 'ignore' });
+    configureGitUser(projectDir);
+    configureGitUser(collaboratorDir);
+
+    writeFileSync(join(collaboratorDir, 'README.md'), 'Incoming remote line\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: collaboratorDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'remote: update readme'], {
+      cwd: collaboratorDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['push'], { cwd: collaboratorDir, stdio: 'ignore' });
+
+    writeFileSync(join(projectDir, 'README.md'), 'Current local line\n');
+    execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: projectDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['commit', '-m', 'local: update readme'], {
+      cwd: projectDir,
+      stdio: 'ignore',
+    });
+    execFileSync(GIT_BINARY, ['fetch', 'origin'], { cwd: projectDir, stdio: 'ignore' });
+    seedDesktopDatabase(sqlitePath);
+
+    try {
+      app = await electron.launch({
+        cwd: desktopDir,
+        args: ['.'],
+        env: {
+          ...process.env,
+          AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(backendPort),
+          AGENT_PLATFORM_DESKTOP_NODE_PATH: process.execPath,
+          AGENT_PLATFORM_DESKTOP_RENDERER: 'standalone',
+          AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
+          AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
+          AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
+          AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
+          CI: process.env.CI,
+        },
+      });
+
+      const page = await app.firstWindow();
+      await openProject(page);
+
+      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
+      await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
+      await expect(gitPanel.getByRole('button', { name: /Pull/ })).toBeVisible({
+        timeout: 10_000,
+      });
+      await gitPanel.getByRole('button', { name: /Pull/ }).click();
+      await expect(gitPanel.getByText('Pull remote changes').first()).toBeVisible({
+        timeout: 10_000,
+      });
+      await gitPanel.getByRole('button', { name: 'Pull remote changes' }).click();
+
+      await expect(page.getByRole('heading', { name: 'Resolve Merge Conflicts' })).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByRole('button', { name: /README\.md/ })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Open in IDE' })).toBeVisible();
+      await expect(page.getByText('Current local line', { exact: true })).toBeVisible();
+      await expect(page.getByText('Incoming remote line', { exact: true })).toBeVisible();
+
+      await page.getByRole('button', { name: 'Accept both' }).click();
+      await expect(page.getByRole('heading', { name: 'Merge Conflicts Resolved' })).toBeVisible({
+        timeout: 15_000,
+      });
+      await page.getByRole('button', { name: 'Commit merge' }).click();
+
+      await expect(page.getByRole('heading', { name: 'Merge Conflicts Resolved' })).toHaveCount(0, {
+        timeout: 15_000,
+      });
+      await expect(gitPanel.getByRole('button', { name: /^Push\d*$/ })).toBeVisible({
+        timeout: 10_000,
+      });
+      await expect(gitPanel.getByText('Push local commits')).toBeVisible();
+      await expect(gitPanel.getByRole('button', { name: 'Push 2' })).toBeVisible();
+    } finally {
+      await app?.close();
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
 });
+
+function configureGitUser(cwd: string): void {
+  execFileSync(GIT_BINARY, ['config', 'user.email', 'e2e@example.com'], {
+    cwd,
+    stdio: 'ignore',
+  });
+  execFileSync(GIT_BINARY, ['config', 'user.name', 'Electron E2E'], {
+    cwd,
+    stdio: 'ignore',
+  });
+}
 
 async function openProject(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');

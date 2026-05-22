@@ -4,8 +4,12 @@ import type {
   ProjectGitChangedFile,
   ProjectGitChangesResult,
   ProjectGitChecksResult,
+  ProjectGitConflictFileResult,
+  ProjectGitConflictSummary,
   ProjectGitDiffMode,
   ProjectGitFileDiffResult,
+  ProjectGitHubRepositoryConnectionResult,
+  ProjectGitPullResult,
   ProjectGitPullRequestSummary,
   ProjectGitPullRequestsResult,
   ProjectGitStatusResult,
@@ -18,7 +22,9 @@ import {
   GitBranch,
   GitCommitHorizontal,
   GitPullRequest,
+  Link,
   PanelRightClose,
+  Plus,
   RefreshCw,
   X,
 } from 'lucide-react';
@@ -29,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { cn } from '@/lib/cn';
+import { buildProjectIdeHref } from '@/lib/project-navigation';
 
 type ProjectGitHubPanelProps = Readonly<{
   projectId: string | null;
@@ -65,10 +72,13 @@ type GitPublishState = Readonly<{
   statusLabel: string;
   actionLabel?: string;
   canPublish: boolean;
+  canPull: boolean;
   canClearStaleUpstream: boolean;
   pushed: boolean;
   detail?: string;
 }>;
+
+type RepositoryConnectionMode = 'create' | 'connect';
 
 const ZERO_WORKING_TREE = {
   total: 0,
@@ -107,6 +117,15 @@ function relativeCommitLabel(committedAt: string | undefined): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+function defaultRepositoryName(repositoryName: string | undefined): string {
+  const normalized = (repositoryName ?? 'new-project')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || 'new-project';
+}
+
 function EmptyGitStatus(): ProjectGitStatusResult {
   return {
     available: false,
@@ -118,6 +137,10 @@ function EmptyGitStatus(): ProjectGitStatusResult {
     githubRemoteDetected: false,
     workingTree: ZERO_WORKING_TREE,
   };
+}
+
+function currentStatusHasConflicts(status: ProjectGitStatusResult | null): boolean {
+  return Boolean(status?.available && status.workingTree.conflicts > 0);
 }
 
 function StatusPill({ status }: Readonly<{ status: ProjectGitStatusResult }>) {
@@ -170,7 +193,7 @@ export function deriveGitWorkflowOverview({
         status.workingTree.conflicts === 1 ? '' : 's'
       } need attention before this branch can continue.`,
       tone: 'danger',
-      primaryAction: { label: 'Review changes', tab: 'changes' },
+      primaryAction: { label: 'Resolve conflicts', tab: 'push' },
     };
   }
 
@@ -199,6 +222,17 @@ export function deriveGitWorkflowOverview({
         label: staged > 0 ? 'Commit changes' : 'Review changes',
         tab: staged > 0 ? 'commit' : 'changes',
       },
+    };
+  }
+
+  if (status.behind > 0) {
+    return {
+      title: 'Pull remote changes',
+      description: `${status.behind} remote commit${status.behind === 1 ? '' : 's'} ${
+        status.behind === 1 ? 'is' : 'are'
+      } waiting on ${status.upstreamBranch ?? 'the upstream branch'}. Pull before pushing local work.`,
+      tone: 'warning',
+      primaryAction: { label: 'Review pull options', tab: 'push' },
     };
   }
 
@@ -269,6 +303,15 @@ export function deriveGitWorkflowOverview({
   }
 
   if (!status.githubRemoteDetected) {
+    if (status.available && !status.remoteUrl && status.recentCommit) {
+      return {
+        title: 'Connect this project to GitHub',
+        description:
+          'This local repository has commits, but no GitHub repository is connected yet.',
+        tone: 'warning',
+        primaryAction: { label: 'Create or connect repository', tab: 'push' },
+      };
+    }
     return {
       title: 'Local repository only',
       description:
@@ -305,8 +348,12 @@ export function deriveGitWorkflowTabs({
   const hasChanges = workingTree.total > 0 || workingTree.conflicts > 0;
   const hasStagedChanges = workingTree.staged > 0;
   const hasPublishWork =
-    status.clean &&
-    (status.ahead > 0 || status.upstreamState === 'missing' || status.upstreamState === 'none');
+    workingTree.conflicts > 0 ||
+    (status.clean &&
+      (status.ahead > 0 ||
+        status.behind > 0 ||
+        status.upstreamState === 'missing' ||
+        status.upstreamState === 'none'));
   const currentPullRequest = pullRequests?.pullRequests.find(
     (pullRequest) => pullRequest.currentBranch,
   );
@@ -339,8 +386,16 @@ export function deriveGitWorkflowTabs({
   }
 
   if (hasPublishWork || pushSuccess) {
-    const badge = status.ahead > 0 ? status.ahead : undefined;
-    tabs.push({ id: 'push', label: status.upstreamState === 'none' ? 'Publish' : 'Push', badge });
+    const badge = status.behind > 0 ? status.behind : status.ahead > 0 ? status.ahead : undefined;
+    const label =
+      workingTree.conflicts > 0
+        ? 'Resolve'
+        : status.behind > 0
+          ? 'Pull'
+          : status.upstreamState === 'none'
+            ? 'Publish'
+            : 'Push';
+    tabs.push({ id: 'push', label, badge });
   }
 
   if (hasPullRequestStep) {
@@ -383,12 +438,44 @@ export function deriveGitPublishState({
   commitSuccess?: string | null;
   pushSuccess?: string | null;
 }>): GitPublishState {
+  if (status.workingTree.conflicts > 0) {
+    return {
+      title: 'Resolve merge conflicts',
+      description:
+        'This branch has unresolved merge conflicts. Resolve them before committing or pushing.',
+      statusLabel: 'Conflicts',
+      actionLabel: 'Resolve conflicts',
+      canPublish: false,
+      canPull: false,
+      canClearStaleUpstream: false,
+      pushed: false,
+    };
+  }
+
+  if (status.clean && status.behind > 0) {
+    return {
+      title: 'Pull remote changes',
+      description:
+        status.ahead > 0
+          ? 'This branch has local commits and remote commits. Pull remote changes before pushing.'
+          : 'Remote commits are waiting on this branch. Pull them before continuing.',
+      statusLabel: 'Pull required',
+      actionLabel: 'Pull remote changes',
+      canPublish: false,
+      canPull: true,
+      canClearStaleUpstream: false,
+      pushed: false,
+      detail: status.upstreamBranch ? `Upstream: ${status.upstreamBranch}` : undefined,
+    };
+  }
+
   if (pushSuccess || (status.clean && status.upstreamState === 'active' && status.ahead === 0)) {
     return {
       title: 'Published',
       description: 'This branch is published and up to date with its upstream.',
       statusLabel: 'Published',
       canPublish: false,
+      canPull: false,
       canClearStaleUpstream: false,
       pushed: true,
       detail: pushSuccess ?? undefined,
@@ -403,6 +490,7 @@ export function deriveGitPublishState({
       statusLabel: 'Not connected',
       actionLabel: undefined,
       canPublish: false,
+      canPull: false,
       canClearStaleUpstream: false,
       pushed: false,
       detail: commitSuccess ?? undefined,
@@ -417,6 +505,7 @@ export function deriveGitPublishState({
       statusLabel: 'Stale upstream',
       actionLabel: 'Publish branch',
       canPublish: true,
+      canPull: false,
       canClearStaleUpstream: true,
       pushed: false,
       detail: status.upstreamBranch ? `Missing upstream: ${status.upstreamBranch}` : undefined,
@@ -431,6 +520,7 @@ export function deriveGitPublishState({
       statusLabel: 'Ready to publish',
       actionLabel: 'Publish branch',
       canPublish: true,
+      canPull: false,
       canClearStaleUpstream: false,
       pushed: false,
       detail: commitSuccess ?? undefined,
@@ -446,6 +536,7 @@ export function deriveGitPublishState({
       statusLabel: 'Ready to push',
       actionLabel: `Push ${status.ahead}`,
       canPublish: true,
+      canPull: false,
       canClearStaleUpstream: false,
       pushed: false,
       detail: status.upstreamBranch ? `Upstream: ${status.upstreamBranch}` : undefined,
@@ -457,6 +548,7 @@ export function deriveGitPublishState({
     description: 'There are no unpublished commits on this branch.',
     statusLabel: 'Up to date',
     canPublish: false,
+    canPull: false,
     canClearStaleUpstream: false,
     pushed: false,
   };
@@ -808,6 +900,10 @@ export function ProjectGitHubPanel({
   const [checksProjectId, setChecksProjectId] = useState<string | null>(null);
   const [pullRequests, setPullRequests] = useState<ProjectGitPullRequestsResult | null>(null);
   const [pullRequestsProjectId, setPullRequestsProjectId] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<ProjectGitConflictSummary | null>(null);
+  const [conflictFile, setConflictFile] = useState<ProjectGitConflictFileResult | null>(null);
+  const [selectedConflictPath, setSelectedConflictPath] = useState<string | null>(null);
+  const [conflictResolverOpen, setConflictResolverOpen] = useState(false);
   const [selectedChange, setSelectedChange] = useState<ProjectGitChangedFile | null>(null);
   const [selectedDiffMode, setSelectedDiffMode] = useState<ProjectGitDiffMode>('unstaged');
   const [diff, setDiff] = useState<ProjectGitFileDiffResult | null>(null);
@@ -815,6 +911,8 @@ export function ProjectGitHubPanel({
   const [changesLoading, setChangesLoading] = useState(false);
   const [checksLoading, setChecksLoading] = useState(false);
   const [pullRequestsLoading, setPullRequestsLoading] = useState(false);
+  const [conflictsLoading, setConflictsLoading] = useState(false);
+  const [conflictFileLoading, setConflictFileLoading] = useState(false);
   const [diffLoading, setDiffLoading] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState('');
@@ -824,6 +922,20 @@ export function ProjectGitHubPanel({
   const [changesError, setChangesError] = useState<string | null>(null);
   const [checksError, setChecksError] = useState<string | null>(null);
   const [pullRequestsError, setPullRequestsError] = useState<string | null>(null);
+  const [conflictError, setConflictError] = useState<string | null>(null);
+  const [mergeCommitMessage, setMergeCommitMessage] = useState('Resolve merge conflicts');
+  const [repositoryDialogOpen, setRepositoryDialogOpen] = useState(false);
+  const [repositoryDialogMode, setRepositoryDialogMode] =
+    useState<RepositoryConnectionMode>('create');
+  const [repositoryOwner, setRepositoryOwner] = useState('');
+  const [repositoryName, setRepositoryName] = useState('');
+  const [repositoryDescription, setRepositoryDescription] = useState('');
+  const [repositoryVisibility, setRepositoryVisibility] = useState<'private' | 'public'>(
+    'private',
+  );
+  const [connectRepository, setConnectRepository] = useState('');
+  const [repositoryActionError, setRepositoryActionError] = useState<string | null>(null);
+  const [repositoryActionSuccess, setRepositoryActionSuccess] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     if (!projectId) {
@@ -932,6 +1044,36 @@ export function ProjectGitHubPanel({
     }
   }, [projectId]);
 
+  const loadConflicts = useCallback(async () => {
+    if (!projectId) {
+      setConflicts(null);
+      setConflictFile(null);
+      setSelectedConflictPath(null);
+      setConflictError(null);
+      return;
+    }
+    setConflictsLoading(true);
+    try {
+      const next = await apiGet<ProjectGitConflictSummary>(
+        apiPath('projects', projectId, 'git', 'conflicts'),
+      );
+      setConflicts(next ?? null);
+      setConflictError(null);
+      setSelectedConflictPath((current) => {
+        if (!next?.files.length) return null;
+        if (current && next.files.some((file) => file.path === current)) return current;
+        return next.files[0]?.path ?? null;
+      });
+    } catch (cause) {
+      setConflicts(null);
+      setConflictError(
+        cause instanceof ApiRequestError ? cause.message : 'Failed to load merge conflicts.',
+      );
+    } finally {
+      setConflictsLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     setStatus(null);
     setStatusProjectId(null);
@@ -941,14 +1083,22 @@ export function ProjectGitHubPanel({
     setChecksProjectId(null);
     setPullRequests(null);
     setPullRequestsProjectId(null);
+    setConflicts(null);
+    setConflictFile(null);
+    setSelectedConflictPath(null);
+    setConflictResolverOpen(false);
     setSelectedChange(null);
     setDiff(null);
     setError(null);
     setChangesError(null);
     setChecksError(null);
     setPullRequestsError(null);
+    setConflictError(null);
     setCommitSuccess(null);
     setPushSuccess(null);
+    setRepositoryDialogOpen(false);
+    setRepositoryActionError(null);
+    setRepositoryActionSuccess(null);
   }, [projectId]);
 
   useEffect(() => {
@@ -966,6 +1116,40 @@ export function ProjectGitHubPanel({
   useEffect(() => {
     if (activeTab === 'prs' || activeTab === 'overview') void loadPullRequests();
   }, [activeTab, loadPullRequests, refreshKey]);
+
+  useEffect(() => {
+    if (conflictResolverOpen || currentStatusHasConflicts(status)) void loadConflicts();
+  }, [conflictResolverOpen, loadConflicts, refreshKey, status]);
+
+  useEffect(() => {
+    if (!projectId || !selectedConflictPath || !conflictResolverOpen) {
+      setConflictFile(null);
+      return;
+    }
+    let cancelled = false;
+    setConflictFileLoading(true);
+    const params = new URLSearchParams({ path: selectedConflictPath });
+    apiGet<ProjectGitConflictFileResult>(
+      `${apiPath('projects', projectId, 'git', 'conflicts', 'file')}?${params.toString()}`,
+    )
+      .then((next) => {
+        if (!cancelled) setConflictFile(next ?? null);
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          setConflictFile(null);
+          setConflictError(
+            cause instanceof ApiRequestError ? cause.message : 'Failed to load conflict file.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setConflictFileLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [conflictResolverOpen, projectId, selectedConflictPath]);
 
   useEffect(() => {
     const selectedPath = selectedChange?.path;
@@ -1017,8 +1201,18 @@ export function ProjectGitHubPanel({
       loadChanges(),
       activeTab === 'prs' || activeTab === 'overview' ? loadPullRequests() : null,
       activeTab === 'checks' || activeTab === 'overview' ? loadChecks() : null,
+      conflictResolverOpen || currentStatusHasConflicts(status) ? loadConflicts() : null,
     ]);
-  }, [activeTab, loadChanges, loadChecks, loadPullRequests, loadStatus]);
+  }, [
+    activeTab,
+    conflictResolverOpen,
+    loadChanges,
+    loadChecks,
+    loadConflicts,
+    loadPullRequests,
+    loadStatus,
+    status,
+  ]);
 
   const stagePaths = useCallback(
     async (paths: string[] | 'all') => {
@@ -1203,6 +1397,109 @@ export function ProjectGitHubPanel({
     }
   }, [activeTab, loadChecks, loadPullRequests, projectId]);
 
+  const openRepositoryDialog = useCallback(
+    (mode: RepositoryConnectionMode) => {
+      setRepositoryDialogMode(mode);
+      setRepositoryName((current) => current || defaultRepositoryName(status?.repositoryName));
+      setRepositoryDescription(
+        (current) => current || (status?.repositoryName ? `Project for ${status.repositoryName}` : ''),
+      );
+      setRepositoryActionError(null);
+      setRepositoryActionSuccess(null);
+      setRepositoryDialogOpen(true);
+    },
+    [status?.repositoryName],
+  );
+
+  const createGitHubRepository = useCallback(async () => {
+    if (!projectId) return;
+    if (!repositoryOwner.trim() || !repositoryName.trim()) {
+      setRepositoryActionError('Enter a GitHub owner and repository name.');
+      return;
+    }
+    setActionPending('github-create-repository');
+    try {
+      const result = await apiPost<ProjectGitHubRepositoryConnectionResult>(
+        apiPath('projects', projectId, 'git', 'github', 'create-repository'),
+        {
+          owner: repositoryOwner.trim(),
+          name: repositoryName.trim(),
+          description: repositoryDescription.trim() || undefined,
+          visibility: repositoryVisibility,
+          pushCurrentBranch: true,
+        },
+      );
+      if (result?.status) {
+        setStatus(result.status);
+        setStatusProjectId(projectId);
+      }
+      setPushSuccess(
+        result?.pushed
+          ? `Created ${result.repositoryUrl} and pushed the current branch.`
+          : `Created ${result?.repositoryUrl ?? 'GitHub repository'}.`,
+      );
+      setCommitSuccess(null);
+      setRepositoryActionSuccess('Repository connected successfully.');
+      setRepositoryActionError(null);
+      setRepositoryDialogOpen(false);
+      setPreferredTab('push');
+      setActiveTab('push');
+      await Promise.all([loadChanges(), loadChecks(), loadPullRequests()]);
+    } catch (cause) {
+      setRepositoryActionError(
+        cause instanceof ApiRequestError ? cause.message : 'Failed to create GitHub repository.',
+      );
+    } finally {
+      setActionPending(null);
+    }
+  }, [
+    loadChanges,
+    loadChecks,
+    loadPullRequests,
+    projectId,
+    repositoryDescription,
+    repositoryName,
+    repositoryOwner,
+    repositoryVisibility,
+  ]);
+
+  const connectGitHubRepository = useCallback(async () => {
+    if (!projectId) return;
+    if (!connectRepository.trim()) {
+      setRepositoryActionError('Enter an existing GitHub repository.');
+      return;
+    }
+    setActionPending('github-connect-repository');
+    try {
+      const result = await apiPost<ProjectGitHubRepositoryConnectionResult>(
+        apiPath('projects', projectId, 'git', 'github', 'connect-repository'),
+        { repository: connectRepository.trim() },
+      );
+      if (result?.status) {
+        setStatus(result.status);
+        setStatusProjectId(projectId);
+      }
+      setPushSuccess(null);
+      setCommitSuccess(
+        result?.status.behind
+          ? 'Repository connected. Pull remote changes before pushing.'
+          : 'Repository connected.',
+      );
+      setRepositoryActionSuccess('Repository connected successfully.');
+      setRepositoryActionError(null);
+      setRepositoryDialogOpen(false);
+      setPreferredTab('push');
+      setActiveTab('push');
+      await Promise.all([loadChanges(), loadChecks(), loadPullRequests()]);
+    } catch (cause) {
+      setRepositoryActionError(
+        cause instanceof ApiRequestError ? cause.message : 'Failed to connect GitHub repository.',
+      );
+    } finally {
+      setActionPending(null);
+    }
+  }, [connectRepository, loadChanges, loadChecks, loadPullRequests, projectId]);
+
   const clearStaleUpstream = useCallback(async () => {
     if (!projectId) return;
     setActionPending('clear-upstream');
@@ -1221,6 +1518,107 @@ export function ProjectGitHubPanel({
       setActionPending(null);
     }
   }, [projectId]);
+
+  const openConflictResolver = useCallback(async () => {
+    setConflictResolverOpen(true);
+    await loadConflicts();
+  }, [loadConflicts]);
+
+  const pullRemoteChanges = useCallback(async () => {
+    if (!projectId) return;
+    setActionPending('pull');
+    try {
+      const result = await apiPost<ProjectGitPullResult>(
+        apiPath('projects', projectId, 'git', 'pull'),
+        {},
+      );
+      if (result?.status) {
+        setStatus(result.status);
+        setStatusProjectId(projectId);
+      }
+      setPushSuccess(null);
+      setError(null);
+      if (result?.outcome === 'conflicts') {
+        setConflicts(result.conflicts ?? null);
+        setConflictResolverOpen(true);
+        setPreferredTab('push');
+        setActiveTab('push');
+      } else {
+        setCommitSuccess('Pulled remote changes.');
+        setPreferredTab('push');
+        setActiveTab('push');
+      }
+      await Promise.all([loadChanges(), loadChecks(), loadPullRequests()]);
+    } catch (cause) {
+      setError(cause instanceof ApiRequestError ? cause.message : 'Failed to pull remote changes.');
+    } finally {
+      setActionPending(null);
+    }
+  }, [loadChanges, loadChecks, loadPullRequests, projectId]);
+
+  const applyConflictChoice = useCallback(
+    async (strategy: 'current' | 'incoming' | 'both') => {
+      if (!projectId || !selectedConflictPath) return;
+      setActionPending(`resolve:${selectedConflictPath}:${strategy}`);
+      try {
+        await apiPost<ProjectGitConflictSummary>(
+          apiPath('projects', projectId, 'git', 'conflicts', 'resolve'),
+          { path: selectedConflictPath, strategy },
+        );
+        setConflictFile(null);
+        setConflictError(null);
+        await Promise.all([loadConflicts(), loadStatus(), loadChanges()]);
+      } catch (cause) {
+        setConflictError(
+          cause instanceof ApiRequestError ? cause.message : 'Failed to resolve conflict.',
+        );
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [loadChanges, loadConflicts, loadStatus, projectId, selectedConflictPath],
+  );
+
+  const commitMergeResolution = useCallback(
+    async (push: boolean) => {
+      if (!projectId) return;
+      const message = mergeCommitMessage.trim();
+      if (!message) {
+        setConflictError('Enter a merge commit message before continuing.');
+        return;
+      }
+      setActionPending(push ? 'merge-commit-push' : 'merge-commit');
+      try {
+        const nextStatus = await apiPost<ProjectGitStatusResult>(
+          apiPath('projects', projectId, 'git', 'conflicts', 'commit'),
+          { message, push },
+        );
+        setStatus(nextStatus ?? null);
+        setStatusProjectId(projectId);
+        setCommitSuccess(
+          nextStatus?.recentCommit
+            ? `Committed ${shortSha(nextStatus.recentCommit.sha)}: ${nextStatus.recentCommit.subject}`
+            : 'Merge resolution committed.',
+        );
+        setPushSuccess(push ? 'Merge resolution pushed.' : null);
+        setConflictResolverOpen(false);
+        setConflicts(null);
+        setConflictFile(null);
+        setSelectedConflictPath(null);
+        setPreferredTab('push');
+        setActiveTab('push');
+        setConflictError(null);
+        await Promise.all([loadChanges(), loadChecks(), loadPullRequests()]);
+      } catch (cause) {
+        setConflictError(
+          cause instanceof ApiRequestError ? cause.message : 'Failed to commit merge resolution.',
+        );
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [loadChanges, loadChecks, loadPullRequests, mergeCommitMessage, projectId],
+  );
 
   const statusLoading = shouldRenderGitStatusLoader({
     projectId,
@@ -1259,6 +1657,9 @@ export function ProjectGitHubPanel({
       }),
     [commitSuccess, currentChecks, currentPullRequests, currentStatus, pushSuccess],
   );
+  const conflictFiles = conflicts?.files ?? [];
+  const unresolvedConflictFiles = conflictFiles.filter((file) => !file.resolved);
+  const conflictResolved = currentStatus.available && currentStatus.workingTree.conflicts === 0;
 
   useEffect(() => {
     const nextTab = resolveGitWorkflowActiveTab({ activeTab, tabs, preferredTab });
@@ -1273,7 +1674,490 @@ export function ProjectGitHubPanel({
   if (!projectId) return null;
 
   return (
-    <aside
+    <>
+      {repositoryDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-2xl rounded-lg border border-border bg-background shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  {repositoryDialogMode === 'create'
+                    ? 'Create GitHub Repository'
+                    : 'Connect Existing Repository'}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {repositoryDialogMode === 'create'
+                    ? 'Create a GitHub repository, set it as origin, and push this project.'
+                    : 'Connect this local project to a GitHub repository you already have.'}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setRepositoryDialogOpen(false)}
+                aria-label="Close repository connection dialog"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="grid gap-4 px-5 py-5 md:grid-cols-[180px_1fr]">
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded border px-3 py-2 text-left text-sm',
+                    repositoryDialogMode === 'create'
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-border hover:bg-secondary/50',
+                  )}
+                  onClick={() => {
+                    setRepositoryDialogMode('create');
+                    setRepositoryActionError(null);
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Create repository
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded border px-3 py-2 text-left text-sm',
+                    repositoryDialogMode === 'connect'
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-border hover:bg-secondary/50',
+                  )}
+                  onClick={() => {
+                    setRepositoryDialogMode('connect');
+                    setRepositoryActionError(null);
+                  }}
+                >
+                  <Link className="h-4 w-4" />
+                  Connect existing
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {repositoryActionError && (
+                  <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {repositoryActionError}
+                  </div>
+                )}
+
+                {repositoryDialogMode === 'create' ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="space-y-1 text-sm">
+                        <span className="font-medium">Owner</span>
+                        <Input
+                          value={repositoryOwner}
+                          onChange={(event) => setRepositoryOwner(event.target.value)}
+                          placeholder="GitHub user or organization"
+                          disabled={actionPending === 'github-create-repository'}
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm">
+                        <span className="font-medium">Repository name</span>
+                        <Input
+                          value={repositoryName}
+                          onChange={(event) => setRepositoryName(event.target.value)}
+                          placeholder="repository-name"
+                          disabled={actionPending === 'github-create-repository'}
+                        />
+                      </label>
+                    </div>
+                    <label className="space-y-1 text-sm">
+                      <span className="font-medium">Description</span>
+                      <Input
+                        value={repositoryDescription}
+                        onChange={(event) => setRepositoryDescription(event.target.value)}
+                        placeholder="Optional repository description"
+                        disabled={actionPending === 'github-create-repository'}
+                      />
+                    </label>
+                    <div className="space-y-2 text-sm">
+                      <div className="font-medium">Visibility</div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={repositoryVisibility === 'private' ? 'default' : 'outline'}
+                          onClick={() => setRepositoryVisibility('private')}
+                          disabled={actionPending === 'github-create-repository'}
+                        >
+                          Private
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={repositoryVisibility === 'public' ? 'default' : 'outline'}
+                          onClick={() => setRepositoryVisibility('public')}
+                          disabled={actionPending === 'github-create-repository'}
+                        >
+                          Public
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+                      This will create the repository on GitHub, add it as origin, and push the
+                      current branch.
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setRepositoryDialogOpen(false)}
+                        disabled={actionPending === 'github-create-repository'}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => void createGitHubRepository()}
+                        disabled={actionPending !== null}
+                      >
+                        {actionPending === 'github-create-repository'
+                          ? 'Creating...'
+                          : 'Create repository & push'}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label className="space-y-1 text-sm">
+                      <span className="font-medium">GitHub repository</span>
+                      <Input
+                        value={connectRepository}
+                        onChange={(event) => setConnectRepository(event.target.value)}
+                        placeholder="owner/repository or https://github.com/owner/repository"
+                        disabled={actionPending === 'github-connect-repository'}
+                      />
+                    </label>
+                    <div className="rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+                      AI Studio will validate the repository with GitHub CLI, add it as origin, and
+                      fetch it. If the remote already has commits, you will be guided through pull or
+                      conflict resolution before pushing.
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setRepositoryDialogOpen(false)}
+                        disabled={actionPending === 'github-connect-repository'}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => void connectGitHubRepository()}
+                        disabled={actionPending !== null}
+                      >
+                        {actionPending === 'github-connect-repository'
+                          ? 'Connecting...'
+                          : 'Connect repository'}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {conflictResolverOpen && (
+        <div className="fixed inset-0 z-50 flex bg-background text-foreground">
+          <div className="flex w-72 shrink-0 flex-col border-r border-border bg-muted/20 p-4">
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-lg font-semibold">Git & GitHub</div>
+                <div className="text-xs text-muted-foreground">Merge conflict workflow</div>
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => setConflictResolverOpen(false)}
+                aria-label="Close merge conflict resolver"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              <GitCard title="Repository">
+                <div className="space-y-2 text-sm">
+                  <div className="font-medium">{currentStatus.repositoryName}</div>
+                  <div className="flex items-center gap-2 font-mono text-xs">
+                    <GitBranch className="h-3.5 w-3.5" />
+                    <span className="truncate">{currentStatus.currentBranch}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    ↑ {currentStatus.ahead} ↓ {currentStatus.behind}
+                  </div>
+                </div>
+              </GitCard>
+
+              <section className="rounded border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                <div className="font-medium">
+                  {conflictResolved ? 'All conflicts resolved' : 'Merge conflicts detected'}
+                </div>
+                <div className="mt-1 text-xs">
+                  {conflictResolved
+                    ? 'Review the resolved files and commit the merge resolution.'
+                    : `${conflicts?.totalFiles ?? currentStatus.workingTree.conflicts} file${
+                        (conflicts?.totalFiles ?? currentStatus.workingTree.conflicts) === 1
+                          ? ''
+                          : 's'
+                      } need resolution before pushing.`}
+                </div>
+              </section>
+
+              <Button
+                type="button"
+                className="w-full"
+                variant={conflictResolved ? 'outline' : 'default'}
+                onClick={() => void loadConflicts()}
+                disabled={conflictsLoading}
+              >
+                {conflictsLoading ? 'Refreshing...' : 'Refresh conflicts'}
+              </Button>
+              <Button
+                type="button"
+                className="w-full"
+                variant="outline"
+                onClick={() => setConflictResolverOpen(false)}
+              >
+                Exit resolver
+              </Button>
+
+              <GitCard title="Working Tree">
+                <div className="space-y-1">
+                  <StatRow label="Staged" value={currentStatus.workingTree.staged} />
+                  <StatRow
+                    label="Conflicts"
+                    value={currentStatus.workingTree.conflicts}
+                    tone="text-red-700"
+                  />
+                  <StatRow label="Modified" value={currentStatus.workingTree.modified} />
+                  <StatRow label="Untracked" value={currentStatus.workingTree.untracked} />
+                </div>
+              </GitCard>
+
+              <div className="rounded border border-border bg-background px-3 py-3 text-xs text-muted-foreground">
+                <div className="mb-2">You can also open the project in your IDE if a file needs deeper edits.</div>
+                <Button asChild type="button" size="sm" variant="outline" className="w-full">
+                  <a href={buildProjectIdeHref(projectId)}>Open in IDE</a>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex w-72 shrink-0 flex-col border-r border-border p-4">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold">Files with conflicts</h2>
+              <p className="text-xs text-muted-foreground">
+                {conflictsLoading
+                  ? 'Loading conflicts...'
+                  : `${unresolvedConflictFiles.length} unresolved file${
+                      unresolvedConflictFiles.length === 1 ? '' : 's'
+                    }`}
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+              {conflictFiles.length === 0 && (
+                <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                  No conflicted files are currently reported.
+                </div>
+              )}
+              {conflictFiles.map((file) => (
+                <button
+                  type="button"
+                  key={file.path}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-2 rounded border px-3 py-2 text-left text-xs',
+                    selectedConflictPath === file.path
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-background hover:bg-secondary/50',
+                  )}
+                  onClick={() => setSelectedConflictPath(file.path)}
+                >
+                  <span className="min-w-0 flex-1 truncate font-mono">{file.path}</span>
+                  <Badge variant={file.resolved ? 'outline' : 'destructive'}>
+                    {file.resolved ? 'resolved' : file.conflictCount}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col p-5">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h1 className="text-xl font-semibold">
+                  {conflictResolved ? 'Merge Conflicts Resolved' : 'Resolve Merge Conflicts'}
+                </h1>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Choose the code to keep for each conflicted file, then commit the merge
+                  resolution.
+                </p>
+              </div>
+              <Button type="button" variant="outline" onClick={() => setConflictResolverOpen(false)}>
+                Close
+              </Button>
+            </div>
+
+            {conflictError && (
+              <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {conflictError}
+              </div>
+            )}
+
+            {conflictResolved ? (
+              <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-4">
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="rounded border border-border px-4 py-3">
+                    <div className="text-2xl font-semibold">{conflictFiles.length}</div>
+                    <div className="text-xs text-muted-foreground">Files reviewed</div>
+                  </div>
+                  <div className="rounded border border-border px-4 py-3">
+                    <div className="text-2xl font-semibold text-emerald-700">0</div>
+                    <div className="text-xs text-muted-foreground">Conflicts remaining</div>
+                  </div>
+                  <div className="rounded border border-border px-4 py-3">
+                    <div className="text-2xl font-semibold">{currentStatus.ahead}</div>
+                    <div className="text-xs text-muted-foreground">Commits ahead</div>
+                  </div>
+                  <div className="rounded border border-border px-4 py-3">
+                    <div className="text-2xl font-semibold">{currentStatus.behind}</div>
+                    <div className="text-xs text-muted-foreground">Commits behind</div>
+                  </div>
+                </div>
+                <div className="min-h-0 overflow-y-auto rounded border border-border bg-background p-4">
+                  <h2 className="mb-3 text-sm font-semibold">Resolved files</h2>
+                  <div className="space-y-2">
+                    {conflictFiles.map((file) => (
+                      <div
+                        key={file.path}
+                        className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm"
+                      >
+                        <span className="font-mono">{file.path}</span>
+                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                          Resolved
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded border border-border bg-background p-4">
+                  <div className="mb-3 font-medium">Commit merge resolution</div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={mergeCommitMessage}
+                      onChange={(event) => setMergeCommitMessage(event.target.value)}
+                      placeholder="Merge commit message"
+                      disabled={actionPending !== null}
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => void commitMergeResolution(false)}
+                      disabled={actionPending !== null || !mergeCommitMessage.trim()}
+                    >
+                      {actionPending === 'merge-commit' ? 'Committing...' : 'Commit merge'}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void commitMergeResolution(true)}
+                      disabled={actionPending !== null || !mergeCommitMessage.trim()}
+                    >
+                      {actionPending === 'merge-commit-push' ? 'Pushing...' : 'Commit & push'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-4">
+                <div className="grid min-h-0 grid-cols-3 overflow-hidden rounded border border-border">
+                  <div className="min-h-0 overflow-y-auto border-r border-border">
+                    <div className="border-b border-border bg-emerald-50 px-3 py-2 text-sm font-medium">
+                      Current
+                    </div>
+                    <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
+                      {conflictFileLoading
+                        ? 'Loading...'
+                        : conflictFile?.hunks.map((hunk) => hunk.current).join('\n') ||
+                          'Select a conflicted file.'}
+                    </pre>
+                  </div>
+                  <div className="min-h-0 overflow-y-auto border-r border-border">
+                    <div className="border-b border-border bg-red-50 px-3 py-2 text-sm font-medium">
+                      Incoming
+                    </div>
+                    <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
+                      {conflictFileLoading
+                        ? 'Loading...'
+                        : conflictFile?.hunks.map((hunk) => hunk.incoming).join('\n') ||
+                          'Select a conflicted file.'}
+                    </pre>
+                  </div>
+                  <div className="min-h-0 overflow-y-auto">
+                    <div className="border-b border-border bg-primary/5 px-3 py-2 text-sm font-medium">
+                      Result
+                    </div>
+                    <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
+                      {conflictFileLoading
+                        ? 'Loading...'
+                        : conflictFile?.content ?? 'Select a conflicted file.'}
+                    </pre>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 rounded border border-border bg-background p-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!selectedConflictPath || actionPending !== null}
+                    onClick={() => void applyConflictChoice('current')}
+                  >
+                    Accept current
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!selectedConflictPath || actionPending !== null}
+                    onClick={() => void applyConflictChoice('incoming')}
+                  >
+                    Accept incoming
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!selectedConflictPath || actionPending !== null}
+                    onClick={() => void applyConflictChoice('both')}
+                  >
+                    Accept both
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={!selectedConflictPath || conflictFileLoading}
+                    onClick={() => {
+                      setConflictFile(null);
+                      const currentPath = selectedConflictPath;
+                      setSelectedConflictPath(null);
+                      window.setTimeout(() => setSelectedConflictPath(currentPath), 0);
+                    }}
+                  >
+                    Reset view
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <aside
       className={cn(
         'hidden h-full max-h-full min-h-0 shrink-0 overflow-hidden border-l border-border bg-background/95 lg:flex',
         open ? 'w-[360px] max-w-[30vw]' : 'w-12',
@@ -1826,72 +2710,127 @@ export function ProjectGitHubPanel({
                       {shortSha(currentStatus.recentCommit.sha)}
                     </div>
                     <div className="font-medium">{currentStatus.recentCommit.subject}</div>
-                    <div className="rounded border border-border bg-muted/20 px-3 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-medium">{publishState.title}</div>
+                    {!currentStatus.remoteUrl ? (
+                      <div className="rounded border border-border bg-background px-3 py-4">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                          <GitBranch className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="mt-3 text-center">
+                          <div className="font-medium">No repository connected</div>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {publishState.description}
+                            Create a new GitHub repository or connect an existing one to publish
+                            this project.
                           </p>
-                          {publishState.detail && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {publishState.detail}
-                            </p>
-                          )}
                         </div>
-                        <Badge variant={publishState.pushed ? 'default' : 'outline'}>
-                          {publishState.statusLabel}
-                        </Badge>
+                        {repositoryActionSuccess && (
+                          <div className="mt-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                            {repositoryActionSuccess}
+                          </div>
+                        )}
+                        <div className="mt-4 space-y-2">
+                          <Button
+                            type="button"
+                            className="w-full"
+                            disabled={actionPending !== null}
+                            onClick={() => openRepositoryDialog('create')}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create Repository
+                          </Button>
+                          <Button
+                            type="button"
+                            className="w-full"
+                            variant="outline"
+                            disabled={actionPending !== null}
+                            onClick={() => openRepositoryDialog('connect')}
+                          >
+                            <Link className="mr-2 h-4 w-4" />
+                            Connect Existing Repository
+                          </Button>
+                        </div>
+                        <div className="mt-4 rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+                          You can also add an origin remote from the terminal. After that, refresh
+                          this panel to continue the publish workflow here.
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {publishState.actionLabel && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={actionPending !== null || !publishState.canPublish}
-                          onClick={() =>
-                            currentStatus.upstreamState === 'active'
-                              ? void pushCurrentBranch()
-                              : void publishCurrentBranch()
-                          }
-                        >
-                          {actionPending === 'push' || actionPending === 'publish'
-                            ? 'Publishing...'
-                            : publishState.actionLabel}
-                        </Button>
-                      )}
-                      {publishState.canClearStaleUpstream && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={actionPending !== null}
-                          onClick={() => void clearStaleUpstream()}
-                        >
-                          {actionPending === 'clear-upstream'
-                            ? 'Clearing...'
-                            : 'Clear stale upstream'}
-                        </Button>
-                      )}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setActiveTab('overview')}
-                      >
-                        Back to overview
-                      </Button>
-                    </div>
-                    {!publishState.pushed &&
-                      !publishState.canPublish &&
-                      !currentStatus.remoteUrl && (
-                        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                          GitHub access is not connected for this Project yet. Use the terminal to
-                          add an origin remote, or continue working locally until the GitHub
-                          connection flow is available.
+                    ) : (
+                      <>
+                        <div className="rounded border border-border bg-muted/20 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium">{publishState.title}</div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {publishState.description}
+                              </p>
+                              {publishState.detail && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {publishState.detail}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant={publishState.pushed ? 'default' : 'outline'}>
+                              {publishState.statusLabel}
+                            </Badge>
+                          </div>
                         </div>
-                      )}
+                        <div className="flex flex-wrap gap-2">
+                          {publishState.actionLabel && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={
+                                actionPending !== null ||
+                                (!publishState.canPublish &&
+                                  !publishState.canPull &&
+                                  currentStatus.workingTree.conflicts === 0)
+                              }
+                              onClick={() => {
+                                if (currentStatus.workingTree.conflicts > 0) {
+                                  void openConflictResolver();
+                                  return;
+                                }
+                                if (publishState.canPull) {
+                                  void pullRemoteChanges();
+                                  return;
+                                }
+                                if (currentStatus.upstreamState === 'active') {
+                                  void pushCurrentBranch();
+                                  return;
+                                }
+                                void publishCurrentBranch();
+                              }}
+                            >
+                              {actionPending === 'pull'
+                                ? 'Pulling...'
+                                : actionPending === 'push' || actionPending === 'publish'
+                                  ? 'Publishing...'
+                                  : publishState.actionLabel}
+                            </Button>
+                          )}
+                          {publishState.canClearStaleUpstream && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={actionPending !== null}
+                              onClick={() => void clearStaleUpstream()}
+                            >
+                              {actionPending === 'clear-upstream'
+                                ? 'Clearing...'
+                                : 'Clear stale upstream'}
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setActiveTab('overview')}
+                          >
+                            Back to overview
+                          </Button>
+                        </div>
+                      </>
+                    )}
                     {!publishState.pushed && (
                       <div className="rounded border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                         Not ready to publish? You can undo the last local commit from the terminal
@@ -2220,6 +3159,7 @@ export function ProjectGitHubPanel({
           </div>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }

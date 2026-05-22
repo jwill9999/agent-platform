@@ -128,6 +128,90 @@ describe('deriveGitWorkflowOverview', () => {
     });
   });
 
+  it('prioritizes pulling remote commits before pushing divergent branches', () => {
+    expect(
+      deriveGitWorkflowOverview({
+        status: status({ ahead: 2, behind: 1 }),
+      }),
+    ).toMatchObject({
+      title: 'Pull remote changes',
+      primaryAction: { label: 'Review pull options', tab: 'push' },
+    });
+  });
+
+  it('keeps dirty behind branches in local change review before pulling', () => {
+    expect(
+      deriveGitWorkflowOverview({
+        status: status({
+          clean: false,
+          behind: 1,
+          workingTree: {
+            total: 1,
+            staged: 0,
+            unstaged: 1,
+            added: 0,
+            modified: 1,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 0,
+          },
+        }),
+      }),
+    ).toMatchObject({
+      title: 'Review local changes',
+      primaryAction: { label: 'Review changes', tab: 'changes' },
+    });
+  });
+
+  it('sends committed local-only repositories to the GitHub connection workflow', () => {
+    expect(
+      deriveGitWorkflowOverview({
+        status: status({
+          remoteUrl: undefined,
+          githubRemoteDetected: false,
+          upstreamBranch: undefined,
+          upstreamState: 'none',
+          recentCommit: {
+            sha: '752fe8b',
+            subject: 'First commit',
+          },
+        }),
+      }),
+    ).toMatchObject({
+      title: 'Connect this project to GitHub',
+      tone: 'warning',
+      primaryAction: { label: 'Create or connect repository', tab: 'push' },
+    });
+  });
+
+  it('prioritizes merge conflict resolution over every other Git workflow step', () => {
+    expect(
+      deriveGitWorkflowOverview({
+        status: status({
+          clean: false,
+          ahead: 2,
+          behind: 1,
+          workingTree: {
+            total: 1,
+            staged: 0,
+            unstaged: 0,
+            added: 0,
+            modified: 1,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 1,
+          },
+        }),
+      }),
+    ).toMatchObject({
+      title: 'Resolve merge conflicts',
+      tone: 'danger',
+      primaryAction: { label: 'Resolve conflicts', tab: 'push' },
+    });
+  });
+
   it('surfaces pull request checks before generic clean synced state', () => {
     const pullRequests: ProjectGitPullRequestsResult = {
       available: true,
@@ -268,6 +352,40 @@ describe('deriveGitWorkflowTabs', () => {
       { id: 'overview', label: 'Overview' },
       { id: 'push', label: 'Push', badge: 2 },
     ]);
+
+    expect(
+      deriveGitWorkflowTabs({
+        status: status({ ahead: 2, behind: 1 }),
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'push', label: 'Pull', badge: 1 },
+    ]);
+
+    expect(
+      deriveGitWorkflowTabs({
+        status: status({
+          clean: false,
+          ahead: 2,
+          behind: 1,
+          workingTree: {
+            total: 1,
+            staged: 0,
+            unstaged: 0,
+            added: 0,
+            modified: 1,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 1,
+          },
+        }),
+      }),
+    ).toEqual([
+      { id: 'overview', label: 'Overview' },
+      { id: 'changes', label: 'Changes', badge: 1 },
+      { id: 'push', label: 'Resolve', badge: 1 },
+    ]);
   });
 
   it('does not keep the Commit tab visible after a successful commit clears staged files', () => {
@@ -357,6 +475,54 @@ describe('deriveGitWorkflowTabs', () => {
       title: 'Publish this branch',
       actionLabel: 'Publish branch',
       statusLabel: 'Ready to publish',
+      pushed: false,
+    });
+  });
+
+  it('uses Publish tab state that disables push until divergent branches are pulled', () => {
+    expect(
+      deriveGitPublishState({
+        status: status({ ahead: 2, behind: 1 }),
+        commitSuccess: null,
+        pushSuccess: null,
+      }),
+    ).toMatchObject({
+      title: 'Pull remote changes',
+      statusLabel: 'Pull required',
+      actionLabel: 'Pull remote changes',
+      canPublish: false,
+      canPull: true,
+      pushed: false,
+    });
+  });
+
+  it('uses Publish tab state that disables push until conflicts are resolved', () => {
+    expect(
+      deriveGitPublishState({
+        status: status({
+          clean: false,
+          ahead: 2,
+          behind: 1,
+          workingTree: {
+            total: 1,
+            staged: 0,
+            unstaged: 0,
+            added: 0,
+            modified: 1,
+            deleted: 0,
+            renamed: 0,
+            untracked: 0,
+            conflicts: 1,
+          },
+        }),
+        commitSuccess: null,
+        pushSuccess: null,
+      }),
+    ).toMatchObject({
+      title: 'Resolve merge conflicts',
+      actionLabel: 'Resolve conflicts',
+      canPublish: false,
+      canPull: false,
       pushed: false,
     });
   });
