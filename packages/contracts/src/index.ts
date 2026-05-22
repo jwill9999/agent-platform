@@ -22,7 +22,14 @@ export {
   type McpServer,
   type McpServerCreateBody,
 } from './mcpServer.js';
-export { OutputSchema, type Output } from './output.js';
+export {
+  CapabilityRecoveryOptionSchema,
+  CapabilityRecoverySchema,
+  OutputSchema,
+  type CapabilityRecovery,
+  type CapabilityRecoveryOption,
+  type Output,
+} from './output.js';
 export {
   MessageRecordSchema,
   MessageCreateBodySchema,

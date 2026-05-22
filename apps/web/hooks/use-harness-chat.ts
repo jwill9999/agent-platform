@@ -5,6 +5,7 @@ import type { UIMessage } from 'ai';
 import type {
   ApprovalRequest,
   ApprovalRequestStatus,
+  CapabilityRecovery,
   MessageRecord,
 } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
@@ -82,6 +83,7 @@ interface StreamEvent {
   toolName?: string;
   riskTier?: string;
   argsPreview?: unknown;
+  recovery?: unknown;
 }
 
 export type ApprovalRequiredStreamEvent = {
@@ -113,7 +115,7 @@ export type ApprovalDecision = 'approve' | 'reject';
 export type ToolTraceEvent =
   | { type: 'status'; label: string }
   | { type: 'result'; toolId: string; data: unknown; status: 'success' | 'error' | 'denied' }
-  | { type: 'error'; code?: string; message: string };
+  | { type: 'error'; code?: string; message: string; recovery?: CapabilityRecovery };
 
 const BLOCKING_APPROVAL_STATUSES = new Set<ApprovalCardStatus>([
   'pending',
@@ -183,6 +185,38 @@ function isRecoverableToolErrorCode(code: unknown): code is string {
   );
 }
 
+function parseCapabilityRecovery(value: unknown): CapabilityRecovery | undefined {
+  if (!isRecord(value)) return undefined;
+  const status = value.status;
+  const summary = value.summary;
+  const options = Array.isArray(value.options) ? value.options : [];
+  if (
+    status !== 'capability_missing' &&
+    status !== 'provider_required' &&
+    status !== 'approval_escalation' &&
+    status !== 'sandbox_available'
+  ) {
+    return undefined;
+  }
+  if (typeof summary !== 'string' || summary.trim().length === 0) return undefined;
+  const parsedOptions = options.flatMap((option): CapabilityRecovery['options'] => {
+    if (!isRecord(option)) return [];
+    const { id, label, action } = option;
+    if (typeof id !== 'string' || typeof label !== 'string') return [];
+    if (
+      action !== 'approve' &&
+      action !== 'connect' &&
+      action !== 'sandbox' &&
+      action !== 'manual' &&
+      action !== 'cancel'
+    ) {
+      return [];
+    }
+    return [{ id, label, action }];
+  });
+  return { status, summary, options: parsedOptions };
+}
+
 function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.message !== 'string') return null;
   const { code } = o;
@@ -199,7 +233,10 @@ function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (code === 'MODEL_AUTH_FAILED') {
     return { error: friendlyChatErrorMessage(message) };
   }
-  if (isRecoverableToolErrorCode(code)) return { toolTrace: { type: 'error', code, message } };
+  if (isRecoverableToolErrorCode(code)) {
+    const recovery = parseCapabilityRecovery(o.recovery);
+    return { toolTrace: { type: 'error', code, message, ...(recovery ? { recovery } : {}) } };
+  }
   return { error: friendlyChatErrorMessage(message) };
 }
 

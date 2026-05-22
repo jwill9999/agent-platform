@@ -102,6 +102,37 @@ const WRITE_TOOL_IDS = new Set(
 );
 WRITE_TOOL_IDS.add(CODING_APPLY_PATCH_ID);
 
+const ALLOWLIST_RECOVERY_OPTIONS = [
+  { id: 'request-approval', label: 'Request approval', action: 'approve' as const },
+  { id: 'connect-provider', label: 'Connect provider', action: 'connect' as const },
+  { id: 'manual-steps', label: 'Show manual steps', action: 'manual' as const },
+];
+
+function capabilityNameForTool(toolName: string): string {
+  if (toolName.startsWith('sys_git_')) return 'source control';
+  if (toolName.startsWith('sys_browser_')) return 'browser automation';
+  if (toolName.startsWith('sys_')) return 'system tool';
+  if (toolName.includes('repo') || toolName.includes('github') || toolName.startsWith('gh_')) {
+    return 'repository management';
+  }
+  if (parseToolId(toolName).kind === 'mcp') return 'connected tool';
+  return 'tool execution';
+}
+
+function buildCapabilityRecoveryOutput(call: ToolCallIntent): Output {
+  const capability = capabilityNameForTool(call.name);
+  return {
+    type: 'error',
+    code: 'TOOL_NOT_ALLOWED',
+    message: `No approved ${capability} capability is available for "${call.name}".`,
+    recovery: {
+      status: 'capability_missing',
+      summary: `This action needs an approved ${capability} capability before it can run.`,
+      options: ALLOWLIST_RECOVERY_OPTIONS,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -277,11 +308,7 @@ async function dispatchSingleTool(
   options?: { timeoutMs?: number },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
   if (!isToolExecutionAllowed(ctx.agent, call.name)) {
-    const output: Output = {
-      type: 'error',
-      code: 'TOOL_NOT_ALLOWED',
-      message: `Tool "${call.name}" is not in the agent's allowlist`,
-    };
+    const output = buildCapabilityRecoveryOutput(call);
     ctx.auditLog?.logDenied(call.name, call.args, ctx.agent.id, '', 'Tool not in agent allowlist');
     return { output, ok: false };
   }
@@ -909,11 +936,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       rateLimiter.record(call.name);
 
       if (!isToolExecutionAllowed(ctx.agent, call.name)) {
-        const output: Output = {
-          type: 'error',
-          code: 'TOOL_NOT_ALLOWED',
-          message: `Tool "${call.name}" is not in the agent's allowlist`,
-        };
+        const output = buildCapabilityRecoveryOutput(call);
         ctx.auditLog?.logDenied(
           call.name,
           call.args,

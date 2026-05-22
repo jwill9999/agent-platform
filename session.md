@@ -8,6 +8,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 ## Last updated
 
 - **Date:** 2026-05-22
+- **Session:** Implemented capability recovery UX for allowlist failures on `task/capability-recovery-ux`.
+- **Today’s outputs:** Added shared capability recovery schemas, emitted structured recovery metadata for `TOOL_NOT_ALLOWED` dispatch failures, preserved recovery data through the web stream parser, rendered capability-oriented statuses/options in the operator tool trace, and documented/closed bead `agent-platform-fxi`.
+- **Validation:** Passed focused web/contracts/harness tests, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm docs:lint`, and a rerun of `projectsRouter.test.ts`. Full `pnpm test` passed all packages except one unrelated API `projectsRouter.test.ts` timeout on first run; the same file passed immediately on rerun. SonarQube MCP analysis was not available through the current tool surface, so the documented fallback gate was used.
+- **Current state:** Bead `agent-platform-fxi` is closed. Branch is `task/capability-recovery-ux`; the current branch tip contains the capability recovery implementation and this handoff update.
+- **Next:** Push Beads and the task branch. Follow-up architecture work can introduce a real capability registry/resolver and make recovery card actions interactive.
+- **Date:** 2026-05-22
 - **Session:** Implemented the GitHub repository create/connect flow on `task/divergent-pull-merge-resolver` and committed the completed Git workflow work.
 - **Today’s outputs:** Added GitHub CLI-backed create/connect repository API routes, shared contracts, no-remote Publish UI with Create Repository and Connect Existing Repository actions, repository connection modal states, refreshed publish/PR/check routing after connection, task specs for the divergent resolver and repository connection work, and Electron/API/web regression coverage.
 - **Validation:** Passed focused API Project router tests, focused web Git workflow tests, API/web/desktop typechecks, focused Electron Playwright `project-git-workflow.e2e.ts`, root lint, and desktop/web/API builds during E2E. SonarQube MCP analysis was not available through the current tool surface, so the documented fallback gate was used.

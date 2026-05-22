@@ -1,4 +1,5 @@
 import type { ToolTraceEvent } from '@/hooks/use-harness-chat';
+import type { CapabilityRecovery } from '@agent-platform/contracts';
 import {
   summarizeBrowserToolResult,
   type BrowserToolArtifactPreview,
@@ -17,7 +18,11 @@ export type OperatorToolEventStatus =
   | 'failed'
   | 'denied'
   | 'blocked'
-  | 'unavailable';
+  | 'unavailable'
+  | 'capability_missing'
+  | 'provider_required'
+  | 'approval_escalation'
+  | 'sandbox_available';
 
 export type OperatorToolEventDisplay = {
   label: string;
@@ -31,6 +36,7 @@ export type OperatorToolEventDisplay = {
     payload: string;
     redacted: boolean;
   };
+  recovery?: CapabilityRecovery;
   artifacts: BrowserToolArtifactPreview[];
 };
 
@@ -42,6 +48,17 @@ const STATUS_LABELS: Record<OperatorToolEventStatus, string> = {
   denied: 'Denied',
   blocked: 'Blocked',
   unavailable: 'Unavailable',
+  capability_missing: 'Capability missing',
+  provider_required: 'Provider required',
+  approval_escalation: 'Approval escalation',
+  sandbox_available: 'Sandbox available',
+};
+
+const RECOVERY_LABELS: Record<CapabilityRecovery['status'], string> = {
+  capability_missing: 'Capability missing',
+  provider_required: 'Provider required',
+  approval_escalation: 'Approval needed',
+  sandbox_available: 'Sandbox available',
 };
 
 function stringifyDetails(payload: unknown): OperatorToolEventDisplay['details'] {
@@ -146,6 +163,21 @@ export function displayToolEvent(event: ToolTraceEvent): OperatorToolEventDispla
 
   if (event.type === 'error') {
     const redacted = redactDisplayText(event.message);
+    if (event.recovery) {
+      return {
+        label: RECOVERY_LABELS[event.recovery.status],
+        status: event.recovery.status,
+        statusLabel: STATUS_LABELS[event.recovery.status],
+        summary: event.recovery.summary,
+        recovery: event.recovery,
+        details: stringifyDetails({
+          code: event.code,
+          message: event.message,
+          recovery: event.recovery,
+        }),
+        artifacts: [],
+      };
+    }
     return {
       label: errorLabel(event.code),
       status: event.code === 'CONTENT_TOO_LARGE' ? 'unavailable' : 'failed',

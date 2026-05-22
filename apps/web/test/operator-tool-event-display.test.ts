@@ -74,4 +74,34 @@ describe('operator tool event display model', () => {
       summary: 'Path is outside the workspace',
     });
   });
+
+  it('renders capability recovery metadata for allowlist failures', () => {
+    const display = displayToolEvent({
+      type: 'error',
+      code: 'TOOL_NOT_ALLOWED',
+      message: 'Tool "gh_repo_create" is not in the agent allowlist',
+      recovery: {
+        status: 'capability_missing',
+        summary: 'Repository creation needs an approved capability provider.',
+        options: [
+          { id: 'request-approval', label: 'Request approval', action: 'approve' },
+          { id: 'connect-provider', label: 'Connect provider', action: 'connect' },
+        ],
+      },
+    });
+
+    expect(display).toMatchObject({
+      label: 'Capability missing',
+      status: 'capability_missing',
+      statusLabel: 'Capability missing',
+      summary: 'Repository creation needs an approved capability provider.',
+      recovery: {
+        options: [
+          { id: 'request-approval', label: 'Request approval', action: 'approve' },
+          { id: 'connect-provider', label: 'Connect provider', action: 'connect' },
+        ],
+      },
+    });
+    expect(display.summary).not.toContain('allowlist');
+  });
 });

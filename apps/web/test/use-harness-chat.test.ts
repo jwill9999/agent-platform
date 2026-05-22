@@ -76,6 +76,32 @@ describe('harness chat stream parser', () => {
     });
   });
 
+  it('preserves capability recovery metadata on tool trace errors', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      code: 'TOOL_NOT_ALLOWED',
+      message: 'Tool "gh_repo_create" is not in the agent allowlist',
+      recovery: {
+        status: 'capability_missing',
+        summary: 'Repository creation needs an approved capability provider.',
+        options: [{ id: 'manual', label: 'Show manual steps', action: 'manual' }],
+      },
+    });
+
+    expect(result).toEqual({
+      toolTrace: {
+        type: 'error',
+        code: 'TOOL_NOT_ALLOWED',
+        message: 'Tool "gh_repo_create" is not in the agent allowlist',
+        recovery: {
+          status: 'capability_missing',
+          summary: 'Repository creation needs an approved capability provider.',
+          options: [{ id: 'manual', label: 'Show manual steps', action: 'manual' }],
+        },
+      },
+    });
+  });
+
   it('keeps tool-call placeholders separate from assistant text', () => {
     const result = renderStreamEvent({
       type: 'text',
