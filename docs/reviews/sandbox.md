@@ -478,8 +478,14 @@ Examples:
 Add category:
 
 ```ts
+<<<<<<< HEAD
 'package-management';
 ```
+
+=======
+"package-management";
+
+> > > > > > > c6fb698f71650276152e3e09bc180c71168134b1
 
 Separate from:
 
