@@ -1619,7 +1619,8 @@ function visibleToolsForProjectPolicy(
   tools: ContractTool[],
   policy: ProjectAccessPolicy | undefined,
 ): ContractTool[] {
-  if (policy?.canWrite !== false) return tools;
+  if (!policy) return tools;
+  if (policy.canWrite === true && policy.writeBlockReason === undefined) return tools;
   return tools.filter((tool) => !PROJECT_WRITE_TOOL_IDS.has(tool.id));
 }
 

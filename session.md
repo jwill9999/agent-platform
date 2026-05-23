@@ -13,19 +13,26 @@
 ## Last Updated
 
 - **Date:** 2026-05-23
-- **Session:** Reinstated Project write gating until AGENTS.md onboarding is approved.
+- **Session:** Hardened Project write tool visibility for onboarding-gated chats.
 - **Branch:** `staging`
-- **Latest commit before this change:** `9e9f029` (`Merge pull request #225 from jwill9999/task/workspace-resource-runtime-v2`).
+- **Latest commit before this change:** `8cf8d1b` (`staging fix gate project writes before onboarding`) pushed to `origin/staging`.
 - **Current PR:** [#224 staging -> main](https://github.com/jwill9999/agent-platform/pull/224)
 
 ## Current State
 
 - `staging` contains the merged webview/runtime work from PR #225.
-- A high-severity review finding identified that backend-accessible Project chats could still expose and execute write tools before onboarding approval.
-- The fix is local and verified; commit and push are next.
+- A follow-up Promptfoo review commented directly on `visibleToolsForProjectPolicy`, asking for write tools to be hidden until onboarding is approved.
+- The prior contract fix already encoded onboarding in `ProjectAccessPolicy`; a local helper hardening now makes that invariant explicit in `chatRouter`.
+- The follow-up fix is local and verified; commit and push are next.
 
 ## Recent Work
 
+- Updated `apps/api/src/infrastructure/http/v1/chatRouter.ts` so Project chats only expose write tools when `policy.canWrite === true` and no `writeBlockReason` is present. Non-project chats with no Project policy keep existing tool visibility.
+- Verified the follow-up locally:
+  - `pnpm --filter @agent-platform/api test -- test/sessionChat.integration.test.ts test/projectWorkspaceResolver.test.ts`
+  - `pnpm --filter @agent-platform/api typecheck`
+  - `pnpm --filter @agent-platform/api lint`
+  - `git diff --check`
 - Updated `packages/contracts/src/project.ts` so `backend_accessible` Projects can inspect files but cannot write until `onboardingState === 'approved'`.
 - Updated API and contract tests to cover blocked pre-approval writes, hidden write tool definitions, onboarding draft creation, and read/write access policy output.
 - Rebuilt contracts before API verification so tests used the updated package output.
@@ -45,7 +52,7 @@
 
 ## Next
 
-1. Commit and push the Project write gating fix to `origin/staging`.
+1. Commit and push the `visibleToolsForProjectPolicy` hardening to `origin/staging`.
 2. If `verify` fails again, inspect the new GitHub Actions log before changing code.
 3. If SonarCloud still fails duplication, confirm whether `.sonarcloud.properties` was picked up by automatic analysis; if not, move exclusions into the SonarCloud UI or switch PR analysis to scanner-based CI.
 4. If all checks pass, keep `session.md` short by updating this file in place and moving any older detail into `session-archive-2026-05.md`.
