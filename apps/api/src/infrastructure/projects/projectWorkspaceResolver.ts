@@ -92,7 +92,11 @@ export function resolveSessionWorkspace(
   const capabilityState = metadataCapabilityState(project.metadata);
   const backendProjectRoot = metadataString(project.metadata, 'backendProjectRoot');
   const metadataRepositoryRoot = metadataString(project.metadata, 'repositoryRoot');
-  if (capabilityState !== 'backend_accessible' || !backendProjectRoot) {
+  if (
+    !capabilityState ||
+    (capabilityState !== 'backend_accessible' && capabilityState !== 'readonly') ||
+    !backendProjectRoot
+  ) {
     return {
       ok: false,
       code: 'PROJECT_UNAVAILABLE',
@@ -137,7 +141,7 @@ export function resolveSessionWorkspace(
         label: 'workspace',
         hostPath: workspaceRoot,
         containerPath: '/workspace',
-        permission: 'read_write',
+        permission: capabilityState === 'readonly' ? 'read_only' : 'read_write',
       },
     ],
   };

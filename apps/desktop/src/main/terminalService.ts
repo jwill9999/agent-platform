@@ -192,7 +192,7 @@ export async function fetchDesktopProjectRootFromApi(
   projectId: string,
 ): Promise<string | undefined> {
   const response = await fetch(
-    `${apiBaseUrl.replace(/\/+$/, '')}/v1/projects/${encodeURIComponent(projectId)}`,
+    `${trimTrailingSlashes(apiBaseUrl)}/v1/projects/${encodeURIComponent(projectId)}`,
     { cache: 'no-store' },
   );
   if (!response.ok) return undefined;
@@ -203,6 +203,14 @@ export async function fetchDesktopProjectRootFromApi(
   };
   const root = json.data?.metadata?.['backendProjectRoot'];
   return typeof root === 'string' && root.trim() ? root : undefined;
+}
+
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return value.slice(0, end);
 }
 
 export function validateDesktopTerminalCreateRequest(

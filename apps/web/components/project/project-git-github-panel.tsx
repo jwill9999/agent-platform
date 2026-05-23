@@ -215,13 +215,36 @@ function relativeCommitLabel(committedAt: string | undefined): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-function defaultRepositoryName(repositoryName: string | undefined): string {
-  const normalized = (repositoryName ?? 'new-project')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+export function defaultRepositoryName(repositoryName: string | undefined): string {
+  const source = (repositoryName ?? 'new-project').trim().toLowerCase();
+  const parts: string[] = [];
+  for (const char of source) {
+    if (isRepositoryNameCharacter(char)) {
+      parts.push(char);
+      continue;
+    }
+    if (parts.length > 0 && parts[parts.length - 1] !== '-') {
+      parts.push('-');
+    }
+  }
+
+  let start = 0;
+  let end = parts.length;
+  while (start < end && parts[start] === '-') start += 1;
+  while (end > start && parts[end - 1] === '-') end -= 1;
+  const normalized = parts.slice(start, end).join('');
   return normalized || 'new-project';
+}
+
+function isRepositoryNameCharacter(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 97 && code <= 122) ||
+    (code >= 48 && code <= 57) ||
+    char === '.' ||
+    char === '_' ||
+    char === '-'
+  );
 }
 
 function EmptyGitStatus(): ProjectGitStatusResult {
