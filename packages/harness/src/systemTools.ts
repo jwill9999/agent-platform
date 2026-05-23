@@ -6,7 +6,7 @@ import type { Output, Tool as ContractTool, RiskTier } from '@agent-platform/con
 import type { CommandRunner } from './commandRunner.js';
 import {
   commandRunnerResultToOutput,
-  createConfiguredCommandRunner,
+  createHostShellCommandRunner,
   createProjectScopedCommandRunner,
 } from './commandRunner.js';
 import type { NativeToolExecutor } from './types.js';
@@ -348,7 +348,7 @@ export function createSystemToolExecutor(options?: {
     ? configuredWorkspaceRoot
     : process.cwd();
   const browserManager = new BrowserSessionManager({ workspaceRoot });
-  const hostCommandRunner = options?.commandRunner ?? createConfiguredCommandRunner();
+  const hostCommandRunner = options?.commandRunner ?? createHostShellCommandRunner();
   const commandRunner = options?.pathJail
     ? createProjectScopedCommandRunner({ delegate: hostCommandRunner, pathJail: options.pathJail })
     : hostCommandRunner;
