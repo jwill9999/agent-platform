@@ -90,7 +90,8 @@ export function WorkspaceDashboard() {
 
   const updateExecutionPolicy = useCallback(
     async (patch: Partial<ExecutionPolicySettings>) => {
-      const next = { ...executionPolicy, ...patch };
+      const previous = executionPolicy;
+      const next = { ...previous, ...patch };
       setExecutionPolicy(next);
       setSettingsSaving(true);
       setError(null);
@@ -100,7 +101,7 @@ export function WorkspaceDashboard() {
         });
         setExecutionPolicy(updated?.executionPolicy ?? next);
       } catch (err) {
-        setExecutionPolicy(executionPolicy);
+        setExecutionPolicy(previous);
         setError(err instanceof ApiRequestError ? err.message : String(err));
       } finally {
         setSettingsSaving(false);

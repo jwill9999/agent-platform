@@ -1543,6 +1543,10 @@ exit 1
       stdio: 'ignore',
     });
     execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['symbolic-ref', 'HEAD', 'refs/heads/main'], {
+      cwd: remoteDir,
+      stdio: 'ignore',
+    });
     execFileSync(GIT_BINARY, ['clone', remoteDir, collaboratorDir], { stdio: 'ignore' });
     execFileSync(GIT_BINARY, ['config', 'user.email', 'collab@example.com'], {
       cwd: collaboratorDir,
@@ -1604,6 +1608,10 @@ exit 1
       stdio: 'ignore',
     });
     execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['symbolic-ref', 'HEAD', 'refs/heads/main'], {
+      cwd: remoteDir,
+      stdio: 'ignore',
+    });
     execFileSync(GIT_BINARY, ['clone', remoteDir, collaboratorDir], { stdio: 'ignore' });
     execFileSync(GIT_BINARY, ['config', 'user.email', 'collab@example.com'], {
       cwd: collaboratorDir,
@@ -1662,6 +1670,10 @@ exit 1
       stdio: 'ignore',
     });
     execFileSync(GIT_BINARY, ['push', '-u', 'origin', 'main'], { cwd: repoDir, stdio: 'ignore' });
+    execFileSync(GIT_BINARY, ['symbolic-ref', 'HEAD', 'refs/heads/main'], {
+      cwd: remoteDir,
+      stdio: 'ignore',
+    });
     execFileSync(GIT_BINARY, ['clone', remoteDir, collaboratorDir], { stdio: 'ignore' });
     execFileSync(GIT_BINARY, ['config', 'user.email', 'collab@example.com'], {
       cwd: collaboratorDir,

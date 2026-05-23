@@ -7,12 +7,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
-- **Date:** 2026-05-22
-- **Session:** Implemented `agent-platform-0ra` on `task/divergent-pull-merge-resolver`: in-app GitHub pull request creation and monitoring after branch publish.
-- **Today’s outputs:** Added create-PR contracts, `POST /v1/projects/:id/github/pull-requests`, GitHub CLI-backed PR creation, refreshed PR/check state after creation, Publish success GitHub links, PR-tab create form/fallback links/current-branch PR prioritisation, and focused API/web/Electron coverage with a fake `gh`.
-- **Validation:** Passed contracts PR tests, focused API Project router tests, focused web Git workflow tests, API/web/desktop typechecks and lint, focused Electron Playwright create-PR flow, desktop/web/API builds during E2E, and `git diff --check`. SonarQube MCP analysis was not available through the current tool surface, so the documented fallback gate was used.
-- **Current state:** Bead `agent-platform-0ra` is implemented and ready to close. Branch is `task/divergent-pull-merge-resolver`; commit `3d31a71` contains the PR creation flow. `docs/reviews/*.md` and `output/` remain unrelated/untracked and must not be committed.
-- **Next:** Close the bead, push Beads, commit this session handoff update, push the branch, then continue with `agent-platform-5zg`: focused PR review view.
+- **Date:** 2026-05-23
+- **Session:** Fixed `staging` PR #224 CI and SonarCloud failures.
+- **Today’s outputs:** Added `.sonarcloud.properties` for automatic-analysis CPD exclusions, made Project Git pull/conflict test remotes clone deterministically from `main`, and removed the React rollback setter pattern flagged by SonarCloud in `WorkspaceDashboard`.
+- **Validation:** Passed focused API Project router tests, focused web tests, API/web typechecks, root `pnpm lint`, root `pnpm typecheck`, `pnpm format:check`, `git diff --check`, and full `pnpm run test`.
+- **Current state:** Branch is `staging`, one local commit ahead of `origin/staging` pending push; expected remote result is rerun of PR #224 `verify` and SonarCloud checks.
+- **Next:** Push `staging`, monitor GitHub Actions and SonarCloud, then address any remaining remote-only findings.
 - **Session:** Implemented less-rigid execution policy on `task/less-rigid-execution-policy`.
 - **Today’s outputs:** Added workspace `executionPolicy` settings/contracts and persistence coverage; split shell validation so `bashGuard` only handles hard-deny patterns while `bashCommandPolicy` classifies read-only, workspace-write, package/script, network, git mutation, container, unknown, and destructive commands; routed reviewable unknown/state-changing shell commands and registered unallowlisted tools through one-shot durable HITL approvals; kept destructive commands non-approvable and missing tools/providers on capability recovery; passed execution policy into chat tool dispatch; added policy metadata/copy to approvals; and exposed policy controls on the Workspace page.
 - **Validation:** SonarQube MCP was not callable through the current tool surface, so the documented fallback gate was used. Passed focused contracts/db/harness/API/web tests, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm docs:lint`, and full `pnpm test` after updating the settings router default assertions for `executionPolicy`.
