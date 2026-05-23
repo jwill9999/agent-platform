@@ -118,6 +118,7 @@ describe('desktop backend supervisor helpers', () => {
       AGENT_PLATFORM_DESKTOP_DATA_DIR: join(runtimeRoot, 'data'),
       AGENT_PLATFORM_DESKTOP_LOG_DIR: join(runtimeRoot, 'logs'),
       AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeRoot, 'tmp'),
+      AGENT_PLATFORM_COMMAND_RUNNER: 'auto',
     });
   });
 

@@ -82,6 +82,25 @@ During development the backend supervisor uses the active development Node execu
 child process. The packaging epic must decide whether the released app bundles a Node runtime,
 rebuilds native dependencies for Electron's Node ABI, or packages the backend another way.
 
+## Command sandbox runner
+
+Shell commands issued through `sys_bash` use the harness `CommandRunner` boundary. In the managed
+desktop backend, the runner uses `AGENT_PLATFORM_COMMAND_RUNNER=auto` by default: it tries the
+Docker sandbox runner and falls back to the existing Project-scoped host runner only when Docker is
+unavailable. Non-desktop harness usage defaults to the host runner unless this variable is set.
+
+Supported modes:
+
+- `AGENT_PLATFORM_COMMAND_RUNNER=auto` — prefer Docker sandbox, fallback to host if Docker is
+  missing.
+- `AGENT_PLATFORM_COMMAND_RUNNER=docker-sandbox` — require Docker sandbox execution.
+- `AGENT_PLATFORM_COMMAND_RUNNER=host` — use the Project-scoped host runner.
+
+The Docker sandbox mounts only the selected Project at `/workspace`, runs without host networking,
+uses bounded CPU, memory, process, timeout, and output limits, and does not inherit the host
+environment. The existing policy layer still runs first: command classification, PathJail checks,
+Project write gating, and human approvals remain outside the runner adapter.
+
 ## Desktop app data
 
 The desktop runtime resolves app-owned paths through Electron's OS path API:
@@ -210,6 +229,7 @@ Later release work must add production-like packaged Electron E2E for:
 - Public installers, signing, notarization, update delivery, and uninstall cleanup are not complete.
 - Native Project picker and Project-bound desktop chat have development E2E coverage; packaged-app
   coverage remains future release work.
-- Command/test execution still requires a sandbox design; Electron is not the sandbox.
+- Command/test execution has an initial Docker sandbox runner. Electron is not the sandbox, and VM
+  or remote runners remain future stronger adapters behind the same `CommandRunner` interface.
 - Windows/Linux support should reuse the runtime path resolver and add platform-specific packaging
   and E2E coverage later.
