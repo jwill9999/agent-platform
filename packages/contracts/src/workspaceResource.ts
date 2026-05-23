@@ -100,3 +100,44 @@ export const WorkspaceEventSchema = z.object({
   metadata: z.record(z.unknown()).default({}),
 });
 export type WorkspaceEvent = z.infer<typeof WorkspaceEventSchema>;
+
+export type DesktopWebViewPolicyTier = 'local' | 'trusted' | 'external';
+export type DesktopWebViewStatus = 'loading' | 'active' | 'blocked' | 'error' | 'closed';
+
+export interface DesktopWorkspaceWebViewState {
+  readonly webviewId: string;
+  readonly projectId?: string;
+  readonly url: string;
+  readonly title?: string;
+  readonly origin: string;
+  readonly policyTier: DesktopWebViewPolicyTier;
+  readonly status: DesktopWebViewStatus;
+  readonly canGoBack: boolean;
+  readonly canGoForward: boolean;
+  readonly externalFallbackUrl?: string;
+  readonly blockedUrl?: string;
+  readonly error?: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export type DesktopWebViewState = DesktopWorkspaceWebViewState;
+
+export type DesktopWorkspaceOpenResult =
+  | {
+      readonly ok: true;
+      readonly handled: true;
+      readonly webview: DesktopWorkspaceWebViewState;
+    }
+  | {
+      readonly ok: true;
+      readonly handled: false;
+      readonly reason: string;
+      readonly externalFallbackUrl?: string;
+    };
+
+export interface DesktopWorkspaceOpenExternalFallbackResult {
+  readonly ok: true;
+  readonly handled: true;
+  readonly externalFallbackUrl: string;
+}

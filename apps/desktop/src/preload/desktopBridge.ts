@@ -1,3 +1,16 @@
+import type {
+  DesktopWorkspaceOpenExternalFallbackResult,
+  DesktopWorkspaceOpenResult,
+  DesktopWorkspaceWebViewState,
+} from '@agent-platform/contracts';
+export type {
+  DesktopWebViewPolicyTier,
+  DesktopWebViewStatus,
+  DesktopWorkspaceOpenExternalFallbackResult,
+  DesktopWorkspaceOpenResult,
+  DesktopWorkspaceWebViewState,
+} from '@agent-platform/contracts';
+
 export interface DesktopVersionsApi {
   readonly chrome: () => string;
   readonly electron: () => string;
@@ -107,45 +120,6 @@ export interface DesktopWorkspaceOpenExternalFallbackRequest {
 export interface DesktopWorkspaceOpenWebViewRequest {
   readonly url: string;
   readonly projectId?: string;
-}
-
-export type DesktopWebViewPolicyTier = 'local' | 'trusted' | 'external';
-export type DesktopWebViewStatus = 'loading' | 'active' | 'blocked' | 'error' | 'closed';
-
-export interface DesktopWorkspaceWebViewState {
-  readonly webviewId: string;
-  readonly projectId?: string;
-  readonly url: string;
-  readonly title?: string;
-  readonly origin: string;
-  readonly policyTier: DesktopWebViewPolicyTier;
-  readonly status: DesktopWebViewStatus;
-  readonly canGoBack: boolean;
-  readonly canGoForward: boolean;
-  readonly externalFallbackUrl?: string;
-  readonly blockedUrl?: string;
-  readonly error?: string;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
-
-export type DesktopWorkspaceOpenResult =
-  | {
-      readonly ok: true;
-      readonly handled: true;
-      readonly webview: DesktopWorkspaceWebViewState;
-    }
-  | {
-      readonly ok: true;
-      readonly handled: false;
-      readonly reason: string;
-      readonly externalFallbackUrl?: string;
-    };
-
-export interface DesktopWorkspaceOpenExternalFallbackResult {
-  readonly ok: true;
-  readonly handled: true;
-  readonly externalFallbackUrl: string;
 }
 
 export interface DesktopWorkspaceWebViewIdRequest {

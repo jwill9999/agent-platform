@@ -48,6 +48,12 @@ export {
   type WorkspaceResourceResolution,
   type WorkspaceEventType,
   type WorkspaceEvent,
+  type DesktopWebViewPolicyTier,
+  type DesktopWebViewStatus,
+  type DesktopWorkspaceWebViewState,
+  type DesktopWebViewState,
+  type DesktopWorkspaceOpenResult,
+  type DesktopWorkspaceOpenExternalFallbackResult,
 } from './workspaceResource.js';
 export {
   MessageRecordSchema,

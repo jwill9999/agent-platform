@@ -1,4 +1,10 @@
 import type {
+  DesktopWebViewPolicyTier,
+  DesktopWebViewState,
+  DesktopWebViewStatus,
+  DesktopWorkspaceOpenResult,
+} from '@agent-platform/contracts';
+import type {
   BrowserWindow,
   Event,
   Rectangle,
@@ -7,39 +13,6 @@ import type {
   WebPreferences,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
-
-export type DesktopWebViewPolicyTier = 'local' | 'trusted' | 'external';
-export type DesktopWebViewStatus = 'loading' | 'active' | 'blocked' | 'error' | 'closed';
-
-export interface DesktopWebViewState {
-  readonly webviewId: string;
-  readonly projectId?: string;
-  readonly url: string;
-  readonly title?: string;
-  readonly origin: string;
-  readonly policyTier: DesktopWebViewPolicyTier;
-  readonly status: DesktopWebViewStatus;
-  readonly canGoBack: boolean;
-  readonly canGoForward: boolean;
-  readonly externalFallbackUrl?: string;
-  readonly blockedUrl?: string;
-  readonly error?: string;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
-
-export type DesktopWorkspaceOpenResult =
-  | {
-      readonly ok: true;
-      readonly handled: true;
-      readonly webview: DesktopWebViewState;
-    }
-  | {
-      readonly ok: true;
-      readonly handled: false;
-      readonly reason: string;
-      readonly externalFallbackUrl?: string;
-    };
 
 export interface DesktopWebViewBoundsRequest {
   readonly webviewId: string;

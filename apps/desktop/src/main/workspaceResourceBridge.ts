@@ -1,10 +1,8 @@
+import type { DesktopWorkspaceOpenResult } from '@agent-platform/contracts';
+
 import type { IpcValidationResult } from './ipcValidation.js';
 import { fail, ok } from './ipcValidation.js';
-import type {
-  DesktopWebViewBoundsRequest,
-  DesktopWebViewIdRequest,
-  DesktopWorkspaceOpenResult,
-} from './webviewService.js';
+import type { DesktopWebViewBoundsRequest, DesktopWebViewIdRequest } from './webviewService.js';
 
 const WORKSPACE_RESOURCE_URI_PATTERN =
   /^workspace:\/\/project\/([^/\s]+)\/(file|diff|preview|terminal|webview)\/.+$/;

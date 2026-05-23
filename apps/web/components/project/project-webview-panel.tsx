@@ -135,11 +135,9 @@ export function ProjectWebViewPanel({
     const observer = element ? new ResizeObserver(updateBounds) : null;
     if (element) observer?.observe(element);
     window.addEventListener('resize', updateBounds);
-    const frame = window.setInterval(updateBounds, 600);
     return () => {
       observer?.disconnect();
       window.removeEventListener('resize', updateBounds);
-      window.clearInterval(frame);
       if (activeWebView) {
         void getDesktopWorkspaceBridge()?.setWebViewBounds?.({
           webviewId: activeWebView.webviewId,

@@ -1,43 +1,22 @@
-import type { WorkspaceResource } from '@agent-platform/contracts';
-
-export type DesktopWorkspaceOpenResult =
-  | Readonly<{
-      ok: true;
-      handled: true;
-      webview: DesktopWorkspaceWebViewState;
-    }>
-  | Readonly<{
-      ok: true;
-      handled: false;
-      reason: string;
-      externalFallbackUrl?: string;
-    }>;
-
-export type DesktopWebViewPolicyTier = 'local' | 'trusted' | 'external';
-export type DesktopWebViewStatus = 'loading' | 'active' | 'blocked' | 'error' | 'closed';
-
-export type DesktopWorkspaceWebViewState = Readonly<{
-  webviewId: string;
-  projectId?: string;
-  url: string;
-  title?: string;
-  origin: string;
-  policyTier: DesktopWebViewPolicyTier;
-  status: DesktopWebViewStatus;
-  canGoBack: boolean;
-  canGoForward: boolean;
-  externalFallbackUrl?: string;
-  blockedUrl?: string;
-  error?: string;
-  createdAt: string;
-  updatedAt: string;
-}>;
+import type {
+  DesktopWorkspaceOpenExternalFallbackResult,
+  DesktopWorkspaceOpenResult,
+  DesktopWorkspaceWebViewState,
+  WorkspaceResource,
+} from '@agent-platform/contracts';
+export type {
+  DesktopWebViewPolicyTier,
+  DesktopWebViewStatus,
+  DesktopWorkspaceOpenExternalFallbackResult,
+  DesktopWorkspaceOpenResult,
+  DesktopWorkspaceWebViewState,
+} from '@agent-platform/contracts';
 
 export type DesktopWorkspaceBridge = Readonly<{
   openResource: (request: { readonly uri: string }) => Promise<DesktopWorkspaceOpenResult>;
   openExternalFallback: (request: {
     readonly url: string;
-  }) => Promise<Readonly<{ ok: true; handled: true; externalFallbackUrl: string }>>;
+  }) => Promise<DesktopWorkspaceOpenExternalFallbackResult>;
   openWebView: (request: {
     readonly url: string;
     readonly projectId?: string;
