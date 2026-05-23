@@ -478,8 +478,7 @@ Examples:
 Add category:
 
 ```ts
-package - management;
-```
+"package-management";
 
 Separate from:
 
