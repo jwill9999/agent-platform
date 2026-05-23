@@ -13,41 +13,43 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Added initial Docker sandbox command runner for `sys_bash`.
-- **Branch:** `main`
-- **Latest commit before this change:** `0ded8a7` (`Merge pull request #224 from jwill9999/staging`).
+- **Session:** Created production macOS VM sandbox runner plan and Beads epic.
+- **Branch:** `jwill9999/docker-sandbox-command-runner`
+- **Latest commit:** `3b6f0c7` (`jwill9999/docker-sandbox-command-runner docs plan macos production sandbox runner`).
 
 ## Current State
 
-- User wants shell commands to run in a safer environment that is less close to the host system.
-- The implementation is local and verified so far; commit and push are next.
-- The approach keeps policy separate from execution by adding a Docker-backed `CommandRunner`
-  delegate instead of moving security decisions into the model or shell prompt.
+- The Docker sandbox runner branch exists and has a PR, but it is now explicitly treated as
+  foundation/development-adapter work, not the production sandbox solution.
+- User clarified that packaged macOS staging must test production-ready behavior before merge to
+  `main`; host or Docker fallback must not count as release evidence.
+- New production tracking exists:
+  - Plan: `docs/superpowers/plans/2026-05-24-macos-production-sandbox-runner.md`
+  - Epic: `agent-platform-macos-production-sandbox`
+  - First ready task: `agent-platform-macos-production-sandbox.1`
 
 ## Recent Work
 
-- Added `createDockerSandboxCommandRunner` behind the existing harness `CommandRunner` interface.
-- Added `createConfiguredCommandRunner` with modes:
-  - `AGENT_PLATFORM_COMMAND_RUNNER=auto`
-  - `AGENT_PLATFORM_COMMAND_RUNNER=docker-sandbox`
-  - `AGENT_PLATFORM_COMMAND_RUNNER=host`
-- Wired `createSystemToolExecutor` to use the configured runner by default while preserving injected test runners.
-- Managed desktop backends default `AGENT_PLATFORM_COMMAND_RUNNER=auto`; non-desktop harness usage
-  stays on host mode unless explicitly configured.
-- Docker sandbox behavior:
-  - mounts only the selected Project as `/workspace`,
-  - uses `--network none`,
-  - applies memory, CPU, PID, timeout, and output bounds,
-  - runs as non-root `1000:1000`,
-  - does not inherit host environment variables.
-- Verified locally so far:
-  - `pnpm --filter @agent-platform/harness test -- test/commandRunner.test.ts`
-  - `pnpm --filter @agent-platform/harness typecheck`
-  - `pnpm --filter @agent-platform/harness lint`
+- Reverted the accidental direct `main` push with commit `0dc0d47`; feature work remains on
+  `jwill9999/docker-sandbox-command-runner`.
+- Created a staged production plan for a macOS VM-backed `CommandRunner` using Apple
+  `Virtualization.framework`, with staging required to run packaged Electron E2E against the same
+  runner path production will use.
+- Added task specs for the full chain:
+  1. fail-closed runner defaults,
+  2. runner health/status contract,
+  3. ADR and native Swift helper skeleton,
+  4. VM lifecycle and command execution,
+  5. packaging plus staging E2E gate,
+  6. release hardening and future Windows/Linux adapter plan.
+- Created Beads epic `agent-platform-macos-production-sandbox` and child tasks `.1` through `.6`
+  with dependencies.
+- Verified docs with `pnpm docs:lint`.
 
 ## Next
 
-1. Run full quality gate for the sandbox runner change.
-2. Commit and push to `origin/main`.
-3. Follow up later with runner capability metadata and VM/remote adapters if Docker proves too
-   heavy for public desktop default.
+1. Push the current branch after committing this `session.md` handoff update.
+2. If continuing implementation, start `agent-platform-macos-production-sandbox.1` first:
+   make desktop command execution fail closed and remove production `auto` fallback semantics.
+3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
+   explicitly disabled before anything merges to `main`.
