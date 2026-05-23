@@ -31,6 +31,25 @@ export {
   type Output,
 } from './output.js';
 export {
+  WorkspaceResourceKindSchema,
+  WorkspaceResourceActionSchema,
+  WorkspaceResourceUriSchema,
+  WorkspaceResourceSchema,
+  WorkspaceResourceResolutionSchema,
+  WorkspaceEventTypeSchema,
+  WorkspaceEventSchema,
+  parseWorkspaceResourceUri,
+  workspaceResourceUri,
+  type WorkspaceResourceKind,
+  type WorkspaceResourceAction,
+  type WorkspaceResourceUri,
+  type ParsedWorkspaceResourceUri,
+  type WorkspaceResource,
+  type WorkspaceResourceResolution,
+  type WorkspaceEventType,
+  type WorkspaceEvent,
+} from './workspaceResource.js';
+export {
   MessageRecordSchema,
   MessageCreateBodySchema,
   MessageRoleSchema,

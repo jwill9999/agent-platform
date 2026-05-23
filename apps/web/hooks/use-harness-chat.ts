@@ -7,7 +7,9 @@ import type {
   ApprovalRequestStatus,
   CapabilityRecovery,
   MessageRecord,
+  WorkspaceEvent,
 } from '@agent-platform/contracts';
+import { WorkspaceEventSchema } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
@@ -84,6 +86,7 @@ interface StreamEvent {
   riskTier?: string;
   argsPreview?: unknown;
   recovery?: unknown;
+  event?: unknown;
 }
 
 export type ApprovalRequiredStreamEvent = {
@@ -246,6 +249,7 @@ export type StreamRenderResult =
   | { critic: CriticEvent }
   | { thinking: string }
   | { toolTrace: ToolTraceEvent }
+  | { workspaceEvent: WorkspaceEvent }
   | { approvalRequired: ApprovalRequiredStreamEvent }
   | null;
 
@@ -313,6 +317,10 @@ export function renderStreamEvent(o: StreamEvent): StreamRenderResult {
             },
           }
         : null;
+    case 'workspace_event': {
+      const parsed = WorkspaceEventSchema.safeParse(o.event);
+      return parsed.success ? { workspaceEvent: parsed.data } : null;
+    }
     default:
       return null;
   }
@@ -337,6 +345,7 @@ async function readNdjsonStream(
   onCritic: (event: CriticEvent) => void,
   onThinking: (chunk: string) => void,
   onToolTrace: (event: ToolTraceEvent) => void,
+  onWorkspaceEvent: (event: WorkspaceEvent) => void,
   onApprovalRequired: (event: ApprovalRequiredStreamEvent) => void,
 ): Promise<void> {
   const reader = body.getReader();
@@ -351,6 +360,7 @@ async function readNdjsonStream(
     if ('text' in result) onText(result.text);
     else if ('thinking' in result) onThinking(result.thinking);
     else if ('toolTrace' in result) onToolTrace(result.toolTrace);
+    else if ('workspaceEvent' in result) onWorkspaceEvent(result.workspaceEvent);
     else if ('critic' in result) onCritic(result.critic);
     else if ('approvalRequired' in result) onApprovalRequired(result.approvalRequired);
     else onError(result.error);
@@ -459,6 +469,9 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const [toolEventsByMessage, setToolEventsByMessage] = useState<Record<string, ToolTraceEvent[]>>(
     {},
   );
+  const [workspaceEventsByMessage, setWorkspaceEventsByMessage] = useState<
+    Record<string, WorkspaceEvent[]>
+  >({});
   const [approvalEventsByMessage, setApprovalEventsByMessage] = useState<
     Record<string, ApprovalCardState[]>
   >({});
@@ -476,6 +489,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setCriticEventsByMessage({});
       setThinkingByMessage({});
       setToolEventsByMessage({});
+      setWorkspaceEventsByMessage({});
       setApprovalEventsByMessage({});
       return;
     }
@@ -484,6 +498,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setCriticEventsByMessage({});
       setThinkingByMessage({});
       setToolEventsByMessage({});
+      setWorkspaceEventsByMessage({});
       setApprovalEventsByMessage({});
       return;
     }
@@ -551,6 +566,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     });
   }, []);
 
+  const appendWorkspaceEvent = useCallback((id: string, event: WorkspaceEvent) => {
+    setWorkspaceEventsByMessage((prev) => {
+      const existing = prev[id] ?? [];
+      return { ...prev, [id]: [...existing, event] };
+    });
+  }, []);
+
   const appendApprovalRequired = useCallback((id: string, event: ApprovalRequiredStreamEvent) => {
     setApprovalEventsByMessage((prev) => {
       const existing = prev[id] ?? [];
@@ -613,11 +635,18 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         },
         (chunk) => appendThinking(assistantId, chunk),
         (event) => appendToolTrace(assistantId, event),
+        (event) => appendWorkspaceEvent(assistantId, event),
         (event) => appendApprovalRequired(assistantId, event),
       );
       return { text: accumulated, errorMessage: streamErrorMessage };
     },
-    [appendApprovalRequired, appendCriticEvent, appendThinking, appendToolTrace],
+    [
+      appendApprovalRequired,
+      appendCriticEvent,
+      appendThinking,
+      appendToolTrace,
+      appendWorkspaceEvent,
+    ],
   );
 
   const sendMessage = useCallback(
@@ -684,6 +713,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           return next;
         });
         setToolEventsByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
+        setWorkspaceEventsByMessage((prev) => {
           if (!(assistantId in prev)) return prev;
           const next = { ...prev };
           delete next[assistantId];
@@ -768,6 +803,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           delete next[assistantId];
           return next;
         });
+        setWorkspaceEventsByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
       } finally {
         setStatus('ready');
       }
@@ -785,6 +826,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     criticEventsByMessage,
     thinkingByMessage,
     toolEventsByMessage,
+    workspaceEventsByMessage,
     approvalEventsByMessage,
     hasPendingApproval,
   };

@@ -901,6 +901,9 @@ function createRuntimeToolDispatchNode({
   const projectAccessPolicy = workspaceResolution?.ok
     ? workspaceResolution.accessPolicy
     : undefined;
+  const workspaceResources = workspaceResolution?.ok
+    ? { projectId: workspaceResolution.projectId }
+    : undefined;
 
   return createToolDispatchNode({
     agent: agentCtx.agent,
@@ -921,6 +924,7 @@ function createRuntimeToolDispatchNode({
     approvedToolCallIds,
     skillResolver: (id: string) => getSkill(db, id),
     projectAccessPolicy,
+    workspaceResources,
     projectWriteBlockHandler: createProjectWriteBlockHandler(db, sessionId),
     executionPolicy: loadSettings(db).executionPolicy,
   });

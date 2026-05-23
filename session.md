@@ -7,6 +7,12 @@ Update this file **at the end of each work session** (or when stopping mid-epic)
 
 ## Last updated
 
+- **Date:** 2026-05-23
+- **Session:** Implemented internal workspace WebView runtime on `task/workspace-resource-runtime-v2`.
+- **Today’s outputs:** Added workspace resource contracts and harness event routing, Electron `WebContentsView` runtime with URL policy and lifecycle IPC, persistent isolated WebView session, generated preload bridge support, visible Project Chat WebView panel with docked/wide/focused modes, GitHub sidebar/chat/resource-card URL routing, and a sandbox hardening review doc included by request.
+- **Validation:** Passed focused desktop/web unit tests, desktop/web typechecks and lint, `pnpm format:check`, `git diff --check`, and Electron Playwright `webview-runtime.e2e.ts`, which verifies GitHub link opening, usable WebView sizing, wide mode, local preview loading, and non-local HTTP fallback. SonarQube MCP was unavailable through tool discovery, so the documented fallback gate was used.
+- **Current state:** Branch is `task/workspace-resource-runtime-v2`; commit `9006e71` contains the WebView implementation before this handoff amend. Worktree was clean after the feature commit.
+- **Next:** Amend this handoff into the commit, push the branch, then manually smoke-test the built Electron app by clicking the GitHub repository link in the sidebar and resizing the WebView panel.
 - **Date:** 2026-05-22
 - **Session:** Implemented `agent-platform-0ra` on `task/divergent-pull-merge-resolver`: in-app GitHub pull request creation and monitoring after branch publish.
 - **Today’s outputs:** Added create-PR contracts, `POST /v1/projects/:id/github/pull-requests`, GitHub CLI-backed PR creation, refreshed PR/check state after creation, Publish success GitHub links, PR-tab create form/fallback links/current-branch PR prioritisation, and focused API/web/Electron coverage with a fake `gh`.

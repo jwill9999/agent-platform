@@ -6,15 +6,27 @@ import {
   desktopMaintenanceApiKeys,
   desktopProjectsApiKeys,
   desktopTerminalApiKeys,
+  desktopWorkspaceApiKeys,
+  closeWorkspaceWebViewIpcChannel,
   createTerminalIpcChannel,
   disposeTerminalIpcChannel,
+  focusWorkspaceWebViewIpcChannel,
+  goBackWorkspaceWebViewIpcChannel,
+  goForwardWorkspaceWebViewIpcChannel,
   inputTerminalIpcChannel,
+  listWorkspaceWebViewsIpcChannel,
   createProjectFolderIpcChannel,
+  openWorkspaceExternalFallbackIpcChannel,
+  openWorkspaceResourceIpcChannel,
+  openWorkspaceWebViewIpcChannel,
+  reloadWorkspaceWebViewIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   resizeTerminalIpcChannel,
   selectProjectFolderIpcChannel,
+  setWorkspaceWebViewBoundsIpcChannel,
   desktopVersionsApiKeys,
+  workspaceWebViewUpdatedIpcChannel,
 } from '../src/preload/desktopBridge.js';
 
 describe('desktop preload bridge contract', () => {
@@ -23,7 +35,13 @@ describe('desktop preload bridge contract', () => {
   });
 
   it('limits the root bridge keys to the explicit contract', () => {
-    expect(desktopBridgeApiKeys).toEqual(['maintenance', 'projects', 'terminal', 'versions']);
+    expect(desktopBridgeApiKeys).toEqual([
+      'maintenance',
+      'projects',
+      'terminal',
+      'workspace',
+      'versions',
+    ]);
   });
 
   it('limits maintenance helpers to explicit destructive actions', () => {
@@ -46,6 +64,22 @@ describe('desktop preload bridge contract', () => {
       'dispose',
       'onData',
       'onExit',
+    ]);
+  });
+
+  it('limits workspace helpers to explicit WebView lifecycle actions', () => {
+    expect(desktopWorkspaceApiKeys).toEqual([
+      'openResource',
+      'openExternalFallback',
+      'openWebView',
+      'closeWebView',
+      'focusWebView',
+      'listWebViews',
+      'setWebViewBounds',
+      'goBackWebView',
+      'goForwardWebView',
+      'reloadWebView',
+      'onWebViewUpdated',
     ]);
   });
 
@@ -94,6 +128,41 @@ describe('desktop preload bridge contract', () => {
       disposeTerminalIpcChannel,
     ]) {
       expect(channel).toMatch(/^agent-platform:terminal:/);
+      expect(channel).not.toContain('eval');
+    }
+  });
+
+  it('keeps workspace IPC channels scoped to explicit workspace actions', () => {
+    expect(openWorkspaceResourceIpcChannel).toBe('agent-platform:workspace:open-resource');
+    expect(openWorkspaceExternalFallbackIpcChannel).toBe(
+      'agent-platform:workspace:open-external-fallback',
+    );
+    expect(openWorkspaceWebViewIpcChannel).toBe('agent-platform:workspace:open-webview');
+    expect(closeWorkspaceWebViewIpcChannel).toBe('agent-platform:workspace:close-webview');
+    expect(focusWorkspaceWebViewIpcChannel).toBe('agent-platform:workspace:focus-webview');
+    expect(listWorkspaceWebViewsIpcChannel).toBe('agent-platform:workspace:list-webviews');
+    expect(setWorkspaceWebViewBoundsIpcChannel).toBe('agent-platform:workspace:set-webview-bounds');
+    expect(goBackWorkspaceWebViewIpcChannel).toBe('agent-platform:workspace:webview-back');
+    expect(goForwardWorkspaceWebViewIpcChannel).toBe('agent-platform:workspace:webview-forward');
+    expect(reloadWorkspaceWebViewIpcChannel).toBe('agent-platform:workspace:webview-reload');
+    expect(workspaceWebViewUpdatedIpcChannel).toBe('agent-platform:workspace:webview-updated');
+
+    for (const channel of [
+      openWorkspaceResourceIpcChannel,
+      openWorkspaceExternalFallbackIpcChannel,
+      openWorkspaceWebViewIpcChannel,
+      closeWorkspaceWebViewIpcChannel,
+      focusWorkspaceWebViewIpcChannel,
+      listWorkspaceWebViewsIpcChannel,
+      setWorkspaceWebViewBoundsIpcChannel,
+      goBackWorkspaceWebViewIpcChannel,
+      goForwardWorkspaceWebViewIpcChannel,
+      reloadWorkspaceWebViewIpcChannel,
+      workspaceWebViewUpdatedIpcChannel,
+    ]) {
+      expect(channel).toMatch(/^agent-platform:workspace:/);
+      expect(channel).not.toContain('fs');
+      expect(channel).not.toContain('shell');
       expect(channel).not.toContain('eval');
     }
   });

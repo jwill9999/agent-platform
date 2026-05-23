@@ -140,6 +140,8 @@ export function OutputRenderer({ output, showThinking }: Props) {
           {output.message ? <div style={{ marginTop: '0.35rem' }}>{output.message}</div> : null}
         </div>
       );
+    case 'workspace_event':
+      return null;
     default: {
       const _exhaustive: never = output;
       return _exhaustive;

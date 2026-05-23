@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { RiskTierSchema } from './tool.js';
+import { WorkspaceEventSchema } from './workspaceResource.js';
 
 export const CapabilityRecoveryOptionSchema = z.object({
   id: z.string().min(1),
@@ -60,6 +61,10 @@ export const OutputSchema = z.discriminatedUnion('type', [
     riskTier: RiskTierSchema.optional(),
     argsPreview: z.unknown(),
     message: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('workspace_event'),
+    event: WorkspaceEventSchema,
   }),
 ]);
 

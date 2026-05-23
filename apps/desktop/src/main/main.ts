@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, WebContentsView } from 'electron';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node-pty';
@@ -43,12 +43,23 @@ import {
   resetLocalDataIpcChannel,
   createProjectFolderIpcChannel,
   createTerminalIpcChannel,
+  closeWorkspaceWebViewIpcChannel,
   disposeTerminalIpcChannel,
+  focusWorkspaceWebViewIpcChannel,
+  goBackWorkspaceWebViewIpcChannel,
+  goForwardWorkspaceWebViewIpcChannel,
   inputTerminalIpcChannel,
+  listWorkspaceWebViewsIpcChannel,
+  openWorkspaceExternalFallbackIpcChannel,
+  openWorkspaceResourceIpcChannel,
+  openWorkspaceWebViewIpcChannel,
+  reloadWorkspaceWebViewIpcChannel,
   resizeTerminalIpcChannel,
   selectProjectFolderIpcChannel,
+  setWorkspaceWebViewBoundsIpcChannel,
   terminalDataIpcChannel,
   terminalExitIpcChannel,
+  workspaceWebViewUpdatedIpcChannel,
 } from '../preload/desktopBridge.js';
 import {
   DesktopTerminalService,
@@ -61,6 +72,15 @@ import {
   type DesktopPtySpawnOptions,
 } from './terminalService.js';
 import {
+  validateDesktopWorkspaceOpenExternalFallbackRequest,
+  validateDesktopWorkspaceOpenResourceRequest,
+  validateDesktopWorkspaceOpenWebViewRequest,
+  validateDesktopWorkspaceWebViewBoundsRequest,
+  validateDesktopWorkspaceWebViewIdRequest,
+  workspaceOpenFallbackResult,
+} from './workspaceResourceBridge.js';
+import { createElectronWebViewFactory, DesktopWebViewService } from './webviewService.js';
+import {
   applyRendererSecurity,
   buildBootstrapHtml,
   createWindowOptions,
@@ -72,6 +92,7 @@ let mainWindow: BrowserWindow | undefined;
 let desktopBackend: DesktopBackendHandle | undefined;
 let standaloneRenderer: StandaloneRendererHandle | undefined;
 let desktopTerminalService: DesktopTerminalService | undefined;
+let desktopWebViewService: DesktopWebViewService | undefined;
 
 export async function createMainWindow(): Promise<BrowserWindow> {
   const mainDir = dirname(fileURLToPath(import.meta.url));
@@ -153,6 +174,7 @@ async function bootstrap(): Promise<void> {
   registerDesktopMaintenanceIpc(window, runtimePaths);
   registerDesktopProjectIpc(window);
   registerDesktopTerminalIpc(window);
+  registerDesktopWorkspaceIpc(window);
 
   app.on('activate', async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -160,6 +182,7 @@ async function bootstrap(): Promise<void> {
       registerDesktopMaintenanceIpc(activatedWindow, runtimePaths);
       registerDesktopProjectIpc(activatedWindow);
       registerDesktopTerminalIpc(activatedWindow);
+      registerDesktopWorkspaceIpc(activatedWindow);
       return;
     }
 
@@ -256,6 +279,107 @@ function registerDesktopProjectIpc(window: BrowserWindow): void {
   });
 }
 
+function registerDesktopWorkspaceIpc(window: BrowserWindow): void {
+  desktopWebViewService?.disposeAll();
+  desktopWebViewService = new DesktopWebViewService({
+    factory: createElectronWebViewFactory(window, WebContentsView),
+    onUpdate: (state) => {
+      if (!window.isDestroyed()) {
+        window.webContents.send(workspaceWebViewUpdatedIpcChannel, state);
+      }
+    },
+  });
+
+  window.once('closed', () => {
+    desktopWebViewService?.disposeAll();
+    desktopWebViewService = undefined;
+  });
+
+  ipcMain.removeHandler(openWorkspaceResourceIpcChannel);
+  ipcMain.handle(openWorkspaceResourceIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceOpenResourceRequest);
+    return (
+      desktopWebViewService?.openResource(request.uri, request.projectId) ??
+      workspaceOpenFallbackResult('Workspace WebView service is unavailable.')
+    );
+  });
+
+  ipcMain.removeHandler(openWorkspaceExternalFallbackIpcChannel);
+  ipcMain.handle(openWorkspaceExternalFallbackIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(
+      payload,
+      validateDesktopWorkspaceOpenExternalFallbackRequest,
+    );
+    await shell.openExternal(request.url);
+    return {
+      ok: true,
+      handled: true,
+      externalFallbackUrl: request.url,
+    };
+  });
+
+  ipcMain.removeHandler(openWorkspaceWebViewIpcChannel);
+  ipcMain.handle(openWorkspaceWebViewIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceOpenWebViewRequest);
+    return (
+      desktopWebViewService?.openWebView(request) ??
+      workspaceOpenFallbackResult('Workspace WebView service is unavailable.')
+    );
+  });
+
+  ipcMain.removeHandler(closeWorkspaceWebViewIpcChannel);
+  ipcMain.handle(closeWorkspaceWebViewIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceWebViewIdRequest);
+    return desktopWebViewService?.close(request.webviewId) ?? null;
+  });
+
+  ipcMain.removeHandler(focusWorkspaceWebViewIpcChannel);
+  ipcMain.handle(focusWorkspaceWebViewIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceWebViewIdRequest);
+    return desktopWebViewService?.focus(request.webviewId) ?? null;
+  });
+
+  ipcMain.removeHandler(listWorkspaceWebViewsIpcChannel);
+  ipcMain.handle(listWorkspaceWebViewsIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    validateIpcPayload(payload, validateNoPayload);
+    return desktopWebViewService?.list() ?? [];
+  });
+
+  ipcMain.removeHandler(setWorkspaceWebViewBoundsIpcChannel);
+  ipcMain.handle(setWorkspaceWebViewBoundsIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceWebViewBoundsRequest);
+    return desktopWebViewService?.setBounds(request) ?? null;
+  });
+
+  ipcMain.removeHandler(goBackWorkspaceWebViewIpcChannel);
+  ipcMain.handle(goBackWorkspaceWebViewIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceWebViewIdRequest);
+    return desktopWebViewService?.goBack(request.webviewId) ?? null;
+  });
+
+  ipcMain.removeHandler(goForwardWorkspaceWebViewIpcChannel);
+  ipcMain.handle(goForwardWorkspaceWebViewIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceWebViewIdRequest);
+    return desktopWebViewService?.goForward(request.webviewId) ?? null;
+  });
+
+  ipcMain.removeHandler(reloadWorkspaceWebViewIpcChannel);
+  ipcMain.handle(reloadWorkspaceWebViewIpcChannel, (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceWebViewIdRequest);
+    return desktopWebViewService?.reload(request.webviewId) ?? null;
+  });
+}
+
 function registerDesktopMaintenanceIpc(
   window: BrowserWindow,
   runtimePaths: ReturnType<typeof resolveDesktopRuntimePathsFromApp>,
@@ -289,6 +413,9 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  desktopWebViewService?.disposeAll();
+  desktopWebViewService = undefined;
+
   desktopTerminalService?.disposeAll();
   desktopTerminalService = undefined;
 

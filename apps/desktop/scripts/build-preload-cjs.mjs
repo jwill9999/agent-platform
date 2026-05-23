@@ -51,6 +51,37 @@ const resizeTerminalIpcChannel = ${JSON.stringify(desktopBridge.resizeTerminalIp
 const disposeTerminalIpcChannel = ${JSON.stringify(desktopBridge.disposeTerminalIpcChannel)};
 const terminalDataIpcChannel = ${JSON.stringify(desktopBridge.terminalDataIpcChannel)};
 const terminalExitIpcChannel = ${JSON.stringify(desktopBridge.terminalExitIpcChannel)};
+const openWorkspaceResourceIpcChannel = ${JSON.stringify(
+    desktopBridge.openWorkspaceResourceIpcChannel,
+  )};
+const openWorkspaceExternalFallbackIpcChannel = ${JSON.stringify(
+    desktopBridge.openWorkspaceExternalFallbackIpcChannel,
+  )};
+const openWorkspaceWebViewIpcChannel = ${JSON.stringify(desktopBridge.openWorkspaceWebViewIpcChannel)};
+const closeWorkspaceWebViewIpcChannel = ${JSON.stringify(
+    desktopBridge.closeWorkspaceWebViewIpcChannel,
+  )};
+const focusWorkspaceWebViewIpcChannel = ${JSON.stringify(
+    desktopBridge.focusWorkspaceWebViewIpcChannel,
+  )};
+const listWorkspaceWebViewsIpcChannel = ${JSON.stringify(
+    desktopBridge.listWorkspaceWebViewsIpcChannel,
+  )};
+const setWorkspaceWebViewBoundsIpcChannel = ${JSON.stringify(
+    desktopBridge.setWorkspaceWebViewBoundsIpcChannel,
+  )};
+const goBackWorkspaceWebViewIpcChannel = ${JSON.stringify(
+    desktopBridge.goBackWorkspaceWebViewIpcChannel,
+  )};
+const goForwardWorkspaceWebViewIpcChannel = ${JSON.stringify(
+    desktopBridge.goForwardWorkspaceWebViewIpcChannel,
+  )};
+const reloadWorkspaceWebViewIpcChannel = ${JSON.stringify(
+    desktopBridge.reloadWorkspaceWebViewIpcChannel,
+  )};
+const workspaceWebViewUpdatedIpcChannel = ${JSON.stringify(
+    desktopBridge.workspaceWebViewUpdatedIpcChannel,
+  )};
 
 const desktopApi = {
   maintenance: {
@@ -75,6 +106,25 @@ const desktopApi = {
       const listener = (_event, payload) => callback(payload);
       ipcRenderer.on(terminalExitIpcChannel, listener);
       return () => ipcRenderer.removeListener(terminalExitIpcChannel, listener);
+    },
+  },
+  workspace: {
+    openResource: (request) => ipcRenderer.invoke(openWorkspaceResourceIpcChannel, request),
+    openExternalFallback: (request) =>
+      ipcRenderer.invoke(openWorkspaceExternalFallbackIpcChannel, request),
+    openWebView: (request) => ipcRenderer.invoke(openWorkspaceWebViewIpcChannel, request),
+    closeWebView: (request) => ipcRenderer.invoke(closeWorkspaceWebViewIpcChannel, request),
+    focusWebView: (request) => ipcRenderer.invoke(focusWorkspaceWebViewIpcChannel, request),
+    listWebViews: () => ipcRenderer.invoke(listWorkspaceWebViewsIpcChannel),
+    setWebViewBounds: (request) =>
+      ipcRenderer.invoke(setWorkspaceWebViewBoundsIpcChannel, request),
+    goBackWebView: (request) => ipcRenderer.invoke(goBackWorkspaceWebViewIpcChannel, request),
+    goForwardWebView: (request) => ipcRenderer.invoke(goForwardWorkspaceWebViewIpcChannel, request),
+    reloadWebView: (request) => ipcRenderer.invoke(reloadWorkspaceWebViewIpcChannel, request),
+    onWebViewUpdated: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on(workspaceWebViewUpdatedIpcChannel, listener);
+      return () => ipcRenderer.removeListener(workspaceWebViewUpdatedIpcChannel, listener);
     },
   },
   versions: {
@@ -116,6 +166,50 @@ function loadDesktopBridgeContract() {
     disposeTerminalIpcChannel: readExportedStringConst(sourceFile, 'disposeTerminalIpcChannel'),
     terminalDataIpcChannel: readExportedStringConst(sourceFile, 'terminalDataIpcChannel'),
     terminalExitIpcChannel: readExportedStringConst(sourceFile, 'terminalExitIpcChannel'),
+    openWorkspaceResourceIpcChannel: readExportedStringConst(
+      sourceFile,
+      'openWorkspaceResourceIpcChannel',
+    ),
+    openWorkspaceExternalFallbackIpcChannel: readExportedStringConst(
+      sourceFile,
+      'openWorkspaceExternalFallbackIpcChannel',
+    ),
+    openWorkspaceWebViewIpcChannel: readExportedStringConst(
+      sourceFile,
+      'openWorkspaceWebViewIpcChannel',
+    ),
+    closeWorkspaceWebViewIpcChannel: readExportedStringConst(
+      sourceFile,
+      'closeWorkspaceWebViewIpcChannel',
+    ),
+    focusWorkspaceWebViewIpcChannel: readExportedStringConst(
+      sourceFile,
+      'focusWorkspaceWebViewIpcChannel',
+    ),
+    listWorkspaceWebViewsIpcChannel: readExportedStringConst(
+      sourceFile,
+      'listWorkspaceWebViewsIpcChannel',
+    ),
+    setWorkspaceWebViewBoundsIpcChannel: readExportedStringConst(
+      sourceFile,
+      'setWorkspaceWebViewBoundsIpcChannel',
+    ),
+    goBackWorkspaceWebViewIpcChannel: readExportedStringConst(
+      sourceFile,
+      'goBackWorkspaceWebViewIpcChannel',
+    ),
+    goForwardWorkspaceWebViewIpcChannel: readExportedStringConst(
+      sourceFile,
+      'goForwardWorkspaceWebViewIpcChannel',
+    ),
+    reloadWorkspaceWebViewIpcChannel: readExportedStringConst(
+      sourceFile,
+      'reloadWorkspaceWebViewIpcChannel',
+    ),
+    workspaceWebViewUpdatedIpcChannel: readExportedStringConst(
+      sourceFile,
+      'workspaceWebViewUpdatedIpcChannel',
+    ),
   };
 }
 

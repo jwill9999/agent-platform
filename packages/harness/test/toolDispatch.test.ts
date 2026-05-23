@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   createToolDispatchNode,
+  workspaceResourceEventsForToolOutput,
   type ApprovalRequestCreateInput,
   type ToolDispatchContext,
 } from '../src/nodes/toolDispatch.js';
@@ -1551,5 +1552,70 @@ describe('toolDispatchNode', () => {
     expect(result2.trace).toContainEqual(
       expect.objectContaining({ type: 'rate_limit_hit', toolId: 'echo' }),
     );
+  });
+
+  it('maps git changed files to workspace resource events', () => {
+    const events = workspaceResourceEventsForToolOutput(
+      'sys_git_changed_files',
+      {
+        type: 'tool_result',
+        toolId: 'sys_git_changed_files',
+        data: {
+          ok: true,
+          result: {
+            files: [{ path: 'src/index.ts', status: 'M', staged: false, unstaged: true }],
+          },
+        },
+      },
+      'project-1',
+      '2026-05-23T12:00:00.000Z',
+    );
+
+    expect(events).toEqual([
+      {
+        type: 'workspace_event',
+        event: {
+          type: 'resource_created',
+          action: 'open',
+          resource: {
+            uri: 'workspace://project/project-1/file/src/index.ts',
+            kind: 'file',
+            projectId: 'project-1',
+            label: 'src/index.ts',
+            createdAt: '2026-05-23T12:00:00.000Z',
+            metadata: { path: 'src/index.ts', sourceTool: 'sys_git_changed_files' },
+          },
+          metadata: { sourceTool: 'sys_git_changed_files' },
+        },
+      },
+    ]);
+  });
+
+  it('maps git diff output to a diff resource event', () => {
+    const events = workspaceResourceEventsForToolOutput(
+      'sys_git_diff',
+      {
+        type: 'tool_result',
+        toolId: 'sys_git_diff',
+        data: {
+          ok: true,
+          result: { path: 'src/index.ts', staged: true },
+        },
+      },
+      'project-1',
+      '2026-05-23T12:00:00.000Z',
+    );
+
+    expect(events[0]).toMatchObject({
+      type: 'workspace_event',
+      event: {
+        type: 'diff_created',
+        resource: {
+          uri: 'workspace://project/project-1/diff/src/index.ts',
+          kind: 'diff',
+          metadata: { path: 'src/index.ts', mode: 'staged' },
+        },
+      },
+    });
   });
 });
