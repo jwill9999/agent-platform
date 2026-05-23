@@ -959,6 +959,13 @@ export function getProjectAccessPolicy(input: {
         writeBlockReason: 'readonly_capability',
       };
     case 'backend_accessible':
+      if (input.onboardingState !== 'approved') {
+        return {
+          canInspect: true,
+          canWrite: false,
+          writeBlockReason: 'onboarding_not_approved',
+        };
+      }
       return {
         canInspect: true,
         canWrite: true,

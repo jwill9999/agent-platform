@@ -13,43 +13,39 @@
 ## Last Updated
 
 - **Date:** 2026-05-23
-- **Session:** Fixed `staging` PR #224 CI/SonarCloud failures, then reset `session.md` into a bounded rolling handoff.
+- **Session:** Reinstated Project write gating until AGENTS.md onboarding is approved.
 - **Branch:** `staging`
-- **Latest commit before this handoff cleanup:** `070ea39` (`staging fix CI and SonarCloud failures`) pushed to `origin/staging`.
+- **Latest commit before this change:** `9e9f029` (`Merge pull request #225 from jwill9999/task/workspace-resource-runtime-v2`).
 - **Current PR:** [#224 staging -> main](https://github.com/jwill9999/agent-platform/pull/224)
 
 ## Current State
 
-- `staging` was clean and aligned with `origin/staging` at `070ea39` after pushing the CI/SonarCloud fix.
-- PR #224 checks were rerunning after the push.
-- At last check:
-  - Passing: GitGuardian, docs `markdownlint`, docs `lychee`, CodeQL actions analysis.
-  - In progress: CI `verify`, CI `docker`, CI `desktop-e2e`, Promptfoo `security-scan`, CodeQL JavaScript/TypeScript analysis.
-- SonarCloud had previously failed on:
-  - `new_duplicated_lines_density` at `5.3%`.
-  - `new_reliability_rating` at `3`.
-  - one bug in `apps/web/components/config/workspace-dashboard.tsx`.
+- `staging` contains the merged webview/runtime work from PR #225.
+- A high-severity review finding identified that backend-accessible Project chats could still expose and execute write tools before onboarding approval.
+- The fix is local and verified; commit and push are next.
 
 ## Recent Work
 
-- Added `.sonarcloud.properties` so SonarCloud automatic analysis receives CPD exclusions for intentionally repetitive test and E2E files.
-- Fixed the SonarCloud React bug in `WorkspaceDashboard` by storing `previous` execution policy state before optimistic update rollback.
-- Fixed CI-only Git fixture failures in `apps/api/test/projectsRouter.test.ts` by setting bare remote `HEAD` to `refs/heads/main` before cloning.
-- Verified locally before pushing:
-  - `pnpm --filter @agent-platform/api test -- test/projectsRouter.test.ts`
-  - `pnpm --filter @agent-platform/web test -- test/workspace-files.test.ts test/project-navigation.test.ts`
+- Updated `packages/contracts/src/project.ts` so `backend_accessible` Projects can inspect files but cannot write until `onboardingState === 'approved'`.
+- Updated API and contract tests to cover blocked pre-approval writes, hidden write tool definitions, onboarding draft creation, and read/write access policy output.
+- Rebuilt contracts before API verification so tests used the updated package output.
+- Verified locally:
+  - `pnpm --filter @agent-platform/contracts test -- test/project.test.ts`
+  - `pnpm --filter @agent-platform/api test -- test/sessionChat.integration.test.ts test/projectWorkspaceResolver.test.ts`
+  - `pnpm --filter @agent-platform/contracts typecheck`
   - `pnpm --filter @agent-platform/api typecheck`
-  - `pnpm --filter @agent-platform/web typecheck`
   - `pnpm lint`
   - `pnpm typecheck`
   - `pnpm format:check`
   - `git diff --check`
-  - `pnpm run test`
-- The pre-push hook also passed affected `apps/api` and `apps/web` build, typecheck, and tests.
+  - `pnpm test`
+- Added `.sonarcloud.properties` so SonarCloud automatic analysis receives CPD exclusions for intentionally repetitive test and E2E files.
+- Fixed the SonarCloud React bug in `WorkspaceDashboard` by storing `previous` execution policy state before optimistic update rollback.
+- Fixed CI-only Git fixture failures in `apps/api/test/projectsRouter.test.ts` by setting bare remote `HEAD` to `refs/heads/main` before cloning.
 
 ## Next
 
-1. Monitor PR #224 checks for commit `070ea39`.
+1. Commit and push the Project write gating fix to `origin/staging`.
 2. If `verify` fails again, inspect the new GitHub Actions log before changing code.
 3. If SonarCloud still fails duplication, confirm whether `.sonarcloud.properties` was picked up by automatic analysis; if not, move exclusions into the SonarCloud UI or switch PR analysis to scanner-based CI.
 4. If all checks pass, keep `session.md` short by updating this file in place and moving any older detail into `session-archive-2026-05.md`.

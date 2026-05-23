@@ -420,7 +420,7 @@ describe('Project mode and workspace binding contracts', () => {
         capabilityState: 'backend_accessible',
         onboardingState: 'missing',
       }),
-    ).toMatchObject({ canInspect: true, canWrite: true });
+    ).toMatchObject({ canInspect: true, canWrite: false });
 
     expect(
       getProjectAccessPolicy({
@@ -437,7 +437,7 @@ describe('Project mode and workspace binding contracts', () => {
     ).toMatchObject({ canInspect: false, canWrite: false });
   });
 
-  it('allows writes whenever the backend can access the project', () => {
+  it('allows writes only after backend-accessible Project onboarding is approved', () => {
     expect(
       getProjectAccessPolicy({
         capabilityState: 'backend_accessible',
@@ -456,8 +456,8 @@ describe('Project mode and workspace binding contracts', () => {
       }),
     ).toEqual({
       canInspect: true,
-      canWrite: true,
-      writeBlockReason: undefined,
+      canWrite: false,
+      writeBlockReason: 'onboarding_not_approved',
     });
   });
 

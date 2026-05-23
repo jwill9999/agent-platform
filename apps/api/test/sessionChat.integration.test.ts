@@ -1268,10 +1268,10 @@ describe('POST /v1/chat (session-aware)', () => {
     });
   });
 
-  it('allows Project writes before AGENTS.md onboarding is approved', async () => {
+  it('blocks Project writes before AGENTS.md onboarding is approved', async () => {
     await withMockChatApp(dirs, async ({ app, db }) => {
       const projectRoot = createProjectRoot(dirs);
-      const sessionId = await createProjectSession(app, db, {
+      const project = createChatProject(db, {
         name: 'Needs Review Project',
         workspaceKey: projectRoot,
         backendProjectRoot: projectRoot,
@@ -1279,6 +1279,11 @@ describe('POST /v1/chat (session-aware)', () => {
         capabilityState: 'backend_accessible',
         onboardingState: 'needs_review',
       });
+      const sessionRes = await request(app)
+        .post('/v1/sessions')
+        .send({ agentId: DEFAULT_AGENT_ID, mode: 'project', projectId: project.id })
+        .expect(201);
+      const sessionId = sessionRes.body.data.id as string;
       mockProjectWrite('tc-project-write-allowed', 'written before onboarding');
 
       const res = await request(app)
@@ -1286,14 +1291,13 @@ describe('POST /v1/chat (session-aware)', () => {
         .send({ sessionId, message: 'Write the project note' })
         .expect(200);
 
-      expect(res.text).toContain('tool_result');
-      expect(readFileSync(path.join(projectRoot, 'project-note.txt'), 'utf8')).toBe(
-        'written before onboarding',
-      );
+      expect(res.text).toContain('I prepared a Project instructions draft');
+      expect(existsSync(path.join(projectRoot, 'project-note.txt'))).toBe(false);
+      expect(getProject(db, project.id).metadata['onboardingDraft']).toBeDefined();
     });
   });
 
-  it('writes from a new desktop Project first request without auto-starting AGENTS.md setup', async () => {
+  it('blocks writes from a new desktop Project first request and starts AGENTS.md setup', async () => {
     await withMockChatApp(dirs, async ({ app, db }) => {
       const projectRoot = createProjectRoot(dirs);
       const registered = await request(app)
@@ -1314,17 +1318,15 @@ describe('POST /v1/chat (session-aware)', () => {
         .send({ sessionId, message: 'Create a simple Node project' })
         .expect(200);
 
-      expect(firstWrite.text).toContain('tool_result');
-      expect(firstWrite.text).not.toContain('I prepared a Project instructions draft');
+      expect(firstWrite.text).not.toContain('tool_result');
+      expect(firstWrite.text).toContain('I prepared a Project instructions draft');
       expect(firstWrite.text).not.toContain(projectRoot);
-      expect(readFileSync(path.join(projectRoot, 'project-note.txt'), 'utf8')).toBe(
-        'written on first request',
-      );
-      expect(getProject(db, projectId).metadata['onboardingDraft']).toBeUndefined();
+      expect(existsSync(path.join(projectRoot, 'project-note.txt'))).toBe(false);
+      expect(getProject(db, projectId).metadata['onboardingDraft']).toBeDefined();
     });
   });
 
-  it('keeps write tools visible in new Project Chat so first write attempts can execute', async () => {
+  it('hides write tools in new Project Chat until AGENTS.md onboarding is approved', async () => {
     await withMockChatApp(dirs, async ({ app }) => {
       const projectRoot = createProjectRoot(dirs);
       const registered = await request(app)
@@ -1342,7 +1344,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockToolCalls.mockImplementationOnce((state) => {
         visibleToolNames = state.toolDefinitions.map((tool: { name: string }) => tool.name);
-        return 'I can create files now.';
+        return 'I can inspect files now.';
       });
 
       await request(app)
@@ -1350,8 +1352,13 @@ describe('POST /v1/chat (session-aware)', () => {
         .send({ sessionId, message: 'Create a simple Node project' })
         .expect(200);
 
-      expect(visibleToolNames).toContain('sys_write_file');
-      expect(visibleToolNames).toContain('coding_apply_patch');
+      expect(visibleToolNames).toContain('sys_read_file');
+      expect(visibleToolNames).not.toContain('sys_write_file');
+      expect(visibleToolNames).not.toContain('sys_append_file');
+      expect(visibleToolNames).not.toContain('sys_copy_file');
+      expect(visibleToolNames).not.toContain('sys_create_directory');
+      expect(visibleToolNames).not.toContain('sys_download_file');
+      expect(visibleToolNames).not.toContain('coding_apply_patch');
     });
   });
 
