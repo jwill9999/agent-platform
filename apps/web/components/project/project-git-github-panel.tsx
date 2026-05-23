@@ -29,6 +29,7 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react';
+import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { cn } from '@/lib/cn';
+import { getDesktopWorkspaceBridge, openWorkspaceWebUrl } from '@/lib/desktop-workspace';
 import { buildProjectIdeHref } from '@/lib/project-navigation';
 
 type ProjectGitHubPanelProps = Readonly<{
@@ -111,6 +113,17 @@ function normalizeGitHubUrl(remoteUrl: string | undefined): string | null {
   return null;
 }
 
+function openWorkspaceWebLink(
+  event: React.MouseEvent<HTMLAnchorElement>,
+  url: string,
+  projectId: string | null,
+): void {
+  const bridge = getDesktopWorkspaceBridge();
+  if (!bridge) return;
+  event.preventDefault();
+  void openWorkspaceWebUrl({ url, projectId });
+}
+
 export function deriveGitPullRequestCreateState({
   status,
   pullRequests,
@@ -121,7 +134,10 @@ export function deriveGitPullRequestCreateState({
   const currentPullRequest =
     pullRequests?.pullRequests.find((pullRequest) => pullRequest.currentBranch) ?? null;
   const defaultTitle =
-    status.recentCommit?.subject ?? status.currentBranch ?? pullRequests?.currentBranch ?? 'Pull request';
+    status.recentCommit?.subject ??
+    status.currentBranch ??
+    pullRequests?.currentBranch ??
+    'Pull request';
   const baseBranch =
     status.baseBranch && status.baseBranch !== status.currentBranch ? status.baseBranch : 'main';
   const repositoryUrl = normalizeGitHubUrl(status.remoteUrl ?? pullRequests?.remoteUrl);
@@ -1054,9 +1070,7 @@ export function ProjectGitHubPanel({
   const [repositoryOwner, setRepositoryOwner] = useState('');
   const [repositoryName, setRepositoryName] = useState('');
   const [repositoryDescription, setRepositoryDescription] = useState('');
-  const [repositoryVisibility, setRepositoryVisibility] = useState<'private' | 'public'>(
-    'private',
-  );
+  const [repositoryVisibility, setRepositoryVisibility] = useState<'private' | 'public'>('private');
   const [connectRepository, setConnectRepository] = useState('');
   const [repositoryActionError, setRepositoryActionError] = useState<string | null>(null);
   const [repositoryActionSuccess, setRepositoryActionSuccess] = useState<string | null>(null);
@@ -1424,9 +1438,7 @@ export function ProjectGitHubPanel({
         setChangesError(null);
         await loadStatus();
       } catch (cause) {
-        setChangesError(
-          cause instanceof ApiRequestError ? cause.message : 'Failed to stash file.',
-        );
+        setChangesError(cause instanceof ApiRequestError ? cause.message : 'Failed to stash file.');
       } finally {
         setActionPending(null);
       }
@@ -1553,7 +1565,8 @@ export function ProjectGitHubPanel({
       setRepositoryDialogMode(mode);
       setRepositoryName((current) => current || defaultRepositoryName(status?.repositoryName));
       setRepositoryDescription(
-        (current) => current || (status?.repositoryName ? `Project for ${status.repositoryName}` : ''),
+        (current) =>
+          current || (status?.repositoryName ? `Project for ${status.repositoryName}` : ''),
       );
       setRepositoryActionError(null);
       setRepositoryActionSuccess(null);
@@ -1894,7 +1907,12 @@ export function ProjectGitHubPanel({
     if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestTitle) {
       setPullRequestTitle(pullRequestCreateState.defaultTitle);
     }
-  }, [activeTab, pullRequestCreateState.canCreate, pullRequestCreateState.defaultTitle, pullRequestTitle]);
+  }, [
+    activeTab,
+    pullRequestCreateState.canCreate,
+    pullRequestCreateState.defaultTitle,
+    pullRequestTitle,
+  ]);
 
   useEffect(() => {
     const nextTab = resolveGitWorkflowActiveTab({ activeTab, tabs, preferredTab });
@@ -2071,8 +2089,8 @@ export function ProjectGitHubPanel({
                     </label>
                     <div className="rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
                       AI Studio will validate the repository with GitHub CLI, add it as origin, and
-                      fetch it. If the remote already has commits, you will be guided through pull or
-                      conflict resolution before pushing.
+                      fetch it. If the remote already has commits, you will be guided through pull
+                      or conflict resolution before pushing.
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button
@@ -2181,7 +2199,9 @@ export function ProjectGitHubPanel({
               </GitCard>
 
               <div className="rounded border border-border bg-background px-3 py-3 text-xs text-muted-foreground">
-                <div className="mb-2">You can also open the project in your IDE if a file needs deeper edits.</div>
+                <div className="mb-2">
+                  You can also open the project in your IDE if a file needs deeper edits.
+                </div>
                 <Button asChild type="button" size="sm" variant="outline" className="w-full">
                   <a href={buildProjectIdeHref(projectId)}>Open in IDE</a>
                 </Button>
@@ -2238,7 +2258,11 @@ export function ProjectGitHubPanel({
                   resolution.
                 </p>
               </div>
-              <Button type="button" variant="outline" onClick={() => setConflictResolverOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConflictResolverOpen(false)}
+              >
                 Close
               </Button>
             </div>
@@ -2343,7 +2367,7 @@ export function ProjectGitHubPanel({
                     <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
                       {conflictFileLoading
                         ? 'Loading...'
-                        : conflictFile?.content ?? 'Select a conflicted file.'}
+                        : (conflictFile?.content ?? 'Select a conflicted file.')}
                     </pre>
                   </div>
                 </div>
@@ -2393,312 +2417,492 @@ export function ProjectGitHubPanel({
       )}
 
       <aside
-      className={cn(
-        'hidden h-full max-h-full min-h-0 shrink-0 overflow-hidden border-l border-border bg-background/95 lg:flex',
-        open ? 'w-[360px] max-w-[30vw]' : 'w-12',
-      )}
-      aria-label="Git and GitHub"
-    >
-      {!open ? (
-        <button
-          type="button"
-          className="flex h-full w-full flex-col items-center gap-3 px-2 py-4 text-xs text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-          onClick={() => setOpen(true)}
-          aria-label="Open Git and GitHub panel"
-          title="Open Git and GitHub panel"
-        >
-          <GitBranch className="h-5 w-5" />
-          <span className="[writing-mode:vertical-rl] rotate-180 font-medium tracking-wide">
-            Git
-          </span>
-        </button>
-      ) : (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
-            <GitBranch className="h-4 w-4 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">Git & GitHub</span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Live
-                </span>
-              </div>
-              <div className="truncate text-xs text-muted-foreground">
-                {statusLoading
-                  ? 'Loading Git state'
-                  : currentStatus.available
-                    ? 'Local Git state'
-                    : 'No local Git repository'}
-              </div>
-            </div>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => void refreshGitViews()}
-              disabled={loading || changesLoading || pullRequestsLoading || checksLoading}
-              title="Refresh Git state"
-              aria-label="Refresh Git state"
-            >
-              <RefreshCw
-                className={cn(
-                  'h-4 w-4',
-                  (loading || changesLoading || pullRequestsLoading || checksLoading) &&
-                    'animate-spin',
-                )}
-              />
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={() => setOpen(false)}
-              title="Close Git and GitHub panel"
-              aria-label="Close Git and GitHub panel"
-            >
-              <PanelRightClose className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 pt-2 text-xs">
-            {tabs.map(({ id, label, badge }) => (
-              <button
-                key={id}
-                type="button"
-                className={cn(
-                  'border-b-2 px-2 py-2 text-muted-foreground hover:text-foreground',
-                  activeTab === id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent hover:border-muted-foreground/30',
-                )}
-                onClick={() => setActiveTab(id)}
-              >
-                {label}
-                {badge !== undefined && badge > 0 && (
-                  <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                    {badge}
+        className={cn(
+          'hidden h-full max-h-full min-h-0 shrink-0 overflow-hidden border-l border-border bg-background/95 lg:flex',
+          open ? 'w-[360px] max-w-[30vw]' : 'w-12',
+        )}
+        aria-label="Git and GitHub"
+      >
+        {!open ? (
+          <button
+            type="button"
+            className="flex h-full w-full flex-col items-center gap-3 px-2 py-4 text-xs text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+            onClick={() => setOpen(true)}
+            aria-label="Open Git and GitHub panel"
+            title="Open Git and GitHub panel"
+          >
+            <GitBranch className="h-5 w-5" />
+            <span className="[writing-mode:vertical-rl] rotate-180 font-medium tracking-wide">
+              Git
+            </span>
+          </button>
+        ) : (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
+              <GitBranch className="h-4 w-4 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Git & GitHub</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Live
                   </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 text-sm">
-            {error && (
-              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                {error}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {statusLoading
+                    ? 'Loading Git state'
+                    : currentStatus.available
+                      ? 'Local Git state'
+                      : 'No local Git repository'}
+                </div>
               </div>
-            )}
-            {changesError && activeTab === 'changes' && (
-              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                {changesError}
-              </div>
-            )}
-            {changesError && activeTab === 'commit' && (
-              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                {changesError}
-              </div>
-            )}
-            {checksError && activeTab === 'checks' && (
-              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                {checksError}
-              </div>
-            )}
-            {pullRequestsError && activeTab === 'prs' && (
-              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                {pullRequestsError}
-              </div>
-            )}
-
-            {statusLoading ? (
-              <>
-                <ProjectInstructionsCard
-                  status={projectInstructionsStatus}
-                  isStarting={isStartingProjectInstructions}
-                  onStart={onStartProjectInstructions}
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => void refreshGitViews()}
+                disabled={loading || changesLoading || pullRequestsLoading || checksLoading}
+                title="Refresh Git state"
+                aria-label="Refresh Git state"
+              >
+                <RefreshCw
+                  className={cn(
+                    'h-4 w-4',
+                    (loading || changesLoading || pullRequestsLoading || checksLoading) &&
+                      'animate-spin',
+                  )}
                 />
-                <GitStatusLoadingCard />
-              </>
-            ) : !currentStatus.available ? (
-              <>
-                <ProjectInstructionsCard
-                  status={projectInstructionsStatus}
-                  isStarting={isStartingProjectInstructions}
-                  onStart={onStartProjectInstructions}
-                />
-                <GitCard title="Repository">
-                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                    <span>{currentStatus.reason ?? 'This Project is not a Git repository.'}</span>
-                  </div>
-                </GitCard>
-              </>
-            ) : activeTab === 'overview' ? (
-              <>
-                <ProjectInstructionsCard
-                  status={projectInstructionsStatus}
-                  isStarting={isStartingProjectInstructions}
-                  onStart={onStartProjectInstructions}
-                />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => setOpen(false)}
+                title="Close Git and GitHub panel"
+                aria-label="Close Git and GitHub panel"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </Button>
+            </div>
 
-                <WorkflowOverviewCard overview={workflowOverview} onSelectTab={setActiveTab} />
+            <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 pt-2 text-xs">
+              {tabs.map(({ id, label, badge }) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={cn(
+                    'border-b-2 px-2 py-2 text-muted-foreground hover:text-foreground',
+                    activeTab === id
+                      ? 'border-primary text-primary'
+                      : 'border-transparent hover:border-muted-foreground/30',
+                  )}
+                  onClick={() => setActiveTab(id)}
+                >
+                  {label}
+                  {badge !== undefined && badge > 0 && (
+                    <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
 
-                <GitCard title="Repository">
-                  <div className="space-y-2">
-                    <div className="font-medium">{currentStatus.repositoryName}</div>
-                    {currentStatus.remoteUrl ? (
-                      <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                        <span className="truncate">{currentStatus.remoteUrl}</span>
-                        {githubUrl && (
-                          <a
-                            href={githubUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            aria-label="Open remote repository"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 text-sm">
+              {error && (
+                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {error}
+                </div>
+              )}
+              {changesError && activeTab === 'changes' && (
+                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {changesError}
+                </div>
+              )}
+              {changesError && activeTab === 'commit' && (
+                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {changesError}
+                </div>
+              )}
+              {checksError && activeTab === 'checks' && (
+                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {checksError}
+                </div>
+              )}
+              {pullRequestsError && activeTab === 'prs' && (
+                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {pullRequestsError}
+                </div>
+              )}
+
+              {statusLoading ? (
+                <>
+                  <ProjectInstructionsCard
+                    status={projectInstructionsStatus}
+                    isStarting={isStartingProjectInstructions}
+                    onStart={onStartProjectInstructions}
+                  />
+                  <GitStatusLoadingCard />
+                </>
+              ) : !currentStatus.available ? (
+                <>
+                  <ProjectInstructionsCard
+                    status={projectInstructionsStatus}
+                    isStarting={isStartingProjectInstructions}
+                    onStart={onStartProjectInstructions}
+                  />
+                  <GitCard title="Repository">
+                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                      <span>{currentStatus.reason ?? 'This Project is not a Git repository.'}</span>
+                    </div>
+                  </GitCard>
+                </>
+              ) : activeTab === 'overview' ? (
+                <>
+                  <ProjectInstructionsCard
+                    status={projectInstructionsStatus}
+                    isStarting={isStartingProjectInstructions}
+                    onStart={onStartProjectInstructions}
+                  />
+
+                  <WorkflowOverviewCard overview={workflowOverview} onSelectTab={setActiveTab} />
+
+                  <GitCard title="Repository">
+                    <div className="space-y-2">
+                      <div className="font-medium">{currentStatus.repositoryName}</div>
+                      {currentStatus.remoteUrl ? (
+                        <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                          {githubUrl && (
+                            <a
+                              href={githubUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label="Open remote repository"
+                              className="inline-flex min-w-0 items-center gap-1 hover:text-foreground hover:underline"
+                              onClick={(event) => openWorkspaceWebLink(event, githubUrl, projectId)}
+                            >
+                              <span className="truncate">{currentStatus.remoteUrl}</span>
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                          {!githubUrl && (
+                            <span className="truncate">{currentStatus.remoteUrl}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          No origin remote configured.
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <StatusPill status={currentStatus} />
+                        <span className="text-xs text-muted-foreground">
+                          Updated from local Git state
+                        </span>
+                      </div>
+                    </div>
+                  </GitCard>
+
+                  <GitCard title="Current Branch">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 font-mono text-sm">
+                        <GitBranch className="h-4 w-4 text-muted-foreground" />
+                        <span className="truncate">
+                          {currentStatus.currentBranch ?? 'Detached HEAD'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Base: {currentStatus.baseBranch ?? upstreamStateLabel(currentStatus)}
+                      </div>
+                      <div className="flex gap-3 text-xs">
+                        <span className="text-emerald-700">↑ {currentStatus.ahead}</span>
+                        <span className="text-red-700">↓ {currentStatus.behind}</span>
+                        {currentStatus.upstreamState === 'missing' && (
+                          <span className="text-amber-700">Upstream missing</span>
+                        )}
+                        {!currentStatus.clean && (
+                          <span className="text-amber-700">Working tree has changes</span>
                         )}
                       </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">
-                        No origin remote configured.
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <StatusPill status={currentStatus} />
-                      <span className="text-xs text-muted-foreground">
-                        Updated from local Git state
-                      </span>
                     </div>
-                  </div>
-                </GitCard>
+                  </GitCard>
 
-                <GitCard title="Current Branch">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 font-mono text-sm">
-                      <GitBranch className="h-4 w-4 text-muted-foreground" />
-                      <span className="truncate">
-                        {currentStatus.currentBranch ?? 'Detached HEAD'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Base: {currentStatus.baseBranch ?? upstreamStateLabel(currentStatus)}
-                    </div>
-                    <div className="flex gap-3 text-xs">
-                      <span className="text-emerald-700">↑ {currentStatus.ahead}</span>
-                      <span className="text-red-700">↓ {currentStatus.behind}</span>
-                      {currentStatus.upstreamState === 'missing' && (
-                        <span className="text-amber-700">Upstream missing</span>
-                      )}
-                      {!currentStatus.clean && (
-                        <span className="text-amber-700">Working tree has changes</span>
-                      )}
-                    </div>
-                  </div>
-                </GitCard>
-
-                <GitCard title="Working Tree">
-                  <div className="space-y-1">
-                    <div className="mb-2 font-medium">
-                      {currentStatus.clean
-                        ? 'Clean'
-                        : `${currentStatus.workingTree.total} change${
-                            currentStatus.workingTree.total === 1 ? '' : 's'
-                          }`}
-                    </div>
-                    <StatRow
-                      label="Added"
-                      value={currentStatus.workingTree.added}
-                      tone="text-emerald-700"
-                    />
-                    <StatRow
-                      label="Modified"
-                      value={currentStatus.workingTree.modified}
-                      tone="text-amber-700"
-                    />
-                    <StatRow
-                      label="Deleted"
-                      value={currentStatus.workingTree.deleted}
-                      tone="text-red-700"
-                    />
-                    <StatRow label="Untracked" value={currentStatus.workingTree.untracked} />
-                    <StatRow
-                      label="Conflicts"
-                      value={currentStatus.workingTree.conflicts}
-                      tone="text-red-700"
-                    />
-                  </div>
-                </GitCard>
-
-                <GitCard title="Recent Commit">
-                  {currentStatus.recentCommit ? (
-                    <div className="space-y-2">
-                      <div className="font-mono text-xs">
-                        {shortSha(currentStatus.recentCommit.sha)}
-                      </div>
-                      <div className="font-medium">{currentStatus.recentCommit.subject}</div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <GitCommitHorizontal className="h-3.5 w-3.5" />
-                        <span>{currentStatus.recentCommit.authorName ?? 'Unknown author'}</span>
-                        <span>·</span>
-                        <span>{relativeCommitLabel(currentStatus.recentCommit.committedAt)}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">No commits found.</div>
-                  )}
-                </GitCard>
-              </>
-            ) : activeTab === 'changes' ? (
-              <>
-                <GitCard title="Changes">
-                  <div className="flex min-h-0 flex-col gap-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-medium">
+                  <GitCard title="Working Tree">
+                    <div className="space-y-1">
+                      <div className="mb-2 font-medium">
                         {currentStatus.clean
-                          ? 'Working tree clean'
-                          : `${currentStatus.workingTree.total} changed file${
+                          ? 'Clean'
+                          : `${currentStatus.workingTree.total} change${
                               currentStatus.workingTree.total === 1 ? '' : 's'
                             }`}
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={
-                          changesLoading ||
-                          actionPending !== null ||
-                          currentStatus.workingTree.total === 0
-                        }
-                        onClick={() => void stagePaths('all')}
-                      >
-                        {actionPending === 'stage-all' ? 'Staging...' : 'Stage all'}
-                      </Button>
+                      <StatRow
+                        label="Added"
+                        value={currentStatus.workingTree.added}
+                        tone="text-emerald-700"
+                      />
+                      <StatRow
+                        label="Modified"
+                        value={currentStatus.workingTree.modified}
+                        tone="text-amber-700"
+                      />
+                      <StatRow
+                        label="Deleted"
+                        value={currentStatus.workingTree.deleted}
+                        tone="text-red-700"
+                      />
+                      <StatRow label="Untracked" value={currentStatus.workingTree.untracked} />
+                      <StatRow
+                        label="Conflicts"
+                        value={currentStatus.workingTree.conflicts}
+                        tone="text-red-700"
+                      />
                     </div>
+                  </GitCard>
 
-                    {changesLoading && (
-                      <div className="text-xs text-muted-foreground">Loading changed files...</div>
+                  <GitCard title="Recent Commit">
+                    {currentStatus.recentCommit ? (
+                      <div className="space-y-2">
+                        <div className="font-mono text-xs">
+                          {shortSha(currentStatus.recentCommit.sha)}
+                        </div>
+                        <div className="font-medium">{currentStatus.recentCommit.subject}</div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <GitCommitHorizontal className="h-3.5 w-3.5" />
+                          <span>{currentStatus.recentCommit.authorName ?? 'Unknown author'}</span>
+                          <span>·</span>
+                          <span>{relativeCommitLabel(currentStatus.recentCommit.committedAt)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">No commits found.</div>
                     )}
+                  </GitCard>
+                </>
+              ) : activeTab === 'changes' ? (
+                <>
+                  <GitCard title="Changes">
+                    <div className="flex min-h-0 flex-col gap-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-medium">
+                          {currentStatus.clean
+                            ? 'Working tree clean'
+                            : `${currentStatus.workingTree.total} changed file${
+                                currentStatus.workingTree.total === 1 ? '' : 's'
+                              }`}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            changesLoading ||
+                            actionPending !== null ||
+                            currentStatus.workingTree.total === 0
+                          }
+                          onClick={() => void stagePaths('all')}
+                        >
+                          {actionPending === 'stage-all' ? 'Staging...' : 'Stage all'}
+                        </Button>
+                      </div>
 
-                    {!changesLoading && currentChanges?.files.length === 0 && (
+                      {changesLoading && (
+                        <div className="text-xs text-muted-foreground">
+                          Loading changed files...
+                        </div>
+                      )}
+
+                      {!changesLoading && currentChanges?.files.length === 0 && (
+                        <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                          No local changes detected.
+                        </div>
+                      )}
+
+                      <div className="max-h-[45vh] min-h-0 space-y-3 overflow-y-auto pr-1">
+                        {stagedFiles.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Staged
+                            </div>
+                            {stagedFiles.map((file) => (
+                              <ChangeFileRow
+                                key={`staged:${file.path}`}
+                                file={file}
+                                mode="staged"
+                                selected={
+                                  selectedChange?.path === file.path &&
+                                  selectedDiffMode === 'staged'
+                                }
+                                onSelect={(nextFile, mode) => {
+                                  setSelectedChange(nextFile);
+                                  setSelectedDiffMode(mode);
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {unstagedFiles.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Unstaged
+                            </div>
+                            {unstagedFiles.map((file) => (
+                              <ChangeFileRow
+                                key={`unstaged:${file.path}`}
+                                file={file}
+                                mode="unstaged"
+                                selected={
+                                  selectedChange?.path === file.path &&
+                                  selectedDiffMode === 'unstaged'
+                                }
+                                onSelect={(nextFile, mode) => {
+                                  setSelectedChange(nextFile);
+                                  setSelectedDiffMode(mode);
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {untrackedFiles.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Untracked
+                            </div>
+                            {untrackedFiles.map((file) => (
+                              <ChangeFileRow
+                                key={`untracked:${file.path}`}
+                                file={file}
+                                mode="unstaged"
+                                selected={selectedChange?.path === file.path}
+                                onSelect={(nextFile, mode) => {
+                                  setSelectedChange(nextFile);
+                                  setSelectedDiffMode(mode);
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {stagedFiles.length > 0 && (
+                        <div className="rounded border border-primary/20 bg-primary/5 px-3 py-3">
+                          <div className="mb-2 text-xs text-muted-foreground">
+                            {stagedFiles.length} staged file{stagedFiles.length === 1 ? '' : 's'}{' '}
+                            ready to commit.
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="w-full"
+                            disabled={!canContinueToCommit(stagedFiles.length, actionPending)}
+                            onClick={() => setActiveTab('commit')}
+                          >
+                            Continue to commit
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </GitCard>
+
+                  <GitCard title="Diff">
+                    {selectedChange ? (
+                      <div className="space-y-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <FileCode2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div
+                            className="min-w-0 flex-1 truncate font-mono text-xs"
+                            title={selectedChange.path}
+                          >
+                            {selectedChange.path}
+                          </div>
+                          <Badge variant="outline">{selectedDiffMode}</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedChange.unstaged && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => void stagePaths([selectedChange.path])}
+                              disabled={actionPending !== null}
+                            >
+                              {actionPending === `stage:${selectedChange.path}`
+                                ? 'Staging...'
+                                : 'Stage file'}
+                            </Button>
+                          )}
+                          {selectedChange.unstaged && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void stashPaths([selectedChange.path])}
+                              disabled={actionPending !== null}
+                            >
+                              {actionPending === `stash:${selectedChange.path}`
+                                ? 'Stashing...'
+                                : 'Stash file'}
+                            </Button>
+                          )}
+                          {selectedChange.staged && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void unstagePaths([selectedChange.path])}
+                              disabled={actionPending !== null}
+                            >
+                              {actionPending === `unstage:${selectedChange.path}`
+                                ? 'Unstaging...'
+                                : 'Unstage file'}
+                            </Button>
+                          )}
+                        </div>
+                        {diffLoading ? (
+                          <div className="text-xs text-muted-foreground">Loading diff...</div>
+                        ) : (
+                          <DiffPreview diff={diff?.diff ?? ''} />
+                        )}
+                        {diff?.truncated && (
+                          <div className="text-xs text-amber-700">
+                            Diff preview truncated to keep the panel responsive.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
                       <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                        No local changes detected.
+                        Select a changed file to review its diff.
                       </div>
                     )}
-
-                    <div className="max-h-[45vh] min-h-0 space-y-3 overflow-y-auto pr-1">
-                      {stagedFiles.length > 0 && (
-                        <div className="space-y-1.5">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Staged
+                  </GitCard>
+                </>
+              ) : activeTab === 'commit' ? (
+                <GitCard title="Commit">
+                  <div className="space-y-3">
+                    {changesLoading && (
+                      <div className="text-xs text-muted-foreground">Loading staged files...</div>
+                    )}
+                    {stagedFiles.length === 0 ? (
+                      <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                        No staged files are ready to commit. Go back to Changes to choose files.
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <div className="font-medium">Commit staged changes</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {stagedFiles.length} staged file{stagedFiles.length === 1 ? '' : 's'}{' '}
+                            ready.
                           </div>
+                        </div>
+                        <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
                           {stagedFiles.map((file) => (
                             <ChangeFileRow
-                              key={`staged:${file.path}`}
+                              key={`commit:${file.path}`}
                               file={file}
                               mode="staged"
                               selected={
@@ -2707,824 +2911,684 @@ export function ProjectGitHubPanel({
                               onSelect={(nextFile, mode) => {
                                 setSelectedChange(nextFile);
                                 setSelectedDiffMode(mode);
+                                setActiveTab('changes');
                               }}
                             />
                           ))}
                         </div>
-                      )}
-
-                      {unstagedFiles.length > 0 && (
-                        <div className="space-y-1.5">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Unstaged
-                          </div>
-                          {unstagedFiles.map((file) => (
-                            <ChangeFileRow
-                              key={`unstaged:${file.path}`}
-                              file={file}
-                              mode="unstaged"
-                              selected={
-                                selectedChange?.path === file.path &&
-                                selectedDiffMode === 'unstaged'
-                              }
-                              onSelect={(nextFile, mode) => {
-                                setSelectedChange(nextFile);
-                                setSelectedDiffMode(mode);
-                              }}
-                            />
-                          ))}
-                        </div>
-                      )}
-
-                      {untrackedFiles.length > 0 && (
-                        <div className="space-y-1.5">
-                          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Untracked
-                          </div>
-                          {untrackedFiles.map((file) => (
-                            <ChangeFileRow
-                              key={`untracked:${file.path}`}
-                              file={file}
-                              mode="unstaged"
-                              selected={selectedChange?.path === file.path}
-                              onSelect={(nextFile, mode) => {
-                                setSelectedChange(nextFile);
-                                setSelectedDiffMode(mode);
-                              }}
-                            />
-                          ))}
-                        </div>
-                      )}
+                      </>
+                    )}
+                    <div className="flex gap-2">
+                      <Input
+                        value={commitMessage}
+                        onChange={(event) => setCommitMessage(event.target.value)}
+                        placeholder="Commit message"
+                        disabled={stagedFiles.length === 0 || actionPending !== null}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && !event.shiftKey) {
+                            event.preventDefault();
+                            void commitStagedChanges();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={
+                          stagedFiles.length === 0 ||
+                          actionPending !== null ||
+                          commitMessage.trim().length === 0
+                        }
+                        onClick={() => void commitStagedChanges()}
+                      >
+                        {actionPending === 'commit' ? 'Committing...' : 'Commit'}
+                      </Button>
                     </div>
-
                     {stagedFiles.length > 0 && (
-                      <div className="rounded border border-primary/20 bg-primary/5 px-3 py-3">
-                        <div className="mb-2 text-xs text-muted-foreground">
-                          {stagedFiles.length} staged file{stagedFiles.length === 1 ? '' : 's'}{' '}
-                          ready to commit.
-                        </div>
+                      <div>
                         <Button
                           type="button"
                           size="sm"
-                          className="w-full"
-                          disabled={!canContinueToCommit(stagedFiles.length, actionPending)}
-                          onClick={() => setActiveTab('commit')}
+                          variant="ghost"
+                          onClick={() => setActiveTab('changes')}
+                          disabled={actionPending !== null}
                         >
-                          Continue to commit
+                          Back to changes
                         </Button>
                       </div>
                     )}
                   </div>
                 </GitCard>
-
-                <GitCard title="Diff">
-                  {selectedChange ? (
+              ) : activeTab === 'push' ? (
+                <GitCard title="Publish">
+                  {currentStatus.recentCommit ? (
                     <div className="space-y-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <FileCode2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <div
-                          className="min-w-0 flex-1 truncate font-mono text-xs"
-                          title={selectedChange.path}
-                        >
-                          {selectedChange.path}
-                        </div>
-                        <Badge variant="outline">{selectedDiffMode}</Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedChange.unstaged && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => void stagePaths([selectedChange.path])}
-                            disabled={actionPending !== null}
-                          >
-                            {actionPending === `stage:${selectedChange.path}`
-                              ? 'Staging...'
-                              : 'Stage file'}
-                          </Button>
-                        )}
-                        {selectedChange.unstaged && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void stashPaths([selectedChange.path])}
-                            disabled={actionPending !== null}
-                          >
-                            {actionPending === `stash:${selectedChange.path}`
-                              ? 'Stashing...'
-                              : 'Stash file'}
-                          </Button>
-                        )}
-                        {selectedChange.staged && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void unstagePaths([selectedChange.path])}
-                            disabled={actionPending !== null}
-                          >
-                            {actionPending === `unstage:${selectedChange.path}`
-                              ? 'Unstaging...'
-                              : 'Unstage file'}
-                          </Button>
-                        )}
-                      </div>
-                      {diffLoading ? (
-                        <div className="text-xs text-muted-foreground">Loading diff...</div>
-                      ) : (
-                        <DiffPreview diff={diff?.diff ?? ''} />
-                      )}
-                      {diff?.truncated && (
-                        <div className="text-xs text-amber-700">
-                          Diff preview truncated to keep the panel responsive.
+                      {commitSuccess && (
+                        <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                          {commitSuccess}
                         </div>
                       )}
-                    </div>
-                  ) : (
-                    <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                      Select a changed file to review its diff.
-                    </div>
-                  )}
-                </GitCard>
-              </>
-            ) : activeTab === 'commit' ? (
-              <GitCard title="Commit">
-                <div className="space-y-3">
-                  {changesLoading && (
-                    <div className="text-xs text-muted-foreground">Loading staged files...</div>
-                  )}
-                  {stagedFiles.length === 0 ? (
-                    <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                      No staged files are ready to commit. Go back to Changes to choose files.
-                    </div>
-                  ) : (
-                    <>
-                      <div>
-                        <div className="font-medium">Commit staged changes</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {stagedFiles.length} staged file{stagedFiles.length === 1 ? '' : 's'}{' '}
-                          ready.
-                        </div>
-                      </div>
-                      <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
-                        {stagedFiles.map((file) => (
-                          <ChangeFileRow
-                            key={`commit:${file.path}`}
-                            file={file}
-                            mode="staged"
-                            selected={
-                              selectedChange?.path === file.path && selectedDiffMode === 'staged'
-                            }
-                            onSelect={(nextFile, mode) => {
-                              setSelectedChange(nextFile);
-                              setSelectedDiffMode(mode);
-                              setActiveTab('changes');
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  <div className="flex gap-2">
-                    <Input
-                      value={commitMessage}
-                      onChange={(event) => setCommitMessage(event.target.value)}
-                      placeholder="Commit message"
-                      disabled={stagedFiles.length === 0 || actionPending !== null}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                          event.preventDefault();
-                          void commitStagedChanges();
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={
-                        stagedFiles.length === 0 ||
-                        actionPending !== null ||
-                        commitMessage.trim().length === 0
-                      }
-                      onClick={() => void commitStagedChanges()}
-                    >
-                      {actionPending === 'commit' ? 'Committing...' : 'Commit'}
-                    </Button>
-                  </div>
-                  {stagedFiles.length > 0 && (
-                    <div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setActiveTab('changes')}
-                        disabled={actionPending !== null}
-                      >
-                        Back to changes
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </GitCard>
-            ) : activeTab === 'push' ? (
-              <GitCard title="Publish">
-                {currentStatus.recentCommit ? (
-                  <div className="space-y-3">
-                    {commitSuccess && (
-                      <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                        {commitSuccess}
-                      </div>
-                    )}
-                    {pushSuccess && (
-                      <div className="space-y-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                        <div>{pushSuccess}</div>
-                        {currentGitHubUrl && (
-                          <a
-                            href={currentGitHubUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 font-medium text-emerald-900 hover:underline"
-                          >
-                            Open GitHub
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        )}
-                      </div>
-                    )}
-                    <div className="font-mono text-xs">
-                      {shortSha(currentStatus.recentCommit.sha)}
-                    </div>
-                    <div className="font-medium">{currentStatus.recentCommit.subject}</div>
-                    {!currentStatus.remoteUrl ? (
-                      <div className="rounded border border-border bg-background px-3 py-4">
-                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                          <GitBranch className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className="mt-3 text-center">
-                          <div className="font-medium">No repository connected</div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Create a new GitHub repository or connect an existing one to publish
-                            this project.
-                          </p>
-                        </div>
-                        {repositoryActionSuccess && (
-                          <div className="mt-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                            {repositoryActionSuccess}
-                          </div>
-                        )}
-                        <div className="mt-4 space-y-2">
-                          <Button
-                            type="button"
-                            className="w-full"
-                            disabled={actionPending !== null}
-                            onClick={() => openRepositoryDialog('create')}
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Create Repository
-                          </Button>
-                          <Button
-                            type="button"
-                            className="w-full"
-                            variant="outline"
-                            disabled={actionPending !== null}
-                            onClick={() => openRepositoryDialog('connect')}
-                          >
-                            <Link className="mr-2 h-4 w-4" />
-                            Connect Existing Repository
-                          </Button>
-                        </div>
-                        <div className="mt-4 rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
-                          You can also add an origin remote from the terminal. After that, refresh
-                          this panel to continue the publish workflow here.
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="rounded border border-border bg-muted/20 px-3 py-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-medium">{publishState.title}</div>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {publishState.description}
-                              </p>
-                              {publishState.detail && (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {publishState.detail}
-                                </p>
-                              )}
-                            </div>
-                            <Badge variant={publishState.pushed ? 'default' : 'outline'}>
-                              {publishState.statusLabel}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {publishState.actionLabel && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={
-                                actionPending !== null ||
-                                (!publishState.canPublish &&
-                                  !publishState.canPull &&
-                                  currentStatus.workingTree.conflicts === 0)
+                      {pushSuccess && (
+                        <div className="space-y-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                          <div>{pushSuccess}</div>
+                          {currentGitHubUrl && (
+                            <a
+                              href={currentGitHubUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 font-medium text-emerald-900 hover:underline"
+                              onClick={(event) =>
+                                openWorkspaceWebLink(event, currentGitHubUrl, projectId)
                               }
-                              onClick={() => {
-                                if (currentStatus.workingTree.conflicts > 0) {
-                                  void openConflictResolver();
-                                  return;
-                                }
-                                if (publishState.canPull) {
-                                  void pullRemoteChanges();
-                                  return;
-                                }
-                                if (currentStatus.upstreamState === 'active') {
-                                  void pushCurrentBranch();
-                                  return;
-                                }
-                                void publishCurrentBranch();
-                              }}
                             >
-                              {actionPending === 'pull'
-                                ? 'Pulling...'
-                                : actionPending === 'push' || actionPending === 'publish'
-                                  ? 'Publishing...'
-                                  : publishState.actionLabel}
-                            </Button>
+                              Open GitHub
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
                           )}
-                          {publishState.canClearStaleUpstream && (
+                        </div>
+                      )}
+                      <div className="font-mono text-xs">
+                        {shortSha(currentStatus.recentCommit.sha)}
+                      </div>
+                      <div className="font-medium">{currentStatus.recentCommit.subject}</div>
+                      {!currentStatus.remoteUrl ? (
+                        <div className="rounded border border-border bg-background px-3 py-4">
+                          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                            <GitBranch className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <div className="mt-3 text-center">
+                            <div className="font-medium">No repository connected</div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Create a new GitHub repository or connect an existing one to publish
+                              this project.
+                            </p>
+                          </div>
+                          {repositoryActionSuccess && (
+                            <div className="mt-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                              {repositoryActionSuccess}
+                            </div>
+                          )}
+                          <div className="mt-4 space-y-2">
                             <Button
                               type="button"
-                              size="sm"
+                              className="w-full"
+                              disabled={actionPending !== null}
+                              onClick={() => openRepositoryDialog('create')}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Create Repository
+                            </Button>
+                            <Button
+                              type="button"
+                              className="w-full"
                               variant="outline"
                               disabled={actionPending !== null}
-                              onClick={() => void clearStaleUpstream()}
+                              onClick={() => openRepositoryDialog('connect')}
                             >
-                              {actionPending === 'clear-upstream'
-                                ? 'Clearing...'
-                                : 'Clear stale upstream'}
+                              <Link className="mr-2 h-4 w-4" />
+                              Connect Existing Repository
                             </Button>
-                          )}
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setActiveTab('overview')}
-                          >
-                            Back to overview
-                          </Button>
+                          </div>
+                          <div className="mt-4 rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+                            You can also add an origin remote from the terminal. After that, refresh
+                            this panel to continue the publish workflow here.
+                          </div>
                         </div>
-                      </>
-                    )}
-                    {!publishState.pushed && (
-                      <div className="rounded border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                        Not ready to publish? You can undo the last local commit from the terminal
-                        with <span className="font-mono">git reset --soft HEAD~1</span> to keep
-                        files staged, or <span className="font-mono">git reset HEAD~1</span> to keep
-                        them unstaged.
-                      </div>
-                    )}
-                    <div className="text-xs text-muted-foreground">
-                      After this branch is published, pull request options appear when they are
-                      available.
-                      {currentGitHubUrl && (
+                      ) : (
                         <>
-                          {' '}
-                          <a
-                            href={currentGitHubUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-primary hover:underline"
-                          >
-                            Open GitHub
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">No commits found.</div>
-                )}
-              </GitCard>
-            ) : activeTab === 'prs' ? (
-              <>
-                <GitCard title="Pull Requests">
-                  <div className="space-y-3">
-                    {pullRequestsLoading && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Loading GitHub pull requests...
-                      </div>
-                    )}
-
-                    {!pullRequestsLoading &&
-                      currentPullRequests &&
-                      !currentPullRequests.available && (
-                        <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                          {currentPullRequests.githubRemoteDetected ? (
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                          ) : (
-                            <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                          )}
-                          <div className="space-y-1">
-                            <div>
-                              {currentPullRequests.reason ??
-                                'GitHub pull requests are unavailable.'}
-                            </div>
-                            {currentPullRequests.githubRemoteDetected &&
-                              !currentPullRequests.authenticated && (
-                                <div className="text-xs">
-                                  Authenticate with GitHub CLI in the terminal to enable live PRs.
-                                </div>
-                              )}
-                            {currentGitHubUrl && (
-                              <a
-                                href={currentGitHubUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                              >
-                                Open GitHub
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                    {!pullRequestsLoading && !currentPullRequests && (
-                      <div className="text-sm text-muted-foreground">
-                        Select refresh or open this tab again to load pull request state.
-                      </div>
-                    )}
-
-                    {!pullRequestsLoading && currentPullRequests?.available && (
-                      <>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
-                            <div className="text-muted-foreground">Open PRs</div>
-                            <div className="text-lg font-semibold">
-                              {currentPullRequests.pullRequests.length}
+                          <div className="rounded border border-border bg-muted/20 px-3 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-medium">{publishState.title}</div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {publishState.description}
+                                </p>
+                                {publishState.detail && (
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {publishState.detail}
+                                  </p>
+                                )}
+                              </div>
+                              <Badge variant={publishState.pushed ? 'default' : 'outline'}>
+                                {publishState.statusLabel}
+                              </Badge>
                             </div>
                           </div>
-                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
-                            <div className="text-muted-foreground">Current branch</div>
-                            <div className="truncate text-sm font-semibold">
-                              {currentPullRequests.currentBranch ?? 'Detached HEAD'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {pullRequestSuccess && (
-                          <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                            {pullRequestSuccess}
-                          </div>
-                        )}
-
-                        {pullRequestCreateState.canCreate && !currentBranchPullRequest && (
-                          <div className="space-y-3 rounded border border-border bg-background px-3 py-3">
-                            <div>
-                              <div className="font-medium">Create a pull request</div>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {currentStatus.currentBranch} is published. Open a pull request to
-                                review checks and collaborate from this panel.
-                              </p>
-                            </div>
-                            <div className="space-y-2">
-                              <label className="block text-xs font-medium text-muted-foreground">
-                                Title
-                              </label>
-                              <Input
-                                value={pullRequestTitle}
-                                onChange={(event) => setPullRequestTitle(event.target.value)}
-                                placeholder={pullRequestCreateState.defaultTitle}
-                                disabled={actionPending !== null}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <label className="block text-xs font-medium text-muted-foreground">
-                                Description
-                              </label>
-                              <textarea
-                                value={pullRequestBody}
-                                onChange={(event) => setPullRequestBody(event.target.value)}
-                                disabled={actionPending !== null}
-                                rows={3}
-                                placeholder="Optional summary for reviewers"
-                                className="min-h-20 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                              />
-                            </div>
-                            <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            {publishState.actionLabel && (
                               <Button
                                 type="button"
                                 size="sm"
-                                disabled={actionPending !== null}
-                                onClick={() => void createPullRequest()}
+                                disabled={
+                                  actionPending !== null ||
+                                  (!publishState.canPublish &&
+                                    !publishState.canPull &&
+                                    currentStatus.workingTree.conflicts === 0)
+                                }
+                                onClick={() => {
+                                  if (currentStatus.workingTree.conflicts > 0) {
+                                    void openConflictResolver();
+                                    return;
+                                  }
+                                  if (publishState.canPull) {
+                                    void pullRemoteChanges();
+                                    return;
+                                  }
+                                  if (currentStatus.upstreamState === 'active') {
+                                    void pushCurrentBranch();
+                                    return;
+                                  }
+                                  void publishCurrentBranch();
+                                }}
                               >
-                                {actionPending === 'create-pull-request'
-                                  ? 'Creating...'
-                                  : 'Create pull request'}
+                                {actionPending === 'pull'
+                                  ? 'Pulling...'
+                                  : actionPending === 'push' || actionPending === 'publish'
+                                    ? 'Publishing...'
+                                    : publishState.actionLabel}
                               </Button>
-                              {currentGitHubUrl && (
-                                <Button type="button" size="sm" variant="outline" asChild>
-                                  <a
-                                    href={currentGitHubUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    Open GitHub
-                                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
+                            )}
+                            {publishState.canClearStaleUpstream && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={actionPending !== null}
+                                onClick={() => void clearStaleUpstream()}
+                              >
+                                {actionPending === 'clear-upstream'
+                                  ? 'Clearing...'
+                                  : 'Clear stale upstream'}
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setActiveTab('overview')}
+                            >
+                              Back to overview
+                            </Button>
                           </div>
+                        </>
+                      )}
+                      {!publishState.pushed && (
+                        <div className="rounded border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                          Not ready to publish? You can undo the last local commit from the terminal
+                          with <span className="font-mono">git reset --soft HEAD~1</span> to keep
+                          files staged, or <span className="font-mono">git reset HEAD~1</span> to
+                          keep them unstaged.
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground">
+                        After this branch is published, pull request options appear when they are
+                        available.
+                        {currentGitHubUrl && (
+                          <>
+                            {' '}
+                            <a
+                              href={currentGitHubUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                              onClick={(event) =>
+                                openWorkspaceWebLink(event, currentGitHubUrl, projectId)
+                              }
+                            >
+                              Open GitHub
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          </>
                         )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No commits found.</div>
+                  )}
+                </GitCard>
+              ) : activeTab === 'prs' ? (
+                <>
+                  <GitCard title="Pull Requests">
+                    <div className="space-y-3">
+                      {pullRequestsLoading && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Loading GitHub pull requests...
+                        </div>
+                      )}
 
-                        {!pullRequestCreateState.canCreate &&
-                          !currentBranchPullRequest &&
-                          sortedPullRequests.length === 0 && (
-                            <div className="space-y-2 rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                      {!pullRequestsLoading &&
+                        currentPullRequests &&
+                        !currentPullRequests.available && (
+                          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                            {currentPullRequests.githubRemoteDetected ? (
+                              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                            ) : (
+                              <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                            )}
+                            <div className="space-y-1">
                               <div>
-                                {pullRequestCreateState.reason ??
-                                  'No open GitHub pull requests were found for this repository.'}
+                                {currentPullRequests.reason ??
+                                  'GitHub pull requests are unavailable.'}
                               </div>
+                              {currentPullRequests.githubRemoteDetected &&
+                                !currentPullRequests.authenticated && (
+                                  <div className="text-xs">
+                                    Authenticate with GitHub CLI in the terminal to enable live PRs.
+                                  </div>
+                                )}
                               {currentGitHubUrl && (
                                 <a
                                   href={currentGitHubUrl}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                  onClick={(event) =>
+                                    openWorkspaceWebLink(event, currentGitHubUrl, projectId)
+                                  }
                                 >
                                   Open GitHub
                                   <ExternalLink className="h-3.5 w-3.5" />
                                 </a>
                               )}
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                        {sortedPullRequests.length > 0 && (
-                          <div className="space-y-2">
-                            {sortedPullRequests.map((pullRequest) => (
-                              <div
-                                key={pullRequest.number}
-                                className={cn(
-                                  'rounded border bg-background px-3 py-2',
-                                  pullRequest.currentBranch
-                                    ? 'border-primary bg-primary/5'
-                                    : 'border-border',
-                                )}
-                              >
-                                <div className="flex min-w-0 items-start gap-2">
-                                  <GitPullRequest className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                                  <div className="min-w-0 flex-1 space-y-2">
-                                    <div className="flex min-w-0 items-start justify-between gap-2">
-                                      <div className="min-w-0">
-                                        <div className="flex min-w-0 items-center gap-2">
-                                          <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                                            #{pullRequest.number}
-                                          </span>
-                                          <a
-                                            href={pullRequest.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="truncate text-sm font-medium hover:underline"
-                                          >
-                                            {pullRequest.title}
-                                          </a>
-                                        </div>
-                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                                          <span className="font-mono">
-                                            {pullRequest.headRefName} → {pullRequest.baseRefName}
-                                          </span>
-                                          {pullRequest.authorLogin && (
-                                            <span>{pullRequest.authorLogin}</span>
-                                          )}
-                                          {pullRequest.updatedAt && (
-                                            <span>
-                                              {relativeCommitLabel(pullRequest.updatedAt)}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <PullRequestStateBadge pullRequest={pullRequest} />
-                                    </div>
+                      {!pullRequestsLoading && !currentPullRequests && (
+                        <div className="text-sm text-muted-foreground">
+                          Select refresh or open this tab again to load pull request state.
+                        </div>
+                      )}
 
-                                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                                      {pullRequest.currentBranch && (
-                                        <Badge
-                                          variant="outline"
-                                          className="border-primary/40 text-primary"
-                                        >
-                                          Current branch
-                                        </Badge>
-                                      )}
-                                      <span
-                                        className={reviewDecisionTone(pullRequest.reviewDecision)}
-                                      >
-                                        {reviewDecisionLabel(pullRequest.reviewDecision)}
-                                      </span>
-                                      <span className={checkSummaryTone(pullRequest.checks)}>
-                                        {checkSummaryLabel(pullRequest.checks)}
-                                      </span>
-                                      <a
-                                        href={pullRequest.url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                                      >
-                                        Open on GitHub
-                                        <ExternalLink className="h-3.5 w-3.5" />
-                                      </a>
-                                      {(pullRequest.currentBranch &&
-                                        (pullRequest.checks.failure > 0 ||
-                                          pullRequest.checks.pending > 0)) && (
-                                        <button
-                                          type="button"
-                                          className="text-primary hover:underline"
-                                          onClick={() => setActiveTab('checks')}
-                                        >
-                                          View checks
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
+                      {!pullRequestsLoading && currentPullRequests?.available && (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                              <div className="text-muted-foreground">Open PRs</div>
+                              <div className="text-lg font-semibold">
+                                {currentPullRequests.pullRequests.length}
                               </div>
-                            ))}
+                            </div>
+                            <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                              <div className="text-muted-foreground">Current branch</div>
+                              <div className="truncate text-sm font-semibold">
+                                {currentPullRequests.currentBranch ?? 'Detached HEAD'}
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </GitCard>
 
-                <GitCard title="Source">
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <div>
-                      {currentPullRequests?.repositoryName ??
-                        currentStatus.repositoryName ??
-                        'Repository'}{' '}
-                      {(currentPullRequests?.currentBranch ?? currentStatus.currentBranch)
-                        ? `· ${currentPullRequests?.currentBranch ?? currentStatus.currentBranch}`
-                        : ''}
-                    </div>
-                    <div>
-                      {currentPullRequests?.ghAvailable
-                        ? 'GitHub CLI detected'
-                        : 'GitHub CLI not confirmed for this Project'}
-                    </div>
-                    <div>
-                      {currentPullRequests?.authenticated
-                        ? 'Authenticated with github.com'
-                        : 'GitHub authentication not confirmed'}
-                    </div>
-                    <div>Create and monitor pull requests from this Project.</div>
-                  </div>
-                </GitCard>
-              </>
-            ) : (
-              <>
-                <GitCard title="Checks">
-                  <div className="space-y-3">
-                    {checksLoading && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Loading GitHub checks...
-                      </div>
-                    )}
-
-                    {!checksLoading && currentChecks && !currentChecks.available && (
-                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                        {currentChecks.githubRemoteDetected ? (
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                        ) : (
-                          <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                        )}
-                        <div className="space-y-1">
-                          <div>{currentChecks.reason ?? 'GitHub checks are unavailable.'}</div>
-                          {currentChecks.githubRemoteDetected && !currentChecks.authenticated && (
-                            <div className="text-xs">
-                              Authenticate with GitHub CLI in the terminal to enable live checks.
+                          {pullRequestSuccess && (
+                            <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                              {pullRequestSuccess}
                             </div>
                           )}
-                        </div>
-                      </div>
-                    )}
 
-                    {!checksLoading && !currentChecks && (
-                      <div className="text-sm text-muted-foreground">
-                        Select refresh or open this tab again to load check state.
-                      </div>
-                    )}
+                          {pullRequestCreateState.canCreate && !currentBranchPullRequest && (
+                            <div className="space-y-3 rounded border border-border bg-background px-3 py-3">
+                              <div>
+                                <div className="font-medium">Create a pull request</div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {currentStatus.currentBranch} is published. Open a pull request to
+                                  review checks and collaborate from this panel.
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <label className="block text-xs font-medium text-muted-foreground">
+                                  Title
+                                </label>
+                                <Input
+                                  value={pullRequestTitle}
+                                  onChange={(event) => setPullRequestTitle(event.target.value)}
+                                  placeholder={pullRequestCreateState.defaultTitle}
+                                  disabled={actionPending !== null}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="block text-xs font-medium text-muted-foreground">
+                                  Description
+                                </label>
+                                <textarea
+                                  value={pullRequestBody}
+                                  onChange={(event) => setPullRequestBody(event.target.value)}
+                                  disabled={actionPending !== null}
+                                  rows={3}
+                                  placeholder="Optional summary for reviewers"
+                                  className="min-h-20 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={actionPending !== null}
+                                  onClick={() => void createPullRequest()}
+                                >
+                                  {actionPending === 'create-pull-request'
+                                    ? 'Creating...'
+                                    : 'Create pull request'}
+                                </Button>
+                                {currentGitHubUrl && (
+                                  <Button type="button" size="sm" variant="outline" asChild>
+                                    <a
+                                      href={currentGitHubUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={(event) =>
+                                        openWorkspaceWebLink(event, currentGitHubUrl, projectId)
+                                      }
+                                    >
+                                      Open GitHub
+                                      <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                                    </a>
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          )}
 
-                    {!checksLoading && currentChecks?.available && (
-                      <>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
-                            <div className="text-muted-foreground">Total</div>
-                            <div className="text-lg font-semibold">
-                              {currentChecks.summary.total}
-                            </div>
-                          </div>
-                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
-                            <div className="text-muted-foreground">Passing</div>
-                            <div className="text-lg font-semibold text-emerald-700">
-                              {currentChecks.summary.success}
-                            </div>
-                          </div>
-                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
-                            <div className="text-muted-foreground">Failing</div>
-                            <div className="text-lg font-semibold text-red-700">
-                              {currentChecks.summary.failure}
-                            </div>
-                          </div>
-                          <div className="rounded border border-border bg-muted/20 px-2 py-2">
-                            <div className="text-muted-foreground">Running</div>
-                            <div className="text-lg font-semibold text-blue-700">
-                              {currentChecks.summary.inProgress + currentChecks.summary.queued}
-                            </div>
-                          </div>
-                        </div>
+                          {!pullRequestCreateState.canCreate &&
+                            !currentBranchPullRequest &&
+                            sortedPullRequests.length === 0 && (
+                              <div className="space-y-2 rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                                <div>
+                                  {pullRequestCreateState.reason ??
+                                    'No open GitHub pull requests were found for this repository.'}
+                                </div>
+                                {currentGitHubUrl && (
+                                  <a
+                                    href={currentGitHubUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                    onClick={(event) =>
+                                      openWorkspaceWebLink(event, currentGitHubUrl, projectId)
+                                    }
+                                  >
+                                    Open GitHub
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </a>
+                                )}
+                              </div>
+                            )}
 
-                        {currentChecks.checks.length === 0 ? (
-                          <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                            No GitHub checks were found for {checksScopeLabel(currentChecks)}.
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {currentChecks.checks.map((check) => (
-                              <div
-                                key={check.id}
-                                className="rounded border border-border bg-background px-3 py-2"
-                              >
-                                <div className="flex min-w-0 items-start gap-2">
-                                  <CheckStateIcon check={check} />
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex min-w-0 items-center gap-2">
-                                      <div className="truncate text-sm font-medium">
-                                        {check.name}
+                          {sortedPullRequests.length > 0 && (
+                            <div className="space-y-2">
+                              {sortedPullRequests.map((pullRequest) => (
+                                <div
+                                  key={pullRequest.number}
+                                  className={cn(
+                                    'rounded border bg-background px-3 py-2',
+                                    pullRequest.currentBranch
+                                      ? 'border-primary bg-primary/5'
+                                      : 'border-border',
+                                  )}
+                                >
+                                  <div className="flex min-w-0 items-start gap-2">
+                                    <GitPullRequest className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                      <div className="flex min-w-0 items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <div className="flex min-w-0 items-center gap-2">
+                                            <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                                              #{pullRequest.number}
+                                            </span>
+                                            <a
+                                              href={pullRequest.url}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="truncate text-sm font-medium hover:underline"
+                                              onClick={(event) =>
+                                                openWorkspaceWebLink(
+                                                  event,
+                                                  pullRequest.url,
+                                                  projectId,
+                                                )
+                                              }
+                                            >
+                                              {pullRequest.title}
+                                            </a>
+                                          </div>
+                                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                            <span className="font-mono">
+                                              {pullRequest.headRefName} → {pullRequest.baseRefName}
+                                            </span>
+                                            {pullRequest.authorLogin && (
+                                              <span>{pullRequest.authorLogin}</span>
+                                            )}
+                                            {pullRequest.updatedAt && (
+                                              <span>
+                                                {relativeCommitLabel(pullRequest.updatedAt)}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <PullRequestStateBadge pullRequest={pullRequest} />
                                       </div>
-                                      {check.url && (
+
+                                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                                        {pullRequest.currentBranch && (
+                                          <Badge
+                                            variant="outline"
+                                            className="border-primary/40 text-primary"
+                                          >
+                                            Current branch
+                                          </Badge>
+                                        )}
+                                        <span
+                                          className={reviewDecisionTone(pullRequest.reviewDecision)}
+                                        >
+                                          {reviewDecisionLabel(pullRequest.reviewDecision)}
+                                        </span>
+                                        <span className={checkSummaryTone(pullRequest.checks)}>
+                                          {checkSummaryLabel(pullRequest.checks)}
+                                        </span>
                                         <a
-                                          href={check.url}
+                                          href={pullRequest.url}
                                           target="_blank"
                                           rel="noreferrer"
-                                          aria-label={`Open ${check.name} on GitHub`}
+                                          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                                          onClick={(event) =>
+                                            openWorkspaceWebLink(event, pullRequest.url, projectId)
+                                          }
                                         >
-                                          <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                                          Open on GitHub
+                                          <ExternalLink className="h-3.5 w-3.5" />
                                         </a>
-                                      )}
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                                      {check.displayTitle && <span>{check.displayTitle}</span>}
-                                      {check.workflowName && <span>{check.workflowName}</span>}
-                                      {check.completedAt && (
-                                        <span>{relativeCommitLabel(check.completedAt)}</span>
-                                      )}
+                                        {pullRequest.currentBranch &&
+                                          (pullRequest.checks.failure > 0 ||
+                                            pullRequest.checks.pending > 0) && (
+                                            <button
+                                              type="button"
+                                              className="text-primary hover:underline"
+                                              onClick={() => setActiveTab('checks')}
+                                            >
+                                              View checks
+                                            </button>
+                                          )}
+                                      </div>
                                     </div>
                                   </div>
-                                  <CheckStateBadge check={check} />
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </GitCard>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </GitCard>
 
-                <GitCard title="Source">
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <div>
-                      {currentChecks?.repositoryName ??
-                        currentStatus.repositoryName ??
-                        'Repository'}{' '}
-                      {(currentChecks?.currentBranch ?? currentStatus.currentBranch)
-                        ? `· ${currentChecks?.currentBranch ?? currentStatus.currentBranch}`
-                        : ''}
+                  <GitCard title="Source">
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <div>
+                        {currentPullRequests?.repositoryName ??
+                          currentStatus.repositoryName ??
+                          'Repository'}{' '}
+                        {(currentPullRequests?.currentBranch ?? currentStatus.currentBranch)
+                          ? `· ${currentPullRequests?.currentBranch ?? currentStatus.currentBranch}`
+                          : ''}
+                      </div>
+                      <div>
+                        {currentPullRequests?.ghAvailable
+                          ? 'GitHub CLI detected'
+                          : 'GitHub CLI not confirmed for this Project'}
+                      </div>
+                      <div>
+                        {currentPullRequests?.authenticated
+                          ? 'Authenticated with github.com'
+                          : 'GitHub authentication not confirmed'}
+                      </div>
+                      <div>Create and monitor pull requests from this Project.</div>
                     </div>
-                    {currentChecks?.available && <div>{checksScopeLabel(currentChecks)}</div>}
-                    <div>
-                      {currentChecks?.ghAvailable
-                        ? 'GitHub CLI detected'
-                        : 'GitHub CLI not confirmed for this Project'}
+                  </GitCard>
+                </>
+              ) : (
+                <>
+                  <GitCard title="Checks">
+                    <div className="space-y-3">
+                      {checksLoading && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Loading GitHub checks...
+                        </div>
+                      )}
+
+                      {!checksLoading && currentChecks && !currentChecks.available && (
+                        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                          {currentChecks.githubRemoteDetected ? (
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                          ) : (
+                            <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                          )}
+                          <div className="space-y-1">
+                            <div>{currentChecks.reason ?? 'GitHub checks are unavailable.'}</div>
+                            {currentChecks.githubRemoteDetected && !currentChecks.authenticated && (
+                              <div className="text-xs">
+                                Authenticate with GitHub CLI in the terminal to enable live checks.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {!checksLoading && !currentChecks && (
+                        <div className="text-sm text-muted-foreground">
+                          Select refresh or open this tab again to load check state.
+                        </div>
+                      )}
+
+                      {!checksLoading && currentChecks?.available && (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                              <div className="text-muted-foreground">Total</div>
+                              <div className="text-lg font-semibold">
+                                {currentChecks.summary.total}
+                              </div>
+                            </div>
+                            <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                              <div className="text-muted-foreground">Passing</div>
+                              <div className="text-lg font-semibold text-emerald-700">
+                                {currentChecks.summary.success}
+                              </div>
+                            </div>
+                            <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                              <div className="text-muted-foreground">Failing</div>
+                              <div className="text-lg font-semibold text-red-700">
+                                {currentChecks.summary.failure}
+                              </div>
+                            </div>
+                            <div className="rounded border border-border bg-muted/20 px-2 py-2">
+                              <div className="text-muted-foreground">Running</div>
+                              <div className="text-lg font-semibold text-blue-700">
+                                {currentChecks.summary.inProgress + currentChecks.summary.queued}
+                              </div>
+                            </div>
+                          </div>
+
+                          {currentChecks.checks.length === 0 ? (
+                            <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                              No GitHub checks were found for {checksScopeLabel(currentChecks)}.
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {currentChecks.checks.map((check) => (
+                                <div
+                                  key={check.id}
+                                  className="rounded border border-border bg-background px-3 py-2"
+                                >
+                                  <div className="flex min-w-0 items-start gap-2">
+                                    <CheckStateIcon check={check} />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex min-w-0 items-center gap-2">
+                                        <div className="truncate text-sm font-medium">
+                                          {check.name}
+                                        </div>
+                                        {check.url ? (
+                                          <a
+                                            href={check.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            aria-label={`Open ${check.name} on GitHub`}
+                                            onClick={(event) =>
+                                              openWorkspaceWebLink(
+                                                event,
+                                                check.url ?? '',
+                                                projectId,
+                                              )
+                                            }
+                                          >
+                                            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                                          </a>
+                                        ) : null}
+                                      </div>
+                                      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                                        {check.displayTitle && <span>{check.displayTitle}</span>}
+                                        {check.workflowName && <span>{check.workflowName}</span>}
+                                        {check.completedAt && (
+                                          <span>{relativeCommitLabel(check.completedAt)}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <CheckStateBadge check={check} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
-                    <div>
-                      {currentChecks?.authenticated
-                        ? 'Authenticated with github.com'
-                        : 'GitHub authentication not confirmed'}
+                  </GitCard>
+
+                  <GitCard title="Source">
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <div>
+                        {currentChecks?.repositoryName ??
+                          currentStatus.repositoryName ??
+                          'Repository'}{' '}
+                        {(currentChecks?.currentBranch ?? currentStatus.currentBranch)
+                          ? `· ${currentChecks?.currentBranch ?? currentStatus.currentBranch}`
+                          : ''}
+                      </div>
+                      {currentChecks?.available && <div>{checksScopeLabel(currentChecks)}</div>}
+                      <div>
+                        {currentChecks?.ghAvailable
+                          ? 'GitHub CLI detected'
+                          : 'GitHub CLI not confirmed for this Project'}
+                      </div>
+                      <div>
+                        {currentChecks?.authenticated
+                          ? 'Authenticated with github.com'
+                          : 'GitHub authentication not confirmed'}
+                      </div>
                     </div>
-                  </div>
-                </GitCard>
-              </>
-            )}
+                  </GitCard>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </aside>
     </>
   );

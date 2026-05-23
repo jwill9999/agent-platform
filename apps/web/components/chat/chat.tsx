@@ -10,6 +10,7 @@ import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import type { CriticEvent } from '@/lib/critic-events';
 import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
 import type { SensorDashboardResponse } from '@agent-platform/contracts';
+import type { WorkspaceEvent } from '@agent-platform/contracts';
 
 export interface ChatProps {
   messages: UIMessage[];
@@ -38,6 +39,10 @@ export interface ChatProps {
   thinkingByMessage?: Record<string, string>;
   /** Tool execution events keyed by assistant message id. */
   toolEventsByMessage?: Record<string, readonly ToolTraceEvent[]>;
+  /** Workspace resource events keyed by assistant message id. */
+  workspaceEventsByMessage?: Record<string, readonly WorkspaceEvent[]>;
+  /** Project id used to route assistant Markdown links into the desktop WebView panel. */
+  workspaceWebViewProjectId?: string | null;
   /** Approval requests keyed by assistant message id. */
   approvalEventsByMessage?: Record<string, readonly ApprovalCardState[]>;
   /** User decision handler for approval requests. */
@@ -77,6 +82,8 @@ export function Chat({
   criticEventsByMessage,
   thinkingByMessage,
   toolEventsByMessage,
+  workspaceEventsByMessage,
+  workspaceWebViewProjectId,
   approvalEventsByMessage,
   onApprovalDecision,
   showSensors = true,
@@ -101,7 +108,7 @@ export function Chat({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, approvalEventsByMessage, scrollToBottom]);
+  }, [messages, approvalEventsByMessage, workspaceEventsByMessage, scrollToBottom]);
 
   useEffect(() => {
     const firstFrame = requestAnimationFrame(() => {
@@ -145,6 +152,14 @@ export function Chat({
                     }
                     toolEvents={
                       message.role === 'assistant' ? toolEventsByMessage?.[message.id] : undefined
+                    }
+                    workspaceEvents={
+                      message.role === 'assistant'
+                        ? workspaceEventsByMessage?.[message.id]
+                        : undefined
+                    }
+                    workspaceWebViewProjectId={
+                      message.role === 'assistant' ? workspaceWebViewProjectId : null
                     }
                     approvals={
                       message.role === 'assistant'

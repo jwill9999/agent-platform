@@ -46,6 +46,9 @@ import {
   ScheduledJobRunLogRecordSchema,
   ScheduledJobRunRecordSchema,
   SkillSchema,
+  WorkspaceEventSchema,
+  parseWorkspaceResourceUri,
+  workspaceResourceUri,
 } from '../src/index.js';
 
 describe('contracts round-trip', () => {
@@ -78,6 +81,26 @@ describe('contracts round-trip', () => {
         argsPreview: { command: 'date' },
         message: 'Tool "sys_bash" requires human approval before execution.',
       },
+      {
+        type: 'workspace_event' as const,
+        event: {
+          type: 'resource_created' as const,
+          action: 'open' as const,
+          resource: {
+            uri: workspaceResourceUri({
+              projectId: 'project-1',
+              kind: 'file',
+              target: 'src/index.ts',
+            }),
+            kind: 'file' as const,
+            projectId: 'project-1',
+            label: 'src/index.ts',
+            metadata: { path: 'src/index.ts' },
+            createdAt: '2026-05-23T12:00:00.000Z',
+          },
+          metadata: { sourceTool: 'sys_git_status' },
+        },
+      },
     ];
     for (const s of samples) {
       const parsed = OutputSchema.parse(s);
@@ -91,6 +114,32 @@ describe('contracts round-trip', () => {
         ]),
       },
     });
+  });
+
+  it('WorkspaceEventSchema validates resource URIs', () => {
+    const uri = workspaceResourceUri({
+      projectId: 'project 1',
+      kind: 'diff',
+      target: 'src/app/page.tsx',
+    });
+    expect(parseWorkspaceResourceUri(uri)).toEqual({
+      projectId: 'project 1',
+      kind: 'diff',
+      target: 'src/app/page.tsx',
+    });
+    expect(
+      WorkspaceEventSchema.parse({
+        type: 'diff_created',
+        action: 'open',
+        resource: {
+          uri,
+          kind: 'diff',
+          projectId: 'project 1',
+          label: 'Diff: src/app/page.tsx',
+          createdAt: '2026-05-23T12:00:00.000Z',
+        },
+      }),
+    ).toMatchObject({ type: 'diff_created' });
   });
 
   it('SkillSchema + AgentSchema + limits', () => {

@@ -5,16 +5,28 @@ import {
   createProjectFolderIpcChannel,
   createTerminalIpcChannel,
   disposeTerminalIpcChannel,
+  closeWorkspaceWebViewIpcChannel,
+  focusWorkspaceWebViewIpcChannel,
+  goBackWorkspaceWebViewIpcChannel,
+  goForwardWorkspaceWebViewIpcChannel,
   inputTerminalIpcChannel,
+  listWorkspaceWebViewsIpcChannel,
+  openWorkspaceExternalFallbackIpcChannel,
+  openWorkspaceResourceIpcChannel,
+  openWorkspaceWebViewIpcChannel,
+  reloadWorkspaceWebViewIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   resizeTerminalIpcChannel,
   selectProjectFolderIpcChannel,
+  setWorkspaceWebViewBoundsIpcChannel,
   terminalDataIpcChannel,
   terminalExitIpcChannel,
+  workspaceWebViewUpdatedIpcChannel,
   type AgentPlatformDesktopApi,
   type DesktopTerminalDataEvent,
   type DesktopTerminalExitEvent,
+  type DesktopWorkspaceWebViewState,
 } from './desktopBridge.js';
 
 const desktopApi = {
@@ -69,6 +81,60 @@ const desktopApi = {
       ipcRenderer.on(terminalExitIpcChannel, listener);
       return () => {
         ipcRenderer.removeListener(terminalExitIpcChannel, listener);
+      };
+    },
+  },
+  workspace: {
+    openResource: (request) =>
+      ipcRenderer.invoke(openWorkspaceResourceIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['openResource']
+      >,
+    openExternalFallback: (request) =>
+      ipcRenderer.invoke(openWorkspaceExternalFallbackIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['openExternalFallback']
+      >,
+    openWebView: (request) =>
+      ipcRenderer.invoke(openWorkspaceWebViewIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['openWebView']
+      >,
+    closeWebView: (request) =>
+      ipcRenderer.invoke(closeWorkspaceWebViewIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['closeWebView']
+      >,
+    focusWebView: (request) =>
+      ipcRenderer.invoke(focusWorkspaceWebViewIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['focusWebView']
+      >,
+    listWebViews: () =>
+      ipcRenderer.invoke(listWorkspaceWebViewsIpcChannel) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['listWebViews']
+      >,
+    setWebViewBounds: (request) =>
+      ipcRenderer.invoke(setWorkspaceWebViewBoundsIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['setWebViewBounds']
+      >,
+    goBackWebView: (request) =>
+      ipcRenderer.invoke(goBackWorkspaceWebViewIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['goBackWebView']
+      >,
+    goForwardWebView: (request) =>
+      ipcRenderer.invoke(goForwardWorkspaceWebViewIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['goForwardWebView']
+      >,
+    reloadWebView: (request) =>
+      ipcRenderer.invoke(reloadWorkspaceWebViewIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['reloadWebView']
+      >,
+    onWebViewUpdated: (callback) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: DesktopWorkspaceWebViewState,
+      ) => {
+        callback(payload);
+      };
+      ipcRenderer.on(workspaceWebViewUpdatedIpcChannel, listener);
+      return () => {
+        ipcRenderer.removeListener(workspaceWebViewUpdatedIpcChannel, listener);
       };
     },
   },

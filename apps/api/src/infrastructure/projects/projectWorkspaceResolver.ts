@@ -24,6 +24,7 @@ type WorkspaceResolutionErrorCode =
 export type ProjectWorkspaceResolution =
   | {
       ok: true;
+      projectId: string;
       workspaceRoot: string;
       repositoryRoot: string;
       defaultRepoPath: string;
@@ -130,6 +131,7 @@ export function resolveSessionWorkspace(
 
   return {
     ok: true,
+    projectId: project.id,
     workspaceRoot,
     repositoryRoot,
     defaultRepoPath: repositoryRoot,

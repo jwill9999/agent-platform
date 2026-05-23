@@ -14,6 +14,7 @@ import type {
   ProjectFileTreeResult,
   ProjectRecord,
   SessionRecord,
+  WorkspaceEvent,
 } from '@agent-platform/contracts';
 import {
   ProjectOnboardingDialogueSchema,
@@ -85,6 +86,7 @@ import { CriticBadges } from '@/components/chat/critic-badges';
 import { BrowserArtifactPreviews } from '@/components/chat/browser-artifact-previews';
 import { ThinkingBlock } from '@/components/chat/thinking-block';
 import { ToolTraceBlock } from '@/components/chat/tool-trace-block';
+import { WorkspaceResourceCards } from '@/components/chat/workspace-resource-cards';
 import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
 import { WorkbenchCodeEditor } from '@/components/ide/workbench-code-editor';
 import { getWorkbenchLanguage, updateWorkbenchTabContent } from '@/lib/code-workbench-editor';
@@ -297,6 +299,7 @@ function ContentActivityBlocks({
   criticEvents,
   thinking,
   toolEvents,
+  workspaceEvents,
   approvals,
   onApprovalDecision,
   defaultOpenThinking = false,
@@ -305,12 +308,14 @@ function ContentActivityBlocks({
   criticEvents?: readonly CriticEvent[];
   thinking?: string;
   toolEvents?: readonly ToolTraceEvent[];
+  workspaceEvents?: readonly WorkspaceEvent[];
   approvals?: readonly ApprovalCardState[];
   onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
   defaultOpenThinking?: boolean;
   isStreaming?: boolean;
 }>) {
   const hasToolEvents = Boolean(toolEvents?.length);
+  const hasWorkspaceEvents = Boolean(workspaceEvents?.length);
 
   return (
     <>
@@ -320,6 +325,7 @@ function ContentActivityBlocks({
         <ToolTraceBlock events={toolEvents ?? []} isStreaming={isStreaming} />
       ) : null}
       {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
+      {hasWorkspaceEvents ? <WorkspaceResourceCards events={workspaceEvents ?? []} /> : null}
       {approvals?.map((approval) => (
         <ApprovalCard
           key={approval.approvalRequestId}
@@ -645,6 +651,7 @@ function shouldShowEmptyAssistantResponse(input: {
   messageText: string;
   thinking?: string;
   hasToolEvents: boolean;
+  hasWorkspaceEvents: boolean;
   hasApprovals: boolean;
   criticEvents?: readonly CriticEvent[];
 }) {
@@ -652,6 +659,7 @@ function shouldShowEmptyAssistantResponse(input: {
     !input.messageText.trim() &&
     !input.thinking?.trim() &&
     !input.hasToolEvents &&
+    !input.hasWorkspaceEvents &&
     !input.hasApprovals &&
     !input.criticEvents?.length
   );
@@ -669,6 +677,7 @@ export function AssistantContent({
   criticEvents,
   thinking,
   toolEvents,
+  workspaceEvents,
   approvals,
   onApprovalDecision,
 }: Readonly<{
@@ -683,10 +692,12 @@ export function AssistantContent({
   criticEvents?: readonly CriticEvent[];
   thinking?: string;
   toolEvents?: readonly ToolTraceEvent[];
+  workspaceEvents?: readonly WorkspaceEvent[];
   approvals?: readonly ApprovalCardState[];
   onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
   const hasToolEvents = Boolean(toolEvents?.length);
+  const hasWorkspaceEvents = Boolean(workspaceEvents?.length);
   const hasApprovals = Boolean(approvals?.length);
   const messageText = getMessageText(message);
 
@@ -697,6 +708,7 @@ export function AssistantContent({
           criticEvents={criticEvents}
           thinking={thinking}
           toolEvents={toolEvents}
+          workspaceEvents={workspaceEvents}
           approvals={approvals}
           onApprovalDecision={onApprovalDecision}
           defaultOpenThinking
@@ -715,6 +727,7 @@ export function AssistantContent({
         criticEvents={criticEvents}
         thinking={thinking}
         toolEvents={toolEvents}
+        workspaceEvents={workspaceEvents}
         approvals={approvals}
         onApprovalDecision={onApprovalDecision}
       />
@@ -730,6 +743,7 @@ export function AssistantContent({
         messageText,
         thinking,
         hasToolEvents,
+        hasWorkspaceEvents,
         hasApprovals,
         criticEvents,
       }) ? (
@@ -1291,6 +1305,7 @@ function ChatPanel({
   criticEventsByMessage,
   thinkingByMessage,
   toolEventsByMessage,
+  workspaceEventsByMessage,
   approvalEventsByMessage,
   onApprovalDecision,
 }: Readonly<{
@@ -1321,6 +1336,7 @@ function ChatPanel({
   criticEventsByMessage: Record<string, CriticEvent[]>;
   thinkingByMessage: Record<string, string>;
   toolEventsByMessage: Record<string, ToolTraceEvent[]>;
+  workspaceEventsByMessage: Record<string, WorkspaceEvent[]>;
   approvalEventsByMessage: Record<string, ApprovalCardState[]>;
   onApprovalDecision: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
@@ -1413,6 +1429,7 @@ function ChatPanel({
                         criticEvents={criticEventsByMessage[message.id]}
                         thinking={thinkingByMessage[message.id]}
                         toolEvents={toolEventsByMessage[message.id]}
+                        workspaceEvents={workspaceEventsByMessage[message.id]}
                         approvals={approvalEventsByMessage[message.id]}
                         onApprovalDecision={onApprovalDecision}
                       />
@@ -1839,6 +1856,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     criticEventsByMessage,
     thinkingByMessage,
     toolEventsByMessage,
+    workspaceEventsByMessage,
     approvalEventsByMessage,
     decideApproval,
   } = useHarnessChat(sessionId);
@@ -3014,6 +3032,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 criticEventsByMessage={criticEventsByMessage}
                 thinkingByMessage={thinkingByMessage}
                 toolEventsByMessage={toolEventsByMessage}
+                workspaceEventsByMessage={workspaceEventsByMessage}
                 approvalEventsByMessage={approvalEventsByMessage}
                 onApprovalDecision={decideApproval}
               />

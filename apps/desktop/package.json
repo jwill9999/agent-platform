@@ -26,6 +26,7 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "@agent-platform/contracts": "workspace:*",
     "node-pty": "^1.1.0"
   }
 }

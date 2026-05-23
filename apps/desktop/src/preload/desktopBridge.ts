@@ -1,3 +1,16 @@
+import type {
+  DesktopWorkspaceOpenExternalFallbackResult,
+  DesktopWorkspaceOpenResult,
+  DesktopWorkspaceWebViewState,
+} from '@agent-platform/contracts';
+export type {
+  DesktopWebViewPolicyTier,
+  DesktopWebViewStatus,
+  DesktopWorkspaceOpenExternalFallbackResult,
+  DesktopWorkspaceOpenResult,
+  DesktopWorkspaceWebViewState,
+} from '@agent-platform/contracts';
+
 export interface DesktopVersionsApi {
   readonly chrome: () => string;
   readonly electron: () => string;
@@ -96,10 +109,74 @@ export interface DesktopTerminalApi {
   ) => DesktopTerminalUnsubscribe;
 }
 
+export interface DesktopWorkspaceOpenResourceRequest {
+  readonly uri: string;
+}
+
+export interface DesktopWorkspaceOpenExternalFallbackRequest {
+  readonly url: string;
+}
+
+export interface DesktopWorkspaceOpenWebViewRequest {
+  readonly url: string;
+  readonly projectId?: string;
+}
+
+export interface DesktopWorkspaceWebViewIdRequest {
+  readonly webviewId: string;
+}
+
+export interface DesktopWorkspaceWebViewBoundsRequest {
+  readonly webviewId: string;
+  readonly bounds: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+}
+
+export type DesktopWorkspaceWebViewUnsubscribe = () => void;
+
+export interface DesktopWorkspaceApi {
+  readonly openResource: (
+    request: DesktopWorkspaceOpenResourceRequest,
+  ) => Promise<DesktopWorkspaceOpenResult>;
+  readonly openExternalFallback: (
+    request: DesktopWorkspaceOpenExternalFallbackRequest,
+  ) => Promise<DesktopWorkspaceOpenExternalFallbackResult>;
+  readonly openWebView: (
+    request: DesktopWorkspaceOpenWebViewRequest,
+  ) => Promise<DesktopWorkspaceOpenResult>;
+  readonly closeWebView: (
+    request: DesktopWorkspaceWebViewIdRequest,
+  ) => Promise<DesktopWorkspaceWebViewState | null>;
+  readonly focusWebView: (
+    request: DesktopWorkspaceWebViewIdRequest,
+  ) => Promise<DesktopWorkspaceWebViewState | null>;
+  readonly listWebViews: () => Promise<readonly DesktopWorkspaceWebViewState[]>;
+  readonly setWebViewBounds: (
+    request: DesktopWorkspaceWebViewBoundsRequest,
+  ) => Promise<DesktopWorkspaceWebViewState | null>;
+  readonly goBackWebView: (
+    request: DesktopWorkspaceWebViewIdRequest,
+  ) => Promise<DesktopWorkspaceWebViewState | null>;
+  readonly goForwardWebView: (
+    request: DesktopWorkspaceWebViewIdRequest,
+  ) => Promise<DesktopWorkspaceWebViewState | null>;
+  readonly reloadWebView: (
+    request: DesktopWorkspaceWebViewIdRequest,
+  ) => Promise<DesktopWorkspaceWebViewState | null>;
+  readonly onWebViewUpdated: (
+    callback: (event: DesktopWorkspaceWebViewState) => void,
+  ) => DesktopWorkspaceWebViewUnsubscribe;
+}
+
 export interface AgentPlatformDesktopApi {
   readonly maintenance: DesktopMaintenanceApi;
   readonly projects: DesktopProjectsApi;
   readonly terminal: DesktopTerminalApi;
+  readonly workspace: DesktopWorkspaceApi;
   readonly versions: DesktopVersionsApi;
 }
 
@@ -115,11 +192,24 @@ export const resizeTerminalIpcChannel = 'agent-platform:terminal:resize';
 export const disposeTerminalIpcChannel = 'agent-platform:terminal:dispose';
 export const terminalDataIpcChannel = 'agent-platform:terminal:data';
 export const terminalExitIpcChannel = 'agent-platform:terminal:exit';
+export const openWorkspaceResourceIpcChannel = 'agent-platform:workspace:open-resource';
+export const openWorkspaceExternalFallbackIpcChannel =
+  'agent-platform:workspace:open-external-fallback';
+export const openWorkspaceWebViewIpcChannel = 'agent-platform:workspace:open-webview';
+export const closeWorkspaceWebViewIpcChannel = 'agent-platform:workspace:close-webview';
+export const focusWorkspaceWebViewIpcChannel = 'agent-platform:workspace:focus-webview';
+export const listWorkspaceWebViewsIpcChannel = 'agent-platform:workspace:list-webviews';
+export const setWorkspaceWebViewBoundsIpcChannel = 'agent-platform:workspace:set-webview-bounds';
+export const goBackWorkspaceWebViewIpcChannel = 'agent-platform:workspace:webview-back';
+export const goForwardWorkspaceWebViewIpcChannel = 'agent-platform:workspace:webview-forward';
+export const reloadWorkspaceWebViewIpcChannel = 'agent-platform:workspace:webview-reload';
+export const workspaceWebViewUpdatedIpcChannel = 'agent-platform:workspace:webview-updated';
 
 export const desktopBridgeApiKeys = [
   'maintenance',
   'projects',
   'terminal',
+  'workspace',
   'versions',
 ] as const satisfies readonly (keyof AgentPlatformDesktopApi)[];
 
@@ -141,6 +231,20 @@ export const desktopTerminalApiKeys = [
   'onData',
   'onExit',
 ] as const satisfies readonly (keyof DesktopTerminalApi)[];
+
+export const desktopWorkspaceApiKeys = [
+  'openResource',
+  'openExternalFallback',
+  'openWebView',
+  'closeWebView',
+  'focusWebView',
+  'listWebViews',
+  'setWebViewBounds',
+  'goBackWebView',
+  'goForwardWebView',
+  'reloadWebView',
+  'onWebViewUpdated',
+] as const satisfies readonly (keyof DesktopWorkspaceApi)[];
 
 export const desktopVersionsApiKeys = [
   'chrome',

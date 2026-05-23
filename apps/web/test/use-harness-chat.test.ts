@@ -60,6 +60,41 @@ describe('harness chat stream parser', () => {
     expect(result).not.toHaveProperty('text');
   });
 
+  it('keeps workspace events separate from assistant text', () => {
+    const result = renderStreamEvent({
+      type: 'workspace_event',
+      event: {
+        type: 'resource_created',
+        action: 'open',
+        resource: {
+          uri: 'workspace://project/project-1/file/src/index.ts',
+          kind: 'file',
+          projectId: 'project-1',
+          label: 'src/index.ts',
+          createdAt: '2026-05-23T12:00:00.000Z',
+          metadata: { path: 'src/index.ts' },
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      workspaceEvent: {
+        type: 'resource_created',
+        action: 'open',
+        resource: {
+          uri: 'workspace://project/project-1/file/src/index.ts',
+          kind: 'file',
+          projectId: 'project-1',
+          label: 'src/index.ts',
+          createdAt: '2026-05-23T12:00:00.000Z',
+          metadata: { path: 'src/index.ts' },
+        },
+        metadata: {},
+      },
+    });
+    expect(result).not.toHaveProperty('text');
+  });
+
   it('keeps recoverable tool errors out of the global chat error', () => {
     const result = renderStreamEvent({
       type: 'error',

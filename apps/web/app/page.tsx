@@ -40,6 +40,10 @@ import {
 import { ProjectBranchSelector } from '@/components/project/project-branch-selector';
 import { ProjectGitHubPanel } from '@/components/project/project-git-github-panel';
 import { ProjectTerminalDock } from '@/components/project/project-terminal-dock';
+import {
+  ProjectWebViewPanel,
+  type ProjectWebViewMode,
+} from '@/components/project/project-webview-panel';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
 import {
@@ -509,6 +513,7 @@ export default function HomePage() {
   const [selectedMode, setSelectedMode] = useState<WorkspaceMode | null>(null);
   const [activeProject, setActiveProject] = useState<ProjectDesktopRecord | null>(null);
   const [projectTerminalOpen, setProjectTerminalOpen] = useState(false);
+  const [projectWebViewMode, setProjectWebViewMode] = useState<ProjectWebViewMode>('docked');
   const [projectGitRefreshKey, setProjectGitRefreshKey] = useState(0);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
@@ -546,6 +551,7 @@ export default function HomePage() {
     criticEventsByMessage,
     thinkingByMessage,
     toolEventsByMessage,
+    workspaceEventsByMessage,
     approvalEventsByMessage,
     decideApproval,
     hasPendingApproval,
@@ -1315,6 +1321,10 @@ export default function HomePage() {
               criticEventsByMessage={criticEventsByMessage}
               thinkingByMessage={thinkingByMessage}
               toolEventsByMessage={toolEventsByMessage}
+              workspaceEventsByMessage={workspaceEventsByMessage}
+              workspaceWebViewProjectId={
+                selectedMode === 'project-chat' ? (activeProject?.id ?? null) : null
+              }
               approvalEventsByMessage={approvalEventsByMessage}
               onApprovalDecision={handleApprovalDecision}
               showSensors={false}
@@ -1370,19 +1380,28 @@ export default function HomePage() {
               }
               sideAccessory={
                 selectedMode === 'project-chat' ? (
-                  <ProjectGitHubPanel
-                    projectId={activeProject?.id ?? null}
-                    refreshKey={projectGitRefreshKey}
-                    projectInstructionsStatus={
-                      projectOnboardingIsApproved(activeProject)
-                        ? 'approved'
-                        : onboardingDraft
-                          ? 'draft_ready'
-                          : 'missing'
-                    }
-                    isStartingProjectInstructions={isStartingProjectInstructions}
-                    onStartProjectInstructions={handleStartProjectInstructions}
-                  />
+                  <div className="hidden h-full min-h-0 shrink-0 lg:flex">
+                    <ProjectWebViewPanel
+                      projectId={activeProject?.id ?? null}
+                      viewMode={projectWebViewMode}
+                      onViewModeChange={setProjectWebViewMode}
+                    />
+                    {projectWebViewMode === 'docked' && (
+                      <ProjectGitHubPanel
+                        projectId={activeProject?.id ?? null}
+                        refreshKey={projectGitRefreshKey}
+                        projectInstructionsStatus={
+                          projectOnboardingIsApproved(activeProject)
+                            ? 'approved'
+                            : onboardingDraft
+                              ? 'draft_ready'
+                              : 'missing'
+                        }
+                        isStartingProjectInstructions={isStartingProjectInstructions}
+                        onStartProjectInstructions={handleStartProjectInstructions}
+                      />
+                    )}
+                  </div>
                 ) : null
               }
             />
