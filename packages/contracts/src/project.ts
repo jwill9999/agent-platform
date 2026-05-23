@@ -6,6 +6,28 @@ export type ProjectMode = z.infer<typeof ProjectModeSchema>;
 export const ProjectDefaultAgentProfileSchema = z.enum(['coding', 'personal_assistant']);
 export type ProjectDefaultAgentProfile = z.infer<typeof ProjectDefaultAgentProfileSchema>;
 
+export const ProjectProfileSchema = z.enum([
+  'coding',
+  'docs_content',
+  'research',
+  'automation',
+  'mixed',
+  'unknown',
+]);
+export type ProjectProfile = z.infer<typeof ProjectProfileSchema>;
+
+export const ProjectCapabilitySchema = z.enum([
+  'files',
+  'chat',
+  'coding_tools',
+  'terminal',
+  'git',
+  'tests',
+  'automation',
+  'docs_research',
+]);
+export type ProjectCapability = z.infer<typeof ProjectCapabilitySchema>;
+
 export const ProjectCapabilityStateSchema = z.enum([
   'backend_accessible',
   'readonly',
@@ -92,6 +114,303 @@ export const ProjectInstructionFileReferenceSchema = z.object({
 });
 export type ProjectInstructionFileReference = z.infer<typeof ProjectInstructionFileReferenceSchema>;
 
+export const ProjectOnboardingAssessmentStatusSchema = z.enum([
+  'approved',
+  'in_progress',
+  'needs_review',
+]);
+export type ProjectOnboardingAssessmentStatus = z.infer<
+  typeof ProjectOnboardingAssessmentStatusSchema
+>;
+
+export const ProjectOnboardingEvidenceKindSchema = z.enum([
+  'instructions',
+  'manifest',
+  'config',
+  'docs',
+  'source',
+  'test',
+  'container',
+  'automation',
+  'other',
+]);
+export type ProjectOnboardingEvidenceKind = z.infer<typeof ProjectOnboardingEvidenceKindSchema>;
+
+export const ProjectOnboardingEvidenceFileSchema = z.object({
+  path: RelativeProjectPathSchema,
+  kind: ProjectOnboardingEvidenceKindSchema,
+  summary: z.string().min(1).max(1000).optional(),
+});
+export type ProjectOnboardingEvidenceFile = z.infer<typeof ProjectOnboardingEvidenceFileSchema>;
+
+export const ProjectOnboardingCommandKindSchema = z.enum([
+  'run',
+  'build',
+  'test',
+  'lint',
+  'container',
+  'automation',
+  'other',
+]);
+export type ProjectOnboardingCommandKind = z.infer<typeof ProjectOnboardingCommandKindSchema>;
+
+export const ProjectOnboardingCommandSchema = z.object({
+  kind: ProjectOnboardingCommandKindSchema,
+  command: z.string().min(1).max(1000),
+  path: RelativeProjectPathSchema.optional(),
+  packageName: z.string().min(1).max(200).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+});
+export type ProjectOnboardingCommand = z.infer<typeof ProjectOnboardingCommandSchema>;
+
+export const ProjectOnboardingGapKindSchema = z.enum([
+  'missing_instructions',
+  'stale_instructions',
+  'contradiction',
+  'ambiguous_scope',
+  'missing_command',
+  'unknown_profile',
+  'other',
+]);
+export type ProjectOnboardingGapKind = z.infer<typeof ProjectOnboardingGapKindSchema>;
+
+export const ProjectOnboardingGapSchema = z.object({
+  kind: ProjectOnboardingGapKindSchema,
+  severity: z.enum(['info', 'warning', 'blocking']),
+  message: z.string().min(1).max(1000),
+  evidencePaths: z.array(RelativeProjectPathSchema).default([]),
+});
+export type ProjectOnboardingGap = z.infer<typeof ProjectOnboardingGapSchema>;
+
+export const ProjectOnboardingQuestionSchema = z.object({
+  id: z.string().min(1).max(120),
+  prompt: z.string().min(1).max(1000),
+  reason: z.string().min(1).max(1000).optional(),
+  required: z.boolean().default(true),
+});
+export type ProjectOnboardingQuestion = z.infer<typeof ProjectOnboardingQuestionSchema>;
+
+export const ProjectInstructionUpdateRecommendationSchema = z.object({
+  targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
+  summary: z.string().min(1).max(1000),
+  rationale: z.string().min(1).max(1000).optional(),
+  proposedMarkdown: z.string().min(1).max(20000).optional(),
+});
+export type ProjectInstructionUpdateRecommendation = z.infer<
+  typeof ProjectInstructionUpdateRecommendationSchema
+>;
+
+export const ProjectInstructionUpdateSourceSchema = z.enum([
+  'agent_observation',
+  'closeout',
+  'refresh',
+  'user_feedback',
+]);
+export type ProjectInstructionUpdateSource = z.infer<typeof ProjectInstructionUpdateSourceSchema>;
+
+export const ProjectInstructionUpdateRiskSchema = z.enum([
+  'low_risk_fact',
+  'needs_review',
+  'policy_change',
+]);
+export type ProjectInstructionUpdateRisk = z.infer<typeof ProjectInstructionUpdateRiskSchema>;
+
+export const ProjectInstructionUpdateStatusSchema = z.enum([
+  'pending',
+  'proposed',
+  'applied',
+  'rejected',
+]);
+export type ProjectInstructionUpdateStatus = z.infer<typeof ProjectInstructionUpdateStatusSchema>;
+
+export const ProjectInstructionUpdateCandidateSchema = z.object({
+  id: z.string().min(1).max(120),
+  targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
+  summary: z.string().min(1).max(1000),
+  rationale: z.string().min(1).max(1000).optional(),
+  proposedMarkdown: z.string().min(1).max(5000).optional(),
+  source: ProjectInstructionUpdateSourceSchema,
+  risk: ProjectInstructionUpdateRiskSchema.default('needs_review'),
+  status: ProjectInstructionUpdateStatusSchema.default('pending'),
+  evidence: z.array(ProjectOnboardingEvidenceFileSchema).default([]),
+  createdAtMs: z.number().int().nonnegative(),
+  decidedAtMs: z.number().int().nonnegative().optional(),
+  reviewer: z.string().min(1).max(200).optional(),
+  decisionComment: z.string().max(2000).optional(),
+});
+export type ProjectInstructionUpdateCandidate = z.infer<
+  typeof ProjectInstructionUpdateCandidateSchema
+>;
+
+export const ProjectInstructionUpdateCandidateInputSchema = z.object({
+  targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
+  summary: z.string().trim().min(1).max(1000),
+  rationale: z.string().trim().min(1).max(1000).optional(),
+  proposedMarkdown: z.string().trim().min(1).max(5000).optional(),
+  source: ProjectInstructionUpdateSourceSchema.default('agent_observation'),
+  risk: ProjectInstructionUpdateRiskSchema.default('needs_review'),
+  evidence: z.array(ProjectOnboardingEvidenceFileSchema).default([]),
+});
+export type ProjectInstructionUpdateCandidateInput = z.infer<
+  typeof ProjectInstructionUpdateCandidateInputSchema
+>;
+
+export const ProjectInstructionUpdateCandidateBodySchema = z.object({
+  candidates: z.array(ProjectInstructionUpdateCandidateInputSchema).min(1).max(20),
+});
+export type ProjectInstructionUpdateCandidateBody = z.infer<
+  typeof ProjectInstructionUpdateCandidateBodySchema
+>;
+
+export const ProjectInstructionUpdateDecisionBodySchema = z.object({
+  reviewer: z.string().trim().min(1).max(200).default('User'),
+  comment: z.string().trim().max(2000).optional(),
+});
+export type ProjectInstructionUpdateDecisionBody = z.infer<
+  typeof ProjectInstructionUpdateDecisionBodySchema
+>;
+
+export const ProjectInstructionUpdateProposalSchema = z.object({
+  id: z.string().min(1).max(120),
+  status: z.enum(['ready', 'empty']),
+  candidateIds: z.array(z.string().min(1).max(120)).default([]),
+  summary: z.string().min(1).max(1000),
+  policy: z.enum(['relaxed_reviewable', 'strict_blocking']).default('relaxed_reviewable'),
+  createdAtMs: z.number().int().nonnegative(),
+});
+export type ProjectInstructionUpdateProposal = z.infer<
+  typeof ProjectInstructionUpdateProposalSchema
+>;
+
+export const ProjectOnboardingDisplayContextSchema = z.object({
+  projectName: z.string().min(1).max(200),
+  folderLabel: z.string().min(1).max(500).optional(),
+  relativePath: RelativeProjectPathSchema.optional(),
+  profileLabel: z.string().min(1).max(120).optional(),
+  onboardingLabel: z.string().min(1).max(120),
+  branchLabel: z.string().min(1).max(300).optional(),
+});
+export type ProjectOnboardingDisplayContext = z.infer<typeof ProjectOnboardingDisplayContextSchema>;
+
+export const ProjectOnboardingAssessmentSchema = z.object({
+  status: ProjectOnboardingAssessmentStatusSchema,
+  profile: ProjectProfileSchema,
+  capabilities: z.array(ProjectCapabilitySchema).default([]),
+  summary: z.string().min(1).max(4000),
+  evidenceFiles: z.array(ProjectOnboardingEvidenceFileSchema).default([]),
+  subprojectScopes: z.array(ProjectSubprojectScopeSchema).default([]),
+  commands: z.array(ProjectOnboardingCommandSchema).default([]),
+  gaps: z.array(ProjectOnboardingGapSchema).default([]),
+  questions: z.array(ProjectOnboardingQuestionSchema).default([]),
+  recommendedInstructionUpdates: z.array(ProjectInstructionUpdateRecommendationSchema).default([]),
+  display: ProjectOnboardingDisplayContextSchema,
+  assessedAtMs: z.number().int().nonnegative(),
+});
+export type ProjectOnboardingAssessment = z.infer<typeof ProjectOnboardingAssessmentSchema>;
+
+export const ProjectOnboardingDraftSchema = z.object({
+  id: z.string().min(1).max(120),
+  projectId: z.string().min(1),
+  targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
+  markdown: z.string().min(1).max(50000),
+  revision: z.number().int().positive(),
+  history: z
+    .array(
+      z.object({
+        revision: z.number().int().positive(),
+        markdown: z.string().min(1).max(50000),
+        summary: z.string().min(1).max(1000),
+        createdAtMs: z.number().int().nonnegative(),
+      }),
+    )
+    .default([]),
+  createdAtMs: z.number().int().nonnegative(),
+  updatedAtMs: z.number().int().nonnegative(),
+});
+export type ProjectOnboardingDraft = z.infer<typeof ProjectOnboardingDraftSchema>;
+
+export const ProjectOnboardingDialogueRoleSchema = z.enum(['assistant', 'user']);
+export type ProjectOnboardingDialogueRole = z.infer<typeof ProjectOnboardingDialogueRoleSchema>;
+
+export const ProjectOnboardingDialogueTurnSchema = z.object({
+  id: z.string().min(1).max(120),
+  role: ProjectOnboardingDialogueRoleSchema,
+  content: z.string().min(1).max(5000),
+  questionId: z.string().min(1).max(120).optional(),
+  createdAtMs: z.number().int().nonnegative(),
+});
+export type ProjectOnboardingDialogueTurn = z.infer<typeof ProjectOnboardingDialogueTurnSchema>;
+
+export const ProjectOnboardingDialogueSchema = z.object({
+  status: z.enum(['idle', 'asking', 'draft_ready']),
+  activeQuestionId: z.string().min(1).max(120).optional(),
+  answeredQuestionIds: z.array(z.string().min(1).max(120)).default([]),
+  turns: z.array(ProjectOnboardingDialogueTurnSchema).default([]),
+  updatedAtMs: z.number().int().nonnegative(),
+});
+export type ProjectOnboardingDialogue = z.infer<typeof ProjectOnboardingDialogueSchema>;
+
+export const ProjectOnboardingAnswerBodySchema = z.object({
+  questionId: z.string().min(1).max(120).optional(),
+  answer: z.string().trim().min(1).max(5000),
+});
+export type ProjectOnboardingAnswerBody = z.infer<typeof ProjectOnboardingAnswerBodySchema>;
+
+export const ProjectOnboardingReviewBodySchema = z.object({
+  decision: z.enum(['approve', 'reject', 'request_changes']).default('approve'),
+  reviewer: z.string().trim().min(1).max(200).default('User'),
+  comment: z.string().trim().max(2000).optional(),
+});
+export type ProjectOnboardingReviewBody = z.infer<typeof ProjectOnboardingReviewBodySchema>;
+
+export const ProjectOnboardingApprovalDecisionSchema = z.object({
+  decision: z.enum(['approve', 'reject', 'request_changes']),
+  projectId: z.string().min(1),
+  targetPath: RelativeProjectPathSchema.default('AGENTS.md'),
+  contentHash: z.string().min(1).max(200).optional(),
+  reviewer: z.string().min(1).max(200),
+  source: z.enum(['auto_assessment', 'manual_review']),
+  decidedAtMs: z.number().int().nonnegative(),
+  comment: z.string().max(2000).optional(),
+});
+export type ProjectOnboardingApprovalDecision = z.infer<
+  typeof ProjectOnboardingApprovalDecisionSchema
+>;
+
+export const ProjectOnboardingRefreshResultSchema = z.object({
+  previousState: ProjectOnboardingStateSchema,
+  nextState: ProjectOnboardingStateSchema,
+  updateStatus: z.enum(['no_change', 'proposed_update', 'material_drift']).default('no_change'),
+  materialDrift: z.boolean(),
+  assessment: ProjectOnboardingAssessmentSchema,
+  refreshedAtMs: z.number().int().nonnegative(),
+});
+export type ProjectOnboardingRefreshResult = z.infer<typeof ProjectOnboardingRefreshResultSchema>;
+
+export const ProjectOnboardingFixtureStateSchema = z.enum([
+  'sufficient_existing_instructions',
+  'missing_instructions',
+  'insufficient_instructions',
+  'stale_instructions',
+  'nested_instructions',
+  'ambiguous_subproject',
+  'mixed_non_code_project',
+]);
+export type ProjectOnboardingFixtureState = z.infer<typeof ProjectOnboardingFixtureStateSchema>;
+
+export const ProjectOnboardingTransitionTriggerSchema = z.enum([
+  'assessment_missing',
+  'assessment_needs_review',
+  'assessment_approved',
+  'approval_granted',
+  'approval_rejected',
+  'refresh_material_drift',
+  'refresh_no_change',
+]);
+export type ProjectOnboardingTransitionTrigger = z.infer<
+  typeof ProjectOnboardingTransitionTriggerSchema
+>;
+
 export const ProjectWorkspaceBindingSchema = z.object({
   projectId: z.string().min(1),
   displayName: z.string().min(1).max(200),
@@ -152,6 +471,464 @@ export const ProjectOpenBodySchema = z.object({
   slug: ProjectSlugSchema.optional(),
 });
 
+export const ProjectDesktopRegistrationBodySchema = ProjectOpenBodySchema;
+export type ProjectDesktopRegistrationBody = z.infer<typeof ProjectDesktopRegistrationBodySchema>;
+
+export const ProjectDesktopMetadataSchema = z.object({
+  source: z.literal('desktop'),
+  folderName: z.string().min(1).max(200),
+  folderPathLabel: z.string().min(1).max(1000).optional(),
+  capabilityState: ProjectCapabilityStateSchema,
+  onboardingState: ProjectOnboardingStateSchema,
+  defaultAgentProfile: ProjectDefaultAgentProfileSchema,
+  activeBranch: z.string().min(1).max(300).optional(),
+  instructionFileCount: z.number().int().nonnegative(),
+});
+export type ProjectDesktopMetadata = z.infer<typeof ProjectDesktopMetadataSchema>;
+
+export const ProjectDesktopRecordSchema = ProjectRecordSchema.extend({
+  workspaceKey: z.undefined().optional(),
+  metadata: ProjectDesktopMetadataSchema,
+});
+export type ProjectDesktopRecord = z.infer<typeof ProjectDesktopRecordSchema>;
+
+export const ProjectDesktopRegistrationResultSchema = z.object({
+  created: z.boolean(),
+  project: ProjectDesktopRecordSchema,
+});
+export type ProjectDesktopRegistrationResult = z.infer<
+  typeof ProjectDesktopRegistrationResultSchema
+>;
+
+export const ProjectDesktopRecentProjectsResultSchema = z.object({
+  projects: ProjectDesktopRecordSchema.array(),
+});
+export type ProjectDesktopRecentProjectsResult = z.infer<
+  typeof ProjectDesktopRecentProjectsResultSchema
+>;
+
+const ProjectBranchNameSchema = z
+  .string()
+  .min(1)
+  .max(300)
+  .refine(
+    (value) =>
+      value.trim() === value &&
+      !value.startsWith('-') &&
+      !value.includes('\\') &&
+      !value.includes('..') &&
+      !/[\s~^:?*[\]\0]/.test(value),
+    { message: 'Branch name must be a safe Git branch reference' },
+  );
+
+export const ProjectBranchSummarySchema = z.object({
+  name: ProjectBranchNameSchema,
+  current: z.boolean(),
+  upstreamBranch: z.string().min(1).max(300).optional(),
+  upstreamState: z.enum(['none', 'active', 'missing']).default('none'),
+});
+export type ProjectBranchSummary = z.infer<typeof ProjectBranchSummarySchema>;
+
+export const ProjectBranchListResultSchema = z.object({
+  currentBranch: ProjectBranchNameSchema.optional(),
+  clean: z.boolean(),
+  branches: z.array(ProjectBranchSummarySchema),
+});
+export type ProjectBranchListResult = z.infer<typeof ProjectBranchListResultSchema>;
+
+export const ProjectBranchCheckoutBodySchema = z.object({
+  branch: ProjectBranchNameSchema,
+});
+export type ProjectBranchCheckoutBody = z.infer<typeof ProjectBranchCheckoutBodySchema>;
+
+export const ProjectGitWorkingTreeSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  staged: z.number().int().nonnegative(),
+  unstaged: z.number().int().nonnegative(),
+  added: z.number().int().nonnegative(),
+  modified: z.number().int().nonnegative(),
+  deleted: z.number().int().nonnegative(),
+  renamed: z.number().int().nonnegative(),
+  untracked: z.number().int().nonnegative(),
+  conflicts: z.number().int().nonnegative(),
+});
+export type ProjectGitWorkingTreeSummary = z.infer<typeof ProjectGitWorkingTreeSummarySchema>;
+
+export const ProjectGitRecentCommitSchema = z.object({
+  sha: z.string().min(1).max(80),
+  subject: z.string().min(1).max(500),
+  authorName: z.string().min(1).max(200).optional(),
+  committedAt: z.string().min(1).max(100).optional(),
+});
+export type ProjectGitRecentCommit = z.infer<typeof ProjectGitRecentCommitSchema>;
+
+export const ProjectGitStatusResultSchema = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).max(500).optional(),
+  repositoryName: z.string().min(1).max(200).optional(),
+  remoteUrl: z.string().min(1).max(1000).optional(),
+  currentBranch: z.string().min(1).max(300).optional(),
+  upstreamBranch: z.string().min(1).max(300).optional(),
+  upstreamState: z.enum(['none', 'active', 'missing']).default('none'),
+  baseBranch: z.string().min(1).max(300).optional(),
+  headSha: z.string().min(1).max(80).optional(),
+  ahead: z.number().int().nonnegative().default(0),
+  behind: z.number().int().nonnegative().default(0),
+  clean: z.boolean(),
+  workingTree: ProjectGitWorkingTreeSummarySchema,
+  recentCommit: ProjectGitRecentCommitSchema.optional(),
+  githubRemoteDetected: z.boolean().default(false),
+});
+export type ProjectGitStatusResult = z.infer<typeof ProjectGitStatusResultSchema>;
+
+export const ProjectGitFileStatusSchema = z.enum([
+  'added',
+  'modified',
+  'deleted',
+  'renamed',
+  'untracked',
+  'conflict',
+]);
+export type ProjectGitFileStatus = z.infer<typeof ProjectGitFileStatusSchema>;
+
+export const ProjectGitChangedFileSchema = z.object({
+  path: z.string().min(1).max(1000),
+  originalPath: z.string().min(1).max(1000).optional(),
+  status: ProjectGitFileStatusSchema,
+  indexStatus: z.string().min(1).max(2),
+  worktreeStatus: z.string().min(1).max(2),
+  staged: z.boolean(),
+  unstaged: z.boolean(),
+  additions: z.number().int().nonnegative().optional(),
+  deletions: z.number().int().nonnegative().optional(),
+});
+export type ProjectGitChangedFile = z.infer<typeof ProjectGitChangedFileSchema>;
+
+export const ProjectGitChangesResultSchema = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).max(500).optional(),
+  clean: z.boolean(),
+  workingTree: ProjectGitWorkingTreeSummarySchema,
+  files: z.array(ProjectGitChangedFileSchema),
+});
+export type ProjectGitChangesResult = z.infer<typeof ProjectGitChangesResultSchema>;
+
+export const ProjectGitDiffModeSchema = z.enum(['unstaged', 'staged']);
+export type ProjectGitDiffMode = z.infer<typeof ProjectGitDiffModeSchema>;
+
+export const ProjectGitFileDiffResultSchema = z.object({
+  path: z.string().min(1).max(1000),
+  mode: ProjectGitDiffModeSchema,
+  status: ProjectGitFileStatusSchema.optional(),
+  diff: z.string(),
+  truncated: z.boolean().default(false),
+});
+export type ProjectGitFileDiffResult = z.infer<typeof ProjectGitFileDiffResultSchema>;
+
+export const ProjectGitStageBodySchema = z
+  .object({
+    all: z.boolean().optional(),
+    paths: z.array(z.string().min(1).max(1000)).max(100).optional(),
+  })
+  .refine((value) => value.all === true || Boolean(value.paths?.length), {
+    message: 'Specify all=true or at least one path',
+  });
+export type ProjectGitStageBody = z.infer<typeof ProjectGitStageBodySchema>;
+
+export const ProjectGitStashBodySchema = z.object({
+  paths: z.array(z.string().min(1).max(1000)).min(1).max(100),
+});
+export type ProjectGitStashBody = z.infer<typeof ProjectGitStashBodySchema>;
+
+export const ProjectGitCommitBodySchema = z.object({
+  message: z.string().trim().min(1).max(1000),
+});
+export type ProjectGitCommitBody = z.infer<typeof ProjectGitCommitBodySchema>;
+
+export const ProjectGitConflictFileSchema = z.object({
+  path: z.string().min(1).max(1000),
+  conflictCount: z.number().int().nonnegative(),
+  resolved: z.boolean(),
+});
+export type ProjectGitConflictFile = z.infer<typeof ProjectGitConflictFileSchema>;
+
+export const ProjectGitConflictSummarySchema = z.object({
+  totalFiles: z.number().int().nonnegative(),
+  totalConflicts: z.number().int().nonnegative(),
+  files: z.array(ProjectGitConflictFileSchema),
+});
+export type ProjectGitConflictSummary = z.infer<typeof ProjectGitConflictSummarySchema>;
+
+export const ProjectGitPullResultSchema = z.object({
+  outcome: z.enum(['clean', 'conflicts']),
+  status: ProjectGitStatusResultSchema,
+  conflicts: ProjectGitConflictSummarySchema.optional(),
+});
+export type ProjectGitPullResult = z.infer<typeof ProjectGitPullResultSchema>;
+
+export const ProjectGitConflictHunkSchema = z.object({
+  index: z.number().int().nonnegative(),
+  currentLabel: z.string().min(1).max(300).optional(),
+  incomingLabel: z.string().min(1).max(300).optional(),
+  before: z.string(),
+  current: z.string(),
+  incoming: z.string(),
+  after: z.string(),
+});
+export type ProjectGitConflictHunk = z.infer<typeof ProjectGitConflictHunkSchema>;
+
+export const ProjectGitConflictFileResultSchema = z.object({
+  path: z.string().min(1).max(1000),
+  conflictCount: z.number().int().nonnegative(),
+  resolved: z.boolean(),
+  hunks: z.array(ProjectGitConflictHunkSchema),
+  content: z.string(),
+});
+export type ProjectGitConflictFileResult = z.infer<typeof ProjectGitConflictFileResultSchema>;
+
+export const ProjectGitConflictResolveBodySchema = z.object({
+  path: z.string().min(1).max(1000),
+  strategy: z.enum(['current', 'incoming', 'both']),
+});
+export type ProjectGitConflictResolveBody = z.infer<typeof ProjectGitConflictResolveBodySchema>;
+
+export const ProjectGitConflictMarkResolvedBodySchema = z.object({
+  path: z.string().min(1).max(1000),
+});
+export type ProjectGitConflictMarkResolvedBody = z.infer<
+  typeof ProjectGitConflictMarkResolvedBodySchema
+>;
+
+export const ProjectGitMergeCommitBodySchema = z.object({
+  message: z.string().trim().min(1).max(1000),
+  push: z.boolean().optional(),
+});
+export type ProjectGitMergeCommitBody = z.infer<typeof ProjectGitMergeCommitBodySchema>;
+
+export const ProjectGitHubRepositoryVisibilitySchema = z.enum(['private', 'public']);
+export type ProjectGitHubRepositoryVisibility = z.infer<
+  typeof ProjectGitHubRepositoryVisibilitySchema
+>;
+
+export const ProjectGitHubCreateRepositoryBodySchema = z.object({
+  owner: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9-]*$/, {
+      message: 'Owner must be a GitHub user or organization name',
+    }),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .regex(/^[A-Za-z0-9._-]+$/, {
+      message: 'Repository name must contain only letters, numbers, dots, underscores, or dashes',
+    }),
+  description: z.string().trim().max(500).optional(),
+  visibility: ProjectGitHubRepositoryVisibilitySchema.default('private'),
+  pushCurrentBranch: z.boolean().default(true),
+});
+export type ProjectGitHubCreateRepositoryBody = z.infer<
+  typeof ProjectGitHubCreateRepositoryBodySchema
+>;
+
+export const ProjectGitHubConnectRepositoryBodySchema = z.object({
+  repository: z.string().trim().min(1).max(1000),
+  remoteUrl: z.string().trim().min(1).max(1000).optional(),
+});
+export type ProjectGitHubConnectRepositoryBody = z.infer<
+  typeof ProjectGitHubConnectRepositoryBodySchema
+>;
+
+export const ProjectGitHubRepositoryConnectionResultSchema = z.object({
+  repositoryUrl: z.string().min(1).max(1000),
+  remoteUrl: z.string().min(1).max(1000),
+  pushed: z.boolean(),
+  status: ProjectGitStatusResultSchema,
+});
+export type ProjectGitHubRepositoryConnectionResult = z.infer<
+  typeof ProjectGitHubRepositoryConnectionResultSchema
+>;
+
+export const ProjectGitCheckStatusSchema = z.enum([
+  'queued',
+  'in_progress',
+  'completed',
+  'waiting',
+  'pending',
+  'requested',
+  'unknown',
+]);
+export type ProjectGitCheckStatus = z.infer<typeof ProjectGitCheckStatusSchema>;
+
+export const ProjectGitCheckConclusionSchema = z.enum([
+  'success',
+  'failure',
+  'cancelled',
+  'skipped',
+  'timed_out',
+  'action_required',
+  'neutral',
+  'stale',
+  'unknown',
+]);
+export type ProjectGitCheckConclusion = z.infer<typeof ProjectGitCheckConclusionSchema>;
+
+export const ProjectGitCheckRunSchema = z.object({
+  id: z.string().min(1).max(200),
+  name: z.string().min(1).max(300),
+  workflowName: z.string().min(1).max(300).optional(),
+  displayTitle: z.string().min(1).max(500).optional(),
+  status: ProjectGitCheckStatusSchema,
+  conclusion: ProjectGitCheckConclusionSchema.optional(),
+  event: z.string().min(1).max(100).optional(),
+  headSha: z.string().min(1).max(80).optional(),
+  url: z.string().url().optional(),
+  startedAt: z.string().min(1).max(100).optional(),
+  completedAt: z.string().min(1).max(100).optional(),
+});
+export type ProjectGitCheckRun = z.infer<typeof ProjectGitCheckRunSchema>;
+
+export const ProjectGitChecksSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  success: z.number().int().nonnegative(),
+  failure: z.number().int().nonnegative(),
+  inProgress: z.number().int().nonnegative(),
+  queued: z.number().int().nonnegative(),
+  cancelled: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  unknown: z.number().int().nonnegative(),
+});
+export type ProjectGitChecksSummary = z.infer<typeof ProjectGitChecksSummarySchema>;
+
+export const ProjectGitChecksResultSchema = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).max(500).optional(),
+  repositoryName: z.string().min(1).max(200).optional(),
+  remoteUrl: z.string().min(1).max(1000).optional(),
+  currentBranch: z.string().min(1).max(300).optional(),
+  headSha: z.string().min(1).max(80).optional(),
+  scope: z.enum(['pull_request', 'head_commit']).optional(),
+  pullRequestNumber: z.number().int().positive().optional(),
+  pullRequestUrl: z.string().url().optional(),
+  githubRemoteDetected: z.boolean().default(false),
+  ghAvailable: z.boolean().default(false),
+  authenticated: z.boolean().default(false),
+  checkedAt: z.string().min(1).max(100),
+  summary: ProjectGitChecksSummarySchema,
+  checks: z.array(ProjectGitCheckRunSchema),
+});
+export type ProjectGitChecksResult = z.infer<typeof ProjectGitChecksResultSchema>;
+
+export const ProjectGitPullRequestStateSchema = z.enum(['open', 'closed', 'merged', 'unknown']);
+export type ProjectGitPullRequestState = z.infer<typeof ProjectGitPullRequestStateSchema>;
+
+export const ProjectGitPullRequestReviewDecisionSchema = z.enum([
+  'approved',
+  'changes_requested',
+  'review_required',
+  'unknown',
+]);
+export type ProjectGitPullRequestReviewDecision = z.infer<
+  typeof ProjectGitPullRequestReviewDecisionSchema
+>;
+
+export const ProjectGitPullRequestCheckSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  success: z.number().int().nonnegative(),
+  failure: z.number().int().nonnegative(),
+  pending: z.number().int().nonnegative(),
+  unknown: z.number().int().nonnegative(),
+});
+export type ProjectGitPullRequestCheckSummary = z.infer<
+  typeof ProjectGitPullRequestCheckSummarySchema
+>;
+
+export const ProjectGitPullRequestSummarySchema = z.object({
+  number: z.number().int().positive(),
+  title: z.string().min(1).max(500),
+  state: ProjectGitPullRequestStateSchema,
+  url: z.string().url(),
+  headRefName: z.string().min(1).max(300),
+  baseRefName: z.string().min(1).max(300),
+  authorLogin: z.string().min(1).max(200).optional(),
+  isDraft: z.boolean().default(false),
+  currentBranch: z.boolean().default(false),
+  reviewDecision: ProjectGitPullRequestReviewDecisionSchema.optional(),
+  mergeable: z.string().min(1).max(100).optional(),
+  createdAt: z.string().min(1).max(100).optional(),
+  updatedAt: z.string().min(1).max(100).optional(),
+  checks: ProjectGitPullRequestCheckSummarySchema,
+});
+export type ProjectGitPullRequestSummary = z.infer<typeof ProjectGitPullRequestSummarySchema>;
+
+export const ProjectGitPullRequestsResultSchema = z.object({
+  available: z.boolean(),
+  reason: z.string().min(1).max(500).optional(),
+  repositoryName: z.string().min(1).max(200).optional(),
+  remoteUrl: z.string().min(1).max(1000).optional(),
+  currentBranch: z.string().min(1).max(300).optional(),
+  headSha: z.string().min(1).max(80).optional(),
+  githubRemoteDetected: z.boolean().default(false),
+  ghAvailable: z.boolean().default(false),
+  authenticated: z.boolean().default(false),
+  checkedAt: z.string().min(1).max(100),
+  pullRequests: z.array(ProjectGitPullRequestSummarySchema),
+});
+export type ProjectGitPullRequestsResult = z.infer<typeof ProjectGitPullRequestsResultSchema>;
+
+export const ProjectGitCreatePullRequestBodySchema = z.object({
+  title: z.string().trim().min(1).max(500),
+  body: z.string().trim().max(10000).optional(),
+  baseBranch: z.string().trim().min(1).max(300).optional(),
+  draft: z.boolean().default(false),
+});
+export type ProjectGitCreatePullRequestBody = z.infer<typeof ProjectGitCreatePullRequestBodySchema>;
+
+export const ProjectGitCreatePullRequestResultSchema = z.object({
+  pullRequest: ProjectGitPullRequestSummarySchema,
+  pullRequests: ProjectGitPullRequestsResultSchema,
+  checks: ProjectGitChecksResultSchema.optional(),
+});
+export type ProjectGitCreatePullRequestResult = z.infer<
+  typeof ProjectGitCreatePullRequestResultSchema
+>;
+
+export type ProjectFileNode = {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+  children?: ProjectFileNode[];
+};
+
+export const ProjectFileNodeSchema: z.ZodType<ProjectFileNode> = z.lazy(() =>
+  z.object({
+    name: z.string().min(1),
+    path: z.string().min(1),
+    type: z.enum(['file', 'directory']),
+    size: z.number().int().nonnegative().optional(),
+    children: z.array(ProjectFileNodeSchema).optional(),
+  }),
+);
+
+export const ProjectFileTreeResultSchema = z.object({
+  rootName: z.string().min(1),
+  files: z.array(ProjectFileNodeSchema),
+});
+export type ProjectFileTreeResult = z.infer<typeof ProjectFileTreeResultSchema>;
+
+export const ProjectFileReadResultSchema = z.object({
+  name: z.string().min(1),
+  path: z.string().min(1),
+  content: z.string(),
+  size: z.number().int().nonnegative(),
+});
+export type ProjectFileReadResult = z.infer<typeof ProjectFileReadResultSchema>;
+
 export const ProjectQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false),
 });
@@ -182,27 +959,54 @@ export function getProjectAccessPolicy(input: {
         writeBlockReason: 'readonly_capability',
       };
     case 'backend_accessible':
-      switch (input.onboardingState) {
-        case 'approved':
-          return {
-            canInspect: true,
-            canWrite: true,
-            writeBlockReason: undefined,
-          };
-        case 'missing':
-        case 'in_progress':
-        case 'needs_review':
-          return {
-            canInspect: true,
-            canWrite: false,
-            writeBlockReason: 'onboarding_not_approved',
-          };
-        default:
-          return assertNever(input.onboardingState);
+      if (input.onboardingState !== 'approved') {
+        return {
+          canInspect: true,
+          canWrite: false,
+          writeBlockReason: 'onboarding_not_approved',
+        };
       }
+      return {
+        canInspect: true,
+        canWrite: true,
+        writeBlockReason: undefined,
+      };
     default:
       return assertNever(input.capabilityState);
   }
+}
+
+export function transitionProjectOnboardingState(input: {
+  current: ProjectOnboardingState;
+  trigger: ProjectOnboardingTransitionTrigger;
+}): ProjectOnboardingState {
+  switch (input.trigger) {
+    case 'assessment_missing':
+      if (input.current === 'missing') return 'in_progress';
+      break;
+    case 'assessment_needs_review':
+      if (input.current === 'missing' || input.current === 'needs_review') return 'in_progress';
+      if (input.current === 'approved') return 'needs_review';
+      break;
+    case 'assessment_approved':
+    case 'approval_granted':
+      if (input.current === 'needs_review' || input.current === 'in_progress') return 'approved';
+      break;
+    case 'approval_rejected':
+      if (input.current === 'needs_review' || input.current === 'in_progress') {
+        return 'in_progress';
+      }
+      break;
+    case 'refresh_material_drift':
+      if (input.current === 'approved') return 'needs_review';
+      break;
+    case 'refresh_no_change':
+      return input.current;
+    default:
+      return assertNever(input.trigger);
+  }
+
+  throw new Error(`Invalid Project onboarding transition: ${input.current} via ${input.trigger}`);
 }
 
 export type ProjectRecord = z.infer<typeof ProjectRecordSchema>;

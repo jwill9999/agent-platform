@@ -51,6 +51,9 @@ The Next.js BFF exposes two proxy layers to the browser:
 | `DELETE /v1/agents/:id`                    |    ✅    |       ✅        | Agent dashboard                              |
 | `GET /v1/sessions`                         |    ✅    |       ✅        | Sessions page                                |
 | `POST /v1/sessions`                        |    ✅    |       ✅        | Home page, IDE chat                          |
+| `POST /v1/sessions/project`                |    —     |       ✅        | Create/resume a Project-bound session        |
+| `GET /v1/projects/desktop/recent`          |    ✅    |       ✅        | Recent desktop Projects without host paths   |
+| `POST /v1/projects/desktop/register`       |    ✅    |       ✅        | Trusted desktop Project registration         |
 | `GET /v1/skills`                           |    ✅    |       ✅        | Skills dashboard, agent editor               |
 | `POST /v1/skills`                          |    ✅    |       ✅        | Skills dashboard                             |
 | `PUT /v1/skills/:id`                       |    ✅    |       ✅        | Skills dashboard                             |
@@ -336,6 +339,33 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 
 > **Security:** `SECRETS_MASTER_KEY` must be set to store or use API keys in model configs. Keys are encrypted with AES-256-GCM and never appear in API responses or logs.
 
+### Projects
+
+| Method | Path                            | Description                             |
+| ------ | ------------------------------- | --------------------------------------- |
+| `GET`  | `/v1/projects/desktop/recent`   | List recent desktop Projects            |
+| `GET`  | `/v1/projects/:id/files/tree`   | List Project-relative file tree         |
+| `GET`  | `/v1/projects/:id/files/read`   | Read one Project-relative text file     |
+| `POST` | `/v1/projects/desktop/register` | Register a trusted desktop Project path |
+
+`GET /v1/projects/desktop/recent` returns `{ "data": { "projects": ProjectDesktopRecord[] } }`.
+Records include Project names, safe folder labels, onboarding state, and capability state. They do
+not include `workspaceKey` or absolute host paths. A moved or missing folder is returned with
+`metadata.capabilityState: "unavailable"` so the UI can show a clear reopen state without exposing
+the stored path.
+
+`POST /v1/projects/desktop/register` is only for the desktop bridge. It requires
+`x-agent-platform-desktop-bridge: 1`, accepts `{ "path": "/absolute/host/folder", "name": "..." }`,
+persists the real path internally, and returns a safe `ProjectDesktopRegistrationResult`.
+
+`GET /v1/projects/:id/files/tree` returns `{ "data": { "rootName": "...", "files": ProjectFileNode[] } }`.
+The tree is built from the backend-bound Project root, omits generated or hidden directories such as
+`node_modules` and `.git`, and returns only Project-relative paths.
+
+`GET /v1/projects/:id/files/read?path=src/index.ts` reads a single Project-relative text file and
+returns `{ "data": { "name": "...", "path": "...", "content": "...", "size": 123 } }`. Absolute
+paths, parent traversal, symlink escapes, large files, and binary files are rejected.
+
 ### Sessions
 
 | Method   | Path                              | Description                         |
@@ -346,10 +376,13 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 | `GET`    | `/v1/sessions/:id/sensors`        | Get session sensor dashboard        |
 | `POST`   | `/v1/sessions/:id/sensors/retry`  | Refresh sensor discovery view       |
 | `POST`   | `/v1/sessions`                    | Create a session                    |
+| `POST`   | `/v1/sessions/project`            | Create/resume Project session       |
 | `PUT`    | `/v1/sessions/:id`                | Update a session                    |
 | `DELETE` | `/v1/sessions/:id`                | Delete a session                    |
 
 Body schema: `SessionCreateBodySchema` — requires `agentId`. Agent must exist (FK constraint → 404 on missing).
+
+`POST /v1/sessions/project` body schema: `SessionProjectBindingBodySchema` — requires `agentId` and `projectId`. The API validates both resources, reuses the latest existing Project-mode session for that Agent and Project when present, or creates one with `projectId` set. The response shape is `{ "data": { "created": boolean, "session": SessionRecord } }`.
 
 `GET /v1/sessions/:id/working-memory` returns `{ "data": null }` until the session has completed at least one chat or resume turn that produced working-memory state. When present, the artifact is scoped to the session and contains the current goal, active project/task, key decisions, important files, bounded tool summaries, blockers, pending approval IDs, next action, and a compact summary used for session continuity.
 

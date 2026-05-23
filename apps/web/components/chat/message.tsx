@@ -10,7 +10,9 @@ import type { CriticEvent } from '@/lib/critic-events';
 import { ApprovalCard } from './approval-card';
 import { ToolTraceBlock } from './tool-trace-block';
 import { BrowserArtifactPreviews } from './browser-artifact-previews';
+import { WorkspaceResourceCards } from './workspace-resource-cards';
 import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
+import type { WorkspaceEvent } from '@agent-platform/contracts';
 
 interface MessageProps {
   message: UIMessage;
@@ -22,6 +24,10 @@ interface MessageProps {
   thinking?: string;
   /** Tool execution events emitted for this assistant turn. */
   toolEvents?: readonly ToolTraceEvent[];
+  /** Workspace resource events emitted for this assistant turn. */
+  workspaceEvents?: readonly WorkspaceEvent[];
+  /** Project id used to route assistant Markdown links into the desktop WebView panel. */
+  workspaceWebViewProjectId?: string | null;
   /** True while this assistant turn is still receiving streamed content. */
   isStreaming?: boolean;
   /** Approval requests emitted for this assistant turn. */
@@ -60,6 +66,8 @@ export function Message({
   criticEvents,
   thinking,
   toolEvents,
+  workspaceEvents,
+  workspaceWebViewProjectId,
   isStreaming = false,
   approvals,
   onApprovalDecision,
@@ -70,6 +78,7 @@ export function Message({
   const contextFileCount = isUser ? countContextFiles(message.content) : 0;
   const hasCritic = !isUser && criticEvents && criticEvents.length > 0;
   const hasToolEvents = !isUser && toolEvents && toolEvents.length > 0;
+  const hasWorkspaceEvents = !isUser && workspaceEvents && workspaceEvents.length > 0;
   // Find the final accept event for review block
   const finalAccept =
     hasCritic && criticEvents
@@ -91,7 +100,14 @@ export function Message({
           )}
           {hasToolEvents && <ToolTraceBlock events={toolEvents ?? []} isStreaming={isStreaming} />}
           {hasToolEvents && <BrowserArtifactPreviews events={toolEvents ?? []} />}
-          {hasText && <Markdown content={text} className="text-sm" />}
+          {hasWorkspaceEvents && <WorkspaceResourceCards events={workspaceEvents ?? []} />}
+          {hasText && (
+            <Markdown
+              content={text}
+              className="text-sm"
+              workspaceWebViewProjectId={workspaceWebViewProjectId}
+            />
+          )}
           {hasApprovals &&
             approvals.map((approval) => (
               <ApprovalCard
@@ -107,6 +123,7 @@ export function Message({
             !hasCritic &&
             !hasThinking &&
             !hasToolEvents &&
+            !hasWorkspaceEvents &&
             !hasApprovals && (
               <span className="sr-only" aria-busy={isAwaitingStreamContent} aria-live="polite">
                 Assistant feedback pending

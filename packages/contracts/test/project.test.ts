@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ProjectModeSchema,
+  ProjectBranchCheckoutBodySchema,
+  ProjectGitChecksResultSchema,
+  ProjectGitCreatePullRequestBodySchema,
+  ProjectGitCreatePullRequestResultSchema,
+  ProjectGitPullRequestsResultSchema,
+  ProjectGitStatusResultSchema,
+  ProjectBranchListResultSchema,
   ProjectOpenBodySchema,
   ProjectWorkspaceBindingSchema,
   ProjectCapabilityStateSchema,
@@ -25,6 +32,315 @@ describe('Project mode and workspace binding contracts', () => {
     });
 
     expect(() => ProjectOpenBodySchema.parse({ path: '' })).toThrow();
+  });
+
+  it('validates Project branch list and checkout contracts', () => {
+    expect(
+      ProjectBranchListResultSchema.parse({
+        currentBranch: 'main',
+        clean: true,
+        branches: [
+          { name: 'main', current: true, upstreamBranch: 'origin/main', upstreamState: 'active' },
+          {
+            name: 'feature/chat-input-branch',
+            current: false,
+            upstreamBranch: 'origin/feature/chat-input-branch',
+            upstreamState: 'missing',
+          },
+        ],
+      }),
+    ).toEqual({
+      currentBranch: 'main',
+      clean: true,
+      branches: [
+        { name: 'main', current: true, upstreamBranch: 'origin/main', upstreamState: 'active' },
+        {
+          name: 'feature/chat-input-branch',
+          current: false,
+          upstreamBranch: 'origin/feature/chat-input-branch',
+          upstreamState: 'missing',
+        },
+      ],
+    });
+
+    expect(ProjectBranchCheckoutBodySchema.parse({ branch: 'feature/chat-input-branch' })).toEqual({
+      branch: 'feature/chat-input-branch',
+    });
+    expect(() => ProjectBranchCheckoutBodySchema.parse({ branch: '-bad' })).toThrow();
+    expect(() => ProjectBranchCheckoutBodySchema.parse({ branch: '../bad' })).toThrow();
+  });
+
+  it('validates Project Git status contracts', () => {
+    expect(
+      ProjectGitStatusResultSchema.parse({
+        available: true,
+        repositoryName: 'agent-platform',
+        remoteUrl: 'https://github.com/jwill9999/agent-platform.git',
+        currentBranch: 'task/git-panel',
+        upstreamBranch: 'origin/task/git-panel',
+        upstreamState: 'active',
+        baseBranch: 'task/git-panel',
+        headSha: 'abc123',
+        ahead: 2,
+        behind: 1,
+        clean: false,
+        githubRemoteDetected: true,
+        workingTree: {
+          total: 3,
+          staged: 1,
+          unstaged: 1,
+          added: 1,
+          modified: 1,
+          deleted: 0,
+          renamed: 0,
+          untracked: 1,
+          conflicts: 0,
+        },
+        recentCommit: {
+          sha: 'abc123',
+          subject: 'Add Git panel',
+          authorName: 'Test User',
+          committedAt: '2026-05-16T15:00:00+00:00',
+        },
+      }),
+    ).toMatchObject({
+      available: true,
+      ahead: 2,
+      behind: 1,
+      githubRemoteDetected: true,
+    });
+
+    expect(
+      ProjectGitStatusResultSchema.parse({
+        available: false,
+        reason: 'Project is not a Git repository.',
+        clean: true,
+        workingTree: {
+          total: 0,
+          staged: 0,
+          unstaged: 0,
+          added: 0,
+          modified: 0,
+          deleted: 0,
+          renamed: 0,
+          untracked: 0,
+          conflicts: 0,
+        },
+      }),
+    ).toMatchObject({ available: false, clean: true });
+  });
+
+  it('validates Project Git checks contracts', () => {
+    expect(
+      ProjectGitChecksResultSchema.parse({
+        available: true,
+        repositoryName: 'agent-platform',
+        remoteUrl: 'git@github.com:jwill9999/agent-platform.git',
+        currentBranch: 'task/checks',
+        headSha: 'abc123',
+        scope: 'pull_request',
+        pullRequestNumber: 42,
+        pullRequestUrl: 'https://github.com/jwill9999/agent-platform/pull/42',
+        githubRemoteDetected: true,
+        ghAvailable: true,
+        authenticated: true,
+        checkedAt: '2026-05-16T16:00:00.000Z',
+        summary: {
+          total: 2,
+          success: 1,
+          failure: 1,
+          inProgress: 0,
+          queued: 0,
+          cancelled: 0,
+          skipped: 0,
+          unknown: 0,
+        },
+        checks: [
+          {
+            id: '123',
+            name: 'CI / build',
+            workflowName: 'CI',
+            displayTitle: 'build',
+            status: 'completed',
+            conclusion: 'success',
+            event: 'push',
+            headSha: 'abc123',
+            url: 'https://github.com/jwill9999/agent-platform/actions/runs/123',
+            startedAt: '2026-05-16T15:55:00.000Z',
+            completedAt: '2026-05-16T15:58:00.000Z',
+          },
+          {
+            id: '124',
+            name: 'Tests',
+            status: 'completed',
+            conclusion: 'failure',
+          },
+        ],
+      }),
+    ).toMatchObject({
+      available: true,
+      githubRemoteDetected: true,
+      summary: { total: 2, success: 1, failure: 1 },
+    });
+
+    expect(
+      ProjectGitChecksResultSchema.parse({
+        available: false,
+        reason: 'GitHub CLI is not authenticated.',
+        githubRemoteDetected: true,
+        ghAvailable: true,
+        authenticated: false,
+        checkedAt: '2026-05-16T16:00:00.000Z',
+        summary: {
+          total: 0,
+          success: 0,
+          failure: 0,
+          inProgress: 0,
+          queued: 0,
+          cancelled: 0,
+          skipped: 0,
+          unknown: 0,
+        },
+        checks: [],
+      }),
+    ).toMatchObject({ available: false, authenticated: false });
+  });
+
+  it('validates Project GitHub pull request contracts', () => {
+    expect(
+      ProjectGitCreatePullRequestBodySchema.parse({
+        title: 'Add PR creation flow',
+        body: 'Creates the first in-app pull request.',
+        baseBranch: 'main',
+        draft: true,
+      }),
+    ).toEqual({
+      title: 'Add PR creation flow',
+      body: 'Creates the first in-app pull request.',
+      baseBranch: 'main',
+      draft: true,
+    });
+
+    expect(
+      ProjectGitCreatePullRequestBodySchema.parse({
+        title: 'Add PR creation flow',
+      }),
+    ).toEqual({
+      title: 'Add PR creation flow',
+      draft: false,
+    });
+
+    expect(
+      ProjectGitPullRequestsResultSchema.parse({
+        available: true,
+        repositoryName: 'agent-platform',
+        remoteUrl: 'git@github.com:jwill9999/agent-platform.git',
+        currentBranch: 'task/prs',
+        headSha: 'abc123',
+        githubRemoteDetected: true,
+        ghAvailable: true,
+        authenticated: true,
+        checkedAt: '2026-05-16T16:00:00.000Z',
+        pullRequests: [
+          {
+            number: 42,
+            title: 'Add PR view',
+            state: 'open',
+            url: 'https://github.com/jwill9999/agent-platform/pull/42',
+            headRefName: 'task/prs',
+            baseRefName: 'feature/git-panel',
+            authorLogin: 'jwill9999',
+            isDraft: false,
+            currentBranch: true,
+            reviewDecision: 'review_required',
+            mergeable: 'MERGEABLE',
+            createdAt: '2026-05-16T15:00:00.000Z',
+            updatedAt: '2026-05-16T15:30:00.000Z',
+            checks: {
+              total: 2,
+              success: 1,
+              failure: 1,
+              pending: 0,
+              unknown: 0,
+            },
+          },
+        ],
+      }),
+    ).toMatchObject({
+      available: true,
+      pullRequests: [{ number: 42, currentBranch: true, checks: { total: 2 } }],
+    });
+
+    expect(
+      ProjectGitPullRequestsResultSchema.parse({
+        available: false,
+        reason: 'GitHub CLI is not authenticated.',
+        githubRemoteDetected: true,
+        ghAvailable: true,
+        authenticated: false,
+        checkedAt: '2026-05-16T16:00:00.000Z',
+        pullRequests: [],
+      }),
+    ).toMatchObject({ available: false, authenticated: false });
+
+    expect(
+      ProjectGitCreatePullRequestResultSchema.parse({
+        pullRequest: {
+          number: 43,
+          title: 'Add PR creation flow',
+          state: 'open',
+          url: 'https://github.com/jwill9999/agent-platform/pull/43',
+          headRefName: 'task/pr-flow',
+          baseRefName: 'main',
+          isDraft: false,
+          currentBranch: true,
+          checks: {
+            total: 1,
+            success: 0,
+            failure: 0,
+            pending: 1,
+            unknown: 0,
+          },
+        },
+        pullRequests: {
+          available: true,
+          repositoryName: 'agent-platform',
+          remoteUrl: 'git@github.com:jwill9999/agent-platform.git',
+          currentBranch: 'task/pr-flow',
+          githubRemoteDetected: true,
+          ghAvailable: true,
+          authenticated: true,
+          checkedAt: '2026-05-22T12:00:00.000Z',
+          pullRequests: [],
+        },
+        checks: {
+          available: true,
+          repositoryName: 'agent-platform',
+          remoteUrl: 'git@github.com:jwill9999/agent-platform.git',
+          currentBranch: 'task/pr-flow',
+          scope: 'pull_request',
+          githubRemoteDetected: true,
+          ghAvailable: true,
+          authenticated: true,
+          checkedAt: '2026-05-22T12:00:00.000Z',
+          summary: {
+            total: 1,
+            success: 0,
+            failure: 0,
+            inProgress: 1,
+            queued: 0,
+            cancelled: 0,
+            skipped: 0,
+            unknown: 0,
+          },
+          checks: [],
+        },
+      }),
+    ).toMatchObject({
+      pullRequest: { number: 43, currentBranch: true },
+      pullRequests: { available: true },
+      checks: { available: true },
+    });
   });
 
   it('captures backend-accessible Project working-tree metadata without conflating chat workspace', () => {
@@ -121,7 +437,7 @@ describe('Project mode and workspace binding contracts', () => {
     ).toMatchObject({ canInspect: false, canWrite: false });
   });
 
-  it('allows writes only when the backend can access the project and onboarding is approved', () => {
+  it('allows writes only after backend-accessible Project onboarding is approved', () => {
     expect(
       getProjectAccessPolicy({
         capabilityState: 'backend_accessible',
@@ -137,8 +453,12 @@ describe('Project mode and workspace binding contracts', () => {
       getProjectAccessPolicy({
         capabilityState: 'backend_accessible',
         onboardingState: 'needs_review',
-      }).writeBlockReason,
-    ).toBe('onboarding_not_approved');
+      }),
+    ).toEqual({
+      canInspect: true,
+      canWrite: false,
+      writeBlockReason: 'onboarding_not_approved',
+    });
   });
 
   it('maps every capability and onboarding state to an explicit access policy', () => {

@@ -10,9 +10,18 @@ a human using the product: opening projects, reading assessment output, answerin
 questions, reviewing drafts, approving instructions, and verifying code work is unlocked only when
 safe.
 
+## Desktop Re-scope Note
+
+The existing browser/Docker Playwright coverage is no longer sufficient for desktop Product
+acceptance. Final acceptance for this lifecycle must be an Electron E2E flow against a built desktop
+runtime: native Project open, Project-bound chat/session, `/init`, review/approval, and filesystem
+assertions against the selected Project root.
+
 ## Requirements
 
 - Playwright tests must use the UI for user-facing flows.
+- Desktop tests must open Projects through the Electron native folder picker or a production-like
+  test bridge that exercises the same backend Project registration path.
 - Tests must inspect visible state and resulting filesystem state.
 - Fixture projects must cover:
   - sufficient existing `AGENTS.md`.
@@ -23,6 +32,7 @@ safe.
   - mixed or non-code Project folder where the user must clarify intended workflow before
     coding-specific assumptions are made.
 - E2E coverage must prove:
+  - `/init` runs only when a backend-bound Project is attached to the active chat/session.
   - auto-approval for sufficient existing instructions.
   - missing instructions start onboarding dialogue.
   - user answers revise a draft.
@@ -33,7 +43,8 @@ safe.
   - closeout update candidates can be reviewed/applied/rejected.
   - refresh/rescan detects no-change and material-drift states.
   - Chat mode remains independent from Project onboarding.
-  - onboarding UI uses user-facing Project labels rather than `/workspace` or backend accessibility.
+  - onboarding UI uses user-facing Project labels rather than `/workspace`, backend accessibility,
+    backend roots, or host absolute paths as primary copy.
 - Test output must be deterministic enough for CI.
 
 ## Implementation Plan
@@ -61,24 +72,27 @@ Keep Beads dependencies aligned with this table.
   - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e`
     against the Docker runtime.
   - Focused tests: fixture cleanup and any lower-level regressions required to stabilize E2E.
-  - Playwright: drive the full onboarding lifecycle through the UI for sufficient, missing,
-    insufficient, nested, and ambiguous Project instruction states; assert visible outputs and
-    filesystem results.
+  - Playwright/Electron: drive the full onboarding lifecycle through the built desktop UI for
+    sufficient, missing, insufficient, nested, and ambiguous Project instruction states; assert
+    visible outputs and filesystem results against the selected Project root.
   - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
     before closing the Bead.
 - Full relevant unit/integration suite.
-- Playwright E2E against the Docker runtime.
+- Electron E2E against the built desktop runtime for Product acceptance; Docker/web Playwright may
+  remain as lower-level regression coverage only.
 - CI-compatible fixture cleanup so generated files do not leak into the repo.
 - Final regression run proving Epics 1 and 2 together are end-to-end testable without manual human
   validation.
 
 ## Definition Of Done
 
-- [ ] Playwright covers sufficient, missing, insufficient, nested, and ambiguous Project instruction
+- [x] Playwright covers sufficient, missing, insufficient, nested, and ambiguous Project instruction
       states.
-- [ ] Playwright acts through the UI and verifies visible outputs plus filesystem results.
-- [ ] Tests prove writes are blocked before approval and allowed after approval.
-- [ ] Tests prove `AGENTS.md` can be drafted, reviewed, approved, refreshed, and updated.
-- [ ] Tests prove onboarding handles mixed/non-code Project folders without forcing coding-only
+- [x] Playwright acts through the UI and verifies visible outputs plus filesystem results.
+- [x] Tests prove writes are blocked before approval and allowed after approval.
+- [x] Tests prove `AGENTS.md` can be drafted, reviewed, approved, refreshed, and updated.
+- [x] Tests prove onboarding handles mixed/non-code Project folders without forcing coding-only
       language.
-- [ ] Combined Epics 1 and 2 are ready for a full end-to-end Playwright run.
+- [x] Combined Epics 1 and 2 are ready for a full end-to-end Playwright run.
+- [x] Desktop Product acceptance is explicitly deferred to Electron E2E and does not rely on
+      browser-only/manual-path Project opening.

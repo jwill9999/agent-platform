@@ -2,6 +2,7 @@ import type { Agent, McpServer, Skill } from '@agent-platform/contracts';
 
 import type { DrizzleDb } from '../database.js';
 import { replaceAgent, upsertMcpServer, upsertSkill } from '../repositories/registry.js';
+import { updateSettings } from '../repositories/settings.js';
 
 /** Stable ids for E2E registry rows (API + Playwright assertions). */
 export const E2E_MCP_ID = '00000000-0000-4000-8000-e2e000000001';
@@ -13,6 +14,8 @@ export const E2E_SPECIALIST_ID = '00000000-0000-4000-8000-e2e000000003';
  * Intended for `E2E_SEED=1` against the same SQLite file the API uses (compose or local).
  */
 export function runE2eSeed(db: DrizzleDb): void {
+  updateSettings(db, { rateLimits: { max: 1_000 } });
+
   const mcp: McpServer = {
     id: E2E_MCP_ID,
     slug: 'e2e-filesystem-mcp',

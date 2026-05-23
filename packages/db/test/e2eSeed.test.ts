@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { closeDatabase, openDatabase } from '../src/database.js';
 import { getMcpServer, getSkill } from '../src/repositories/registry.js';
+import { loadSettings } from '../src/repositories/settings.js';
 import { loadAgentById } from '../src/mappers.js';
 import { E2E_MCP_ID, E2E_SKILL_ID, E2E_SPECIALIST_ID, runE2eSeed } from '../src/seed/e2eSeed.js';
 import { runSeed } from '../src/seed/runSeed.js';
@@ -44,6 +45,7 @@ describe('runE2eSeed', () => {
       const agent = loadAgentById(db, E2E_SPECIALIST_ID);
       expect(agent?.allowedMcpServerIds).toEqual([E2E_MCP_ID]);
       expect(agent?.allowedSkillIds).toEqual([E2E_SKILL_ID]);
+      expect(loadSettings(db).rateLimits.max).toBe(1_000);
     } finally {
       closeDatabase(sqlite);
     }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, CircleAlert, CircleCheck, CircleSlash, Wrench } from 'lucide-react';
 
 import type { ToolTraceEvent } from '@/hooks/use-harness-chat';
+import { CapabilityRecoveryCard } from '@/components/agent/capability-recovery-card';
 import { cn } from '@/lib/cn';
 import { formatFileSize } from '@/lib/workspace-files';
 import {
@@ -31,7 +32,11 @@ function StatusIcon({ status }: Readonly<{ status: OperatorToolEventStatus }>) {
     status === 'failed' ||
     status === 'blocked' ||
     status === 'approval_required' ||
-    status === 'unavailable'
+    status === 'unavailable' ||
+    status === 'capability_missing' ||
+    status === 'provider_required' ||
+    status === 'approval_escalation' ||
+    status === 'sandbox_available'
   ) {
     return <CircleAlert className="h-3.5 w-3.5 text-amber-600" />;
   }
@@ -46,7 +51,11 @@ function statusBadgeClass(status: OperatorToolEventStatus): string {
     (status === 'denied' ||
       status === 'blocked' ||
       status === 'approval_required' ||
-      status === 'unavailable') &&
+      status === 'unavailable' ||
+      status === 'capability_missing' ||
+      status === 'provider_required' ||
+      status === 'approval_escalation' ||
+      status === 'sandbox_available') &&
       'bg-amber-50 text-amber-700',
     status === 'running' && 'bg-muted text-muted-foreground',
   );
@@ -235,6 +244,7 @@ export function ToolTraceBlock({ events, isStreaming }: Props) {
                 {display.reason && (
                   <p className="mt-0.5 text-[11px] text-muted-foreground">{display.reason}</p>
                 )}
+                {display.recovery && <CapabilityRecoveryCard recovery={display.recovery} />}
                 <ArtifactSummary display={display} />
                 <TechnicalDetails display={display} />
               </li>

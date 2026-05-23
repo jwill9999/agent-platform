@@ -1,7 +1,27 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import type { Agent, ProjectRecord, SessionRecord } from '@agent-platform/contracts';
+import Link from 'next/link';
+import type {
+  Agent,
+  ProjectOnboardingAssessment,
+  ProjectOnboardingDialogue,
+  ProjectOnboardingDraft,
+  ProjectInstructionUpdateCandidate,
+  ProjectInstructionUpdateProposal,
+  ProjectDesktopRecord,
+  ProjectFileReadResult,
+  ProjectFileTreeResult,
+  ProjectRecord,
+  SessionRecord,
+  WorkspaceEvent,
+} from '@agent-platform/contracts';
+import {
+  ProjectOnboardingDialogueSchema,
+  ProjectOnboardingDraftSchema,
+  ProjectInstructionUpdateCandidateSchema,
+  ProjectInstructionUpdateProposalSchema,
+} from '@agent-platform/contracts';
 import type { UIMessage } from 'ai';
 import {
   FolderOpen,
@@ -59,13 +79,14 @@ import {
 import type { FileNode } from '@/hooks/use-file-system';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
-import { formatFileContext } from '@/lib/file-context';
+import { formatFileContext, type SanitisedFile } from '@/lib/file-context';
 import { ChatAgentSelector } from '@/components/chat/chat-agent-selector';
 import { ApprovalCard } from '@/components/chat/approval-card';
 import { CriticBadges } from '@/components/chat/critic-badges';
 import { BrowserArtifactPreviews } from '@/components/chat/browser-artifact-previews';
 import { ThinkingBlock } from '@/components/chat/thinking-block';
 import { ToolTraceBlock } from '@/components/chat/tool-trace-block';
+import { WorkspaceResourceCards } from '@/components/chat/workspace-resource-cards';
 import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
 import { WorkbenchCodeEditor } from '@/components/ide/workbench-code-editor';
 import { getWorkbenchLanguage, updateWorkbenchTabContent } from '@/lib/code-workbench-editor';
@@ -87,8 +108,38 @@ import {
   buildWorkbenchBranchSummary,
   type WorkbenchBranchSummary,
 } from '@/lib/code-workbench-branch-summary';
+import {
+  desktopProjectFolderLabel,
+  desktopProjectIsAvailable,
+  buildProjectChatHref,
+  projectCapabilityDisplays,
+  projectDisplayProfile,
+  projectOnboardingAssessmentFromMetadata,
+  projectProfileDisplay,
+  projectReopenSearchParam,
+  recentProjectsUpdatedEvent,
+  sessionReopenSearchParam,
+} from '@/lib/project-navigation';
+import {
+  bindProjectSession,
+  getDesktopProjectBridge,
+  hasDesktopProjectBridge,
+  loadRecentDesktopProjects as loadRecentDesktopProjectsFromApi,
+  registerDesktopProject,
+} from '@/lib/desktop-projects';
 
 type ProjectOnboardingState = 'missing' | 'in_progress' | 'approved' | 'needs_review';
+
+export function buildIdeChatMessage(input: {
+  userLine: string;
+  sanitisedFiles: SanitisedFile[];
+}): string {
+  const userLine = input.userLine.trim();
+  if (userLine.startsWith('/')) return userLine;
+
+  const fileContext = formatFileContext(input.sanitisedFiles);
+  return fileContext ? `${fileContext}\n${userLine}` : userLine;
+}
 
 function projectMetadataString(project: ProjectRecord | null, key: string): string | undefined {
   const value = project?.metadata[key];
@@ -122,17 +173,96 @@ function projectHasRootInstructions(project: ProjectRecord | null): boolean {
   );
 }
 
+function canManuallyApproveProjectInstructions(input: {
+  project: ProjectRecord | null;
+  onboardingState: ProjectOnboardingState;
+  onboardingAssessment: ProjectOnboardingAssessment | null;
+}): boolean {
+  if (!input.project || input.onboardingState === 'approved') return false;
+  if (input.onboardingAssessment?.status !== 'approved') return false;
+  return projectHasRootInstructions(input.project);
+}
+
+function hasInstructionUpdateReview(
+  candidates: readonly ProjectInstructionUpdateCandidate[],
+  proposal: ProjectInstructionUpdateProposal | null,
+): boolean {
+  return candidates.length > 0 || proposal !== null;
+}
+
+function projectOnboardingDraft(project: ProjectRecord | null): ProjectOnboardingDraft | null {
+  const parsed = ProjectOnboardingDraftSchema.safeParse(project?.metadata.onboardingDraft);
+  return parsed.success ? parsed.data : null;
+}
+
+function projectOnboardingDialogue(
+  project: ProjectRecord | null,
+): ProjectOnboardingDialogue | null {
+  const parsed = ProjectOnboardingDialogueSchema.safeParse(project?.metadata.onboardingDialogue);
+  return parsed.success ? parsed.data : null;
+}
+
+function projectInstructionUpdateCandidates(
+  project: ProjectRecord | null,
+): ProjectInstructionUpdateCandidate[] {
+  const parsed = ProjectInstructionUpdateCandidateSchema.array().safeParse(
+    project?.metadata.instructionUpdateCandidates,
+  );
+  return parsed.success ? parsed.data : [];
+}
+
+function projectInstructionUpdateProposal(
+  project: ProjectRecord | null,
+): ProjectInstructionUpdateProposal | null {
+  const parsed = ProjectInstructionUpdateProposalSchema.safeParse(
+    project?.metadata.instructionUpdateProposal,
+  );
+  return parsed.success ? parsed.data : null;
+}
+
 function projectOnboardingLabel(state: ProjectOnboardingState): string {
   switch (state) {
     case 'approved':
-      return 'Instructions approved';
+      return 'Project ready';
     case 'needs_review':
-      return 'Instructions review required';
+      return 'Review Project instructions';
     case 'in_progress':
-      return 'Instructions review in progress';
+      return 'Project setup in progress';
     case 'missing':
-      return 'Instructions missing';
+      return 'Project setup needed';
   }
+}
+
+function projectOnboardingDescription(state: ProjectOnboardingState): string {
+  switch (state) {
+    case 'approved':
+      return 'Project instructions are approved. File edits are available when allowed by policy.';
+    case 'needs_review':
+      return 'Review the proposed Project instructions before enabling file edits.';
+    case 'in_progress':
+      return 'Finish the Project setup questions or review the draft before enabling file edits.';
+    case 'missing':
+      return 'Start setup to create Project instructions. You can still inspect files and ask questions first.';
+  }
+}
+
+function desktopProjectOpenButtonLabel(options: {
+  isOpening: boolean;
+  hasActiveProject: boolean;
+}): string {
+  if (options.isOpening) return 'Opening...';
+  return options.hasActiveProject ? 'Change Project' : 'Open Project';
+}
+
+function projectBindingStatus(
+  project: ProjectRecord | null,
+  isDesktopProjectBridgeAvailable: boolean,
+): { label: string; className: string } {
+  if (project) return { label: 'Open', className: 'text-emerald-600' };
+  if (isDesktopProjectBridgeAvailable) {
+    return { label: 'Desktop ready', className: 'text-emerald-600' };
+  }
+  return { label: 'Desktop app required', className: 'text-muted-foreground' };
 }
 
 // ---------------------------------------------------------------------------
@@ -155,10 +285,21 @@ function StatusLabel({
   );
 }
 
+export function ideChatUnavailableText(options: {
+  readonly sessionReady: boolean;
+  readonly hasActiveProject: boolean;
+}): string | null {
+  if (options.sessionReady) return null;
+  return options.hasActiveProject
+    ? 'Opening Project chat...'
+    : 'Open a Project to chat with the assistant.';
+}
+
 function ContentActivityBlocks({
   criticEvents,
   thinking,
   toolEvents,
+  workspaceEvents,
   approvals,
   onApprovalDecision,
   defaultOpenThinking = false,
@@ -167,12 +308,14 @@ function ContentActivityBlocks({
   criticEvents?: readonly CriticEvent[];
   thinking?: string;
   toolEvents?: readonly ToolTraceEvent[];
+  workspaceEvents?: readonly WorkspaceEvent[];
   approvals?: readonly ApprovalCardState[];
   onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
   defaultOpenThinking?: boolean;
   isStreaming?: boolean;
 }>) {
   const hasToolEvents = Boolean(toolEvents?.length);
+  const hasWorkspaceEvents = Boolean(workspaceEvents?.length);
 
   return (
     <>
@@ -182,6 +325,7 @@ function ContentActivityBlocks({
         <ToolTraceBlock events={toolEvents ?? []} isStreaming={isStreaming} />
       ) : null}
       {hasToolEvents ? <BrowserArtifactPreviews events={toolEvents ?? []} /> : null}
+      {hasWorkspaceEvents ? <WorkspaceResourceCards events={workspaceEvents ?? []} /> : null}
       {approvals?.map((approval) => (
         <ApprovalCard
           key={approval.approvalRequestId}
@@ -190,6 +334,306 @@ function ContentActivityBlocks({
         />
       ))}
     </>
+  );
+}
+
+export function ProjectOnboardingAssessmentPanel({
+  assessment,
+  isRefreshing,
+  onRefresh,
+}: Readonly<{
+  assessment: ProjectOnboardingAssessment;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}>) {
+  const profile = projectProfileDisplay(assessment.profile);
+  const capabilities = projectCapabilityDisplays(assessment.capabilities);
+
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">{profile.label}</div>
+          <div className="text-muted-foreground">{assessment.display.onboardingLabel}</div>
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0"
+          aria-label="Refresh project assessment"
+          title="Refresh project assessment"
+          onClick={onRefresh}
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden />
+        </Button>
+      </div>
+      {capabilities.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {capabilities.slice(0, 6).map((capability) => (
+            <span
+              key={capability.capability}
+              className="rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+              title={capability.description}
+            >
+              {capability.label}
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 leading-snug">{assessment.summary}</p>
+      {assessment.gaps.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {assessment.gaps.slice(0, 3).map((gap) => (
+            <li key={`${gap.kind}:${gap.message}`} className="leading-snug">
+              {gap.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      {assessment.questions.length > 0 && (
+        <p className="mt-2 leading-snug text-muted-foreground">{assessment.questions[0]?.prompt}</p>
+      )}
+    </div>
+  );
+}
+
+function activeOnboardingQuestion(dialogue: ProjectOnboardingDialogue | null): string | null {
+  if (!dialogue?.activeQuestionId) return null;
+  const turn = [...dialogue.turns]
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.role === 'assistant' && candidate.questionId === dialogue.activeQuestionId,
+    );
+  return turn?.content ?? null;
+}
+
+export function ProjectOnboardingDraftPanel({
+  draft,
+  dialogue,
+  answer,
+  isStarting,
+  isSubmitting,
+  isReviewing,
+  reviewComment,
+  onStart,
+  onAnswerChange,
+  onSubmitAnswer,
+  onReviewCommentChange,
+  onApprove,
+  onRequestChanges,
+  onReject,
+}: Readonly<{
+  draft: ProjectOnboardingDraft | null;
+  dialogue: ProjectOnboardingDialogue | null;
+  answer: string;
+  isStarting: boolean;
+  isSubmitting: boolean;
+  isReviewing: boolean;
+  reviewComment: string;
+  onStart: () => void;
+  onAnswerChange: (value: string) => void;
+  onSubmitAnswer: () => void;
+  onReviewCommentChange: (value: string) => void;
+  onApprove: () => void;
+  onRequestChanges: () => void;
+  onReject: () => void;
+}>) {
+  const question = activeOnboardingQuestion(dialogue);
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">Onboarding draft</div>
+          <div className="text-muted-foreground">
+            {draft ? `Revision ${draft.revision}` : 'Not started'}
+          </div>
+        </div>
+        {!draft && (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-7 shrink-0"
+            onClick={onStart}
+            disabled={isStarting}
+          >
+            {isStarting ? 'Starting...' : 'Start'}
+          </Button>
+        )}
+      </div>
+      {question && (
+        <form
+          className="mt-2 space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmitAnswer();
+          }}
+        >
+          <p className="leading-snug text-foreground">{question}</p>
+          <Textarea
+            aria-label="Onboarding answer"
+            value={answer}
+            onChange={(event) => {
+              onAnswerChange(event.target.value);
+            }}
+            className="min-h-20 text-sm"
+            placeholder="Answer this question for the Project instructions"
+          />
+          <Button type="submit" size="sm" className="h-7" disabled={!answer.trim() || isSubmitting}>
+            {isSubmitting ? 'Saving...' : 'Send answer'}
+          </Button>
+        </form>
+      )}
+      {!draft && (
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
+          Create Project instructions so the assistant understands how to work in this folder before
+          making file changes.
+        </p>
+      )}
+      {draft && (
+        <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-2 text-xs leading-relaxed text-foreground">
+          {draft.markdown}
+        </pre>
+      )}
+      {draft && (
+        <div className="mt-2 space-y-2">
+          <Textarea
+            aria-label="Review feedback"
+            value={reviewComment}
+            onChange={(event) => {
+              onReviewCommentChange(event.target.value);
+            }}
+            className="min-h-16 text-sm"
+            placeholder="Optional feedback before requesting changes"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="h-7"
+              onClick={onApprove}
+              disabled={isReviewing}
+            >
+              {isReviewing ? 'Reviewing...' : 'Approve draft'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7"
+              onClick={onRequestChanges}
+              disabled={!reviewComment.trim() || isReviewing}
+            >
+              Request changes
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7"
+              onClick={onReject}
+              disabled={!reviewComment.trim() || isReviewing}
+            >
+              Reject
+            </Button>
+          </div>
+        </div>
+      )}
+      {draft?.history.length ? (
+        <div className="mt-2 text-muted-foreground">{draft.history.length} earlier revision(s)</div>
+      ) : null}
+    </div>
+  );
+}
+
+export function ProjectInstructionUpdatesPanel({
+  candidates,
+  proposal,
+  isPreparing,
+  isDeciding,
+  onPrepare,
+  onApply,
+  onReject,
+}: Readonly<{
+  candidates: readonly ProjectInstructionUpdateCandidate[];
+  proposal: ProjectInstructionUpdateProposal | null;
+  isPreparing: boolean;
+  isDeciding: boolean;
+  onPrepare: () => void;
+  onApply: (candidateId: string) => void;
+  onReject: (candidateId: string) => void;
+}>) {
+  const visible = candidates.filter(
+    (candidate) => candidate.status === 'pending' || candidate.status === 'proposed',
+  );
+  return (
+    <div className="rounded-md border border-border bg-background px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-medium text-foreground">Closeout updates</div>
+          <div className="text-muted-foreground">
+            {proposal?.summary ?? `${visible.length} candidate update(s) waiting`}
+          </div>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-7 shrink-0"
+          onClick={onPrepare}
+          disabled={isPreparing}
+        >
+          {isPreparing ? 'Preparing...' : 'Prepare'}
+        </Button>
+      </div>
+      {visible.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {visible.map((candidate) => (
+            <div key={candidate.id} className="rounded border border-border px-2 py-2">
+              <div className="text-foreground">{candidate.summary}</div>
+              <div className="mt-1 text-muted-foreground">
+                {candidate.risk === 'policy_change'
+                  ? 'Policy change requires explicit review'
+                  : 'Reviewable factual update'}
+              </div>
+              {candidate.proposedMarkdown && (
+                <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded bg-muted px-2 py-2 text-xs leading-relaxed text-foreground">
+                  {candidate.proposedMarkdown}
+                </pre>
+              )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7"
+                  onClick={() => {
+                    onApply(candidate.id);
+                  }}
+                  disabled={isDeciding || candidate.status !== 'proposed'}
+                >
+                  Apply
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7"
+                  onClick={() => {
+                    onReject(candidate.id);
+                  }}
+                  disabled={isDeciding}
+                >
+                  Reject
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -207,6 +651,7 @@ function shouldShowEmptyAssistantResponse(input: {
   messageText: string;
   thinking?: string;
   hasToolEvents: boolean;
+  hasWorkspaceEvents: boolean;
   hasApprovals: boolean;
   criticEvents?: readonly CriticEvent[];
 }) {
@@ -214,6 +659,7 @@ function shouldShowEmptyAssistantResponse(input: {
     !input.messageText.trim() &&
     !input.thinking?.trim() &&
     !input.hasToolEvents &&
+    !input.hasWorkspaceEvents &&
     !input.hasApprovals &&
     !input.criticEvents?.length
   );
@@ -231,6 +677,7 @@ export function AssistantContent({
   criticEvents,
   thinking,
   toolEvents,
+  workspaceEvents,
   approvals,
   onApprovalDecision,
 }: Readonly<{
@@ -245,10 +692,12 @@ export function AssistantContent({
   criticEvents?: readonly CriticEvent[];
   thinking?: string;
   toolEvents?: readonly ToolTraceEvent[];
+  workspaceEvents?: readonly WorkspaceEvent[];
   approvals?: readonly ApprovalCardState[];
   onApprovalDecision?: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
   const hasToolEvents = Boolean(toolEvents?.length);
+  const hasWorkspaceEvents = Boolean(workspaceEvents?.length);
   const hasApprovals = Boolean(approvals?.length);
   const messageText = getMessageText(message);
 
@@ -259,6 +708,7 @@ export function AssistantContent({
           criticEvents={criticEvents}
           thinking={thinking}
           toolEvents={toolEvents}
+          workspaceEvents={workspaceEvents}
           approvals={approvals}
           onApprovalDecision={onApprovalDecision}
           defaultOpenThinking
@@ -277,6 +727,7 @@ export function AssistantContent({
         criticEvents={criticEvents}
         thinking={thinking}
         toolEvents={toolEvents}
+        workspaceEvents={workspaceEvents}
         approvals={approvals}
         onApprovalDecision={onApprovalDecision}
       />
@@ -292,6 +743,7 @@ export function AssistantContent({
         messageText,
         thinking,
         hasToolEvents,
+        hasWorkspaceEvents,
         hasApprovals,
         criticEvents,
       }) ? (
@@ -476,17 +928,6 @@ function FileTreeNode({
 // Toolbar
 // ---------------------------------------------------------------------------
 
-function getFolderButtonLabel(
-  isLoading: boolean,
-  isOpeningDirectory: boolean,
-  rootName: string | null,
-): string {
-  if (isOpeningDirectory) return 'Opening...';
-  if (isLoading) return 'Loading...';
-  if (rootName) return `Close ${rootName}`;
-  return 'Open Folder';
-}
-
 function getToggleButtonState(isOpen: boolean, openLabel: string, closedLabel: string) {
   return {
     variant: isOpen ? 'secondary' : 'ghost',
@@ -495,7 +936,7 @@ function getToggleButtonState(isOpen: boolean, openLabel: string, closedLabel: s
 }
 
 function getTerminalTitle(canUseProjectTools: boolean, showTerminal: boolean): string {
-  if (!canUseProjectTools) return 'Open a backend project before using the terminal';
+  if (!canUseProjectTools) return 'Open a Project before using the terminal';
   return showTerminal ? 'Hide terminal' : 'Show terminal';
 }
 
@@ -507,6 +948,8 @@ function getSaveTitle(activeFileIsDirty: boolean, canSaveActiveFile: boolean): s
 }
 
 function IDEToolbar({
+  projectName,
+  projectChatHref,
   showExplorer,
   setShowExplorer,
   showTerminal,
@@ -522,14 +965,10 @@ function IDEToolbar({
   pathInput,
   setPathInput,
   onLoadFromPath,
-  onOpenFolder,
-  isLoadingFolder,
-  isOpeningFolder,
-  rootName,
-  onRefreshFolder,
-  onCloseFolder,
   canUseProjectTools,
 }: Readonly<{
+  projectName: string | null;
+  projectChatHref: string | null;
   showExplorer: boolean;
   setShowExplorer: (v: boolean) => void;
   showTerminal: boolean;
@@ -545,12 +984,6 @@ function IDEToolbar({
   pathInput: string;
   setPathInput: (v: string) => void;
   onLoadFromPath: () => void;
-  onOpenFolder: () => void;
-  isLoadingFolder: boolean;
-  isOpeningFolder: boolean;
-  rootName: string | null;
-  onRefreshFolder: () => void;
-  onCloseFolder: () => void;
   canUseProjectTools: boolean;
 }>) {
   const explorerButton = getToggleButtonState(showExplorer, 'Hide', 'Files');
@@ -565,13 +998,26 @@ function IDEToolbar({
   const chatTitle = showChat ? 'Hide AI assistant' : 'Show AI assistant';
   const ChatIcon = showChat ? PanelRightClose : MessageSquare;
 
-  const folderLabel = getFolderButtonLabel(isLoadingFolder, isOpeningFolder, rootName);
-  const folderActionDisabled = isLoadingFolder || isOpeningFolder;
   const saveTitle = getSaveTitle(activeFileIsDirty, canSaveActiveFile);
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
       <div className="flex items-center gap-2">
+        {projectChatHref ? (
+          <Button asChild variant="ghost" size="sm" className="max-w-56 justify-start gap-2">
+            <Link href={projectChatHref} title="Return to Project chat">
+              <MessageSquare className="h-4 w-4 shrink-0" />
+              <span className="hidden md:inline truncate">
+                Project / {projectName ?? 'Project'} / IDE
+              </span>
+              <span className="md:hidden">Project</span>
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/">Workspaces</Link>
+          </Button>
+        )}
         <Button
           variant={explorerButton.variant}
           size="sm"
@@ -612,27 +1058,6 @@ function IDEToolbar({
             </div>
           </DialogContent>
         </Dialog>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={rootName ? onCloseFolder : onOpenFolder}
-          disabled={folderActionDisabled}
-        >
-          <FolderOpen className="h-4 w-4" />
-          {folderLabel}
-        </Button>
-        {rootName && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRefreshFolder}
-            disabled={folderActionDisabled}
-            title="Refresh file tree"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        )}
         <Button
           variant="outline"
           size="sm"
@@ -876,9 +1301,11 @@ function ChatPanel({
   selectedAgentId,
   onAgentChange,
   sessionReady,
+  chatUnavailableText,
   criticEventsByMessage,
   thinkingByMessage,
   toolEventsByMessage,
+  workspaceEventsByMessage,
   approvalEventsByMessage,
   onApprovalDecision,
 }: Readonly<{
@@ -905,9 +1332,11 @@ function ChatPanel({
   selectedAgentId: string | null;
   onAgentChange: (id: string) => void;
   sessionReady: boolean;
+  chatUnavailableText: string | null;
   criticEventsByMessage: Record<string, CriticEvent[]>;
   thinkingByMessage: Record<string, string>;
   toolEventsByMessage: Record<string, ToolTraceEvent[]>;
+  workspaceEventsByMessage: Record<string, WorkspaceEvent[]>;
   approvalEventsByMessage: Record<string, ApprovalCardState[]>;
   onApprovalDecision: (approvalRequestId: string, decision: ApprovalDecision) => void;
 }>) {
@@ -1000,6 +1429,7 @@ function ChatPanel({
                         criticEvents={criticEventsByMessage[message.id]}
                         thinking={thinkingByMessage[message.id]}
                         toolEvents={toolEventsByMessage[message.id]}
+                        workspaceEvents={workspaceEventsByMessage[message.id]}
                         approvals={approvalEventsByMessage[message.id]}
                         onApprovalDecision={onApprovalDecision}
                       />
@@ -1028,7 +1458,7 @@ function ChatPanel({
         />
         <div className="flex gap-2">
           <Textarea
-            placeholder="Ask about your code..."
+            placeholder={chatUnavailableText ?? 'Ask about your code...'}
             value={chatInput}
             onChange={(e) => {
               setChatInput(e.target.value);
@@ -1040,16 +1470,22 @@ function ChatPanel({
               }
             }}
             className="min-h-[60px] max-h-[120px] text-sm resize-none"
+            disabled={isLoading || Boolean(chatUnavailableText)}
           />
           <Button
             size="icon"
             onClick={onSendMessage}
-            disabled={!chatInput.trim() || isLoading || !sessionReady}
+            disabled={
+              !chatInput.trim() || isLoading || !sessionReady || Boolean(chatUnavailableText)
+            }
             className="flex-shrink-0"
           >
             <Send className="h-4 w-4" />
           </Button>
         </div>
+        {chatUnavailableText ? (
+          <p className="mt-2 text-xs text-muted-foreground">{chatUnavailableText}</p>
+        ) : null}
       </div>
     </div>
   );
@@ -1089,14 +1525,16 @@ function WorkbenchBranchPanel({ summary }: Readonly<{ summary: WorkbenchBranchSu
         </div>
       )}
 
-      <div className="mt-2 space-y-1">
-        {summary.providers.map((provider) => (
-          <div key={provider.label} className="text-[11px] leading-snug text-muted-foreground">
-            <span className="font-medium text-foreground">{provider.label} unavailable:</span>{' '}
-            {provider.description}
-          </div>
-        ))}
-      </div>
+      {summary.providers.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {summary.providers.map((provider) => (
+            <div key={provider.label} className="text-[11px] leading-snug text-muted-foreground">
+              <span className="font-medium text-foreground">{provider.label} unavailable:</span>{' '}
+              {provider.description}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1310,22 +1748,30 @@ export interface IDEWithChatProps {
 }
 
 export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatProps>) {
-  // File System Access API
-  const fs = useFileSystem();
-
-  // Use FS API tree when a directory is open, otherwise fall back to props or empty
-  const fileTree = fs.isDirectoryOpen ? fs.fileTree : (initialFileTree ?? []);
+  // Browser File System Access is parked for the product IDE until Electron provides native Project access.
+  const fs = useFileSystem({ enabled: false });
 
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
-  const [projectPathInput, setProjectPathInput] = useState('/workspace');
   const [activeProject, setActiveProject] = useState<ProjectRecord | null>(null);
+  const [recentDesktopProjects, setRecentDesktopProjects] = useState<ProjectDesktopRecord[]>([]);
+  const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
+  const [isOpeningDesktopProject, setIsOpeningDesktopProject] = useState(false);
+  const [projectFileTree, setProjectFileTree] = useState<FileNode[]>([]);
+  const [isLoadingProjectFileTree, setIsLoadingProjectFileTree] = useState(false);
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
-  const [isOpeningBackendProject, setIsOpeningBackendProject] = useState(false);
   const [isApprovingProjectInstructions, setIsApprovingProjectInstructions] = useState(false);
+  const [isAssessingProject, setIsAssessingProject] = useState(false);
+  const [isStartingOnboardingDraft, setIsStartingOnboardingDraft] = useState(false);
+  const [isSubmittingOnboardingAnswer, setIsSubmittingOnboardingAnswer] = useState(false);
+  const [isReviewingOnboardingDraft, setIsReviewingOnboardingDraft] = useState(false);
+  const [isPreparingInstructionUpdates, setIsPreparingInstructionUpdates] = useState(false);
+  const [isDecidingInstructionUpdate, setIsDecidingInstructionUpdate] = useState(false);
+  const [onboardingAnswer, setOnboardingAnswer] = useState('');
+  const [onboardingReviewComment, setOnboardingReviewComment] = useState('');
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -1341,7 +1787,15 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   const [contextFiles, setContextFiles] = useState<OpenTab[]>([]);
   const [includeActiveFile, setIncludeActiveFile] = useState(true);
   const [editProposal, setEditProposal] = useState<WorkbenchEditProposal | null>(null);
+  const attemptedProjectReopenIdRef = useRef<string | null>(null);
+  const handoffSessionRef = useRef<{ projectId: string; sessionId: string } | null>(null);
 
+  // Use backend-bound Project files first. Browser FS remains parked for product IDE use.
+  let fileTree = initialFileTree ?? [];
+  if (fs.isDirectoryOpen) fileTree = fs.fileTree;
+  if (activeProject) fileTree = projectFileTree;
+  const isExplorerLoading = fs.isLoading || isLoadingProjectFileTree;
+  const hasOpenProjectOrFolder = Boolean(activeProject) || fs.isDirectoryOpen;
   const workspaceName = activeProject?.name ?? fs.rootName ?? 'No folder open';
   const activeFile = openTabs.find((tab) => tab.path === activeTab);
   const freshContextFiles = useMemo(
@@ -1371,12 +1825,27 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [contextFiles],
   );
   const onboardingState = projectOnboardingState(activeProject);
+  const onboardingAssessment = projectOnboardingAssessmentFromMetadata(activeProject);
+  const activeProjectProfile = projectDisplayProfile(activeProject);
+  const activeProjectCapabilities = projectCapabilityDisplays(onboardingAssessment?.capabilities);
+  const onboardingDraft = projectOnboardingDraft(activeProject);
+  const onboardingDialogue = projectOnboardingDialogue(activeProject);
+  const instructionUpdateCandidates = projectInstructionUpdateCandidates(activeProject);
+  const instructionUpdateProposal = projectInstructionUpdateProposal(activeProject);
+  const projectFolderLabel = desktopProjectFolderLabel(activeProject);
+  const projectStatus = projectBindingStatus(activeProject, isDesktopProjectBridgeAvailable);
+  const projectChatHref = activeProject ? buildProjectChatHref(activeProject.id, sessionId) : null;
   const projectWritesApproved = !activeProject || onboardingState === 'approved';
   const canSaveActiveFile = Boolean(activeFile?.isDirty && projectWritesApproved);
-  const canApproveProjectInstructions =
-    Boolean(activeProject) &&
-    onboardingState !== 'approved' &&
-    projectHasRootInstructions(activeProject);
+  const canApproveProjectInstructions = canManuallyApproveProjectInstructions({
+    project: activeProject,
+    onboardingState,
+    onboardingAssessment,
+  });
+  const showInstructionUpdatesPanel = hasInstructionUpdateReview(
+    instructionUpdateCandidates,
+    instructionUpdateProposal,
+  );
 
   const {
     messages,
@@ -1387,6 +1856,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     criticEventsByMessage,
     thinkingByMessage,
     toolEventsByMessage,
+    workspaceEventsByMessage,
     approvalEventsByMessage,
     decideApproval,
   } = useHarnessChat(sessionId);
@@ -1407,15 +1877,170 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     })();
   }, []);
 
+  const loadRecentDesktopProjects = useCallback(async () => {
+    try {
+      const projects = await loadRecentDesktopProjectsFromApi();
+      setRecentDesktopProjects(projects);
+      return projects;
+    } catch (e) {
+      toast.error(e instanceof ApiRequestError ? e.message : 'Failed to load recent Projects');
+      return [];
+    }
+  }, []);
+
+  useEffect(() => {
+    setIsDesktopProjectBridgeAvailable(hasDesktopProjectBridge());
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktopProjectBridgeAvailable) {
+      setRecentDesktopProjects([]);
+      return;
+    }
+    loadRecentDesktopProjects().catch(() => {});
+  }, [isDesktopProjectBridgeAvailable, loadRecentDesktopProjects]);
+
+  const loadProjectFileTree = useCallback(async (projectId: string) => {
+    setIsLoadingProjectFileTree(true);
+    try {
+      const result = await apiGet<ProjectFileTreeResult>(
+        apiPath('projects', projectId, 'files', 'tree'),
+      );
+      setProjectFileTree(result?.files ?? []);
+      setProjectOpenError(null);
+    } catch (e) {
+      const message = e instanceof ApiRequestError ? e.message : 'Failed to load Project files';
+      setProjectOpenError(message);
+      setProjectFileTree([]);
+      toast.error(message);
+    } finally {
+      setIsLoadingProjectFileTree(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!activeProject?.id) {
+      setProjectFileTree([]);
+      return;
+    }
+    loadProjectFileTree(activeProject.id).catch(() => {});
+  }, [activeProject?.id, loadProjectFileTree]);
+
+  const reopenDesktopProject = useCallback((project: ProjectDesktopRecord) => {
+    if (!desktopProjectIsAvailable(project)) {
+      const message = 'This Project folder could not be found. Open it again from your system.';
+      setProjectOpenError(message);
+      toast.error(message);
+      return;
+    }
+    setActiveProject(project);
+    setProjectOpenError(null);
+    setOpenTabs([]);
+    setActiveTab(null);
+    setContextFiles([]);
+    setEditProposal(null);
+    setProjectFileTree([]);
+    setSessionId(null);
+    handoffSessionRef.current = null;
+  }, []);
+
+  const reopenDesktopProjectById = useCallback(
+    async (projectId: string) => {
+      const projects =
+        recentDesktopProjects.length > 0
+          ? recentDesktopProjects
+          : await loadRecentDesktopProjects();
+      const project = projects.find((candidate) => candidate.id === projectId);
+      if (!project) {
+        const message =
+          'This recent Project is no longer available. Open it again from your system.';
+        setProjectOpenError(message);
+        toast.error(message);
+        return false;
+      }
+      reopenDesktopProject(project);
+      return true;
+    },
+    [loadRecentDesktopProjects, recentDesktopProjects, reopenDesktopProject],
+  );
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    const params = new URLSearchParams(globalThis.window.location.search);
+    const projectId = params.get(projectReopenSearchParam);
+    const requestedSessionId = params.get(sessionReopenSearchParam);
+    if (!projectId || activeProject?.id === projectId) return;
+    if (attemptedProjectReopenIdRef.current === projectId) return;
+    attemptedProjectReopenIdRef.current = projectId;
+
+    void (async () => {
+      const reopened = await reopenDesktopProjectById(projectId);
+      if (reopened && requestedSessionId) {
+        try {
+          const session = await apiGet<SessionRecord>(apiPath('sessions', requestedSessionId));
+          if (session?.mode === 'project' && session.projectId === projectId) {
+            setSelectedAgentId(session.agentId);
+            setSessionId(session.id);
+            handoffSessionRef.current = { projectId, sessionId: session.id };
+          }
+        } catch {
+          toast.error('Failed to restore Project chat session');
+        }
+      }
+      if (reopened && globalThis.window !== undefined) {
+        const nextUrl = new URL(globalThis.window.location.href);
+        nextUrl.searchParams.delete(projectReopenSearchParam);
+        nextUrl.searchParams.delete(sessionReopenSearchParam);
+        globalThis.window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}`);
+      }
+    })();
+  }, [activeProject?.id, reopenDesktopProjectById]);
+
+  const handleOpenDesktopProject = useCallback(async () => {
+    const bridge = getDesktopProjectBridge();
+    const selectFolder = bridge?.projects?.selectFolder;
+    if (!selectFolder) {
+      const message = 'Project opening is available in the desktop app.';
+      setProjectOpenError(message);
+      toast.error(message);
+      return;
+    }
+
+    setIsOpeningDesktopProject(true);
+    setProjectOpenError(null);
+    try {
+      const selection = await selectFolder();
+      if (selection.canceled) return;
+      const result = await registerDesktopProject(selection.folder);
+      if (!result) throw new ApiRequestError('Failed to open Project', 500);
+      reopenDesktopProject(result.project);
+      await loadRecentDesktopProjects();
+      if (globalThis.window !== undefined) {
+        globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+      }
+      toast.success(result.created ? 'Project opened' : 'Project reopened');
+    } catch (e) {
+      const message = e instanceof ApiRequestError ? e.message : 'Failed to open Project';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsOpeningDesktopProject(false);
+    }
+  }, [loadRecentDesktopProjects, reopenDesktopProject]);
+
   useEffect(() => {
     if (!selectedAgentId || !activeProject?.id) return;
+    const handoffSession = handoffSessionRef.current;
+    if (handoffSession?.projectId === activeProject.id && handoffSession.sessionId === sessionId) {
+      return;
+    }
     void (async () => {
       try {
-        const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+        const result = await bindProjectSession({
           agentId: selectedAgentId,
-          mode: 'project',
           projectId: activeProject.id,
         });
+        const session = result?.session;
         if (session?.id) {
           setSessionId(session.id);
         } else {
@@ -1427,7 +2052,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         toast.error(e instanceof ApiRequestError ? e.message : 'Failed to create session');
       }
     })();
-  }, [activeProject?.id, selectedAgentId]);
+  }, [activeProject?.id, selectedAgentId, sessionId]);
 
   useEffect(() => {
     if (harnessError) {
@@ -1437,46 +2062,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   }, [harnessError, setHarnessError]);
 
   const isLoading = status === 'streaming';
-
-  const clearProjectContext = useCallback(() => {
-    setOpenTabs([]);
-    setActiveTab(null);
-    setContextFiles([]);
-    setEditProposal(null);
-    setChatInput('');
-    setShowTerminal(false);
-    fs.closeDirectory();
-  }, [fs]);
-
-  const handleOpenBackendProject = useCallback(async () => {
-    const path = projectPathInput.trim();
-    if (!path) return;
-
-    setIsOpeningBackendProject(true);
-    setProjectOpenError(null);
-    try {
-      const project = await apiPost<ProjectRecord>(apiPath('projects', 'open'), { path });
-      if (!project) {
-        throw new ApiRequestError('Failed to open backend project', 500);
-      }
-      clearProjectContext();
-      setActiveProject(project);
-      setSessionId(null);
-      toast.success(`Opened ${project.name}`);
-    } catch (error) {
-      setActiveProject(null);
-      setSessionId(null);
-      clearProjectContext();
-      const message =
-        error instanceof ApiRequestError
-          ? error.message
-          : 'Backend cannot inspect that project path';
-      setProjectOpenError(message);
-      toast.error(message);
-    } finally {
-      setIsOpeningBackendProject(false);
-    }
-  }, [clearProjectContext, projectPathInput]);
+  const chatUnavailableText = ideChatUnavailableText({
+    sessionReady: Boolean(sessionId),
+    hasActiveProject: Boolean(activeProject),
+  });
 
   const handleApproveProjectInstructions = useCallback(async () => {
     if (!activeProject?.id) return;
@@ -1485,7 +2074,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     try {
       const project = await apiPost<ProjectRecord>(
         apiPath('projects', activeProject.id, 'onboarding', 'approve'),
-        {},
+        { reviewer: 'User' },
       );
       if (!project) throw new ApiRequestError('Failed to approve project instructions', 500);
       setActiveProject(project);
@@ -1498,6 +2087,176 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     } finally {
       setIsApprovingProjectInstructions(false);
     }
+  }, [activeProject?.id]);
+
+  const handleReviewOnboardingDraft = useCallback(
+    async (decision: 'approve' | 'reject' | 'request_changes') => {
+      if (!activeProject?.id) return;
+      const comment = onboardingReviewComment.trim();
+      if (decision !== 'approve' && !comment) return;
+      setIsReviewingOnboardingDraft(true);
+      setProjectOpenError(null);
+      try {
+        const project = await apiPost<ProjectRecord>(
+          apiPath('projects', activeProject.id, 'onboarding', 'review'),
+          {
+            decision,
+            reviewer: 'User',
+            ...(comment ? { comment } : {}),
+          },
+        );
+        if (!project) throw new ApiRequestError('Failed to review project instructions', 500);
+        setActiveProject(project);
+        setOnboardingReviewComment('');
+        toast.success(
+          decision === 'approve'
+            ? 'Project instructions approved'
+            : 'Project instruction feedback saved',
+        );
+      } catch (error) {
+        const message =
+          error instanceof ApiRequestError
+            ? error.message
+            : 'Failed to review project instructions';
+        setProjectOpenError(message);
+        toast.error(message);
+      } finally {
+        setIsReviewingOnboardingDraft(false);
+      }
+    },
+    [activeProject?.id, onboardingReviewComment],
+  );
+
+  const handleAssessProject = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsAssessingProject(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'refresh'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to assess project', 500);
+      setActiveProject(project);
+      const refresh = project.metadata.onboardingRefresh as { materialDrift?: unknown } | undefined;
+      toast.success(
+        refresh?.materialDrift ? 'Project instructions need review' : 'Project assessment updated',
+      );
+    } catch (error) {
+      const message = error instanceof ApiRequestError ? error.message : 'Failed to assess project';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsAssessingProject(false);
+    }
+  }, [activeProject?.id]);
+
+  const handlePrepareInstructionUpdates = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsPreparingInstructionUpdates(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'instruction-updates', 'closeout'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to prepare closeout updates', 500);
+      setActiveProject(project);
+      toast.success('Closeout updates prepared');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to prepare closeout updates';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsPreparingInstructionUpdates(false);
+    }
+  }, [activeProject?.id]);
+
+  const handleInstructionUpdateDecision = useCallback(
+    async (candidateId: string, decision: 'apply' | 'reject') => {
+      if (!activeProject?.id) return;
+      setIsDecidingInstructionUpdate(true);
+      setProjectOpenError(null);
+      try {
+        const project = await apiPost<ProjectRecord>(
+          apiPath(
+            'projects',
+            activeProject.id,
+            'instruction-updates',
+            'candidates',
+            candidateId,
+            decision,
+          ),
+          { reviewer: 'User' },
+        );
+        if (!project) throw new ApiRequestError('Failed to review closeout update', 500);
+        setActiveProject(project);
+        toast.success(decision === 'apply' ? 'Instruction update applied' : 'Update rejected');
+      } catch (error) {
+        const message =
+          error instanceof ApiRequestError ? error.message : 'Failed to review closeout update';
+        setProjectOpenError(message);
+        toast.error(message);
+      } finally {
+        setIsDecidingInstructionUpdate(false);
+      }
+    },
+    [activeProject?.id],
+  );
+
+  const handleStartOnboardingDraft = useCallback(async () => {
+    if (!activeProject?.id) return;
+    setIsStartingOnboardingDraft(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'draft'),
+        {},
+      );
+      if (!project) throw new ApiRequestError('Failed to start onboarding draft', 500);
+      setActiveProject(project);
+      toast.success('Onboarding draft started');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to start onboarding draft';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsStartingOnboardingDraft(false);
+    }
+  }, [activeProject?.id]);
+
+  const handleSubmitOnboardingAnswer = useCallback(async () => {
+    if (!activeProject?.id || !onboardingAnswer.trim()) return;
+    setIsSubmittingOnboardingAnswer(true);
+    setProjectOpenError(null);
+    try {
+      const project = await apiPost<ProjectRecord>(
+        apiPath('projects', activeProject.id, 'onboarding', 'answer'),
+        {
+          questionId: onboardingDialogue?.activeQuestionId,
+          answer: onboardingAnswer.trim(),
+        },
+      );
+      if (!project) throw new ApiRequestError('Failed to save onboarding answer', 500);
+      setActiveProject(project);
+      setOnboardingAnswer('');
+      toast.success('Onboarding draft updated');
+    } catch (error) {
+      const message =
+        error instanceof ApiRequestError ? error.message : 'Failed to save onboarding answer';
+      setProjectOpenError(message);
+      toast.error(message);
+    } finally {
+      setIsSubmittingOnboardingAnswer(false);
+    }
+  }, [activeProject?.id, onboardingAnswer, onboardingDialogue?.activeQuestionId]);
+
+  const refreshActiveProject = useCallback(async () => {
+    if (!activeProject?.id) return;
+    const project = await apiGet<ProjectRecord>(apiPath('projects', activeProject.id));
+    if (project) setActiveProject(project);
   }, [activeProject?.id]);
 
   // --- File operations ---
@@ -1516,20 +2275,52 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
     [fileTree],
   );
 
+  const readActiveProjectFile = useCallback(
+    async (path: string): Promise<ProjectFileReadResult> => {
+      if (!activeProject?.id) {
+        throw new ApiRequestError('Open a Project before reading files', 409);
+      }
+      const params = new URLSearchParams({ path });
+      const result = await apiGet<ProjectFileReadResult>(
+        `${apiPath('projects', activeProject.id, 'files', 'read')}?${params.toString()}`,
+      );
+      if (!result) throw new ApiRequestError('Failed to read Project file', 500);
+      return result;
+    },
+    [activeProject?.id],
+  );
+
+  const readFileNodeContent = useCallback(
+    async (node: FileNode): Promise<string | null> => {
+      if (activeProject?.id && !node.handle) {
+        try {
+          return (await readActiveProjectFile(node.path)).content;
+        } catch (error) {
+          const message =
+            error instanceof ApiRequestError ? error.message : `Failed to read ${node.path}`;
+          toast.error(message);
+          return null;
+        }
+      }
+
+      if (!node.handle) return node.content ?? '';
+
+      try {
+        return await fs.readFile(node);
+      } catch {
+        return `// Failed to read ${node.path}\n`;
+      }
+    },
+    [activeProject?.id, fs, readActiveProjectFile],
+  );
+
   const handleFileSelect = useCallback(
     async (node: FileNode) => {
       if (node.type !== 'file') return;
       const exists = openTabs.some((tab) => tab.path === node.path);
       if (!exists) {
-        let content = node.content ?? '';
-        // Read from filesystem if handle is available
-        if (node.handle) {
-          try {
-            content = await fs.readFile(node);
-          } catch {
-            content = `// Failed to read ${node.path}\n`;
-          }
-        }
+        const content = await readFileNodeContent(node);
+        if (content === null) return;
         const newTab: OpenTab = {
           path: node.path,
           name: node.name,
@@ -1542,7 +2333,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       }
       setActiveTab(node.path);
     },
-    [openTabs, fs],
+    [openTabs, readFileNodeContent],
   );
 
   const handleCloseTab = useCallback(
@@ -1631,7 +2422,16 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
       }
 
       let content = node.content ?? '';
-      if (node.handle) {
+      if (activeProject?.id && !node.handle) {
+        try {
+          content = (await readActiveProjectFile(node.path)).content;
+        } catch (error) {
+          const message =
+            error instanceof ApiRequestError ? error.message : `Failed to read ${node.path}`;
+          toast.error(message);
+          return;
+        }
+      } else if (node.handle) {
         try {
           content = await fs.readFile(node);
         } catch {
@@ -1648,7 +2448,7 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         handle: node.handle as FileSystemFileHandle | undefined,
       });
     },
-    [fs, handleAddToContext, openTabs],
+    [activeProject?.id, fs, handleAddToContext, openTabs, readActiveProjectFile],
   );
 
   // --- Code apply from AI ---
@@ -1794,12 +2594,27 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
 
   const handleSendMessage = useCallback(() => {
     const userLine = chatInput.trim();
-    if (!userLine || !sessionId) return;
-    const prefix = formatFileContext(contextDraft.sanitisedFiles);
-    const messageForApi = prefix ? `${prefix}\n${userLine}` : userLine;
-    sendMessage(messageForApi, userLine).catch(() => {});
+    if (!userLine || !sessionId || isLoading) return;
+    const shouldRefreshProject = Boolean(activeProject?.id && userLine.startsWith('/'));
+    const messageForApi = buildIdeChatMessage({
+      userLine,
+      sanitisedFiles: contextDraft.sanitisedFiles,
+    });
+    sendMessage(messageForApi, userLine)
+      .then(async () => {
+        if (shouldRefreshProject) await refreshActiveProject();
+      })
+      .catch(() => {});
     setChatInput('');
-  }, [chatInput, sessionId, contextDraft, sendMessage]);
+  }, [
+    activeProject?.id,
+    chatInput,
+    sessionId,
+    isLoading,
+    contextDraft,
+    refreshActiveProject,
+    sendMessage,
+  ]);
 
   // --- Keyboard shortcuts ---
 
@@ -1841,6 +2656,8 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
   return (
     <div className="flex flex-col h-full bg-background">
       <IDEToolbar
+        projectName={activeProject?.name ?? null}
+        projectChatHref={projectChatHref}
         showExplorer={showExplorer}
         setShowExplorer={setShowExplorer}
         showTerminal={showTerminal}
@@ -1856,12 +2673,6 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
         pathInput={pathInput}
         setPathInput={setPathInput}
         onLoadFromPath={handleLoadFromPath}
-        onOpenFolder={fs.openDirectory}
-        isLoadingFolder={fs.isLoading}
-        isOpeningFolder={fs.isOpeningDirectory}
-        rootName={fs.rootName}
-        onRefreshFolder={fs.refresh}
-        onCloseFolder={fs.closeDirectory}
         canUseProjectTools={Boolean(activeProject)}
       />
 
@@ -1885,25 +2696,29 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   </div>
                 </div>
                 <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center justify-between gap-2 min-w-0">
-                  <span className="truncate">{fs.rootName ?? 'Explorer'}</span>
+                  <span className="truncate">
+                    {projectFolderLabel ?? fs.rootName ?? 'Explorer'}
+                  </span>
                   <div className="flex items-center gap-1 shrink-0">
-                    {fs.isDirectoryOpen && filteredFileTree.length > 0 && !fs.isLoading && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs font-normal normal-case tracking-normal text-muted-foreground hover:text-foreground"
-                        title="Collapse all folders in the tree"
-                        aria-label="Collapse all folders"
-                        onClick={() => {
-                          setExplorerCollapseSignal((n) => n + 1);
-                        }}
-                      >
-                        <ListCollapse className="h-3.5 w-3.5" aria-hidden />
-                        <span className="hidden sm:inline">Collapse</span>
-                      </Button>
-                    )}
-                    {fs.isLoading && (
+                    {hasOpenProjectOrFolder &&
+                      filteredFileTree.length > 0 &&
+                      !isExplorerLoading && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs font-normal normal-case tracking-normal text-muted-foreground hover:text-foreground"
+                          title="Collapse all folders in the tree"
+                          aria-label="Collapse all folders"
+                          onClick={() => {
+                            setExplorerCollapseSignal((n) => n + 1);
+                          }}
+                        >
+                          <ListCollapse className="h-3.5 w-3.5" aria-hidden />
+                          <span className="hidden sm:inline">Collapse</span>
+                        </Button>
+                      )}
+                    {isExplorerLoading && (
                       <span className="text-xs animate-pulse normal-case tracking-normal">
                         Loading…
                       </span>
@@ -1911,54 +2726,72 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                   </div>
                 </div>
                 <div
-                  className="mx-2 mt-2 rounded-md border border-border bg-background px-3 py-2"
+                  className="mx-2 mt-2 shrink-0 rounded-md border border-border bg-background px-3 py-2"
                   aria-label="Project binding"
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Project
                     </span>
-                    {activeProject ? (
-                      <span className="text-xs text-emerald-600">Backend accessible</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Unavailable</span>
-                    )}
+                    <span className={cn('text-xs', projectStatus.className)}>
+                      {projectStatus.label}
+                    </span>
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      aria-label="Backend project path"
-                      value={projectPathInput}
-                      onChange={(event) => {
-                        setProjectPathInput(event.target.value);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          handleOpenBackendProject().catch(() => {});
-                        }
-                      }}
-                      className="h-8 text-xs"
-                    />
+                  {isDesktopProjectBridgeAvailable && (
                     <Button
                       type="button"
                       size="sm"
-                      variant="secondary"
+                      variant={activeProject ? 'secondary' : 'outline'}
+                      className="mb-2 w-full gap-2"
                       onClick={() => {
-                        handleOpenBackendProject().catch(() => {});
+                        handleOpenDesktopProject().catch(() => {});
                       }}
-                      disabled={isOpeningBackendProject}
+                      disabled={isOpeningDesktopProject}
                     >
-                      {isOpeningBackendProject ? 'Opening...' : 'Open'}
+                      <FolderOpen className="h-4 w-4" aria-hidden="true" />
+                      {desktopProjectOpenButtonLabel({
+                        isOpening: isOpeningDesktopProject,
+                        hasActiveProject: Boolean(activeProject),
+                      })}
                     </Button>
-                  </div>
+                  )}
+                  {!activeProject && isDesktopProjectBridgeAvailable && (
+                    <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-xs leading-snug text-muted-foreground">
+                      Use the desktop app to choose a folder with your system picker. Recent
+                      Projects can be reopened from the left sidebar.
+                    </div>
+                  )}
+                  {!activeProject && !isDesktopProjectBridgeAvailable && (
+                    <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-xs leading-snug text-muted-foreground">
+                      Open this app on desktop to choose a Project folder. Chat remains available,
+                      but Project files cannot be opened from this browser view.
+                    </div>
+                  )}
                   {activeProject && (
                     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                       <div className="truncate text-foreground">{activeProject.name}</div>
                       <div className="truncate">
-                        Root: {String(activeProject.metadata.backendProjectRoot ?? '')}
+                        Folder:{' '}
+                        {projectFolderLabel ??
+                          onboardingAssessment?.display.folderLabel ??
+                          activeProject.name}
                       </div>
-                      <div className="truncate">
-                        Repo: {String(activeProject.metadata.repositoryRoot ?? '')}
-                      </div>
+                      {onboardingAssessment && (
+                        <div className="truncate">{activeProjectProfile.label}</div>
+                      )}
+                      {onboardingAssessment && activeProjectCapabilities.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {activeProjectCapabilities.slice(0, 6).map((capability) => (
+                            <span
+                              key={capability.capability}
+                              className="rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[11px]"
+                              title={capability.description}
+                            >
+                              {capability.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {activeProject.metadata.activeBranch && (
                         <div className="truncate">
                           Branch: {String(activeProject.metadata.activeBranch)}
@@ -1978,84 +2811,129 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                             {projectOnboardingLabel(onboardingState)}
                           </div>
                           <div className="mt-1 leading-snug text-muted-foreground">
-                            {onboardingState === 'approved'
-                              ? 'Code edits and write tools are available when allowed by policy.'
-                              : 'Initial project instructions are required before code edits, commits, installs, migrations, or destructive commands. Read-only inspection and planning remain available.'}
+                            {projectOnboardingDescription(onboardingState)}
                           </div>
                           {canApproveProjectInstructions && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              className="mt-2 h-7"
-                              onClick={() => {
-                                handleApproveProjectInstructions().catch(() => {});
-                              }}
-                              disabled={isApprovingProjectInstructions}
-                            >
-                              {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
-                            </Button>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="h-7"
+                                onClick={() => {
+                                  handleApproveProjectInstructions().catch(() => {});
+                                }}
+                                disabled={isApprovingProjectInstructions}
+                              >
+                                {isApprovingProjectInstructions ? 'Approving...' : 'Approve'}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                aria-label="Refresh project assessment"
+                                title="Refresh project assessment"
+                                onClick={() => {
+                                  handleAssessProject().catch(() => {});
+                                }}
+                                disabled={isAssessingProject}
+                              >
+                                <RefreshCw
+                                  className={cn(
+                                    'h-3.5 w-3.5',
+                                    isAssessingProject && 'animate-spin',
+                                  )}
+                                  aria-hidden
+                                />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
+                      {onboardingAssessment && (
+                        <ProjectOnboardingAssessmentPanel
+                          assessment={onboardingAssessment}
+                          isRefreshing={isAssessingProject}
+                          onRefresh={() => {
+                            handleAssessProject().catch(() => {});
+                          }}
+                        />
+                      )}
+                      {onboardingState !== 'approved' && (
+                        <ProjectOnboardingDraftPanel
+                          draft={onboardingDraft}
+                          dialogue={onboardingDialogue}
+                          answer={onboardingAnswer}
+                          isStarting={isStartingOnboardingDraft}
+                          isSubmitting={isSubmittingOnboardingAnswer}
+                          isReviewing={isReviewingOnboardingDraft}
+                          reviewComment={onboardingReviewComment}
+                          onStart={() => {
+                            handleStartOnboardingDraft().catch(() => {});
+                          }}
+                          onAnswerChange={setOnboardingAnswer}
+                          onSubmitAnswer={() => {
+                            handleSubmitOnboardingAnswer().catch(() => {});
+                          }}
+                          onReviewCommentChange={setOnboardingReviewComment}
+                          onApprove={() => {
+                            handleReviewOnboardingDraft('approve').catch(() => {});
+                          }}
+                          onRequestChanges={() => {
+                            handleReviewOnboardingDraft('request_changes').catch(() => {});
+                          }}
+                          onReject={() => {
+                            handleReviewOnboardingDraft('reject').catch(() => {});
+                          }}
+                        />
+                      )}
+                      {showInstructionUpdatesPanel && (
+                        <ProjectInstructionUpdatesPanel
+                          candidates={instructionUpdateCandidates}
+                          proposal={instructionUpdateProposal}
+                          isPreparing={isPreparingInstructionUpdates}
+                          isDeciding={isDecidingInstructionUpdate}
+                          onPrepare={() => {
+                            handlePrepareInstructionUpdates().catch(() => {});
+                          }}
+                          onApply={(candidateId) => {
+                            handleInstructionUpdateDecision(candidateId, 'apply').catch(() => {});
+                          }}
+                          onReject={(candidateId) => {
+                            handleInstructionUpdateDecision(candidateId, 'reject').catch(() => {});
+                          }}
+                        />
+                      )}
                     </div>
                   )}
                   {projectOpenError && (
                     <p className="mt-2 text-xs text-destructive">{projectOpenError}</p>
                   )}
                 </div>
-                {fs.needsFolderReconnect && (
-                  <div className="mx-2 mt-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
-                    <p className="mb-2 leading-snug">
-                      Restore access to{' '}
-                      <span className="font-medium">
-                        {fs.pendingReconnectFolderName ?? 'your folder'}
-                      </span>{' '}
-                      after refresh (browser permission).
-                    </p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        fs.reconnectFolder().catch(() => {});
-                      }}
-                    >
-                      Restore folder…
-                    </Button>
-                  </div>
-                )}
-                {fs.error && <div className="px-3 py-2 text-xs text-destructive">{fs.error}</div>}
-                <ScrollArea className="flex-1">
+                <ScrollArea className="min-h-0 flex-1">
                   <div className="pb-4">
                     {filteredFileTree.length === 0 &&
-                      !fs.isLoading &&
-                      !fs.isDirectoryOpen &&
+                      !isExplorerLoading &&
+                      !hasOpenProjectOrFolder &&
                       !fs.needsFolderReconnect && (
                         <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
                           <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
                           <p className="text-sm text-muted-foreground">No folder open</p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={fs.openDirectory}
-                            disabled={fs.isOpeningDirectory}
-                          >
-                            <FolderOpen className="h-4 w-4" />
-                            {fs.isOpeningDirectory ? 'Opening...' : 'Open Folder'}
-                          </Button>
+                          <p className="max-w-44 text-xs leading-snug text-muted-foreground">
+                            Project folders will open from the desktop app.
+                          </p>
                         </div>
                       )}
                     {filteredFileTree.length === 0 &&
-                      !fs.isLoading &&
-                      fs.isDirectoryOpen &&
-                      !fs.error && (
+                      !isExplorerLoading &&
+                      hasOpenProjectOrFolder &&
+                      !fs.error &&
+                      !projectOpenError && (
                         <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                           {searchQuery.trim()
                             ? 'No files match your search.'
-                            : 'This folder is empty, or everything here is hidden (ignored folders like node_modules).'}
+                            : 'This Project has no visible files, or everything here is hidden.'}
                         </div>
                       )}
                     {filteredFileTree.map((node) => (
@@ -2111,7 +2989,10 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
               <>
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={30} minSize={15} maxSize={60}>
-                  <Terminal sessionId={sessionId} explorerFolderOpen={fs.isDirectoryOpen} />
+                  <Terminal
+                    sessionId={sessionId}
+                    explorerFolderOpen={fs.isDirectoryOpen || Boolean(activeProject)}
+                  />
                 </ResizablePanel>
               </>
             )}
@@ -2147,9 +3028,11 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
                 selectedAgentId={selectedAgentId}
                 onAgentChange={setSelectedAgentId}
                 sessionReady={Boolean(sessionId)}
+                chatUnavailableText={chatUnavailableText}
                 criticEventsByMessage={criticEventsByMessage}
                 thinkingByMessage={thinkingByMessage}
                 toolEventsByMessage={toolEventsByMessage}
+                workspaceEventsByMessage={workspaceEventsByMessage}
                 approvalEventsByMessage={approvalEventsByMessage}
                 onApprovalDecision={decideApproval}
               />

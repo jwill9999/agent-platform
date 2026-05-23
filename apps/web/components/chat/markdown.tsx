@@ -6,10 +6,12 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { cn } from '@/lib/cn';
+import { openWorkspaceWebUrl } from '@/lib/desktop-workspace';
 
 interface MarkdownProps {
   content: string;
   className?: string;
+  workspaceWebViewProjectId?: string | null;
 }
 
 function CodeBlock({ className: codeClassName, children, ...props }: React.ComponentProps<'code'>) {
@@ -31,10 +33,7 @@ function CodeBlock({ className: codeClassName, children, ...props }: React.Compo
 
   return (
     <code
-      className={cn(
-        'bg-secondary px-1.5 py-0.5 rounded text-sm font-mono',
-        codeClassName,
-      )}
+      className={cn('bg-secondary px-1.5 py-0.5 rounded text-sm font-mono', codeClassName)}
       {...props}
     >
       {children}
@@ -56,6 +55,40 @@ function MdOl({ children }: React.ComponentProps<'ol'>) {
 
 function MdLi({ children }: React.ComponentProps<'li'>) {
   return <li className="leading-relaxed">{children}</li>;
+}
+
+function isHttpUrl(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function createMdAnchor(workspaceWebViewProjectId: string | null | undefined) {
+  function MdAnchor({ href, children }: React.ComponentProps<'a'>) {
+    const onClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (!workspaceWebViewProjectId || !isHttpUrl(href)) return;
+      event.preventDefault();
+      void openWorkspaceWebUrl({ url: href, projectId: workspaceWebViewProjectId });
+    };
+
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:underline"
+        onClick={onClick}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return MdAnchor;
 }
 
 function MdAnchor({ href, children }: React.ComponentProps<'a'>) {
@@ -114,13 +147,18 @@ const markdownComponents: Components = {
   em: MdEm,
 };
 
-export function Markdown({ content, className }: Readonly<MarkdownProps>) {
+export function Markdown({
+  content,
+  className,
+  workspaceWebViewProjectId,
+}: Readonly<MarkdownProps>) {
+  const components = workspaceWebViewProjectId
+    ? { ...markdownComponents, a: createMdAnchor(workspaceWebViewProjectId) }
+    : markdownComponents;
+
   return (
     <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={markdownComponents}
-      >
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {content}
       </ReactMarkdown>
     </div>

@@ -1,12 +1,15 @@
 import type {
   Agent,
   ApprovalRequest,
+  ExecutionPolicyCategory,
+  ExecutionPolicySettings,
   Output,
   RiskTier,
   Skill,
   Tool as ContractTool,
+  WorkspaceEvent,
 } from '@agent-platform/contracts';
-import { evaluateBrowserUrlPolicy } from '@agent-platform/contracts';
+import { evaluateBrowserUrlPolicy, workspaceResourceUri } from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
@@ -19,11 +22,13 @@ import { ToolTimeoutError, withToolTimeout, resolveToolTimeout } from '../toolTi
 import { withRetry, TOOL_RETRY_CONFIG } from '../retry.js';
 import { checkDeadline } from '../deadline.js';
 import { PathJail, PathJailError } from '../security/pathJail.js';
+import { classifyBashCommand } from '../security/bashCommandPolicy.js';
 import { validateBashWorkspacePolicy } from '../security/bashWorkspacePolicy.js';
 import { ToolRateLimiter } from '../security/rateLimiter.js';
 import { isSystemTool, GET_SKILL_DETAIL_ID, SYSTEM_TOOLS } from '../systemTools.js';
 import { CODING_APPLY_PATCH_ID } from '../tools/index.js';
 import { BROWSER_TOOL_IDS } from '../tools/browserTools.js';
+import { GIT_TOOL_IDS } from '../tools/gitTools.js';
 import type { ToolAuditLogger } from '../audit/toolAuditLog.js';
 import { wrapToolResult, scanForInjection } from '../security/injectionGuard.js';
 import { scanOutput } from '../security/outputGuard.js';
@@ -54,6 +59,14 @@ export type ToolDispatchContext = {
     canWrite: boolean;
     writeBlockReason?: string;
   };
+  workspaceResources?: {
+    projectId: string;
+  };
+  projectWriteBlockHandler?: (input: {
+    call: ToolCallIntent;
+    reason: string;
+  }) => Promise<{ message: string } | undefined>;
+  executionPolicy?: ExecutionPolicySettings;
 };
 
 export type ApprovalRequestCreateInput = {
@@ -97,18 +110,135 @@ const WRITE_TOOL_IDS = new Set(
 );
 WRITE_TOOL_IDS.add(CODING_APPLY_PATCH_ID);
 
-const READ_ONLY_SHELL_COMMANDS = new Set([
-  'pwd',
-  'ls',
-  'find',
-  'rg',
-  'grep',
-  'cat',
-  'head',
-  'tail',
-]);
-const READ_ONLY_GIT_SUBCOMMANDS = new Set(['status', 'diff', 'log', 'branch', 'show', 'rev-parse']);
-const SHELL_MUTATION_OR_CHAIN_PATTERN = /(?:^|[^\\])(?:[;&|<>]|\$\(|`)/;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringField(value: Record<string, unknown>, key: string): string | undefined {
+  const field = value[key];
+  return typeof field === 'string' && field.trim() ? field : undefined;
+}
+
+function changedFilePaths(result: Record<string, unknown>): string[] {
+  const source = Array.isArray(result.changedFiles)
+    ? result.changedFiles
+    : Array.isArray(result.files)
+      ? result.files
+      : [];
+  return source
+    .map((entry) => (isRecord(entry) ? stringField(entry, 'path') : undefined))
+    .filter((path): path is string => Boolean(path));
+}
+
+function workspaceEventOutput(event: WorkspaceEvent): Output {
+  return { type: 'workspace_event', event };
+}
+
+export function workspaceResourceEventsForToolOutput(
+  toolId: string,
+  output: Output,
+  projectId: string | undefined,
+  now = new Date().toISOString(),
+): Output[] {
+  if (!projectId || output.type !== 'tool_result' || !isRecord(output.data)) return [];
+  if (output.data.ok === false || !isRecord(output.data.result)) return [];
+
+  const result = output.data.result;
+  if (toolId === GIT_TOOL_IDS.status || toolId === GIT_TOOL_IDS.changedFiles) {
+    return changedFilePaths(result).map((path) =>
+      workspaceEventOutput({
+        type: 'resource_created',
+        action: 'open',
+        resource: {
+          uri: workspaceResourceUri({ projectId, kind: 'file', target: path }),
+          kind: 'file',
+          projectId,
+          label: path,
+          createdAt: now,
+          metadata: { path, sourceTool: toolId },
+        },
+        metadata: { sourceTool: toolId },
+      }),
+    );
+  }
+
+  if (toolId === GIT_TOOL_IDS.diff) {
+    const path = stringField(result, 'path');
+    if (!path) return [];
+    const staged = result.staged === true;
+    return [
+      workspaceEventOutput({
+        type: 'diff_created',
+        action: 'open',
+        resource: {
+          uri: workspaceResourceUri({ projectId, kind: 'diff', target: path }),
+          kind: 'diff',
+          projectId,
+          label: `Diff: ${path}`,
+          createdAt: now,
+          metadata: {
+            path,
+            mode: staged ? 'staged' : 'unstaged',
+            sourceTool: toolId,
+          },
+        },
+        metadata: { sourceTool: toolId },
+      }),
+    ];
+  }
+
+  return [];
+}
+
+const ALLOWLIST_RECOVERY_OPTIONS = [
+  { id: 'request-approval', label: 'Request approval', action: 'approve' as const },
+  { id: 'connect-provider', label: 'Connect provider', action: 'connect' as const },
+  { id: 'manual-steps', label: 'Show manual steps', action: 'manual' as const },
+];
+
+function capabilityNameForTool(toolName: string): string {
+  if (toolName.startsWith('sys_git_')) return 'source control';
+  if (toolName.startsWith('sys_browser_')) return 'browser automation';
+  if (toolName.startsWith('sys_')) return 'system tool';
+  if (toolName.includes('repo') || toolName.includes('github') || toolName.startsWith('gh_')) {
+    return 'repository management';
+  }
+  if (parseToolId(toolName).kind === 'mcp') return 'connected tool';
+  return 'tool execution';
+}
+
+function buildCapabilityRecoveryOutput(call: ToolCallIntent): Output {
+  const capability = capabilityNameForTool(call.name);
+  return {
+    type: 'error',
+    code: 'TOOL_NOT_ALLOWED',
+    message: `No approved ${capability} capability is available for "${call.name}".`,
+    recovery: {
+      status: 'capability_missing',
+      summary: `This action needs an approved ${capability} capability before it can run.`,
+      options: ALLOWLIST_RECOVERY_OPTIONS,
+    },
+  };
+}
+
+function policyModeForTool(ctx: ToolDispatchContext): 'ask' | 'block' {
+  return ctx.executionPolicy?.unknownToolPolicy ?? 'ask';
+}
+
+function withPolicyArgs(
+  args: Record<string, unknown>,
+  policy: {
+    category: ExecutionPolicyCategory;
+    decision: 'approval_required';
+    reason: string;
+    toolId: string;
+    cwd?: string;
+    target?: string;
+    outsideAgentAllowlist?: boolean;
+  },
+): Record<string, unknown> {
+  return { ...args, __policy: policy };
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -251,7 +381,13 @@ async function dispatchNativeTool(
     };
   }
   try {
-    const result = await ctx.nativeToolExecutor(call.name, call.args);
+    const options =
+      call.name === 'sys_bash' && call.approvalGranted === true
+        ? { approvalGranted: true }
+        : undefined;
+    const result = options
+      ? await ctx.nativeToolExecutor(call.name, call.args, options)
+      : await ctx.nativeToolExecutor(call.name, call.args);
     return { output: result, ok: isOutputOk(result) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -278,19 +414,16 @@ async function dispatchSingleTool(
   ctx: ToolDispatchContext,
   options?: { timeoutMs?: number },
 ): Promise<{ output: Output; ok: boolean; images?: Output[] }> {
-  if (!isToolExecutionAllowed(ctx.agent, call.name)) {
-    const output: Output = {
-      type: 'error',
-      code: 'TOOL_NOT_ALLOWED',
-      message: `Tool "${call.name}" is not in the agent's allowlist`,
-    };
+  const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+  if (!approvedForResume && !isToolExecutionAllowed(ctx.agent, call.name)) {
+    const output = buildCapabilityRecoveryOutput(call);
     ctx.auditLog?.logDenied(call.name, call.args, ctx.agent.id, '', 'Tool not in agent allowlist');
     return { output, ok: false };
   }
 
   const onboardingBlockReason = onboardingWriteBlockReason(call, ctx);
   if (onboardingBlockReason) {
-    const output = buildProjectOnboardingBlockedOutput(call);
+    const { output } = await handleProjectWriteBlock(call, ctx, onboardingBlockReason);
     ctx.auditLog?.logDenied(
       call.name,
       call.args,
@@ -350,6 +483,45 @@ function evaluateApprovalPolicy(
   return requiresHumanApproval(toolMetadata);
 }
 
+function reviewableUnallowlistedTool(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+): ContractTool | undefined {
+  if (policyModeForTool(ctx) !== 'ask') return undefined;
+  const parsed = parseToolId(call.name);
+  if (parsed.kind === 'plain') {
+    return ctx.tools?.find((tool) => tool.id === call.name);
+  }
+  if (!ctx.mcpManager.getSession(parsed.mcpServerId)) return undefined;
+  return (
+    ctx.tools?.find((tool) => tool.id === call.name) ??
+    ({
+      id: call.name,
+      slug: call.name,
+      name: call.name,
+      riskTier: 'high',
+      requiresApproval: true,
+    } satisfies ContractTool)
+  );
+}
+
+function buildUnallowlistedApprovalCall(
+  call: ToolCallIntent,
+  reason: string,
+  category: ExecutionPolicyCategory = 'unknown',
+): ToolCallIntent {
+  return {
+    ...call,
+    args: withPolicyArgs(call.args, {
+      category,
+      decision: 'approval_required',
+      reason,
+      toolId: call.name,
+      outsideAgentAllowlist: true,
+    }),
+  };
+}
+
 function buildApprovalRequiredOutput(call: ToolCallIntent, reason: string): Output {
   return {
     type: 'error',
@@ -371,18 +543,8 @@ function stringArgValue(args: Record<string, unknown>, key: string): string | un
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
-function firstShellWords(command: string): string[] {
-  return command.trim().split(/\s+/).filter(Boolean);
-}
-
 function isReadOnlyShellCommand(command: string): boolean {
-  if (SHELL_MUTATION_OR_CHAIN_PATTERN.test(command)) return false;
-  const [commandName, subcommand] = firstShellWords(command);
-  if (!commandName) return false;
-  if (commandName === 'sed') return subcommand === '-n';
-  if (commandName === 'git')
-    return Boolean(subcommand && READ_ONLY_GIT_SUBCOMMANDS.has(subcommand));
-  return READ_ONLY_SHELL_COMMANDS.has(commandName);
+  return classifyBashCommand(command).state === 'allowed';
 }
 
 function browserUrlApprovalReason(call: ToolCallIntent): string | undefined {
@@ -394,6 +556,15 @@ function browserUrlApprovalReason(call: ToolCallIntent): string | undefined {
   const decision = evaluateBrowserUrlPolicy(url);
   if (decision.state !== 'approval_required') return undefined;
   return decision.reasons.at(0) ?? 'Browser URL policy requires human approval.';
+}
+
+function shellCommandPolicyDecision(
+  ctx: ToolDispatchContext,
+  call: ToolCallIntent,
+): ReturnType<typeof classifyBashCommand> | undefined {
+  if (call.name !== 'sys_bash') return undefined;
+  const command = typeof call.args.command === 'string' ? call.args.command : '';
+  return classifyBashCommand(command, { policy: ctx.executionPolicy });
 }
 
 function onboardingWriteBlockReason(
@@ -416,6 +587,31 @@ function buildProjectOnboardingBlockedOutput(call: ToolCallIntent): Output {
   };
 }
 
+async function handleProjectWriteBlock(
+  call: ToolCallIntent,
+  ctx: ToolDispatchContext,
+  reason: string,
+): Promise<{ output: Output; message?: ChatMessage }> {
+  const handled = await ctx.projectWriteBlockHandler?.({ call, reason });
+  if (handled?.message) {
+    return {
+      output: { type: 'text', content: handled.message },
+      message: { role: 'assistant', content: handled.message },
+    };
+  }
+
+  const output = buildProjectOnboardingBlockedOutput(call);
+  return {
+    output,
+    message: {
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: outputToContent(call.name, output),
+    },
+  };
+}
+
 function markBrowserUrlApproved(call: ToolCallIntent): ToolCallIntent {
   if (call.name !== BROWSER_TOOL_IDS.start && call.name !== BROWSER_TOOL_IDS.navigate) {
     return call;
@@ -423,10 +619,16 @@ function markBrowserUrlApproved(call: ToolCallIntent): ToolCallIntent {
   return { ...call, args: { ...call.args, approved: true } };
 }
 
+function markShellCommandApproved(call: ToolCallIntent): ToolCallIntent {
+  if (call.name !== 'sys_bash') return call;
+  return { ...call, approvalGranted: true };
+}
+
 async function createApprovalRequiredOutput(
   ctx: ToolDispatchContext,
   state: HarnessStateType,
-  call: ToolCallIntent,
+  displayCall: ToolCallIntent,
+  executionCall: ToolCallIntent,
   riskTier: RiskTier,
   reason: string,
 ): Promise<Output> {
@@ -434,12 +636,12 @@ async function createApprovalRequiredOutput(
     sessionId: state.sessionId ?? '',
     runId: state.runId,
     agentId: ctx.agent.id,
-    toolName: call.name,
-    args: call.args,
+    toolName: displayCall.name,
+    args: displayCall.args,
     executionPayloadJson: JSON.stringify({
-      toolCallId: call.id,
-      toolName: call.name,
-      args: call.args,
+      toolCallId: executionCall.id,
+      toolName: executionCall.name,
+      args: executionCall.args,
     }),
     riskTier,
     createdAtMs: Date.now(),
@@ -448,10 +650,10 @@ async function createApprovalRequiredOutput(
   return {
     type: 'approval_required',
     approvalRequestId: request.id,
-    toolName: call.name,
+    toolName: displayCall.name,
     riskTier,
     argsPreview: parseArgsPreview(request.argsJson),
-    message: `Tool "${call.name}" requires human approval before execution. ${reason}`,
+    message: `Tool "${displayCall.name}" requires human approval before execution. ${reason}`,
   };
 }
 
@@ -881,12 +1083,49 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
       rateLimiter.record(call.name);
 
-      if (!isToolExecutionAllowed(ctx.agent, call.name)) {
-        const output: Output = {
-          type: 'error',
-          code: 'TOOL_NOT_ALLOWED',
-          message: `Tool "${call.name}" is not in the agent's allowlist`,
-        };
+      const approvedForResume = ctx.approvedToolCallIds?.has(call.id) ?? false;
+      if (!approvedForResume && !isToolExecutionAllowed(ctx.agent, call.name)) {
+        const reviewableTool = reviewableUnallowlistedTool(call, ctx);
+        if (reviewableTool && ctx.approvalRequests) {
+          const reason = 'Tool is registered but not auto-approved by the agent allowlist.';
+          const riskTier: RiskTier = reviewableTool.riskTier ?? 'high';
+          const displayCall = buildUnallowlistedApprovalCall(call, reason);
+          const output = await createApprovalRequiredOutput(
+            ctx,
+            state,
+            displayCall,
+            call,
+            riskTier,
+            reason,
+          );
+
+          await emitToolOutput(ctx, output);
+          traceEvents.push(
+            {
+              type: 'tool_approval_required',
+              toolId: call.name,
+              step,
+              riskTier,
+            },
+            { type: 'tool_dispatch', toolId: call.name, step, ok: false },
+          );
+          ctx.auditLog?.logPendingApproval(
+            call.name,
+            call.args,
+            ctx.agent.id,
+            state.sessionId ?? '',
+            riskTier,
+          );
+          return {
+            halted: true,
+            llmOutput: null,
+            messages: toolMessages,
+            trace: traceEvents,
+            totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+            totalToolCalls: toolCallCount,
+          };
+        }
+        const output = buildCapabilityRecoveryOutput(call);
         ctx.auditLog?.logDenied(
           call.name,
           call.args,
@@ -906,7 +1145,7 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       const onboardingBlockReason = onboardingWriteBlockReason(call, ctx);
       if (onboardingBlockReason) {
-        const output = buildProjectOnboardingBlockedOutput(call);
+        const { output, message } = await handleProjectWriteBlock(call, ctx, onboardingBlockReason);
         ctx.auditLog?.logDenied(
           call.name,
           call.args,
@@ -914,13 +1153,20 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           state.sessionId ?? '',
           onboardingBlockReason,
         );
-        toolMessages.push({
-          role: 'tool',
-          toolCallId: call.id,
-          toolName: call.name,
-          content: outputToContent(call.name, output),
-        });
+        await emitToolOutput(ctx, output);
+        if (message) toolMessages.push(message);
         traceEvents.push({ type: 'tool_dispatch', toolId: call.name, step, ok: false });
+        if (output.type === 'text') {
+          return {
+            halted: true,
+            llmOutput: null,
+            messages: toolMessages,
+            trace: traceEvents,
+            totalRetries: (state.totalRetries ?? 0) + totalToolRetries,
+            totalToolCalls: toolCallCount,
+            loadedSkillIds: newLoadedSkillIds,
+          };
+        }
         continue;
       }
 
@@ -966,11 +1212,41 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
 
       const toolMetadata = resolveToolMetadata(safeCall, ctx);
-      const approvedForResume = ctx.approvedToolCallIds?.has(safeCall.id) ?? false;
+      const shellPolicy = shellCommandPolicyDecision(ctx, safeCall);
+      if (shellPolicy?.state === 'denied') {
+        const output: Output = {
+          type: 'error',
+          code: 'COMMAND_POLICY_DENIED',
+          message: shellPolicy.reason,
+        };
+        ctx.auditLog?.logDenied(
+          safeCall.name,
+          safeCall.args,
+          ctx.agent.id,
+          state.sessionId ?? '',
+          shellPolicy.reason,
+          toolMetadata?.riskTier ?? 'high',
+        );
+        toolMessages.push({
+          role: 'tool',
+          toolCallId: safeCall.id,
+          toolName: safeCall.name,
+          content: outputToContent(safeCall.name, output),
+        });
+        traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok: false });
+        continue;
+      }
       const browserUrlReason = browserUrlApprovalReason(safeCall);
       if (browserUrlReason && !approvedForResume) {
         const output = ctx.approvalRequests
-          ? await createApprovalRequiredOutput(ctx, state, safeCall, 'medium', browserUrlReason)
+          ? await createApprovalRequiredOutput(
+              ctx,
+              state,
+              call,
+              safeCall,
+              'medium',
+              browserUrlReason,
+            )
           : buildApprovalRequiredOutput(safeCall, browserUrlReason);
 
         await emitToolOutput(ctx, output);
@@ -1022,15 +1298,36 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
 
       if (approvedForResume) {
         safeCall = markBrowserUrlApproved(safeCall);
+        safeCall = markShellCommandApproved(safeCall);
       }
 
-      const approval = evaluateApprovalPolicy(toolMetadata);
+      const approval =
+        shellPolicy?.state === 'approval_required'
+          ? {
+              required: true,
+              riskTier: shellPolicy.riskTier,
+              reason: shellPolicy.reason,
+            }
+          : evaluateApprovalPolicy(toolMetadata);
       if (approval.required && !approvedForResume) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
+        const displayCall =
+          shellPolicy?.state === 'approval_required'
+            ? {
+                ...call,
+                args: withPolicyArgs(call.args, {
+                  category: shellPolicy.category,
+                  decision: 'approval_required',
+                  reason,
+                  toolId: call.name,
+                  target: typeof call.args.command === 'string' ? call.args.command : undefined,
+                }),
+              }
+            : safeCall;
         const output = ctx.approvalRequests
-          ? await createApprovalRequiredOutput(ctx, state, safeCall, riskTier, reason)
-          : buildApprovalRequiredOutput(safeCall, reason);
+          ? await createApprovalRequiredOutput(ctx, state, displayCall, safeCall, riskTier, reason)
+          : buildApprovalRequiredOutput(displayCall, reason);
 
         await emitToolOutput(ctx, output);
         traceEvents.push({
@@ -1104,6 +1401,13 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       await fireToolErrorHook(ctx, state, safeCall, output);
 
       await emitToolOutput(ctx, output, images);
+      for (const eventOutput of workspaceResourceEventsForToolOutput(
+        safeCall.name,
+        output,
+        ctx.workspaceResources?.projectId,
+      )) {
+        await emitToolOutput(ctx, eventOutput);
+      }
 
       // Security scanning (injection detection + credential leak detection)
       scanToolOutput(safeCall.name, output, traceEvents);

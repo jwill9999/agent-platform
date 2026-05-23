@@ -67,7 +67,7 @@ export type CodingToolEnvelope = z.infer<typeof CodingToolEnvelopeSchema>;
 
 export const CodingPatchOperationSchema = z.object({
   path: z.string().min(1),
-  oldText: z.string().optional(),
+  oldText: z.preprocess((value) => (value === null ? undefined : value), z.string().optional()),
   newText: z.string(),
 });
 export type CodingPatchOperation = z.infer<typeof CodingPatchOperationSchema>;

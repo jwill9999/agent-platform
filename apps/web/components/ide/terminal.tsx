@@ -341,7 +341,7 @@ export function Terminal({ className, sessionId, explorerFolderOpen }: Readonly<
           </div>
           <p className="text-[10px] leading-snug text-[#858585]">
             {showExplorerHint
-              ? 'Browsers do not expose the folder path from Open Folder. Paste the same absolute path here so the shell matches the Explorer, or leave empty to use your home directory.'
+              ? 'Project terminal binding will use the selected desktop Project when Electron access is available.'
               : 'Leave empty to use your home directory on the API machine (or set TERMINAL_CWD on the server).'}
           </p>
         </div>

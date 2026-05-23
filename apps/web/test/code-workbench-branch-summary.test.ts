@@ -11,9 +11,10 @@ describe('code workbench branch summary', () => {
       }),
     ).toMatchObject({
       workspaceName: 'agent-platform',
-      branchLabel: 'Branch not connected',
+      branchLabel: 'Project activity',
       stateLabel: 'Clean',
       changedFiles: [],
+      providers: [],
     });
   });
 
@@ -34,7 +35,7 @@ describe('code workbench branch summary', () => {
         pendingProposalPath: '/src/app.ts',
       }),
     ).toMatchObject({
-      workspaceName: 'No folder open',
+      workspaceName: 'No Project open',
       stateLabel: 'Review pending',
       changedFiles: [{ path: '/src/app.ts', name: 'app.ts', state: 'pending_review' }],
     });

@@ -2,7 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createToolDispatchNode, type ToolDispatchContext } from '../src/nodes/toolDispatch.js';
+import {
+  createToolDispatchNode,
+  workspaceResourceEventsForToolOutput,
+  type ApprovalRequestCreateInput,
+  type ToolDispatchContext,
+} from '../src/nodes/toolDispatch.js';
 import type { HarnessStateType } from '../src/graphState.js';
 import type {
   Agent,
@@ -419,9 +424,98 @@ describe('toolDispatchNode', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
-      command: `mkdir -p ${expectedDir} && touch ${expectedPath}`,
-    });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'sys_bash',
+      {
+        command: `mkdir -p ${expectedDir} && touch ${expectedPath}`,
+      },
+      { approvalGranted: true },
+    );
+  });
+
+  it('keeps approval previews canonical while persisting resolved bash execution payloads', async () => {
+    const workspace = makeTmpDir();
+    const realWorkspace = realpathSync(workspace);
+    const emitted: Output[] = [];
+    const approvalRequests = {
+      create: vi.fn((request: ApprovalRequestCreateInput) =>
+        makeApprovalRequest({
+          argsJson: JSON.stringify(request.args),
+          executionPayloadJson: request.executionPayloadJson,
+        }),
+      ),
+    };
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: vi.fn(),
+      emitter: { emit: (event) => emitted.push(event), end: vi.fn() },
+      approvalRequests,
+      pathJail: new PathJail([
+        {
+          label: 'workspace',
+          hostPath: workspace,
+          containerPath: '/workspace',
+          permission: 'read_write',
+        },
+      ]),
+    };
+    const node = createToolDispatchNode(ctx);
+
+    try {
+      const result = await node(
+        makeState({
+          sessionId: 'session-bash-preview',
+          runId: 'run-bash-preview',
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [
+              {
+                id: 'tc-bash-preview',
+                name: 'sys_bash',
+                args: { command: 'touch /workspace/generated/report.md' },
+              },
+            ],
+          },
+        }),
+      );
+
+      expect(result.halted).toBe(true);
+      expect(emitted).toContainEqual(
+        expect.objectContaining({
+          type: 'approval_required',
+          argsPreview: expect.objectContaining({
+            command: 'touch /workspace/generated/report.md',
+            __policy: expect.objectContaining({
+              category: 'workspace_write',
+              decision: 'approval_required',
+              toolId: 'sys_bash',
+              target: 'touch /workspace/generated/report.md',
+            }),
+          }),
+        }),
+      );
+      expect(JSON.stringify(emitted)).not.toContain(realWorkspace);
+      expect(approvalRequests.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          args: expect.objectContaining({
+            command: 'touch /workspace/generated/report.md',
+            __policy: expect.objectContaining({
+              category: 'workspace_write',
+              decision: 'approval_required',
+              target: 'touch /workspace/generated/report.md',
+            }),
+          }),
+          executionPayloadJson: JSON.stringify({
+            toolCallId: 'tc-bash-preview',
+            toolName: 'sys_bash',
+            args: { command: `touch ${join(realWorkspace, 'generated', 'report.md')}` },
+          }),
+        }),
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
   });
 
   it('blocks mutating shell commands while AGENTS.md onboarding is not approved', async () => {
@@ -479,9 +573,13 @@ describe('toolDispatchNode', () => {
       rmSync(workspace, { recursive: true, force: true });
     }
 
-    expect(nativeExecutor).toHaveBeenCalledWith('sys_bash', {
-      command: 'ls /workspace/generated',
-    });
+    expect(nativeExecutor).toHaveBeenCalledWith(
+      'sys_bash',
+      {
+        command: 'ls /workspace/generated',
+      },
+      { approvalGranted: true },
+    );
   });
 
   it('does not rewrite non-path args that happen to equal a path value', async () => {
@@ -620,7 +718,182 @@ describe('toolDispatchNode', () => {
     }
   });
 
-  it('rejects tool not in agent allowlist', async () => {
+  it('denies destructive shell commands before creating an approval request', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: '', stderr: '', exitCode: 0 },
+    });
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(makeApprovalRequest()),
+    };
+    const logDenied = vi.fn();
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied,
+      logPendingApproval: vi.fn(),
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvalRequests,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-shell-policy-denied',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-shell-denied', name: 'sys_bash', args: { command: 'rm -rf data' } }],
+        },
+      }),
+    );
+
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(approvalRequests.create).not.toHaveBeenCalled();
+    expect(logDenied).toHaveBeenCalledWith(
+      'sys_bash',
+      { command: 'rm -rf data' },
+      'agent-1',
+      'session-shell-policy-denied',
+      expect.stringContaining('Recursive removal commands are blocked'),
+      'high',
+    );
+    expect(JSON.parse(result.messages![0]!.content)).toMatchObject({
+      error: 'COMMAND_POLICY_DENIED',
+      message: expect.stringContaining('Recursive removal commands are blocked'),
+    });
+  });
+
+  it('uses command policy reasons for shell approval prompts', async () => {
+    const nativeExecutor: NativeToolExecutor = vi.fn().mockResolvedValue({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: { stdout: '', stderr: '', exitCode: 0 },
+    });
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(makeApprovalRequest()),
+    };
+    const logPendingApproval = vi.fn();
+    const auditLog = {
+      logStart: vi.fn(),
+      logComplete: vi.fn(),
+      logDenied: vi.fn(),
+      logPendingApproval,
+    } satisfies ToolAuditLogger;
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: nativeExecutor,
+      approvalRequests,
+      auditLog,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-shell-policy-approval',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-shell-write', name: 'sys_bash', args: { command: 'touch notes.md' } }],
+        },
+      }),
+    );
+
+    expect(result.halted).toBe(true);
+    expect(nativeExecutor).not.toHaveBeenCalled();
+    expect(approvalRequests.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'sys_bash',
+        args: expect.objectContaining({
+          command: 'touch notes.md',
+          __policy: expect.objectContaining({
+            category: 'workspace_write',
+            decision: 'approval_required',
+            toolId: 'sys_bash',
+            target: 'touch notes.md',
+          }),
+        }),
+        riskTier: 'high',
+      }),
+    );
+    expect(logPendingApproval).toHaveBeenCalledWith(
+      'sys_bash',
+      { command: 'touch notes.md' },
+      'agent-1',
+      'session-shell-policy-approval',
+      'high',
+    );
+    expect(result.trace).toContainEqual(
+      expect.objectContaining({ type: 'tool_approval_required', toolId: 'sys_bash' }),
+    );
+  });
+
+  it('requests approval for a registered tool not in the agent allowlist when workspace policy allows it', async () => {
+    const emitted: Output[] = [];
+    const approvalRequests = {
+      create: vi.fn().mockResolvedValue(
+        makeApprovalRequest({
+          toolName: 'publish',
+          argsJson:
+            '{"repo":"agent-platform","__policy":{"category":"unknown","decision":"approval_required","reason":"Tool is registered but not auto-approved by the agent allowlist.","toolId":"publish","outsideAgentAllowlist":true}}',
+        }),
+      ),
+    };
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: [], allowedMcpServerIds: [] }),
+      tools: [makeTool({ id: 'publish', name: 'Publish', riskTier: 'high' })],
+      mcpManager: makeMcpManager(),
+      emitter: { emit: (event) => emitted.push(event), end: vi.fn() },
+      approvalRequests,
+    };
+    const node = createToolDispatchNode(ctx);
+
+    const result = await node(
+      makeState({
+        sessionId: 'session-unallowlisted-tool',
+        llmOutput: {
+          kind: 'tool_calls',
+          calls: [{ id: 'tc-3', name: 'publish', args: { repo: 'agent-platform' } }],
+        },
+      }),
+    );
+
+    expect(result.halted).toBe(true);
+    expect(approvalRequests.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'publish',
+        riskTier: 'high',
+        args: expect.objectContaining({
+          repo: 'agent-platform',
+          __policy: expect.objectContaining({
+            category: 'unknown',
+            outsideAgentAllowlist: true,
+          }),
+        }),
+        executionPayloadJson: JSON.stringify({
+          toolCallId: 'tc-3',
+          toolName: 'publish',
+          args: { repo: 'agent-platform' },
+        }),
+      }),
+    );
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: 'approval_required',
+        toolName: 'publish',
+        argsPreview: expect.objectContaining({
+          __policy: expect.objectContaining({ outsideAgentAllowlist: true }),
+        }),
+      }),
+    );
+  });
+
+  it('keeps missing tools on capability recovery instead of approval', async () => {
     const ctx: ToolDispatchContext = {
       agent: makeAgent({ allowedToolIds: [], allowedMcpServerIds: [] }),
       mcpManager: makeMcpManager(),
@@ -1279,5 +1552,70 @@ describe('toolDispatchNode', () => {
     expect(result2.trace).toContainEqual(
       expect.objectContaining({ type: 'rate_limit_hit', toolId: 'echo' }),
     );
+  });
+
+  it('maps git changed files to workspace resource events', () => {
+    const events = workspaceResourceEventsForToolOutput(
+      'sys_git_changed_files',
+      {
+        type: 'tool_result',
+        toolId: 'sys_git_changed_files',
+        data: {
+          ok: true,
+          result: {
+            files: [{ path: 'src/index.ts', status: 'M', staged: false, unstaged: true }],
+          },
+        },
+      },
+      'project-1',
+      '2026-05-23T12:00:00.000Z',
+    );
+
+    expect(events).toEqual([
+      {
+        type: 'workspace_event',
+        event: {
+          type: 'resource_created',
+          action: 'open',
+          resource: {
+            uri: 'workspace://project/project-1/file/src/index.ts',
+            kind: 'file',
+            projectId: 'project-1',
+            label: 'src/index.ts',
+            createdAt: '2026-05-23T12:00:00.000Z',
+            metadata: { path: 'src/index.ts', sourceTool: 'sys_git_changed_files' },
+          },
+          metadata: { sourceTool: 'sys_git_changed_files' },
+        },
+      },
+    ]);
+  });
+
+  it('maps git diff output to a diff resource event', () => {
+    const events = workspaceResourceEventsForToolOutput(
+      'sys_git_diff',
+      {
+        type: 'tool_result',
+        toolId: 'sys_git_diff',
+        data: {
+          ok: true,
+          result: { path: 'src/index.ts', staged: true },
+        },
+      },
+      'project-1',
+      '2026-05-23T12:00:00.000Z',
+    );
+
+    expect(events[0]).toMatchObject({
+      type: 'workspace_event',
+      event: {
+        type: 'diff_created',
+        resource: {
+          uri: 'workspace://project/project-1/diff/src/index.ts',
+          kind: 'diff',
+          metadata: { path: 'src/index.ts', mode: 'staged' },
+        },
+      },
+    });
   });
 });

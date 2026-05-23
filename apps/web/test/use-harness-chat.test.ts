@@ -60,6 +60,41 @@ describe('harness chat stream parser', () => {
     expect(result).not.toHaveProperty('text');
   });
 
+  it('keeps workspace events separate from assistant text', () => {
+    const result = renderStreamEvent({
+      type: 'workspace_event',
+      event: {
+        type: 'resource_created',
+        action: 'open',
+        resource: {
+          uri: 'workspace://project/project-1/file/src/index.ts',
+          kind: 'file',
+          projectId: 'project-1',
+          label: 'src/index.ts',
+          createdAt: '2026-05-23T12:00:00.000Z',
+          metadata: { path: 'src/index.ts' },
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      workspaceEvent: {
+        type: 'resource_created',
+        action: 'open',
+        resource: {
+          uri: 'workspace://project/project-1/file/src/index.ts',
+          kind: 'file',
+          projectId: 'project-1',
+          label: 'src/index.ts',
+          createdAt: '2026-05-23T12:00:00.000Z',
+          metadata: { path: 'src/index.ts' },
+        },
+        metadata: {},
+      },
+    });
+    expect(result).not.toHaveProperty('text');
+  });
+
   it('keeps recoverable tool errors out of the global chat error', () => {
     const result = renderStreamEvent({
       type: 'error',
@@ -72,6 +107,32 @@ describe('harness chat stream parser', () => {
         type: 'error',
         code: 'WRITE_FAILED',
         message: "ENOENT: no such file or directory, open '/workspace/scratch/demo-app/src/app.ts'",
+      },
+    });
+  });
+
+  it('preserves capability recovery metadata on tool trace errors', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      code: 'TOOL_NOT_ALLOWED',
+      message: 'Tool "gh_repo_create" is not in the agent allowlist',
+      recovery: {
+        status: 'capability_missing',
+        summary: 'Repository creation needs an approved capability provider.',
+        options: [{ id: 'manual', label: 'Show manual steps', action: 'manual' }],
+      },
+    });
+
+    expect(result).toEqual({
+      toolTrace: {
+        type: 'error',
+        code: 'TOOL_NOT_ALLOWED',
+        message: 'Tool "gh_repo_create" is not in the agent allowlist',
+        recovery: {
+          status: 'capability_missing',
+          summary: 'Repository creation needs an approved capability provider.',
+          options: [{ id: 'manual', label: 'Show manual steps', action: 'manual' }],
+        },
       },
     });
   });
@@ -114,6 +175,43 @@ describe('harness chat stream parser', () => {
 
     expect(result).toEqual({
       error: 'Incorrect API key provided: [REDACTED:CREDENTIAL]',
+    });
+  });
+
+  it('normalizes internal tool-state provider errors before displaying them', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      message:
+        "Invalid parameter: messages with role 'tool' must be a response to a preceding message with 'tool_calls'.",
+    });
+
+    expect(result).toEqual({
+      error:
+        'The agent could not continue because the conversation tool state is out of sync. Start a new Project chat or retry after preparing Project instructions.',
+    });
+  });
+
+  it('normalizes missing Project instructions failures before displaying them', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      message: "ENOENT: no such file or directory, open '/Users/example/project/AGENTS.md'",
+    });
+
+    expect(result).toEqual({
+      error:
+        'Project instructions are missing. Run /init or use Generate AGENTS.md before asking the agent to edit Project files.',
+    });
+  });
+
+  it('normalizes invalid request body failures before displaying them', () => {
+    const result = renderStreamEvent({
+      type: 'error',
+      message: 'Invalid request body',
+    });
+
+    expect(result).toEqual({
+      error:
+        'The agent request could not be sent because the chat payload was invalid. Retry the message, or start a new Project chat if it persists.',
     });
   });
 

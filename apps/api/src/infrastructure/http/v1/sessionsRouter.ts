@@ -1,4 +1,10 @@
-import { SessionCreateBodySchema, SessionRecordSchema } from '@agent-platform/contracts';
+import {
+  SessionCreateBodySchema,
+  SessionProjectBindingBodySchema,
+  SessionProjectBindingResultSchema,
+  SessionRecordSchema,
+} from '@agent-platform/contracts';
+import type { SessionRecord } from '@agent-platform/contracts';
 import {
   createSession,
   deleteSession,
@@ -20,6 +26,15 @@ import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js'
 import { handleSessionResume, type ChatRouterOptions } from './chatRouter.js';
 import { parseBody, requireParam } from './routerUtils.js';
 import { buildSensorDashboardResponse, coerceSensorDashboardLimit } from './sensorDashboard.js';
+
+function reusableProjectSession(
+  sessions: readonly SessionRecord[],
+  projectId: string,
+): SessionRecord | undefined {
+  return sessions
+    .filter((session) => session.mode === 'project' && session.projectId === projectId)
+    .sort((a, b) => b.updatedAtMs - a.updatedAtMs)[0];
+}
 
 export function createSessionsRouter(
   db: DrizzleDb,
@@ -113,6 +128,42 @@ export function createSessionsRouter(
       const body = parseBody(SessionCreateBodySchema, req.body);
       const session = createSession(db, body);
       res.status(201).json({ data: session });
+    }),
+  );
+
+  router.post(
+    '/project',
+    asyncHandler(async (req, res) => {
+      const body = parseBody(SessionProjectBindingBodySchema, req.body);
+      if (!getAgent(db, body.agentId)) {
+        throw new HttpError(404, 'NOT_FOUND', 'Agent not found');
+      }
+      if (!findProject(db, body.projectId)) {
+        throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      }
+
+      const existing = reusableProjectSession(listSessions(db, body.agentId), body.projectId);
+      if (existing) {
+        res.json({
+          data: SessionProjectBindingResultSchema.parse({
+            created: false,
+            session: existing,
+          }),
+        });
+        return;
+      }
+
+      const session = createSession(db, {
+        agentId: body.agentId,
+        mode: 'project',
+        projectId: body.projectId,
+      });
+      res.status(201).json({
+        data: SessionProjectBindingResultSchema.parse({
+          created: true,
+          session,
+        }),
+      });
     }),
   );
 

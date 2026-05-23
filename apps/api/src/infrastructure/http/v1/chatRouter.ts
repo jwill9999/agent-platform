@@ -25,6 +25,7 @@ import {
   retrievePromptMemories,
   formatPromptMemoryBundle,
   findProject,
+  loadSettings,
 } from '@agent-platform/db';
 import type {
   ApprovalRequest,
@@ -32,8 +33,11 @@ import type {
   MessageRecord,
   Output,
   PromptMemoryBundle,
+  ProjectRecord,
   ProjectAccessPolicy,
   SensorAgentProfile,
+  SessionRecord,
+  Tool as ContractTool,
   WorkingMemoryToolSummary,
 } from '@agent-platform/contracts';
 import {
@@ -89,8 +93,26 @@ import {
   buildProjectInstructionPrompt,
   parseProjectInstructionFileReferences,
 } from '../../projects/projectInstructions.js';
+import { startProjectOnboardingDraft } from '../../projects/projectOnboardingWorkflow.js';
+import {
+  runSlashCommand,
+  type RunSlashCommandOptions,
+} from '../../../application/slashCommands/runSlashCommand.js';
+import {
+  createBuiltinSlashCommandRegistry,
+  formatInitDraftMessage,
+} from '../../../application/slashCommands/builtin.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
+
+const PROJECT_WRITE_TOOL_IDS = new Set([
+  'sys_write_file',
+  'sys_append_file',
+  'sys_copy_file',
+  'sys_create_directory',
+  'sys_download_file',
+  'coding_apply_patch',
+]);
 
 // ---------------------------------------------------------------------------
 // Request schemas
@@ -116,6 +138,12 @@ const LegacyChatStreamBodySchema = z.object({
 // ---------------------------------------------------------------------------
 
 const MAX_TITLE_LENGTH = 80;
+const defaultSlashCommandRegistry = createBuiltinSlashCommandRegistry();
+
+type SessionProjectContext = {
+  projectId?: string;
+  project?: ProjectRecord;
+};
 
 export type ChatRouterOptions = {
   globalPlugins?: readonly RegisteredPlugin[];
@@ -123,6 +151,7 @@ export type ChatRouterOptions = {
   llmReasonNode?: ReturnType<typeof createLlmReasonNode>;
   disableEvaluatorNodes?: boolean;
   sessionLock?: SessionLock;
+  slashCommands?: RunSlashCommandOptions;
   systemToolExecutorFactory?: (context: {
     sessionId: string;
     runId: string;
@@ -130,6 +159,10 @@ export type ChatRouterOptions = {
     defaultRepoPath?: string;
   }) => NativeToolExecutor;
 };
+
+function resolveSlashCommandOptions(options?: RunSlashCommandOptions): RunSlashCommandOptions {
+  return options ?? { registry: defaultSlashCommandRegistry };
+}
 
 /** Derive a human-readable session title from the first user message. */
 function deriveSessionTitle(message: string): string {
@@ -489,17 +522,19 @@ function buildResumeMessages(
   sessionId: string,
   systemPrompt: string,
   toolCall: ToolCallIntent,
-): ChatMessage[] {
-  const history = sanitiseToolCallHistory(
-    listMessagesBySession(db, sessionId).map(dbRecordToChatMessage),
-  );
+): { messages: ChatMessage[]; reconstructedToolCallContext: boolean } {
+  const rawHistory = listMessagesBySession(db, sessionId).map(dbRecordToChatMessage);
+  const hasPersistedToolCallContext = hasAssistantToolCall(rawHistory, toolCall.id);
+  const history = sanitiseToolCallHistory(rawHistory);
   const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...history];
+  let reconstructedToolCallContext = false;
 
   if (!hasAssistantToolCall(messages, toolCall.id)) {
     messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
+    reconstructedToolCallContext = !hasPersistedToolCallContext;
   }
 
-  return messages;
+  return { messages, reconstructedToolCallContext };
 }
 
 function buildRejectedToolMessage(toolCall: ToolCallIntent, request: ApprovalRequest): ChatMessage {
@@ -680,6 +715,17 @@ function resolveSessionProjectPath(db: DrizzleDb, sessionId: string): string | u
   return workingMemory?.activeProject;
 }
 
+function resolveSessionProjectContext(
+  db: DrizzleDb,
+  session: SessionRecord,
+): SessionProjectContext {
+  const projectId = session.projectId;
+  if (!projectId) return {};
+
+  const project = findProject(db, projectId);
+  return project ? { projectId: project.id, project } : { projectId };
+}
+
 function resolveRuntimeWorkspace(
   db: DrizzleDb,
   sessionId: string,
@@ -726,14 +772,57 @@ function mapProjectWorkspacePaths(value: unknown, workspaceRoot: string): unknow
   );
 }
 
+function sanitizeProjectFacingText(value: string): string {
+  return value
+    .replace(/\/workspace\/([^\s`"')\]},]+)/g, '$1')
+    .replace(/\/workspace\b/g, 'the Project root');
+}
+
+function sanitizeProjectFacingOutput(event: Output): Output {
+  if (event.type === 'text') {
+    return { ...event, content: sanitizeProjectFacingText(event.content) };
+  }
+  if (event.type === 'error') {
+    return { ...event, message: sanitizeProjectFacingText(event.message) };
+  }
+  return event;
+}
+
+function projectUserFacingEmitter(
+  emitter: OutputEmitter,
+  projectContext: SessionProjectContext,
+): OutputEmitter {
+  if (!projectContext.project) return emitter;
+  return {
+    emit(event) {
+      return emitter.emit(sanitizeProjectFacingOutput(event));
+    },
+    end() {
+      emitter.end();
+    },
+  };
+}
+
+function sanitizeProjectAssistantMessages(
+  messages: ChatMessage[] | undefined,
+  projectContext: SessionProjectContext,
+): ChatMessage[] | undefined {
+  if (!projectContext.project || !messages) return messages;
+  return messages.map((message) =>
+    message.role === 'assistant'
+      ? { ...message, content: sanitizeProjectFacingText(message.content) }
+      : message,
+  );
+}
+
 function projectWorkspaceOutputExecutor(
   executor: NativeToolExecutor,
   workspaceResolution: ProjectWorkspaceResolution | undefined,
 ): NativeToolExecutor {
   if (!workspaceResolution?.ok) return executor;
-  return async (toolId, args) =>
+  return async (toolId, args, executionOptions) =>
     mapProjectWorkspacePaths(
-      await executor(toolId, args),
+      await executor(toolId, args, executionOptions),
       workspaceResolution.workspaceRoot,
     ) as Output;
 }
@@ -759,6 +848,7 @@ function createRuntimeNativeToolExecutor({
     ? workspaceResolution.defaultRepoPath
     : resolveSessionProjectPath(db, sessionId);
   const workspaceRoot = workspaceResolution?.ok ? workspaceResolution.workspaceRoot : undefined;
+  const pathJail = workspaceResolution?.ok ? new PathJail(workspaceResolution.mounts) : undefined;
   const factoryExecutor = options.systemToolExecutorFactory?.({
     sessionId,
     runId,
@@ -781,8 +871,14 @@ function createRuntimeNativeToolExecutor({
             memory: { db, sessionId, agentId: agentCtx.agent.id },
             defaultRepoPath,
             workspaceRoot,
+            pathJail,
           }
-        : { memory: { db, sessionId, agentId: agentCtx.agent.id }, defaultRepoPath, workspaceRoot },
+        : {
+            memory: { db, sessionId, agentId: agentCtx.agent.id },
+            defaultRepoPath,
+            workspaceRoot,
+            pathJail,
+          },
     ),
     workspaceResolution,
   );
@@ -815,6 +911,9 @@ function createRuntimeToolDispatchNode({
   const projectAccessPolicy = workspaceResolution?.ok
     ? workspaceResolution.accessPolicy
     : undefined;
+  const workspaceResources = workspaceResolution?.ok
+    ? { projectId: workspaceResolution.projectId }
+    : undefined;
 
   return createToolDispatchNode({
     agent: agentCtx.agent,
@@ -835,6 +934,9 @@ function createRuntimeToolDispatchNode({
     approvedToolCallIds,
     skillResolver: (id: string) => getSkill(db, id),
     projectAccessPolicy,
+    workspaceResources,
+    projectWriteBlockHandler: createProjectWriteBlockHandler(db, sessionId),
+    executionPolicy: loadSettings(db).executionPolicy,
   });
 }
 
@@ -844,6 +946,20 @@ function projectAccessPolicyForSession(
 ): ProjectAccessPolicy | undefined {
   const resolution = resolveRuntimeWorkspace(db, sessionId);
   return resolution?.ok ? resolution.accessPolicy : undefined;
+}
+
+function createProjectWriteBlockHandler(
+  db: DrizzleDb,
+  sessionId: string,
+): ((input: { reason: string }) => Promise<{ message: string } | undefined>) | undefined {
+  const session = getSession(db, sessionId);
+  if (!session?.projectId) return undefined;
+
+  return async ({ reason }) => {
+    if (reason !== 'onboarding_not_approved') return undefined;
+    const project = startProjectOnboardingDraft(db, session.projectId!);
+    return { message: formatInitDraftMessage(project.metadata['onboardingDraft']) };
+  };
 }
 
 function buildRuntimeGraph(
@@ -1032,18 +1148,19 @@ export async function handleSessionResume(
     ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
     const emitter: OutputEmitter = createNdjsonEmitter(res);
 
-    const messages = buildResumeMessages(
+    const projectContext = resolveSessionProjectContext(db, session);
+    const resumeBuild = buildResumeMessages(
       db,
       sessionId,
       withProjectInstructionPrompt(
-        db,
-        sessionId,
+        projectContext,
         agentCtx.systemPrompt,
         JSON.stringify(toolCall.args),
       ),
       toolCall,
     );
-    const initialCount = messages.length;
+    const messages = resumeBuild.messages;
+    const initialCount = messages.length - (resumeBuild.reconstructedToolCallContext ? 1 : 0);
 
     let resumeMessages: ChatMessage[];
     let nativeToolExecutor: NativeToolExecutor | undefined;
@@ -1054,6 +1171,14 @@ export async function handleSessionResume(
         code: 'APPROVAL_REJECTED',
         message: 'Human rejected tool execution.',
       });
+      createAuditLog(db).logRejectedApproval(
+        toolCall.name,
+        toolCall.args,
+        agentCtx.agent.id,
+        sessionId,
+        'Human rejected tool execution.',
+        approval.riskTier,
+      );
     } else {
       nativeToolExecutor = createRuntimeNativeToolExecutor({
         db,
@@ -1111,14 +1236,18 @@ export async function handleSessionResume(
       configurable: { thread_id: sessionId, signal },
     });
 
-    persistNewMessages(db, sessionId, finalState?.messages, initialCount);
+    const persistedMessages = sanitizeProjectAssistantMessages(
+      finalState?.messages,
+      projectContext,
+    );
+    persistNewMessages(db, sessionId, persistedMessages, initialCount);
     refreshWorkingMemory({
       db,
       sessionId,
       agentId: session.agentId,
       runId,
       userMessage: 'Resume reviewed tool call.',
-      newMessages: finalState?.messages?.slice(initialCount) ?? [],
+      newMessages: persistedMessages?.slice(initialCount) ?? [],
     });
     await safePluginCall(() =>
       agentCtx.pluginDispatcher.onTaskEnd({ sessionId, runId, taskId: runId, ok: true }),
@@ -1150,6 +1279,10 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
       const session = getSession(db, sessionId);
       if (!session) throw new HttpError(404, 'NOT_FOUND', 'Session not found');
 
+      if (await handleSlashCommandMessage(db, options, sessionLock, session, message, res)) {
+        return;
+      }
+
       const agentCtx = await loadAgentContext(db, session.agentId, {
         globalPlugins: options.globalPlugins,
       });
@@ -1179,7 +1312,11 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
         );
 
         ({ timeoutId, heartbeatId } = startRuntimeResponse(req, res, controller, timeoutMs));
-        const emitter: OutputEmitter = createNdjsonEmitter(res);
+        const projectContext = resolveSessionProjectContext(db, session);
+        const emitter: OutputEmitter = projectUserFacingEmitter(
+          createNdjsonEmitter(res),
+          projectContext,
+        );
         const dispatcher = agentCtx.pluginDispatcher;
 
         await emitTaskStart(agentCtx, sessionId, runId);
@@ -1188,8 +1325,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
 
         const { messages, dropped, contextTokens, memoryBundle } = buildConversationMessages(
           db,
-          sessionId,
-          session.agentId,
+          session,
           message,
           agentCtx.systemPrompt,
           agentCtx.agent.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
@@ -1210,14 +1346,18 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           configurable: { thread_id: sessionId, signal },
         });
 
-        persistNewMessages(db, sessionId, finalState?.messages, messages.length);
+        const persistedMessages = sanitizeProjectAssistantMessages(
+          finalState?.messages,
+          projectContext,
+        );
+        persistNewMessages(db, sessionId, persistedMessages, messages.length);
         refreshWorkingMemory({
           db,
           sessionId,
           agentId: session.agentId,
           runId,
           userMessage: message,
-          newMessages: finalState?.messages?.slice(messages.length) ?? [],
+          newMessages: persistedMessages?.slice(messages.length) ?? [],
         });
         await safePluginCall(() =>
           dispatcher.onTaskEnd({
@@ -1275,6 +1415,53 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
   return router;
 }
 
+async function handleSlashCommandMessage(
+  db: DrizzleDb,
+  options: ChatRouterOptions,
+  sessionLock: SessionLock,
+  session: SessionRecord,
+  message: string,
+  res: Response,
+): Promise<boolean> {
+  if (!message.trimStart().startsWith('/')) return false;
+
+  const release = await sessionLock.acquire(session.id);
+  try {
+    const slashCommand = runSlashCommand(
+      message,
+      {
+        session,
+        ...resolveSessionProjectContext(db, session),
+        startProjectOnboarding: (projectId) => startProjectOnboardingDraft(db, projectId),
+      },
+      resolveSlashCommandOptions(options.slashCommands),
+    );
+    if (slashCommand.kind === 'handled') {
+      persistSlashCommandMessages(db, session.id, message, slashCommand.message);
+      prepareNdjsonResponse(res);
+      const emitter: OutputEmitter = createNdjsonEmitter(res);
+      await emitter.emit({ type: 'text', content: slashCommand.message });
+      if (!res.writableEnded) res.end();
+      return true;
+    }
+    return false;
+  } finally {
+    release();
+  }
+}
+
+function persistSlashCommandMessages(
+  db: DrizzleDb,
+  sessionId: string,
+  userMessage: string,
+  assistantMessage: string,
+): void {
+  withTransaction(db, (tx) => {
+    appendMessage(tx, { sessionId, role: 'user', content: userMessage });
+    appendMessage(tx, { sessionId, role: 'assistant', content: assistantMessage });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // State builders (extracted for readability)
 // ---------------------------------------------------------------------------
@@ -1288,8 +1475,7 @@ function prepareNdjsonResponse(res: Response): void {
 
 function buildConversationMessages(
   db: DrizzleDb,
-  sessionId: string,
-  agentId: string,
+  session: SessionRecord,
   newMessage: string,
   systemPrompt: string,
   contextWindow: ContextWindow,
@@ -1300,15 +1486,16 @@ function buildConversationMessages(
   memoryBundle: PromptMemoryBundle;
 } {
   return withTransaction(db, (tx) => {
+    const sessionId = session.id;
     const priorMessages = listMessagesBySession(tx, sessionId);
     appendMessage(tx, { sessionId, role: 'user', content: newMessage });
     const workingMemory = getWorkingMemoryArtifact(tx, sessionId);
-    const session = getSession(tx, sessionId);
+    const projectContext = resolveSessionProjectContext(tx, session);
     const memoryBundle = retrievePromptMemories(tx, {
       scope: {
         sessionId,
-        agentId,
-        projectId: session?.projectId ?? workingMemory?.projectId ?? workingMemory?.activeProject,
+        agentId: session.agentId,
+        projectId: projectContext.projectId,
       },
       query: newMessage,
     });
@@ -1318,8 +1505,7 @@ function buildConversationMessages(
     const counter = createApproximateCounter();
     const effectiveSystemPrompt = withPromptMemoryBundle(
       withProjectInstructionPrompt(
-        tx,
-        sessionId,
+        projectContext,
         withWorkingMemoryPrompt(systemPrompt, workingMemory?.summary),
         newMessage,
       ),
@@ -1340,14 +1526,11 @@ function projectScopePath(message: string): string | undefined {
 }
 
 function withProjectInstructionPrompt(
-  db: DrizzleDb,
-  sessionId: string,
+  projectContext: SessionProjectContext,
   systemPrompt: string,
   message: string,
 ): string {
-  const session = getSession(db, sessionId);
-  if (!session?.projectId) return systemPrompt;
-  const project = findProject(db, session.projectId);
+  const project = projectContext.project;
   const backendProjectRoot = project?.metadata['backendProjectRoot'];
   if (!project || typeof backendProjectRoot !== 'string') return systemPrompt;
   const prompt = buildProjectInstructionPrompt(
@@ -1356,24 +1539,6 @@ function withProjectInstructionPrompt(
     projectScopePath(message),
   );
   return prompt ? `${systemPrompt}\n\n${prompt}` : systemPrompt;
-}
-
-const ONBOARDING_BLOCKED_TOOL_IDS = new Set([
-  'sys_bash',
-  'sys_write_file',
-  'sys_append_file',
-  'sys_copy_file',
-  'sys_create_directory',
-  'sys_download_file',
-  'coding_apply_patch',
-]);
-
-function visibleToolsForProjectPolicy(
-  tools: readonly AgentContext['tools'][number][],
-  projectAccessPolicy?: ProjectAccessPolicy,
-) {
-  if (projectAccessPolicy?.canWrite !== false) return tools;
-  return tools.filter((tool) => !ONBOARDING_BLOCKED_TOOL_IDS.has(tool.id));
 }
 
 function buildInitialState(
@@ -1393,7 +1558,7 @@ function buildInitialState(
   const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
   const memoryBundle = contextInfo.memoryBundle;
   const sensorProfile = inferSensorAgentProfile(agentCtx);
-  const tools = [...visibleToolsForProjectPolicy(agentCtx.tools, contextInfo.projectAccessPolicy)];
+  const tools = visibleToolsForProjectPolicy(agentCtx.tools, contextInfo.projectAccessPolicy);
   return {
     trace: [
       {
@@ -1448,6 +1613,15 @@ function buildInitialState(
     sensorRepoPath: '.',
     sensorFindingCollectorResults: [],
   };
+}
+
+function visibleToolsForProjectPolicy(
+  tools: ContractTool[],
+  policy: ProjectAccessPolicy | undefined,
+): ContractTool[] {
+  if (!policy) return tools;
+  if (policy.canWrite === true && policy.writeBlockReason === undefined) return tools;
+  return tools.filter((tool) => !PROJECT_WRITE_TOOL_IDS.has(tool.id));
 }
 
 function inferSensorAgentProfile(agentCtx: AgentContext): SensorAgentProfile {

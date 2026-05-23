@@ -5,8 +5,11 @@ import type { UIMessage } from 'ai';
 import type {
   ApprovalRequest,
   ApprovalRequestStatus,
+  CapabilityRecovery,
   MessageRecord,
+  WorkspaceEvent,
 } from '@agent-platform/contracts';
+import { WorkspaceEventSchema } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
 import { parseCriticContent, type CriticEvent } from '@/lib/critic-events';
 
@@ -25,6 +28,24 @@ function redactDisplayText(text: string): string {
     (current, pattern) => current.replace(pattern, '[REDACTED:CREDENTIAL]'),
     text,
   );
+}
+
+function friendlyChatErrorMessage(message: string): string {
+  const redacted = redactDisplayText(message);
+  if (/messages with role ['"]tool['"].*tool_calls/i.test(redacted)) {
+    return 'The agent could not continue because the conversation tool state is out of sync. Start a new Project chat or retry after preparing Project instructions.';
+  }
+  if (/ENOENT: no such file or directory.*AGENTS\.md/i.test(redacted)) {
+    return 'Project instructions are missing. Run /init or use Generate AGENTS.md before asking the agent to edit Project files.';
+  }
+  if (/^Invalid request body$/i.test(redacted)) {
+    return 'The agent request could not be sent because the chat payload was invalid. Retry the message, or start a new Project chat if it persists.';
+  }
+  return redacted;
+}
+
+function failedRunMessage(errorMessage: string): string {
+  return `The agent run failed before returning a response.\n\n${friendlyChatErrorMessage(errorMessage)}`;
 }
 
 function makeTextParts(text: string): NonNullable<UIMessage['parts']> {
@@ -64,6 +85,8 @@ interface StreamEvent {
   toolName?: string;
   riskTier?: string;
   argsPreview?: unknown;
+  recovery?: unknown;
+  event?: unknown;
 }
 
 export type ApprovalRequiredStreamEvent = {
@@ -95,7 +118,7 @@ export type ApprovalDecision = 'approve' | 'reject';
 export type ToolTraceEvent =
   | { type: 'status'; label: string }
   | { type: 'result'; toolId: string; data: unknown; status: 'success' | 'error' | 'denied' }
-  | { type: 'error'; code?: string; message: string };
+  | { type: 'error'; code?: string; message: string; recovery?: CapabilityRecovery };
 
 const BLOCKING_APPROVAL_STATUSES = new Set<ApprovalCardStatus>([
   'pending',
@@ -165,6 +188,38 @@ function isRecoverableToolErrorCode(code: unknown): code is string {
   );
 }
 
+function parseCapabilityRecovery(value: unknown): CapabilityRecovery | undefined {
+  if (!isRecord(value)) return undefined;
+  const status = value.status;
+  const summary = value.summary;
+  const options = Array.isArray(value.options) ? value.options : [];
+  if (
+    status !== 'capability_missing' &&
+    status !== 'provider_required' &&
+    status !== 'approval_escalation' &&
+    status !== 'sandbox_available'
+  ) {
+    return undefined;
+  }
+  if (typeof summary !== 'string' || summary.trim().length === 0) return undefined;
+  const parsedOptions = options.flatMap((option): CapabilityRecovery['options'] => {
+    if (!isRecord(option)) return [];
+    const { id, label, action } = option;
+    if (typeof id !== 'string' || typeof label !== 'string') return [];
+    if (
+      action !== 'approve' &&
+      action !== 'connect' &&
+      action !== 'sandbox' &&
+      action !== 'manual' &&
+      action !== 'cancel'
+    ) {
+      return [];
+    }
+    return [{ id, label, action }];
+  });
+  return { status, summary, options: parsedOptions };
+}
+
 function renderErrorEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.message !== 'string') return null;
   const { code } = o;
@@ -179,10 +234,13 @@ function renderErrorEvent(o: StreamEvent): StreamRenderResult {
     return { text: `\n\n[${code}] ${message}\n` };
   }
   if (code === 'MODEL_AUTH_FAILED') {
-    return { error: message };
+    return { error: friendlyChatErrorMessage(message) };
   }
-  if (isRecoverableToolErrorCode(code)) return { toolTrace: { type: 'error', code, message } };
-  return { error: message };
+  if (isRecoverableToolErrorCode(code)) {
+    const recovery = parseCapabilityRecovery(o.recovery);
+    return { toolTrace: { type: 'error', code, message, ...(recovery ? { recovery } : {}) } };
+  }
+  return { error: friendlyChatErrorMessage(message) };
 }
 
 export type StreamRenderResult =
@@ -191,6 +249,7 @@ export type StreamRenderResult =
   | { critic: CriticEvent }
   | { thinking: string }
   | { toolTrace: ToolTraceEvent }
+  | { workspaceEvent: WorkspaceEvent }
   | { approvalRequired: ApprovalRequiredStreamEvent }
   | null;
 
@@ -258,6 +317,10 @@ export function renderStreamEvent(o: StreamEvent): StreamRenderResult {
             },
           }
         : null;
+    case 'workspace_event': {
+      const parsed = WorkspaceEventSchema.safeParse(o.event);
+      return parsed.success ? { workspaceEvent: parsed.data } : null;
+    }
     default:
       return null;
   }
@@ -282,6 +345,7 @@ async function readNdjsonStream(
   onCritic: (event: CriticEvent) => void,
   onThinking: (chunk: string) => void,
   onToolTrace: (event: ToolTraceEvent) => void,
+  onWorkspaceEvent: (event: WorkspaceEvent) => void,
   onApprovalRequired: (event: ApprovalRequiredStreamEvent) => void,
 ): Promise<void> {
   const reader = body.getReader();
@@ -296,6 +360,7 @@ async function readNdjsonStream(
     if ('text' in result) onText(result.text);
     else if ('thinking' in result) onThinking(result.thinking);
     else if ('toolTrace' in result) onToolTrace(result.toolTrace);
+    else if ('workspaceEvent' in result) onWorkspaceEvent(result.workspaceEvent);
     else if ('critic' in result) onCritic(result.critic);
     else if ('approvalRequired' in result) onApprovalRequired(result.approvalRequired);
     else onError(result.error);
@@ -404,6 +469,9 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
   const [toolEventsByMessage, setToolEventsByMessage] = useState<Record<string, ToolTraceEvent[]>>(
     {},
   );
+  const [workspaceEventsByMessage, setWorkspaceEventsByMessage] = useState<
+    Record<string, WorkspaceEvent[]>
+  >({});
   const [approvalEventsByMessage, setApprovalEventsByMessage] = useState<
     Record<string, ApprovalCardState[]>
   >({});
@@ -421,6 +489,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setCriticEventsByMessage({});
       setThinkingByMessage({});
       setToolEventsByMessage({});
+      setWorkspaceEventsByMessage({});
       setApprovalEventsByMessage({});
       return;
     }
@@ -429,6 +498,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       setCriticEventsByMessage({});
       setThinkingByMessage({});
       setToolEventsByMessage({});
+      setWorkspaceEventsByMessage({});
       setApprovalEventsByMessage({});
       return;
     }
@@ -496,6 +566,13 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     });
   }, []);
 
+  const appendWorkspaceEvent = useCallback((id: string, event: WorkspaceEvent) => {
+    setWorkspaceEventsByMessage((prev) => {
+      const existing = prev[id] ?? [];
+      return { ...prev, [id]: [...existing, event] };
+    });
+  }, []);
+
   const appendApprovalRequired = useCallback((id: string, event: ApprovalRequiredStreamEvent) => {
     setApprovalEventsByMessage((prev) => {
       const existing = prev[id] ?? [];
@@ -558,11 +635,18 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         },
         (chunk) => appendThinking(assistantId, chunk),
         (event) => appendToolTrace(assistantId, event),
+        (event) => appendWorkspaceEvent(assistantId, event),
         (event) => appendApprovalRequired(assistantId, event),
       );
       return { text: accumulated, errorMessage: streamErrorMessage };
     },
-    [appendApprovalRequired, appendCriticEvent, appendThinking, appendToolTrace],
+    [
+      appendApprovalRequired,
+      appendCriticEvent,
+      appendThinking,
+      appendToolTrace,
+      appendWorkspaceEvent,
+    ],
   );
 
   const sendMessage = useCallback(
@@ -600,7 +684,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
         const finalText =
           result.text.trim() || !result.errorMessage
             ? result.text
-            : `The agent run failed before returning a response.\n\n${result.errorMessage}`;
+            : failedRunMessage(result.errorMessage);
 
         // Publish a single final answer for the turn after all revisions/streaming settle.
         updateAssistantMessage(assistantId, finalText);
@@ -614,7 +698,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           return prev;
         });
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(friendlyChatErrorMessage(e instanceof Error ? e.message : String(e)));
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         setCriticEventsByMessage((prev) => {
           if (!(assistantId in prev)) return prev;
@@ -629,6 +713,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           return next;
         });
         setToolEventsByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
+        setWorkspaceEventsByMessage((prev) => {
           if (!(assistantId in prev)) return prev;
           const next = { ...prev };
           delete next[assistantId];
@@ -687,7 +777,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           accumulated =
             result.text.trim() || !result.errorMessage
               ? result.text
-              : `The agent run failed before returning a response.\n\n${result.errorMessage}`;
+              : failedRunMessage(result.errorMessage);
         }
 
         updateAssistantMessage(assistantId, accumulated);
@@ -713,6 +803,12 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
           delete next[assistantId];
           return next;
         });
+        setWorkspaceEventsByMessage((prev) => {
+          if (!(assistantId in prev)) return prev;
+          const next = { ...prev };
+          delete next[assistantId];
+          return next;
+        });
       } finally {
         setStatus('ready');
       }
@@ -730,6 +826,7 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
     criticEventsByMessage,
     thinkingByMessage,
     toolEventsByMessage,
+    workspaceEventsByMessage,
     approvalEventsByMessage,
     hasPendingApproval,
   };

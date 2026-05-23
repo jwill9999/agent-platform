@@ -27,6 +27,17 @@ function backendProjectMetadata(projectRoot: string, onboardingState: TestOnboar
   };
 }
 
+function readonlyProjectMetadata(projectRoot: string) {
+  return {
+    backendProjectRoot: projectRoot,
+    repositoryRoot: projectRoot,
+    projectRoot: '/workspace',
+    capabilityState: 'readonly',
+    onboardingState: 'approved',
+    defaultAgentProfile: 'coding',
+  };
+}
+
 function unavailableProjectSession(db: TestDb) {
   const project = createProject(db, {
     name: 'Unavailable Project',
@@ -131,6 +142,38 @@ describe('resolveSessionWorkspace', () => {
         canInspect: true,
         canWrite: true,
       },
+    });
+  });
+
+  it('resolves readonly Projects with read-only mounts and blocked writes', () => {
+    const projectRoot = realpathSync(mkdtempSync(join(tmpRoot, 'project-')));
+    const project = createProject(opened.db, {
+      name: 'Readonly Project',
+      workspaceKey: projectRoot,
+      metadata: readonlyProjectMetadata(projectRoot),
+    });
+    const session = createSession(opened.db, {
+      agentId: 'agent-1',
+      mode: 'project',
+      projectId: project.id,
+    });
+
+    expect(resolveSessionWorkspace(opened.db, session.id)).toMatchObject({
+      ok: true,
+      workspaceRoot: projectRoot,
+      accessPolicy: {
+        canInspect: true,
+        canWrite: false,
+        writeBlockReason: 'readonly_capability',
+      },
+      mounts: [
+        {
+          label: 'workspace',
+          hostPath: projectRoot,
+          containerPath: '/workspace',
+          permission: 'read_only',
+        },
+      ],
     });
   });
 

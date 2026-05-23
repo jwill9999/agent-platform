@@ -177,23 +177,20 @@ describe('BashGuard', () => {
   // Unknown / not-allowed commands
   // -----------------------------------------------------------------------
   describe('unknown commands', () => {
-    it('blocks unknown commands not on allowlist', () => {
+    it('allows unknown commands to reach the policy classifier', () => {
       const result = validateBashCommand('some_unknown_tool --flag');
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('not in the allowed command list');
-      expect(result.matched).toBe('some_unknown_tool');
+      expect(result.allowed).toBe(true);
     });
 
-    it('blocks rm (not on default allowlist)', () => {
+    it('allows non-recursive rm to reach the policy classifier', () => {
       const result = validateBashCommand('rm file.txt');
-      expect(result.allowed).toBe(false);
-      expect(result.matched).toBe('rm');
+      expect(result.allowed).toBe(true);
     });
 
     it('blocks chown', () => {
       const result = validateBashCommand('chown root:root file.txt');
       expect(result.allowed).toBe(false);
-      expect(result.matched).toBe('chown');
+      expect(result.reason).toContain('chown');
     });
 
     it('rejects empty command', () => {
@@ -213,16 +210,14 @@ describe('BashGuard', () => {
   // Chain / pipe validation
   // -----------------------------------------------------------------------
   describe('chain validation', () => {
-    it('blocks if any segment uses a non-allowed command', () => {
+    it('allows non-hard-blocked chained commands to reach the policy classifier', () => {
       const result = validateBashCommand('ls -la && rm -f secret.txt');
-      expect(result.allowed).toBe(false);
-      expect(result.matched).toBe('rm');
+      expect(result.allowed).toBe(true);
     });
 
-    it('blocks chained pipe to blocked command', () => {
+    it('allows unknown piped commands to reach the policy classifier', () => {
       const result = validateBashCommand('cat file.txt | some_evil_cmd');
-      expect(result.allowed).toBe(false);
-      expect(result.matched).toBe('some_evil_cmd');
+      expect(result.allowed).toBe(true);
     });
 
     it('allows fully valid chains', () => {

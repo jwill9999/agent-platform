@@ -33,7 +33,7 @@ const observabilityLog = createLogger('api:observability');
 export type V1RouterOptions = {
   chat?: Pick<
     ChatRouterOptions,
-    'llmReasonNode' | 'disableEvaluatorNodes' | 'systemToolExecutorFactory'
+    'llmReasonNode' | 'disableEvaluatorNodes' | 'sessionLock' | 'systemToolExecutorFactory'
   >;
   observabilityStore?: ObservabilityStore;
 };
@@ -52,7 +52,7 @@ export function createV1Router(db: DrizzleDb, options: V1RouterOptions = {}): Ro
   ];
 
   const rateLimiter = createDynamicRateLimiter();
-  const sessionLock = createInProcessSessionLock();
+  const sessionLock = options.chat?.sessionLock ?? createInProcessSessionLock();
 
   // Hydrate rate limiter from persisted settings on startup
   const persisted = loadSettings(db);

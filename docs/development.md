@@ -2,11 +2,15 @@
 
 ## Prerequisites
 
-- [Docker](https://www.docker.com/) — **required** for all development (dev/prod parity)
+- [Docker](https://www.docker.com/) — **required** for the normal API/web development and CI workflow
 - [Node.js](https://nodejs.org/) 20+ — host-side quality gates only (tests, lint, typecheck)
 - [pnpm](https://pnpm.io/) 9+ — `corepack enable && corepack prepare pnpm@9.15.4 --activate`
 
-> **All runtime commands use Docker.** Never run the API or web app locally. The Makefile targets build images, start containers, and seed the database inside the running API container. Host-side Node/pnpm is only used for quality gates (tests, lint, typecheck).
+> **Default development runtime:** use Docker for the API/web stack. The Electron desktop runtime is
+> a separate macOS-first foundation path for native app behavior and local Project access. See
+> [Desktop Runtime](desktop-runtime.md) and
+> [Electron Development Workflow](development/electron-development-workflow.md) before using
+> Electron commands.
 
 ## Quick Start
 
@@ -166,6 +170,43 @@ Troubleshooting:
 - If local host-side integration tests bind a fixture HTTP server, run them
   outside restricted sandboxes or with approval for local loopback binding.
 
+## Electron Desktop Runtime
+
+The Electron desktop app is developed in `apps/desktop`. It is separate from the Docker Compose
+runtime and is currently macOS-first.
+
+Use Docker for normal API/web development and CI. Use Electron when validating desktop-only
+behavior such as the app shell, built renderer loading, local backend supervision, OS app data
+paths, native folder access, and future desktop Project flows.
+
+Common commands:
+
+| Command                                                    | Description                                               |
+| ---------------------------------------------------------- | --------------------------------------------------------- |
+| `pnpm --filter @agent-platform/desktop start`              | Build and launch the Electron shell                       |
+| `pnpm --filter @agent-platform/desktop start:dev-renderer` | Launch Electron against the normal web dev server         |
+| `pnpm --filter @agent-platform/desktop start:renderer`     | Build the web renderer and launch the standalone renderer |
+| `pnpm --filter @agent-platform/desktop smoke`              | Compile and smoke-test Electron startup                   |
+| `pnpm --filter @agent-platform/desktop smoke:renderer`     | Smoke-test the built standalone renderer path             |
+| `pnpm --filter @agent-platform/desktop smoke:backend`      | Smoke-test local backend supervision and readiness        |
+| `pnpm --filter @agent-platform/desktop test`               | Run desktop unit tests                                    |
+| `pnpm --filter @agent-platform/desktop typecheck`          | Typecheck desktop code                                    |
+| `pnpm --filter @agent-platform/desktop lint`               | Lint desktop code                                         |
+
+Desktop runtime storage is resolved through Electron OS paths:
+
+- app data/config/data: `app.getPath('userData')`,
+- logs: `app.getPath('logs')`,
+- temp/runtime scratch: `app.getPath('temp')`.
+
+Managed backend logs are written as `backend.stdout.log` and `backend.stderr.log` in the resolved
+desktop logs directory. The desktop app must not copy user Project folders into app data; Project
+folders remain user-owned files outside the app data boundary.
+
+See [Desktop Runtime](desktop-runtime.md) for the full desktop runtime reference and
+[Electron Development Workflow](development/electron-development-workflow.md) for when Electron is
+required during development, manual QA, and task closeout.
+
 ### Host-Side Quality Gates
 
 These run on the host (not in Docker) for fast feedback:
@@ -185,6 +226,7 @@ These run on the host (not in Docker) for fast feedback:
 agent-platform/
 ├── apps/
 │   ├── api/              # Express REST API (Dockerfile → port 3000)
+│   ├── desktop/          # Electron shell and desktop runtime foundation
 │   └── web/              # Next.js chat UI (Dockerfile.web → port 3001)
 ├── packages/
 │   ├── contracts/        # Shared Zod schemas

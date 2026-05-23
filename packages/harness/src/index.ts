@@ -27,6 +27,21 @@ export type {
 } from './types.js';
 export { contractToolsToDefinitions } from './types.js';
 export {
+  commandRunnerResultToOutput,
+  createHostShellCommandRunner,
+  createProjectScopedCommandRunner,
+  type CommandEnvironmentPolicy,
+  type CommandRunner,
+  type CommandRunnerAuditMetadata,
+  type CommandRunnerCompletedResult,
+  type CommandRunnerDeniedResult,
+  type CommandRunnerApprovalRequiredResult,
+  type CommandRunnerRequest,
+  type CommandRunnerResult,
+  type CommandRunnerWorkspace,
+  type ProjectScopedCommandRunnerOptions,
+} from './commandRunner.js';
+export {
   llmReasonNode,
   createLlmReasonNode,
   type LlmReasonNodeOptions,
@@ -122,7 +137,7 @@ export {
   resolveWorkspaceConfig,
 } from './security/index.js';
 export type { HostPlatform, WorkspaceConfig, WorkspaceEnv } from './security/index.js';
-export { validateBashCommand, buildAllowlist } from './security/index.js';
+export { validateBashCommand, buildAllowlist, classifyBashCommand } from './security/index.js';
 export { validateUrl } from './security/index.js';
 export { redactCredentials } from './security/index.js';
 export { ToolRateLimiter } from './security/index.js';
@@ -132,6 +147,7 @@ export type {
   PathOperation,
   PathValidationResult,
   BashValidationResult,
+  BashCommandPolicyDecision,
   UrlValidationResult,
   RateLimitResult,
 } from './security/index.js';

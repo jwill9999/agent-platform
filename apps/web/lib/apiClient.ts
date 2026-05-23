@@ -47,10 +47,14 @@ export async function apiGet<T>(path: string): Promise<T | undefined> {
   return json.data;
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T | undefined> {
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  init: { headers?: HeadersInit } = {},
+): Promise<T | undefined> {
   const res = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...init.headers },
     body: JSON.stringify(body),
   });
   const text = await res.text();

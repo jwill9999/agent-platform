@@ -26,19 +26,6 @@ export type WorkbenchBranchTab = {
   isDirty: boolean;
 };
 
-const UNAVAILABLE_PROVIDERS: WorkbenchBranchProviderState[] = [
-  {
-    label: 'Git branch',
-    status: 'unavailable',
-    description: 'Repository and branch discovery is not connected in this workbench yet.',
-  },
-  {
-    label: 'Remote checks',
-    status: 'unavailable',
-    description: 'GitHub, CodeQL, SonarQube, and review feedback belong to branch feedback status.',
-  },
-];
-
 export function buildWorkbenchBranchSummary({
   workspaceName,
   openTabs,
@@ -73,10 +60,10 @@ export function buildWorkbenchBranchSummary({
         : 'Dirty';
 
   return {
-    workspaceName: workspaceName ?? 'No folder open',
-    branchLabel: 'Branch not connected',
+    workspaceName: workspaceName ?? 'No Project open',
+    branchLabel: 'Project activity',
     stateLabel,
     changedFiles: files,
-    providers: UNAVAILABLE_PROVIDERS,
+    providers: [],
   };
 }

@@ -1,9 +1,9 @@
 /**
  * Bash command validation — allowlist-based guard for the sys_bash tool.
  *
- * Commands are split on shell separators (|, &&, ||, ;) and each segment's
- * leading command is checked against the allowlist. Blocked patterns (rm -rf /,
- * sudo, curl|sh, etc.) are rejected before the allowlist check.
+ * Blocks known-unsafe shell patterns before the command policy classifier runs.
+ * Unknown commands are intentionally allowed through this guard so the policy
+ * layer can require HITL approval instead of failing on a static allowlist.
  */
 
 // ---------------------------------------------------------------------------
@@ -181,6 +181,8 @@ const BLOCKED_PATTERNS: readonly BlockedPattern[] = [
   { pattern: /\/etc\/passwd/, reason: 'Blocked: access to /etc/passwd' },
 
   // chmod world-writable / setuid
+  { pattern: /\bchown\b/, reason: 'Blocked: chown is not allowed' },
+  { pattern: /\bchgrp\b/, reason: 'Blocked: chgrp is not allowed' },
   { pattern: /\bchmod\s+[0-7]*7[0-7]{2}\b/, reason: 'Blocked: chmod world-writable' },
   { pattern: /\bchmod\s+[ug]\+s\b/, reason: 'Blocked: chmod setuid/setgid' },
 
@@ -302,7 +304,11 @@ export function validateBashCommand(
     }
   }
 
-  // Phase 2: allowlist check per shell segment
+  // Phase 2: optional compatibility allowlist check per shell segment. The
+  // default path no longer blocks unknown commands; callers that pass an
+  // explicit allowlist still get strict validation.
+  if (!allowlist) return { allowed: true };
+
   const effectiveAllowlist = allowlist ?? buildAllowlist();
   const leadingCommands = extractLeadingCommands(trimmed);
 

@@ -1,7 +1,23 @@
 'use client';
 
-import { useState, useRef, useCallback, type KeyboardEvent, type DragEvent } from 'react';
-import { Send, Loader2, Paperclip, X, FileText, AlertTriangle } from 'lucide-react';
+import {
+  useState,
+  useRef,
+  useCallback,
+  type KeyboardEvent,
+  type DragEvent,
+  type ReactNode,
+} from 'react';
+import {
+  Send,
+  Loader2,
+  Paperclip,
+  X,
+  FileText,
+  AlertTriangle,
+  Image,
+  FileWarning,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import { useAgentModelContext } from './agent-model-context';
@@ -11,6 +27,7 @@ import { ChatModelSelector } from './chat-model-selector';
 interface ChatInputProps {
   onSend: (text: string) => void;
   isLoading: boolean;
+  placeholder?: string;
   /** When false, sending is blocked (e.g. session not ready yet). */
   canSend?: boolean;
   /** Optional status text shown below the composer. */
@@ -25,12 +42,15 @@ interface ChatInputProps {
   onClearAttachments?: () => void;
   /** Sanitisation warnings from file validation. */
   attachmentWarnings?: string[];
+  /** Optional controls rendered beside the agent/model selectors. */
+  selectorAccessory?: ReactNode;
   // agent/model selector props removed; use context via `useAgentModelContext()`
 }
 
 export function ChatInput({
   onSend,
   isLoading,
+  placeholder,
   canSend = true,
   statusText,
   attachments,
@@ -38,6 +58,7 @@ export function ChatInput({
   onRemoveAttachment,
   onClearAttachments,
   attachmentWarnings,
+  selectorAccessory,
   // agent/model props removed — use context
 }: Readonly<ChatInputProps>) {
   const [input, setInput] = useState('');
@@ -157,7 +178,7 @@ export function ChatInput({
                   key={`${att.name}-${i}`}
                   className="inline-flex items-center gap-1 text-xs bg-secondary text-secondary-foreground rounded-lg px-2 py-1 max-w-[200px]"
                 >
-                  <FileText className="h-3 w-3 flex-shrink-0" />
+                  <AttachmentIcon kind={att.kind} />
                   <span className="truncate">{att.name}</span>
                   {onRemoveAttachment && (
                     <button
@@ -229,7 +250,8 @@ export function ChatInput({
               }}
               onKeyDown={handleKeyDown}
               placeholder={
-                onAddFiles ? 'Send a message... (drop files to attach)' : 'Send a message...'
+                placeholder ??
+                (onAddFiles ? 'Send a message... (drop files to attach)' : 'Send a message...')
               }
               className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground resize-none outline-none text-sm leading-relaxed max-h-[200px]"
               rows={1}
@@ -268,6 +290,7 @@ export function ChatInput({
                 onSelect={ctx.onSelectModelConfig!}
                 disabled={ctx.selectorDisabled || isLoading}
               />
+              {selectorAccessory}
             </div>
           </div>
         </section>
@@ -280,4 +303,10 @@ export function ChatInput({
       </form>
     </div>
   );
+}
+
+function AttachmentIcon({ kind }: Readonly<{ kind: AttachmentEntry['kind'] }>) {
+  if (kind === 'image') return <Image className="h-3 w-3 flex-shrink-0" />;
+  if (kind === 'unsupported') return <FileWarning className="h-3 w-3 flex-shrink-0" />;
+  return <FileText className="h-3 w-3 flex-shrink-0" />;
 }

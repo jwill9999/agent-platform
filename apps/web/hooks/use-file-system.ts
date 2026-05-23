@@ -59,6 +59,14 @@ export interface UseFileSystemReturn {
   reconnectFolder: () => Promise<void>;
 }
 
+export interface UseFileSystemOptions {
+  /**
+   * Product surfaces should keep browser File System Access parked until Electron
+   * supplies native Project access. Tests/dev-only callers may opt in explicitly.
+   */
+  enabled?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Feature detection
 // ---------------------------------------------------------------------------
@@ -267,7 +275,8 @@ async function restorePersistedFolder(
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useFileSystem(): UseFileSystemReturn {
+export function useFileSystem(options: UseFileSystemOptions = {}): UseFileSystemReturn {
+  const enabled = options.enabled ?? true;
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -340,8 +349,8 @@ export function useFileSystem(): UseFileSystemReturn {
   useEffect(() => {
     let cancelled = false;
     const supported = isFileSystemAccessSupported();
-    setIsSupported(supported);
-    if (!supported) return;
+    setIsSupported(enabled && supported);
+    if (!enabled || !supported) return;
 
     const isCancelled = () => cancelled || userPickedFolderThisSessionRef.current;
 
@@ -366,9 +375,12 @@ export function useFileSystem(): UseFileSystemReturn {
       cancelled = true;
       globalThis.clearTimeout(timerId);
     };
-  }, [loadTree]);
+  }, [enabled, loadTree]);
 
   const reconnectFolder = useCallback(async () => {
+    if (!enabled) {
+      return;
+    }
     if (directoryPickerInFlightRef.current) {
       fsDebugLog('reconnect:prompt_already_active');
       return;
@@ -412,7 +424,9 @@ export function useFileSystem(): UseFileSystemReturn {
         return;
       }
 
-      setError('Permission was not granted. Try Open Folder again.');
+      setError(
+        'Permission was not granted. Project folder access is available in the desktop app.',
+      );
     } catch (err) {
       if (isDirectoryPromptAlreadyActiveError(err)) {
         fsDebugLog('reconnect:prompt_already_active_error');
@@ -422,9 +436,13 @@ export function useFileSystem(): UseFileSystemReturn {
       fsDebugLog('reconnect:error', message);
       setError(message);
     }
-  }, [loadTree, clearReconnectState]);
+  }, [enabled, loadTree, clearReconnectState]);
 
   const openDirectory = useCallback(async () => {
+    if (!enabled) {
+      setError('Project folder access is available in the desktop app.');
+      return;
+    }
     if (!isFileSystemAccessSupported()) {
       setError('File System Access API is not supported in this browser. Use Chrome or Edge.');
       return;
@@ -463,7 +481,7 @@ export function useFileSystem(): UseFileSystemReturn {
       directoryPickerInFlightRef.current = false;
       setIsOpeningDirectory(false);
     }
-  }, [loadTree, clearReconnectState]);
+  }, [enabled, loadTree, clearReconnectState]);
 
   const readFile = useCallback(async (node: FileNode): Promise<string> => {
     const handle = node.handle;

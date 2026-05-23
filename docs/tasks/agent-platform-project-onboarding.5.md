@@ -60,9 +60,9 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Durable instruction learnings are batched rather than written as noisy rolling updates.
-- [ ] Closeout can propose reviewable `AGENTS.md` updates.
-- [ ] Users can apply or reject update candidates.
-- [ ] Refresh/rescan can reassess instructions and flag material drift.
-- [ ] Refresh/rescan preserves non-code or mixed Project intent unless the user confirms a change.
-- [ ] Later updates are reviewable by default and blocking only when policy requires it.
+- [x] Durable instruction learnings are batched rather than written as noisy rolling updates.
+- [x] Closeout can propose reviewable `AGENTS.md` updates.
+- [x] Users can apply or reject update candidates.
+- [x] Refresh/rescan can reassess instructions and flag material drift.
+- [x] Refresh/rescan preserves non-code or mixed Project intent unless the user confirms a change.
+- [x] Later updates are reviewable by default and blocking only when policy requires it.

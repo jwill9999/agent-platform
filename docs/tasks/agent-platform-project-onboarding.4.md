@@ -8,12 +8,20 @@
 Let users review and approve initial Project instructions, and let the system auto-approve existing
 instructions only when assessment concludes they are sufficient and consistent.
 
+## Desktop Re-scope Note
+
+For desktop Product acceptance, approval and `AGENTS.md` finalization write only to the
+backend-bound Project root selected through Electron native Project access. Browser-only folder
+handles, Docker `/workspace` paths, and manually typed absolute paths are not valid acceptance paths.
+
 ## Requirements
 
 - If assessment recommends approval for existing `AGENTS.md`, the UI must show the summary/evidence
   and mark onboarding approved without requiring extra human work.
 - If onboarding produced a draft, the user must be able to review it before approval.
 - Draft approval should write or finalize root `AGENTS.md` in the Project working tree.
+- Draft approval must write through the backend Project root binding and must not infer the target
+  from chat text alone.
 - Reject/request-changes must keep onboarding in progress and preserve user feedback.
 - Approved onboarding must unlock normal code-agent write behavior from Epic 1.
 - Approval must be scoped to the Project's enabled profile/capabilities; coding write unlock applies
@@ -47,21 +55,22 @@ Keep Beads dependencies aligned with this table.
     integration/E2E gates for approval unlock behavior.
   - Focused tests: approve, reject, request-changes, approval metadata, draft finalization, and tool
     gating immediately after approval.
-  - Playwright: review a draft, reject/request changes, approve a revised draft, verify
-    `AGENTS.md` is finalized, then verify a code write is allowed and lands in the Project root.
+  - Playwright/Electron: review a draft, reject/request changes, approve a revised draft, verify
+    `AGENTS.md` is finalized through the backend-bound Project root, then verify a code write is
+    allowed and lands in that Project root.
   - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
     before closing the Bead.
 - API/use-case tests for approve, reject, request changes, and approval metadata.
-- File-write tests for finalizing draft root `AGENTS.md`.
+- File-write tests for finalizing draft root `AGENTS.md` through the selected backend-bound Project.
 - UI tests for review/approve/reject states.
 - Integration test proving approved onboarding unlocks write tools.
 - Playwright flow: user reviews draft, approves it, then asks coding agent to create a file.
 
 ## Definition Of Done
 
-- [ ] Existing sufficient `AGENTS.md` can auto-approve with visible evidence.
-- [ ] Drafted `AGENTS.md` requires user review/approval before writes unlock.
-- [ ] Approval metadata is persisted.
-- [ ] Reject/request-changes keeps onboarding in progress.
-- [ ] Approved onboarding unlocks normal Project code-agent writes and keeps all Epic 1 tool scoping.
-- [ ] Approval UI avoids runtime/backend implementation labels in primary user-facing copy.
+- [x] Existing sufficient `AGENTS.md` can auto-approve with visible evidence.
+- [x] Drafted `AGENTS.md` requires user review/approval before writes unlock.
+- [x] Approval metadata is persisted.
+- [x] Reject/request-changes keeps onboarding in progress.
+- [x] Approved onboarding unlocks normal Project code-agent writes and keeps all Epic 1 tool scoping.
+- [x] Approval UI avoids runtime/backend implementation labels in primary user-facing copy.

@@ -35,3 +35,4 @@ ADRs are sequentially numbered, four-digit, kebab-case:
 | #    | Title                                                                                                 | Status   |
 | ---- | ----------------------------------------------------------------------------------------------------- | -------- |
 | 0001 | [Tier 1 gap remediation: evaluator, DoD, observability tools, docs CI](0001-tier1-gap-remediation.md) | Accepted |
+| 0002 | [Electron desktop runtime for local Project access](0002-electron-desktop-runtime.md)                 | Accepted |

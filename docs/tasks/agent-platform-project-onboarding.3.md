@@ -8,9 +8,16 @@
 When assessment finds missing or insufficient instructions, guide the user through focused Q&A and
 revise a proposed `AGENTS.md` until the project context is clear enough to approve.
 
+## Desktop Re-scope Note
+
+For desktop Product acceptance, the onboarding dialogue is entered from a Project-bound chat/session
+created by Electron native Project access. `/init` must carry that Project context into the backend
+workflow; ordinary chat context or renderer-only file handles are not enough.
+
 ## Requirements
 
 - Onboarding dialogue must be scoped to the Project and its current assessment result.
+- Onboarding dialogue must reject or defer setup when the active session has no backend-bound Project.
 - The agent should ask focused questions one at a time when important context is missing.
 - The user can answer in normal chat.
 - The agent must use the answers plus read-only evidence to revise the draft instructions.
@@ -53,8 +60,9 @@ Keep Beads dependencies aligned with this table.
   - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
   - Focused tests: onboarding dialogue state, question/answer handling, draft revision persistence,
     and write-tool denial during onboarding.
-  - Playwright: start onboarding for a missing-instructions fixture, answer the agent's questions,
-    and assert the visible draft updates without unlocking code writes.
+  - Playwright/Electron: start onboarding for a missing-instructions fixture through a backend-bound
+    desktop Project, answer the agent's questions, and assert the visible draft updates without
+    unlocking code writes.
   - CI: open the task PR, monitor GitHub Actions checks/logs/artifacts until green, and fix failures
     before closing the Bead.
 - Unit/integration tests for onboarding dialogue state and draft revisions.
@@ -64,9 +72,9 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Missing/insufficient instructions start a collaborative onboarding Q&A flow.
-- [ ] The agent asks focused questions instead of guessing critical project facts.
-- [ ] The agent asks about intended Project use when the folder is non-code, mixed, or ambiguous.
-- [ ] User answers can revise a human-readable `AGENTS.md` draft.
-- [ ] Draft state is persisted and visible for review.
-- [ ] Code writes remain blocked throughout onboarding dialogue.
+- [x] Missing/insufficient instructions start a collaborative onboarding Q&A flow.
+- [x] The agent asks focused questions instead of guessing critical project facts.
+- [x] The agent asks about intended Project use when the folder is non-code, mixed, or ambiguous.
+- [x] User answers can revise a human-readable `AGENTS.md` draft.
+- [x] Draft state is persisted and visible for review.
+- [x] Code writes remain blocked throughout onboarding dialogue.

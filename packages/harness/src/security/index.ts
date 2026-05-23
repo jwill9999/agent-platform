@@ -11,6 +11,8 @@ export {
 export type { HostPlatform, WorkspaceConfig, WorkspaceEnv } from './workspaceConfig.js';
 export { validateBashCommand, buildAllowlist } from './bashGuard.js';
 export type { BashValidationResult } from './bashGuard.js';
+export { classifyBashCommand } from './bashCommandPolicy.js';
+export type { BashCommandPolicyDecision } from './bashCommandPolicy.js';
 export { extractBashPathAccesses, validateBashWorkspacePolicy } from './bashWorkspacePolicy.js';
 export type { BashPathAccess, BashWorkspacePolicyResult } from './bashWorkspacePolicy.js';
 export { validateUrl } from './urlGuard.js';
