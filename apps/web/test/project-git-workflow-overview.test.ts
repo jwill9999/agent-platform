@@ -6,6 +6,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  defaultRepositoryName,
   deriveGitPullRequestCreateState,
   deriveGitPublishState,
   deriveGitWorkflowOverview,
@@ -278,6 +279,15 @@ describe('deriveGitWorkflowOverview', () => {
       title: 'Pull request checks need attention',
       primaryAction: { label: 'Review checks', tab: 'checks' },
     });
+  });
+});
+
+describe('defaultRepositoryName', () => {
+  it('normalizes repository names without regex replacement', () => {
+    expect(defaultRepositoryName('  My App / Prototype  ')).toBe('my-app-prototype');
+    expect(defaultRepositoryName('...agent_platform---web...')).toBe('...agent_platform---web...');
+    expect(defaultRepositoryName('---')).toBe('new-project');
+    expect(defaultRepositoryName(undefined)).toBe('new-project');
   });
 });
 

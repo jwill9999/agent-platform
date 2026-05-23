@@ -37,6 +37,7 @@ import type {
   ProjectAccessPolicy,
   SensorAgentProfile,
   SessionRecord,
+  Tool as ContractTool,
   WorkingMemoryToolSummary,
 } from '@agent-platform/contracts';
 import {
@@ -103,6 +104,15 @@ import {
 } from '../../../application/slashCommands/builtin.js';
 import { createInProcessSessionLock, type SessionLock } from '../sessionLock.js';
 import { parseBody } from './routerUtils.js';
+
+const PROJECT_WRITE_TOOL_IDS = new Set([
+  'sys_write_file',
+  'sys_append_file',
+  'sys_copy_file',
+  'sys_create_directory',
+  'sys_download_file',
+  'coding_apply_patch',
+]);
 
 // ---------------------------------------------------------------------------
 // Request schemas
@@ -1548,6 +1558,7 @@ function buildInitialState(
   const totalMessages = messages.length - 2 + contextInfo.dropped; // exclude system + user
   const memoryBundle = contextInfo.memoryBundle;
   const sensorProfile = inferSensorAgentProfile(agentCtx);
+  const tools = visibleToolsForProjectPolicy(agentCtx.tools, contextInfo.projectAccessPolicy);
   return {
     trace: [
       {
@@ -1575,7 +1586,7 @@ function buildInitialState(
     halted: false,
     mode: 'react' as const,
     messages,
-    toolDefinitions: contractToolsToDefinitions(agentCtx.tools),
+    toolDefinitions: contractToolsToDefinitions(tools),
     llmOutput: null,
     modelConfig,
     stepCount: 0,
@@ -1602,6 +1613,14 @@ function buildInitialState(
     sensorRepoPath: '.',
     sensorFindingCollectorResults: [],
   };
+}
+
+function visibleToolsForProjectPolicy(
+  tools: ContractTool[],
+  policy: ProjectAccessPolicy | undefined,
+): ContractTool[] {
+  if (policy?.canWrite !== false) return tools;
+  return tools.filter((tool) => !PROJECT_WRITE_TOOL_IDS.has(tool.id));
 }
 
 function inferSensorAgentProfile(agentCtx: AgentContext): SensorAgentProfile {

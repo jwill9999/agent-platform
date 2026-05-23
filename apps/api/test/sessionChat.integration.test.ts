@@ -164,7 +164,7 @@ function createChatProject(
     workspaceKey?: string;
     backendProjectRoot: string;
     repositoryRoot: string;
-    capabilityState: 'backend_accessible' | 'unavailable';
+    capabilityState: 'backend_accessible' | 'readonly' | 'unavailable';
     onboardingState?: 'missing' | 'approved' | 'needs_review' | 'in_progress';
     instructionFiles?: unknown[];
   },
@@ -1352,6 +1352,39 @@ describe('POST /v1/chat (session-aware)', () => {
 
       expect(visibleToolNames).toContain('sys_write_file');
       expect(visibleToolNames).toContain('coding_apply_patch');
+    });
+  });
+
+  it('hides write tools from readonly Project chat tool definitions', async () => {
+    await withMockChatApp(dirs, async ({ app, db }) => {
+      const projectRoot = createProjectRoot(dirs);
+      const sessionId = await createProjectSession(app, db, {
+        name: 'Readonly Tool Visibility Project',
+        workspaceKey: projectRoot,
+        backendProjectRoot: projectRoot,
+        repositoryRoot: projectRoot,
+        capabilityState: 'readonly',
+        onboardingState: 'approved',
+      });
+      let visibleToolNames: string[] = [];
+
+      mockToolCalls.mockImplementationOnce((state) => {
+        visibleToolNames = state.toolDefinitions.map((tool: { name: string }) => tool.name);
+        return 'Readonly project inspected.';
+      });
+
+      await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'Inspect this project' })
+        .expect(200);
+
+      expect(visibleToolNames).toContain('sys_read_file');
+      expect(visibleToolNames).not.toContain('sys_write_file');
+      expect(visibleToolNames).not.toContain('sys_append_file');
+      expect(visibleToolNames).not.toContain('sys_copy_file');
+      expect(visibleToolNames).not.toContain('sys_create_directory');
+      expect(visibleToolNames).not.toContain('sys_download_file');
+      expect(visibleToolNames).not.toContain('coding_apply_patch');
     });
   });
 

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   DesktopTerminalService,
+  trimTrailingSlashes,
   validateDesktopTerminalCreateRequest,
   validateDesktopTerminalInputRequest,
   validateDesktopTerminalResizeRequest,
@@ -100,6 +101,12 @@ describe('desktop terminal service', () => {
         cwd: '/Users/tester',
       }),
     );
+  });
+
+  it('trims API base URL trailing slashes without regex backtracking', () => {
+    expect(trimTrailingSlashes('http://127.0.0.1:3000///')).toBe('http://127.0.0.1:3000');
+    expect(trimTrailingSlashes('http://127.0.0.1:3000')).toBe('http://127.0.0.1:3000');
+    expect(trimTrailingSlashes('///')).toBe('');
   });
 });
 
