@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Started `.4.2` Virtualization.framework VM boot lifecycle.
+- **Session:** Split `.4.2` into explicit boot-proof child tasks.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending `.4.2` VM daemon lifecycle slice.
+- **Latest commit:** pending `.4.2` child task split.
 
 ## Current State
 
@@ -118,6 +118,9 @@
   entropy, and memory balloon devices; `status` now requires a live daemon PID plus ready marker,
   and `stop` clears stale runtime state. Dummy-image smoke fails closed; `.4.2` remains open until a
   real bootable image starts and reports ready.
+- Split remaining `.4.2` work into child tasks so `.4.3` is blocked until real boot proof exists:
+  `.4.2.1` provisions a bootable arm64 Linux image, `.4.2.2` proves boot/ready status, and `.4.2.3`
+  proves daemon lifecycle reliability.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -129,9 +132,9 @@
 
 ## Next
 
-1. Continue `.4.2` by obtaining or generating a real bootable arm64 Linux image compatible with the
-   `.4.1` asset contract, then prove `start` reaches ready state and `status` reports ready only
-   while the daemon is alive.
-2. Then continue `.4.3` guest command service, `/workspace` mount, and host-path isolation proof.
+1. Start `.4.2.1`: obtain or generate a real bootable arm64 Linux image compatible with the `.4.1`
+   asset contract.
+2. Complete `.4.2.2` and `.4.2.3` before starting `.4.3`; `.4.3` is blocked until real boot and
+   daemon lifecycle evidence exists.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.
