@@ -25,6 +25,17 @@ Follow Stage 5, Stage 6, and Stage 7 in the implementation plan:
 [Implement VM lifecycle](../superpowers/plans/2026-05-24-macos-production-sandbox-runner.md#stage-6-implement-vm-lifecycle), and
 [Execute commands inside the VM](../superpowers/plans/2026-05-24-macos-production-sandbox-runner.md#stage-7-execute-commands-inside-the-vm).
 
+Remaining work is split into child tasks so `.4` is not treated as complete until the real VM
+runner is proven:
+
+1. `agent-platform-macos-production-sandbox.4.1` — define and provision the guest image/bootstrap
+   contract.
+2. `agent-platform-macos-production-sandbox.4.2` — implement the Virtualization.framework VM boot
+   lifecycle.
+3. `agent-platform-macos-production-sandbox.4.3` — implement guest command execution and
+   `/workspace` mounting.
+4. `agent-platform-macos-production-sandbox.4.4` — run local proof, record evidence, and close `.4`.
+
 ## Tests And Verification
 
 - `pnpm --filter @agent-platform/desktop test -- test/macosVmRunner.test.ts`

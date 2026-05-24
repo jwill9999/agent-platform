@@ -15,7 +15,7 @@
 - **Date:** 2026-05-24
 - **Session:** Continued macOS VM lifecycle/command execution task.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending partial `.4` commit for VM runtime-dir wiring.
+- **Latest commit:** `89d0d78` — runtime-dir wiring and fail-closed VM helper validation.
 
 ## Current State
 
@@ -88,6 +88,11 @@
 - Continued `.4` by adding app-owned `AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR` propagation, requiring
   the harness `macos-vm` adapter to pass `--runtime-dir` to the native helper, and making Swift
   `exec` fail closed for unconfigured runtime, missing image, or VM not started.
+- Corrected the task graph so broad tasks cannot be mistaken for completed production sandboxing:
+  `.4.1` through `.4.4` cover guest image/bootstrap, VM boot, guest command execution, and local
+  proof; `.5.1` through `.5.4` cover packaging, packaged runner health, packaged Electron E2E, and
+  staging gate evidence; `.6.1` through `.6.4` cover resource/network hardening, VM reset/repair,
+  signing/notarization smoke, and future platform adapter closure.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -99,9 +104,10 @@
 
 ## Next
 
-1. Commit and push the current `.4` runtime-dir/fail-closed slice.
-2. Continue `.4` with the real VM lifecycle:
+1. Commit and push the task-graph correction that decomposes `.4`, `.5`, and `.6`.
+2. Continue `.4.1` with the real guest image/bootstrap contract, then proceed through `.4.4`.
+3. Continue `.4` with the real VM lifecycle:
    Virtualization.framework boot, guest command service, `/workspace` mount, and host-path
    isolation proof.
-3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
+4. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.

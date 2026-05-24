@@ -22,6 +22,16 @@ Follow Stage 10 and Stage 11 in the implementation plan:
 [Release hardening](../superpowers/plans/2026-05-24-macos-production-sandbox-runner.md#stage-10-release-hardening) and
 [Future platform adapters](../superpowers/plans/2026-05-24-macos-production-sandbox-runner.md#stage-11-future-platform-adapters).
 
+Remaining work is split into child tasks so `.6` cannot be closed without release evidence:
+
+1. `agent-platform-macos-production-sandbox.6.1` — enforce production resource and network
+   defaults.
+2. `agent-platform-macos-production-sandbox.6.2` — add safe VM reset and repair flow.
+3. `agent-platform-macos-production-sandbox.6.3` — validate signing/notarization preserves helper
+   execution.
+4. `agent-platform-macos-production-sandbox.6.4` — document Windows/Linux adapter plan and close the
+   epic with evidence.
+
 ## Tests And Verification
 
 - `pnpm lint`

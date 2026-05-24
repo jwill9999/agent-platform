@@ -23,6 +23,16 @@ Follow Stage 8 and Stage 9 in the implementation plan:
 [Package the runner with Electron](../superpowers/plans/2026-05-24-macos-production-sandbox-runner.md#stage-8-package-the-runner-with-electron) and
 [Add production-like E2E and staging gate](../superpowers/plans/2026-05-24-macos-production-sandbox-runner.md#stage-9-add-production-like-e2e-and-staging-gate).
 
+Remaining work is split into child tasks so `.5` cannot be closed with only local packaging or
+manual checks:
+
+1. `agent-platform-macos-production-sandbox.5.1` — package the native helper and VM assets.
+2. `agent-platform-macos-production-sandbox.5.2` — validate packaged runner startup and health.
+3. `agent-platform-macos-production-sandbox.5.3` — add packaged Electron E2E for successful VM
+   command execution and fail-closed unavailable behavior.
+4. `agent-platform-macos-production-sandbox.5.4` — gate staging on the packaged macOS E2E job and
+   record evidence.
+
 ## Tests And Verification
 
 - `pnpm --filter @agent-platform/desktop test:e2e`
