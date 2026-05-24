@@ -146,6 +146,10 @@
 - Added an epic-level task sign-off matrix that lists each task's independent closure claim,
   required evidence, and what it explicitly does not claim. This is the audit checklist to use
   before closing any remaining sandbox task.
+- Started `.4.2.1` and selected the Apple `VZLinuxBootLoader` contract instead of EFI
+  auto-discovery. The VM asset contract now requires `base-linux.img`, matching `vmlinuz`, matching
+  `initrd.img`, and `guest-bootstrap.sh`; schema version moved to 2 and helper validation now fails
+  closed when kernel/initrd assets are absent.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -157,8 +161,8 @@
 
 ## Next
 
-1. Start `.4.2.1`: choose and implement the Apple Virtualization.framework boot contract, then
-   obtain or generate a real bootable arm64 Linux image compatible with that contract.
+1. Continue `.4.2.1`: produce or obtain the pinned real arm64 Linux image artifact with matching
+   kernel/initrd and guest bootstrap prerequisites, then stage it through `native:vm:assets:prepare`.
 2. Complete `.4.2.2` and `.4.2.3` with real boot, negative boot, stale-state, and daemon lifecycle
    evidence before starting `.4.3`.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain

@@ -11,16 +11,17 @@ Virtualization.framework and the `.4.1` VM asset contract.
 
 ## Requirements
 
-- Select and document the Apple Virtualization.framework boot contract before boot proof begins:
-  either an EFI-bootable raw disk image with required EFI variable-store handling, or a
-  `VZLinuxBootLoader` contract with kernel, initrd, command line, and disk image assets.
-- If the selected boot contract differs from the `.4.1` asset layout, update the asset preparation
-  script, helper validation, and documentation in this task before `.4.2.2` starts.
+- Select and document the Apple Virtualization.framework boot contract before boot proof begins.
+  This task selects `VZLinuxBootLoader` with a raw disk image, matching kernel, matching initrd, and
+  explicit kernel command line. EFI auto-discovery is not the production contract for this task.
+- Update the `.4.1` asset layout, asset preparation script, helper validation, and documentation to
+  require `base-linux.img`, `vmlinuz`, `initrd.img`, and `guest-bootstrap.sh` before `.4.2.2`
+  starts.
 - Produce a bootable `arm64` Linux disk image in raw format.
 - Install or define the bootstrap path for the guest command service prerequisites, including how
   the service is installed and started after boot.
 - Feed the image through `native:vm:assets:prepare` so the runtime contains `manifest.json`,
-  the selected boot assets, and `guest-bootstrap.sh`.
+  `base-linux.img`, `vmlinuz`, `initrd.img`, and `guest-bootstrap.sh`.
 - Document the local, staging, and release-packaging source of the image.
 - Do not depend on user Project folders or host-specific manual setup.
 
@@ -39,5 +40,6 @@ Virtualization.framework and the `.4.1` VM asset contract.
 - The boot contract is explicit and implemented in the asset manifest/helper validation.
 - The guest bootstrap/service installation model is explicit enough for `.4.3` to implement command
   execution without redesigning the image.
-- The image is staged into the runtime asset contract without manual guessing.
+- The image, kernel, initrd, and bootstrap assets are staged into the runtime asset contract without
+  manual guessing.
 - `.4.2.2` can attempt a real VM boot from the produced assets.

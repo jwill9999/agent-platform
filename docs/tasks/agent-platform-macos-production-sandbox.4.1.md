@@ -18,7 +18,7 @@ Define the bootable Linux guest image and bootstrap contract required by the pro
 
 ## Tests And Verification
 
-- `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- --source-image <raw-linux.img> --bootstrap <guest-bootstrap.sh> --out-dir <runtime>/images`
+- `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- --source-image <raw-linux.img> --kernel <vmlinuz> --initrd <initrd.img> --bootstrap <guest-bootstrap.sh> --out-dir <runtime>/images`
 - `pnpm --filter @agent-platform/desktop native:vm:test`
 - Helper smoke proving missing image/bootstrap assets fail closed with specific messages.
 - Documentation showing where the image comes from and how staging obtains the same asset.
@@ -28,5 +28,6 @@ Define the bootable Linux guest image and bootstrap contract required by the pro
 - The image/bootstrap contract is explicit and reproducible.
 - The helper validates all required assets.
 - `.4.2` can implement VM boot against this contract without guessing asset names or paths.
-- If `.4.2.1` proves the boot contract needs additional kernel/initrd/EFI variable-store assets,
-  `.4.2.1` owns the corrective update to this contract before boot proof continues.
+- `.4.2.1` selected the `VZLinuxBootLoader` contract and owns the corrective update from raw image
+  plus bootstrap to raw image plus matching kernel, initrd, and bootstrap before boot proof
+  continues.

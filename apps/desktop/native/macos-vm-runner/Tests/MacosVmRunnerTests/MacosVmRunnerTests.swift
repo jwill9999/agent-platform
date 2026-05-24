@@ -81,7 +81,43 @@ struct MacosVmRunnerTests {
         removeRuntimeDir(runtimeDir)
     }
 
-    @Test func prepareCreatesRuntimeStateWhenBaseImageExists() throws {
+    @Test func prepareFailsClearlyWhenKernelIsMissing() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        try writeVmAssets(runtimeDir: runtimeDir, includeKernel: false)
+
+        let result = handleCommand(arguments: ["prepare", "--runtime-dir", runtimeDir.path])
+
+        #expect(result.exitCode == 0)
+        #expect(
+            result.response
+                == JsonResponse(
+                    ok: false,
+                    state: "unavailable",
+                    message: "Linux VM kernel is missing from the packaged runtime."
+                )
+        )
+        removeRuntimeDir(runtimeDir)
+    }
+
+    @Test func prepareFailsClearlyWhenInitrdIsMissing() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        try writeVmAssets(runtimeDir: runtimeDir, includeInitrd: false)
+
+        let result = handleCommand(arguments: ["prepare", "--runtime-dir", runtimeDir.path])
+
+        #expect(result.exitCode == 0)
+        #expect(
+            result.response
+                == JsonResponse(
+                    ok: false,
+                    state: "unavailable",
+                    message: "Linux VM initrd is missing from the packaged runtime."
+                )
+        )
+        removeRuntimeDir(runtimeDir)
+    }
+
+    @Test func prepareCreatesRuntimeStateWhenBootAssetsExist() throws {
         let runtimeDir = temporaryRuntimeDir()
         try writeVmAssets(runtimeDir: runtimeDir)
 
@@ -222,17 +258,29 @@ struct MacosVmRunnerTests {
     private func writeVmAssets(
         runtimeDir: URL,
         includeImage: Bool = true,
+        includeKernel: Bool = true,
+        includeInitrd: Bool = true,
         includeBootstrap: Bool = true
     ) throws {
         let images = runtimeDir.appendingPathComponent("images", isDirectory: true)
         try FileManager.default.createDirectory(at: images, withIntermediateDirectories: true)
         let manifest = """
         {
-          "schemaVersion": 1,
+          "schemaVersion": 2,
           "architecture": "arm64",
           "imageFormat": "raw",
           "image": "base-linux.img",
+          "imageSha256": "placeholder-image-sha",
+          "boot": {
+            "loader": "linux",
+            "kernel": "vmlinuz",
+            "kernelSha256": "placeholder-kernel-sha",
+            "initrd": "initrd.img",
+            "initrdSha256": "placeholder-initrd-sha",
+            "commandLine": "console=hvc0 root=/dev/vda1 rw systemd.unit=multi-user.target"
+          },
           "bootstrap": "guest-bootstrap.sh",
+          "bootstrapSha256": "placeholder-bootstrap-sha",
           "guestService": {
             "transport": "vsock",
             "port": 10240,
@@ -249,6 +297,18 @@ struct MacosVmRunnerTests {
             FileManager.default.createFile(
                 atPath: images.appendingPathComponent("base-linux.img").path,
                 contents: Data("raw-image-placeholder".utf8)
+            )
+        }
+        if includeKernel {
+            FileManager.default.createFile(
+                atPath: images.appendingPathComponent("vmlinuz").path,
+                contents: Data("kernel-placeholder".utf8)
+            )
+        }
+        if includeInitrd {
+            FileManager.default.createFile(
+                atPath: images.appendingPathComponent("initrd.img").path,
+                contents: Data("initrd-placeholder".utf8)
             )
         }
         if includeBootstrap {

@@ -223,9 +223,10 @@ private struct RuntimePaths {
     let logs: URL
     let manifest: URL
     let baseImage: URL
+    let kernel: URL
+    let initrd: URL
     let guestBootstrap: URL
     let machineId: URL
-    let efiVariableStore: URL
     let daemonPid: URL
     let lastError: URL
     let runnerSocket: URL
@@ -236,8 +237,20 @@ private struct VmAssetManifest: Codable {
     let architecture: String
     let imageFormat: String
     let image: String
+    let imageSha256: String
+    let boot: Boot
     let bootstrap: String
+    let bootstrapSha256: String
     let guestService: GuestService
+}
+
+private struct Boot: Codable {
+    let loader: String
+    let kernel: String
+    let kernelSha256: String
+    let initrd: String
+    let initrdSha256: String
+    let commandLine: String
 }
 
 private struct GuestService: Codable {
@@ -285,9 +298,10 @@ private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
         logs: logs,
         manifest: images.appendingPathComponent("manifest.json", isDirectory: false),
         baseImage: images.appendingPathComponent("base-linux.img", isDirectory: false),
+        kernel: images.appendingPathComponent("vmlinuz", isDirectory: false),
+        initrd: images.appendingPathComponent("initrd.img", isDirectory: false),
         guestBootstrap: images.appendingPathComponent("guest-bootstrap.sh", isDirectory: false),
         machineId: state.appendingPathComponent("machine-id", isDirectory: false),
-        efiVariableStore: state.appendingPathComponent("efi-variable-store", isDirectory: false),
         daemonPid: state.appendingPathComponent("daemon.pid", isDirectory: false),
         lastError: logs.appendingPathComponent("last-error.log", isDirectory: false),
         runnerSocket: state.appendingPathComponent("runner.sock", isDirectory: false)
@@ -365,12 +379,11 @@ private func waitUntilReady(paths: RuntimePaths, timeoutSeconds: TimeInterval) -
 }
 
 private func buildVirtualMachineConfiguration(paths: RuntimePaths) throws -> VZVirtualMachineConfiguration {
-    if !fileExists(paths.efiVariableStore) {
-        _ = try VZEFIVariableStore(creatingVariableStoreAt: paths.efiVariableStore)
-    }
+    let manifest = try loadVmAssetManifest(paths: paths)
     let platform = VZGenericPlatformConfiguration()
-    let bootLoader = VZEFIBootLoader()
-    bootLoader.variableStore = VZEFIVariableStore(url: paths.efiVariableStore)
+    let bootLoader = VZLinuxBootLoader(kernelURL: paths.kernel)
+    bootLoader.initialRamdiskURL = paths.initrd
+    bootLoader.commandLine = manifest.boot.commandLine
 
     let diskAttachment = try VZDiskImageStorageDeviceAttachment(
         url: paths.baseImage,
@@ -418,13 +431,12 @@ private func validateVmAssets(paths: RuntimePaths) -> String? {
 
     let manifest: VmAssetManifest
     do {
-        let data = try Data(contentsOf: paths.manifest)
-        manifest = try JSONDecoder().decode(VmAssetManifest.self, from: data)
+        manifest = try loadVmAssetManifest(paths: paths)
     } catch {
         return "Linux VM asset manifest is invalid: \(error.localizedDescription)"
     }
 
-    guard manifest.schemaVersion == 1 else {
+    guard manifest.schemaVersion == 2 else {
         return "Linux VM asset manifest schema version is unsupported."
     }
     guard manifest.architecture == "arm64" else {
@@ -436,8 +448,32 @@ private func validateVmAssets(paths: RuntimePaths) -> String? {
     guard manifest.image == "base-linux.img" else {
         return "Linux VM asset manifest image path is unsupported."
     }
+    guard !manifest.imageSha256.isEmpty else {
+        return "Linux VM image checksum is not configured."
+    }
+    guard manifest.boot.loader == "linux" else {
+        return "Linux VM boot loader is unsupported."
+    }
+    guard manifest.boot.kernel == "vmlinuz" else {
+        return "Linux VM kernel path is unsupported."
+    }
+    guard !manifest.boot.kernelSha256.isEmpty else {
+        return "Linux VM kernel checksum is not configured."
+    }
+    guard manifest.boot.initrd == "initrd.img" else {
+        return "Linux VM initrd path is unsupported."
+    }
+    guard !manifest.boot.initrdSha256.isEmpty else {
+        return "Linux VM initrd checksum is not configured."
+    }
+    guard !manifest.boot.commandLine.isEmpty else {
+        return "Linux VM kernel command line is not configured."
+    }
     guard manifest.bootstrap == "guest-bootstrap.sh" else {
         return "Linux VM asset manifest bootstrap path is unsupported."
+    }
+    guard !manifest.bootstrapSha256.isEmpty else {
+        return "Linux VM guest bootstrap checksum is not configured."
     }
     guard manifest.guestService.transport == "vsock" else {
         return "Linux VM guest service transport is unsupported."
@@ -451,11 +487,22 @@ private func validateVmAssets(paths: RuntimePaths) -> String? {
     guard fileExists(paths.baseImage) else {
         return "Linux VM image is missing from the packaged runtime."
     }
+    guard fileExists(paths.kernel) else {
+        return "Linux VM kernel is missing from the packaged runtime."
+    }
+    guard fileExists(paths.initrd) else {
+        return "Linux VM initrd is missing from the packaged runtime."
+    }
     guard fileExists(paths.guestBootstrap) else {
         return "Linux VM guest bootstrap is missing from the packaged runtime."
     }
 
     return nil
+}
+
+private func loadVmAssetManifest(paths: RuntimePaths) throws -> VmAssetManifest {
+    let data = try Data(contentsOf: paths.manifest)
+    return try JSONDecoder().decode(VmAssetManifest.self, from: data)
 }
 
 private func parseOptions(_ arguments: [String]) -> [String: String] {

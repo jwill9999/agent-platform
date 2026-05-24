@@ -15,25 +15,36 @@ const { values } = parseArgs({
   args: scriptArgs,
   options: {
     'source-image': { type: 'string' },
+    kernel: { type: 'string' },
+    initrd: { type: 'string' },
     'bootstrap': { type: 'string' },
+    'kernel-command-line': {
+      type: 'string',
+      default: 'console=hvc0 root=/dev/vda1 rw systemd.unit=multi-user.target',
+    },
     'out-dir': { type: 'string' },
     architecture: { type: 'string', default: 'arm64' },
   },
 });
 
 const sourceImage = values['source-image'];
+const kernel = values.kernel;
+const initrd = values.initrd;
 const bootstrap = values.bootstrap;
+const kernelCommandLine = values['kernel-command-line'];
 const outDir = values['out-dir'];
 const architecture = values.architecture ?? 'arm64';
 
-if (!sourceImage || !bootstrap || !outDir) {
+if (!sourceImage || !kernel || !initrd || !bootstrap || !outDir) {
   console.error(
     [
-      'Usage: node scripts/prepare-macos-vm-assets.mjs --source-image <raw-linux.img> --bootstrap <guest-bootstrap.sh> --out-dir <dir>',
+      'Usage: node scripts/prepare-macos-vm-assets.mjs --source-image <raw-linux.img> --kernel <vmlinuz> --initrd <initrd.img> --bootstrap <guest-bootstrap.sh> --out-dir <dir>',
       '',
       'Creates the macOS VM asset contract expected by macos-vm-runner:',
       '  manifest.json',
       '  base-linux.img',
+      '  vmlinuz',
+      '  initrd.img',
       '  guest-bootstrap.sh',
     ].join('\n'),
   );
@@ -46,22 +57,38 @@ if (architecture !== 'arm64') {
 }
 
 assertReadableFile(sourceImage, 'source image');
+assertReadableFile(kernel, 'Linux kernel');
+assertReadableFile(initrd, 'Linux initrd');
 assertReadableFile(bootstrap, 'guest bootstrap');
 mkdirSync(outDir, { recursive: true });
 
 const imagePath = join(outDir, 'base-linux.img');
+const kernelPath = join(outDir, 'vmlinuz');
+const initrdPath = join(outDir, 'initrd.img');
 const bootstrapPath = join(outDir, 'guest-bootstrap.sh');
 copyFileSync(sourceImage, imagePath);
+copyFileSync(kernel, kernelPath);
+copyFileSync(initrd, initrdPath);
 copyFileSync(bootstrap, bootstrapPath);
 
 const imageSha256 = await sha256File(imagePath);
+const kernelSha256 = await sha256File(kernelPath);
+const initrdSha256 = await sha256File(initrdPath);
 const bootstrapSha256 = await sha256File(bootstrapPath);
 const manifest = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   architecture,
   imageFormat: 'raw',
   image: basename(imagePath),
   imageSha256,
+  boot: {
+    loader: 'linux',
+    kernel: basename(kernelPath),
+    kernelSha256,
+    initrd: basename(initrdPath),
+    initrdSha256,
+    commandLine: kernelCommandLine,
+  },
   bootstrap: basename(bootstrapPath),
   bootstrapSha256,
   guestService: {
