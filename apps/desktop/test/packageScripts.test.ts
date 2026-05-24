@@ -20,4 +20,13 @@ describe('desktop package scripts', () => {
     expect(startRenderer).toContain('AGENT_PLATFORM_DESKTOP_BACKEND=managed');
     expect(startRenderer).toContain('AGENT_PLATFORM_DESKTOP_RENDERER=standalone');
   });
+
+  it('builds and tests the native macOS VM runner helper', () => {
+    expect(packageJson.scripts['native:vm:build']).toBe(
+      'swift build --package-path native/macos-vm-runner',
+    );
+    expect(packageJson.scripts['native:vm:test']).toBe(
+      'swift test --package-path native/macos-vm-runner',
+    );
+  });
 });

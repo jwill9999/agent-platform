@@ -16,6 +16,7 @@ playwright-report/
 test-results/
 .playwright-mcp/
 .agent-platform/
+apps/desktop/native/macos-vm-runner/.build/
 
 # Beads / Dolt files (added by bd init)
 .beads-credential-key

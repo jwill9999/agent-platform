@@ -88,6 +88,11 @@ Shell commands issued through `sys_bash` use the harness `CommandRunner` boundar
 builds must not use host fallback. Until the macOS VM runner is available, command execution
 defaults to disabled. Docker and host runners are explicit development modes only.
 
+The production macOS runner is the managed VM runner described in
+[ADR-0003](adr/0003-macos-production-sandbox-runner.md). Docker is a development adapter. Staging
+must not merge to `main` unless packaged Electron E2E proves command execution through the managed
+VM runner or command execution remains explicitly disabled.
+
 Supported modes:
 
 - `AGENT_PLATFORM_COMMAND_RUNNER=disabled` — deny command execution because no production sandbox
