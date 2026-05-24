@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Created production macOS VM sandbox runner plan and Beads epic.
+- **Session:** Added environment/testing strategy for macOS VM sandbox runner epic.
 - **Branch:** `jwill9999/docker-sandbox-command-runner`
-- **Latest commit:** `3b6f0c7` (`jwill9999/docker-sandbox-command-runner docs plan macos production sandbox runner`).
+- **Latest commit:** `16416bf` (`jwill9999/docker-sandbox-command-runner docs define sandbox environment testing strategy`).
 
 ## Current State
 
@@ -23,6 +23,10 @@
   foundation/development-adapter work, not the production sandbox solution.
 - User clarified that packaged macOS staging must test production-ready behavior before merge to
   `main`; host or Docker fallback must not count as release evidence.
+- Environment model is now explicit:
+  - local: developer productivity and fast feedback,
+  - staging: production rehearsal with packaged macOS runner evidence,
+  - production: released signed/notarized app.
 - New production tracking exists:
   - Plan: `docs/superpowers/plans/2026-05-24-macos-production-sandbox-runner.md`
   - Epic: `agent-platform-macos-production-sandbox`
@@ -44,12 +48,15 @@
   6. release hardening and future Windows/Linux adapter plan.
 - Created Beads epic `agent-platform-macos-production-sandbox` and child tasks `.1` through `.6`
   with dependencies.
+- Added environment-specific evidence rules: `.4` requires real local macOS VM command execution,
+  `.5` requires packaged staging E2E proving `macos-vm` and fail-closed behavior, and `.6` requires
+  signing/notarization plus release smoke evidence.
 - Verified docs with `pnpm docs:lint`.
 
 ## Next
 
 1. Push the current branch after committing this `session.md` handoff update.
-2. If continuing implementation, start `agent-platform-macos-production-sandbox.1` first:
+2. If continuing implementation, claim `agent-platform-macos-production-sandbox.1` first:
    make desktop command execution fail closed and remove production `auto` fallback semantics.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.
