@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Addressed SonarCloud duplication failure on PR #227.
+- **Session:** Enabled full CI and Promptfoo checks for PRs into staging.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending Sonar duplication fix for PR #227.
+- **Latest commit:** pending staging workflow trigger fix for PR #227.
 
 ## Current State
 
@@ -109,6 +109,9 @@
   with the duplicated lines isolated to `MacosVmRunnerCore.swift`. Refactored repeated runtime and
   asset validation response blocks into shared helper functions so Sonar can recalculate below the
   threshold.
+- Found that expected `CI` and `Promptfoo Code Scan` checks were not running on PR #227 because
+  workflow branch filters only targeted `main`/`feature/**`. Updated workflow triggers to include
+  `staging` so staging PRs run the full validation set.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
