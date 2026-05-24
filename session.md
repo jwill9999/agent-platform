@@ -154,6 +154,12 @@
   `kernelSha256=bd4070ac0545ef395ae263b2260c917a837bc09927f82b06e3329e569e640ea2`,
   `initrdSha256=1dbe788c46b3dd4f4f2ab3bd7971c301f978e9750c0855728a56374f2e2b6312`,
   `bootstrapSha256=6d402c59ce305df0d2f89e80f28634d16412a1edb9fe64a45d2e360a16c8660a`.
+- Started `.4.2.2`: added development signing for the helper with
+  `com.apple.security.virtualization`, reran `prepare/start/status` against the `.4.2.1` generated
+  assets, and fixed failed-start cleanup so daemon PID/socket state is cleared while diagnostics are
+  preserved. Current local boot blocker: Virtualization.framework reports
+  `Virtualization is not available on this hardware`, so `.4.2.2` remains open until a VM-capable
+  macOS runner can complete the real boot proof.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -165,8 +171,9 @@
 
 ## Next
 
-1. Start `.4.2.2`: attempt real VM boot from the `.4.2.1` generated asset set and prove ready
-   status only after successful boot.
+1. Continue `.4.2.2` on VM-capable macOS hardware or CI: rerun signed helper
+   `prepare/start/status` from the `.4.2.1` generated asset set and prove ready status only after
+   successful boot.
 2. Complete `.4.2.3` with stale-state, repeated start/stop, and daemon lifecycle
    evidence before starting `.4.3`.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain

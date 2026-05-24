@@ -16,6 +16,9 @@ after the VM is actually running.
 - Ensure `status` reports `ready` only after the VM reaches the running state.
 - Persist runtime state under the app-owned runtime directory.
 - Capture logs sufficient to diagnose boot failures.
+- Sign the local helper with the development `com.apple.security.virtualization` entitlement before
+  boot smoke tests. Release signing remains owned by `.6.3`, but `.4.2.2` must not fail local boot
+  proof due to an unsigned helper.
 - Record the selected boot contract, image manifest checksum, runtime directory, and helper version
   in the smoke-test evidence.
 - Verify negative boot cases: missing image asset, invalid image asset, incompatible boot contract,
@@ -26,6 +29,7 @@ after the VM is actually running.
 ## Tests And Verification
 
 - `pnpm --filter @agent-platform/desktop native:vm:build`
+- `pnpm --filter @agent-platform/desktop native:vm:sign-dev`
 - `pnpm --filter @agent-platform/desktop native:vm:test`
 - Local smoke:
   - `macos-vm-runner prepare --runtime-dir <dir>`

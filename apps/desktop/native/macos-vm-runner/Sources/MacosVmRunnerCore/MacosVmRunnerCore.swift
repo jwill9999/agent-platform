@@ -318,9 +318,13 @@ private func prepareRuntimeDirectories(paths: RuntimePaths) throws {
 }
 
 private func clearRuntimeState(paths: RuntimePaths) {
+    clearReadyState(paths: paths)
+    try? FileManager.default.removeItem(at: paths.lastError)
+}
+
+private func clearReadyState(paths: RuntimePaths) {
     try? FileManager.default.removeItem(at: paths.runnerSocket)
     try? FileManager.default.removeItem(at: paths.daemonPid)
-    try? FileManager.default.removeItem(at: paths.lastError)
 }
 
 private func vmIsRunning(paths: RuntimePaths) -> Bool {
@@ -368,6 +372,7 @@ private func waitUntilReady(paths: RuntimePaths, timeoutSeconds: TimeInterval) -
             return true
         }
         if fileExists(paths.lastError) {
+            clearReadyState(paths: paths)
             return false
         }
         Thread.sleep(forTimeInterval: 0.2)
@@ -375,6 +380,7 @@ private func waitUntilReady(paths: RuntimePaths, timeoutSeconds: TimeInterval) -
     if let pid = readPid(paths.daemonPid) {
         _ = Darwin.kill(pid, SIGTERM)
     }
+    clearReadyState(paths: paths)
     return false
 }
 
