@@ -28,3 +28,5 @@ Define the bootable Linux guest image and bootstrap contract required by the pro
 - The image/bootstrap contract is explicit and reproducible.
 - The helper validates all required assets.
 - `.4.2` can implement VM boot against this contract without guessing asset names or paths.
+- If `.4.2.1` proves the boot contract needs additional kernel/initrd/EFI variable-store assets,
+  `.4.2.1` owns the corrective update to this contract before boot proof continues.

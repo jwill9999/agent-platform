@@ -11,7 +11,9 @@ Prove the signed and notarized macOS artifact can start and use the VM helper.
 ## Requirements
 
 - Include the native helper in signing and notarization configuration.
-- Validate required entitlements for Apple Virtualization.framework.
+- Validate required entitlements for Apple Virtualization.framework, including
+  `com.apple.security.virtualization`, and any hardened runtime/network entitlements required by
+  the selected guest communication model.
 - Run packaged smoke tests against the signed/notarized artifact.
 - Fail release if helper execution is blocked by quarantine, signing, entitlements, or notarization.
 
@@ -19,6 +21,7 @@ Prove the signed and notarized macOS artifact can start and use the VM helper.
 
 - Signing/notarization workflow job.
 - Signed/notarized artifact smoke test.
+- Entitlement inspection for the app and helper binaries.
 - Helper execution log proving packaged helper runs after notarization.
 - Runner health proving `macos-vm` ready state from the signed artifact.
 

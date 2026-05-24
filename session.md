@@ -13,7 +13,7 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Audited sandbox epic task graph after pausing implementation.
+- **Session:** Tightened sandbox epic traceability after unresolved requirement review.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
 - **Latest commit:** pending sandbox task graph alignment audit.
 
@@ -124,6 +124,19 @@
 - Paused implementation and audited the current Beads/spec graph. Beads dependencies were correct,
   but the epic spec still omitted `.4.2.1` through `.4.2.3`; updated the epic dependency and child
   spec tables so the roadmap matches the tracker.
+- Added explicit requirements traceability to the sandbox epic so unresolved production concerns map
+  to owning tasks: bootable image source, Virtualization.framework boot contract, guest bootstrap,
+  staging asset availability, production packaging boundary, and signing/notarization entitlements.
+- Tightened `.4.2.1` so it must select EFI-vs-kernel/initrd boot contract, update the asset
+  manifest/helper validation if needed, define the guest command service bootstrap path, and prove
+  local/staging/release image acquisition before `.4.2.2` starts.
+- Tightened `.5.1`, `.5.4`, and `.6.3` so packaging, staging, and release hardening cannot proceed
+  with unpinned local assets or unproven macOS virtualization entitlements.
+- Completed a second task-spec audit against the rule that every task must be independently
+  achievable and testable before sign-off. Added epic-level sign-off rules and tightened `.4.2.2`,
+  `.4.2.3`, `.4.3`, `.4.4`, `.5.2`, `.5.3`, `.6.1`, `.6.2`, and `.6.4` with explicit negative
+  tests, user-visible/E2E evidence, runtime cleanup, command-contract behavior, resource/network
+  policy, reset/repair safety, and final traceability audit requirements.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -135,9 +148,9 @@
 
 ## Next
 
-1. Start `.4.2.1`: obtain or generate a real bootable arm64 Linux image compatible with the `.4.1`
-   asset contract.
-2. Complete `.4.2.2` and `.4.2.3` before starting `.4.3`; `.4.3` is blocked until real boot and
-   daemon lifecycle evidence exists.
+1. Start `.4.2.1`: choose and implement the Apple Virtualization.framework boot contract, then
+   obtain or generate a real bootable arm64 Linux image compatible with that contract.
+2. Complete `.4.2.2` and `.4.2.3` with real boot, negative boot, stale-state, and daemon lifecycle
+   evidence before starting `.4.3`.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.

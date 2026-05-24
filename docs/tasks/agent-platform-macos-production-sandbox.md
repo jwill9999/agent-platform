@@ -104,6 +104,37 @@ Nested task dependencies:
 | `agent-platform-macos-production-sandbox.6.4`   | `docs/tasks/agent-platform-macos-production-sandbox.6.4.md`              |
 | `agent-platform-macos-production-sandbox` DoD   | PR checks, packaged E2E, Sonar/Problems gate, and review comments green. |
 
+## Requirements Traceability
+
+These requirements must remain visible across the child tasks so the epic cannot appear complete
+while a production-critical detail is still undecided.
+
+| Requirement                                  | Owning task(s)                                                  | Completion evidence                                                                                                                           |
+| -------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bootable image source/build path             | `.4.2.1`                                                        | Documented reproducible source or build pipeline for an `arm64` Linux guest image, plus checksum/manifest evidence from asset preparation.    |
+| Apple Virtualization.framework boot contract | `.4.2.1`, with corrective updates to `.4.1` artifacts if needed | Explicit choice of EFI bootable disk or Linux kernel/initrd boot path; helper validation matches the selected boot contract.                  |
+| Guest bootstrap and command service model    | `.4.2.1`, `.4.3`                                                | Image/bootstrap includes required service prerequisites; `.4.3` proves command execution through the guest service inside `/workspace`.       |
+| Staging asset availability                   | `.4.2.1`, `.5.1`, `.5.4`                                        | Staging can obtain the same image/assets without manual host setup; packaging fails if assets are absent; staging E2E publishes evidence.     |
+| Production packaging boundary                | `.5.1`, `.5.2`                                                  | App-owned helper/runtime/asset paths are used by the packaged app with no developer-only environment variables.                               |
+| Signing, notarization, and entitlements      | `.6.3`                                                          | Signed/notarized artifact starts the helper and reports `macos-vm` health; release fails closed if entitlements or hardened runtime block it. |
+
+## Independent Task Sign-Off Rules
+
+Each task and child task must be independently achievable and testable. A task can close only when
+its own requirements, tests, and Definition of Done are satisfied; it must not close by assuming a
+later task will discover or supply missing requirements.
+
+- If a task uncovers a missing prerequisite, update the current task or create/link a child task
+  before implementation continues.
+- If a task chooses an architecture boundary that affects later tasks, record that decision in the
+  task spec and update downstream specs in the same change.
+- If evidence cannot be collected in the required environment, leave the task open and record the
+  blocker in Beads.
+- Parent tasks `.4`, `.5`, `.6`, and the epic close only after all child tasks are closed and their
+  evidence is recorded.
+- Staging and production sign-off must use production-like runner configuration; host and Docker are
+  never acceptable substitutes for macOS production runner evidence.
+
 ## Testing Strategy
 
 Testing must prove sandbox properties, not just command success:

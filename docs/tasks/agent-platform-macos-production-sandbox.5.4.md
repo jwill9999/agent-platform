@@ -13,6 +13,8 @@ Make staging require the packaged macOS VM E2E evidence before changes can be pr
 
 - Add a staging GitHub Actions job for packaged macOS VM E2E.
 - Ensure the job uses production-like runner defaults and environment variable names.
+- Ensure the job obtains the VM image/assets through the same pinned `.4.2.1` source or release
+  artifact path used by packaging.
 - Fail the staging gate when command execution runs on host or Docker.
 - Publish artifacts/logs needed to inspect runner health and E2E results.
 - Record the passing staging evidence in the task before `.5` is closed.
@@ -22,6 +24,7 @@ Make staging require the packaged macOS VM E2E evidence before changes can be pr
 - GitHub Actions staging packaged macOS E2E job.
 - Full repository quality gate.
 - Manual review of workflow logs proving `macos-vm` was selected.
+- Workflow log/artifact proving the expected image manifest/checksum was used.
 - `pnpm docs:lint`
 
 ## Definition Of Done

@@ -13,7 +13,10 @@ Run the local proof suite required to close `agent-platform-macos-production-san
 - Add or document the local VM runner proof command set.
 - Prove helper `status`, `prepare`, `start`, `exec`, and `stop` work with the real VM.
 - Prove harness `CommandRunner` maps VM execution to tool output correctly.
+- Prove runner health reports `macos-vm` and not host or Docker.
 - Record the evidence needed before `.5` packaging and staging work can start.
+- Record the exact image manifest/checksum, macOS version/architecture, helper version, command
+  runner mode, and proof commands used.
 - Close `.4` only after the acceptance criteria are met.
 
 ## Tests And Verification
@@ -26,6 +29,9 @@ Run the local proof suite required to close `agent-platform-macos-production-san
   - `macos-vm-runner status --runtime-dir <dir>`
   - `macos-vm-runner exec --runtime-dir <dir> --workspace <project> --cwd <project> -- pwd`
   - host-path isolation command proving no host home/credential paths are visible.
+- Harness proof with `AGENT_PLATFORM_COMMAND_RUNNER=macos-vm` showing a project command result is
+  surfaced to the chat/tool layer without host fallback.
+- Beads note or task-spec evidence block with command summaries and relevant artifact paths.
 
 ## Definition Of Done
 
