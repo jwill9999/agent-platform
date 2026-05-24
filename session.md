@@ -146,10 +146,14 @@
 - Added an epic-level task sign-off matrix that lists each task's independent closure claim,
   required evidence, and what it explicitly does not claim. This is the audit checklist to use
   before closing any remaining sandbox task.
-- Started `.4.2.1` and selected the Apple `VZLinuxBootLoader` contract instead of EFI
-  auto-discovery. The VM asset contract now requires `base-linux.img`, matching `vmlinuz`, matching
-  `initrd.img`, and `guest-bootstrap.sh`; schema version moved to 2 and helper validation now fails
-  closed when kernel/initrd assets are absent.
+- Completed `.4.2.1`: selected the Apple `VZLinuxBootLoader` contract instead of EFI
+  auto-discovery, added `native:vm:assets:build-linux`, built a real Alpine arm64 Linux asset source
+  set locally with Docker, staged it through `native:vm:assets:prepare`, and verified helper
+  `prepare` accepts the generated schema v2 manifest. Manifest evidence from local staging:
+  `imageSha256=07064e5e9ff695901866b868678ee56a04c97a7fd2f4e9177f930b616719ff40`,
+  `kernelSha256=bd4070ac0545ef395ae263b2260c917a837bc09927f82b06e3329e569e640ea2`,
+  `initrdSha256=1dbe788c46b3dd4f4f2ab3bd7971c301f978e9750c0855728a56374f2e2b6312`,
+  `bootstrapSha256=6d402c59ce305df0d2f89e80f28634d16412a1edb9fe64a45d2e360a16c8660a`.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -161,9 +165,9 @@
 
 ## Next
 
-1. Continue `.4.2.1`: produce or obtain the pinned real arm64 Linux image artifact with matching
-   kernel/initrd and guest bootstrap prerequisites, then stage it through `native:vm:assets:prepare`.
-2. Complete `.4.2.2` and `.4.2.3` with real boot, negative boot, stale-state, and daemon lifecycle
+1. Start `.4.2.2`: attempt real VM boot from the `.4.2.1` generated asset set and prove ready
+   status only after successful boot.
+2. Complete `.4.2.3` with stale-state, repeated start/stop, and daemon lifecycle
    evidence before starting `.4.3`.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.

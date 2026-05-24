@@ -22,6 +22,9 @@ describe('desktop package scripts', () => {
   });
 
   it('builds and tests the native macOS VM runner helper', () => {
+    expect(packageJson.scripts['native:vm:assets:build-linux']).toBe(
+      'node scripts/build-macos-vm-linux-assets.mjs',
+    );
     expect(packageJson.scripts['native:vm:assets:prepare']).toBe(
       'node scripts/prepare-macos-vm-assets.mjs',
     );

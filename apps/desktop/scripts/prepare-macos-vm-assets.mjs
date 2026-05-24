@@ -20,7 +20,7 @@ const { values } = parseArgs({
     'bootstrap': { type: 'string' },
     'kernel-command-line': {
       type: 'string',
-      default: 'console=hvc0 root=/dev/vda1 rw systemd.unit=multi-user.target',
+      default: 'console=hvc0 root=/dev/vda rw systemd.unit=multi-user.target',
     },
     'out-dir': { type: 'string' },
     architecture: { type: 'string', default: 'arm64' },

@@ -22,7 +22,9 @@ Virtualization.framework and the `.4.1` VM asset contract.
   the service is installed and started after boot.
 - Feed the image through `native:vm:assets:prepare` so the runtime contains `manifest.json`,
   `base-linux.img`, `vmlinuz`, `initrd.img`, and `guest-bootstrap.sh`.
-- Document the local, staging, and release-packaging source of the image.
+- Document the local, staging, and release-packaging source of the image. This task uses the
+  repository Linux asset builder as the pinned source path; later release jobs can publish the built
+  asset set as an immutable artifact.
 - Do not depend on user Project folders or host-specific manual setup.
 
 ## Tests And Verification
@@ -33,6 +35,8 @@ Virtualization.framework and the `.4.1` VM asset contract.
   same image or build it from the same pinned inputs.
 - Helper validation smoke proving missing assets from the selected boot contract fail closed with
   specific diagnostics.
+- Builder smoke proving the asset source set produces `source.raw`, `vmlinuz`, `initrd.img`, and
+  `guest-bootstrap.sh`.
 
 ## Definition Of Done
 

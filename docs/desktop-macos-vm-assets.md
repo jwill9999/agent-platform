@@ -42,7 +42,7 @@ the selected Project folder is mounted into the guest later as `/workspace`.
     "kernelSha256": "<sha256>",
     "initrd": "initrd.img",
     "initrdSha256": "<sha256>",
-    "commandLine": "console=hvc0 root=/dev/vda1 rw systemd.unit=multi-user.target"
+    "commandLine": "console=hvc0 root=/dev/vda rw systemd.unit=multi-user.target"
   },
   "bootstrap": "guest-bootstrap.sh",
   "bootstrapSha256": "<sha256>",
@@ -64,14 +64,15 @@ The guest command service is installed by the bootstrap script and listens on vi
 
 ## Reproducible Image Source
 
-For the macOS-first production runner, staging and release packaging should use a pinned image
-artifact produced by the project release pipeline:
+For the macOS-first production runner, staging and release packaging use a pinned image artifact
+produced by the project release pipeline:
 
-1. Start from a supported `aarch64` Linux cloud image source. The initial pinned source is Fedora
-   Cloud Base 44 for ARM/aarch64 from the Fedora Cloud download page and mirror directory:
-   `https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/aarch64/images/`.
-2. Install or bake the guest command service prerequisites into the image.
-3. Extract the matching guest kernel and initrd from the same image build.
+1. Build the first asset source set with Alpine Linux `3.20` using the repository script:
+   `pnpm --filter @agent-platform/desktop native:vm:assets:build-linux -- --out-dir <asset-source-dir>`.
+2. The builder installs the `linux-virt` kernel and guest service prerequisites into an `arm64`
+   root filesystem.
+3. The builder emits a raw ext4 root disk plus the matching `vmlinuz` and `initrd.img` from that
+   same root filesystem.
 4. Stage `base-linux.img`, `vmlinuz`, `initrd.img`, and `guest-bootstrap.sh` through
    `native:vm:assets:prepare`.
 5. Store the resulting manifest and asset checksums with the packaged release artifact.
@@ -89,9 +90,10 @@ guest-bootstrap.sh   # guest provisioning script used for the same image build
 manifest.json        # produced by native:vm:assets:prepare
 ```
 
-Local development, staging, and release packaging use the same asset set. Local development may
-point `native:vm:assets:prepare` at a downloaded build artifact. Staging and release packaging must
-pull the pinned artifact from the release pipeline or rebuild it from the same pinned inputs.
+Local development, staging, and release packaging use the same asset set. Local development may run
+the builder directly or point `native:vm:assets:prepare` at a downloaded build artifact. Staging and
+release packaging must pull the pinned artifact from the release pipeline or rebuild it from the
+same pinned inputs.
 
 ## Guest Bootstrap Contract
 

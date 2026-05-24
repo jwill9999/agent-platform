@@ -277,7 +277,7 @@ struct MacosVmRunnerTests {
             "kernelSha256": "placeholder-kernel-sha",
             "initrd": "initrd.img",
             "initrdSha256": "placeholder-initrd-sha",
-            "commandLine": "console=hvc0 root=/dev/vda1 rw systemd.unit=multi-user.target"
+            "commandLine": "console=hvc0 root=/dev/vda rw systemd.unit=multi-user.target"
           },
           "bootstrap": "guest-bootstrap.sh",
           "bootstrapSha256": "placeholder-bootstrap-sha",
