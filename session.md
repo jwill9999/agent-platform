@@ -137,6 +137,12 @@
   `.4.2.3`, `.4.3`, `.4.4`, `.5.2`, `.5.3`, `.6.1`, `.6.2`, and `.6.4` with explicit negative
   tests, user-visible/E2E evidence, runtime cleanup, command-contract behavior, resource/network
   policy, reset/repair safety, and final traceability audit requirements.
+- Completed a third audit pass from the foundation tasks upward. Expanded the epic traceability
+  table to cover `.1` fail-closed defaults, `.2` health/status contract, `.3` ADR/helper skeleton,
+  `.4` lifecycle/execution, `.5` packaging/E2E/staging, and `.6` hardening/release closure.
+- Tightened `.1`, `.2`, and `.3` specs and Beads acceptance so the already-closed foundation tasks
+  remain independently testable and cannot be misread as claiming real VM boot, packaged execution,
+  or release readiness.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:

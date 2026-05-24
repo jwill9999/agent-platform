@@ -15,6 +15,12 @@ Record the macOS production runner decision and add the native Swift helper skel
 - Implement helper commands for `status`, `prepare`, `start`, `stop`, and `exec` as structured JSON stubs.
 - Add desktop package scripts to build and test the helper.
 - Document that the helper is the production path, while Docker remains development-only.
+- Define the initial helper CLI contract, JSON success/error shape, and exit-code behavior that
+  TypeScript adapters and later E2E tests can depend on.
+- Keep skeleton commands deterministic and explicitly non-production until `.4` replaces stubs with
+  real VM behavior.
+- Record in the ADR that packaging, staging E2E, signing/notarization, and future platform adapters
+  are separate required work, not implied by the skeleton.
 
 ## Implementation Plan
 
@@ -28,6 +34,9 @@ Follow Stage 3 and Stage 4 in the implementation plan:
 - `pnpm --filter @agent-platform/desktop native:vm:build`
 - `pnpm --filter @agent-platform/desktop native:vm:test`
 - `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts`
+- Tests must assert helper JSON shape for every skeleton command and deterministic failure for
+  unsupported or malformed invocation.
+- Docs/ADR review must confirm the skeleton does not claim command execution is safe or production-ready.
 
 ## Definition Of Done
 
@@ -35,3 +44,6 @@ Follow Stage 3 and Stage 4 in the implementation plan:
 - Swift helper builds locally on macOS.
 - Helper emits deterministic JSON status for all skeleton commands.
 - Desktop package scripts can build and test the helper.
+- This task is independently signable because it creates the architectural decision and command
+  surface only; real boot, execution, packaging, and release proof remain explicitly owned by later
+  tasks.

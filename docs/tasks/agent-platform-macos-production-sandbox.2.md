@@ -15,6 +15,10 @@ Add a structured runner health contract so the API, desktop UI, E2E tests, and s
 - Include `mode`, `production`, `canExecute`, and optional detail fields.
 - Export the contract from the harness package.
 - Add tests for production VM, unavailable VM, disabled, Docker, and host modes.
+- Keep the contract serializable and stable for API, desktop UI, packaged E2E, and staging workflow
+  assertions.
+- Include enough detail to distinguish development-only readiness from production runner readiness.
+- Ensure unavailable production runner health cannot be interpreted as executable.
 
 ## Implementation Plan
 
@@ -26,6 +30,10 @@ Follow Stage 2 in the implementation plan:
 - `pnpm --filter @agent-platform/harness test -- test/commandRunnerHealth.test.ts`
 - `pnpm --filter @agent-platform/harness typecheck`
 - `pnpm --filter @agent-platform/harness lint`
+- Tests must cover disabled, unknown/unavailable production VM, ready production VM, host, and
+  Docker modes.
+- Tests must assert `canExecute` and `production` values independently, so host/Docker cannot pass
+  as production evidence.
 
 ## Definition Of Done
 
@@ -33,3 +41,5 @@ Follow Stage 2 in the implementation plan:
 - Tests can assert a packaged app is using `macos-vm`.
 - Host and Docker can be reported as non-production development modes.
 - Unavailable production runner is visible as unavailable and cannot execute.
+- This task is independently signable with contract tests because later tasks consume the contract
+  but do not change its safety semantics without updating this spec.
