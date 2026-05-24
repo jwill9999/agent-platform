@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Implemented fail-closed command runner defaults.
-- **Branch:** `jwill9999/docker-sandbox-command-runner`
-- **Latest commit:** pending commit for `agent-platform-macos-production-sandbox.1`.
+- **Session:** Added command runner health/status contract.
+- **Branch:** `jwill9999/macos-production-sandbox-health-contract`
+- **Latest commit:** pending commit for `agent-platform-macos-production-sandbox.2`.
 
 ## Current State
 
@@ -30,12 +30,16 @@
 - New production tracking exists:
   - Plan: `docs/superpowers/plans/2026-05-24-macos-production-sandbox-runner.md`
   - Epic: `agent-platform-macos-production-sandbox`
-- First production-sandbox task is implemented locally:
-  - `agent-platform-macos-production-sandbox.1`
+- Production sandbox task chain is in progress:
+  - `agent-platform-macos-production-sandbox.1` is complete and pushed on
+    `jwill9999/docker-sandbox-command-runner`,
+  - `agent-platform-macos-production-sandbox.2` is implemented locally on
+    `jwill9999/macos-production-sandbox-health-contract`,
   - command runner defaults to `disabled`,
   - desktop managed backend defaults to `AGENT_PLATFORM_COMMAND_RUNNER=disabled`,
   - `host` and `docker-sandbox` are now explicit development modes only,
-  - `macos-vm` is a recognized mode but remains disabled until the VM runner adapter is implemented.
+  - `macos-vm` is a recognized mode and the health contract reports it as production-ready only
+    when a VM runner is configured.
 
 ## Recent Work
 
@@ -64,11 +68,22 @@
   single-fork API test pool.
 - Verified the implementation with:
   `pnpm lint && pnpm typecheck && pnpm format:check && pnpm docs:lint && pnpm test && pnpm build && git diff --check`.
+- Added `CommandRunnerHealth` / `CommandRunnerHealthStatus` and
+  `getConfiguredCommandRunnerHealth()` in the harness.
+- Added focused health-contract tests for disabled, host, Docker, unavailable macOS VM, and ready
+  macOS VM modes.
+- Focused checks passed:
+  `pnpm --filter @agent-platform/harness test -- test/commandRunnerHealth.test.ts`,
+  `pnpm --filter @agent-platform/harness test -- test/commandRunner.test.ts test/commandRunnerHealth.test.ts`,
+  `pnpm --filter @agent-platform/harness typecheck`, and
+  `pnpm --filter @agent-platform/harness lint`.
+- Full repository gate passed:
+  `pnpm lint && pnpm typecheck && pnpm format:check && pnpm docs:lint && pnpm test && pnpm build && git diff --check`.
 
 ## Next
 
-1. Commit and push the current branch with the `.1` implementation.
-2. After the PR/pipelines for this branch pass, branch from this tip for
-   `agent-platform-macos-production-sandbox.2` and add the runner health/status contract.
+1. Commit and push `jwill9999/macos-production-sandbox-health-contract`.
+2. After this branch/pipelines pass, branch from it for `agent-platform-macos-production-sandbox.3`
+   to add the ADR and native VM helper skeleton.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.

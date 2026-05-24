@@ -71,6 +71,18 @@ export type CommandRunner = {
 
 export type CommandRunnerMode = 'disabled' | 'host' | 'docker-sandbox' | 'macos-vm';
 
+export type CommandRunnerHealthStatus = 'ready' | 'unavailable' | 'disabled';
+
+export type CommandRunnerHealth = {
+  mode: CommandRunnerMode;
+  status: CommandRunnerHealthStatus;
+  production: boolean;
+  canExecute: boolean;
+  reason?: string;
+  message?: string;
+  details?: Record<string, string | number | boolean>;
+};
+
 type ExecFileLike = typeof execFile;
 
 export type DockerSandboxCommandRunnerOptions = {
@@ -352,6 +364,65 @@ function configuredMode(env: Record<string, string | undefined>): CommandRunnerM
     return raw;
   }
   return 'disabled';
+}
+
+export function getConfiguredCommandRunnerHealth(
+  options: ConfiguredCommandRunnerOptions = {},
+): CommandRunnerHealth {
+  const mode = configuredMode(options.env ?? process.env);
+
+  if (mode === 'host') {
+    return {
+      mode,
+      status: 'ready',
+      production: false,
+      canExecute: true,
+      reason: 'development_only',
+      message: 'Host command execution is available for explicit local development only.',
+    };
+  }
+
+  if (mode === 'docker-sandbox') {
+    return {
+      mode,
+      status: 'ready',
+      production: false,
+      canExecute: true,
+      reason: 'development_only',
+      message: 'Docker sandbox execution is available for development and adapter testing only.',
+    };
+  }
+
+  if (mode === 'macos-vm') {
+    if (options.macosVmRunner) {
+      return {
+        mode,
+        status: 'ready',
+        production: true,
+        canExecute: true,
+        reason: 'production_runner_ready',
+        message: 'macOS VM command execution is configured.',
+      };
+    }
+
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_unavailable',
+      message: 'macOS VM command execution is selected but no VM runner is configured.',
+    };
+  }
+
+  return {
+    mode,
+    status: 'disabled',
+    production: false,
+    canExecute: false,
+    reason: 'command_runner_disabled',
+    message: 'Command execution is disabled because no production runner is configured.',
+  };
 }
 
 export function createConfiguredCommandRunner(
