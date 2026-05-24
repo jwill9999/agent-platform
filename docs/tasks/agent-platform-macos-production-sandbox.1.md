@@ -29,6 +29,13 @@ Follow Stage 1 in the implementation plan:
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm docs:lint`
 
+Environment evidence:
+
+- Local evidence is sufficient for this task because it changes runner selection policy and desktop
+  environment defaults, not real VM execution.
+- Tests must assert that production-like desktop defaults are fail-closed and do not select host or
+  Docker implicitly.
+
 ## Definition Of Done
 
 - Desktop no longer injects `AGENT_PLATFORM_COMMAND_RUNNER=auto` by default.

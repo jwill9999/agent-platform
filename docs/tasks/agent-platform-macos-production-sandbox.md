@@ -25,6 +25,19 @@ Host/Docker:
   explicit development-only modes
 ```
 
+## Environment Model
+
+| Environment | Purpose                                      | Runner Policy                                                                                                                                                           | Required Evidence                                                                                                                                   |
+| ----------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local       | Developer productivity and fast feedback.    | Host and Docker may be enabled only through explicit developer configuration; macOS VM should be available for production-path development as early as possible.        | Unit tests, adapter tests, Swift helper tests, and local VM smoke tests where the task claims VM behavior.                                          |
+| Staging     | Production rehearsal before merge to `main`. | Must run the packaged macOS app with `macos-vm`, or command execution must be explicitly disabled for that release. Host/Docker fallback is not valid staging evidence. | Packaged Electron E2E, runner health proving `macos-vm`, command output proving `/workspace`, fail-closed unavailable test, and full quality gates. |
+| Production  | Released app used by end users.              | Uses the packaged macOS app with the managed VM runner. Missing or unhealthy runner fails closed.                                                                       | Signed/notarized artifact smoke, packaged runner startup, staging evidence from the same artifact shape, and manual release verification.           |
+
+Configuration must use the same variable names and defaults in staging and production. Differences
+between staging and production should be limited to credentials, artifact identity, and release-safe
+test data. Any setting that changes runner safety must be exposed in runner health and asserted by
+tests.
+
 ## Proposed Task Chain
 
 1. `agent-platform-macos-production-sandbox.1` — Correct runner defaults and fail closed.
@@ -59,13 +72,31 @@ Host/Docker:
 
 ## Testing Strategy
 
-- Unit tests for runner mode selection and fail-closed behavior.
-- Unit tests for runner health/status normalization.
-- Swift helper tests for native CLI status and execution output.
-- Desktop adapter tests for helper invocation and error mapping.
-- Packaged macOS Electron E2E proving `sys_bash` runs through `macos-vm`.
-- Packaged macOS Electron E2E proving unavailable VM runner fails closed and does not use host fallback.
-- Staging workflow requires packaged macOS runner evidence before merge to `main`.
+Testing must prove sandbox properties, not just command success:
+
+- Unit tests prove runner mode selection, fail-closed defaults, health/status normalization, and
+  result mapping.
+- Desktop adapter tests prove helper invocation, explicit environment passing, unavailable mapping,
+  and absence of silent host fallback.
+- Swift helper tests prove native CLI parsing and structured JSON output.
+- Local VM smoke tests prove real command execution in `/workspace` before VM lifecycle tasks are
+  complete.
+- Packaged macOS Electron E2E proves staging uses `macos-vm`, can execute `sys_bash` inside the
+  guest, cannot see host-only paths, and fails closed when VM assets are unavailable.
+- Manual packaged-app release smoke proves the signed/notarized artifact can start the runner on a
+  real macOS machine with a real Project folder.
+
+Per-task evidence rules:
+
+- `.1` and `.2` can complete with unit/adapter tests because they define policy and status
+  contracts.
+- `.3` can complete with ADR approval and Swift helper skeleton tests because it does not claim real
+  VM execution.
+- `.4` cannot complete without real local macOS VM command execution proof.
+- `.5` cannot complete without packaged Electron E2E proving staging uses `macos-vm` and fail-closed
+  behavior.
+- `.6` cannot complete without signing/notarization and release smoke evidence.
+- The epic cannot close while staging can pass using host or Docker command execution.
 
 ## Definition Of Done
 
@@ -75,4 +106,6 @@ Host/Docker:
 - Host and Docker runners remain explicit development-only modes.
 - The app package includes the native helper and required VM assets.
 - Staging tests the packaged macOS app and runner path before any merge to `main`.
+- Staging and production share the same runner defaults and environment variable names.
+- Every child task records the environment it was tested in and why that evidence is sufficient.
 - Documentation explains the production runner, development overrides, staging gate, and future Windows/Linux adapter path.

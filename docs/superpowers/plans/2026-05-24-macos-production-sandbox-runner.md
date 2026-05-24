@@ -40,6 +40,40 @@ Developer override:
   host or Docker runner only when explicitly configured for local development
 ```
 
+## Environment Model
+
+The sandbox runner must be built and tested against three explicit environments. The same
+environment names should appear in code, docs, CI configuration, and release checklists.
+
+| Environment | Purpose                                                | Runner Policy                                                                                                                                                                | Evidence Required                                                                                                                        |
+| ----------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Local       | Developer productivity while building the app.         | Host and Docker runners may be enabled only by explicit developer configuration. macOS VM runner should be available as early as possible for production-path development.   | Unit tests, adapter tests, Swift helper tests, and optional local VM smoke tests.                                                        |
+| Staging     | Production rehearsal and release candidate validation. | Must use the packaged macOS app with `macos-vm`, or command execution must be explicitly disabled for that release. Host and Docker fallback are not valid staging evidence. | Packaged Electron E2E, runner health proving `macos-vm`, VM command execution proof, fail-closed unavailable proof, full quality gates.  |
+| Production  | Released app used by end users.                        | Must use the packaged macOS app with the managed VM runner. Missing or unhealthy runner fails closed with a clear user-visible status.                                       | Release artifact signing/notarization, packaged runner startup, manual release smoke, and staging evidence from the same artifact shape. |
+
+Configuration rules:
+
+- Local may use `.env.local`, shell environment overrides, or explicit developer settings.
+- Staging must use production-like environment variables committed to CI/release configuration, with
+  secrets supplied through the staging secret store.
+- Production must use the same variable names and defaults as staging, with production secrets and
+  production artifact signing.
+- A setting that changes runner safety must be visible in runner health output and test assertions.
+- `AGENT_PLATFORM_COMMAND_RUNNER=host` and `AGENT_PLATFORM_COMMAND_RUNNER=docker-sandbox` are
+  development modes. They are not acceptable for staging-to-main approval.
+
+Production-readiness principles:
+
+- Store configuration in environment-specific settings rather than code branches.
+- Keep dev/staging/production as similar as possible; staging should differ only in credentials,
+  artifact identity, and endpoints required for test safety.
+- Fail closed when a production dependency such as the VM helper, VM image, secure storage, or
+  runner health check is unavailable.
+- Emit logs and health states that explain whether failures are policy denials, runner
+  unavailability, VM boot failures, command failures, or packaging/signing problems.
+- Treat packaged Electron E2E as the release gate for desktop runtime behavior; dev Electron and
+  Docker checks are useful but insufficient for production promotion.
+
 ## File Structure
 
 Create or modify these files during the plan:
@@ -1141,6 +1175,49 @@ All platforms implement the harness `CommandRunner` behavior:
 git add docs/planning/local-sandbox-runner-platforms.md
 git commit -m "feature/docker-sandbox-command-runner docs plan future local sandbox adapters"
 ```
+
+## Testing Strategy And Evidence Matrix
+
+The test strategy must prove properties, not just run commands. Each task must state which property
+it proves and which environment it applies to.
+
+| Layer                 | Environment                              | What It Proves                                                                                                                                        | Required Before                       |
+| --------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Unit tests            | Local                                    | Pure policy, mode selection, health normalization, and result mapping are deterministic.                                                              | Any PR merge into the feature branch. |
+| Adapter tests         | Local                                    | TypeScript calls the correct helper command, passes explicit env only, maps failures to denied results, and never falls back silently.                | VM adapter implementation review.     |
+| Swift helper tests    | Local and staging CI on macOS            | Native CLI parsing and JSON output are stable before packaging.                                                                                       | Native helper merge.                  |
+| Local VM smoke        | Local                                    | Developers can run the same VM path before staging, without relying on host/Docker behavior.                                                          | VM lifecycle task completion.         |
+| Packaged Electron E2E | Staging                                  | The release-shaped app can start the managed backend, report `macos-vm`, execute inside `/workspace`, and fail closed when VM assets are unavailable. | Any staging-to-main promotion.        |
+| Manual packaged smoke | Staging and production release candidate | The installed/notarized app works on a real macOS machine with a real Project folder.                                                                 | Release approval.                     |
+
+Required sandbox properties:
+
+- Runner identity: health output must show the active mode and whether it is production-valid.
+- Filesystem isolation: commands see `/workspace` for the selected Project and cannot see host home
+  directories, app data, credentials, or unrelated Projects.
+- Fail-closed behavior: missing helper, missing image, VM boot failure, and unavailable secure
+  storage deny command execution instead of falling back to host.
+- Environment isolation: guest commands receive only explicit allowed environment variables.
+- Resource control: timeout, output limit, CPU, memory, and process/user restrictions are enforced
+  or reported as unavailable until enforced.
+- Auditability: command execution results distinguish policy denial, approval required, runner
+  unavailable, VM failure, and command non-zero exit.
+- Packaging validity: the helper and VM assets are present, executable after signing, and usable
+  from the packaged app location.
+
+Per-task Definition of Done rules:
+
+- Tasks `.1` and `.2` may complete with unit and adapter tests because they define policy and
+  status contracts.
+- Task `.3` may complete with Swift helper skeleton tests and ADR approval because it does not yet
+  claim production command execution.
+- Task `.4` cannot complete until a real local macOS VM smoke proves command execution in
+  `/workspace`.
+- Task `.5` cannot complete until packaged Electron E2E proves staging uses `macos-vm` and fails
+  closed when unavailable.
+- Task `.6` cannot complete until signing/notarization and release smoke are documented and
+  verified for the packaged helper.
+- The epic cannot close while staging can pass using host or Docker command execution.
 
 ## Final Verification
 

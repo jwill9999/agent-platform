@@ -31,6 +31,14 @@ Follow Stage 8 and Stage 9 in the implementation plan:
 - Staging GitHub Actions macOS packaged app job.
 - Manual packaged app pass on macOS using a real Project folder.
 
+Environment evidence:
+
+- This task is the staging gate. It cannot complete with local-only evidence.
+- Staging must run the packaged macOS artifact with production-like environment variables and
+  runner defaults.
+- E2E must prove runner health reports `macos-vm`, successful command execution happens in
+  `/workspace`, host-only paths are not visible, and unavailable VM assets fail closed.
+
 ## Definition Of Done
 
 - Packaged macOS artifact includes the VM helper and required runner assets.

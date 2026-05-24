@@ -33,6 +33,14 @@ Follow Stage 5, Stage 6, and Stage 7 in the implementation plan:
 - Manual local helper smoke: `macos-vm-runner status`
 - Manual local helper command execution proving guest `/workspace` path.
 
+Environment evidence:
+
+- Local unit and helper tests are not sufficient on their own for this task.
+- Completion requires a real macOS VM smoke test that proves command execution inside `/workspace`
+  and proves host-only paths are unavailable from the guest.
+- Staging packaged E2E is not required until `.5`, but `.4` must leave the VM runner ready for that
+  packaged path.
+
 ## Definition Of Done
 
 - `macos-vm` runner can start, report ready health, execute commands, and stop.

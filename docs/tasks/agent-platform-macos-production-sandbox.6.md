@@ -35,6 +35,14 @@ Follow Stage 10 and Stage 11 in the implementation plan:
 - `pnpm --filter @agent-platform/desktop test:e2e`
 - Manual signed/notarized macOS artifact smoke test.
 
+Environment evidence:
+
+- Production release evidence must come from a signed/notarized macOS artifact, not the dev Electron
+  shell.
+- Staging and production must use the same runner mode defaults and environment variable names.
+- The release smoke must prove helper execution still works after signing/notarization and that VM
+  reset/repair touches only app-owned runtime state.
+
 ## Definition Of Done
 
 - VM runner resource and network behavior is documented and enforced.
