@@ -98,6 +98,8 @@ Supported modes:
 - `AGENT_PLATFORM_COMMAND_RUNNER=disabled` — deny command execution because no production sandbox
   runner is configured.
 - `AGENT_PLATFORM_COMMAND_RUNNER=macos-vm` — use the managed macOS VM runner once implemented.
+  This mode requires `AGENT_PLATFORM_MACOS_VM_RUNNER_PATH` to point at the packaged native helper;
+  if the helper is absent, command execution is denied and never falls back to host execution.
 - `AGENT_PLATFORM_COMMAND_RUNNER=docker-sandbox` — use Docker sandbox execution for development
   and adapter testing.
 - `AGENT_PLATFORM_COMMAND_RUNNER=host` — use the Project-scoped host runner for explicit local

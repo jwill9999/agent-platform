@@ -100,6 +100,7 @@ describe('desktop backend supervisor helpers', () => {
       env: {
         SCHEDULER_ENABLED: 'true',
         SQLITE_PATH: '/data/agent.sqlite',
+        AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/app/macos-vm-runner',
       },
       paths,
       port: '4500',
@@ -119,6 +120,7 @@ describe('desktop backend supervisor helpers', () => {
       AGENT_PLATFORM_DESKTOP_LOG_DIR: join(runtimeRoot, 'logs'),
       AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeRoot, 'tmp'),
       AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
+      AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/app/macos-vm-runner',
     });
   });
 

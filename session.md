@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Added macOS production sandbox ADR and native VM helper skeleton.
-- **Branch:** `jwill9999/macos-production-sandbox-vm-helper-skeleton`
-- **Latest commit:** pending commit for `agent-platform-macos-production-sandbox.3`.
+- **Session:** Started macOS VM lifecycle/command execution task.
+- **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
+- **Latest commit:** pending partial `.4` commit for the harness macOS VM adapter.
 
 ## Current State
 
@@ -37,6 +37,8 @@
     `jwill9999/macos-production-sandbox-health-contract`,
   - `agent-platform-macos-production-sandbox.3` is implemented locally on
     `jwill9999/macos-production-sandbox-vm-helper-skeleton`,
+  - `agent-platform-macos-production-sandbox.4` is claimed and started on
+    `jwill9999/macos-production-sandbox-vm-lifecycle-exec`,
   - command runner defaults to `disabled`,
   - desktop managed backend defaults to `AGENT_PLATFORM_COMMAND_RUNNER=disabled`,
   - `host` and `docker-sandbox` are now explicit development modes only,
@@ -80,6 +82,11 @@
 - Added a native Swift package at `apps/desktop/native/macos-vm-runner` with deterministic JSON
   skeleton commands for `status`, `prepare`, `start`, `stop`, and `exec`.
 - Added desktop package scripts and tests for building/testing the native helper.
+- Started `.4` by adding the harness-side `macos-vm` runner adapter, preserving
+  `AGENT_PLATFORM_MACOS_VM_RUNNER_PATH` through the managed desktop backend, and expanding the Swift
+  helper lifecycle contract for deterministic runtime-dir and missing-image behavior.
+- The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
+  Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
   `pnpm --filter @agent-platform/desktop native:vm:build`,
   `pnpm --filter @agent-platform/desktop native:vm:test`, and
@@ -89,8 +96,9 @@
 
 ## Next
 
-1. Commit and push `jwill9999/macos-production-sandbox-vm-helper-skeleton`.
-2. After this branch/pipelines pass, branch from it for `agent-platform-macos-production-sandbox.4`
-   to add VM lifecycle and command execution behind the macOS VM helper.
+1. Commit and push the current `.4` adapter/lifecycle-contract slice.
+2. Continue `.4` with the real VM lifecycle: packaged base image validation,
+   Virtualization.framework boot, guest command service, `/workspace` mount, and host-path
+   isolation proof.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.
