@@ -120,6 +120,7 @@ describe('desktop backend supervisor helpers', () => {
       AGENT_PLATFORM_DESKTOP_LOG_DIR: join(runtimeRoot, 'logs'),
       AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeRoot, 'tmp'),
       AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
+      AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: join(runtimeRoot, 'data/vm'),
       AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/app/macos-vm-runner',
     });
   });

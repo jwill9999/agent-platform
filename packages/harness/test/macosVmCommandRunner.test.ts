@@ -40,6 +40,7 @@ describe('macOS VM command runner adapter', () => {
     });
     const runner = createMacosVmCommandRunner({
       helperPath: '/app/macos-vm-runner',
+      runtimeDir: '/app/vm',
       execFile,
     });
 
@@ -49,6 +50,8 @@ describe('macOS VM command runner adapter', () => {
       '/app/macos-vm-runner',
       [
         'exec',
+        '--runtime-dir',
+        '/app/vm',
         '--workspace',
         workspaceRoot,
         '--cwd',
@@ -91,6 +94,7 @@ describe('macOS VM command runner adapter', () => {
     });
     const runner = createMacosVmCommandRunner({
       helperPath: '/app/macos-vm-runner',
+      runtimeDir: '/app/vm',
       execFile,
     });
 
@@ -115,6 +119,7 @@ describe('macOS VM command runner adapter', () => {
     });
     const runner = createMacosVmCommandRunner({
       helperPath: '/missing/macos-vm-runner',
+      runtimeDir: '/app/vm',
       execFile,
     });
 
@@ -135,12 +140,33 @@ describe('macOS VM command runner adapter', () => {
       env: {
         AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
         AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/missing/macos-vm-runner',
+        AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: '/app/vm',
       },
     });
 
     await expect(runner.run(request(workspaceRoot))).resolves.toMatchObject({
       status: 'denied',
       code: 'MACOS_VM_RUNNER_UNAVAILABLE',
+    });
+
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('fails closed when macOS VM mode is selected without a runtime directory', async () => {
+    const workspaceRoot = await realpath(
+      await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-runner-')),
+    );
+    const runner = createConfiguredCommandRunner({
+      env: {
+        AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
+        AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/app/macos-vm-runner',
+      },
+    });
+
+    await expect(runner.run(request(workspaceRoot))).resolves.toMatchObject({
+      status: 'denied',
+      code: 'COMMAND_RUNNER_UNAVAILABLE',
+      reason: 'command_runner_disabled',
     });
 
     await rm(workspaceRoot, { recursive: true, force: true });

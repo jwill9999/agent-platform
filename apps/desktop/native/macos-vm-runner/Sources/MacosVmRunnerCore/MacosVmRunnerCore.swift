@@ -55,13 +55,7 @@ public func handleCommand(arguments: [String]) -> CommandResult {
     case "stop":
         return stop(runtimeDir: options["runtime-dir"])
     case "exec":
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: "VM command execution is not implemented."
-            )
-        )
+        return execute(runtimeDir: options["runtime-dir"])
     default:
         return CommandResult(
             response: JsonResponse(
@@ -200,6 +194,46 @@ private func stop(runtimeDir: String?) -> CommandResult {
             ok: true,
             state: "disabled",
             message: "VM runner is stopped."
+        )
+    )
+}
+
+private func execute(runtimeDir: String?) -> CommandResult {
+    guard let paths = runtimePaths(runtimeDir: runtimeDir) else {
+        return CommandResult(
+            response: JsonResponse(
+                ok: false,
+                state: "unavailable",
+                message: "VM runner runtime directory is not configured."
+            )
+        )
+    }
+
+    guard fileExists(paths.baseImage) else {
+        return CommandResult(
+            response: JsonResponse(
+                ok: false,
+                state: "unavailable",
+                message: "Linux VM image is missing from the packaged runtime."
+            )
+        )
+    }
+
+    guard fileExists(paths.runnerSocket) else {
+        return CommandResult(
+            response: JsonResponse(
+                ok: false,
+                state: "unavailable",
+                message: "VM runner is prepared but not started."
+            )
+        )
+    }
+
+    return CommandResult(
+        response: JsonResponse(
+            ok: false,
+            state: "unavailable",
+            message: "VM command execution transport is not implemented."
         )
     )
 }

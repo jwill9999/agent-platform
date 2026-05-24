@@ -61,7 +61,8 @@ describe('CommandRunner health contract', () => {
       production: true,
       canExecute: false,
       reason: 'macos_vm_runner_unavailable',
-      message: 'macOS VM command execution is selected but no VM runner is configured.',
+      message:
+        'macOS VM command execution is selected but no VM helper and runtime directory are configured.',
     } satisfies CommandRunnerHealth);
   });
 

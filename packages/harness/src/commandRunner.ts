@@ -104,6 +104,7 @@ export type ConfiguredCommandRunnerOptions = {
   hostRunner?: CommandRunner;
   macosVmRunner?: CommandRunner;
   macosVmHelperPath?: string;
+  macosVmRuntimeDir?: string;
 };
 
 export type ProjectScopedCommandRunnerOptions = {
@@ -350,6 +351,7 @@ export function createDockerSandboxCommandRunner(
 
 export type MacosVmCommandRunnerOptions = {
   helperPath: string;
+  runtimeDir: string;
   execFile?: ExecFileLike;
 };
 
@@ -411,10 +413,18 @@ async function macosVmWorkspacePaths(request: CommandRunnerRequest): Promise<{
 
 export function createMacosVmCommandRunner({
   helperPath,
+  runtimeDir,
   execFile: exec = execFile,
 }: MacosVmCommandRunnerOptions): CommandRunner {
   return {
     run: async (request) => {
+      if (!runtimeDir.trim()) {
+        return macosVmUnavailable(
+          'macos_vm_runner_runtime_unconfigured',
+          'macOS VM runner runtime directory is not configured.',
+        );
+      }
+
       let paths: Awaited<ReturnType<typeof macosVmWorkspacePaths>>;
       try {
         paths = await macosVmWorkspacePaths(request);
@@ -429,6 +439,8 @@ export function createMacosVmCommandRunner({
         const startedAt = Date.now();
         const args = [
           'exec',
+          '--runtime-dir',
+          runtimeDir,
           '--workspace',
           paths.hostWorkspaceRoot,
           '--cwd',
@@ -517,7 +529,13 @@ function configuredMacosVmRunner(
     options.macosVmHelperPath ??
     options.env?.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH ??
     process.env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH;
-  return helperPath ? createMacosVmCommandRunner({ helperPath }) : undefined;
+  const runtimeDir =
+    options.macosVmRuntimeDir ??
+    options.env?.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ??
+    process.env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR;
+  return helperPath && runtimeDir
+    ? createMacosVmCommandRunner({ helperPath, runtimeDir })
+    : undefined;
 }
 
 function configuredMacosVmHelperPath(options: ConfiguredCommandRunnerOptions): string | undefined {
@@ -525,6 +543,14 @@ function configuredMacosVmHelperPath(options: ConfiguredCommandRunnerOptions): s
     options.macosVmHelperPath ??
     options.env?.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH ??
     process.env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH
+  );
+}
+
+function configuredMacosVmRuntimeDir(options: ConfiguredCommandRunnerOptions): string | undefined {
+  return (
+    options.macosVmRuntimeDir ??
+    options.env?.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ??
+    process.env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR
   );
 }
 
@@ -557,7 +583,8 @@ export function getConfiguredCommandRunnerHealth(
 
   if (mode === 'macos-vm') {
     const helperPath = configuredMacosVmHelperPath(options);
-    if (options.macosVmRunner || (helperPath && existsSync(helperPath))) {
+    const runtimeDir = configuredMacosVmRuntimeDir(options);
+    if (options.macosVmRunner || (helperPath && runtimeDir && existsSync(helperPath))) {
       return {
         mode,
         status: 'ready',
@@ -565,7 +592,7 @@ export function getConfiguredCommandRunnerHealth(
         canExecute: true,
         reason: 'production_runner_ready',
         message: 'macOS VM command execution is configured.',
-        ...(helperPath ? { details: { helperPath } } : {}),
+        ...(helperPath && runtimeDir ? { details: { helperPath, runtimeDir } } : {}),
       };
     }
 
@@ -575,7 +602,8 @@ export function getConfiguredCommandRunnerHealth(
       production: true,
       canExecute: false,
       reason: 'macos_vm_runner_unavailable',
-      message: 'macOS VM command execution is selected but no VM runner is configured.',
+      message:
+        'macOS VM command execution is selected but no VM helper and runtime directory are configured.',
     };
   }
 

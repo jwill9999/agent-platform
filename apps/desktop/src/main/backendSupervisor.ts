@@ -52,6 +52,7 @@ export interface DesktopBackendEnvironment {
   readonly AGENT_PLATFORM_DESKTOP_TEMP_DIR: string;
   readonly AGENT_PLATFORM_COMMAND_RUNNER: string;
   readonly AGENT_PLATFORM_MACOS_VM_RUNNER_PATH?: string;
+  readonly AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: string;
 }
 
 const defaultBackendPort = 4310;
@@ -117,6 +118,8 @@ export function buildDesktopBackendEnvironment({
     AGENT_PLATFORM_DESKTOP_LOG_DIR: dirname(paths.stdoutLog),
     AGENT_PLATFORM_DESKTOP_TEMP_DIR: paths.tempDir,
     AGENT_PLATFORM_COMMAND_RUNNER: env.AGENT_PLATFORM_COMMAND_RUNNER ?? 'disabled',
+    AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR:
+      env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ?? join(dirname(paths.sqlitePath), 'vm'),
     ...(env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH
       ? { AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH }
       : {}),

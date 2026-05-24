@@ -90,9 +90,44 @@ struct MacosVmRunnerTests {
                 == JsonResponse(
                     ok: false,
                     state: "unavailable",
-                    message: "VM command execution is not implemented."
+                    message: "VM runner runtime directory is not configured."
                 )
         )
+    }
+
+    @Test func execFailsClosedWhenVmIsNotStarted() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        let images = runtimeDir.appendingPathComponent("images", isDirectory: true)
+        try FileManager.default.createDirectory(at: images, withIntermediateDirectories: true)
+        FileManager.default.createFile(
+            atPath: images.appendingPathComponent("base-linux.img").path,
+            contents: Data()
+        )
+
+        let result = handleCommand(
+            arguments: [
+                "exec",
+                "--runtime-dir",
+                runtimeDir.path,
+                "--workspace",
+                "/tmp/project",
+                "--cwd",
+                "/tmp/project",
+                "--",
+                "pwd",
+            ]
+        )
+
+        #expect(result.exitCode == 0)
+        #expect(
+            result.response
+                == JsonResponse(
+                    ok: false,
+                    state: "unavailable",
+                    message: "VM runner is prepared but not started."
+                )
+        )
+        removeRuntimeDir(runtimeDir)
     }
 
     @Test func unknownCommandReturnsExitCodeTwo() {

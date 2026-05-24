@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Started macOS VM lifecycle/command execution task.
+- **Session:** Continued macOS VM lifecycle/command execution task.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending partial `.4` commit for the harness macOS VM adapter.
+- **Latest commit:** pending partial `.4` commit for VM runtime-dir wiring.
 
 ## Current State
 
@@ -85,6 +85,9 @@
 - Started `.4` by adding the harness-side `macos-vm` runner adapter, preserving
   `AGENT_PLATFORM_MACOS_VM_RUNNER_PATH` through the managed desktop backend, and expanding the Swift
   helper lifecycle contract for deterministic runtime-dir and missing-image behavior.
+- Continued `.4` by adding app-owned `AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR` propagation, requiring
+  the harness `macos-vm` adapter to pass `--runtime-dir` to the native helper, and making Swift
+  `exec` fail closed for unconfigured runtime, missing image, or VM not started.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -96,8 +99,8 @@
 
 ## Next
 
-1. Commit and push the current `.4` adapter/lifecycle-contract slice.
-2. Continue `.4` with the real VM lifecycle: packaged base image validation,
+1. Commit and push the current `.4` runtime-dir/fail-closed slice.
+2. Continue `.4` with the real VM lifecycle:
    Virtualization.framework boot, guest command service, `/workspace` mount, and host-path
    isolation proof.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
