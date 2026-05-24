@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Split `.4.2` into explicit boot-proof child tasks.
+- **Session:** Audited sandbox epic task graph after pausing implementation.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending `.4.2` child task split.
+- **Latest commit:** pending sandbox task graph alignment audit.
 
 ## Current State
 
@@ -121,6 +121,9 @@
 - Split remaining `.4.2` work into child tasks so `.4.3` is blocked until real boot proof exists:
   `.4.2.1` provisions a bootable arm64 Linux image, `.4.2.2` proves boot/ready status, and `.4.2.3`
   proves daemon lifecycle reliability.
+- Paused implementation and audited the current Beads/spec graph. Beads dependencies were correct,
+  but the epic spec still omitted `.4.2.1` through `.4.2.3`; updated the epic dependency and child
+  spec tables so the roadmap matches the tracker.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:

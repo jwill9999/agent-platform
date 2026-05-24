@@ -63,41 +63,46 @@ as complete until their child tasks and evidence tasks are closed.
 
 Nested task dependencies:
 
-| Upstream                                      | Downstream                                    |
-| --------------------------------------------- | --------------------------------------------- |
-| `agent-platform-macos-production-sandbox.4.1` | `agent-platform-macos-production-sandbox.4.2` |
-| `agent-platform-macos-production-sandbox.4.2` | `agent-platform-macos-production-sandbox.4.3` |
-| `agent-platform-macos-production-sandbox.4.3` | `agent-platform-macos-production-sandbox.4.4` |
-| `agent-platform-macos-production-sandbox.5.1` | `agent-platform-macos-production-sandbox.5.2` |
-| `agent-platform-macos-production-sandbox.5.2` | `agent-platform-macos-production-sandbox.5.3` |
-| `agent-platform-macos-production-sandbox.5.3` | `agent-platform-macos-production-sandbox.5.4` |
-| `agent-platform-macos-production-sandbox.6.1` | `agent-platform-macos-production-sandbox.6.2` |
-| `agent-platform-macos-production-sandbox.6.2` | `agent-platform-macos-production-sandbox.6.3` |
-| `agent-platform-macos-production-sandbox.6.3` | `agent-platform-macos-production-sandbox.6.4` |
+| Upstream                                        | Downstream                                      |
+| ----------------------------------------------- | ----------------------------------------------- |
+| `agent-platform-macos-production-sandbox.4.1`   | `agent-platform-macos-production-sandbox.4.2`   |
+| `agent-platform-macos-production-sandbox.4.2.1` | `agent-platform-macos-production-sandbox.4.2.2` |
+| `agent-platform-macos-production-sandbox.4.2.2` | `agent-platform-macos-production-sandbox.4.2.3` |
+| `agent-platform-macos-production-sandbox.4.2.3` | `agent-platform-macos-production-sandbox.4.3`   |
+| `agent-platform-macos-production-sandbox.4.3`   | `agent-platform-macos-production-sandbox.4.4`   |
+| `agent-platform-macos-production-sandbox.5.1`   | `agent-platform-macos-production-sandbox.5.2`   |
+| `agent-platform-macos-production-sandbox.5.2`   | `agent-platform-macos-production-sandbox.5.3`   |
+| `agent-platform-macos-production-sandbox.5.3`   | `agent-platform-macos-production-sandbox.5.4`   |
+| `agent-platform-macos-production-sandbox.6.1`   | `agent-platform-macos-production-sandbox.6.2`   |
+| `agent-platform-macos-production-sandbox.6.2`   | `agent-platform-macos-production-sandbox.6.3`   |
+| `agent-platform-macos-production-sandbox.6.3`   | `agent-platform-macos-production-sandbox.6.4`   |
 
 ## Child Task Specs
 
-| Task                                          | Spec                                                                     |
-| --------------------------------------------- | ------------------------------------------------------------------------ |
-| `agent-platform-macos-production-sandbox.1`   | `docs/tasks/agent-platform-macos-production-sandbox.1.md`                |
-| `agent-platform-macos-production-sandbox.2`   | `docs/tasks/agent-platform-macos-production-sandbox.2.md`                |
-| `agent-platform-macos-production-sandbox.3`   | `docs/tasks/agent-platform-macos-production-sandbox.3.md`                |
-| `agent-platform-macos-production-sandbox.4`   | `docs/tasks/agent-platform-macos-production-sandbox.4.md`                |
-| `agent-platform-macos-production-sandbox.4.1` | `docs/tasks/agent-platform-macos-production-sandbox.4.1.md`              |
-| `agent-platform-macos-production-sandbox.4.2` | `docs/tasks/agent-platform-macos-production-sandbox.4.2.md`              |
-| `agent-platform-macos-production-sandbox.4.3` | `docs/tasks/agent-platform-macos-production-sandbox.4.3.md`              |
-| `agent-platform-macos-production-sandbox.4.4` | `docs/tasks/agent-platform-macos-production-sandbox.4.4.md`              |
-| `agent-platform-macos-production-sandbox.5`   | `docs/tasks/agent-platform-macos-production-sandbox.5.md`                |
-| `agent-platform-macos-production-sandbox.5.1` | `docs/tasks/agent-platform-macos-production-sandbox.5.1.md`              |
-| `agent-platform-macos-production-sandbox.5.2` | `docs/tasks/agent-platform-macos-production-sandbox.5.2.md`              |
-| `agent-platform-macos-production-sandbox.5.3` | `docs/tasks/agent-platform-macos-production-sandbox.5.3.md`              |
-| `agent-platform-macos-production-sandbox.5.4` | `docs/tasks/agent-platform-macos-production-sandbox.5.4.md`              |
-| `agent-platform-macos-production-sandbox.6`   | `docs/tasks/agent-platform-macos-production-sandbox.6.md`                |
-| `agent-platform-macos-production-sandbox.6.1` | `docs/tasks/agent-platform-macos-production-sandbox.6.1.md`              |
-| `agent-platform-macos-production-sandbox.6.2` | `docs/tasks/agent-platform-macos-production-sandbox.6.2.md`              |
-| `agent-platform-macos-production-sandbox.6.3` | `docs/tasks/agent-platform-macos-production-sandbox.6.3.md`              |
-| `agent-platform-macos-production-sandbox.6.4` | `docs/tasks/agent-platform-macos-production-sandbox.6.4.md`              |
-| `agent-platform-macos-production-sandbox` DoD | PR checks, packaged E2E, Sonar/Problems gate, and review comments green. |
+| Task                                            | Spec                                                                     |
+| ----------------------------------------------- | ------------------------------------------------------------------------ |
+| `agent-platform-macos-production-sandbox.1`     | `docs/tasks/agent-platform-macos-production-sandbox.1.md`                |
+| `agent-platform-macos-production-sandbox.2`     | `docs/tasks/agent-platform-macos-production-sandbox.2.md`                |
+| `agent-platform-macos-production-sandbox.3`     | `docs/tasks/agent-platform-macos-production-sandbox.3.md`                |
+| `agent-platform-macos-production-sandbox.4`     | `docs/tasks/agent-platform-macos-production-sandbox.4.md`                |
+| `agent-platform-macos-production-sandbox.4.1`   | `docs/tasks/agent-platform-macos-production-sandbox.4.1.md`              |
+| `agent-platform-macos-production-sandbox.4.2`   | `docs/tasks/agent-platform-macos-production-sandbox.4.2.md`              |
+| `agent-platform-macos-production-sandbox.4.2.1` | `docs/tasks/agent-platform-macos-production-sandbox.4.2.1.md`            |
+| `agent-platform-macos-production-sandbox.4.2.2` | `docs/tasks/agent-platform-macos-production-sandbox.4.2.2.md`            |
+| `agent-platform-macos-production-sandbox.4.2.3` | `docs/tasks/agent-platform-macos-production-sandbox.4.2.3.md`            |
+| `agent-platform-macos-production-sandbox.4.3`   | `docs/tasks/agent-platform-macos-production-sandbox.4.3.md`              |
+| `agent-platform-macos-production-sandbox.4.4`   | `docs/tasks/agent-platform-macos-production-sandbox.4.4.md`              |
+| `agent-platform-macos-production-sandbox.5`     | `docs/tasks/agent-platform-macos-production-sandbox.5.md`                |
+| `agent-platform-macos-production-sandbox.5.1`   | `docs/tasks/agent-platform-macos-production-sandbox.5.1.md`              |
+| `agent-platform-macos-production-sandbox.5.2`   | `docs/tasks/agent-platform-macos-production-sandbox.5.2.md`              |
+| `agent-platform-macos-production-sandbox.5.3`   | `docs/tasks/agent-platform-macos-production-sandbox.5.3.md`              |
+| `agent-platform-macos-production-sandbox.5.4`   | `docs/tasks/agent-platform-macos-production-sandbox.5.4.md`              |
+| `agent-platform-macos-production-sandbox.6`     | `docs/tasks/agent-platform-macos-production-sandbox.6.md`                |
+| `agent-platform-macos-production-sandbox.6.1`   | `docs/tasks/agent-platform-macos-production-sandbox.6.1.md`              |
+| `agent-platform-macos-production-sandbox.6.2`   | `docs/tasks/agent-platform-macos-production-sandbox.6.2.md`              |
+| `agent-platform-macos-production-sandbox.6.3`   | `docs/tasks/agent-platform-macos-production-sandbox.6.3.md`              |
+| `agent-platform-macos-production-sandbox.6.4`   | `docs/tasks/agent-platform-macos-production-sandbox.6.4.md`              |
+| `agent-platform-macos-production-sandbox` DoD   | PR checks, packaged E2E, Sonar/Problems gate, and review comments green. |
 
 ## Testing Strategy
 
