@@ -69,7 +69,7 @@ export type CommandRunner = {
   run(request: CommandRunnerRequest): Promise<CommandRunnerResult>;
 };
 
-export type CommandRunnerMode = 'auto' | 'host' | 'docker-sandbox';
+export type CommandRunnerMode = 'disabled' | 'host' | 'docker-sandbox' | 'macos-vm';
 
 type ExecFileLike = typeof execFile;
 
@@ -89,6 +89,7 @@ export type ConfiguredCommandRunnerOptions = {
   env?: Record<string, string | undefined>;
   dockerRunner?: CommandRunner;
   hostRunner?: CommandRunner;
+  macosVmRunner?: CommandRunner;
 };
 
 export type ProjectScopedCommandRunnerOptions = {
@@ -333,10 +334,24 @@ export function createDockerSandboxCommandRunner(
   };
 }
 
+function createDisabledCommandRunner(): CommandRunner {
+  return {
+    run: async () => ({
+      status: 'denied',
+      code: 'COMMAND_RUNNER_UNAVAILABLE',
+      reason: 'command_runner_disabled',
+      message:
+        'Command execution is unavailable because no production sandbox runner is configured.',
+    }),
+  };
+}
+
 function configuredMode(env: Record<string, string | undefined>): CommandRunnerMode {
   const raw = env.AGENT_PLATFORM_COMMAND_RUNNER ?? env.AGENT_COMMAND_RUNNER;
-  if (raw === 'host' || raw === 'docker-sandbox' || raw === 'auto') return raw;
-  return 'host';
+  if (raw === 'host' || raw === 'docker-sandbox' || raw === 'macos-vm' || raw === 'disabled') {
+    return raw;
+  }
+  return 'disabled';
 }
 
 export function createConfiguredCommandRunner(
@@ -346,15 +361,8 @@ export function createConfiguredCommandRunner(
   const hostRunner = options.hostRunner ?? createHostShellCommandRunner();
   const dockerRunner = options.dockerRunner ?? createDockerSandboxCommandRunner();
 
+  if (mode === 'disabled') return createDisabledCommandRunner();
   if (mode === 'host') return hostRunner;
   if (mode === 'docker-sandbox') return dockerRunner;
-
-  return {
-    run: async (request) => {
-      const sandboxResult = await dockerRunner.run(request);
-      return sandboxResult.status === 'denied' && sandboxResult.code === 'DOCKER_UNAVAILABLE'
-        ? hostRunner.run(request)
-        : sandboxResult;
-    },
-  };
+  return options.macosVmRunner ?? createDisabledCommandRunner();
 }

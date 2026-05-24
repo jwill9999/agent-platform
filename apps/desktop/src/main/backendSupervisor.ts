@@ -115,7 +115,7 @@ export function buildDesktopBackendEnvironment({
     AGENT_PLATFORM_DESKTOP_DATA_DIR: dirname(paths.sqlitePath),
     AGENT_PLATFORM_DESKTOP_LOG_DIR: dirname(paths.stdoutLog),
     AGENT_PLATFORM_DESKTOP_TEMP_DIR: paths.tempDir,
-    AGENT_PLATFORM_COMMAND_RUNNER: env.AGENT_PLATFORM_COMMAND_RUNNER ?? 'auto',
+    AGENT_PLATFORM_COMMAND_RUNNER: env.AGENT_PLATFORM_COMMAND_RUNNER ?? 'disabled',
   };
 }
 

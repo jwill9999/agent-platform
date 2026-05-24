@@ -226,6 +226,7 @@ async function withMockChatApp(
   const ctx = await createSeededApp(dirs, { mockLlm: true });
   try {
     process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+    process.env.AGENT_PLATFORM_COMMAND_RUNNER = 'host';
     await callback(ctx);
   } finally {
     restoreChatEnv(envSnap);
@@ -291,6 +292,7 @@ async function createPendingToolApproval(
   toolName = 'sys_bash',
   args?: Record<string, unknown>,
 ) {
+  process.env.AGENT_PLATFORM_COMMAND_RUNNER = 'host';
   mockStreamText.mockReset();
   mockToolCalls.mockReset();
   mockToolCallStream(toolName, args ?? { command: 'date' });

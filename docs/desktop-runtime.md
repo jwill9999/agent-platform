@@ -84,22 +84,25 @@ rebuilds native dependencies for Electron's Node ABI, or packages the backend an
 
 ## Command sandbox runner
 
-Shell commands issued through `sys_bash` use the harness `CommandRunner` boundary. In the managed
-desktop backend, the runner uses `AGENT_PLATFORM_COMMAND_RUNNER=auto` by default: it tries the
-Docker sandbox runner and falls back to the existing Project-scoped host runner only when Docker is
-unavailable. Non-desktop harness usage defaults to the host runner unless this variable is set.
+Shell commands issued through `sys_bash` use the harness `CommandRunner` boundary. Packaged desktop
+builds must not use host fallback. Until the macOS VM runner is available, command execution
+defaults to disabled. Docker and host runners are explicit development modes only.
 
 Supported modes:
 
-- `AGENT_PLATFORM_COMMAND_RUNNER=auto` — prefer Docker sandbox, fallback to host if Docker is
-  missing.
-- `AGENT_PLATFORM_COMMAND_RUNNER=docker-sandbox` — require Docker sandbox execution.
-- `AGENT_PLATFORM_COMMAND_RUNNER=host` — use the Project-scoped host runner.
+- `AGENT_PLATFORM_COMMAND_RUNNER=disabled` — deny command execution because no production sandbox
+  runner is configured.
+- `AGENT_PLATFORM_COMMAND_RUNNER=macos-vm` — use the managed macOS VM runner once implemented.
+- `AGENT_PLATFORM_COMMAND_RUNNER=docker-sandbox` — use Docker sandbox execution for development
+  and adapter testing.
+- `AGENT_PLATFORM_COMMAND_RUNNER=host` — use the Project-scoped host runner for explicit local
+  development only.
 
 The Docker sandbox mounts only the selected Project at `/workspace`, runs without host networking,
 uses bounded CPU, memory, process, timeout, and output limits, and does not inherit the host
-environment. The existing policy layer still runs first: command classification, PathJail checks,
-Project write gating, and human approvals remain outside the runner adapter.
+environment. It is not the packaged production runner. The existing policy layer still runs first:
+command classification, PathJail checks, Project write gating, and human approvals remain outside
+the runner adapter.
 
 ## Desktop app data
 

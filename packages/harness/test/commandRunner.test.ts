@@ -345,16 +345,25 @@ describe('CommandRunner boundary', () => {
     await rm(workspaceRoot, { recursive: true, force: true });
   });
 
-  it('falls back to the host runner only when auto sandbox mode cannot find Docker', async () => {
+  it('defaults configured command execution to disabled when no mode is provided', async () => {
     const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
-    const dockerRunner: CommandRunner = {
-      run: vi.fn().mockResolvedValue({
-        status: 'denied',
-        code: 'DOCKER_UNAVAILABLE',
-        reason: 'docker_unavailable',
-        message: 'Docker is not available.',
-      }),
-    };
+    const dockerRunner: CommandRunner = { run: vi.fn() };
+    const hostRunner: CommandRunner = { run: vi.fn() };
+    const runner = createConfiguredCommandRunner({ env: {}, dockerRunner, hostRunner });
+
+    await expect(runner.run(commandRequest(workspaceRoot))).resolves.toMatchObject({
+      status: 'denied',
+      code: 'COMMAND_RUNNER_UNAVAILABLE',
+      reason: 'command_runner_disabled',
+    });
+    expect(dockerRunner.run).not.toHaveBeenCalled();
+    expect(hostRunner.run).not.toHaveBeenCalled();
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('uses host execution only when explicitly requested', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const dockerRunner: CommandRunner = { run: vi.fn() };
     const hostRunner: CommandRunner = {
       run: vi.fn().mockResolvedValue({
         status: 'success',
@@ -365,7 +374,7 @@ describe('CommandRunner boundary', () => {
       }),
     };
     const runner = createConfiguredCommandRunner({
-      env: { AGENT_PLATFORM_COMMAND_RUNNER: 'auto' },
+      env: { AGENT_PLATFORM_COMMAND_RUNNER: 'host' },
       dockerRunner,
       hostRunner,
     });
@@ -374,33 +383,35 @@ describe('CommandRunner boundary', () => {
       status: 'success',
       stdout: 'host\n',
     });
-    expect(dockerRunner.run).toHaveBeenCalledOnce();
+    expect(dockerRunner.run).not.toHaveBeenCalled();
     expect(hostRunner.run).toHaveBeenCalledOnce();
     await rm(workspaceRoot, { recursive: true, force: true });
   });
 
-  it('defaults non-desktop configured command execution to the host runner', async () => {
+  it('uses Docker sandbox execution only when explicitly requested', async () => {
     const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
     const dockerRunner: CommandRunner = {
-      run: vi.fn(),
-    };
-    const hostRunner: CommandRunner = {
       run: vi.fn().mockResolvedValue({
         status: 'success',
-        stdout: 'host\n',
+        stdout: 'docker\n',
         stderr: '',
         exitCode: 0,
         durationMs: 1,
       }),
     };
-    const runner = createConfiguredCommandRunner({ env: {}, dockerRunner, hostRunner });
+    const hostRunner: CommandRunner = { run: vi.fn() };
+    const runner = createConfiguredCommandRunner({
+      env: { AGENT_PLATFORM_COMMAND_RUNNER: 'docker-sandbox' },
+      dockerRunner,
+      hostRunner,
+    });
 
     await expect(runner.run(commandRequest(workspaceRoot))).resolves.toMatchObject({
       status: 'success',
-      stdout: 'host\n',
+      stdout: 'docker\n',
     });
-    expect(dockerRunner.run).not.toHaveBeenCalled();
-    expect(hostRunner.run).toHaveBeenCalledOnce();
+    expect(dockerRunner.run).toHaveBeenCalledOnce();
+    expect(hostRunner.run).not.toHaveBeenCalled();
     await rm(workspaceRoot, { recursive: true, force: true });
   });
 });
