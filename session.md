@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Addressed sandbox PR review comments on runner health, helper errors, and asset hashing.
+- **Session:** Addressed SonarCloud duplication failure on PR #227.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending review-fix commit for PR #227.
+- **Latest commit:** pending Sonar duplication fix for PR #227.
 
 ## Current State
 
@@ -105,6 +105,10 @@
   directory before reporting `production_runner_ready`, mapping missing/non-executable helper
   process failures to distinct denied reasons, and streaming VM asset SHA-256 hashes instead of
   reading whole images into memory.
+- Investigated PR #227 SonarCloud failure: quality gate failed on `3.8% Duplication on New Code`
+  with the duplicated lines isolated to `MacosVmRunnerCore.swift`. Refactored repeated runtime and
+  asset validation response blocks into shared helper functions so Sonar can recalculate below the
+  threshold.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:

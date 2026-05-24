@@ -69,34 +69,11 @@ public func handleCommand(arguments: [String]) -> CommandResult {
 }
 
 private func status(runtimeDir: String?) -> CommandResult {
-    guard let paths = runtimePaths(runtimeDir: runtimeDir) else {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: "VM runner runtime directory is not configured."
-            )
-        )
-    }
-
-    if let assetError = validateVmAssets(paths: paths) {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: assetError
-            )
-        )
-    }
+    let validation = validateRuntime(runtimeDir: runtimeDir)
+    guard let paths = validation.paths else { return validation.result! }
 
     guard fileExists(paths.runnerSocket) else {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: "VM runner is prepared but not started."
-            )
-        )
+        return unavailableResult("VM runner is prepared but not started.")
     }
 
     return CommandResult(
@@ -109,25 +86,8 @@ private func status(runtimeDir: String?) -> CommandResult {
 }
 
 private func prepare(runtimeDir: String?) -> CommandResult {
-    guard let paths = runtimePaths(runtimeDir: runtimeDir) else {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: "VM runner runtime directory is not configured."
-            )
-        )
-    }
-
-    if let assetError = validateVmAssets(paths: paths) {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: assetError
-            )
-        )
-    }
+    let validation = validateRuntime(runtimeDir: runtimeDir)
+    guard let paths = validation.paths else { return validation.result! }
 
     do {
         try FileManager.default.createDirectory(at: paths.images, withIntermediateDirectories: true)
@@ -155,33 +115,10 @@ private func prepare(runtimeDir: String?) -> CommandResult {
 }
 
 private func start(runtimeDir: String?) -> CommandResult {
-    guard let paths = runtimePaths(runtimeDir: runtimeDir) else {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: "VM runner runtime directory is not configured."
-            )
-        )
-    }
+    let validation = validateRuntime(runtimeDir: runtimeDir)
+    guard validation.paths != nil else { return validation.result! }
 
-    if let assetError = validateVmAssets(paths: paths) {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: assetError
-            )
-        )
-    }
-
-    return CommandResult(
-        response: JsonResponse(
-            ok: false,
-            state: "unavailable",
-            message: "VM start is not implemented."
-        )
-    )
+    return unavailableResult("VM start is not implemented.")
 }
 
 private func stop(runtimeDir: String?) -> CommandResult {
@@ -199,43 +136,14 @@ private func stop(runtimeDir: String?) -> CommandResult {
 }
 
 private func execute(runtimeDir: String?) -> CommandResult {
-    guard let paths = runtimePaths(runtimeDir: runtimeDir) else {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: "VM runner runtime directory is not configured."
-            )
-        )
-    }
-
-    if let assetError = validateVmAssets(paths: paths) {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: assetError
-            )
-        )
-    }
+    let validation = validateRuntime(runtimeDir: runtimeDir)
+    guard let paths = validation.paths else { return validation.result! }
 
     guard fileExists(paths.runnerSocket) else {
-        return CommandResult(
-            response: JsonResponse(
-                ok: false,
-                state: "unavailable",
-                message: "VM runner is prepared but not started."
-            )
-        )
+        return unavailableResult("VM runner is prepared but not started.")
     }
 
-    return CommandResult(
-        response: JsonResponse(
-            ok: false,
-            state: "unavailable",
-            message: "VM command execution transport is not implemented."
-        )
-    )
+    return unavailableResult("VM command execution transport is not implemented.")
 }
 
 private struct RuntimePaths {
@@ -263,6 +171,30 @@ private struct GuestService: Codable {
     let transport: String
     let port: Int
     let command: String
+}
+
+private struct RuntimeValidation {
+    let paths: RuntimePaths?
+    let result: CommandResult?
+}
+
+private func unavailableResult(_ message: String) -> CommandResult {
+    CommandResult(response: JsonResponse(ok: false, state: "unavailable", message: message))
+}
+
+private func validateRuntime(runtimeDir: String?) -> RuntimeValidation {
+    guard let paths = runtimePaths(runtimeDir: runtimeDir) else {
+        return RuntimeValidation(
+            paths: nil,
+            result: unavailableResult("VM runner runtime directory is not configured.")
+        )
+    }
+
+    if let assetError = validateVmAssets(paths: paths) {
+        return RuntimeValidation(paths: nil, result: unavailableResult(assetError))
+    }
+
+    return RuntimeValidation(paths: paths, result: nil)
 }
 
 private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
