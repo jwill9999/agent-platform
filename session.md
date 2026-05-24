@@ -143,6 +143,9 @@
 - Tightened `.1`, `.2`, and `.3` specs and Beads acceptance so the already-closed foundation tasks
   remain independently testable and cannot be misread as claiming real VM boot, packaged execution,
   or release readiness.
+- Added an epic-level task sign-off matrix that lists each task's independent closure claim,
+  required evidence, and what it explicitly does not claim. This is the audit checklist to use
+  before closing any remaining sandbox task.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
