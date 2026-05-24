@@ -1,4 +1,6 @@
+import Darwin
 import Foundation
+import Virtualization
 
 public struct JsonResponse: Codable, Equatable {
     public let ok: Bool
@@ -56,6 +58,8 @@ public func handleCommand(arguments: [String]) -> CommandResult {
         return stop(runtimeDir: options["runtime-dir"])
     case "exec":
         return execute(runtimeDir: options["runtime-dir"])
+    case "daemon":
+        return daemon(runtimeDir: options["runtime-dir"])
     default:
         return CommandResult(
             response: JsonResponse(
@@ -72,7 +76,7 @@ private func status(runtimeDir: String?) -> CommandResult {
     let validation = validateRuntime(runtimeDir: runtimeDir)
     guard let paths = validation.paths else { return validation.result! }
 
-    guard fileExists(paths.runnerSocket) else {
+    guard vmIsRunning(paths: paths) else {
         return unavailableResult("VM runner is prepared but not started.")
     }
 
@@ -116,14 +120,44 @@ private func prepare(runtimeDir: String?) -> CommandResult {
 
 private func start(runtimeDir: String?) -> CommandResult {
     let validation = validateRuntime(runtimeDir: runtimeDir)
-    guard validation.paths != nil else { return validation.result! }
+    guard let paths = validation.paths else { return validation.result! }
 
-    return unavailableResult("VM start is not implemented.")
+    if vmIsRunning(paths: paths) {
+        return CommandResult(
+            response: JsonResponse(
+                ok: true,
+                state: "ready",
+                message: "VM runner is already running."
+            )
+        )
+    }
+
+    do {
+        try prepareRuntimeDirectories(paths: paths)
+        clearRuntimeState(paths: paths)
+        try launchDaemon(paths: paths)
+        if waitUntilReady(paths: paths, timeoutSeconds: 15) {
+            return CommandResult(
+                response: JsonResponse(
+                    ok: true,
+                    state: "ready",
+                    message: "VM runner is ready."
+                )
+            )
+        }
+        let message = readText(paths.lastError) ?? "VM did not become ready before the startup timeout."
+        return unavailableResult(message)
+    } catch {
+        return unavailableResult("Failed to start VM runner: \(error.localizedDescription)")
+    }
 }
 
 private func stop(runtimeDir: String?) -> CommandResult {
-    if let paths = runtimePaths(runtimeDir: runtimeDir), fileExists(paths.runnerSocket) {
-        try? FileManager.default.removeItem(at: paths.runnerSocket)
+    if let paths = runtimePaths(runtimeDir: runtimeDir) {
+        if let pid = readPid(paths.daemonPid) {
+            _ = Darwin.kill(pid, SIGTERM)
+        }
+        clearRuntimeState(paths: paths)
     }
 
     return CommandResult(
@@ -146,6 +180,42 @@ private func execute(runtimeDir: String?) -> CommandResult {
     return unavailableResult("VM command execution transport is not implemented.")
 }
 
+private func daemon(runtimeDir: String?) -> CommandResult {
+    let validation = validateRuntime(runtimeDir: runtimeDir)
+    guard let paths = validation.paths else { return validation.result! }
+
+    do {
+        try prepareRuntimeDirectories(paths: paths)
+        let configuration = try buildVirtualMachineConfiguration(paths: paths)
+        let virtualMachine = VZVirtualMachine(configuration: configuration)
+        let semaphore = DispatchSemaphore(value: 0)
+        var startupError: Error?
+        virtualMachine.start { result in
+            if case let .failure(error) = result {
+                startupError = error
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+        if let startupError {
+            try startupError.localizedDescription.write(
+                to: paths.lastError,
+                atomically: true,
+                encoding: .utf8
+            )
+            return unavailableResult("VM failed to start: \(startupError.localizedDescription)")
+        }
+        try "ready\n".write(to: paths.runnerSocket, atomically: true, encoding: .utf8)
+        RunLoop.current.run()
+        return CommandResult(
+            response: JsonResponse(ok: true, state: "disabled", message: "VM runner daemon stopped.")
+        )
+    } catch {
+        try? error.localizedDescription.write(to: paths.lastError, atomically: true, encoding: .utf8)
+        return unavailableResult("VM daemon failed: \(error.localizedDescription)")
+    }
+}
+
 private struct RuntimePaths {
     let root: URL
     let images: URL
@@ -155,6 +225,9 @@ private struct RuntimePaths {
     let baseImage: URL
     let guestBootstrap: URL
     let machineId: URL
+    let efiVariableStore: URL
+    let daemonPid: URL
+    let lastError: URL
     let runnerSocket: URL
 }
 
@@ -214,8 +287,124 @@ private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
         baseImage: images.appendingPathComponent("base-linux.img", isDirectory: false),
         guestBootstrap: images.appendingPathComponent("guest-bootstrap.sh", isDirectory: false),
         machineId: state.appendingPathComponent("machine-id", isDirectory: false),
+        efiVariableStore: state.appendingPathComponent("efi-variable-store", isDirectory: false),
+        daemonPid: state.appendingPathComponent("daemon.pid", isDirectory: false),
+        lastError: logs.appendingPathComponent("last-error.log", isDirectory: false),
         runnerSocket: state.appendingPathComponent("runner.sock", isDirectory: false)
     )
+}
+
+private func prepareRuntimeDirectories(paths: RuntimePaths) throws {
+    try FileManager.default.createDirectory(at: paths.images, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: paths.state, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
+    if !fileExists(paths.machineId) {
+        try UUID().uuidString.write(to: paths.machineId, atomically: true, encoding: .utf8)
+    }
+}
+
+private func clearRuntimeState(paths: RuntimePaths) {
+    try? FileManager.default.removeItem(at: paths.runnerSocket)
+    try? FileManager.default.removeItem(at: paths.daemonPid)
+    try? FileManager.default.removeItem(at: paths.lastError)
+}
+
+private func vmIsRunning(paths: RuntimePaths) -> Bool {
+    guard fileExists(paths.runnerSocket), let pid = readPid(paths.daemonPid) else {
+        return false
+    }
+    return Darwin.kill(pid, 0) == 0
+}
+
+private func readPid(_ url: URL) -> pid_t? {
+    guard let text = readText(url), let value = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+        return nil
+    }
+    return pid_t(value)
+}
+
+private func readText(_ url: URL) -> String? {
+    try? String(contentsOf: url, encoding: .utf8)
+}
+
+private func launchDaemon(paths: RuntimePaths) throws {
+    guard let executablePath = CommandLine.arguments.first, executablePath.hasSuffix("macos-vm-runner") else {
+        throw RuntimeError("VM daemon can only be launched from the macos-vm-runner helper.")
+    }
+    let executable = URL(fileURLWithPath: executablePath)
+    let stdoutURL = paths.logs.appendingPathComponent("daemon.out.log")
+    let stderrURL = paths.logs.appendingPathComponent("daemon.err.log")
+    FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
+    FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
+    let stdout = try FileHandle(forWritingTo: stdoutURL)
+    let stderr = try FileHandle(forWritingTo: stderrURL)
+    let process = Process()
+    process.executableURL = executable
+    process.arguments = ["daemon", "--runtime-dir", paths.root.path]
+    process.standardOutput = stdout
+    process.standardError = stderr
+    try process.run()
+    try "\(process.processIdentifier)\n".write(to: paths.daemonPid, atomically: true, encoding: .utf8)
+}
+
+private func waitUntilReady(paths: RuntimePaths, timeoutSeconds: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeoutSeconds)
+    while Date() < deadline {
+        if vmIsRunning(paths: paths) {
+            return true
+        }
+        if fileExists(paths.lastError) {
+            return false
+        }
+        Thread.sleep(forTimeInterval: 0.2)
+    }
+    if let pid = readPid(paths.daemonPid) {
+        _ = Darwin.kill(pid, SIGTERM)
+    }
+    return false
+}
+
+private func buildVirtualMachineConfiguration(paths: RuntimePaths) throws -> VZVirtualMachineConfiguration {
+    if !fileExists(paths.efiVariableStore) {
+        _ = try VZEFIVariableStore(creatingVariableStoreAt: paths.efiVariableStore)
+    }
+    let platform = VZGenericPlatformConfiguration()
+    let bootLoader = VZEFIBootLoader()
+    bootLoader.variableStore = VZEFIVariableStore(url: paths.efiVariableStore)
+
+    let diskAttachment = try VZDiskImageStorageDeviceAttachment(
+        url: paths.baseImage,
+        readOnly: false,
+        cachingMode: .automatic,
+        synchronizationMode: .fsync
+    )
+    let disk = VZVirtioBlockDeviceConfiguration(attachment: diskAttachment)
+
+    let configuration = VZVirtualMachineConfiguration()
+    configuration.platform = platform
+    configuration.bootLoader = bootLoader
+    configuration.cpuCount = min(2, VZVirtualMachineConfiguration.maximumAllowedCPUCount)
+    configuration.memorySize = min(
+        2 * 1024 * 1024 * 1024,
+        VZVirtualMachineConfiguration.maximumAllowedMemorySize
+    )
+    configuration.storageDevices = [disk]
+    configuration.entropyDevices = [VZVirtioEntropyDeviceConfiguration()]
+    configuration.memoryBalloonDevices = [VZVirtioTraditionalMemoryBalloonDeviceConfiguration()]
+    try configuration.validate()
+    return configuration
+}
+
+private struct RuntimeError: LocalizedError {
+    let message: String
+
+    init(_ message: String) {
+        self.message = message
+    }
+
+    var errorDescription: String? {
+        message
+    }
 }
 
 private func fileExists(_ url: URL) -> Bool {

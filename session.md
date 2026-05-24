@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Enabled full CI and Promptfoo checks for PRs into staging.
+- **Session:** Started `.4.2` Virtualization.framework VM boot lifecycle.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending staging workflow trigger fix for PR #227.
+- **Latest commit:** pending `.4.2` VM daemon lifecycle slice.
 
 ## Current State
 
@@ -112,6 +112,12 @@
 - Found that expected `CI` and `Promptfoo Code Scan` checks were not running on PR #227 because
   workflow branch filters only targeted `main`/`feature/**`. Updated workflow triggers to include
   `staging` so staging PRs run the full validation set.
+- Started `.4.2` by adding a helper-owned daemon lifecycle: `start` launches a
+  `macos-vm-runner daemon`, the daemon builds a `Virtualization.framework`
+  `VZVirtualMachineConfiguration` with EFI bootloader, bounded CPU/memory, disk attachment,
+  entropy, and memory balloon devices; `status` now requires a live daemon PID plus ready marker,
+  and `stop` clears stale runtime state. Dummy-image smoke fails closed; `.4.2` remains open until a
+  real bootable image starts and reports ready.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -123,8 +129,9 @@
 
 ## Next
 
-1. Continue `.4.2` with the Virtualization.framework VM boot lifecycle against the `.4.1` asset
-   contract.
+1. Continue `.4.2` by obtaining or generating a real bootable arm64 Linux image compatible with the
+   `.4.1` asset contract, then prove `start` reaches ready state and `status` reports ready only
+   while the daemon is alive.
 2. Then continue `.4.3` guest command service, `/workspace` mount, and host-path isolation proof.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.

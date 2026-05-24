@@ -105,7 +105,7 @@ struct MacosVmRunnerTests {
         removeRuntimeDir(runtimeDir)
     }
 
-    @Test func startDoesNotPretendVmIsReadyBeforeLifecycleIsImplemented() throws {
+    @Test func startFailsClosedWhenDaemonCannotBeLaunchedFromHelperBinary() throws {
         let runtimeDir = temporaryRuntimeDir()
         try writeVmAssets(runtimeDir: runtimeDir)
 
@@ -114,7 +114,41 @@ struct MacosVmRunnerTests {
         #expect(result.exitCode == 0)
         #expect(
             result.response
-                == JsonResponse(ok: false, state: "unavailable", message: "VM start is not implemented.")
+                == JsonResponse(
+                    ok: false,
+                    state: "unavailable",
+                    message: "Failed to start VM runner: VM daemon can only be launched from the macos-vm-runner helper."
+                )
+        )
+        removeRuntimeDir(runtimeDir)
+    }
+
+    @Test func statusDoesNotReportReadyForStaleSocketWithoutLiveDaemon() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        try writeVmAssets(runtimeDir: runtimeDir)
+        let state = runtimeDir.appendingPathComponent("state", isDirectory: true)
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
+        try "ready\n".write(
+            to: state.appendingPathComponent("runner.sock"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "999999\n".write(
+            to: state.appendingPathComponent("daemon.pid"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let result = handleCommand(arguments: ["status", "--runtime-dir", runtimeDir.path])
+
+        #expect(result.exitCode == 0)
+        #expect(
+            result.response
+                == JsonResponse(
+                    ok: false,
+                    state: "unavailable",
+                    message: "VM runner is prepared but not started."
+                )
         )
         removeRuntimeDir(runtimeDir)
     }
