@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* global console, process */
 import { createHash } from 'node:crypto';
-import { copyFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, createReadStream, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -54,8 +54,8 @@ const bootstrapPath = join(outDir, 'guest-bootstrap.sh');
 copyFileSync(sourceImage, imagePath);
 copyFileSync(bootstrap, bootstrapPath);
 
-const imageSha256 = sha256File(imagePath);
-const bootstrapSha256 = sha256File(bootstrapPath);
+const imageSha256 = await sha256File(imagePath);
+const bootstrapSha256 = await sha256File(bootstrapPath);
 const manifest = {
   schemaVersion: 1,
   architecture,
@@ -84,6 +84,10 @@ function assertReadableFile(path, label) {
   }
 }
 
-function sha256File(path) {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
+async function sha256File(path) {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(path)) {
+    hash.update(chunk);
+  }
+  return hash.digest('hex');
 }

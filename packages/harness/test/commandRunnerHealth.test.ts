@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   getConfiguredCommandRunnerHealth,
@@ -62,8 +65,34 @@ describe('CommandRunner health contract', () => {
       canExecute: false,
       reason: 'macos_vm_runner_unavailable',
       message:
-        'macOS VM command execution is selected but no VM helper and runtime directory are configured.',
+        'macOS VM command execution is selected but the VM helper or runtime directory is unavailable.',
     } satisfies CommandRunnerHealth);
+  });
+
+  it('reports macOS VM mode as unavailable when the runtime directory is missing', async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-health-'));
+    const helperPath = join(tempRoot, 'macos-vm-runner');
+    await writeFile(helperPath, '#!/bin/sh\n');
+
+    expect(
+      getConfiguredCommandRunnerHealth({
+        env: {
+          AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
+          AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: helperPath,
+          AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: join(tempRoot, 'missing-runtime'),
+        },
+      }),
+    ).toEqual({
+      mode: 'macos-vm',
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_unavailable',
+      message:
+        'macOS VM command execution is selected but the VM helper or runtime directory is unavailable.',
+    } satisfies CommandRunnerHealth);
+
+    await rm(tempRoot, { recursive: true, force: true });
   });
 
   it('reports macOS VM mode as production-ready when a runner is configured', () => {

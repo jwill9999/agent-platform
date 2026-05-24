@@ -132,6 +132,31 @@ describe('macOS VM command runner adapter', () => {
     await rm(workspaceRoot, { recursive: true, force: true });
   });
 
+  it('returns an actionable reason when the helper binary is missing', async () => {
+    const workspaceRoot = await realpath(
+      await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-runner-')),
+    );
+    const missingHelperError = Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' });
+    const execFile = vi.fn((_binary, _args, _options, callback) => {
+      callback(missingHelperError, '', '');
+      return fakeChildProcess();
+    });
+    const runner = createMacosVmCommandRunner({
+      helperPath: '/missing/macos-vm-runner',
+      runtimeDir: '/app/vm',
+      execFile,
+    });
+
+    await expect(runner.run(request(workspaceRoot))).resolves.toMatchObject({
+      status: 'denied',
+      code: 'MACOS_VM_RUNNER_UNAVAILABLE',
+      reason: 'macos_vm_runner_helper_missing',
+      message: 'macOS VM runner helper binary was not found.',
+    });
+
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
   it('uses the helper path from environment for configured macOS VM execution', async () => {
     const workspaceRoot = await realpath(
       await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-runner-')),

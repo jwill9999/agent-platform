@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-24
-- **Session:** Continued macOS VM lifecycle/command execution task.
+- **Session:** Addressed sandbox PR review comments on runner health, helper errors, and asset hashing.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `89d0d78` — runtime-dir wiring and fail-closed VM helper validation.
+- **Latest commit:** pending review-fix commit for PR #227.
 
 ## Current State
 
@@ -37,7 +37,9 @@
     `jwill9999/macos-production-sandbox-health-contract`,
   - `agent-platform-macos-production-sandbox.3` is implemented locally on
     `jwill9999/macos-production-sandbox-vm-helper-skeleton`,
-  - `agent-platform-macos-production-sandbox.4` is claimed and started on
+  - `agent-platform-macos-production-sandbox.4.1` is complete,
+  - `agent-platform-macos-production-sandbox.4.2` is claimed and started,
+  - `agent-platform-macos-production-sandbox.4` remains in progress on
     `jwill9999/macos-production-sandbox-vm-lifecycle-exec`,
   - command runner defaults to `disabled`,
   - desktop managed backend defaults to `AGENT_PLATFORM_COMMAND_RUNNER=disabled`,
@@ -97,6 +99,12 @@
   `native:vm:assets:prepare`, validating manifest/image/bootstrap/service fields in the Swift
   helper, and proving `prepare` succeeds while `status` remains unavailable until `.4.2` boots the
   VM.
+- Opened PR #227 from `jwill9999/macos-production-sandbox-vm-lifecycle-exec` into recreated
+  `staging`; closed older Docker-only PR #226.
+- Addressed PR review comments by requiring the macOS VM health check to see an existing runtime
+  directory before reporting `production_runner_ready`, mapping missing/non-executable helper
+  process failures to distinct denied reasons, and streaming VM asset SHA-256 hashes instead of
+  reading whole images into memory.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:

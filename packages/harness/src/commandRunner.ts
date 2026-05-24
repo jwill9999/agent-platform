@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { realpath } from 'node:fs/promises';
 
 import type { Output, RiskTier } from '@agent-platform/contracts';
@@ -375,6 +375,29 @@ function macosVmUnavailable(reason: string, message: string): CommandRunnerDenie
   };
 }
 
+function childProcessErrorCode(error: unknown): string | number | undefined {
+  return error && typeof error === 'object' && 'code' in error
+    ? (error.code as string | number | undefined)
+    : undefined;
+}
+
+function macosVmProcessFailure(error: unknown, stderr: string): CommandRunnerDeniedResult {
+  const code = childProcessErrorCode(error);
+  if (code === 'ENOENT') {
+    return macosVmUnavailable(
+      'macos_vm_runner_helper_missing',
+      'macOS VM runner helper binary was not found.',
+    );
+  }
+  if (code === 'EACCES') {
+    return macosVmUnavailable(
+      'macos_vm_runner_helper_not_executable',
+      'macOS VM runner helper binary is not executable.',
+    );
+  }
+  return macosVmUnavailable('macos_vm_runner_process_failed', stderr || errorMessage(error));
+}
+
 function macosVmEnvironment(env: CommandEnvironmentPolicy): Record<string, string> {
   return {
     ...env.variables,
@@ -463,9 +486,7 @@ export function createMacosVmCommandRunner({
           },
           (error, stdout, stderr) => {
             if (error) {
-              resolve(
-                macosVmUnavailable('macos_vm_runner_process_failed', stderr || errorMessage(error)),
-              );
+              resolve(macosVmProcessFailure(error, stderr));
               return;
             }
 
@@ -554,6 +575,14 @@ function configuredMacosVmRuntimeDir(options: ConfiguredCommandRunnerOptions): s
   );
 }
 
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 export function getConfiguredCommandRunnerHealth(
   options: ConfiguredCommandRunnerOptions = {},
 ): CommandRunnerHealth {
@@ -584,7 +613,10 @@ export function getConfiguredCommandRunnerHealth(
   if (mode === 'macos-vm') {
     const helperPath = configuredMacosVmHelperPath(options);
     const runtimeDir = configuredMacosVmRuntimeDir(options);
-    if (options.macosVmRunner || (helperPath && runtimeDir && existsSync(helperPath))) {
+    if (
+      options.macosVmRunner ||
+      (helperPath && runtimeDir && existsSync(helperPath) && isDirectory(runtimeDir))
+    ) {
       return {
         mode,
         status: 'ready',
@@ -603,7 +635,7 @@ export function getConfiguredCommandRunnerHealth(
       canExecute: false,
       reason: 'macos_vm_runner_unavailable',
       message:
-        'macOS VM command execution is selected but no VM helper and runtime directory are configured.',
+        'macOS VM command execution is selected but the VM helper or runtime directory is unavailable.',
     };
   }
 
