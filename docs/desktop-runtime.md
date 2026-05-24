@@ -101,7 +101,8 @@ Supported modes:
   This mode requires `AGENT_PLATFORM_MACOS_VM_RUNNER_PATH` to point at the packaged native helper
   and `AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR` to point at app-owned VM state. The managed desktop
   backend defaults the runtime directory to `<desktop data dir>/vm`. If either value is absent,
-  command execution is denied and never falls back to host execution.
+  command execution is denied and never falls back to host execution. The runtime asset contract is
+  documented in [macOS VM Runner Assets](desktop-macos-vm-assets.md).
 - `AGENT_PLATFORM_COMMAND_RUNNER=docker-sandbox` — use Docker sandbox execution for development
   and adapter testing.
 - `AGENT_PLATFORM_COMMAND_RUNNER=host` — use the Project-scoped host runner for explicit local

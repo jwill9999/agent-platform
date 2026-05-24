@@ -79,12 +79,12 @@ private func status(runtimeDir: String?) -> CommandResult {
         )
     }
 
-    guard fileExists(paths.baseImage) else {
+    if let assetError = validateVmAssets(paths: paths) {
         return CommandResult(
             response: JsonResponse(
                 ok: false,
                 state: "unavailable",
-                message: "Linux VM image is missing from the packaged runtime."
+                message: assetError
             )
         )
     }
@@ -119,12 +119,12 @@ private func prepare(runtimeDir: String?) -> CommandResult {
         )
     }
 
-    guard fileExists(paths.baseImage) else {
+    if let assetError = validateVmAssets(paths: paths) {
         return CommandResult(
             response: JsonResponse(
                 ok: false,
                 state: "unavailable",
-                message: "Linux VM image is missing from the packaged runtime."
+                message: assetError
             )
         )
     }
@@ -165,12 +165,12 @@ private func start(runtimeDir: String?) -> CommandResult {
         )
     }
 
-    guard fileExists(paths.baseImage) else {
+    if let assetError = validateVmAssets(paths: paths) {
         return CommandResult(
             response: JsonResponse(
                 ok: false,
                 state: "unavailable",
-                message: "Linux VM image is missing from the packaged runtime."
+                message: assetError
             )
         )
     }
@@ -209,12 +209,12 @@ private func execute(runtimeDir: String?) -> CommandResult {
         )
     }
 
-    guard fileExists(paths.baseImage) else {
+    if let assetError = validateVmAssets(paths: paths) {
         return CommandResult(
             response: JsonResponse(
                 ok: false,
                 state: "unavailable",
-                message: "Linux VM image is missing from the packaged runtime."
+                message: assetError
             )
         )
     }
@@ -243,9 +243,26 @@ private struct RuntimePaths {
     let images: URL
     let state: URL
     let logs: URL
+    let manifest: URL
     let baseImage: URL
+    let guestBootstrap: URL
     let machineId: URL
     let runnerSocket: URL
+}
+
+private struct VmAssetManifest: Codable {
+    let schemaVersion: Int
+    let architecture: String
+    let imageFormat: String
+    let image: String
+    let bootstrap: String
+    let guestService: GuestService
+}
+
+private struct GuestService: Codable {
+    let transport: String
+    let port: Int
+    let command: String
 }
 
 private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
@@ -261,7 +278,9 @@ private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
         images: images,
         state: state,
         logs: logs,
+        manifest: images.appendingPathComponent("manifest.json", isDirectory: false),
         baseImage: images.appendingPathComponent("base-linux.img", isDirectory: false),
+        guestBootstrap: images.appendingPathComponent("guest-bootstrap.sh", isDirectory: false),
         machineId: state.appendingPathComponent("machine-id", isDirectory: false),
         runnerSocket: state.appendingPathComponent("runner.sock", isDirectory: false)
     )
@@ -269,6 +288,53 @@ private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
 
 private func fileExists(_ url: URL) -> Bool {
     FileManager.default.fileExists(atPath: url.path)
+}
+
+private func validateVmAssets(paths: RuntimePaths) -> String? {
+    guard fileExists(paths.manifest) else {
+        return "Linux VM asset manifest is missing from the packaged runtime."
+    }
+
+    let manifest: VmAssetManifest
+    do {
+        let data = try Data(contentsOf: paths.manifest)
+        manifest = try JSONDecoder().decode(VmAssetManifest.self, from: data)
+    } catch {
+        return "Linux VM asset manifest is invalid: \(error.localizedDescription)"
+    }
+
+    guard manifest.schemaVersion == 1 else {
+        return "Linux VM asset manifest schema version is unsupported."
+    }
+    guard manifest.architecture == "arm64" else {
+        return "Linux VM image architecture is unsupported."
+    }
+    guard manifest.imageFormat == "raw" else {
+        return "Linux VM image format is unsupported."
+    }
+    guard manifest.image == "base-linux.img" else {
+        return "Linux VM asset manifest image path is unsupported."
+    }
+    guard manifest.bootstrap == "guest-bootstrap.sh" else {
+        return "Linux VM asset manifest bootstrap path is unsupported."
+    }
+    guard manifest.guestService.transport == "vsock" else {
+        return "Linux VM guest service transport is unsupported."
+    }
+    guard manifest.guestService.port == 10240 else {
+        return "Linux VM guest service port is unsupported."
+    }
+    guard !manifest.guestService.command.isEmpty else {
+        return "Linux VM guest service command is not configured."
+    }
+    guard fileExists(paths.baseImage) else {
+        return "Linux VM image is missing from the packaged runtime."
+    }
+    guard fileExists(paths.guestBootstrap) else {
+        return "Linux VM guest bootstrap is missing from the packaged runtime."
+    }
+
+    return nil
 }
 
 private func parseOptions(_ arguments: [String]) -> [String: String] {

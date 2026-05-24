@@ -93,6 +93,10 @@
   proof; `.5.1` through `.5.4` cover packaging, packaged runner health, packaged Electron E2E, and
   staging gate evidence; `.6.1` through `.6.4` cover resource/network hardening, VM reset/repair,
   signing/notarization smoke, and future platform adapter closure.
+- Completed `.4.1` by documenting the macOS VM asset layout, adding
+  `native:vm:assets:prepare`, validating manifest/image/bootstrap/service fields in the Swift
+  helper, and proving `prepare` succeeds while `status` remains unavailable until `.4.2` boots the
+  VM.
 - The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
   Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
 - Focused checks passed:
@@ -104,10 +108,8 @@
 
 ## Next
 
-1. Commit and push the task-graph correction that decomposes `.4`, `.5`, and `.6`.
-2. Continue `.4.1` with the real guest image/bootstrap contract, then proceed through `.4.4`.
-3. Continue `.4` with the real VM lifecycle:
-   Virtualization.framework boot, guest command service, `/workspace` mount, and host-path
-   isolation proof.
-4. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
+1. Continue `.4.2` with the Virtualization.framework VM boot lifecycle against the `.4.1` asset
+   contract.
+2. Then continue `.4.3` guest command service, `/workspace` mount, and host-path isolation proof.
+3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.

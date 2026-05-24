@@ -18,6 +18,7 @@ Define the bootable Linux guest image and bootstrap contract required by the pro
 
 ## Tests And Verification
 
+- `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- --source-image <raw-linux.img> --bootstrap <guest-bootstrap.sh> --out-dir <runtime>/images`
 - `pnpm --filter @agent-platform/desktop native:vm:test`
 - Helper smoke proving missing image/bootstrap assets fail closed with specific messages.
 - Documentation showing where the image comes from and how staging obtains the same asset.
