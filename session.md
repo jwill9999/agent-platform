@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Fixed PR #227 SonarCloud Security Hotspots, then implemented `.5.2` packaged runner startup/health contract changes.
+- **Session:** Fixed PR #227 Security Hotspots and duplication gate, then implemented `.5.2` packaged runner startup/health contract changes.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending local `.5.2` commit; latest pushed commit is `3271c13` session handoff update after Security Hotspot fixes.
+- **Latest commit:** `cf42fd7` reduces duplicated test setup after `.5.2` implementation commit `fb8248a`.
 
 ## Current State
 
@@ -60,6 +60,8 @@
     and last-error diagnostics before reporting ready,
   - `/health/ready` includes a degraded `commandRunner` subsystem check with the same mode/status
     contract used by the harness.
+- SonarCloud rerun after `fb8248a` showed hotspots fixed and no open issues, but duplication was
+  still at 3.5%; refactored duplicated runner-health/backend-supervisor test setup in `cf42fd7`.
 
 ## Checks Run
 
@@ -84,6 +86,6 @@
 ## Next
 
 1. Commit and push the local `.5.2` changes.
-2. Confirm PR #227 reruns cleanly after the `.5.2` push.
+2. Confirm PR #227 reruns cleanly after `cf42fd7`.
 3. Decide whether `.5.2` can be closed from unit/package-level verification or needs an additional
    packaged Electron smoke before sign-off.
