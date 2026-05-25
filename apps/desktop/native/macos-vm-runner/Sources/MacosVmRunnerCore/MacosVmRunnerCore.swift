@@ -43,6 +43,30 @@ public struct CommandResult: Equatable {
     }
 }
 
+private struct VmConfigDiagnostics: Codable {
+    let bootLoader: String
+    let kernel: String
+    let initrd: String
+    let kernelExists: Bool
+    let initrdExists: Bool
+    let baseImage: String
+    let baseImageExists: Bool
+    let bootCommandLine: String
+    let cpus: Int
+    let memoryMB: UInt64
+    let maximumAllowedCPUCount: Int
+    let maximumAllowedMemoryMB: UInt64
+    let storageDevices: Int
+    let serialPorts: Int
+    let entropyDevices: Int
+    let memoryBalloonDevices: Int
+    let platform: String
+    let machineIdentifier: Bool
+    let helperPath: String
+    let hostArch: String
+    let virtualizationEntitlementPresent: Bool
+}
+
 public func handleCommand(arguments: [String]) -> CommandResult {
     let command = arguments.first ?? "status"
     let options = parseOptions(Array(arguments.dropFirst()))
@@ -94,12 +118,7 @@ private func prepare(runtimeDir: String?) -> CommandResult {
     guard let paths = validation.paths else { return validation.result! }
 
     do {
-        try FileManager.default.createDirectory(at: paths.images, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: paths.state, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
-        if !fileExists(paths.machineId) {
-            try UUID().uuidString.write(to: paths.machineId, atomically: true, encoding: .utf8)
-        }
+        try prepareRuntimeDirectories(paths: paths)
         return CommandResult(
             response: JsonResponse(
                 ok: true,
@@ -188,17 +207,26 @@ private func daemon(runtimeDir: String?) -> CommandResult {
         try prepareRuntimeDirectories(paths: paths)
         let configuration = try buildVirtualMachineConfiguration(paths: paths)
         let virtualMachine = VZVirtualMachine(configuration: configuration)
-        let semaphore = DispatchSemaphore(value: 0)
         var startupError: Error?
+        var startupCompleted = false
         virtualMachine.start { result in
             if case let .failure(error) = result {
                 startupError = error
             }
-            semaphore.signal()
+            startupCompleted = true
         }
-        semaphore.wait()
+        let startupDeadline = Date().addingTimeInterval(45)
+        while !startupCompleted && Date() < startupDeadline {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.2))
+        }
+        guard startupCompleted else {
+            let message = "VM startup callback did not complete before the startup timeout."
+            try message.write(to: paths.lastError, atomically: true, encoding: .utf8)
+            return unavailableResult(message)
+        }
         if let startupError {
-            try startupError.localizedDescription.write(
+            let message = describeError(startupError)
+            try message.write(
                 to: paths.lastError,
                 atomically: true,
                 encoding: .utf8
@@ -211,7 +239,7 @@ private func daemon(runtimeDir: String?) -> CommandResult {
             response: JsonResponse(ok: true, state: "disabled", message: "VM runner daemon stopped.")
         )
     } catch {
-        try? error.localizedDescription.write(to: paths.lastError, atomically: true, encoding: .utf8)
+        try? describeError(error).write(to: paths.lastError, atomically: true, encoding: .utf8)
         return unavailableResult("VM daemon failed: \(error.localizedDescription)")
     }
 }
@@ -229,7 +257,9 @@ private struct RuntimePaths {
     let machineId: URL
     let daemonPid: URL
     let lastError: URL
+    let diagnostics: URL
     let runnerSocket: URL
+    let guestConsoleLog: URL
 }
 
 private struct VmAssetManifest: Codable {
@@ -304,7 +334,9 @@ private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
         machineId: state.appendingPathComponent("machine-id", isDirectory: false),
         daemonPid: state.appendingPathComponent("daemon.pid", isDirectory: false),
         lastError: logs.appendingPathComponent("last-error.log", isDirectory: false),
-        runnerSocket: state.appendingPathComponent("runner.sock", isDirectory: false)
+        diagnostics: logs.appendingPathComponent("vm-config.json", isDirectory: false),
+        runnerSocket: state.appendingPathComponent("runner.sock", isDirectory: false),
+        guestConsoleLog: logs.appendingPathComponent("guest-console.log", isDirectory: false)
     )
 }
 
@@ -312,9 +344,7 @@ private func prepareRuntimeDirectories(paths: RuntimePaths) throws {
     try FileManager.default.createDirectory(at: paths.images, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: paths.state, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
-    if !fileExists(paths.machineId) {
-        try UUID().uuidString.write(to: paths.machineId, atomically: true, encoding: .utf8)
-    }
+    _ = try loadOrCreateMachineIdentifier(paths: paths)
 }
 
 private func clearRuntimeState(paths: RuntimePaths) {
@@ -387,6 +417,7 @@ private func waitUntilReady(paths: RuntimePaths, timeoutSeconds: TimeInterval) -
 private func buildVirtualMachineConfiguration(paths: RuntimePaths) throws -> VZVirtualMachineConfiguration {
     let manifest = try loadVmAssetManifest(paths: paths)
     let platform = VZGenericPlatformConfiguration()
+    platform.machineIdentifier = try loadOrCreateMachineIdentifier(paths: paths)
     let bootLoader = VZLinuxBootLoader(kernelURL: paths.kernel)
     bootLoader.initialRamdiskURL = paths.initrd
     bootLoader.commandLine = manifest.boot.commandLine
@@ -408,10 +439,24 @@ private func buildVirtualMachineConfiguration(paths: RuntimePaths) throws -> VZV
         VZVirtualMachineConfiguration.maximumAllowedMemorySize
     )
     configuration.storageDevices = [disk]
+    configuration.serialPorts = [try makeGuestConsoleSerialPort(paths: paths)]
     configuration.entropyDevices = [VZVirtioEntropyDeviceConfiguration()]
     configuration.memoryBalloonDevices = [VZVirtioTraditionalMemoryBalloonDeviceConfiguration()]
     try configuration.validate()
+    try writeVmConfigDiagnostics(configuration: configuration, manifest: manifest, paths: paths)
     return configuration
+}
+
+private func makeGuestConsoleSerialPort(paths: RuntimePaths) throws -> VZSerialPortConfiguration {
+    FileManager.default.createFile(atPath: paths.guestConsoleLog.path, contents: nil)
+    let output = try FileHandle(forWritingTo: paths.guestConsoleLog)
+    let attachment = VZFileHandleSerialPortAttachment(
+        fileHandleForReading: nil,
+        fileHandleForWriting: output
+    )
+    let serialPort = VZVirtioConsoleDeviceSerialPortConfiguration()
+    serialPort.attachment = attachment
+    return serialPort
 }
 
 private struct RuntimeError: LocalizedError {
@@ -424,6 +469,80 @@ private struct RuntimeError: LocalizedError {
     var errorDescription: String? {
         message
     }
+}
+
+private func describeError(_ error: Error) -> String {
+    let nsError = error as NSError
+    var lines = [
+        error.localizedDescription,
+        "domain: \(nsError.domain)",
+        "code: \(nsError.code)",
+    ]
+    if let failureReason = nsError.localizedFailureReason {
+        lines.append("failureReason: \(failureReason)")
+    }
+    if let recoverySuggestion = nsError.localizedRecoverySuggestion {
+        lines.append("recoverySuggestion: \(recoverySuggestion)")
+    }
+    if !nsError.userInfo.isEmpty {
+        lines.append("userInfo: \(nsError.userInfo)")
+    }
+    return lines.joined(separator: "\n")
+}
+
+private func writeVmConfigDiagnostics(
+    configuration: VZVirtualMachineConfiguration,
+    manifest: VmAssetManifest,
+    paths: RuntimePaths
+) throws {
+    let diagnostics = VmConfigDiagnostics(
+        bootLoader: "VZLinuxBootLoader",
+        kernel: paths.kernel.path,
+        initrd: paths.initrd.path,
+        kernelExists: fileExists(paths.kernel),
+        initrdExists: fileExists(paths.initrd),
+        baseImage: paths.baseImage.path,
+        baseImageExists: fileExists(paths.baseImage),
+        bootCommandLine: manifest.boot.commandLine,
+        cpus: configuration.cpuCount,
+        memoryMB: configuration.memorySize / 1024 / 1024,
+        maximumAllowedCPUCount: VZVirtualMachineConfiguration.maximumAllowedCPUCount,
+        maximumAllowedMemoryMB: VZVirtualMachineConfiguration.maximumAllowedMemorySize / 1024 / 1024,
+        storageDevices: configuration.storageDevices.count,
+        serialPorts: configuration.serialPorts.count,
+        entropyDevices: configuration.entropyDevices.count,
+        memoryBalloonDevices: configuration.memoryBalloonDevices.count,
+        platform: "VZGenericPlatformConfiguration",
+        machineIdentifier: true,
+        helperPath: CommandLine.arguments.first ?? "",
+        hostArch: hostArchitecture(),
+        virtualizationEntitlementPresent: hasVirtualizationEntitlement()
+    )
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    try encoder.encode(diagnostics).write(to: paths.diagnostics, options: [.atomic])
+}
+
+private func hostArchitecture() -> String {
+    var systemInfo = utsname()
+    uname(&systemInfo)
+    return withUnsafePointer(to: &systemInfo.machine) { pointer in
+        pointer.withMemoryRebound(to: CChar.self, capacity: 1) {
+            String(cString: $0)
+        }
+    }
+}
+
+private func hasVirtualizationEntitlement() -> Bool {
+    guard let task = SecTaskCreateFromSelf(nil) else {
+        return false
+    }
+    let value = SecTaskCopyValueForEntitlement(
+        task,
+        "com.apple.security.virtualization" as CFString,
+        nil
+    )
+    return (value as? Bool) == true
 }
 
 private func fileExists(_ url: URL) -> Bool {
@@ -509,6 +628,18 @@ private func validateVmAssets(paths: RuntimePaths) -> String? {
 private func loadVmAssetManifest(paths: RuntimePaths) throws -> VmAssetManifest {
     let data = try Data(contentsOf: paths.manifest)
     return try JSONDecoder().decode(VmAssetManifest.self, from: data)
+}
+
+private func loadOrCreateMachineIdentifier(paths: RuntimePaths) throws -> VZGenericMachineIdentifier {
+    if let data = try? Data(contentsOf: paths.machineId),
+       let identifier = VZGenericMachineIdentifier(dataRepresentation: data)
+    {
+        return identifier
+    }
+
+    let identifier = VZGenericMachineIdentifier()
+    try identifier.dataRepresentation.write(to: paths.machineId, options: [.atomic])
+    return identifier
 }
 
 private func parseOptions(_ arguments: [String]) -> [String: String] {

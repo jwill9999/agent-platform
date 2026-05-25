@@ -1,13 +1,26 @@
 #!/usr/bin/env node
 /* global console, process */
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createGunzip } from 'node:zlib';
+import {
+  copyFileSync,
+  createReadStream,
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { parseArgs } from 'node:util';
 
 const DEFAULT_IMAGE_SIZE_MB = 2048;
 const DEFAULT_ALPINE_VERSION = '3.20';
 const DEFAULT_BUILDER_IMAGE = `alpine:${DEFAULT_ALPINE_VERSION}`;
+const DEFAULT_UBUNTU_UNPACKED_BASE =
+  'https://cloud-images.ubuntu.com/daily/server/jammy/current/unpacked';
+const DEFAULT_KERNEL_URL = `${DEFAULT_UBUNTU_UNPACKED_BASE}/jammy-server-cloudimg-arm64-vmlinuz-generic`;
+const DEFAULT_INITRD_URL = `${DEFAULT_UBUNTU_UNPACKED_BASE}/jammy-server-cloudimg-arm64-initrd-generic`;
 
 const scriptArgs = process.argv.slice(2);
 if (scriptArgs[0] === '--') scriptArgs.shift();
@@ -18,12 +31,16 @@ const { values } = parseArgs({
     'out-dir': { type: 'string' },
     'image-size-mb': { type: 'string', default: String(DEFAULT_IMAGE_SIZE_MB) },
     'builder-image': { type: 'string', default: DEFAULT_BUILDER_IMAGE },
+    'kernel-url': { type: 'string', default: DEFAULT_KERNEL_URL },
+    'initrd-url': { type: 'string', default: DEFAULT_INITRD_URL },
   },
 });
 
 const outDir = values['out-dir'];
 const imageSizeMb = Number(values['image-size-mb']);
 const builderImage = values['builder-image'] ?? DEFAULT_BUILDER_IMAGE;
+const kernelUrl = values['kernel-url'] ?? DEFAULT_KERNEL_URL;
+const initrdUrl = values['initrd-url'] ?? DEFAULT_INITRD_URL;
 
 if (!outDir || !Number.isInteger(imageSizeMb) || imageSizeMb < 512) {
   console.error(
@@ -32,7 +49,7 @@ if (!outDir || !Number.isInteger(imageSizeMb) || imageSizeMb < 512) {
       '',
       'Builds a reproducible arm64 Linux VM asset source set:',
       '  source.raw',
-      '  vmlinuz',
+      '  vmlinuz (raw ARM64 Linux Image, not an EFI-stub kernel)',
       '  initrd.img',
       '  guest-bootstrap.sh',
       '',
@@ -78,6 +95,13 @@ try {
   process.exit(typeof error?.status === 'number' ? error.status : 1);
 }
 
+const downloadedKernelPath = join(resolvedOutDir, 'vmlinuz.gz');
+const rawKernelPath = join(resolvedOutDir, 'vmlinuz');
+downloadFile(kernelUrl, downloadedKernelPath);
+await pipeline(createReadStream(downloadedKernelPath), createGunzip(), createWriteStream(rawKernelPath));
+downloadFile(initrdUrl, join(resolvedOutDir, 'initrd.img'));
+assertRawArm64Kernel(rawKernelPath);
+
 const required = ['source.raw', 'vmlinuz', 'initrd.img', 'guest-bootstrap.sh'];
 for (const file of required) {
   const path = join(resolvedOutDir, file);
@@ -89,6 +113,29 @@ for (const file of required) {
 
 copyFileSync(join(resolvedOutDir, 'source.raw'), join(resolvedOutDir, 'base-linux.img'));
 console.log(`Built macOS VM Linux asset source set in ${resolvedOutDir}`);
+
+function downloadFile(url, path) {
+  try {
+    execFileSync('curl', ['-L', '--fail', '--output', path, url], { stdio: 'inherit' });
+  } catch (error) {
+    console.error(`Failed to download VM boot asset from ${url}`);
+    process.exit(typeof error?.status === 'number' ? error.status : 1);
+  }
+}
+
+function assertRawArm64Kernel(path) {
+  const description = execFileSync('file', [path], { encoding: 'utf8' });
+  if (!description.includes('Linux kernel ARM64 boot executable Image')) {
+    console.error(
+      [
+        `Unsupported macOS VM kernel format: ${description.trim()}`,
+        'VZLinuxBootLoader requires a raw ARM64 Linux Image.',
+        'EFI-stub kernels such as PE32+ executable vmlinuz files fail at VM start with VZErrorDomain code 1.',
+      ].join('\n'),
+    );
+    process.exit(1);
+  }
+}
 
 function buildScript() {
   return `#!/bin/sh
@@ -136,9 +183,6 @@ ln -sf /etc/init.d/agent-platform-guest-service \\
 ln -sf /etc/init.d/devfs /tmp/agent-platform-rootfs/etc/runlevels/sysinit/devfs
 ln -sf /etc/init.d/procfs /tmp/agent-platform-rootfs/etc/runlevels/sysinit/procfs
 ln -sf /etc/init.d/sysfs /tmp/agent-platform-rootfs/etc/runlevels/sysinit/sysfs
-
-cp /tmp/agent-platform-rootfs/boot/vmlinuz-virt /out/vmlinuz
-cp /tmp/agent-platform-rootfs/boot/initramfs-virt /out/initrd.img
 
 cat > /out/guest-bootstrap.sh <<'BOOTSTRAP'
 #!/bin/sh

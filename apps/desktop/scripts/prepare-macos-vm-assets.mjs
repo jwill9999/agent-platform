@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /* global console, process */
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { copyFileSync, createReadStream, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -58,6 +59,7 @@ if (architecture !== 'arm64') {
 
 assertReadableFile(sourceImage, 'source image');
 assertReadableFile(kernel, 'Linux kernel');
+assertRawArm64Kernel(kernel);
 assertReadableFile(initrd, 'Linux initrd');
 assertReadableFile(bootstrap, 'guest bootstrap');
 mkdirSync(outDir, { recursive: true });
@@ -107,6 +109,20 @@ function assertReadableFile(path, label) {
     if (!stats.isFile()) throw new Error(`${path} is not a file`);
   } catch (error) {
     console.error(`Unable to read ${label}: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+function assertRawArm64Kernel(path) {
+  const description = execFileSync('file', [path], { encoding: 'utf8' });
+  if (!description.includes('Linux kernel ARM64 boot executable Image')) {
+    console.error(
+      [
+        `Unsupported Linux kernel format: ${description.trim()}`,
+        'VZLinuxBootLoader requires a raw ARM64 Linux Image.',
+        'EFI-stub kernels such as PE32+ executable vmlinuz files fail at VM start with VZErrorDomain code 1.',
+      ].join('\n'),
+    );
     process.exit(1);
   }
 }
