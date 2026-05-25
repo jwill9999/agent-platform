@@ -55,9 +55,10 @@ the selected Project folder is mounted into the guest later as `/workspace`.
 ```
 
 The selected boot contract is Apple `VZLinuxBootLoader`, not EFI auto-discovery. The runner requires
-a raw `arm64` Linux disk image plus matching kernel and initrd assets. The kernel and initrd must be
-from the same guest image build or release artifact as the raw disk; mixing a random installer
-kernel with an unrelated root disk is not a valid production asset.
+a raw `arm64` Linux disk image plus a compatible raw ARM64 Linux kernel `Image` and initrd. The
+kernel and initrd must be a tested pair from the same upstream kernel release. EFI-stub kernels such
+as Fedora or Alpine `PE32+ executable` `vmlinuz` files are not valid for this boot path and fail
+with opaque `VZErrorDomain Code=1` startup errors if they reach Virtualization.framework.
 
 The guest command service is installed by the bootstrap script and listens on virtio socket port
 `10240`. Follow-on lifecycle work uses that port for command execution inside the guest.
@@ -71,8 +72,8 @@ produced by the project release pipeline:
    `pnpm --filter @agent-platform/desktop native:vm:assets:build-linux -- --out-dir <asset-source-dir>`.
 2. The builder installs the `linux-virt` kernel and guest service prerequisites into an `arm64`
    root filesystem.
-3. The builder emits a raw ext4 root disk plus the matching `vmlinuz` and `initrd.img` from that
-   same root filesystem.
+3. The builder emits a raw ext4 root disk and downloads a tested Ubuntu cloud-image ARM64 kernel
+   and initrd pair. The downloaded kernel is gzip-decompressed to a raw Linux `Image` before staging.
 4. Stage `base-linux.img`, `vmlinuz`, `initrd.img`, and `guest-bootstrap.sh` through
    `native:vm:assets:prepare`.
 5. Store the resulting manifest and asset checksums with the packaged release artifact.
@@ -84,8 +85,8 @@ The reproducible builder must publish these files as one immutable asset set:
 
 ```text
 base-linux.img       # uncompressed raw arm64 root disk
-vmlinuz              # kernel matching the root disk image
-initrd.img           # initrd matching the root disk image
+vmlinuz              # raw ARM64 Linux Image accepted by VZLinuxBootLoader
+initrd.img           # initrd paired with the selected kernel
 guest-bootstrap.sh   # guest provisioning script used for the same image build
 manifest.json        # produced by native:vm:assets:prepare
 ```
@@ -128,6 +129,10 @@ pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- \
 The script copies the source image, kernel, initrd, and bootstrap script into the output directory
 and writes the manifest with SHA-256 checksums. It intentionally fails if any required source asset
 is missing, because packaging a runner without valid assets would be misleading.
+
+The script also runs the host `file` command against the staged kernel and fails if it is not
+reported as `Linux kernel ARM64 boot executable Image`. This protects release builds from
+accidentally packaging an EFI-stub kernel that `VZLinuxBootLoader` cannot boot.
 
 ## Validation
 

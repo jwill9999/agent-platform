@@ -180,6 +180,11 @@
   `pnpm --filter @agent-platform/desktop native:vm:test`,
   `pnpm --filter @agent-platform/desktop native:vm:sign-dev`,
   `pnpm docs:lint`, and `git diff --check`.
+- Documented release-facing macOS VM runtime requirements in `docs/desktop-runtime.md`: Apple
+  Silicon scope, tested macOS version evidence, memory/disk expectations, no end-user Xcode/Docker
+  requirement, signing entitlement requirements, and raw ARM64 VM asset expectations. Corrected
+  `docs/desktop-macos-vm-assets.md` so the asset contract matches the current Ubuntu raw-kernel
+  pipeline rather than the earlier Alpine kernel assumption.
 
 ## Next
 

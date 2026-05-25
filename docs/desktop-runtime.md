@@ -13,6 +13,27 @@ paths or shell behavior into product code.
 The current desktop app is a development foundation, not a public packaged release. Packaging,
 signing, notarization, auto-update, and installer cleanup are future release tasks.
 
+## Release runtime requirements
+
+The packaged macOS app must work for an end user after installation without requiring a local
+development toolchain. Release notes and download pages should state the currently validated runtime
+requirements:
+
+| Requirement | Release expectation                                                                                                                                                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform    | Apple Silicon macOS. Intel Macs are not in the current production VM runner scope because they require separate `x86_64` guest assets.                                                                                                              |
+| macOS       | Apple Virtualization.framework is required. The product must publish the exact tested macOS minimum for each release; current VM lifecycle validation was performed on Apple Silicon macOS `26.5`.                                                  |
+| CPU/RAM     | The VM runner currently starts a local Linux guest with `2` virtual CPUs and `2 GB` memory. Release packaging should require enough free memory for the app, backend, and guest; `4 GB` free system memory is the minimum practical support target. |
+| Disk        | The app needs space for the packaged VM image plus app-owned runtime state under the normal Electron app data directory. Current development images are about `2 GB`; release notes should publish the actual packaged size.                        |
+| User tools  | End users must not need Xcode, Docker, Homebrew, `qemu-img`, `guestfish`, or manual kernel downloads to use the packaged app.                                                                                                                       |
+| Signing     | The packaged helper that starts Virtualization.framework must be signed and notarized with `com.apple.security.virtualization`. The entitlement must be present on the executable that calls the VM APIs, not only on the top-level `.app`.         |
+| VM assets   | The release must include a staged, checksum-verified VM asset set. For the current `VZLinuxBootLoader` path, the kernel must be a raw ARM64 Linux `Image`; EFI-stub `PE32+` kernels are rejected before boot.                                       |
+
+Xcode is a development and release-engineering requirement, not an end-user runtime requirement.
+Full Xcode is recommended for release signing, notarization checks, and reproducing Apple
+Virtualization.framework diagnostics. Docker is required only for the current asset builder or CI
+job that creates the Linux root image; the packaged app consumes the built artifacts.
+
 ## Runtime split
 
 | Mode            | Owner                    | Use it for                                                                         |
