@@ -12,10 +12,10 @@
 
 ## Last Updated
 
-- **Date:** 2026-05-24
-- **Session:** Tightened sandbox epic traceability after unresolved requirement review.
+- **Date:** 2026-05-25
+- **Session:** Completed `.4.2.2` by fixing the macOS VM boot asset contract to use a raw ARM64 kernel.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending sandbox task graph alignment audit.
+- **Latest commit:** `bf10216` — raw ARM64 VM kernel assets and boot diagnostics.
 
 ## Current State
 
@@ -38,7 +38,10 @@
   - `agent-platform-macos-production-sandbox.3` is implemented locally on
     `jwill9999/macos-production-sandbox-vm-helper-skeleton`,
   - `agent-platform-macos-production-sandbox.4.1` is complete,
-  - `agent-platform-macos-production-sandbox.4.2` is claimed and started,
+  - `agent-platform-macos-production-sandbox.4.2.1` is complete,
+  - `agent-platform-macos-production-sandbox.4.2.2` is complete,
+  - `agent-platform-macos-production-sandbox.4.2.3` is next,
+  - `agent-platform-macos-production-sandbox.4.2` remains in progress until `.4.2.3` closes,
   - `agent-platform-macos-production-sandbox.4` remains in progress on
     `jwill9999/macos-production-sandbox-vm-lifecycle-exec`,
   - command runner defaults to `disabled`,
@@ -46,6 +49,9 @@
   - `host` and `docker-sandbox` are now explicit development modes only,
   - `macos-vm` is a recognized mode and the health contract reports it as production-ready only
     when a VM runner is configured.
+- The previous `VZErrorDomain code 1` boot failure was caused by EFI-stub kernels being passed to
+  `VZLinuxBootLoader`. The verified short-term contract is `VZLinuxBootLoader` plus a raw ARM64
+  Linux `Image`; a future `VZEFIBootLoader` migration remains a separate design follow-up.
 
 ## Recent Work
 
@@ -154,27 +160,32 @@
   `kernelSha256=bd4070ac0545ef395ae263b2260c917a837bc09927f82b06e3329e569e640ea2`,
   `initrdSha256=1dbe788c46b3dd4f4f2ab3bd7971c301f978e9750c0855728a56374f2e2b6312`,
   `bootstrapSha256=6d402c59ce305df0d2f89e80f28634d16412a1edb9fe64a45d2e360a16c8660a`.
-- Started `.4.2.2`: added development signing for the helper with
-  `com.apple.security.virtualization`, reran `prepare/start/status` against the `.4.2.1` generated
-  assets, and fixed failed-start cleanup so daemon PID/socket state is cleared while diagnostics are
-  preserved. Current local boot blocker: Virtualization.framework reports
-  `Virtualization is not available on this hardware`, so `.4.2.2` remains open until a VM-capable
-  macOS runner can complete the real boot proof.
-- The helper still fails closed for `start` and `exec`; `.4` is not complete until a real
-  Virtualization.framework-backed VM can start and execute commands inside `/workspace`.
-- Focused checks passed:
+- Completed `.4.2.2`: reproduced Apple sample failure with Fedora/Alpine EFI-stub kernels, then
+  proved Apple’s sample boots with Ubuntu’s decompressed raw ARM64 `Image`.
+- Updated the VM asset pipeline so `native:vm:assets:build-linux` downloads Ubuntu cloud-image
+  kernel/initrd assets, decompresses the kernel to a raw ARM64 `Image`, and rejects non-raw
+  kernels. `native:vm:assets:prepare` now also rejects EFI-stub `PE32+` kernels before boot.
+- Improved `macos-vm-runner` lifecycle diagnostics: valid `VZGenericMachineIdentifier`, run-loop
+  startup wait instead of a blocking semaphore, full `NSError` details, `vm-config.json`, and guest
+  console capture.
+- Real boot proof passed locally on macOS 26.5/Xcode 26.3:
+  `start` returned ready, `status` returned ready, guest console showed Linux mounting `/dev/vda`,
+  OpenRC starting, and `agent-platform-guest-service` starting. `stop` returned disabled and
+  subsequent `status` returned unavailable.
+- Negative asset proof passed: preparing a Fedora `PE32+ executable` kernel now fails fast with an
+  explicit `VZLinuxBootLoader` raw ARM64 `Image` requirement.
+- Focused checks passed: `node --check` for build/prepare scripts,
+  `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts`,
   `pnpm --filter @agent-platform/desktop native:vm:build`,
-  `pnpm --filter @agent-platform/desktop native:vm:test`, and
-  `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts`.
-- Full repository gate passed:
-  `pnpm lint && pnpm typecheck && pnpm format:check && pnpm docs:lint && pnpm test && pnpm build && pnpm --filter @agent-platform/desktop native:vm:build && pnpm --filter @agent-platform/desktop native:vm:test && git diff --check`.
+  `pnpm --filter @agent-platform/desktop native:vm:test`,
+  `pnpm --filter @agent-platform/desktop native:vm:sign-dev`,
+  `pnpm docs:lint`, and `git diff --check`.
 
 ## Next
 
-1. Continue `.4.2.2` on VM-capable macOS hardware or CI: rerun signed helper
-   `prepare/start/status` from the `.4.2.1` generated asset set and prove ready status only after
-   successful boot.
-2. Complete `.4.2.3` with stale-state, repeated start/stop, and daemon lifecycle
-   evidence before starting `.4.3`.
+1. Complete `.4.2.3` with stale-state, repeated start/stop, daemon survival, and lifecycle
+   reliability evidence using the raw ARM64 kernel runtime.
+2. Start `.4.3` only after `.4.2.3` is closed; `.4.3` owns real guest command execution inside the
+   VM, not just host-side boot readiness.
 3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.
