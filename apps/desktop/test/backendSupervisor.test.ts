@@ -56,6 +56,32 @@ function makeRuntimePaths(runtimeRoot: string): DesktopRuntimePaths {
   };
 }
 
+function writePackagedMacosVmResources(
+  paths: DesktopBackendPaths,
+  runtimeRoot: string,
+  options: { assets?: boolean; helper?: boolean } = {},
+): void {
+  const { assets = true, helper = true } = options;
+  mkdirSync(join(runtimeRoot, 'resources/macos-vm'), { recursive: true });
+  if (helper) {
+    writeFileSync(paths.macosVmPackagedHelperPath, '#!/bin/sh\n');
+  }
+  if (assets) {
+    mkdirSync(paths.macosVmPackagedAssetsDir, { recursive: true });
+    writeFileSync(join(paths.macosVmPackagedAssetsDir, 'manifest.json'), '{"schemaVersion":2}\n');
+  }
+}
+
+function expectPackagedMacosVmEnvironment(
+  env: ReturnType<typeof buildDesktopBackendEnvironment>,
+  paths: DesktopBackendPaths,
+  runtimeRoot: string,
+): void {
+  expect(env.AGENT_PLATFORM_COMMAND_RUNNER).toBe('macos-vm');
+  expect(env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH).toBe(paths.macosVmPackagedHelperPath);
+  expect(env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR).toBe(join(runtimeRoot, 'data/vm'));
+}
+
 async function startReadyServer(statusCode: number): Promise<string> {
   const server = createServer((_request, response) => {
     response.writeHead(statusCode, { 'content-type': 'application/json' });
@@ -137,8 +163,7 @@ describe('desktop backend supervisor helpers', () => {
     const repoRoot = makeTempRepo();
     const runtimeRoot = join(repoRoot, 'runtime');
     const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
-    mkdirSync(join(runtimeRoot, 'resources/macos-vm'), { recursive: true });
-    writeFileSync(paths.macosVmPackagedHelperPath, '#!/bin/sh\n');
+    writePackagedMacosVmResources(paths, runtimeRoot, { assets: false });
 
     const env = buildDesktopBackendEnvironment({
       env: {
@@ -148,18 +173,14 @@ describe('desktop backend supervisor helpers', () => {
       port: '4500',
     });
 
-    expect(env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH).toBe(paths.macosVmPackagedHelperPath);
-    expect(env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR).toBe(join(runtimeRoot, 'data/vm'));
+    expectPackagedMacosVmEnvironment(env, paths, runtimeRoot);
   });
 
   it('selects packaged macOS VM mode when packaged helper and assets exist', () => {
     const repoRoot = makeTempRepo();
     const runtimeRoot = join(repoRoot, 'runtime');
     const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
-    mkdirSync(join(runtimeRoot, 'resources/macos-vm'), { recursive: true });
-    mkdirSync(paths.macosVmPackagedAssetsDir, { recursive: true });
-    writeFileSync(paths.macosVmPackagedHelperPath, '#!/bin/sh\n');
-    writeFileSync(join(paths.macosVmPackagedAssetsDir, 'manifest.json'), '{"schemaVersion":2}\n');
+    writePackagedMacosVmResources(paths, runtimeRoot);
 
     const env = buildDesktopBackendEnvironment({
       env: {},
@@ -167,19 +188,14 @@ describe('desktop backend supervisor helpers', () => {
       port: '4500',
     });
 
-    expect(env.AGENT_PLATFORM_COMMAND_RUNNER).toBe('macos-vm');
-    expect(env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH).toBe(paths.macosVmPackagedHelperPath);
-    expect(env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR).toBe(join(runtimeRoot, 'data/vm'));
+    expectPackagedMacosVmEnvironment(env, paths, runtimeRoot);
   });
 
   it('copies packaged macOS VM assets into the app-owned runtime directory', () => {
     const repoRoot = makeTempRepo();
     const runtimeRoot = join(repoRoot, 'runtime');
     const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
-    mkdirSync(join(runtimeRoot, 'resources/macos-vm'), { recursive: true });
-    mkdirSync(paths.macosVmPackagedAssetsDir, { recursive: true });
-    writeFileSync(paths.macosVmPackagedHelperPath, '#!/bin/sh\n');
-    writeFileSync(join(paths.macosVmPackagedAssetsDir, 'manifest.json'), '{"schemaVersion":2}\n');
+    writePackagedMacosVmResources(paths, runtimeRoot);
 
     ensurePackagedMacosVmAssets(paths, {});
 
@@ -190,8 +206,7 @@ describe('desktop backend supervisor helpers', () => {
     const repoRoot = makeTempRepo();
     const runtimeRoot = join(repoRoot, 'runtime');
     const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
-    mkdirSync(join(runtimeRoot, 'resources/macos-vm'), { recursive: true });
-    writeFileSync(paths.macosVmPackagedHelperPath, '#!/bin/sh\n');
+    writePackagedMacosVmResources(paths, runtimeRoot, { assets: false });
 
     expect(() =>
       ensurePackagedMacosVmAssets(paths, { AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm' }),
@@ -202,8 +217,7 @@ describe('desktop backend supervisor helpers', () => {
     const repoRoot = makeTempRepo();
     const runtimeRoot = join(repoRoot, 'runtime');
     const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
-    mkdirSync(paths.macosVmPackagedAssetsDir, { recursive: true });
-    writeFileSync(join(paths.macosVmPackagedAssetsDir, 'manifest.json'), '{"schemaVersion":2}\n');
+    writePackagedMacosVmResources(paths, runtimeRoot, { helper: false });
 
     expect(() =>
       ensurePackagedMacosVmAssets(paths, { AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm' }),

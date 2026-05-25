@@ -30,6 +30,32 @@ async function createRuntimeAssets(runtimeDir: string): Promise<void> {
   );
 }
 
+async function createMacosVmRuntimeFixture({
+  withAssets = true,
+}: {
+  withAssets?: boolean;
+} = {}): Promise<{ tempRoot: string; helperPath: string; runtimeDir: string }> {
+  const tempRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-health-'));
+  const helperPath = await createExecutableHelper(tempRoot);
+  const runtimeDir = join(tempRoot, 'runtime');
+  if (withAssets) {
+    await createRuntimeAssets(runtimeDir);
+  } else {
+    await mkdir(runtimeDir, { recursive: true });
+  }
+  return { tempRoot, helperPath, runtimeDir };
+}
+
+function getMacosVmHealth(helperPath: string, runtimeDir: string): CommandRunnerHealth {
+  return getConfiguredCommandRunnerHealth({
+    env: {
+      AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
+      AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: helperPath,
+      AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: runtimeDir,
+    },
+  });
+}
+
 describe('CommandRunner health contract', () => {
   it('reports disabled mode as non-executable and non-production', () => {
     expect(getConfiguredCommandRunnerHealth({ env: {} })).toEqual({
@@ -114,20 +140,11 @@ describe('CommandRunner health contract', () => {
   });
 
   it('reports macOS VM mode as unavailable when runtime assets are missing', async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-health-'));
-    const helperPath = await createExecutableHelper(tempRoot);
-    const runtimeDir = join(tempRoot, 'runtime');
-    await mkdir(runtimeDir, { recursive: true });
+    const { tempRoot, helperPath, runtimeDir } = await createMacosVmRuntimeFixture({
+      withAssets: false,
+    });
 
-    expect(
-      getConfiguredCommandRunnerHealth({
-        env: {
-          AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
-          AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: helperPath,
-          AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: runtimeDir,
-        },
-      }),
-    ).toMatchObject({
+    expect(getMacosVmHealth(helperPath, runtimeDir)).toMatchObject({
       mode: 'macos-vm',
       status: 'unavailable',
       production: true,
@@ -139,22 +156,11 @@ describe('CommandRunner health contract', () => {
   });
 
   it('reports macOS VM mode as starting when daemon markers are present but not ready', async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-health-'));
-    const helperPath = await createExecutableHelper(tempRoot);
-    const runtimeDir = join(tempRoot, 'runtime');
-    await createRuntimeAssets(runtimeDir);
+    const { tempRoot, helperPath, runtimeDir } = await createMacosVmRuntimeFixture();
     await mkdir(join(runtimeDir, 'state'), { recursive: true });
     await writeFile(join(runtimeDir, 'state/daemon.pid'), `${process.pid}\n`);
 
-    expect(
-      getConfiguredCommandRunnerHealth({
-        env: {
-          AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
-          AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: helperPath,
-          AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: runtimeDir,
-        },
-      }),
-    ).toMatchObject({
+    expect(getMacosVmHealth(helperPath, runtimeDir)).toMatchObject({
       mode: 'macos-vm',
       status: 'starting',
       production: true,
@@ -166,22 +172,11 @@ describe('CommandRunner health contract', () => {
   });
 
   it('reports macOS VM mode as failed closed when the runner records an error', async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-health-'));
-    const helperPath = await createExecutableHelper(tempRoot);
-    const runtimeDir = join(tempRoot, 'runtime');
-    await createRuntimeAssets(runtimeDir);
+    const { tempRoot, helperPath, runtimeDir } = await createMacosVmRuntimeFixture();
     await mkdir(join(runtimeDir, 'logs'), { recursive: true });
     await writeFile(join(runtimeDir, 'logs/last-error.log'), 'boot failed\n');
 
-    expect(
-      getConfiguredCommandRunnerHealth({
-        env: {
-          AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
-          AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: helperPath,
-          AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: runtimeDir,
-        },
-      }),
-    ).toMatchObject({
+    expect(getMacosVmHealth(helperPath, runtimeDir)).toMatchObject({
       mode: 'macos-vm',
       status: 'failed',
       production: true,
@@ -194,11 +189,8 @@ describe('CommandRunner health contract', () => {
   });
 
   it('reports macOS VM mode as ready only when the daemon is alive and fresh', async () => {
-    const tempRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-health-'));
-    const helperPath = await createExecutableHelper(tempRoot);
-    const runtimeDir = join(tempRoot, 'runtime');
+    const { tempRoot, helperPath, runtimeDir } = await createMacosVmRuntimeFixture();
     const stateDir = join(runtimeDir, 'state');
-    await createRuntimeAssets(runtimeDir);
     await mkdir(stateDir, { recursive: true });
     await writeFile(join(stateDir, 'runner.sock'), '');
     await writeFile(join(stateDir, 'daemon.pid'), `${process.pid}\n`);
@@ -206,15 +198,7 @@ describe('CommandRunner health contract', () => {
     const now = new Date();
     await utimes(join(stateDir, 'daemon.heartbeat'), now, now);
 
-    expect(
-      getConfiguredCommandRunnerHealth({
-        env: {
-          AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
-          AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: helperPath,
-          AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: runtimeDir,
-        },
-      }),
-    ).toMatchObject({
+    expect(getMacosVmHealth(helperPath, runtimeDir)).toMatchObject({
       mode: 'macos-vm',
       status: 'ready',
       production: true,
