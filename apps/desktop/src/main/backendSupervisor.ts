@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, statSync, rmSync } from 'node:fs';
+import { cpSync, createWriteStream, existsSync, mkdirSync, statSync, rmSync } from 'node:fs';
 import { get } from 'node:http';
 import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -17,6 +17,8 @@ export interface DesktopBackendPaths {
   sqlitePath: string;
   configPath: string;
   tempDir: string;
+  macosVmPackagedAssetsDir: string;
+  macosVmPackagedHelperPath: string;
 }
 
 export interface DesktopBackendHandle {
@@ -74,6 +76,8 @@ export function getDesktopBackendPaths(
     sqlitePath: runtimePaths.sqlitePath,
     configPath: runtimePaths.configPath,
     tempDir: runtimePaths.tempDir,
+    macosVmPackagedAssetsDir: runtimePaths.macosVmPackagedAssetsDir,
+    macosVmPackagedHelperPath: runtimePaths.macosVmPackagedHelperPath,
   };
 }
 
@@ -105,6 +109,9 @@ export function buildDesktopBackendEnvironment({
   secretsMasterKeyB64?: string;
 }): DesktopBackendEnvironment {
   const secretsMasterKey = secretsMasterKeyB64 ?? env.SECRETS_MASTER_KEY?.trim();
+  const macosVmHelperPath =
+    env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH ??
+    (existsSync(paths.macosVmPackagedHelperPath) ? paths.macosVmPackagedHelperPath : undefined);
   return {
     HOST: '127.0.0.1',
     NODE_ENV: 'production',
@@ -120,9 +127,7 @@ export function buildDesktopBackendEnvironment({
     AGENT_PLATFORM_COMMAND_RUNNER: env.AGENT_PLATFORM_COMMAND_RUNNER ?? 'disabled',
     AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR:
       env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ?? join(dirname(paths.sqlitePath), 'vm'),
-    ...(env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH
-      ? { AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH }
-      : {}),
+    ...(macosVmHelperPath ? { AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: macosVmHelperPath } : {}),
   };
 }
 
@@ -141,6 +146,7 @@ export async function startDesktopBackend({
   }
 
   mkdirSync(dirname(paths.stdoutLog), { recursive: true });
+  ensurePackagedMacosVmAssets(paths, env);
   rotateLogIfNeeded(paths.stdoutLog, maxLogBytes);
   rotateLogIfNeeded(paths.stderrLog, maxLogBytes);
 
@@ -178,6 +184,28 @@ export async function startDesktopBackend({
     },
     stop: () => stopDesktopChild(child, stdout, stderr),
   };
+}
+
+export function ensurePackagedMacosVmAssets(
+  paths: DesktopBackendPaths,
+  env: NodeJS.ProcessEnv,
+): void {
+  const mode = env.AGENT_PLATFORM_COMMAND_RUNNER ?? env.AGENT_COMMAND_RUNNER;
+  if (mode !== 'macos-vm') return;
+
+  const runtimeDir =
+    env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ?? join(dirname(paths.sqlitePath), 'vm');
+  const runtimeImagesDir = join(runtimeDir, 'images');
+  const manifestPath = join(paths.macosVmPackagedAssetsDir, 'manifest.json');
+
+  if (!existsSync(manifestPath)) {
+    throw new Error(
+      `Packaged macOS VM assets are missing at ${paths.macosVmPackagedAssetsDir}. Run native:vm:package before packaging the desktop app.`,
+    );
+  }
+
+  mkdirSync(runtimeImagesDir, { recursive: true });
+  cpSync(paths.macosVmPackagedAssetsDir, runtimeImagesDir, { recursive: true, force: true });
 }
 
 function spawnBackendProcess({

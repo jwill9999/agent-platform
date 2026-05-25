@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Completed `.4.3`; started and locally proved `.4.4`.
+- **Session:** Completed `.4.3` and `.4.4`; started `.5.1` packaging.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `6f5982a` (`.4.3` guest command execution); `.4.4` proof changes pending commit.
+- **Latest commit:** `39670bc` (`.4.4` local proof and lifecycle closeout); `.5.1` packaging changes pending commit.
 
 ## Current State
 
@@ -24,7 +24,9 @@
 - Docker and host command runners remain development-only paths; production/staging must prove `macos-vm` or stay fail-closed.
 - `.4.2`, `.4.2.1`, `.4.2.2`, and `.4.2.3` are complete.
 - `.4.3` is implemented, verified, closed in Beads, committed, and pushed.
-- `.4.4` proof is implemented locally and ready to close after the final commit/push.
+- `.4.4` proof is implemented, verified, closed with parent `.4`, committed, and pushed.
+- `.5.1` is in progress and packages the helper plus prepared VM assets into a stable
+  `macos-vm/` Electron resources layout.
 
 ## Recent Work
 
@@ -65,6 +67,15 @@
   - `exec` fails closed if an already-running VM has no workspace binding,
   - `stop` requests guest shutdown through `VZVirtualMachine.requestStop()` and waits for daemon exit
     before clearing state, so restart-after-stop remains bootable.
+- Started `.5.1` packaging:
+  - added `native:vm:package`,
+  - added `scripts/package-macos-vm-runtime.mjs`,
+  - desktop runtime paths now resolve packaged helper/assets from Electron `process.resourcesPath`,
+  - managed backend startup copies packaged assets into app-owned runtime `data/vm/images` when
+    `AGENT_PLATFORM_COMMAND_RUNNER=macos-vm`,
+  - packaging fails closed on missing assets or checksum mismatch.
+- Real package proof output was created at `/private/tmp/agent-platform-macos-vm-package-proof-5-1`
+  from fresh prepared assets at `/private/tmp/agent-platform-linux-package-input-5-1/images`.
 
 ## Checks Run
 
@@ -87,11 +98,16 @@
   - `pnpm --filter @agent-platform/desktop native:vm:build`
   - `pnpm --filter @agent-platform/desktop native:vm:test`
   - `git diff --check`
+- `.5.1` focused checks:
+  - `node --check apps/desktop/scripts/package-macos-vm-runtime.mjs`
+  - `pnpm --filter @agent-platform/desktop lint`
+  - `pnpm --filter @agent-platform/desktop typecheck`
+  - `pnpm --filter @agent-platform/desktop test -- test/runtimePaths.test.ts test/backendSupervisor.test.ts test/packageScripts.test.ts test/macosVmPackaging.test.ts`
+  - `pnpm --filter @agent-platform/desktop native:vm:package -- --assets-dir /private/tmp/agent-platform-linux-package-input-5-1/images --out-dir /private/tmp/agent-platform-macos-vm-package-proof-5-1`
 
 ## Next
 
-1. Close Beads issue `agent-platform-macos-production-sandbox.4.4` and parent
-   `agent-platform-macos-production-sandbox.4`.
-2. Commit and push `.4.4` proof changes.
-3. Start `agent-platform-macos-production-sandbox.5`, which owns packaging/staging production
-   integration.
+1. Finish `.5.1` final gates, close Beads issue `agent-platform-macos-production-sandbox.5.1`,
+   commit, and push.
+2. Start `.5.2`, which validates packaged runner startup and health from the packaged resource
+   layout.

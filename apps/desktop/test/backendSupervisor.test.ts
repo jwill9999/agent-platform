@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildDesktopBackendEnvironment,
   desktopBackendAvailable,
+  ensurePackagedMacosVmAssets,
   getDesktopBackendPaths,
   getDesktopBackendUrl,
   resolveDesktopBackendNodePath,
@@ -49,6 +50,9 @@ function makeRuntimePaths(runtimeRoot: string): DesktopRuntimePaths {
     sqlitePath: join(runtimeRoot, 'data/agent.sqlite'),
     configPath: join(runtimeRoot, 'config/runtime.json'),
     secretsMasterKeyPath: join(runtimeRoot, 'config/secrets-master-key.json'),
+    resourcesDir: join(runtimeRoot, 'resources'),
+    macosVmPackagedAssetsDir: join(runtimeRoot, 'resources/macos-vm/images'),
+    macosVmPackagedHelperPath: join(runtimeRoot, 'resources/macos-vm/macos-vm-runner'),
   };
 }
 
@@ -90,6 +94,10 @@ describe('desktop backend supervisor helpers', () => {
     expect(paths.sqlitePath).toBe(join(runtimeRoot, 'data/agent.sqlite'));
     expect(paths.configPath).toBe(join(runtimeRoot, 'config/runtime.json'));
     expect(paths.tempDir).toBe(join(runtimeRoot, 'tmp'));
+    expect(paths.macosVmPackagedAssetsDir).toBe(join(runtimeRoot, 'resources/macos-vm/images'));
+    expect(paths.macosVmPackagedHelperPath).toBe(
+      join(runtimeRoot, 'resources/macos-vm/macos-vm-runner'),
+    );
   });
 
   it('builds a managed backend environment from resolved desktop paths', () => {
@@ -123,6 +131,47 @@ describe('desktop backend supervisor helpers', () => {
       AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: join(runtimeRoot, 'data/vm'),
       AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/app/macos-vm-runner',
     });
+  });
+
+  it('uses the packaged macOS VM helper path when no developer override is set', () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+    mkdirSync(join(runtimeRoot, 'resources/macos-vm'), { recursive: true });
+    writeFileSync(paths.macosVmPackagedHelperPath, '#!/bin/sh\n');
+
+    const env = buildDesktopBackendEnvironment({
+      env: {
+        AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm',
+      },
+      paths,
+      port: '4500',
+    });
+
+    expect(env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH).toBe(paths.macosVmPackagedHelperPath);
+    expect(env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR).toBe(join(runtimeRoot, 'data/vm'));
+  });
+
+  it('copies packaged macOS VM assets into the app-owned runtime directory', () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+    mkdirSync(paths.macosVmPackagedAssetsDir, { recursive: true });
+    writeFileSync(join(paths.macosVmPackagedAssetsDir, 'manifest.json'), '{"schemaVersion":2}\n');
+
+    ensurePackagedMacosVmAssets(paths, { AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm' });
+
+    expect(existsSync(join(runtimeRoot, 'data/vm/images/manifest.json'))).toBe(true);
+  });
+
+  it('fails closed when macOS VM mode is selected but packaged assets are missing', () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+
+    expect(() =>
+      ensurePackagedMacosVmAssets(paths, { AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm' }),
+    ).toThrow('Packaged macOS VM assets are missing');
   });
 
   it('detects when the compiled API backend is available', () => {

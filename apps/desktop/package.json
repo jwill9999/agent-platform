@@ -12,6 +12,7 @@
     "native:vm:assets:build-linux": "node scripts/build-macos-vm-linux-assets.mjs",
     "native:vm:assets:prepare": "node scripts/prepare-macos-vm-assets.mjs",
     "native:vm:build": "swift build --package-path native/macos-vm-runner",
+    "native:vm:package": "node scripts/package-macos-vm-runtime.mjs",
     "native:vm:sign-dev": "node scripts/sign-macos-vm-runner.mjs",
     "native:vm:test": "swift test --package-path native/macos-vm-runner",
     "smoke": "pnpm run build && electron . --smoke",
