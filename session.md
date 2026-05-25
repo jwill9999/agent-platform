@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Fixed PR #227 unit-test CI setup and SonarCloud runner findings; ready to start `.5.2` after final PR checks.
+- **Session:** Fixed PR #227 unit-test CI setup, SonarCloud issues, and Security Hotspots; ready to start `.5.2` after final PR checks.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `776cfd4` (remaining SonarCloud findings); prior Sonar fix is `2741a97`, CI setup fix is `27def96`.
+- **Latest commit:** `13d5c3d` (SonarCloud Security Hotspots); prior Sonar fix is `776cfd4`, CI setup fix is `27def96`.
 
 ## Current State
 
@@ -46,6 +46,10 @@
   - modernized VM asset build regex/template string usage.
 - After the first Sonar rerun, cleared the remaining three open issues by deriving Swift path
   defaults without hardcoded URI literals and moving async temp cleanup out of the nested callback.
+- Cleared the three actual SonarCloud Security Hotspots:
+  - Ubuntu package URL now uses HTTPS,
+  - asset/package scripts use fixed system binary paths instead of PATH-dependent `curl`, `file`,
+    `strings`, and `swift` lookups.
 
 ## Checks Run
 
@@ -60,11 +64,11 @@
 - `swift test --package-path apps/desktop/native/macos-vm-runner`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
-  CodeQL, markdownlint, and lychee passed; SonarCloud needs commit `776cfd4` analyzed.
+  CodeQL, markdownlint, and lychee passed; SonarCloud needs commit `13d5c3d` analyzed.
 
 ## Next
 
-1. Push commit `776cfd4` and confirm PR #227 SonarCloud reruns cleanly or inspect any remaining
+1. Push commit `13d5c3d` and confirm PR #227 SonarCloud reruns cleanly or inspect any remaining
    PR issues.
 2. Start Beads issue `agent-platform-macos-production-sandbox.5.2`, validating packaged runner
    startup and health from the packaged resource layout.
