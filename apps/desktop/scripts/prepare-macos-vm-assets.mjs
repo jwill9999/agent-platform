@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util';
 
 const GUEST_SERVICE_PORT = 10240;
 const GUEST_SERVICE_COMMAND = '/usr/local/bin/agent-platform-guest-service';
+const FILE_BINARY = '/usr/bin/file';
 
 const scriptArgs = process.argv.slice(2);
 if (scriptArgs[0] === '--') scriptArgs.shift();
@@ -18,7 +19,7 @@ const { values } = parseArgs({
     'source-image': { type: 'string' },
     kernel: { type: 'string' },
     initrd: { type: 'string' },
-    'bootstrap': { type: 'string' },
+    bootstrap: { type: 'string' },
     'kernel-command-line': {
       type: 'string',
       default: 'console=hvc0 root=/dev/vda rw systemd.unit=multi-user.target',
@@ -108,13 +109,15 @@ function assertReadableFile(path, label) {
     const stats = statSync(path);
     if (!stats.isFile()) throw new Error(`${path} is not a file`);
   } catch (error) {
-    console.error(`Unable to read ${label}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `Unable to read ${label}: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exit(1);
   }
 }
 
 function assertRawArm64Kernel(path) {
-  const description = execFileSync('file', [path], { encoding: 'utf8' });
+  const description = execFileSync(FILE_BINARY, [path], { encoding: 'utf8' });
   if (!description.includes('Linux kernel ARM64 boot executable Image')) {
     console.error(
       [

@@ -22,7 +22,11 @@ const DEFAULT_UBUNTU_UNPACKED_BASE = `${DEFAULT_UBUNTU_IMAGE_BASE}/unpacked`;
 const DEFAULT_ROOTFS_URL = `${DEFAULT_UBUNTU_IMAGE_BASE}/jammy-server-cloudimg-arm64-root.tar.xz`;
 const DEFAULT_KERNEL_URL = `${DEFAULT_UBUNTU_UNPACKED_BASE}/jammy-server-cloudimg-arm64-vmlinuz-generic`;
 const DEFAULT_INITRD_URL = `${DEFAULT_UBUNTU_UNPACKED_BASE}/jammy-server-cloudimg-arm64-initrd-generic`;
-const DEFAULT_UBUNTU_KERNEL_PACKAGE_BASE = 'http://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux';
+const DEFAULT_UBUNTU_KERNEL_PACKAGE_BASE =
+  'https://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux';
+const CURL_BINARY = '/usr/bin/curl';
+const FILE_BINARY = '/usr/bin/file';
+const STRINGS_BINARY = '/usr/bin/strings';
 
 const scriptArgs = process.argv.slice(2);
 if (scriptArgs[0] === '--') scriptArgs.shift();
@@ -136,7 +140,7 @@ console.log(`Built macOS VM Linux asset source set in ${resolvedOutDir}`);
 
 function downloadFile(url, path) {
   try {
-    execFileSync('curl', ['-L', '--fail', '--output', path, url], { stdio: 'inherit' });
+    execFileSync(CURL_BINARY, ['-L', '--fail', '--output', path, url], { stdio: 'inherit' });
   } catch (error) {
     console.error(`Failed to download VM boot asset from ${url}`);
     process.exit(typeof error?.status === 'number' ? error.status : 1);
@@ -144,7 +148,7 @@ function downloadFile(url, path) {
 }
 
 function assertRawArm64Kernel(path) {
-  const description = execFileSync('file', [path], { encoding: 'utf8' });
+  const description = execFileSync(FILE_BINARY, [path], { encoding: 'utf8' });
   if (!description.includes('Linux kernel ARM64 boot executable Image')) {
     console.error(
       [
@@ -158,7 +162,7 @@ function assertRawArm64Kernel(path) {
 }
 
 function readUbuntuKernelPackage(path) {
-  const strings = execFileSync('strings', [path], {
+  const strings = execFileSync(STRINGS_BINARY, [path], {
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
   });

@@ -23,6 +23,7 @@ const defaultHelper = join(
   'native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner',
 );
 const defaultOutDir = join(desktopDir, 'resources/macos-vm');
+const SWIFT_BINARY = '/usr/bin/swift';
 
 function usage(exitCode = 1) {
   console.error(
@@ -89,7 +90,7 @@ function setPathOption(options, arg, value) {
 }
 
 function runSwiftBuild() {
-  const result = spawnSync('swift', ['build', '--package-path', 'native/macos-vm-runner'], {
+  const result = spawnSync(SWIFT_BINARY, ['build', '--package-path', 'native/macos-vm-runner'], {
     cwd: desktopDir,
     stdio: 'inherit',
   });
