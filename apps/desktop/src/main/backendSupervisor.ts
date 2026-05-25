@@ -97,6 +97,29 @@ export function desktopBackendAvailable(paths: DesktopBackendPaths): boolean {
   return existsSync(paths.apiEntry);
 }
 
+function packagedMacosVmAssetsAvailable(paths: DesktopBackendPaths): boolean {
+  return existsSync(join(paths.macosVmPackagedAssetsDir, 'manifest.json'));
+}
+
+function resolvePackagedCommandRunner(
+  env: NodeJS.ProcessEnv,
+  paths: DesktopBackendPaths,
+): 'disabled' | 'macos-vm' | 'host' | 'docker-sandbox' {
+  const configured = env.AGENT_PLATFORM_COMMAND_RUNNER ?? env.AGENT_COMMAND_RUNNER;
+  if (
+    configured === 'disabled' ||
+    configured === 'host' ||
+    configured === 'docker-sandbox' ||
+    configured === 'macos-vm'
+  ) {
+    return configured;
+  }
+
+  return existsSync(paths.macosVmPackagedHelperPath) && packagedMacosVmAssetsAvailable(paths)
+    ? 'macos-vm'
+    : 'disabled';
+}
+
 export function buildDesktopBackendEnvironment({
   env,
   paths,
@@ -112,6 +135,7 @@ export function buildDesktopBackendEnvironment({
   const macosVmHelperPath =
     env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH ??
     (existsSync(paths.macosVmPackagedHelperPath) ? paths.macosVmPackagedHelperPath : undefined);
+  const commandRunner = resolvePackagedCommandRunner(env, paths);
   return {
     HOST: '127.0.0.1',
     NODE_ENV: 'production',
@@ -124,7 +148,7 @@ export function buildDesktopBackendEnvironment({
     AGENT_PLATFORM_DESKTOP_DATA_DIR: dirname(paths.sqlitePath),
     AGENT_PLATFORM_DESKTOP_LOG_DIR: dirname(paths.stdoutLog),
     AGENT_PLATFORM_DESKTOP_TEMP_DIR: paths.tempDir,
-    AGENT_PLATFORM_COMMAND_RUNNER: env.AGENT_PLATFORM_COMMAND_RUNNER ?? 'disabled',
+    AGENT_PLATFORM_COMMAND_RUNNER: commandRunner,
     AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR:
       env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ?? join(dirname(paths.sqlitePath), 'vm'),
     ...(macosVmHelperPath ? { AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: macosVmHelperPath } : {}),
@@ -190,13 +214,19 @@ export function ensurePackagedMacosVmAssets(
   paths: DesktopBackendPaths,
   env: NodeJS.ProcessEnv,
 ): void {
-  const mode = env.AGENT_PLATFORM_COMMAND_RUNNER ?? env.AGENT_COMMAND_RUNNER;
+  const mode = resolvePackagedCommandRunner(env, paths);
   if (mode !== 'macos-vm') return;
 
   const runtimeDir =
     env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ?? join(dirname(paths.sqlitePath), 'vm');
   const runtimeImagesDir = join(runtimeDir, 'images');
   const manifestPath = join(paths.macosVmPackagedAssetsDir, 'manifest.json');
+
+  if (!existsSync(paths.macosVmPackagedHelperPath)) {
+    throw new Error(
+      `Packaged macOS VM helper is missing at ${paths.macosVmPackagedHelperPath}. Run native:vm:package before packaging the desktop app.`,
+    );
+  }
 
   if (!existsSync(manifestPath)) {
     throw new Error(

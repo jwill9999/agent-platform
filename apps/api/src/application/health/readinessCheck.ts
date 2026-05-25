@@ -1,5 +1,6 @@
 import type { DrizzleDb } from '@agent-platform/db';
 import type { SubsystemCheck, ReadinessResponse } from '@agent-platform/contracts';
+import { getConfiguredCommandRunnerHealth } from '@agent-platform/harness';
 import { statSync, accessSync, existsSync, constants as fsConstants } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
@@ -85,6 +86,32 @@ export function checkDisk(sqlitePath: string | undefined): SubsystemCheck {
   }
 }
 
+export function checkCommandRunner(): SubsystemCheck {
+  const health = getConfiguredCommandRunnerHealth();
+  const details: Record<string, string> = {
+    mode: health.mode,
+    status: health.status,
+    production: String(health.production),
+    canExecute: String(health.canExecute),
+  };
+
+  if (health.reason) details['reason'] = health.reason;
+  if (health.message) details['message'] = health.message;
+  for (const [key, value] of Object.entries(health.details ?? {})) {
+    details[key] = String(value);
+  }
+
+  if (health.status === 'ready') {
+    return { status: 'healthy', details };
+  }
+
+  return {
+    status: 'degraded',
+    details,
+    error: health.message ?? 'Command runner is not ready.',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Orchestrator
 // ---------------------------------------------------------------------------
@@ -102,6 +129,7 @@ export async function runReadinessCheck(deps: {
   }
 
   checks['disk'] = checkDisk(deps.sqlitePath);
+  checks['commandRunner'] = checkCommandRunner();
 
   const statuses = new Set(Object.values(checks).map((c) => c.status));
   let overall: 'healthy' | 'degraded' | 'unhealthy';

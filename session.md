@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Fixed PR #227 unit-test CI setup, SonarCloud issues, and Security Hotspots; ready to start `.5.2` after final PR checks.
+- **Session:** Fixed PR #227 SonarCloud Security Hotspots, then implemented `.5.2` packaged runner startup/health contract changes.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `13d5c3d` (SonarCloud Security Hotspots); prior Sonar fix is `776cfd4`, CI setup fix is `27def96`.
+- **Latest commit:** pending local `.5.2` commit; latest pushed commit is `3271c13` session handoff update after Security Hotspot fixes.
 
 ## Current State
 
@@ -23,8 +23,9 @@
 - The macOS VM production path is Apple `Virtualization.framework` with `VZLinuxBootLoader` and a raw ARM64 Linux `Image`.
 - Docker and host command runners remain development-only paths; production/staging must prove `macos-vm` or stay fail-closed.
 - `.4.2`, `.4.2.1`, `.4.2.2`, `.4.2.3`, `.4.3`, `.4.4`, `.4`, and `.5.1` are complete.
-- `.5.2` is the next ready task: validate packaged runner startup and health from the packaged
-  resource layout.
+- `.5.2` is in progress with code implemented locally: packaged startup now selects `macos-vm`
+  from packaged helper/assets, API readiness exposes command-runner diagnostics, and harness health
+  distinguishes disabled, unavailable, starting, ready, and failed-closed states.
 
 ## Recent Work
 
@@ -50,6 +51,15 @@
   - Ubuntu package URL now uses HTTPS,
   - asset/package scripts use fixed system binary paths instead of PATH-dependent `curl`, `file`,
     `strings`, and `swift` lookups.
+- Implemented `.5.2` startup/health work:
+  - desktop backend defaults packaged builds to `AGENT_PLATFORM_COMMAND_RUNNER=macos-vm` only when
+    the packaged helper and VM asset manifest exist,
+  - explicit `macos-vm` mode fails closed if helper or assets are missing instead of selecting host
+    or Docker,
+  - runner health now verifies helper executability, runtime assets, daemon PID/socket/heartbeat,
+    and last-error diagnostics before reporting ready,
+  - `/health/ready` includes a degraded `commandRunner` subsystem check with the same mode/status
+    contract used by the harness.
 
 ## Checks Run
 
@@ -60,15 +70,20 @@
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm --filter @agent-platform/desktop lint`
 - `pnpm --filter @agent-platform/desktop test`
+- `pnpm --filter @agent-platform/api test`
+- `pnpm --filter @agent-platform/api test -- test/readinessCheck.test.ts`
+- `pnpm --filter @agent-platform/api typecheck`
+- `pnpm --filter @agent-platform/api lint`
+- `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
 - `pnpm --filter @agent-platform/desktop test -- test/macosVmPackaging.test.ts test/packageScripts.test.ts`
 - `swift test --package-path apps/desktop/native/macos-vm-runner`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
-  CodeQL, markdownlint, and lychee passed; SonarCloud needs commit `13d5c3d` analyzed.
+  CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Push commit `13d5c3d` and confirm PR #227 SonarCloud reruns cleanly or inspect any remaining
-   PR issues.
-2. Start Beads issue `agent-platform-macos-production-sandbox.5.2`, validating packaged runner
-   startup and health from the packaged resource layout.
+1. Commit and push the local `.5.2` changes.
+2. Confirm PR #227 reruns cleanly after the `.5.2` push.
+3. Decide whether `.5.2` can be closed from unit/package-level verification or needs an additional
+   packaged Electron smoke before sign-off.

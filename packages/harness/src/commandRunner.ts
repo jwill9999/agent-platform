@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, statSync } from 'node:fs';
+import { accessSync, constants as fsConstants, existsSync, readFileSync, statSync } from 'node:fs';
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -74,7 +74,12 @@ export type CommandRunner = {
 
 export type CommandRunnerMode = 'disabled' | 'host' | 'docker-sandbox' | 'macos-vm';
 
-export type CommandRunnerHealthStatus = 'ready' | 'unavailable' | 'disabled';
+export type CommandRunnerHealthStatus =
+  | 'ready'
+  | 'starting'
+  | 'unavailable'
+  | 'failed'
+  | 'disabled';
 
 export type CommandRunnerHealth = {
   mode: CommandRunnerMode;
@@ -591,6 +596,194 @@ function isDirectory(path: string): boolean {
   }
 }
 
+function isExecutableFile(path: string): boolean {
+  try {
+    accessSync(path, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function fileExists(path: string): boolean {
+  try {
+    return statSync(path).isFile() || statSync(path).isSocket();
+  } catch {
+    return false;
+  }
+}
+
+function readSmallTextFile(path: string, maxBytes = 4096): string | undefined {
+  try {
+    return truncate(readFileSync(path, 'utf8').trim(), maxBytes);
+  } catch {
+    return undefined;
+  }
+}
+
+function fileFresh(path: string, maxAgeMs: number): boolean {
+  try {
+    return Date.now() - statSync(path).mtimeMs <= maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
+function processIsAlive(pidPath: string): boolean {
+  const rawPid = readSmallTextFile(pidPath, 64);
+  const pid = rawPid ? Number.parseInt(rawPid, 10) : Number.NaN;
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return childProcessErrorCode(error) === 'EPERM';
+  }
+}
+
+function macosVmRuntimeHealth(
+  mode: CommandRunnerMode,
+  helperPath: string | undefined,
+  runtimeDir: string | undefined,
+): CommandRunnerHealth {
+  const details: Record<string, string | number | boolean> = {};
+  if (helperPath) details['helperPath'] = helperPath;
+  if (runtimeDir) details['runtimeDir'] = runtimeDir;
+
+  if (!helperPath) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_helper_missing',
+      message: 'macOS VM command execution is selected but the VM helper path is not configured.',
+    };
+  }
+
+  if (!existsSync(helperPath)) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_helper_missing',
+      message: 'macOS VM runner helper binary was not found.',
+      details,
+    };
+  }
+
+  if (!isExecutableFile(helperPath)) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_helper_not_executable',
+      message: 'macOS VM runner helper binary is not executable.',
+      details,
+    };
+  }
+
+  if (!runtimeDir || !isDirectory(runtimeDir)) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_runtime_missing',
+      message: 'macOS VM command execution is selected but the runtime directory is unavailable.',
+      details,
+    };
+  }
+
+  const imagesDir = join(runtimeDir, 'images');
+  const requiredAssets = [
+    'manifest.json',
+    'base-linux.img',
+    'vmlinuz',
+    'initrd.img',
+    'guest-bootstrap.sh',
+  ];
+  const missingAssets = requiredAssets.filter((asset) => !fileExists(join(imagesDir, asset)));
+  if (missingAssets.length > 0) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_assets_missing',
+      message: `macOS VM runtime assets are missing: ${missingAssets.join(', ')}.`,
+      details: { ...details, imagesDir, missingAssets: missingAssets.join(',') },
+    };
+  }
+
+  const stateDir = join(runtimeDir, 'state');
+  const logsDir = join(runtimeDir, 'logs');
+  const runnerSocket = join(stateDir, 'runner.sock');
+  const daemonPid = join(stateDir, 'daemon.pid');
+  const daemonHeartbeat = join(stateDir, 'daemon.heartbeat');
+  const lastError = join(logsDir, 'last-error.log');
+  const alive = processIsAlive(daemonPid);
+  const freshHeartbeat = fileFresh(daemonHeartbeat, 5_000);
+  const socketExists = existsSync(runnerSocket);
+
+  if (socketExists && alive && freshHeartbeat) {
+    return {
+      mode,
+      status: 'ready',
+      production: true,
+      canExecute: true,
+      reason: 'production_runner_ready',
+      message: 'macOS VM command execution is ready.',
+      details: { ...details, runnerSocket, daemonPid, daemonHeartbeat },
+    };
+  }
+
+  const failure = readSmallTextFile(lastError);
+  if (failure) {
+    return {
+      mode,
+      status: 'failed',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_failed_closed',
+      message: `macOS VM command execution failed closed: ${failure}`,
+      details: { ...details, lastError },
+    };
+  }
+
+  if (socketExists || alive || existsSync(daemonPid) || existsSync(daemonHeartbeat)) {
+    return {
+      mode,
+      status: 'starting',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_starting',
+      message: 'macOS VM command execution is starting but is not ready yet.',
+      details: {
+        ...details,
+        runnerSocket,
+        daemonPid,
+        daemonHeartbeat,
+        socketExists,
+        daemonAlive: alive,
+        freshHeartbeat,
+      },
+    };
+  }
+
+  return {
+    mode,
+    status: 'unavailable',
+    production: true,
+    canExecute: false,
+    reason: 'macos_vm_runner_not_started',
+    message: 'macOS VM command execution is configured but the VM daemon is not running.',
+    details,
+  };
+}
+
 export function getConfiguredCommandRunnerHealth(
   options: ConfiguredCommandRunnerOptions = {},
 ): CommandRunnerHealth {
@@ -621,10 +814,7 @@ export function getConfiguredCommandRunnerHealth(
   if (mode === 'macos-vm') {
     const helperPath = configuredMacosVmHelperPath(options);
     const runtimeDir = configuredMacosVmRuntimeDir(options);
-    if (
-      options.macosVmRunner ||
-      (helperPath && runtimeDir && existsSync(helperPath) && isDirectory(runtimeDir))
-    ) {
+    if (options.macosVmRunner) {
       return {
         mode,
         status: 'ready',
@@ -636,15 +826,7 @@ export function getConfiguredCommandRunnerHealth(
       };
     }
 
-    return {
-      mode,
-      status: 'unavailable',
-      production: true,
-      canExecute: false,
-      reason: 'macos_vm_runner_unavailable',
-      message:
-        'macOS VM command execution is selected but the VM helper or runtime directory is unavailable.',
-    };
+    return macosVmRuntimeHealth(mode, helperPath, runtimeDir);
   }
 
   return {
