@@ -18,8 +18,7 @@ const DEFAULT_IMAGE_SIZE_MB = 4096;
 const DEFAULT_ALPINE_VERSION = '3.20';
 const DEFAULT_BUILDER_IMAGE = `alpine:${DEFAULT_ALPINE_VERSION}`;
 const DEFAULT_UBUNTU_IMAGE_BASE = 'https://cloud-images.ubuntu.com/daily/server/jammy/current';
-const DEFAULT_UBUNTU_UNPACKED_BASE =
-  `${DEFAULT_UBUNTU_IMAGE_BASE}/unpacked`;
+const DEFAULT_UBUNTU_UNPACKED_BASE = `${DEFAULT_UBUNTU_IMAGE_BASE}/unpacked`;
 const DEFAULT_ROOTFS_URL = `${DEFAULT_UBUNTU_IMAGE_BASE}/jammy-server-cloudimg-arm64-root.tar.xz`;
 const DEFAULT_KERNEL_URL = `${DEFAULT_UBUNTU_UNPACKED_BASE}/jammy-server-cloudimg-arm64-vmlinuz-generic`;
 const DEFAULT_INITRD_URL = `${DEFAULT_UBUNTU_UNPACKED_BASE}/jammy-server-cloudimg-arm64-initrd-generic`;
@@ -72,7 +71,11 @@ downloadFile(rootfsUrl, join(resolvedOutDir, 'rootfs.tar.xz'));
 const downloadedKernelPath = join(resolvedOutDir, 'vmlinuz.gz');
 const rawKernelPath = join(resolvedOutDir, 'vmlinuz');
 downloadFile(kernelUrl, downloadedKernelPath);
-await pipeline(createReadStream(downloadedKernelPath), createGunzip(), createWriteStream(rawKernelPath));
+await pipeline(
+  createReadStream(downloadedKernelPath),
+  createGunzip(),
+  createWriteStream(rawKernelPath),
+);
 downloadFile(initrdUrl, join(resolvedOutDir, 'initrd.img'));
 assertRawArm64Kernel(rawKernelPath);
 const kernelPackage = readUbuntuKernelPackage(rawKernelPath);
@@ -155,18 +158,23 @@ function assertRawArm64Kernel(path) {
 }
 
 function readUbuntuKernelPackage(path) {
-  const strings = execFileSync('strings', [path], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  const strings = execFileSync('strings', [path], {
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
   const kernelVersion = strings.match(/Linux version (\S+)/)?.[1];
-  const packageVersion = strings.match(/\(Ubuntu ([0-9][^ )]+)-generic /)?.[1];
+  const packageVersion = strings.match(/\(Ubuntu (\d[^ )]+)-generic /)?.[1];
   if (!kernelVersion || !packageVersion) {
-    console.error('Unable to determine matching Ubuntu kernel module package version from vmlinuz.');
+    console.error(
+      'Unable to determine matching Ubuntu kernel module package version from vmlinuz.',
+    );
     process.exit(1);
   }
   return { kernelVersion, packageVersion };
 }
 
 function buildScript() {
-  return `#!/bin/sh
+  return String.raw`#!/bin/sh
 set -eu
 
 apk add --no-cache dpkg e2fsprogs kmod tar xz zstd

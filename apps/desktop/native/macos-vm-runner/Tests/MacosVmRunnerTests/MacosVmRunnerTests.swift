@@ -3,6 +3,8 @@ import Darwin
 import Foundation
 @testable import MacosVmRunnerCore
 
+private let fixtureWorkspacePath = "/tmp/project"
+
 struct MacosVmRunnerTests {
     @Test func statusWithoutRuntimeDirReturnsDeterministicUnavailableJson() throws {
         let result = handleCommand(arguments: ["status"])
@@ -302,7 +304,17 @@ struct MacosVmRunnerTests {
         #expect(stop.exitCode == 0)
         #expect(stop.response == JsonResponse(ok: true, state: "disabled", message: "VM runner is stopped."))
 
-        let exec = handleCommand(arguments: ["exec", "--workspace", "/tmp/project", "--cwd", "/tmp/project", "--", "pwd"])
+        let exec = handleCommand(
+            arguments: [
+                "exec",
+                "--workspace",
+                fixtureWorkspacePath,
+                "--cwd",
+                fixtureWorkspacePath,
+                "--",
+                "pwd",
+            ]
+        )
         #expect(exec.exitCode == 0)
         #expect(
             exec.response
@@ -324,9 +336,9 @@ struct MacosVmRunnerTests {
                 "--runtime-dir",
                 runtimeDir.path,
                 "--workspace",
-                "/tmp/project",
+                fixtureWorkspacePath,
                 "--cwd",
-                "/tmp/project",
+                fixtureWorkspacePath,
                 "--",
                 "pwd",
             ]

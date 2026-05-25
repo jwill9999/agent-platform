@@ -61,11 +61,10 @@ export function resolveDesktopRuntimePathsFromApp(
   app: Pick<App, 'getPath'>,
   env: NodeJS.ProcessEnv = process.env,
 ): DesktopRuntimePaths {
-  const electronProcess = process as NodeJS.Process & { resourcesPath?: string };
   return resolveDesktopRuntimePaths({
     userDataDir: app.getPath('userData'),
     logDir: app.getPath('logs'),
-    resourcesDir: electronProcess.resourcesPath,
+    resourcesDir: process.resourcesPath,
     tempDir: app.getPath('temp'),
     env,
   });

@@ -238,7 +238,7 @@ function dockerUnavailable(message: string): CommandRunnerDeniedResult {
   };
 }
 
-function dockerEnvironment(env: CommandEnvironmentPolicy): Record<string, string> {
+function commandRunnerEnvironment(env: CommandEnvironmentPolicy): Record<string, string> {
   return {
     ...env.variables,
     TERM: env.variables.TERM ?? 'dumb',
@@ -323,7 +323,7 @@ export function createDockerSandboxCommandRunner(
             cwd: paths.hostWorkspaceRoot,
             timeout: request.timeoutMs,
             maxBuffer: request.maxOutputBytes * 2,
-            env: dockerEnvironment(request.env),
+            env: commandRunnerEnvironment(request.env),
           },
           (error, stdout, stderr) => {
             if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
@@ -400,13 +400,6 @@ function macosVmProcessFailure(error: unknown, stderr: string): CommandRunnerDen
   return macosVmUnavailable('macos_vm_runner_process_failed', stderr || errorMessage(error));
 }
 
-function macosVmEnvironment(env: CommandEnvironmentPolicy): Record<string, string> {
-  return {
-    ...env.variables,
-    TERM: env.variables.TERM ?? 'dumb',
-  };
-}
-
 function parseMacosVmHelperResponse(stdout: string): MacosVmHelperResponse | undefined {
   try {
     const parsed = JSON.parse(stdout) as Partial<MacosVmHelperResponse>;
@@ -464,7 +457,7 @@ export function createMacosVmCommandRunner({
 
       const envDir = await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-env-'));
       const envFile = join(envDir, 'env.json');
-      await writeFile(envFile, JSON.stringify(macosVmEnvironment(request.env)), 'utf8');
+      await writeFile(envFile, JSON.stringify(commandRunnerEnvironment(request.env)), 'utf8');
 
       return new Promise<CommandRunnerResult>((resolve) => {
         const startedAt = Date.now();
@@ -492,10 +485,10 @@ export function createMacosVmCommandRunner({
             cwd: paths.hostWorkspaceRoot,
             timeout: request.timeoutMs,
             maxBuffer: request.maxOutputBytes * 2,
-            env: macosVmEnvironment(request.env),
+            env: commandRunnerEnvironment(request.env),
           },
           (error, stdout, stderr) => {
-            void rm(envDir, { recursive: true, force: true });
+            rm(envDir, { recursive: true, force: true }).catch(() => undefined);
             if (error) {
               resolve(macosVmProcessFailure(error, stderr));
               return;

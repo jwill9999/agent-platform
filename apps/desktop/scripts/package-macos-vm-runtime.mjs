@@ -52,35 +52,40 @@ function parseArgs(argv) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === '--') continue;
-    if (arg === '--help' || arg === '-h') usage(0);
-    if (arg === '--skip-build') {
-      options.skipBuild = true;
-      continue;
+    switch (arg) {
+      case '--':
+        break;
+      case '--help':
+      case '-h':
+        usage(0);
+        break;
+      case '--skip-build':
+        options.skipBuild = true;
+        break;
+      case '--assets-dir':
+      case '--out-dir':
+      case '--helper': {
+        const value = argv[index + 1];
+        if (!value) usage();
+        setPathOption(options, arg, value);
+        index += 1;
+        break;
+      }
+      default:
+        console.error(`Unknown argument: ${arg}`);
+        usage();
     }
-    const value = argv[index + 1];
-    if (!value) usage();
-    if (arg === '--assets-dir') {
-      options.assetsDir = resolve(value);
-      index += 1;
-      continue;
-    }
-    if (arg === '--out-dir') {
-      options.outDir = resolve(value);
-      index += 1;
-      continue;
-    }
-    if (arg === '--helper') {
-      options.helper = resolve(value);
-      index += 1;
-      continue;
-    }
-    console.error(`Unknown argument: ${arg}`);
-    usage();
   }
 
   if (!options.assetsDir) usage();
   return options;
+}
+
+function setPathOption(options, arg, value) {
+  const resolvedValue = resolve(value);
+  if (arg === '--assets-dir') options.assetsDir = resolvedValue;
+  if (arg === '--out-dir') options.outDir = resolvedValue;
+  if (arg === '--helper') options.helper = resolvedValue;
 }
 
 function runSwiftBuild() {
@@ -120,9 +125,7 @@ async function verifyAsset(path, expectedSha256, label) {
   assertFile(path, label);
   const actualSha256 = await sha256File(path);
   if (actualSha256 !== expectedSha256) {
-    throw new Error(
-      `${label} checksum mismatch: expected ${expectedSha256}, got ${actualSha256}`,
-    );
+    throw new Error(`${label} checksum mismatch: expected ${expectedSha256}, got ${actualSha256}`);
   }
   return actualSha256;
 }
@@ -217,7 +220,9 @@ async function main() {
   console.log(`Packaged macOS VM runtime resources in ${options.outDir}`);
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
-});
+}

@@ -2,6 +2,8 @@ import Darwin
 import Foundation
 import Virtualization
 
+private let guestWorkspaceRoot = "/workspace"
+
 public struct JsonResponse: Codable, Equatable {
     public let ok: Bool
     public let mode: String
@@ -17,15 +19,33 @@ public struct JsonResponse: Codable, Equatable {
         mode: String = "macos-vm",
         state: String,
         message: String,
-        stdout: String? = nil,
-        stderr: String? = nil,
-        exitCode: Int? = nil,
-        durationMs: Int? = nil
+        output: JsonResponseOutput = .empty
     ) {
         self.ok = ok
         self.mode = mode
         self.state = state
         self.message = message
+        self.stdout = output.stdout
+        self.stderr = output.stderr
+        self.exitCode = output.exitCode
+        self.durationMs = output.durationMs
+    }
+}
+
+public struct JsonResponseOutput: Codable, Equatable {
+    public static let empty = JsonResponseOutput()
+
+    public let stdout: String?
+    public let stderr: String?
+    public let exitCode: Int?
+    public let durationMs: Int?
+
+    public init(
+        stdout: String? = nil,
+        stderr: String? = nil,
+        exitCode: Int? = nil,
+        durationMs: Int? = nil
+    ) {
         self.stdout = stdout
         self.stderr = stderr
         self.exitCode = exitCode
@@ -338,11 +358,11 @@ private final class VmLifecycleDelegate: NSObject, VZVirtualMachineDelegate {
         self.onStop = onStop
     }
 
-    func guestDidStop(_ virtualMachine: VZVirtualMachine) {
+    func guestDidStop(_: VZVirtualMachine) {
         onStop()
     }
 
-    func virtualMachine(_ virtualMachine: VZVirtualMachine, didStopWithError error: Error) {
+    func virtualMachine(_: VZVirtualMachine, didStopWithError _: Error) {
         onStop()
     }
 }
@@ -572,10 +592,12 @@ private func dispatchGuestCommand(
                         ok: true,
                         state: "ready",
                         message: "Command completed.",
-                        stdout: truncateText(stdout, maxLength: maxOutputBytes),
-                        stderr: truncateText(stderr, maxLength: maxOutputBytes),
-                        exitCode: exitCode,
-                        durationMs: Int(Date().timeIntervalSince(startedAt) * 1000)
+                        output: JsonResponseOutput(
+                            stdout: truncateText(stdout, maxLength: maxOutputBytes),
+                            stderr: truncateText(stderr, maxLength: maxOutputBytes),
+                            exitCode: exitCode,
+                            durationMs: Int(Date().timeIntervalSince(startedAt) * 1000)
+                        )
                     )
                 )
             }
@@ -631,10 +653,10 @@ private func path(_ candidate: String, isInside root: String) -> Bool {
 
 private func guestWorkspacePath(workspacePath: String, cwdPath: String) -> String {
     guard path(cwdPath, isInside: workspacePath) else {
-        return "/workspace"
+        return guestWorkspaceRoot
     }
     let suffix = String(cwdPath.dropFirst(workspacePath.count))
-    return suffix.isEmpty ? "/workspace" : "/workspace\(suffix)"
+    return suffix.isEmpty ? guestWorkspaceRoot : "\(guestWorkspaceRoot)\(suffix)"
 }
 
 private func truncateText(_ text: String, maxLength: Int) -> String {
