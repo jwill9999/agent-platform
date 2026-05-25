@@ -13,19 +13,19 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Fixed PR #227 Security Hotspots and duplication gate, then implemented `.5.2` packaged runner startup/health contract changes.
+- **Session:** Implemented `.5.3` packaged Electron VM command E2E coverage and verified the browser-tools unit failure is fixed.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `cf42fd7` reduces duplicated test setup after `.5.2` implementation commit `fb8248a`.
+- **Latest commit:** pending commit for `.5.3`.
 
 ## Current State
 
 - Production sandbox work remains on `jwill9999/macos-production-sandbox-vm-lifecycle-exec`; do not push directly to `main`.
 - The macOS VM production path is Apple `Virtualization.framework` with `VZLinuxBootLoader` and a raw ARM64 Linux `Image`.
 - Docker and host command runners remain development-only paths; production/staging must prove `macos-vm` or stay fail-closed.
-- `.4.2`, `.4.2.1`, `.4.2.2`, `.4.2.3`, `.4.3`, `.4.4`, `.4`, and `.5.1` are complete.
-- `.5.2` is in progress with code implemented locally: packaged startup now selects `macos-vm`
-  from packaged helper/assets, API readiness exposes command-runner diagnostics, and harness health
-  distinguishes disabled, unavailable, starting, ready, and failed-closed states.
+- `.4.2`, `.4.2.1`, `.4.2.2`, `.4.2.3`, `.4.3`, `.4.4`, `.4`, `.5.1`, and `.5.2` are complete.
+- `.5.3` is implemented locally and ready to close after commit/push: packaged Electron E2E now
+  proves approved VM shell execution, `/workspace` output, host-path/secret isolation, fail-closed
+  VM-unavailable behavior, visible runner health, and normal Project Chat regression coverage.
 
 ## Recent Work
 
@@ -62,6 +62,14 @@
     contract used by the harness.
 - SonarCloud rerun after `fb8248a` showed hotspots fixed and no open issues, but duplication was
   still at 3.5%; refactored duplicated runner-health/backend-supervisor test setup in `cf42fd7`.
+- Implemented `.5.3` packaged Electron E2E:
+  - added a Project Chat command-runner status badge backed by `/api/health/ready`,
+  - added a web health BFF route so the renderer can read API readiness consistently,
+  - added an E2E-only mock LLM seam for deterministic tool-call stories,
+  - made VM runner unavailable errors visible in Tool activity,
+  - added packaged Electron tests for both ready/success and unhealthy/fail-closed VM command flows.
+- Re-ran the previously failing harness browser-tools integration path; the full harness suite now
+  passes, including `browserTools.integration.test.ts`.
 
 ## Checks Run
 
@@ -78,6 +86,19 @@
 - `pnpm --filter @agent-platform/api lint`
 - `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
 - `pnpm --filter @agent-platform/desktop test -- test/macosVmPackaging.test.ts test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/api run typecheck`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/desktop run typecheck`
+- `pnpm --filter @agent-platform/api run lint`
+- `pnpm --filter @agent-platform/web run lint`
+- `pnpm --filter @agent-platform/desktop run lint`
+- `pnpm --filter @agent-platform/api run build`
+- `pnpm --filter @agent-platform/web run build`
+- `pnpm --filter @agent-platform/desktop run build`
+- `pnpm --filter @agent-platform/api run test`
+- `pnpm --filter @agent-platform/desktop run test`
+- `pnpm --filter @agent-platform/harness run test`
+- `pnpm --filter @agent-platform/desktop exec playwright test -c e2e/playwright.electron.config.ts e2e/packaged-vm-command.e2e.ts`
 - `swift test --package-path apps/desktop/native/macos-vm-runner`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
@@ -85,7 +106,6 @@
 
 ## Next
 
-1. Commit and push the local `.5.2` changes.
-2. Confirm PR #227 reruns cleanly after `cf42fd7`.
-3. Decide whether `.5.2` can be closed from unit/package-level verification or needs an additional
-   packaged Electron smoke before sign-off.
+1. Commit and push `.5.3`, then close `agent-platform-macos-production-sandbox.5.3`.
+2. Start `agent-platform-macos-production-sandbox.5.4`: wire the packaged macOS VM E2E into the
+   staging/CI gate so production-ready staging cannot pass without the packaged VM command proof.

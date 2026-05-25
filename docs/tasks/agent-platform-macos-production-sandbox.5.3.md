@@ -24,6 +24,42 @@ prove command execution runs inside the VM.
   allows it; helper-only tests are not sufficient for this task.
 - Capture enough evidence to debug failures in CI without manual reproduction.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Packaged Electron VM command execution
+
+  Background:
+    Given the packaged Electron app is running with isolated app data
+    And the packaged macOS VM helper and image assets are staged through the resources directory
+    And a real Project folder is available through the desktop Project picker test hook
+
+  Scenario: VM command execution succeeds from Project Chat
+    Given the VM runner health status is visible as ready
+    When the user opens the Project folder through the UI
+    And the user asks Project Chat to run a shell command
+    And the user approves the sys_bash request
+    Then the visible tool activity completes successfully
+    And the command evidence shows the guest working directory is /workspace
+    And host-only paths and credentials are not displayed in the chat transcript
+
+  Scenario: VM command execution fails closed when the runner is unhealthy
+    Given the packaged VM helper and assets exist
+    But the VM runner health status is visible as failed or unavailable
+    When the user opens the Project folder through the UI
+    And the user asks Project Chat to run a shell command
+    And the user approves the sys_bash request
+    Then the visible tool activity is denied or unavailable
+    And the app does not fall back to host shell execution
+
+  Scenario: Normal Project Chat remains usable with VM mode enabled
+    Given VM mode is configured for the packaged Electron app
+    When the user opens the Project folder through the UI
+    And the user runs a non-command Project Chat flow
+    Then the expected Project Chat response is visible
+    And the Project Chat composer remains usable
+```
+
 ## Tests And Verification
 
 - `pnpm --filter @agent-platform/desktop test:e2e`
