@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Fixed PR #227 unit-test CI setup and SonarCloud runner findings; ready to start `.5.2`.
+- **Session:** Fixed PR #227 unit-test CI setup and SonarCloud runner findings; ready to start `.5.2` after final PR checks.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `2741a97` (SonarCloud VM runner findings); CI setup fix is `27def96`.
+- **Latest commit:** `776cfd4` (remaining SonarCloud findings); prior Sonar fix is `2741a97`, CI setup fix is `27def96`.
 
 ## Current State
 
@@ -44,6 +44,8 @@
   - removed unused Swift delegate parameters, reduced `JsonResponse` initializer arity, and replaced
     hardcoded workspace path literals with named constants,
   - modernized VM asset build regex/template string usage.
+- After the first Sonar rerun, cleared the remaining three open issues by deriving Swift path
+  defaults without hardcoded URI literals and moving async temp cleanup out of the nested callback.
 
 ## Checks Run
 
@@ -58,11 +60,11 @@
 - `swift test --package-path apps/desktop/native/macos-vm-runner`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
-  CodeQL, markdownlint, and lychee passed; SonarCloud needs the latest Sonar fix commit analyzed.
+  CodeQL, markdownlint, and lychee passed; SonarCloud needs commit `776cfd4` analyzed.
 
 ## Next
 
-1. Push the SonarCloud fix and confirm PR #227 SonarCloud reruns cleanly or inspect any remaining
+1. Push commit `776cfd4` and confirm PR #227 SonarCloud reruns cleanly or inspect any remaining
    PR issues.
 2. Start Beads issue `agent-platform-macos-production-sandbox.5.2`, validating packaged runner
    startup and health from the packaged resource layout.
