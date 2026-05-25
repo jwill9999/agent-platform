@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Implemented `.5.3` packaged Electron VM command E2E coverage and verified the browser-tools unit failure is fixed.
+- **Session:** Implemented `.5.3` packaged Electron VM command E2E coverage and started `.5.4` staging gate wiring.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending commit for `.5.3`.
+- **Latest commit:** `a70b437` implements `.5.3`; `.5.4` changes are local and pending commit.
 
 ## Current State
 
@@ -23,9 +23,9 @@
 - The macOS VM production path is Apple `Virtualization.framework` with `VZLinuxBootLoader` and a raw ARM64 Linux `Image`.
 - Docker and host command runners remain development-only paths; production/staging must prove `macos-vm` or stay fail-closed.
 - `.4.2`, `.4.2.1`, `.4.2.2`, `.4.2.3`, `.4.3`, `.4.4`, `.4`, `.5.1`, and `.5.2` are complete.
-- `.5.3` is implemented locally and ready to close after commit/push: packaged Electron E2E now
-  proves approved VM shell execution, `/workspace` output, host-path/secret isolation, fail-closed
-  VM-unavailable behavior, visible runner health, and normal Project Chat regression coverage.
+- `.5.3` is complete and pushed.
+- `.5.4` is in progress: staging workflow wiring is implemented locally, but the task must remain
+  open until a staging PR run proves the packaged macOS VM E2E with real pinned assets.
 
 ## Recent Work
 
@@ -70,6 +70,14 @@
   - added packaged Electron tests for both ready/success and unhealthy/fail-closed VM command flows.
 - Re-ran the previously failing harness browser-tools integration path; the full harness suite now
   passes, including `browserTools.integration.test.ts`.
+- Started `.5.4` staging gate work:
+  - added a staging-only `staging-packaged-macos-vm-e2e` CI job on `macos-15`,
+  - made the job require `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL` and
+    `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256`,
+  - packages the signed helper with downloaded pinned assets and uploads manifest/evidence
+    artifacts,
+  - extended the packaged Electron E2E so CI can run the success path against real packaged
+    resources while retaining synthetic fail-closed coverage.
 
 ## Checks Run
 
@@ -99,6 +107,8 @@
 - `pnpm --filter @agent-platform/desktop run test`
 - `pnpm --filter @agent-platform/harness run test`
 - `pnpm --filter @agent-platform/desktop exec playwright test -c e2e/playwright.electron.config.ts e2e/packaged-vm-command.e2e.ts`
+- `pnpm run format:check`
+- `pnpm docs:lint`
 - `swift test --package-path apps/desktop/native/macos-vm-runner`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
@@ -106,6 +116,7 @@
 
 ## Next
 
-1. Commit and push `.5.3`, then close `agent-platform-macos-production-sandbox.5.3`.
-2. Start `agent-platform-macos-production-sandbox.5.4`: wire the packaged macOS VM E2E into the
-   staging/CI gate so production-ready staging cannot pass without the packaged VM command proof.
+1. Commit and push the local `.5.4` staging-gate workflow changes.
+2. Configure the staging repository variables for the pinned prepared VM asset archive URL/SHA.
+3. Open or rerun a PR into `staging`, then keep `.5.4` open until the
+   `staging-packaged-macos-vm-e2e` artifact proves real packaged `macos-vm` command execution.

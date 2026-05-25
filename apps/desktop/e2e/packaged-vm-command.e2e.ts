@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,8 +17,10 @@ type VmFixtureHealth = 'ready' | 'failed';
 
 type VmFixture = {
   backendPort: number;
+  evidenceDir?: string;
   heartbeatTimer?: NodeJS.Timeout;
   projectDir: string;
+  realVmRuntimeDir?: string;
   rendererPort: number;
   resourcesDir: string;
   runtimeDir: string;
@@ -34,6 +36,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
       app = await launchVmFixture(fixture);
       const page = await app.firstWindow();
       await openProject(page);
+      const realVmStatus = fixture.realVmRuntimeDir ? startRealVmRunner(fixture) : undefined;
 
       await expect(page.getByLabel('Command runner status')).toContainText('macos-vm ready', {
         timeout: 15_000,
@@ -54,8 +57,10 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(toolActivity.getByText('VM_SECRET_MISSING:true').first()).toBeVisible();
       await expect(page.getByText(fixture.projectDir)).toHaveCount(0);
       await expect(page.getByText(HOST_ONLY_SECRET)).toHaveCount(0);
+      writeVmEvidence(fixture, 'success', realVmStatus);
     } finally {
       await app?.close();
+      stopRealVmRunner(fixture);
       if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
       rmSync(fixture.tempRoot, { recursive: true, force: true });
     }
@@ -96,11 +101,17 @@ test.describe('packaged Electron macOS VM command runner', () => {
 async function createVmFixture(options: { health: VmFixtureHealth }): Promise<VmFixture> {
   const tempRoot = join(repoRoot, '.agent-platform', 'electron-vm-e2e', String(Date.now()));
   const runtimeDir = join(tempRoot, 'runtime');
-  const resourcesDir = join(tempRoot, 'resources');
+  const fixtureResourcesDir = join(tempRoot, 'resources');
+  const evidenceDir = process.env.AGENT_PLATFORM_E2E_EVIDENCE_DIR;
   const projectDir = join(tempRoot, 'client', 'packaged-vm-project');
   const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
   const backendPort = await getOpenPort();
   const rendererPort = await getOpenPort();
+  const realPackagedResourcesDir =
+    options.health === 'ready'
+      ? process.env.AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR
+      : undefined;
+  const resourcesDir = realPackagedResourcesDir ?? fixtureResourcesDir;
 
   mkdirSync(projectDir, { recursive: true });
   writeFileSync(join(projectDir, 'README.md'), '# Packaged VM E2E Project\n');
@@ -116,14 +127,23 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
   execFileSync(GIT_BINARY, ['add', 'README.md'], { cwd: projectDir, stdio: 'ignore' });
   execFileSync(GIT_BINARY, ['commit', '-m', 'initial'], { cwd: projectDir, stdio: 'ignore' });
 
-  writePackagedVmResources(resourcesDir, options.health);
-  const heartbeatTimer = writeRuntimeHealth(runtimeDir, options.health);
+  if (realPackagedResourcesDir) {
+    assertPackagedResources(realPackagedResourcesDir);
+  } else {
+    writePackagedVmResources(resourcesDir, options.health);
+  }
+  const realVmRuntimeDir = realPackagedResourcesDir ? join(runtimeDir, 'data', 'vm') : undefined;
+  const heartbeatTimer = realPackagedResourcesDir
+    ? undefined
+    : writeRuntimeHealth(runtimeDir, options.health);
   seedDesktopDatabase(sqlitePath);
 
   return {
     backendPort,
+    evidenceDir,
     heartbeatTimer,
     projectDir,
+    realVmRuntimeDir,
     rendererPort,
     resourcesDir,
     runtimeDir,
@@ -242,6 +262,70 @@ function writePackagedVmResources(resourcesDir: string, health: VmFixtureHealth)
     ].join('\n'),
   );
   chmodSync(join(vmDir, 'macos-vm-runner'), 0o755);
+}
+
+function assertPackagedResources(resourcesDir: string): void {
+  const required = [
+    join(resourcesDir, 'macos-vm', 'macos-vm-runner'),
+    join(resourcesDir, 'macos-vm', 'package-manifest.json'),
+    join(resourcesDir, 'macos-vm', 'images', 'manifest.json'),
+  ];
+  for (const path of required) {
+    if (!existsSync(path)) {
+      throw new Error(`Packaged macOS VM resource is missing: ${path}`);
+    }
+  }
+}
+
+function startRealVmRunner(fixture: VmFixture): unknown {
+  if (!fixture.realVmRuntimeDir) return undefined;
+  const helperPath = join(fixture.resourcesDir, 'macos-vm', 'macos-vm-runner');
+  const status = execFileSync(
+    helperPath,
+    ['start', '--runtime-dir', fixture.realVmRuntimeDir, '--workspace', fixture.projectDir],
+    { encoding: 'utf8', timeout: 90_000 },
+  );
+  const parsed = JSON.parse(status) as { ok?: boolean; message?: string; state?: string };
+  if (!parsed.ok || parsed.state !== 'ready') {
+    throw new Error(`macOS VM runner did not start: ${status}`);
+  }
+  return parsed;
+}
+
+function stopRealVmRunner(fixture: VmFixture): void {
+  if (!fixture.realVmRuntimeDir) return;
+  const helperPath = join(fixture.resourcesDir, 'macos-vm', 'macos-vm-runner');
+  try {
+    execFileSync(helperPath, ['stop', '--runtime-dir', fixture.realVmRuntimeDir], {
+      encoding: 'utf8',
+      timeout: 20_000,
+    });
+  } catch {
+    // Best-effort cleanup; the test has already captured the relevant failure.
+  }
+}
+
+function writeVmEvidence(fixture: VmFixture, scenario: string, runnerStatus: unknown): void {
+  if (!fixture.evidenceDir) return;
+  mkdirSync(fixture.evidenceDir, { recursive: true });
+  const packageManifestPath = join(fixture.resourcesDir, 'macos-vm', 'package-manifest.json');
+  const assetManifestPath = join(fixture.resourcesDir, 'macos-vm', 'images', 'manifest.json');
+  writeFileSync(
+    join(fixture.evidenceDir, `${scenario}.json`),
+    `${JSON.stringify(
+      {
+        scenario,
+        commandRunner: 'macos-vm',
+        projectPathVisibleToUser: false,
+        hostSecretVisibleToUser: false,
+        packageManifest: JSON.parse(readFileSync(packageManifestPath, 'utf8')),
+        assetManifest: JSON.parse(readFileSync(assetManifestPath, 'utf8')),
+        runnerStatus,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 function writeRuntimeHealth(

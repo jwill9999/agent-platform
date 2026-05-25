@@ -239,3 +239,94 @@ jobs:
         with:
           name: electron-test-results
           path: apps/desktop/test-results/
+
+  staging-packaged-macos-vm-e2e:
+    if: github.event_name == 'pull_request' && github.base_ref == 'staging'
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL: ${{ vars.AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL }}
+      AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256: ${{ vars.AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Verify Apple Silicon runner
+        run: |
+          test "$(uname -m)" = "arm64"
+          sw_vers
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Download pinned macOS VM assets
+        run: |
+          test -n "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL"
+          test -n "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256"
+          mkdir -p "$RUNNER_TEMP/macos-vm-assets"
+          curl -fsSL "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL" \
+            -o "$RUNNER_TEMP/macos-vm-assets.tgz"
+          printf '%s  %s\n' \
+            "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256" \
+            "$RUNNER_TEMP/macos-vm-assets.tgz" | shasum -a 256 -c -
+          tar -xzf "$RUNNER_TEMP/macos-vm-assets.tgz" -C "$RUNNER_TEMP/macos-vm-assets"
+
+      - name: Resolve asset directory
+        run: |
+          if [ -f "$RUNNER_TEMP/macos-vm-assets/manifest.json" ]; then
+            echo "AGENT_PLATFORM_MACOS_VM_ASSETS_DIR=$RUNNER_TEMP/macos-vm-assets" >> "$GITHUB_ENV"
+          elif [ -f "$RUNNER_TEMP/macos-vm-assets/images/manifest.json" ]; then
+            echo "AGENT_PLATFORM_MACOS_VM_ASSETS_DIR=$RUNNER_TEMP/macos-vm-assets/images" >> "$GITHUB_ENV"
+          else
+            echo "Downloaded VM asset archive does not contain manifest.json or images/manifest.json" >&2
+            find "$RUNNER_TEMP/macos-vm-assets" -maxdepth 3 -type f >&2
+            exit 1
+          fi
+
+      - name: Build and sign macOS VM helper
+        run: |
+          pnpm --filter @agent-platform/desktop native:vm:build
+          pnpm --filter @agent-platform/desktop native:vm:sign-dev
+
+      - name: Package macOS VM runtime resources
+        run: |
+          pnpm --filter @agent-platform/desktop native:vm:package -- \
+            --assets-dir "$AGENT_PLATFORM_MACOS_VM_ASSETS_DIR" \
+            --out-dir "$RUNNER_TEMP/agent-platform-resources/macos-vm" \
+            --helper "$GITHUB_WORKSPACE/apps/desktop/native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner" \
+            --skip-build
+          mkdir -p "$RUNNER_TEMP/agent-platform-vm-evidence"
+          cp "$RUNNER_TEMP/agent-platform-resources/macos-vm/package-manifest.json" \
+            "$RUNNER_TEMP/agent-platform-vm-evidence/package-manifest.json"
+          cp "$RUNNER_TEMP/agent-platform-resources/macos-vm/images/manifest.json" \
+            "$RUNNER_TEMP/agent-platform-vm-evidence/asset-manifest.json"
+          rm -rf "$RUNNER_TEMP/macos-vm-assets" "$RUNNER_TEMP/macos-vm-assets.tgz"
+
+      - name: Staging packaged macOS VM Electron E2E
+        env:
+          AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR: ${{ runner.temp }}/agent-platform-resources
+          AGENT_PLATFORM_E2E_EVIDENCE_DIR: ${{ runner.temp }}/agent-platform-vm-evidence
+        run: pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts
+
+      - name: Upload staging macOS VM evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: staging-packaged-macos-vm-evidence
+          path: ${{ runner.temp }}/agent-platform-vm-evidence/
+
+      - name: Upload staging Electron test results
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: staging-packaged-macos-vm-test-results
+          path: apps/desktop/test-results/

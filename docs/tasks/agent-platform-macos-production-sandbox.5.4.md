@@ -19,6 +19,27 @@ Make staging require the packaged macOS VM E2E evidence before changes can be pr
 - Publish artifacts/logs needed to inspect runner health and E2E results.
 - Record the passing staging evidence in the task before `.5` is closed.
 
+## Implementation Plan
+
+1. Add a staging-only GitHub Actions job that runs on an Apple Silicon macOS runner.
+2. Require the staging job to download the pinned prepared VM asset archive using:
+   - `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL`
+   - `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256`
+3. Verify the archive checksum before packaging.
+4. Build/sign the native `macos-vm-runner`, package it with the downloaded assets, and run the
+   packaged Electron E2E against `AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR`.
+5. Upload package manifest, asset manifest, E2E evidence, Playwright traces, and failure logs.
+
+## Current Implementation Notes
+
+- GitHub's current hosted runner reference lists `macos-15` as an arm64 macOS hosted runner label,
+  so the staging job uses `runs-on: macos-15`.
+- The workflow intentionally fails if either required asset variable is missing. Staging must not
+  silently fall back to host, Docker, or a synthetic VM asset.
+- The `.5.3` packaged E2E keeps the synthetic failed VM fixture for fail-closed UI coverage, but
+  uses real packaged resources when `AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR` is provided.
+- This task should remain open until a staging PR run publishes passing `staging-packaged-macos-vm-evidence`.
+
 ## Tests And Verification
 
 - GitHub Actions staging packaged macOS E2E job.
