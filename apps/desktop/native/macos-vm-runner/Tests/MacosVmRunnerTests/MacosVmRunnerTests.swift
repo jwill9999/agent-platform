@@ -145,8 +145,12 @@ struct MacosVmRunnerTests {
     @Test func startFailsClosedWhenDaemonCannotBeLaunchedFromHelperBinary() throws {
         let runtimeDir = temporaryRuntimeDir()
         try writeVmAssets(runtimeDir: runtimeDir)
+        let workspace = temporaryRuntimeDir()
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
 
-        let result = handleCommand(arguments: ["start", "--runtime-dir", runtimeDir.path])
+        let result = handleCommand(
+            arguments: ["start", "--runtime-dir", runtimeDir.path, "--workspace", workspace.path]
+        )
 
         #expect(result.exitCode == 0)
         #expect(
@@ -158,6 +162,7 @@ struct MacosVmRunnerTests {
                 )
         )
         removeRuntimeDir(runtimeDir)
+        removeRuntimeDir(workspace)
     }
 
     @Test func statusDoesNotReportReadyForStaleSocketWithoutLiveDaemon() throws {
@@ -389,7 +394,7 @@ struct MacosVmRunnerTests {
             atomically: true,
             encoding: .utf8
         )
-        try writeReadyState(runtimeDir: runtimeDir)
+        try writeReadyState(runtimeDir: runtimeDir, workspace: workspace)
 
         let result = handleCommand(
             arguments: [
@@ -437,7 +442,7 @@ struct MacosVmRunnerTests {
         let workspace = temporaryRuntimeDir()
         try writeVmAssets(runtimeDir: runtimeDir)
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
-        try writeReadyState(runtimeDir: runtimeDir)
+        try writeReadyState(runtimeDir: runtimeDir, workspace: workspace)
 
         DispatchQueue.global().async {
             let jobs = runtimeDir.appendingPathComponent("state/commands/jobs", isDirectory: true)
@@ -483,6 +488,41 @@ struct MacosVmRunnerTests {
         #expect(result.response.stdout == "hello\n")
         #expect(result.response.stderr == "warn\n")
         #expect(result.response.exitCode == 7)
+
+        removeRuntimeDir(runtimeDir)
+        removeRuntimeDir(workspace)
+    }
+
+    @Test func execRejectsRunningVmWithoutWorkspaceBinding() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        let workspace = temporaryRuntimeDir()
+        try writeVmAssets(runtimeDir: runtimeDir)
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        try writeReadyState(runtimeDir: runtimeDir)
+
+        let result = handleCommand(
+            arguments: [
+                "exec",
+                "--runtime-dir",
+                runtimeDir.path,
+                "--workspace",
+                workspace.path,
+                "--cwd",
+                workspace.path,
+                "--",
+                "pwd",
+            ]
+        )
+
+        #expect(result.exitCode == 0)
+        #expect(
+            result.response
+                == JsonResponse(
+                    ok: false,
+                    state: "unavailable",
+                    message: "VM runner is already started without a Project workspace."
+                )
+        )
 
         removeRuntimeDir(runtimeDir)
         removeRuntimeDir(workspace)
@@ -572,7 +612,7 @@ struct MacosVmRunnerTests {
         }
     }
 
-    private func writeReadyState(runtimeDir: URL) throws {
+    private func writeReadyState(runtimeDir: URL, workspace: URL? = nil) throws {
         let state = runtimeDir.appendingPathComponent("state", isDirectory: true)
         try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
         try "ready\n".write(
@@ -590,5 +630,12 @@ struct MacosVmRunnerTests {
             atomically: true,
             encoding: .utf8
         )
+        if let workspace {
+            try "\(workspace.resolvingSymlinksInPath().standardizedFileURL.path)\n".write(
+                to: state.appendingPathComponent("workspace-root"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
     }
 }

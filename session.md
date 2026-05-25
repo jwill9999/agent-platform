@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Completed `.4.3` guest command execution and workspace mount.
+- **Session:** Completed `.4.3`; started and locally proved `.4.4`.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending this session.
+- **Latest commit:** `6f5982a` (`.4.3` guest command execution); `.4.4` proof changes pending commit.
 
 ## Current State
 
@@ -23,7 +23,8 @@
 - The macOS VM production path is Apple `Virtualization.framework` with `VZLinuxBootLoader` and a raw ARM64 Linux `Image`.
 - Docker and host command runners remain development-only paths; production/staging must prove `macos-vm` or stay fail-closed.
 - `.4.2`, `.4.2.1`, `.4.2.2`, and `.4.2.3` are complete.
-- `.4.3` is implemented and verified locally; close it in Beads once the final diff/checks are committed.
+- `.4.3` is implemented, verified, closed in Beads, committed, and pushed.
+- `.4.4` proof is implemented locally and ready to close after the final commit/push.
 
 ## Recent Work
 
@@ -50,6 +51,20 @@
   - `id -u; whoami` returned `1000` and `agentplatform`,
   - `/Users`, `/Applications`, and `/root/.ssh` were unavailable,
   - serialized `AGENT_TEST=guest-env` reached the guest command.
+- Started `.4.4` and proved the real runner against fresh runtime
+  `/private/tmp/agent-platform-linux-proof-4-4a`:
+  - fresh Ubuntu ARM64 raw-kernel asset build and prepare passed,
+  - helper `start --workspace`, `status`, `exec`, `stop`, and restart-after-stop passed,
+  - `pwd` returned `/workspace`,
+  - nested cwd read `/workspace/src/file.txt`,
+  - host path isolation returned `isolated`,
+  - harness `createConfiguredCommandRunner` in `macos-vm` mode returned production-ready health and
+    mapped the command result to a `sys_bash` `tool_result`.
+- During `.4.4` proof, fixed a lifecycle edge case:
+  - `start` accepts optional `--workspace`,
+  - `exec` fails closed if an already-running VM has no workspace binding,
+  - `stop` requests guest shutdown through `VZVirtualMachine.requestStop()` and waits for daemon exit
+    before clearing state, so restart-after-stop remains bootable.
 
 ## Checks Run
 
@@ -62,10 +77,21 @@
 - `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- ... --out-dir /private/tmp/agent-platform-linux-runtime-ubuntu-4-3q/images`
 - `pnpm --filter @agent-platform/desktop native:vm:sign-dev`
 - Real helper smoke tests using `apps/desktop/native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner exec`
+- `.4.4` full gate:
+  - `pnpm lint`
+  - `pnpm typecheck`
+  - `pnpm format:check`
+  - `pnpm docs:lint`
+  - `pnpm build`
+  - `pnpm test` rerun outside shell sandbox after sandboxed `listen EPERM`
+  - `pnpm --filter @agent-platform/desktop native:vm:build`
+  - `pnpm --filter @agent-platform/desktop native:vm:test`
+  - `git diff --check`
 
 ## Next
 
-1. Update `docs/tasks/agent-platform-macos-production-sandbox.4.3.md` with final evidence.
-2. Close Beads issue `agent-platform-macos-production-sandbox.4.3`.
-3. Commit and push this branch.
-4. Start `agent-platform-macos-production-sandbox.4.4`, which owns local proof/closure for parent task `.4`.
+1. Close Beads issue `agent-platform-macos-production-sandbox.4.4` and parent
+   `agent-platform-macos-production-sandbox.4`.
+2. Commit and push `.4.4` proof changes.
+3. Start `agent-platform-macos-production-sandbox.5`, which owns packaging/staging production
+   integration.

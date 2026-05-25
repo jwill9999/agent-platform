@@ -78,7 +78,7 @@ public func handleCommand(arguments: [String]) -> CommandResult {
     case "prepare":
         return prepare(runtimeDir: options["runtime-dir"])
     case "start":
-        return start(runtimeDir: options["runtime-dir"])
+        return start(runtimeDir: options["runtime-dir"], workspacePath: options["workspace"])
     case "stop":
         return stop(runtimeDir: options["runtime-dir"])
     case "exec":
@@ -138,11 +138,18 @@ private func prepare(runtimeDir: String?) -> CommandResult {
     }
 }
 
-private func start(runtimeDir: String?) -> CommandResult {
+private func start(runtimeDir: String?, workspacePath rawWorkspacePath: String?) -> CommandResult {
     let validation = validateRuntime(runtimeDir: runtimeDir)
     guard let paths = validation.paths else { return validation.result! }
+    let workspacePath = rawWorkspacePath.map(canonicalPath)
 
     if vmIsRunning(paths: paths) {
+        if let workspacePath {
+            let runningWorkspacePath = readText(paths.workspaceRoot)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard runningWorkspacePath == workspacePath else {
+                return unavailableResult("VM runner is already started for a different Project workspace.")
+            }
+        }
         return CommandResult(
             response: JsonResponse(
                 ok: true,
@@ -155,7 +162,7 @@ private func start(runtimeDir: String?) -> CommandResult {
     do {
         try prepareRuntimeDirectories(paths: paths)
         clearRuntimeState(paths: paths)
-        try launchDaemon(paths: paths, workspacePath: nil)
+        try launchDaemon(paths: paths, workspacePath: workspacePath)
         if waitUntilReady(paths: paths, timeoutSeconds: 15) {
             return CommandResult(
                 response: JsonResponse(
@@ -176,6 +183,9 @@ private func stop(runtimeDir: String?) -> CommandResult {
     if let paths = runtimePaths(runtimeDir: runtimeDir) {
         if let pid = readPid(paths.daemonPid) {
             _ = Darwin.kill(pid, SIGTERM)
+            if !waitUntilProcessExits(pid: pid, timeoutSeconds: 20) {
+                _ = Darwin.kill(pid, SIGKILL)
+            }
         }
         clearRuntimeState(paths: paths)
     }
@@ -208,7 +218,10 @@ private func execute(runtimeDir: String?, arguments: [String]) -> CommandResult 
 
     if vmIsRunning(paths: paths) {
         let runningWorkspacePath = readText(paths.workspaceRoot)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let runningWorkspacePath, runningWorkspacePath != workspacePath {
+        guard let runningWorkspacePath, !runningWorkspacePath.isEmpty else {
+            return unavailableResult("VM runner is already started without a Project workspace.")
+        }
+        if runningWorkspacePath != workspacePath {
             return unavailableResult("VM runner is already started for a different Project workspace.")
         }
     } else {
@@ -253,6 +266,24 @@ private func daemon(runtimeDir: String?, workspacePath rawWorkspacePath: String?
         try prepareRuntimeDirectories(paths: paths)
         let configuration = try buildVirtualMachineConfiguration(paths: paths, workspacePath: workspacePath)
         let virtualMachine = VZVirtualMachine(configuration: configuration)
+        var keepRunning = true
+        let delegate = VmLifecycleDelegate {
+            keepRunning = false
+            CFRunLoopStop(CFRunLoopGetMain())
+        }
+        virtualMachine.delegate = delegate
+        signal(SIGTERM, SIG_IGN)
+        let sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        sigterm.setEventHandler {
+            do {
+                try virtualMachine.requestStop()
+            } catch {
+                try? describeError(error).write(to: paths.lastError, atomically: true, encoding: .utf8)
+                keepRunning = false
+                CFRunLoopStop(CFRunLoopGetMain())
+            }
+        }
+        sigterm.resume()
         var startupError: Error?
         var startupCompleted = false
         virtualMachine.start { result in
@@ -287,13 +318,32 @@ private func daemon(runtimeDir: String?, workspacePath rawWorkspacePath: String?
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             try? writeDaemonHeartbeat(paths: paths)
         }
-        RunLoop.current.run()
+        while keepRunning {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(1))
+        }
+        sigterm.cancel()
         return CommandResult(
             response: JsonResponse(ok: true, state: "disabled", message: "VM runner daemon stopped.")
         )
     } catch {
         try? describeError(error).write(to: paths.lastError, atomically: true, encoding: .utf8)
         return unavailableResult("VM daemon failed: \(error.localizedDescription)")
+    }
+}
+
+private final class VmLifecycleDelegate: NSObject, VZVirtualMachineDelegate {
+    private let onStop: () -> Void
+
+    init(onStop: @escaping () -> Void) {
+        self.onStop = onStop
+    }
+
+    func guestDidStop(_ virtualMachine: VZVirtualMachine) {
+        onStop()
+    }
+
+    func virtualMachine(_ virtualMachine: VZVirtualMachine, didStopWithError error: Error) {
+        onStop()
     }
 }
 
@@ -428,6 +478,17 @@ private func vmIsRunning(paths: RuntimePaths) -> Bool {
     return Darwin.kill(pid, 0) == 0 &&
         daemonProcessMatchesCurrentExecutable(pid: pid) &&
         heartbeatIsFresh(paths: paths)
+}
+
+private func waitUntilProcessExits(pid: pid_t, timeoutSeconds: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeoutSeconds)
+    while Date() < deadline {
+        if Darwin.kill(pid, 0) != 0 && errno == ESRCH {
+            return true
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+    }
+    return Darwin.kill(pid, 0) != 0 && errno == ESRCH
 }
 
 private func readPid(_ url: URL) -> pid_t? {
