@@ -37,3 +37,25 @@ state safely.
 - `stop` is reliable and idempotent.
 - Runtime state cleanup is deterministic and documented.
 - Parent `.4.2` can be closed with real boot and lifecycle evidence.
+
+## Evidence
+
+Completed on 2026-05-25 using the signed development helper and the validated raw ARM64 kernel
+runtime at `/private/tmp/agent-platform-linux-runtime-raw-image`.
+
+- Added a daemon heartbeat file at `state/daemon.heartbeat`; `status` now requires the ready marker,
+  live daemon PID, matching helper executable path, and a fresh heartbeat before reporting ready.
+- `stop` clears `state/runner.sock`, `state/daemon.pid`, `state/daemon.heartbeat`, and
+  `logs/last-error.log`; diagnostic logs such as `daemon.out.log`, `daemon.err.log`,
+  `guest-console.log`, and `vm-config.json` are preserved.
+- Native unit tests cover stale socket without live daemon, stale PID reuse without heartbeat, stale
+  heartbeat, and stop cleanup.
+- Local lifecycle smoke:
+  - baseline `stop` returned `{"ok":true,"state":"disabled"}`;
+  - `start` returned `{"ok":true,"state":"ready"}`;
+  - `status` returned `{"ok":true,"state":"ready"}`;
+  - repeated `start` returned `VM runner is already running`;
+  - after `SIGTERM` to the daemon PID, `status` returned `{"ok":false,"state":"unavailable"}`;
+  - stale state with live unrelated PID `1`, fresh heartbeat, and ready marker returned unavailable;
+  - repeated `stop` returned disabled both times;
+  - final `status` returned unavailable and only `state/machine-id` remained in the state directory.

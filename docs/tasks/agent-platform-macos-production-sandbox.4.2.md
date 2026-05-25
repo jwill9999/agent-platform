@@ -44,3 +44,13 @@ Implement the native helper lifecycle that starts, tracks, reports, and stops th
 - `status` reports ready only when the VM is actually available.
 - The helper can stop or recover from stale VM state.
 - Beads children `.4.2.1` through `.4.2.3` are closed with evidence.
+
+## Evidence
+
+Completed through child tasks `.4.2.1`, `.4.2.2`, and `.4.2.3`.
+
+- `.4.2.1` produced and staged the VM asset contract.
+- `.4.2.2` proved the helper boots a raw ARM64 Linux `Image` and rejects EFI-stub kernels before
+  boot.
+- `.4.2.3` proved daemon lifecycle reliability: start/status/stop idempotency, fail-closed daemon
+  death, stale PID/ready marker rejection, heartbeat-based readiness, and deterministic cleanup.

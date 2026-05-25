@@ -185,12 +185,18 @@
   requirement, signing entitlement requirements, and raw ARM64 VM asset expectations. Corrected
   `docs/desktop-macos-vm-assets.md` so the asset contract matches the current Ubuntu raw-kernel
   pipeline rather than the earlier Alpine kernel assumption.
+- Completed `.4.2.3`: added daemon heartbeat readiness so `status` requires the ready marker, live
+  daemon PID, matching helper executable path, and fresh heartbeat before reporting ready. `stop`
+  now clears `runner.sock`, `daemon.pid`, `daemon.heartbeat`, and `last-error.log` while preserving
+  diagnostic logs. Native unit tests cover stale socket, stale PID reuse without heartbeat, stale
+  heartbeat, and cleanup. Real lifecycle smoke passed against
+  `/private/tmp/agent-platform-linux-runtime-raw-image`: start ready, status ready, repeated start
+  idempotent, daemon death fail-closed, stale live PID state unavailable, repeated stop idempotent,
+  final status unavailable.
 
 ## Next
 
-1. Complete `.4.2.3` with stale-state, repeated start/stop, daemon survival, and lifecycle
-   reliability evidence using the raw ARM64 kernel runtime.
-2. Start `.4.3` only after `.4.2.3` is closed; `.4.3` owns real guest command execution inside the
+1. Start `.4.3`; it owns real guest command execution inside the
    VM, not just host-side boot readiness.
-3. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
+2. Keep staging policy strict: packaged macOS command execution must prove `macos-vm` or remain
    explicitly disabled before anything merges to `main`.

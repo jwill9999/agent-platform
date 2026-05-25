@@ -233,7 +233,11 @@ private func daemon(runtimeDir: String?) -> CommandResult {
             )
             return unavailableResult("VM failed to start: \(startupError.localizedDescription)")
         }
+        try writeDaemonHeartbeat(paths: paths)
         try "ready\n".write(to: paths.runnerSocket, atomically: true, encoding: .utf8)
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            try? writeDaemonHeartbeat(paths: paths)
+        }
         RunLoop.current.run()
         return CommandResult(
             response: JsonResponse(ok: true, state: "disabled", message: "VM runner daemon stopped.")
@@ -256,6 +260,7 @@ private struct RuntimePaths {
     let guestBootstrap: URL
     let machineId: URL
     let daemonPid: URL
+    let daemonHeartbeat: URL
     let lastError: URL
     let diagnostics: URL
     let runnerSocket: URL
@@ -333,6 +338,7 @@ private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
         guestBootstrap: images.appendingPathComponent("guest-bootstrap.sh", isDirectory: false),
         machineId: state.appendingPathComponent("machine-id", isDirectory: false),
         daemonPid: state.appendingPathComponent("daemon.pid", isDirectory: false),
+        daemonHeartbeat: state.appendingPathComponent("daemon.heartbeat", isDirectory: false),
         lastError: logs.appendingPathComponent("last-error.log", isDirectory: false),
         diagnostics: logs.appendingPathComponent("vm-config.json", isDirectory: false),
         runnerSocket: state.appendingPathComponent("runner.sock", isDirectory: false),
@@ -355,13 +361,16 @@ private func clearRuntimeState(paths: RuntimePaths) {
 private func clearReadyState(paths: RuntimePaths) {
     try? FileManager.default.removeItem(at: paths.runnerSocket)
     try? FileManager.default.removeItem(at: paths.daemonPid)
+    try? FileManager.default.removeItem(at: paths.daemonHeartbeat)
 }
 
 private func vmIsRunning(paths: RuntimePaths) -> Bool {
     guard fileExists(paths.runnerSocket), let pid = readPid(paths.daemonPid) else {
         return false
     }
-    return Darwin.kill(pid, 0) == 0
+    return Darwin.kill(pid, 0) == 0 &&
+        daemonProcessMatchesCurrentExecutable(pid: pid) &&
+        heartbeatIsFresh(paths: paths)
 }
 
 private func readPid(_ url: URL) -> pid_t? {
@@ -373,6 +382,39 @@ private func readPid(_ url: URL) -> pid_t? {
 
 private func readText(_ url: URL) -> String? {
     try? String(contentsOf: url, encoding: .utf8)
+}
+
+private func writeDaemonHeartbeat(paths: RuntimePaths) throws {
+    try "\(Date().timeIntervalSince1970)\n".write(
+        to: paths.daemonHeartbeat,
+        atomically: true,
+        encoding: .utf8
+    )
+}
+
+private func heartbeatIsFresh(paths: RuntimePaths) -> Bool {
+    let maxHeartbeatAge: TimeInterval = 5
+    guard
+        let attributes = try? FileManager.default.attributesOfItem(atPath: paths.daemonHeartbeat.path),
+        let modifiedAt = attributes[.modificationDate] as? Date
+    else {
+        return false
+    }
+    return Date().timeIntervalSince(modifiedAt) <= maxHeartbeatAge
+}
+
+private func daemonProcessMatchesCurrentExecutable(pid: pid_t) -> Bool {
+    guard let currentExecutablePath = CommandLine.arguments.first else {
+        return false
+    }
+    var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+    let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+    guard pathLength > 0 else {
+        return false
+    }
+    let daemonPath = URL(fileURLWithPath: String(cString: pathBuffer)).resolvingSymlinksInPath().path
+    let currentPath = URL(fileURLWithPath: currentExecutablePath).resolvingSymlinksInPath().path
+    return daemonPath == currentPath
 }
 
 private func launchDaemon(paths: RuntimePaths) throws {

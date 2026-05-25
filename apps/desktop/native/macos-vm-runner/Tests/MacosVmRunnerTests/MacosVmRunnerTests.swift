@@ -1,4 +1,5 @@
 import Testing
+import Darwin
 import Foundation
 @testable import MacosVmRunnerCore
 
@@ -186,6 +187,108 @@ struct MacosVmRunnerTests {
                     message: "VM runner is prepared but not started."
                 )
         )
+        removeRuntimeDir(runtimeDir)
+    }
+
+    @Test func statusDoesNotReportReadyForStalePidReuseWithoutFreshHeartbeat() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        try writeVmAssets(runtimeDir: runtimeDir)
+        let state = runtimeDir.appendingPathComponent("state", isDirectory: true)
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
+        try "ready\n".write(
+            to: state.appendingPathComponent("runner.sock"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "\(getpid())\n".write(
+            to: state.appendingPathComponent("daemon.pid"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let result = handleCommand(arguments: ["status", "--runtime-dir", runtimeDir.path])
+
+        #expect(result.exitCode == 0)
+        #expect(
+            result.response
+                == JsonResponse(
+                    ok: false,
+                    state: "unavailable",
+                    message: "VM runner is prepared but not started."
+                )
+        )
+        removeRuntimeDir(runtimeDir)
+    }
+
+    @Test func statusDoesNotReportReadyForStaleHeartbeat() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        try writeVmAssets(runtimeDir: runtimeDir)
+        let state = runtimeDir.appendingPathComponent("state", isDirectory: true)
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
+        try "ready\n".write(
+            to: state.appendingPathComponent("runner.sock"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "\(getpid())\n".write(
+            to: state.appendingPathComponent("daemon.pid"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let heartbeat = state.appendingPathComponent("daemon.heartbeat")
+        try "old\n".write(to: heartbeat, atomically: true, encoding: .utf8)
+        let staleDate = Date(timeIntervalSinceNow: -60)
+        try FileManager.default.setAttributes([.modificationDate: staleDate], ofItemAtPath: heartbeat.path)
+
+        let result = handleCommand(arguments: ["status", "--runtime-dir", runtimeDir.path])
+
+        #expect(result.exitCode == 0)
+        #expect(
+            result.response
+                == JsonResponse(
+                    ok: false,
+                    state: "unavailable",
+                    message: "VM runner is prepared but not started."
+                )
+        )
+        removeRuntimeDir(runtimeDir)
+    }
+
+    @Test func stopClearsRuntimeReadyStateMarkers() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        let state = runtimeDir.appendingPathComponent("state", isDirectory: true)
+        let logs = runtimeDir.appendingPathComponent("logs", isDirectory: true)
+        try FileManager.default.createDirectory(at: state, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        try "ready\n".write(
+            to: state.appendingPathComponent("runner.sock"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "999999\n".write(
+            to: state.appendingPathComponent("daemon.pid"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "stale\n".write(
+            to: state.appendingPathComponent("daemon.heartbeat"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "previous failure\n".write(
+            to: logs.appendingPathComponent("last-error.log"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let result = handleCommand(arguments: ["stop", "--runtime-dir", runtimeDir.path])
+
+        #expect(result.exitCode == 0)
+        #expect(result.response == JsonResponse(ok: true, state: "disabled", message: "VM runner is stopped."))
+        #expect(!FileManager.default.fileExists(atPath: state.appendingPathComponent("runner.sock").path))
+        #expect(!FileManager.default.fileExists(atPath: state.appendingPathComponent("daemon.pid").path))
+        #expect(!FileManager.default.fileExists(atPath: state.appendingPathComponent("daemon.heartbeat").path))
+        #expect(!FileManager.default.fileExists(atPath: logs.appendingPathComponent("last-error.log").path))
         removeRuntimeDir(runtimeDir)
     }
 
