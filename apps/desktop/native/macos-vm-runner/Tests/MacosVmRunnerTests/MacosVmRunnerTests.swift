@@ -3,7 +3,9 @@ import Darwin
 import Foundation
 @testable import MacosVmRunnerCore
 
-private let fixtureWorkspacePath = "/tmp/project"
+private let fixtureWorkspacePath = FileManager.default.temporaryDirectory
+    .appendingPathComponent("project")
+    .path
 
 struct MacosVmRunnerTests {
     @Test func statusWithoutRuntimeDirReturnsDeterministicUnavailableJson() throws {

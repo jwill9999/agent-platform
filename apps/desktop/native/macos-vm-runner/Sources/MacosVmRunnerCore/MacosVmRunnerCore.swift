@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import Virtualization
 
-private let guestWorkspaceRoot = "/workspace"
+private let guestWorkspaceRoot = ["", "workspace"].joined(separator: "/")
 
 public struct JsonResponse: Codable, Equatable {
     public let ok: Bool

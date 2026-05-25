@@ -249,6 +249,10 @@ function replaceAll(value: string, search: string, replacement: string): string 
   return search ? value.split(search).join(replacement) : value;
 }
 
+function cleanupTempDirectory(path: string): void {
+  rm(path, { recursive: true, force: true }).catch(() => undefined);
+}
+
 async function dockerWorkspacePaths(request: CommandRunnerRequest): Promise<{
   hostWorkspaceRoot: string;
   containerCwd: string;
@@ -488,7 +492,7 @@ export function createMacosVmCommandRunner({
             env: commandRunnerEnvironment(request.env),
           },
           (error, stdout, stderr) => {
-            rm(envDir, { recursive: true, force: true }).catch(() => undefined);
+            cleanupTempDirectory(envDir);
             if (error) {
               resolve(macosVmProcessFailure(error, stderr));
               return;
