@@ -204,6 +204,12 @@ function commandRunnerDisplayFromReadiness(readiness: ReadinessResponse): Comman
   };
 }
 
+function commandRunnerStatusColor(commandRunner: CommandRunnerDisplay): string {
+  if (commandRunner.canExecute) return 'bg-emerald-500';
+  if (commandRunner.status === 'failed') return 'bg-destructive';
+  return 'bg-amber-500';
+}
+
 async function fetchCommandRunnerDisplay(): Promise<CommandRunnerDisplay> {
   const response = await fetch('/api/health/ready', { cache: 'no-store' });
   const payload = (await response.json()) as ReadinessResponse;
@@ -534,13 +540,7 @@ function ProjectChatHeader({
           title={commandRunner.message}
         >
           <span
-            className={`h-2 w-2 shrink-0 rounded-full ${
-              commandRunner.canExecute
-                ? 'bg-emerald-500'
-                : commandRunner.status === 'failed'
-                  ? 'bg-destructive'
-                  : 'bg-amber-500'
-            }`}
+            className={`h-2 w-2 shrink-0 rounded-full ${commandRunnerStatusColor(commandRunner)}`}
           />
           <span className="truncate">
             {commandRunner.mode} {commandRunner.status}

@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-25
-- **Session:** Implemented `.5.3` packaged Electron VM command E2E coverage and started `.5.4` staging gate wiring.
+- **Session:** Fixed current PR #227 verify/Sonar failures after `.5.4` staging gate wiring.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `a70b437` implements `.5.3`; `.5.4` changes are local and pending commit.
+- **Latest commit:** `2e63c02` wires `.5.4` staging gate; current verify/Sonar fixes are local and pending commit.
 
 ## Current State
 
@@ -78,6 +78,14 @@
     artifacts,
   - extended the packaged Electron E2E so CI can run the success path against real packaged
     resources while retaining synthetic fail-closed coverage.
+- Investigated the three failing PR #227 checks:
+  - `verify` failed in `packages/harness/test/browserTools.integration.test.ts` because first
+    Chromium startup exceeded the 30s tool timeout on GitHub; increased the integration startup
+    budget while keeping action timeouts bounded,
+  - SonarCloud reported one open issue, `typescript:S3358`, in `apps/web/app/page.tsx`; extracted
+    the command-runner status color ternary into a named helper,
+  - `staging-packaged-macos-vm-e2e` failed because the required pinned asset URL/SHA repository
+    variables were empty, not because of test code.
 
 ## Checks Run
 
@@ -109,6 +117,11 @@
 - `pnpm --filter @agent-platform/desktop exec playwright test -c e2e/playwright.electron.config.ts e2e/packaged-vm-command.e2e.ts`
 - `pnpm run format:check`
 - `pnpm docs:lint`
+- `pnpm --filter @agent-platform/harness test -- test/browserTools.integration.test.ts`
+- `pnpm --filter @agent-platform/harness run typecheck`
+- `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/web run typecheck`
+- `pnpm --filter @agent-platform/web run lint`
 - `swift test --package-path apps/desktop/native/macos-vm-runner`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
@@ -116,7 +129,7 @@
 
 ## Next
 
-1. Commit and push the local `.5.4` staging-gate workflow changes.
+1. Commit and push the verify/Sonar fix commit, then monitor PR #227 rerun.
 2. Configure the staging repository variables for the pinned prepared VM asset archive URL/SHA.
-3. Open or rerun a PR into `staging`, then keep `.5.4` open until the
+3. Rerun the PR into `staging`, then keep `.5.4` open until the
    `staging-packaged-macos-vm-e2e` artifact proves real packaged `macos-vm` command execution.
