@@ -1,5 +1,6 @@
 import type { ChildProcess } from 'node:child_process';
 import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -60,6 +61,8 @@ describe('macOS VM command runner adapter', () => {
         '1000',
         '--max-output-bytes',
         '4096',
+        '--env-file',
+        expect.any(String),
         '--',
         'pwd',
       ],
@@ -104,6 +107,77 @@ describe('macOS VM command runner adapter', () => {
       stderr: '',
       exitCode: 0,
       durationMs: 12,
+    });
+
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('rewrites absolute workspace paths before dispatching to the VM helper', async () => {
+    const workspaceRoot = await realpath(
+      await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-runner-')),
+    );
+    const execFile = vi.fn((_binary, _args, _options, callback) => {
+      callback(
+        null,
+        '{"exitCode":0,"message":"Command completed.","mode":"macos-vm","ok":true,"state":"ready","stdout":"","stderr":"","durationMs":12}\n',
+        '',
+      );
+      return fakeChildProcess();
+    });
+    const runner = createMacosVmCommandRunner({
+      helperPath: '/app/macos-vm-runner',
+      runtimeDir: '/app/vm',
+      execFile,
+    });
+
+    await runner.run(
+      request(workspaceRoot, {
+        command: `cat ${workspaceRoot}/package.json`,
+      }),
+    );
+
+    expect(execFile).toHaveBeenCalledWith(
+      '/app/macos-vm-runner',
+      expect.arrayContaining(['cat /workspace/package.json']),
+      expect.any(Object),
+      expect.any(Function),
+    );
+
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('serializes the approved command environment for the VM helper', async () => {
+    const workspaceRoot = await realpath(
+      await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-runner-')),
+    );
+    let envJson: unknown;
+    const execFile = vi.fn((_binary, args, _options, callback) => {
+      const envFileIndex = args.indexOf('--env-file');
+      const envFile = args[envFileIndex + 1];
+      if (!envFile) throw new Error('Expected macOS VM env file argument');
+      envJson = JSON.parse(readFileSync(envFile, 'utf8'));
+      callback(
+        null,
+        '{"exitCode":0,"message":"Command completed.","mode":"macos-vm","ok":true,"state":"ready","stdout":"","stderr":"","durationMs":12}\n',
+        '',
+      );
+      return fakeChildProcess();
+    });
+    const runner = createMacosVmCommandRunner({
+      helperPath: '/app/macos-vm-runner',
+      runtimeDir: '/app/vm',
+      execFile,
+    });
+
+    await runner.run(
+      request(workspaceRoot, {
+        env: { mode: 'explicit', variables: { AGENT_TEST: 'hello', TERM: 'xterm' } },
+      }),
+    );
+
+    expect(envJson).toEqual({
+      AGENT_TEST: 'hello',
+      TERM: 'xterm',
     });
 
     await rm(workspaceRoot, { recursive: true, force: true });

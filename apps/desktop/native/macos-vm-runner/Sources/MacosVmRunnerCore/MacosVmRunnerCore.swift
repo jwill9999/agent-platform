@@ -57,6 +57,7 @@ private struct VmConfigDiagnostics: Codable {
     let maximumAllowedCPUCount: Int
     let maximumAllowedMemoryMB: UInt64
     let storageDevices: Int
+    let directorySharingDevices: Int
     let serialPorts: Int
     let entropyDevices: Int
     let memoryBalloonDevices: Int
@@ -81,9 +82,9 @@ public func handleCommand(arguments: [String]) -> CommandResult {
     case "stop":
         return stop(runtimeDir: options["runtime-dir"])
     case "exec":
-        return execute(runtimeDir: options["runtime-dir"])
+        return execute(runtimeDir: options["runtime-dir"], arguments: Array(arguments.dropFirst()))
     case "daemon":
-        return daemon(runtimeDir: options["runtime-dir"])
+        return daemon(runtimeDir: options["runtime-dir"], workspacePath: options["workspace"])
     default:
         return CommandResult(
             response: JsonResponse(
@@ -154,7 +155,7 @@ private func start(runtimeDir: String?) -> CommandResult {
     do {
         try prepareRuntimeDirectories(paths: paths)
         clearRuntimeState(paths: paths)
-        try launchDaemon(paths: paths)
+        try launchDaemon(paths: paths, workspacePath: nil)
         if waitUntilReady(paths: paths, timeoutSeconds: 15) {
             return CommandResult(
                 response: JsonResponse(
@@ -188,24 +189,69 @@ private func stop(runtimeDir: String?) -> CommandResult {
     )
 }
 
-private func execute(runtimeDir: String?) -> CommandResult {
+private func execute(runtimeDir: String?, arguments: [String]) -> CommandResult {
     let validation = validateRuntime(runtimeDir: runtimeDir)
     guard let paths = validation.paths else { return validation.result! }
 
-    guard fileExists(paths.runnerSocket) else {
-        return unavailableResult("VM runner is prepared but not started.")
+    guard let workspace = parseOption("workspace", from: arguments), !workspace.isEmpty else {
+        return unavailableResult("Command workspace is not configured.")
+    }
+    guard let cwd = parseOption("cwd", from: arguments), !cwd.isEmpty else {
+        return unavailableResult("Command cwd is not configured.")
     }
 
-    return unavailableResult("VM command execution transport is not implemented.")
+    let workspacePath = canonicalPath(workspace)
+    let cwdPath = canonicalPath(cwd)
+    guard path(cwdPath, isInside: workspacePath) else {
+        return unavailableResult("Command cwd is outside the selected Project workspace.")
+    }
+
+    if vmIsRunning(paths: paths) {
+        let runningWorkspacePath = readText(paths.workspaceRoot)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let runningWorkspacePath, runningWorkspacePath != workspacePath {
+            return unavailableResult("VM runner is already started for a different Project workspace.")
+        }
+    } else {
+        do {
+            try prepareRuntimeDirectories(paths: paths)
+            clearRuntimeState(paths: paths)
+            try launchDaemon(paths: paths, workspacePath: workspacePath)
+            guard waitUntilReady(paths: paths, timeoutSeconds: 15) else {
+                let message = readText(paths.lastError) ?? "VM did not become ready before the startup timeout."
+                return unavailableResult(message)
+            }
+        } catch {
+            return unavailableResult("Failed to start VM runner: \(error.localizedDescription)")
+        }
+    }
+
+    let command = commandAfterSeparator(arguments)
+    guard !command.isEmpty else {
+        return unavailableResult("Command is not configured.")
+    }
+
+    let timeoutMs = parsePositiveIntOption("timeout-ms", from: arguments, defaultValue: 30_000)
+    let maxOutputBytes = parsePositiveIntOption("max-output-bytes", from: arguments, defaultValue: 65_536)
+    let environment = loadCommandEnvironment(envFile: parseOption("env-file", from: arguments))
+    let guestCwd = guestWorkspacePath(workspacePath: workspacePath, cwdPath: cwdPath)
+    return dispatchGuestCommand(
+        paths: paths,
+        command: command,
+        environment: environment,
+        guestCwd: guestCwd,
+        timeoutMs: timeoutMs,
+        maxOutputBytes: maxOutputBytes
+    )
 }
 
-private func daemon(runtimeDir: String?) -> CommandResult {
+private func daemon(runtimeDir: String?, workspacePath rawWorkspacePath: String?) -> CommandResult {
     let validation = validateRuntime(runtimeDir: runtimeDir)
     guard let paths = validation.paths else { return validation.result! }
+    let workspacePath = rawWorkspacePath.map(canonicalPath)
 
     do {
         try prepareRuntimeDirectories(paths: paths)
-        let configuration = try buildVirtualMachineConfiguration(paths: paths)
+        let configuration = try buildVirtualMachineConfiguration(paths: paths, workspacePath: workspacePath)
         let virtualMachine = VZVirtualMachine(configuration: configuration)
         var startupError: Error?
         var startupCompleted = false
@@ -234,6 +280,9 @@ private func daemon(runtimeDir: String?) -> CommandResult {
             return unavailableResult("VM failed to start: \(startupError.localizedDescription)")
         }
         try writeDaemonHeartbeat(paths: paths)
+        if let workspacePath {
+            try "\(workspacePath)\n".write(to: paths.workspaceRoot, atomically: true, encoding: .utf8)
+        }
         try "ready\n".write(to: paths.runnerSocket, atomically: true, encoding: .utf8)
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             try? writeDaemonHeartbeat(paths: paths)
@@ -261,9 +310,12 @@ private struct RuntimePaths {
     let machineId: URL
     let daemonPid: URL
     let daemonHeartbeat: URL
+    let workspaceRoot: URL
     let lastError: URL
     let diagnostics: URL
     let runnerSocket: URL
+    let commandRoot: URL
+    let commandJobs: URL
     let guestConsoleLog: URL
 }
 
@@ -339,9 +391,12 @@ private func runtimePaths(runtimeDir: String?) -> RuntimePaths? {
         machineId: state.appendingPathComponent("machine-id", isDirectory: false),
         daemonPid: state.appendingPathComponent("daemon.pid", isDirectory: false),
         daemonHeartbeat: state.appendingPathComponent("daemon.heartbeat", isDirectory: false),
+        workspaceRoot: state.appendingPathComponent("workspace-root", isDirectory: false),
         lastError: logs.appendingPathComponent("last-error.log", isDirectory: false),
         diagnostics: logs.appendingPathComponent("vm-config.json", isDirectory: false),
         runnerSocket: state.appendingPathComponent("runner.sock", isDirectory: false),
+        commandRoot: state.appendingPathComponent("commands", isDirectory: true),
+        commandJobs: state.appendingPathComponent("commands/jobs", isDirectory: true),
         guestConsoleLog: logs.appendingPathComponent("guest-console.log", isDirectory: false)
     )
 }
@@ -350,6 +405,7 @@ private func prepareRuntimeDirectories(paths: RuntimePaths) throws {
     try FileManager.default.createDirectory(at: paths.images, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: paths.state, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: paths.logs, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: paths.commandJobs, withIntermediateDirectories: true)
     _ = try loadOrCreateMachineIdentifier(paths: paths)
 }
 
@@ -362,6 +418,7 @@ private func clearReadyState(paths: RuntimePaths) {
     try? FileManager.default.removeItem(at: paths.runnerSocket)
     try? FileManager.default.removeItem(at: paths.daemonPid)
     try? FileManager.default.removeItem(at: paths.daemonHeartbeat)
+    try? FileManager.default.removeItem(at: paths.workspaceRoot)
 }
 
 private func vmIsRunning(paths: RuntimePaths) -> Bool {
@@ -417,7 +474,116 @@ private func daemonProcessMatchesCurrentExecutable(pid: pid_t) -> Bool {
     return daemonPath == currentPath
 }
 
-private func launchDaemon(paths: RuntimePaths) throws {
+private func dispatchGuestCommand(
+    paths: RuntimePaths,
+    command: String,
+    environment: [String: String],
+    guestCwd: String,
+    timeoutMs: Int,
+    maxOutputBytes: Int
+) -> CommandResult {
+    let startedAt = Date()
+    let job = paths.commandJobs.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    do {
+        try FileManager.default.createDirectory(at: job, withIntermediateDirectories: true)
+        try command.write(to: job.appendingPathComponent("command.sh"), atomically: true, encoding: .utf8)
+        try commandEnvironmentShell(environment)
+            .write(to: job.appendingPathComponent("env.sh"), atomically: true, encoding: .utf8)
+        try "\(guestCwd)\n".write(to: job.appendingPathComponent("cwd"), atomically: true, encoding: .utf8)
+        try "\(timeoutMs)\n".write(to: job.appendingPathComponent("timeout-ms"), atomically: true, encoding: .utf8)
+        try "\(maxOutputBytes)\n".write(
+            to: job.appendingPathComponent("max-output-bytes"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "pending\n".write(to: job.appendingPathComponent("ready"), atomically: true, encoding: .utf8)
+
+        let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0 + 1)
+        while Date() < deadline {
+            if fileExists(job.appendingPathComponent("done")) {
+                let stdout = readText(job.appendingPathComponent("stdout")) ?? ""
+                let stderr = readText(job.appendingPathComponent("stderr")) ?? ""
+                let exitCodeText = readText(job.appendingPathComponent("exit-code")) ?? "1"
+                let exitCode = Int(exitCodeText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 1
+                try? FileManager.default.removeItem(at: job)
+                return CommandResult(
+                    response: JsonResponse(
+                        ok: true,
+                        state: "ready",
+                        message: "Command completed.",
+                        stdout: truncateText(stdout, maxLength: maxOutputBytes),
+                        stderr: truncateText(stderr, maxLength: maxOutputBytes),
+                        exitCode: exitCode,
+                        durationMs: Int(Date().timeIntervalSince(startedAt) * 1000)
+                    )
+                )
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        try? "cancel\n".write(to: job.appendingPathComponent("cancel"), atomically: true, encoding: .utf8)
+        return unavailableResult("VM command did not complete before the timeout.")
+    } catch {
+        try? FileManager.default.removeItem(at: job)
+        return unavailableResult("Failed to dispatch VM command: \(error.localizedDescription)")
+    }
+}
+
+private func loadCommandEnvironment(envFile: String?) -> [String: String] {
+    guard let envFile, let data = FileManager.default.contents(atPath: envFile) else {
+        return [:]
+    }
+    guard
+        let parsed = try? JSONSerialization.jsonObject(with: data),
+        let values = parsed as? [String: String]
+    else {
+        return [:]
+    }
+    return values.filter { isValidEnvironmentName($0.key) }
+}
+
+private func commandEnvironmentShell(_ environment: [String: String]) -> String {
+    environment
+        .sorted { $0.key < $1.key }
+        .map { "export \($0.key)=\(shellQuote($0.value))" }
+        .joined(separator: "\n") + "\n"
+}
+
+private func isValidEnvironmentName(_ name: String) -> Bool {
+    guard let first = name.unicodeScalars.first else { return false }
+    guard first == "_" || CharacterSet.letters.contains(first) else { return false }
+    return name.unicodeScalars.allSatisfy { scalar in
+        scalar == "_" || CharacterSet.alphanumerics.contains(scalar)
+    }
+}
+
+private func shellQuote(_ value: String) -> String {
+    "'\(value.replacingOccurrences(of: "'", with: "'\\\\''"))'"
+}
+
+private func canonicalPath(_ path: String) -> String {
+    URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+}
+
+private func path(_ candidate: String, isInside root: String) -> Bool {
+    candidate == root || candidate.hasPrefix("\(root)/")
+}
+
+private func guestWorkspacePath(workspacePath: String, cwdPath: String) -> String {
+    guard path(cwdPath, isInside: workspacePath) else {
+        return "/workspace"
+    }
+    let suffix = String(cwdPath.dropFirst(workspacePath.count))
+    return suffix.isEmpty ? "/workspace" : "/workspace\(suffix)"
+}
+
+private func truncateText(_ text: String, maxLength: Int) -> String {
+    if text.count <= maxLength {
+        return text
+    }
+    return String(text.prefix(maxLength))
+}
+
+private func launchDaemon(paths: RuntimePaths, workspacePath: String?) throws {
     guard let executablePath = CommandLine.arguments.first, executablePath.hasSuffix("macos-vm-runner") else {
         throw RuntimeError("VM daemon can only be launched from the macos-vm-runner helper.")
     }
@@ -430,7 +596,11 @@ private func launchDaemon(paths: RuntimePaths) throws {
     let stderr = try FileHandle(forWritingTo: stderrURL)
     let process = Process()
     process.executableURL = executable
-    process.arguments = ["daemon", "--runtime-dir", paths.root.path]
+    var arguments = ["daemon", "--runtime-dir", paths.root.path]
+    if let workspacePath {
+        arguments.append(contentsOf: ["--workspace", workspacePath])
+    }
+    process.arguments = arguments
     process.standardOutput = stdout
     process.standardError = stderr
     try process.run()
@@ -456,7 +626,10 @@ private func waitUntilReady(paths: RuntimePaths, timeoutSeconds: TimeInterval) -
     return false
 }
 
-private func buildVirtualMachineConfiguration(paths: RuntimePaths) throws -> VZVirtualMachineConfiguration {
+private func buildVirtualMachineConfiguration(
+    paths: RuntimePaths,
+    workspacePath: String?
+) throws -> VZVirtualMachineConfiguration {
     let manifest = try loadVmAssetManifest(paths: paths)
     let platform = VZGenericPlatformConfiguration()
     platform.machineIdentifier = try loadOrCreateMachineIdentifier(paths: paths)
@@ -481,6 +654,10 @@ private func buildVirtualMachineConfiguration(paths: RuntimePaths) throws -> VZV
         VZVirtualMachineConfiguration.maximumAllowedMemorySize
     )
     configuration.storageDevices = [disk]
+    configuration.directorySharingDevices = try makeDirectorySharingDevices(
+        paths: paths,
+        workspacePath: workspacePath
+    )
     configuration.serialPorts = [try makeGuestConsoleSerialPort(paths: paths)]
     configuration.entropyDevices = [VZVirtioEntropyDeviceConfiguration()]
     configuration.memoryBalloonDevices = [VZVirtioTraditionalMemoryBalloonDeviceConfiguration()]
@@ -499,6 +676,28 @@ private func makeGuestConsoleSerialPort(paths: RuntimePaths) throws -> VZSerialP
     let serialPort = VZVirtioConsoleDeviceSerialPortConfiguration()
     serialPort.attachment = attachment
     return serialPort
+}
+
+private func makeDirectorySharingDevices(
+    paths: RuntimePaths,
+    workspacePath: String?
+) throws -> [VZDirectorySharingDeviceConfiguration] {
+    var devices: [VZDirectorySharingDeviceConfiguration] = []
+    if let workspacePath {
+        let workspaceDirectory = VZSharedDirectory(url: URL(fileURLWithPath: workspacePath), readOnly: false)
+        let workspaceShare = VZSingleDirectoryShare(directory: workspaceDirectory)
+        let workspaceDevice = VZVirtioFileSystemDeviceConfiguration(tag: "agentworkspace")
+        workspaceDevice.share = workspaceShare
+        devices.append(workspaceDevice)
+    }
+
+    try FileManager.default.createDirectory(at: paths.commandRoot, withIntermediateDirectories: true)
+    let commandDirectory = VZSharedDirectory(url: paths.commandRoot, readOnly: false)
+    let commandShare = VZSingleDirectoryShare(directory: commandDirectory)
+    let commandDevice = VZVirtioFileSystemDeviceConfiguration(tag: "agentcommands")
+    commandDevice.share = commandShare
+    devices.append(commandDevice)
+    return devices
 }
 
 private struct RuntimeError: LocalizedError {
@@ -551,6 +750,7 @@ private func writeVmConfigDiagnostics(
         maximumAllowedCPUCount: VZVirtualMachineConfiguration.maximumAllowedCPUCount,
         maximumAllowedMemoryMB: VZVirtualMachineConfiguration.maximumAllowedMemorySize / 1024 / 1024,
         storageDevices: configuration.storageDevices.count,
+        directorySharingDevices: configuration.directorySharingDevices.count,
         serialPorts: configuration.serialPorts.count,
         entropyDevices: configuration.entropyDevices.count,
         memoryBalloonDevices: configuration.memoryBalloonDevices.count,
@@ -700,6 +900,24 @@ private func parseOptions(_ arguments: [String]) -> [String: String] {
         index += 1
     }
     return options
+}
+
+private func parseOption(_ name: String, from arguments: [String]) -> String? {
+    parseOptions(arguments)[name]
+}
+
+private func parsePositiveIntOption(_ name: String, from arguments: [String], defaultValue: Int) -> Int {
+    guard let raw = parseOption(name, from: arguments), let value = Int(raw), value > 0 else {
+        return defaultValue
+    }
+    return value
+}
+
+private func commandAfterSeparator(_ arguments: [String]) -> String {
+    guard let separatorIndex = arguments.firstIndex(of: "--") else {
+        return ""
+    }
+    return arguments.dropFirst(separatorIndex + 1).joined(separator: " ")
 }
 
 public func encodeResponse(_ response: JsonResponse) throws -> String {

@@ -14,13 +14,16 @@ import { join, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { parseArgs } from 'node:util';
 
-const DEFAULT_IMAGE_SIZE_MB = 2048;
+const DEFAULT_IMAGE_SIZE_MB = 4096;
 const DEFAULT_ALPINE_VERSION = '3.20';
 const DEFAULT_BUILDER_IMAGE = `alpine:${DEFAULT_ALPINE_VERSION}`;
+const DEFAULT_UBUNTU_IMAGE_BASE = 'https://cloud-images.ubuntu.com/daily/server/jammy/current';
 const DEFAULT_UBUNTU_UNPACKED_BASE =
-  'https://cloud-images.ubuntu.com/daily/server/jammy/current/unpacked';
+  `${DEFAULT_UBUNTU_IMAGE_BASE}/unpacked`;
+const DEFAULT_ROOTFS_URL = `${DEFAULT_UBUNTU_IMAGE_BASE}/jammy-server-cloudimg-arm64-root.tar.xz`;
 const DEFAULT_KERNEL_URL = `${DEFAULT_UBUNTU_UNPACKED_BASE}/jammy-server-cloudimg-arm64-vmlinuz-generic`;
 const DEFAULT_INITRD_URL = `${DEFAULT_UBUNTU_UNPACKED_BASE}/jammy-server-cloudimg-arm64-initrd-generic`;
+const DEFAULT_UBUNTU_KERNEL_PACKAGE_BASE = 'http://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux';
 
 const scriptArgs = process.argv.slice(2);
 if (scriptArgs[0] === '--') scriptArgs.shift();
@@ -31,6 +34,7 @@ const { values } = parseArgs({
     'out-dir': { type: 'string' },
     'image-size-mb': { type: 'string', default: String(DEFAULT_IMAGE_SIZE_MB) },
     'builder-image': { type: 'string', default: DEFAULT_BUILDER_IMAGE },
+    'rootfs-url': { type: 'string', default: DEFAULT_ROOTFS_URL },
     'kernel-url': { type: 'string', default: DEFAULT_KERNEL_URL },
     'initrd-url': { type: 'string', default: DEFAULT_INITRD_URL },
   },
@@ -39,13 +43,14 @@ const { values } = parseArgs({
 const outDir = values['out-dir'];
 const imageSizeMb = Number(values['image-size-mb']);
 const builderImage = values['builder-image'] ?? DEFAULT_BUILDER_IMAGE;
+const rootfsUrl = values['rootfs-url'] ?? DEFAULT_ROOTFS_URL;
 const kernelUrl = values['kernel-url'] ?? DEFAULT_KERNEL_URL;
 const initrdUrl = values['initrd-url'] ?? DEFAULT_INITRD_URL;
 
 if (!outDir || !Number.isInteger(imageSizeMb) || imageSizeMb < 512) {
   console.error(
     [
-      'Usage: node scripts/build-macos-vm-linux-assets.mjs --out-dir <dir> [--image-size-mb 2048]',
+      'Usage: node scripts/build-macos-vm-linux-assets.mjs --out-dir <dir> [--image-size-mb 4096]',
       '',
       'Builds a reproducible arm64 Linux VM asset source set:',
       '  source.raw',
@@ -63,6 +68,23 @@ if (!outDir || !Number.isInteger(imageSizeMb) || imageSizeMb < 512) {
 const resolvedOutDir = resolve(outDir);
 mkdirSync(resolvedOutDir, { recursive: true });
 
+downloadFile(rootfsUrl, join(resolvedOutDir, 'rootfs.tar.xz'));
+const downloadedKernelPath = join(resolvedOutDir, 'vmlinuz.gz');
+const rawKernelPath = join(resolvedOutDir, 'vmlinuz');
+downloadFile(kernelUrl, downloadedKernelPath);
+await pipeline(createReadStream(downloadedKernelPath), createGunzip(), createWriteStream(rawKernelPath));
+downloadFile(initrdUrl, join(resolvedOutDir, 'initrd.img'));
+assertRawArm64Kernel(rawKernelPath);
+const kernelPackage = readUbuntuKernelPackage(rawKernelPath);
+downloadFile(
+  `${DEFAULT_UBUNTU_KERNEL_PACKAGE_BASE}/linux-modules-${kernelPackage.kernelVersion}_${kernelPackage.packageVersion}_arm64.deb`,
+  join(resolvedOutDir, 'linux-modules.deb'),
+);
+downloadFile(
+  `${DEFAULT_UBUNTU_KERNEL_PACKAGE_BASE}/linux-modules-extra-${kernelPackage.kernelVersion}_${kernelPackage.packageVersion}_arm64.deb`,
+  join(resolvedOutDir, 'linux-modules-extra.deb'),
+);
+
 const buildScriptPath = join(resolvedOutDir, 'build-inside-container.sh');
 writeFileSync(buildScriptPath, buildScript(), { mode: 0o755 });
 
@@ -78,6 +100,8 @@ try {
       `IMAGE_SIZE_MB=${imageSizeMb}`,
       '-v',
       `${resolvedOutDir}:/out`,
+      '--mount',
+      'type=volume,target=/work',
       builderImage,
       '/bin/sh',
       '/out/build-inside-container.sh',
@@ -94,13 +118,6 @@ try {
   );
   process.exit(typeof error?.status === 'number' ? error.status : 1);
 }
-
-const downloadedKernelPath = join(resolvedOutDir, 'vmlinuz.gz');
-const rawKernelPath = join(resolvedOutDir, 'vmlinuz');
-downloadFile(kernelUrl, downloadedKernelPath);
-await pipeline(createReadStream(downloadedKernelPath), createGunzip(), createWriteStream(rawKernelPath));
-downloadFile(initrdUrl, join(resolvedOutDir, 'initrd.img'));
-assertRawArm64Kernel(rawKernelPath);
 
 const required = ['source.raw', 'vmlinuz', 'initrd.img', 'guest-bootstrap.sh'];
 for (const file of required) {
@@ -137,62 +154,181 @@ function assertRawArm64Kernel(path) {
   }
 }
 
+function readUbuntuKernelPackage(path) {
+  const strings = execFileSync('strings', [path], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  const kernelVersion = strings.match(/Linux version (\S+)/)?.[1];
+  const packageVersion = strings.match(/\(Ubuntu ([0-9][^ )]+)-generic /)?.[1];
+  if (!kernelVersion || !packageVersion) {
+    console.error('Unable to determine matching Ubuntu kernel module package version from vmlinuz.');
+    process.exit(1);
+  }
+  return { kernelVersion, packageVersion };
+}
+
 function buildScript() {
   return `#!/bin/sh
 set -eu
 
-apk add --no-cache alpine-base e2fsprogs linux-virt openrc shadow sudo
+apk add --no-cache dpkg e2fsprogs kmod tar xz zstd
 
-rm -rf /tmp/agent-platform-rootfs
-mkdir -p /tmp/agent-platform-rootfs
+ROOTFS="/work/rootfs-$$"
+mkdir -p "$ROOTFS"
 
-apk add --root /tmp/agent-platform-rootfs --initdb --no-cache \\
-  --repositories-file /etc/apk/repositories \\
-  --keys-dir /etc/apk/keys \\
-  alpine-base \\
-  linux-virt \\
-  openrc \\
-  shadow \\
-  sudo
+if ! tar \\
+  --exclude='dev/*' \\
+  --exclude='var/lib/snapd/void' \\
+  --no-same-owner \\
+  --delay-directory-restore \\
+  -C "$ROOTFS" \\
+  -xJf /out/rootfs.tar.xz; then
+  if [ ! -x "$ROOTFS/usr/bin/apt-get" ]; then
+    echo "Ubuntu rootfs extraction failed before package tooling was available." >&2
+    exit 1
+  fi
+  echo "Ubuntu rootfs extraction completed with non-fatal metadata warnings." >&2
+fi
+mkdir -p "$ROOTFS/dev/pts" "$ROOTFS/dev/shm"
+chmod -R u+rwX "$ROOTFS"
+cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf"
+
+dpkg-deb -x /out/linux-modules.deb "$ROOTFS"
+dpkg-deb -x /out/linux-modules-extra.deb "$ROOTFS"
+ln -sfn /usr/lib/aarch64-linux-gnu "$ROOTFS/lib/aarch64-linux-gnu"
+ln -sfn /usr/lib/ld-linux-aarch64.so.1 "$ROOTFS/lib/ld-linux-aarch64.so.1"
+ln -sfn /usr/lib/systemd "$ROOTFS/lib/systemd"
+ln -sfn /usr/lib/udev "$ROOTFS/lib/udev"
+kernel_version="$(grep -a -m1 -o 'Linux version [^ ]*' /out/vmlinuz | awk '{print $3}')"
+depmod -b "$ROOTFS" "$kernel_version"
 
 mkdir -p \\
-  /tmp/agent-platform-rootfs/etc/init.d \\
-  /tmp/agent-platform-rootfs/usr/local/bin \\
-  /tmp/agent-platform-rootfs/workspace
+  "$ROOTFS/etc/systemd/system/multi-user.target.wants" \\
+  "$ROOTFS/usr/local/bin" \\
+  "$ROOTFS/run/agent-platform/commands" \\
+  "$ROOTFS/workspace"
 
-cat > /tmp/agent-platform-rootfs/usr/local/bin/agent-platform-guest-service <<'SERVICE'
+cat > "$ROOTFS/usr/local/bin/agent-platform-guest-service" <<'SERVICE'
 #!/bin/sh
-echo "agent-platform guest service placeholder"
-sleep infinity
+set -eu
+exec >/dev/hvc0 2>&1
+
+WORKSPACE_MOUNT="/workspace"
+COMMAND_MOUNT="/run/agent-platform/commands"
+JOBS_DIR="$COMMAND_MOUNT/jobs"
+
+is_mounted() {
+  grep -q " $1 " /proc/mounts
+}
+
+mount_share() {
+  tag="$1"
+  target="$2"
+  mkdir -p "$target"
+  if ! is_mounted "$target"; then
+    echo "agent-platform: mounting $tag at $target"
+    modprobe virtiofs || insmod "/lib/modules/$(uname -r)/kernel/fs/fuse/virtiofs.ko" || true
+    mount -t virtiofs "$tag" "$target"
+  fi
+}
+
+shell_quote() {
+  printf "'%s'" "$(printf "%s" "$1" | sed "s/'/'\\\\''/g")"
+}
+
+run_job() {
+  job="$1"
+  rm -f "$job/ready"
+  cwd="$(cat "$job/cwd")"
+  timeout_ms="$(cat "$job/timeout-ms")"
+  max_output_bytes="$(cat "$job/max-output-bytes")"
+
+  case "$cwd" in
+    /workspace|/workspace/*) ;;
+    *)
+      printf "Rejected cwd outside /workspace\\n" > "$job/stderr"
+      printf "126\\n" > "$job/exit-code"
+      printf "done\\n" > "$job/done"
+      return
+      ;;
+  esac
+
+  timeout_seconds=$(( (timeout_ms + 999) / 1000 ))
+  [ "$timeout_seconds" -gt 0 ] || timeout_seconds=1
+
+  command_line="if [ -f $(shell_quote "$job/env.sh") ]; then . $(shell_quote "$job/env.sh"); fi; cd $(shell_quote "$cwd") && timeout $(shell_quote "$timeout_seconds") /bin/sh $(shell_quote "$job/command.sh")"
+  tmp_stdout="$job/stdout.tmp"
+  tmp_stderr="$job/stderr.tmp"
+  if su agentplatform -s /bin/sh -c "$command_line" > "$tmp_stdout" 2> "$tmp_stderr"; then
+    exit_code=0
+  else
+    exit_code=$?
+  fi
+  head -c "$max_output_bytes" "$tmp_stdout" > "$job/stdout" || true
+  head -c "$max_output_bytes" "$tmp_stderr" > "$job/stderr" || true
+  rm -f "$tmp_stdout" "$tmp_stderr"
+  printf "%s\\n" "$exit_code" > "$job/exit-code"
+  printf "done\\n" > "$job/done"
+}
+
+echo "agent-platform: guest service starting"
+mount_share agentworkspace "$WORKSPACE_MOUNT"
+mount_share agentcommands "$COMMAND_MOUNT"
+mkdir -p "$JOBS_DIR"
+echo "agent-platform: guest service ready"
+
+while true; do
+  for job in "$JOBS_DIR"/*; do
+    [ -d "$job" ] || continue
+    [ -f "$job/ready" ] || continue
+    run_job "$job"
+  done
+  sleep 0.1
+done
 SERVICE
-chmod 0755 /tmp/agent-platform-rootfs/usr/local/bin/agent-platform-guest-service
+chmod 0755 "$ROOTFS/usr/local/bin/agent-platform-guest-service"
 
-cat > /tmp/agent-platform-rootfs/etc/init.d/agent-platform-guest-service <<'SERVICE_INIT'
-#!/sbin/openrc-run
-name="agent-platform-guest-service"
-command="/usr/local/bin/agent-platform-guest-service"
-command_user="agentplatform"
-command_background="yes"
-pidfile="/run/agent-platform-guest-service.pid"
-SERVICE_INIT
-chmod 0755 /tmp/agent-platform-rootfs/etc/init.d/agent-platform-guest-service
+cat > "$ROOTFS/etc/systemd/system/agent-platform-guest-service.service" <<'SERVICE_UNIT'
+[Unit]
+Description=Agent Platform guest command service
+After=local-fs.target
 
-chroot /tmp/agent-platform-rootfs /usr/sbin/adduser -D -h /home/agentplatform -s /bin/sh agentplatform
-ln -sf /etc/init.d/agent-platform-guest-service \\
-  /tmp/agent-platform-rootfs/etc/runlevels/default/agent-platform-guest-service
-ln -sf /etc/init.d/devfs /tmp/agent-platform-rootfs/etc/runlevels/sysinit/devfs
-ln -sf /etc/init.d/procfs /tmp/agent-platform-rootfs/etc/runlevels/sysinit/procfs
-ln -sf /etc/init.d/sysfs /tmp/agent-platform-rootfs/etc/runlevels/sysinit/sysfs
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/agent-platform-guest-service
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_UNIT
+
+if ! grep -q '^agentplatform:' "$ROOTFS/etc/group"; then
+  printf 'agentplatform:x:1000:\\n' >> "$ROOTFS/etc/group"
+fi
+if ! grep -q '^agentplatform:' "$ROOTFS/etc/passwd"; then
+  printf 'agentplatform:x:1000:1000:Agent Platform:/home/agentplatform:/bin/sh\\n' >> "$ROOTFS/etc/passwd"
+fi
+if [ -f "$ROOTFS/etc/shadow" ] && ! grep -q '^agentplatform:' "$ROOTFS/etc/shadow"; then
+  printf 'agentplatform:!:20498:0:99999:7:::\\n' >> "$ROOTFS/etc/shadow"
+fi
+if [ -f "$ROOTFS/etc/gshadow" ] && ! grep -q '^agentplatform:' "$ROOTFS/etc/gshadow"; then
+  printf 'agentplatform:!::\\n' >> "$ROOTFS/etc/gshadow"
+fi
+mkdir -p "$ROOTFS/home/agentplatform"
+chown 1000:1000 "$ROOTFS/home/agentplatform"
+ln -sf /etc/systemd/system/agent-platform-guest-service.service \\
+  "$ROOTFS/etc/systemd/system/multi-user.target.wants/agent-platform-guest-service.service"
 
 cat > /out/guest-bootstrap.sh <<'BOOTSTRAP'
 #!/bin/sh
 set -eu
 install -m 0755 /usr/local/bin/agent-platform-guest-service /usr/local/bin/agent-platform-guest-service
-rc-update add agent-platform-guest-service default
+systemctl enable agent-platform-guest-service.service
 BOOTSTRAP
 chmod 0755 /out/guest-bootstrap.sh
 
 truncate -s "$IMAGE_SIZE_MB"M /out/source.raw
-mke2fs -q -t ext4 -L AGENTROOT -d /tmp/agent-platform-rootfs /out/source.raw
+mke2fs -q -t ext4 -L AGENTROOT -d "$ROOTFS" /out/source.raw
+chmod -R u+rwX "$ROOTFS" 2>/dev/null || true
+rm -rf "$ROOTFS" 2>/dev/null || true
 `;
 }

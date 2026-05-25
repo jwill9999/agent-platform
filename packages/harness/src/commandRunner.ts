@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
-import { realpath } from 'node:fs/promises';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import type { Output, RiskTier } from '@agent-platform/contracts';
 
@@ -425,13 +427,15 @@ function parseMacosVmHelperResponse(stdout: string): MacosVmHelperResponse | und
 async function macosVmWorkspacePaths(request: CommandRunnerRequest): Promise<{
   hostWorkspaceRoot: string;
   hostCwd: string;
+  guestCommand: string;
 }> {
   const hostWorkspaceRoot = await realpath(request.workspace?.root ?? request.cwd);
   const hostCwd = await realpath(request.cwd);
-  if (!hostCwd.startsWith(hostWorkspaceRoot)) {
-    return { hostWorkspaceRoot, hostCwd: hostWorkspaceRoot };
+  const guestCommand = replaceAll(request.command, hostWorkspaceRoot, '/workspace');
+  if (hostCwd !== hostWorkspaceRoot && !hostCwd.startsWith(`${hostWorkspaceRoot}/`)) {
+    return { hostWorkspaceRoot, hostCwd: hostWorkspaceRoot, guestCommand };
   }
-  return { hostWorkspaceRoot, hostCwd };
+  return { hostWorkspaceRoot, hostCwd, guestCommand };
 }
 
 export function createMacosVmCommandRunner({
@@ -458,6 +462,10 @@ export function createMacosVmCommandRunner({
         );
       }
 
+      const envDir = await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-env-'));
+      const envFile = join(envDir, 'env.json');
+      await writeFile(envFile, JSON.stringify(macosVmEnvironment(request.env)), 'utf8');
+
       return new Promise<CommandRunnerResult>((resolve) => {
         const startedAt = Date.now();
         const args = [
@@ -472,8 +480,10 @@ export function createMacosVmCommandRunner({
           String(request.timeoutMs),
           '--max-output-bytes',
           String(request.maxOutputBytes),
+          '--env-file',
+          envFile,
           '--',
-          request.command,
+          paths.guestCommand,
         ];
         const proc = exec(
           helperPath,
@@ -485,6 +495,7 @@ export function createMacosVmCommandRunner({
             env: macosVmEnvironment(request.env),
           },
           (error, stdout, stderr) => {
+            void rm(envDir, { recursive: true, force: true });
             if (error) {
               resolve(macosVmProcessFailure(error, stderr));
               return;
