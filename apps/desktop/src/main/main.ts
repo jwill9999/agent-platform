@@ -5,6 +5,7 @@ import { spawn } from 'node-pty';
 
 import {
   getDesktopBackendPaths,
+  repairPackagedMacosVmRuntime,
   resolveDesktopBackendNodePath,
   resolveDesktopBackendMode,
   startDesktopBackend,
@@ -41,6 +42,7 @@ import {
 import {
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
+  repairMacosVmRuntimeIpcChannel,
   createProjectFolderIpcChannel,
   createTerminalIpcChannel,
   closeWorkspaceWebViewIpcChannel,
@@ -402,6 +404,23 @@ function registerDesktopMaintenanceIpc(
     return resetDesktopLocalData({
       confirmation: request.confirmation,
       paths: runtimePaths,
+    });
+  });
+
+  ipcMain.removeHandler(repairMacosVmRuntimeIpcChannel);
+  ipcMain.handle(repairMacosVmRuntimeIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    validateIpcPayload(payload, validateNoPayload);
+
+    await desktopBackend?.stop();
+    desktopBackend = undefined;
+
+    return repairPackagedMacosVmRuntime({
+      paths: getDesktopBackendPaths(
+        getRepoRootFromMainDir(dirname(fileURLToPath(import.meta.url))),
+        runtimePaths,
+      ),
+      env: process.env,
     });
   });
 }

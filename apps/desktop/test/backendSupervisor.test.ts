@@ -1,5 +1,14 @@
 import { createServer, type Server } from 'node:http';
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, type ChildProcess } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -10,6 +19,7 @@ import {
   ensurePackagedMacosVmAssets,
   getDesktopBackendPaths,
   getDesktopBackendUrl,
+  repairPackagedMacosVmRuntime,
   resolveDesktopBackendNodePath,
   resolveDesktopBackendMode,
   waitForBackendReady,
@@ -18,8 +28,13 @@ import type { DesktopRuntimePaths } from '../src/main/runtimePaths.js';
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
+const childProcesses: ChildProcess[] = [];
 
 afterEach(async () => {
+  for (const child of childProcesses.splice(0)) {
+    child.kill('SIGTERM');
+  }
+
   await Promise.all(
     servers.splice(0).map(
       (server) =>
@@ -65,6 +80,7 @@ function writePackagedMacosVmResources(
   mkdirSync(join(runtimeRoot, 'resources/macos-vm'), { recursive: true });
   if (helper) {
     writeFileSync(paths.macosVmPackagedHelperPath, '#!/bin/sh\n');
+    chmodSync(paths.macosVmPackagedHelperPath, 0o755);
   }
   if (assets) {
     mkdirSync(paths.macosVmPackagedAssetsDir, { recursive: true });
@@ -200,6 +216,93 @@ describe('desktop backend supervisor helpers', () => {
     ensurePackagedMacosVmAssets(paths, {});
 
     expect(existsSync(join(runtimeRoot, 'data/vm/images/manifest.json'))).toBe(true);
+  });
+
+  it('repairs only app-owned macOS VM runtime state and preserves diagnostics', () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+    const vmRuntimeDir = join(runtimeRoot, 'data/vm');
+    writePackagedMacosVmResources(paths, runtimeRoot);
+    mkdirSync(join(vmRuntimeDir, 'state/commands/jobs'), { recursive: true });
+    mkdirSync(join(vmRuntimeDir, 'images'), { recursive: true });
+    mkdirSync(join(vmRuntimeDir, 'logs'), { recursive: true });
+    writeFileSync(join(vmRuntimeDir, 'state/daemon.pid'), '999999\n');
+    writeFileSync(join(vmRuntimeDir, 'images/manifest.json'), '{"corrupt":true}\n');
+    writeFileSync(join(vmRuntimeDir, 'logs/last-error.log'), 'boot failed\n');
+
+    const result = repairPackagedMacosVmRuntime({ paths, env: {} });
+
+    expect(result).toMatchObject({
+      ok: true,
+      runtimeDir: vmRuntimeDir,
+      stoppedRunningVm: false,
+      repairedAssets: true,
+      preservedDiagnostics: true,
+      preservedProjectFolders: true,
+    });
+    expect(result.deletedPaths).toEqual([
+      join(vmRuntimeDir, 'state'),
+      join(vmRuntimeDir, 'images'),
+    ]);
+    expect(existsSync(join(vmRuntimeDir, 'state'))).toBe(false);
+    expect(existsSync(join(vmRuntimeDir, 'logs/last-error.log'))).toBe(true);
+    expect(existsSync(join(vmRuntimeDir, 'images/manifest.json'))).toBe(true);
+  });
+
+  it('refuses to repair arbitrary or symlinked macOS VM runtime paths', () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const projectRoot = join(makeTempRepo(), 'project');
+    const projectFile = join(projectRoot, 'README.md');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+    writePackagedMacosVmResources(paths, runtimeRoot);
+    mkdirSync(projectRoot, { recursive: true });
+    writeFileSync(projectFile, '# Project\n');
+
+    expect(() =>
+      repairPackagedMacosVmRuntime({
+        paths,
+        env: { AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: projectRoot },
+      }),
+    ).toThrow('Refusing to repair unsafe macOS VM runtime path');
+    expect(existsSync(projectFile)).toBe(true);
+
+    const symlinkPath = join(runtimeRoot, 'data/vm-link');
+    mkdirSync(join(runtimeRoot, 'data'), { recursive: true });
+    symlinkSync(projectRoot, symlinkPath);
+    expect(() =>
+      repairPackagedMacosVmRuntime({
+        paths,
+        env: { AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: symlinkPath },
+      }),
+    ).toThrow('Refusing to repair symlinked macOS VM runtime path');
+    expect(existsSync(projectFile)).toBe(true);
+  });
+
+  it('stops a running macOS VM daemon before repairing runtime state', async () => {
+    const repoRoot = makeTempRepo();
+    const runtimeRoot = join(repoRoot, 'runtime');
+    const paths = getDesktopBackendPaths(repoRoot, makeRuntimePaths(runtimeRoot));
+    const vmRuntimeDir = join(runtimeRoot, 'data/vm');
+    writePackagedMacosVmResources(paths, runtimeRoot);
+    mkdirSync(join(vmRuntimeDir, 'state'), { recursive: true });
+    const child = spawn('/bin/sh', ['-c', 'sleep 30'], { stdio: 'ignore' });
+    childProcesses.push(child);
+    await new Promise<void>((resolve) => {
+      child.once('spawn', () => resolve());
+    });
+    writeFileSync(join(vmRuntimeDir, 'state/daemon.pid'), `${child.pid}\n`);
+    writeFileSync(
+      paths.macosVmPackagedHelperPath,
+      `#!/bin/sh\nkill ${child.pid}\nrm -f "$3/state/daemon.pid"\n`,
+    );
+    chmodSync(paths.macosVmPackagedHelperPath, 0o755);
+
+    const result = repairPackagedMacosVmRuntime({ paths, env: {} });
+
+    expect(result.stoppedRunningVm).toBe(true);
+    expect(existsSync(join(vmRuntimeDir, 'state'))).toBe(false);
   });
 
   it('fails closed when macOS VM mode is selected but packaged assets are missing', () => {

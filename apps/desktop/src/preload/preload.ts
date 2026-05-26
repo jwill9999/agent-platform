@@ -15,6 +15,7 @@ import {
   openWorkspaceResourceIpcChannel,
   openWorkspaceWebViewIpcChannel,
   reloadWorkspaceWebViewIpcChannel,
+  repairMacosVmRuntimeIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   resizeTerminalIpcChannel,
@@ -33,6 +34,10 @@ const desktopApi = {
   maintenance: {
     getResetLocalDataConfirmation: () =>
       ipcRenderer.invoke(resetLocalDataConfirmationIpcChannel) as Promise<string>,
+    repairMacosVmRuntime: () =>
+      ipcRenderer.invoke(repairMacosVmRuntimeIpcChannel) as ReturnType<
+        AgentPlatformDesktopApi['maintenance']['repairMacosVmRuntime']
+      >,
     resetLocalData: (request) =>
       ipcRenderer.invoke(resetLocalDataIpcChannel, request) as ReturnType<
         AgentPlatformDesktopApi['maintenance']['resetLocalData']

@@ -13,10 +13,10 @@
 ## Last Updated
 
 - **Date:** 2026-05-26
-- **Session:** Put `.5/.5.4` on hold for self-hosted runner proof and started `.6.1`.
+- **Session:** Continued release hardening with `.6.2` VM repair flow.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `1f177d1` requires a VM-capable self-hosted macOS runner for staging; `.6.1`
-  policy hardening is local and pending commit.
+- **Latest commit:** `b338110` hardens macOS VM production policy; `.6.2` repair flow is local and
+  pending commit.
 
 ## Current State
 
@@ -30,6 +30,8 @@
   and `agent-platform-vm`.
 - `.6.1` is in progress: production resource/network/filesystem/user policy hardening is
   implemented locally, but live VM smoke evidence is still required before closing.
+- `.6.2` is in progress: safe VM runtime repair is implemented locally and covered by desktop unit
+  tests; signed/packaged smoke evidence can be added later with the self-hosted runner.
 
 ## Recent Work
 
@@ -69,6 +71,14 @@
   - added policy details to command-runner health,
   - added native diagnostics for network device count and effective production policy,
   - hardened the guest service to clamp job limits and set non-root HOME/TMPDIR scratch.
+- Implemented `.6.2` safe VM repair flow:
+  - added desktop maintenance IPC/preload action `repairMacosVmRuntime`,
+  - validates runtime path ownership under desktop app data and refuses Project/arbitrary/symlink
+    paths,
+  - stops a running VM daemon via the packaged helper before deleting state,
+  - deletes only VM `state` and `images` by default, preserves diagnostics logs, and recopies
+    packaged pinned assets,
+  - added desktop tests for stopped/running/corrupt runtime repair and unsafe path refusal.
 
 ## Checks Run
 
@@ -111,13 +121,15 @@
 - `swift test --package-path apps/desktop/native/macos-vm-runner`
 - `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/macosVmPackaging.test.ts`
 - `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts test/preloadContract.test.ts test/localDataReset.test.ts`
+- `pnpm --filter @agent-platform/desktop typecheck`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Commit and push the `.6.1` policy hardening work after final local status review.
+1. Commit and push the `.6.2` VM repair flow after final local status review.
 2. Register or attach a real Apple Silicon self-hosted GitHub runner with labels `self-hosted`,
    `macOS`, `ARM64`, and `agent-platform-vm`.
 3. Confirm the repository variables still contain only the raw checksum and release asset URL:

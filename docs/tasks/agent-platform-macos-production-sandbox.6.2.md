@@ -20,6 +20,21 @@ Add a user-safe reset and repair path for app-owned VM runtime state.
 - Rebuild or revalidate packaged/pinned assets after reset so the next start has a deterministic
   recovery path.
 
+## Current Implementation Notes
+
+- Desktop exposes a maintenance IPC action, `repairMacosVmRuntime`, for the packaged VM repair path.
+- Repair validates that the VM runtime directory is app-owned under the desktop data directory before
+  deleting anything.
+- Repair refuses arbitrary runtime paths, Project folder paths, runtime root deletion, and symlinked
+  runtime/child paths.
+- Repair stops a running VM daemon through the packaged helper before deleting runtime state.
+- Repair deletes only VM `state` and `images` by default, preserves `logs`, then recopies packaged
+  pinned assets into the runtime image directory.
+- Full local unit coverage exists for stopped, running, corrupt, arbitrary path, symlink, and Project
+  folder preservation cases.
+- A signed/packaged live smoke can be recorded later with the same self-hosted Apple Silicon runner
+  used for `.5.4`; do not treat that infrastructure proof as missing implementation code.
+
 ## Tests And Verification
 
 - Unit tests for runtime path validation and deletion scope.
