@@ -507,6 +507,80 @@ struct MacosVmRunnerTests {
         removeRuntimeDir(workspace)
     }
 
+    @Test func execClampsCommandLimitsBeforeGuestDispatch() throws {
+        let runtimeDir = temporaryRuntimeDir()
+        let workspace = temporaryRuntimeDir()
+        var observedTimeout = ""
+        var observedMaxOutput = ""
+        let observed = DispatchSemaphore(value: 0)
+        try writeVmAssets(runtimeDir: runtimeDir)
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        try writeReadyState(runtimeDir: runtimeDir, workspace: workspace)
+
+        DispatchQueue.global().async {
+            let jobs = runtimeDir.appendingPathComponent("state/commands/jobs", isDirectory: true)
+            while true {
+                guard
+                    let job = try? FileManager.default.contentsOfDirectory(
+                        at: jobs,
+                        includingPropertiesForKeys: nil
+                    ).first
+                else {
+                    usleep(10_000)
+                    continue
+                }
+                guard
+                    let timeout = try? String(
+                        contentsOf: job.appendingPathComponent("timeout-ms"),
+                        encoding: .utf8
+                    ),
+                    let maxOutput = try? String(
+                        contentsOf: job.appendingPathComponent("max-output-bytes"),
+                        encoding: .utf8
+                    )
+                else {
+                    usleep(10_000)
+                    continue
+                }
+                observedTimeout = timeout
+                observedMaxOutput = maxOutput
+                try? "".write(to: job.appendingPathComponent("stdout"), atomically: true, encoding: .utf8)
+                try? "".write(to: job.appendingPathComponent("stderr"), atomically: true, encoding: .utf8)
+                try? "0\n".write(to: job.appendingPathComponent("exit-code"), atomically: true, encoding: .utf8)
+                try? "done\n".write(to: job.appendingPathComponent("done"), atomically: true, encoding: .utf8)
+                observed.signal()
+                break
+            }
+        }
+
+        let result = handleCommand(
+            arguments: [
+                "exec",
+                "--runtime-dir",
+                runtimeDir.path,
+                "--workspace",
+                workspace.path,
+                "--cwd",
+                workspace.path,
+                "--timeout-ms",
+                "999999999",
+                "--max-output-bytes",
+                "999999999",
+                "--",
+                "echo hello",
+            ]
+        )
+
+        #expect(result.exitCode == 0)
+        #expect(result.response.ok == true)
+        #expect(observed.wait(timeout: .now() + 1) == .success)
+        #expect(observedTimeout == "120000\n")
+        #expect(observedMaxOutput == "1048576\n")
+
+        removeRuntimeDir(runtimeDir)
+        removeRuntimeDir(workspace)
+    }
+
     @Test func execRejectsRunningVmWithoutWorkspaceBinding() throws {
         let runtimeDir = temporaryRuntimeDir()
         let workspace = temporaryRuntimeDir()

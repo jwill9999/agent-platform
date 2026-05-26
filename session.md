@@ -13,10 +13,10 @@
 ## Last Updated
 
 - **Date:** 2026-05-26
-- **Session:** Updated `.5.4` staging gate after GitHub-hosted macOS proved non-VM-capable.
+- **Session:** Put `.5/.5.4` on hold for self-hosted runner proof and started `.6.1`.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `f122e29` fixes PR #227 verify/Sonar followups; current self-hosted runner
-  change is local and pending commit.
+- **Latest commit:** `1f177d1` requires a VM-capable self-hosted macOS runner for staging; `.6.1`
+  policy hardening is local and pending commit.
 
 ## Current State
 
@@ -25,53 +25,18 @@
 - Docker and host command runners remain development-only paths; production/staging must prove `macos-vm` or stay fail-closed.
 - `.4.2`, `.4.2.1`, `.4.2.2`, `.4.2.3`, `.4.3`, `.4.4`, `.4`, `.5.1`, and `.5.2` are complete.
 - `.5.3` is complete and pushed.
-- `.5.4` is in progress: staging workflow wiring now requires a self-hosted VM-capable Apple
-  Silicon runner, and the task must remain open until a staging PR run proves the packaged macOS VM
-  E2E with real pinned assets.
+- `.5` / `.5.4` are on hold: implementation reaches real VM startup, but final staging sign-off
+  requires a self-hosted VM-capable Apple Silicon runner labelled `self-hosted`, `macOS`, `ARM64`,
+  and `agent-platform-vm`.
+- `.6.1` is in progress: production resource/network/filesystem/user policy hardening is
+  implemented locally, but live VM smoke evidence is still required before closing.
 
 ## Recent Work
 
-- Completed `.5.1` packaging and pushed the stable Electron resources layout:
-  `macos-vm/macos-vm-runner`, `macos-vm/images/*`, and `package-manifest.json`.
-- Fixed the PR #227 harness unit-test CI failure by installing Playwright Chromium before the
-  monorepo `verify` job runs `pnpm run test`; GitHub `verify` now passes.
-- Rechecked the three earlier review-hotspot areas:
-  - `prepare-macos-vm-assets.mjs` already uses streaming SHA-256 hashing,
-  - macOS VM health already checks that the runtime path is a real directory,
-  - helper process failures already distinguish missing/non-executable helper binaries.
-- Addressed current SonarCloud PR findings in runner/package files:
-  - reduced package script argument parser complexity and replaced promise-chain entrypoint with
-    top-level await,
-  - removed redundant Electron process assertion,
-  - deduplicated command runner environment handling and removed `void` cleanup,
-  - removed unused Swift delegate parameters, reduced `JsonResponse` initializer arity, and replaced
-    hardcoded workspace path literals with named constants,
-  - modernized VM asset build regex/template string usage.
-- After the first Sonar rerun, cleared the remaining three open issues by deriving Swift path
-  defaults without hardcoded URI literals and moving async temp cleanup out of the nested callback.
-- Cleared the three actual SonarCloud Security Hotspots:
-  - Ubuntu package URL now uses HTTPS,
-  - asset/package scripts use fixed system binary paths instead of PATH-dependent `curl`, `file`,
-    `strings`, and `swift` lookups.
-- Implemented `.5.2` startup/health work:
-  - desktop backend defaults packaged builds to `AGENT_PLATFORM_COMMAND_RUNNER=macos-vm` only when
-    the packaged helper and VM asset manifest exist,
-  - explicit `macos-vm` mode fails closed if helper or assets are missing instead of selecting host
-    or Docker,
-  - runner health now verifies helper executability, runtime assets, daemon PID/socket/heartbeat,
-    and last-error diagnostics before reporting ready,
-  - `/health/ready` includes a degraded `commandRunner` subsystem check with the same mode/status
-    contract used by the harness.
-- SonarCloud rerun after `fb8248a` showed hotspots fixed and no open issues, but duplication was
-  still at 3.5%; refactored duplicated runner-health/backend-supervisor test setup in `cf42fd7`.
-- Implemented `.5.3` packaged Electron E2E:
-  - added a Project Chat command-runner status badge backed by `/api/health/ready`,
-  - added a web health BFF route so the renderer can read API readiness consistently,
-  - added an E2E-only mock LLM seam for deterministic tool-call stories,
-  - made VM runner unavailable errors visible in Tool activity,
-  - added packaged Electron tests for both ready/success and unhealthy/fail-closed VM command flows.
-- Re-ran the previously failing harness browser-tools integration path; the full harness suite now
-  passes, including `browserTools.integration.test.ts`.
+- Completed `.5.1` through `.5.3`: packaged helper/assets, fail-closed startup/health behavior,
+  and packaged Electron E2E coverage for ready and unavailable VM command flows.
+- Cleared PR #227 verify/Sonar followups, including harness browser startup budget, remaining
+  Sonar issue, fixed security hotspots, and duplicated-test setup.
 - Started `.5.4` staging gate work:
   - added a staging-only `staging-packaged-macos-vm-e2e` CI job on `macos-15`,
   - made the job require `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL` and
@@ -94,6 +59,16 @@
 - Updated `.5.4` CI wiring to require a self-hosted Apple Silicon runner labelled `self-hosted`,
   `macOS`, `ARM64`, and `agent-platform-vm`; hosted macOS is no longer treated as a valid staging
   runner for the production VM gate.
+- Put `.5` and `.5.4` on hold in Beads and claimed `.6.1`.
+- Implemented `.6.1` policy hardening:
+  - exported shared macOS VM production policy details from the harness,
+  - clamped macOS VM command timeout/output limits in the TypeScript adapter and native helper,
+  - documented the production policy: 2 vCPU, 2048 MiB RAM, disabled guest networking, non-root
+    `agentplatform` user, `/workspace` as the only host-backed writable mount, and app-owned guest
+    scratch,
+  - added policy details to command-runner health,
+  - added native diagnostics for network device count and effective production policy,
+  - hardened the guest service to clamp job limits and set non-root HOME/TMPDIR scratch.
 
 ## Checks Run
 
@@ -128,19 +103,25 @@
 - `pnpm --filter @agent-platform/harness test -- test/browserTools.integration.test.ts`
 - `pnpm --filter @agent-platform/harness run typecheck`
 - `pnpm --filter @agent-platform/harness run lint`
+- `pnpm --filter @agent-platform/harness test -- test/macosVmCommandRunner.test.ts test/commandRunnerHealth.test.ts`
+- `pnpm --filter @agent-platform/harness typecheck`
+- `pnpm --filter @agent-platform/harness lint`
 - `pnpm --filter @agent-platform/web run typecheck`
 - `pnpm --filter @agent-platform/web run lint`
 - `swift test --package-path apps/desktop/native/macos-vm-runner`
+- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/macosVmPackaging.test.ts`
+- `pnpm --filter @agent-platform/desktop lint`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Register or attach a real Apple Silicon self-hosted GitHub runner with labels `self-hosted`,
+1. Commit and push the `.6.1` policy hardening work after final local status review.
+2. Register or attach a real Apple Silicon self-hosted GitHub runner with labels `self-hosted`,
    `macOS`, `ARM64`, and `agent-platform-vm`.
-2. Confirm the repository variables still contain only the raw checksum and release asset URL:
+3. Confirm the repository variables still contain only the raw checksum and release asset URL:
    `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256` and
    `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL`.
-3. Rerun the PR into `staging`, then keep `.5.4` open until the
-   `staging-packaged-macos-vm-e2e` artifact proves real packaged `macos-vm` command execution.
+4. Rerun the PR into `staging`, then keep `.5.4` and `.6.1` open until artifacts prove real
+   packaged `macos-vm` command execution plus non-root/no-network/filesystem policy behavior.

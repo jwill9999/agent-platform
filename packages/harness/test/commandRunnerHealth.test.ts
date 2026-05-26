@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  MACOS_VM_PRODUCTION_POLICY,
   getConfiguredCommandRunnerHealth,
   type CommandRunner,
   type CommandRunnerHealth,
@@ -108,6 +109,13 @@ describe('CommandRunner health contract', () => {
       canExecute: false,
       reason: 'macos_vm_runner_helper_missing',
       message: 'macOS VM command execution is selected but the VM helper path is not configured.',
+      details: expect.objectContaining({
+        cpuCount: MACOS_VM_PRODUCTION_POLICY.cpuCount,
+        memoryMB: MACOS_VM_PRODUCTION_POLICY.memoryMB,
+        networkPolicy: 'disabled',
+        guestUser: 'agentplatform',
+        workspaceMount: '/workspace',
+      }) as CommandRunnerHealth['details'],
     } satisfies CommandRunnerHealth);
   });
 
@@ -130,10 +138,13 @@ describe('CommandRunner health contract', () => {
       canExecute: false,
       reason: 'macos_vm_runner_runtime_missing',
       message: 'macOS VM command execution is selected but the runtime directory is unavailable.',
-      details: {
+      details: expect.objectContaining({
         helperPath,
         runtimeDir: join(tempRoot, 'missing-runtime'),
-      },
+        cpuCount: MACOS_VM_PRODUCTION_POLICY.cpuCount,
+        memoryMB: MACOS_VM_PRODUCTION_POLICY.memoryMB,
+        networkPolicy: 'disabled',
+      }) as CommandRunnerHealth['details'],
     } satisfies CommandRunnerHealth);
 
     await rm(tempRoot, { recursive: true, force: true });
@@ -205,6 +216,14 @@ describe('CommandRunner health contract', () => {
       canExecute: true,
       reason: 'production_runner_ready',
       message: 'macOS VM command execution is ready.',
+      details: expect.objectContaining({
+        cpuCount: MACOS_VM_PRODUCTION_POLICY.cpuCount,
+        memoryMB: MACOS_VM_PRODUCTION_POLICY.memoryMB,
+        commandTimeoutMaxMs: MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs,
+        outputMaxBytes: MACOS_VM_PRODUCTION_POLICY.outputMaxBytes,
+        networkPolicy: 'disabled',
+        filesystemPolicy: 'project_rw_workspace_guest_owned_scratch',
+      }) as CommandRunnerHealth['details'],
     } satisfies Partial<CommandRunnerHealth>);
 
     await rm(tempRoot, { recursive: true, force: true });
@@ -223,6 +242,12 @@ describe('CommandRunner health contract', () => {
       canExecute: true,
       reason: 'production_runner_ready',
       message: 'macOS VM command execution is configured.',
+      details: expect.objectContaining({
+        cpuCount: MACOS_VM_PRODUCTION_POLICY.cpuCount,
+        memoryMB: MACOS_VM_PRODUCTION_POLICY.memoryMB,
+        networkPolicy: 'disabled',
+        guestUser: 'agentplatform',
+      }) as CommandRunnerHealth['details'],
     } satisfies CommandRunnerHealth);
   });
 });

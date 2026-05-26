@@ -3,6 +3,17 @@ import Foundation
 import Virtualization
 
 private let guestWorkspaceRoot = ["", "workspace"].joined(separator: "/")
+private let productionCpuCount = 2
+private let productionMemoryBytes: UInt64 = 2 * 1024 * 1024 * 1024
+private let productionCommandTimeoutDefaultMs = 30_000
+private let productionCommandTimeoutMaxMs = 120_000
+private let productionOutputDefaultBytes = 65_536
+private let productionOutputMaxBytes = 1_048_576
+private let productionGuestUser = "agentplatform"
+private let productionGuestUid = 1_000
+private let productionGuestGid = 1_000
+private let productionNetworkPolicy = "disabled"
+private let productionFilesystemPolicy = "project_rw_workspace_guest_owned_scratch"
 
 public struct JsonResponse: Codable, Equatable {
     public let ok: Bool
@@ -81,11 +92,22 @@ private struct VmConfigDiagnostics: Codable {
     let serialPorts: Int
     let entropyDevices: Int
     let memoryBalloonDevices: Int
+    let networkDevices: Int
     let platform: String
     let machineIdentifier: Bool
     let helperPath: String
     let hostArch: String
     let virtualizationEntitlementPresent: Bool
+    let commandTimeoutDefaultMs: Int
+    let commandTimeoutMaxMs: Int
+    let outputDefaultBytes: Int
+    let outputMaxBytes: Int
+    let guestUser: String
+    let guestUid: Int
+    let guestGid: Int
+    let workspaceMount: String
+    let networkPolicy: String
+    let filesystemPolicy: String
 }
 
 public func handleCommand(arguments: [String]) -> CommandResult {
@@ -263,8 +285,18 @@ private func execute(runtimeDir: String?, arguments: [String]) -> CommandResult 
         return unavailableResult("Command is not configured.")
     }
 
-    let timeoutMs = parsePositiveIntOption("timeout-ms", from: arguments, defaultValue: 30_000)
-    let maxOutputBytes = parsePositiveIntOption("max-output-bytes", from: arguments, defaultValue: 65_536)
+    let timeoutMs = parseBoundedPositiveIntOption(
+        "timeout-ms",
+        from: arguments,
+        defaultValue: productionCommandTimeoutDefaultMs,
+        maxValue: productionCommandTimeoutMaxMs
+    )
+    let maxOutputBytes = parseBoundedPositiveIntOption(
+        "max-output-bytes",
+        from: arguments,
+        defaultValue: productionOutputDefaultBytes,
+        maxValue: productionOutputMaxBytes
+    )
     let environment = loadCommandEnvironment(envFile: parseOption("env-file", from: arguments))
     let guestCwd = guestWorkspacePath(workspacePath: workspacePath, cwdPath: cwdPath)
     return dispatchGuestCommand(
@@ -731,9 +763,9 @@ private func buildVirtualMachineConfiguration(
     let configuration = VZVirtualMachineConfiguration()
     configuration.platform = platform
     configuration.bootLoader = bootLoader
-    configuration.cpuCount = min(2, VZVirtualMachineConfiguration.maximumAllowedCPUCount)
+    configuration.cpuCount = min(productionCpuCount, VZVirtualMachineConfiguration.maximumAllowedCPUCount)
     configuration.memorySize = min(
-        2 * 1024 * 1024 * 1024,
+        productionMemoryBytes,
         VZVirtualMachineConfiguration.maximumAllowedMemorySize
     )
     configuration.storageDevices = [disk]
@@ -837,11 +869,22 @@ private func writeVmConfigDiagnostics(
         serialPorts: configuration.serialPorts.count,
         entropyDevices: configuration.entropyDevices.count,
         memoryBalloonDevices: configuration.memoryBalloonDevices.count,
+        networkDevices: configuration.networkDevices.count,
         platform: "VZGenericPlatformConfiguration",
         machineIdentifier: true,
         helperPath: CommandLine.arguments.first ?? "",
         hostArch: hostArchitecture(),
-        virtualizationEntitlementPresent: hasVirtualizationEntitlement()
+        virtualizationEntitlementPresent: hasVirtualizationEntitlement(),
+        commandTimeoutDefaultMs: productionCommandTimeoutDefaultMs,
+        commandTimeoutMaxMs: productionCommandTimeoutMaxMs,
+        outputDefaultBytes: productionOutputDefaultBytes,
+        outputMaxBytes: productionOutputMaxBytes,
+        guestUser: productionGuestUser,
+        guestUid: productionGuestUid,
+        guestGid: productionGuestGid,
+        workspaceMount: guestWorkspaceRoot,
+        networkPolicy: productionNetworkPolicy,
+        filesystemPolicy: productionFilesystemPolicy
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -989,11 +1032,16 @@ private func parseOption(_ name: String, from arguments: [String]) -> String? {
     parseOptions(arguments)[name]
 }
 
-private func parsePositiveIntOption(_ name: String, from arguments: [String], defaultValue: Int) -> Int {
+private func parseBoundedPositiveIntOption(
+    _ name: String,
+    from arguments: [String],
+    defaultValue: Int,
+    maxValue: Int
+) -> Int {
     guard let raw = parseOption(name, from: arguments), let value = Int(raw), value > 0 else {
         return defaultValue
     }
-    return value
+    return min(value, maxValue)
 }
 
 private func commandAfterSeparator(_ arguments: [String]) -> String {

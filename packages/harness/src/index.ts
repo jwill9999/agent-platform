@@ -27,6 +27,7 @@ export type {
 } from './types.js';
 export { contractToolsToDefinitions } from './types.js';
 export {
+  MACOS_VM_PRODUCTION_POLICY,
   commandRunnerResultToOutput,
   createConfiguredCommandRunner,
   createDockerSandboxCommandRunner,

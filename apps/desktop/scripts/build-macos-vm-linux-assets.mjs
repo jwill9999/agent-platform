@@ -226,6 +226,13 @@ exec >/dev/hvc0 2>&1
 WORKSPACE_MOUNT="/workspace"
 COMMAND_MOUNT="/run/agent-platform/commands"
 JOBS_DIR="$COMMAND_MOUNT/jobs"
+GUEST_USER="agentplatform"
+GUEST_HOME="/home/agentplatform"
+GUEST_SCRATCH="$GUEST_HOME/.agent-platform"
+DEFAULT_TIMEOUT_MS=30000
+MAX_TIMEOUT_MS=120000
+DEFAULT_MAX_OUTPUT_BYTES=65536
+MAX_OUTPUT_BYTES=1048576
 
 is_mounted() {
   grep -q " $1 " /proc/mounts
@@ -246,12 +253,26 @@ shell_quote() {
   printf "'%s'" "$(printf "%s" "$1" | sed "s/'/'\\\\''/g")"
 }
 
+bounded_positive_int() {
+  value="$1"
+  default_value="$2"
+  max_value="$3"
+  case "$value" in
+    ''|*[!0-9]*) value="$default_value" ;;
+  esac
+  [ "$value" -gt 0 ] || value="$default_value"
+  if [ "$value" -gt "$max_value" ]; then
+    value="$max_value"
+  fi
+  printf '%s' "$value"
+}
+
 run_job() {
   job="$1"
   rm -f "$job/ready"
   cwd="$(cat "$job/cwd")"
-  timeout_ms="$(cat "$job/timeout-ms")"
-  max_output_bytes="$(cat "$job/max-output-bytes")"
+  timeout_ms="$(bounded_positive_int "$(cat "$job/timeout-ms")" "$DEFAULT_TIMEOUT_MS" "$MAX_TIMEOUT_MS")"
+  max_output_bytes="$(bounded_positive_int "$(cat "$job/max-output-bytes")" "$DEFAULT_MAX_OUTPUT_BYTES" "$MAX_OUTPUT_BYTES")"
 
   case "$cwd" in
     /workspace|/workspace/*) ;;
@@ -266,10 +287,12 @@ run_job() {
   timeout_seconds=$(( (timeout_ms + 999) / 1000 ))
   [ "$timeout_seconds" -gt 0 ] || timeout_seconds=1
 
-  command_line="if [ -f $(shell_quote "$job/env.sh") ]; then . $(shell_quote "$job/env.sh"); fi; cd $(shell_quote "$cwd") && timeout $(shell_quote "$timeout_seconds") /bin/sh $(shell_quote "$job/command.sh")"
+  mkdir -p "$GUEST_SCRATCH/tmp"
+  chown -R "$GUEST_USER:$GUEST_USER" "$GUEST_SCRATCH"
+  command_line="export HOME=$(shell_quote "$GUEST_HOME") TMPDIR=$(shell_quote "$GUEST_SCRATCH/tmp"); if [ -f $(shell_quote "$job/env.sh") ]; then . $(shell_quote "$job/env.sh"); fi; cd $(shell_quote "$cwd") && timeout $(shell_quote "$timeout_seconds") /bin/sh $(shell_quote "$job/command.sh")"
   tmp_stdout="$job/stdout.tmp"
   tmp_stderr="$job/stderr.tmp"
-  if su agentplatform -s /bin/sh -c "$command_line" > "$tmp_stdout" 2> "$tmp_stderr"; then
+  if su "$GUEST_USER" -s /bin/sh -c "$command_line" > "$tmp_stdout" 2> "$tmp_stderr"; then
     exit_code=0
   else
     exit_code=$?

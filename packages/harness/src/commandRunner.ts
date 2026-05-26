@@ -93,6 +93,21 @@ export type CommandRunnerHealth = {
 
 type ExecFileLike = typeof execFile;
 
+export const MACOS_VM_PRODUCTION_POLICY = {
+  cpuCount: 2,
+  memoryMB: 2048,
+  commandTimeoutDefaultMs: 30_000,
+  commandTimeoutMaxMs: 120_000,
+  outputDefaultBytes: 65_536,
+  outputMaxBytes: 1_048_576,
+  guestUser: 'agentplatform',
+  guestUid: 1000,
+  guestGid: 1000,
+  workspaceMount: '/workspace',
+  networkPolicy: 'disabled',
+  filesystemPolicy: 'project_rw_workspace_guest_owned_scratch',
+} as const;
+
 export type DockerSandboxCommandRunnerOptions = {
   execFile?: ExecFileLike;
   dockerBinary?: string;
@@ -248,6 +263,11 @@ function commandRunnerEnvironment(env: CommandEnvironmentPolicy): Record<string,
     ...env.variables,
     TERM: env.variables.TERM ?? 'dumb',
   };
+}
+
+function boundedPositiveInteger(value: number, defaultValue: number, maxValue: number): number {
+  if (!Number.isFinite(value) || value <= 0) return defaultValue;
+  return Math.min(Math.trunc(value), maxValue);
 }
 
 function replaceAll(value: string, search: string, replacement: string): string {
@@ -467,6 +487,16 @@ export function createMacosVmCommandRunner({
       const envDir = await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-env-'));
       const envFile = join(envDir, 'env.json');
       await writeFile(envFile, JSON.stringify(commandRunnerEnvironment(request.env)), 'utf8');
+      const timeoutMs = boundedPositiveInteger(
+        request.timeoutMs,
+        MACOS_VM_PRODUCTION_POLICY.commandTimeoutDefaultMs,
+        MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs,
+      );
+      const maxOutputBytes = boundedPositiveInteger(
+        request.maxOutputBytes,
+        MACOS_VM_PRODUCTION_POLICY.outputDefaultBytes,
+        MACOS_VM_PRODUCTION_POLICY.outputMaxBytes,
+      );
 
       return new Promise<CommandRunnerResult>((resolve) => {
         const startedAt = Date.now();
@@ -479,9 +509,9 @@ export function createMacosVmCommandRunner({
           '--cwd',
           paths.hostCwd,
           '--timeout-ms',
-          String(request.timeoutMs),
+          String(timeoutMs),
           '--max-output-bytes',
-          String(request.maxOutputBytes),
+          String(maxOutputBytes),
           '--env-file',
           envFile,
           '--',
@@ -492,8 +522,8 @@ export function createMacosVmCommandRunner({
           args,
           {
             cwd: paths.hostWorkspaceRoot,
-            timeout: request.timeoutMs,
-            maxBuffer: request.maxOutputBytes * 2,
+            timeout: timeoutMs,
+            maxBuffer: maxOutputBytes * 2,
             env: commandRunnerEnvironment(request.env),
           },
           (error, stdout, stderr) => {
@@ -522,8 +552,8 @@ export function createMacosVmCommandRunner({
             const exitCode = response.exitCode ?? 0;
             resolve({
               status: exitCode === 0 ? 'success' : 'failed',
-              stdout: truncate(response.stdout ?? '', request.maxOutputBytes),
-              stderr: truncate(response.stderr ?? '', request.maxOutputBytes),
+              stdout: truncate(response.stdout ?? '', maxOutputBytes),
+              stderr: truncate(response.stderr ?? '', maxOutputBytes),
               exitCode,
               durationMs: response.durationMs ?? Date.now() - startedAt,
             });
@@ -641,12 +671,29 @@ function processIsAlive(pidPath: string): boolean {
   }
 }
 
+function macosVmPolicyDetails(): Record<string, string | number | boolean> {
+  return {
+    cpuCount: MACOS_VM_PRODUCTION_POLICY.cpuCount,
+    memoryMB: MACOS_VM_PRODUCTION_POLICY.memoryMB,
+    commandTimeoutDefaultMs: MACOS_VM_PRODUCTION_POLICY.commandTimeoutDefaultMs,
+    commandTimeoutMaxMs: MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs,
+    outputDefaultBytes: MACOS_VM_PRODUCTION_POLICY.outputDefaultBytes,
+    outputMaxBytes: MACOS_VM_PRODUCTION_POLICY.outputMaxBytes,
+    guestUser: MACOS_VM_PRODUCTION_POLICY.guestUser,
+    guestUid: MACOS_VM_PRODUCTION_POLICY.guestUid,
+    guestGid: MACOS_VM_PRODUCTION_POLICY.guestGid,
+    workspaceMount: MACOS_VM_PRODUCTION_POLICY.workspaceMount,
+    networkPolicy: MACOS_VM_PRODUCTION_POLICY.networkPolicy,
+    filesystemPolicy: MACOS_VM_PRODUCTION_POLICY.filesystemPolicy,
+  };
+}
+
 function macosVmRuntimeHealth(
   mode: CommandRunnerMode,
   helperPath: string | undefined,
   runtimeDir: string | undefined,
 ): CommandRunnerHealth {
-  const details: Record<string, string | number | boolean> = {};
+  const details: Record<string, string | number | boolean> = macosVmPolicyDetails();
   if (helperPath) details['helperPath'] = helperPath;
   if (runtimeDir) details['runtimeDir'] = runtimeDir;
 
@@ -658,6 +705,7 @@ function macosVmRuntimeHealth(
       canExecute: false,
       reason: 'macos_vm_runner_helper_missing',
       message: 'macOS VM command execution is selected but the VM helper path is not configured.',
+      details,
     };
   }
 
@@ -822,7 +870,11 @@ export function getConfiguredCommandRunnerHealth(
         canExecute: true,
         reason: 'production_runner_ready',
         message: 'macOS VM command execution is configured.',
-        ...(helperPath && runtimeDir ? { details: { helperPath, runtimeDir } } : {}),
+        details: {
+          ...macosVmPolicyDetails(),
+          ...(helperPath ? { helperPath } : {}),
+          ...(runtimeDir ? { runtimeDir } : {}),
+        },
       };
     }
 

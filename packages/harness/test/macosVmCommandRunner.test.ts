@@ -6,7 +6,11 @@ import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createConfiguredCommandRunner, createMacosVmCommandRunner } from '../src/index.js';
+import {
+  MACOS_VM_PRODUCTION_POLICY,
+  createConfiguredCommandRunner,
+  createMacosVmCommandRunner,
+} from '../src/index.js';
 import type { CommandRunnerRequest } from '../src/index.js';
 
 function request(workspaceRoot: string, overrides: Partial<CommandRunnerRequest> = {}) {
@@ -179,6 +183,49 @@ describe('macOS VM command runner adapter', () => {
       AGENT_TEST: 'hello',
       TERM: 'xterm',
     });
+
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('clamps timeout and output requests to the production VM policy', async () => {
+    const workspaceRoot = await realpath(
+      await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-runner-')),
+    );
+    const execFile = vi.fn((_binary, args, options, callback) => {
+      callback(
+        null,
+        '{"exitCode":0,"message":"Command completed.","mode":"macos-vm","ok":true,"state":"ready","stdout":"ok","stderr":"","durationMs":12}\n',
+        '',
+      );
+      return fakeChildProcess();
+    });
+    const runner = createMacosVmCommandRunner({
+      helperPath: '/app/macos-vm-runner',
+      runtimeDir: '/app/vm',
+      execFile,
+    });
+
+    await runner.run(
+      request(workspaceRoot, {
+        timeoutMs: Number.MAX_SAFE_INTEGER,
+        maxOutputBytes: Number.MAX_SAFE_INTEGER,
+      }),
+    );
+
+    expect(execFile).toHaveBeenCalledWith(
+      '/app/macos-vm-runner',
+      expect.arrayContaining([
+        '--timeout-ms',
+        String(MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs),
+        '--max-output-bytes',
+        String(MACOS_VM_PRODUCTION_POLICY.outputMaxBytes),
+      ]),
+      expect.objectContaining({
+        timeout: MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs,
+        maxBuffer: MACOS_VM_PRODUCTION_POLICY.outputMaxBytes * 2,
+      }),
+      expect.any(Function),
+    );
 
     await rm(workspaceRoot, { recursive: true, force: true });
   });
