@@ -14,6 +14,7 @@
     "native:vm:build": "swift build --package-path native/macos-vm-runner",
     "native:vm:package": "node scripts/package-macos-vm-runtime.mjs",
     "native:vm:sign-dev": "node scripts/sign-macos-vm-runner.mjs",
+    "native:vm:verify-signing": "node scripts/verify-macos-vm-signing.mjs",
     "native:vm:test": "swift test --package-path native/macos-vm-runner",
     "smoke": "pnpm run build && electron . --smoke",
     "smoke:backend": "pnpm run build:backend && pnpm run build && SECRETS_MASTER_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= AGENT_PLATFORM_DESKTOP_BACKEND=managed electron . --smoke",

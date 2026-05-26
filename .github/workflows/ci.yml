@@ -312,6 +312,12 @@ jobs:
             "$RUNNER_TEMP/agent-platform-vm-evidence/asset-manifest.json"
           rm -rf "$RUNNER_TEMP/macos-vm-assets" "$RUNNER_TEMP/macos-vm-assets.tgz"
 
+      - name: Verify packaged macOS VM helper signing
+        run: |
+          pnpm --filter @agent-platform/desktop native:vm:verify-signing -- \
+            --runtime-dir "$RUNNER_TEMP/agent-platform-resources/macos-vm" \
+            --json > "$RUNNER_TEMP/agent-platform-vm-evidence/helper-signing-report.json"
+
       - name: Staging packaged macOS VM Electron E2E
         env:
           AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR: ${{ runner.temp }}/agent-platform-resources

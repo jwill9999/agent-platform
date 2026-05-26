@@ -11,6 +11,7 @@ const helperPath = join(
   'native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner',
 );
 const entitlementsPath = join(desktopDir, 'native/macos-vm-runner/Entitlements.plist');
+const CODESIGN_BINARY = '/usr/bin/codesign';
 
 if (!existsSync(helperPath)) {
   console.error(`macos-vm-runner helper binary was not found: ${helperPath}`);
@@ -18,7 +19,7 @@ if (!existsSync(helperPath)) {
 }
 
 execFileSync(
-  'codesign',
+  CODESIGN_BINARY,
   ['--force', '--sign', '-', '--entitlements', entitlementsPath, helperPath],
   { stdio: 'inherit' },
 );

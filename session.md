@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-26
-- **Session:** Continued release hardening with `.6.2` VM repair flow.
+- **Session:** Continued release hardening with `.6.3` VM signing verification.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `b338110` hardens macOS VM production policy; `.6.2` repair flow is local and
+- **Latest commit:** `acc1722` adds the `.6.2` VM repair flow; `.6.3` signing verification is
   pending commit.
 
 ## Current State
@@ -32,6 +32,8 @@
   implemented locally, but live VM smoke evidence is still required before closing.
 - `.6.2` is in progress: safe VM runtime repair is implemented locally and covered by desktop unit
   tests; signed/packaged smoke evidence can be added later with the self-hosted runner.
+- `.6.3` is in progress: packaged helper signing/quarantine/entitlement verification is implemented
+  locally; signed/notarized artifact smoke evidence is still required before closing.
 
 ## Recent Work
 
@@ -79,6 +81,12 @@
   - deletes only VM `state` and `images` by default, preserves diagnostics logs, and recopies
     packaged pinned assets,
   - added desktop tests for stopped/running/corrupt runtime repair and unsafe path refusal.
+- Started `.6.3` signing/notarization validation:
+  - added `native:vm:verify-signing` for packaged helper verification,
+  - verifier fails closed for missing/non-executable/quarantined/unsigned helpers and missing
+    `com.apple.security.virtualization`,
+  - staging packaged VM workflow now stores `helper-signing-report.json` before running the VM E2E,
+  - full signed/notarized artifact smoke remains pending the VM-capable Apple Silicon runner.
 
 ## Checks Run
 
@@ -123,17 +131,20 @@
 - `pnpm --filter @agent-platform/desktop lint`
 - `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts test/preloadContract.test.ts test/localDataReset.test.ts`
 - `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/macosVmSigning.test.ts test/macosVmPackaging.test.ts`
+- `pnpm --filter @agent-platform/desktop lint`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Commit and push the `.6.2` VM repair flow after final local status review.
+1. Commit and push the `.6.3` helper signing verification after final local status review.
 2. Register or attach a real Apple Silicon self-hosted GitHub runner with labels `self-hosted`,
    `macOS`, `ARM64`, and `agent-platform-vm`.
 3. Confirm the repository variables still contain only the raw checksum and release asset URL:
    `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256` and
    `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL`.
-4. Rerun the PR into `staging`, then keep `.5.4` and `.6.1` open until artifacts prove real
-   packaged `macos-vm` command execution plus non-root/no-network/filesystem policy behavior.
+4. Rerun the PR into `staging`, then keep `.5.4`, `.6.1`, `.6.2`, and `.6.3` open until artifacts
+   prove real packaged `macos-vm` command execution, policy behavior, repair, and signed/notarized
+   helper execution.
