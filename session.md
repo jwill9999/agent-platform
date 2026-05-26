@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-26
-- **Session:** Continued release hardening with `.6.4` adapter documentation and epic audit.
+- **Session:** Added VM self-hosted runner preflight checks.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `850325e` adds `.6.3` VM signing verification; `.6.4` adapter docs/audit are
+- **Latest commit:** `dcd2e3f` adds `.6.4` platform adapter documentation; VM host preflight is
   pending commit.
 
 ## Current State
@@ -94,6 +94,11 @@
   - documented Windows and Linux as future `CommandRunner` adapters, not host-shell fallbacks,
   - added `.6.4` Beads/traceability audit showing exactly which VM evidence tasks still block epic
     closure.
+- Added self-hosted runner preflight support for `.5.4`:
+  - added `native:vm:host-check`,
+  - checks macOS, `arm64`, minimum macOS major, Virtualization.framework, hypervisor support,
+    `xcode-select`, Swift, and `codesign`,
+  - staging workflow now runs the preflight after install before downloading/publishing VM assets.
 
 ## Checks Run
 
@@ -143,13 +148,16 @@
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm format:check`
 - `pnpm docs:lint`
+- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/macosVmHostCheck.test.ts`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop typecheck`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Commit and push the `.6.4` adapter docs/audit after docs checks pass.
+1. Commit and push the VM host preflight support after final checks pass.
 2. Register or attach a real Apple Silicon self-hosted GitHub runner with labels `self-hosted`,
    `macOS`, `ARM64`, and `agent-platform-vm`.
 3. Confirm the repository variables still contain only the raw checksum and release asset URL:

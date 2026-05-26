@@ -31,6 +31,9 @@ describe('desktop package scripts', () => {
     expect(packageJson.scripts['native:vm:build']).toBe(
       'swift build --package-path native/macos-vm-runner',
     );
+    expect(packageJson.scripts['native:vm:host-check']).toBe(
+      'node scripts/check-macos-vm-runner-host.mjs',
+    );
     expect(packageJson.scripts['native:vm:package']).toBe(
       'node scripts/package-macos-vm-runtime.mjs',
     );
