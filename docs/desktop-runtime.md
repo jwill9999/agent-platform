@@ -50,6 +50,10 @@ Electron solves native folder access and local app lifecycle. It does not by its
 execution. Any future command/test execution against user Projects must still run behind a sandbox
 boundary such as Docker, a VM, a macOS sandbox profile, or another approved runner.
 
+Future Windows and Linux production runners must extend the same harness `CommandRunner` contract
+without reclassifying host execution as a production sandbox. The adapter boundaries and required
+evidence are documented in [Command Runner Platform Adapters](design/command-runner-platform-adapters.md).
+
 ## Docker development workflow
 
 Use Docker when developing the API, web UI, harness, contracts, database, and normal browser E2E

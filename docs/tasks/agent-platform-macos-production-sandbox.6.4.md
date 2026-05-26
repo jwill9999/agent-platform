@@ -22,6 +22,51 @@ then close the macOS epic with complete evidence.
   task.
 - Close `.6` and the parent epic only when all child tasks are closed.
 
+## Current Implementation Notes
+
+- Added [Command Runner Platform Adapters](../design/command-runner-platform-adapters.md).
+- Linked the platform adapter boundary from [Desktop Runtime](../desktop-runtime.md).
+- Windows is documented as a future adapter behind the existing `CommandRunner` contract, with WSL2,
+  Hyper-V, or Windows Sandbox as candidate boundaries and host shell fallback explicitly forbidden.
+- Linux is documented as a future adapter behind the existing `CommandRunner` contract, with user
+  namespaces/Bubblewrap or a lightweight VM as candidate boundaries and host shell fallback
+  explicitly forbidden.
+- The final epic closure audit is prepared below but cannot pass until the remaining evidence tasks
+  are closed.
+
+## Current Beads Audit
+
+The following VM work remains open and prevents `.6.4`, `.6`, and the parent epic from closing:
+
+| Task   | Status      | Remaining sign-off                                                                                                               |
+| ------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `.5`   | blocked     | Parent packaging/staging task remains blocked until `.5.4` has passing staging evidence.                                         |
+| `.5.4` | blocked     | Requires a VM-capable Apple Silicon self-hosted runner to publish passing packaged macOS VM E2E evidence.                        |
+| `.6.1` | in progress | Code-side policy is implemented; live VM evidence must prove non-root, no-network, timeout/output, and filesystem behavior.      |
+| `.6.2` | in progress | Code-side safe repair is implemented; signed/packaged live smoke evidence must prove repair works in the release-shaped runtime. |
+| `.6.3` | in progress | Code-side signing verifier is implemented; signed/notarized artifact smoke must prove helper execution and `macos-vm` health.    |
+| `.6.4` | in progress | Platform adapter docs are implemented; final traceability closure is blocked by the rows above.                                  |
+
+## Final Traceability Audit Draft
+
+| Epic requirement                          | Owning task(s)           | Current evidence state                                                                                |
+| ----------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Fail-closed production defaults           | `.1`                     | Complete in closed task evidence.                                                                     |
+| Shared runner health/status contract      | `.2`, `.5.2`             | Complete in closed task evidence.                                                                     |
+| Production runner architecture decision   | `.3`                     | Complete in ADR/task evidence.                                                                        |
+| Native helper command surface             | `.3`, `.4.2`, `.4.3`     | Complete in closed task evidence.                                                                     |
+| Bootable image source/build path          | `.4.2.1`                 | Complete with raw ARM64 `Image`/manifest evidence in closed task evidence.                            |
+| Real VM boot and lifecycle                | `.4.2.2`, `.4.2.3`       | Complete in local evidence; staging/release evidence is still represented by `.5.4` and `.6.3`.       |
+| Guest bootstrap and command service model | `.4.2.1`, `.4.3`         | Complete in closed task evidence.                                                                     |
+| Command contract and workspace isolation  | `.4.3`, `.4.4`           | Complete in local evidence; staging/release evidence remains blocked by `.5.4`.                       |
+| Staging asset availability                | `.4.2.1`, `.5.1`, `.5.4` | Asset packaging is complete; final staging evidence remains blocked by `.5.4`.                        |
+| Production packaging boundary             | `.5.1`, `.5.2`           | Complete in closed task evidence.                                                                     |
+| User-visible packaged E2E behavior        | `.5.3`, `.5.4`           | Local packaged E2E exists; final staging evidence remains blocked by `.5.4`.                          |
+| Production resource and policy hardening  | `.6.1`                   | Code-side implementation exists; live VM policy evidence remains open.                                |
+| Safe reset and repair                     | `.6.2`                   | Code-side implementation exists; signed/packaged live repair smoke remains open.                      |
+| Signing, notarization, and entitlements   | `.6.3`                   | Code-side verifier exists; signed/notarized artifact smoke remains open.                              |
+| Future platform adapter boundaries        | `.6.4`                   | Documented in `docs/design/command-runner-platform-adapters.md`; docs lint passed for this increment. |
+
 ## Tests And Verification
 
 - `pnpm docs:lint`
@@ -31,9 +76,18 @@ then close the macOS epic with complete evidence.
   corresponding implementation/test artifact or a deliberately created follow-up outside the macOS
   production release scope.
 
+Current local verification:
+
+- `pnpm docs:lint`
+- `pnpm format:check`
+- `git diff --check`
+
 ## Definition Of Done
 
 - Future platform work has explicit adapter boundaries and does not weaken macOS production safety.
 - The epic has no unresolved implementation, packaging, staging, E2E, or release-hardening tasks.
 - The final sign-off explains exactly what has been proven locally, in staging, and in the
   signed/notarized release artifact.
+
+Current status: the first Definition of Done item is implemented. The remaining items are blocked
+until `.5`, `.5.4`, `.6.1`, `.6.2`, and `.6.3` are closed with their required evidence.

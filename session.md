@@ -13,9 +13,9 @@
 ## Last Updated
 
 - **Date:** 2026-05-26
-- **Session:** Continued release hardening with `.6.3` VM signing verification.
+- **Session:** Continued release hardening with `.6.4` adapter documentation and epic audit.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `acc1722` adds the `.6.2` VM repair flow; `.6.3` signing verification is
+- **Latest commit:** `850325e` adds `.6.3` VM signing verification; `.6.4` adapter docs/audit are
   pending commit.
 
 ## Current State
@@ -34,6 +34,8 @@
   tests; signed/packaged smoke evidence can be added later with the self-hosted runner.
 - `.6.3` is in progress: packaged helper signing/quarantine/entitlement verification is implemented
   locally; signed/notarized artifact smoke evidence is still required before closing.
+- `.6.4` is in progress: Windows/Linux adapter boundaries and the epic closure audit are drafted;
+  final closure remains blocked by `.5`, `.5.4`, `.6.1`, `.6.2`, and `.6.3`.
 
 ## Recent Work
 
@@ -87,6 +89,11 @@
     `com.apple.security.virtualization`,
   - staging packaged VM workflow now stores `helper-signing-report.json` before running the VM E2E,
   - full signed/notarized artifact smoke remains pending the VM-capable Apple Silicon runner.
+- Started `.6.4` final documentation/audit:
+  - added `docs/design/command-runner-platform-adapters.md`,
+  - documented Windows and Linux as future `CommandRunner` adapters, not host-shell fallbacks,
+  - added `.6.4` Beads/traceability audit showing exactly which VM evidence tasks still block epic
+    closure.
 
 ## Checks Run
 
@@ -133,18 +140,21 @@
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/macosVmSigning.test.ts test/macosVmPackaging.test.ts`
 - `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm format:check`
+- `pnpm docs:lint`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Commit and push the `.6.3` helper signing verification after final local status review.
+1. Commit and push the `.6.4` adapter docs/audit after docs checks pass.
 2. Register or attach a real Apple Silicon self-hosted GitHub runner with labels `self-hosted`,
    `macOS`, `ARM64`, and `agent-platform-vm`.
 3. Confirm the repository variables still contain only the raw checksum and release asset URL:
    `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256` and
    `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL`.
-4. Rerun the PR into `staging`, then keep `.5.4`, `.6.1`, `.6.2`, and `.6.3` open until artifacts
-   prove real packaged `macos-vm` command execution, policy behavior, repair, and signed/notarized
-   helper execution.
+4. Rerun the PR into `staging`, then keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
+   the epic open until artifacts prove real packaged `macos-vm` command execution, policy behavior,
+   repair, signed/notarized helper execution, and final traceability closure.
