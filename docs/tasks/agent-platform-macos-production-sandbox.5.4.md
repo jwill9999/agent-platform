@@ -32,8 +32,11 @@ Make staging require the packaged macOS VM E2E evidence before changes can be pr
 
 ## Current Implementation Notes
 
-- GitHub's current hosted runner reference lists `macos-15` as an arm64 macOS hosted runner label,
-  so the staging job uses `runs-on: macos-15`.
+- The staging job uses a self-hosted Apple Silicon macOS runner with labels `self-hosted`,
+  `macOS`, `ARM64`, and `agent-platform-vm`.
+- GitHub-hosted `macos-15-arm64` is not acceptable for this gate. On 2026-05-26 it downloaded
+  and verified the pinned VM asset archive, then failed real VM startup with `VZErrorDomain` code
+  `2`: `Virtualization is not available on this hardware`.
 - The workflow intentionally fails if either required asset variable is missing. Staging must not
   silently fall back to host, Docker, or a synthetic VM asset.
 - The `.5.3` packaged E2E keeps the synthetic failed VM fixture for fail-closed UI coverage, but
@@ -44,7 +47,8 @@ Make staging require the packaged macOS VM E2E evidence before changes can be pr
 
 - GitHub Actions staging packaged macOS E2E job.
 - Full repository quality gate.
-- Manual review of workflow logs proving `macos-vm` was selected.
+- Manual review of workflow logs proving a self-hosted VM-capable Apple Silicon runner was used and
+  `macos-vm` was selected.
 - Workflow log/artifact proving the expected image manifest/checksum was used.
 - `pnpm docs:lint`
 

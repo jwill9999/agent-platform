@@ -242,7 +242,7 @@ jobs:
 
   staging-packaged-macos-vm-e2e:
     if: github.event_name == 'pull_request' && github.base_ref == 'staging'
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS, ARM64, agent-platform-vm]
     timeout-minutes: 60
     env:
       AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL: ${{ vars.AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL }}
@@ -251,10 +251,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Verify Apple Silicon runner
+      - name: Verify VM-capable Apple Silicon runner
         run: |
           test "$(uname -m)" = "arm64"
           sw_vers
+          echo "This staging gate requires a self-hosted Apple Silicon runner with Virtualization.framework available."
 
       - name: Setup pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4

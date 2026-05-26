@@ -12,10 +12,11 @@
 
 ## Last Updated
 
-- **Date:** 2026-05-25
-- **Session:** Fixed current PR #227 verify/Sonar failures after `.5.4` staging gate wiring.
+- **Date:** 2026-05-26
+- **Session:** Updated `.5.4` staging gate after GitHub-hosted macOS proved non-VM-capable.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `2e63c02` wires `.5.4` staging gate; current verify/Sonar fixes are local and pending commit.
+- **Latest commit:** `f122e29` fixes PR #227 verify/Sonar followups; current self-hosted runner
+  change is local and pending commit.
 
 ## Current State
 
@@ -24,8 +25,9 @@
 - Docker and host command runners remain development-only paths; production/staging must prove `macos-vm` or stay fail-closed.
 - `.4.2`, `.4.2.1`, `.4.2.2`, `.4.2.3`, `.4.3`, `.4.4`, `.4`, `.5.1`, and `.5.2` are complete.
 - `.5.3` is complete and pushed.
-- `.5.4` is in progress: staging workflow wiring is implemented locally, but the task must remain
-  open until a staging PR run proves the packaged macOS VM E2E with real pinned assets.
+- `.5.4` is in progress: staging workflow wiring now requires a self-hosted VM-capable Apple
+  Silicon runner, and the task must remain open until a staging PR run proves the packaged macOS VM
+  E2E with real pinned assets.
 
 ## Recent Work
 
@@ -86,6 +88,12 @@
     the command-runner status color ternary into a named helper,
   - `staging-packaged-macos-vm-e2e` failed because the required pinned asset URL/SHA repository
     variables were empty, not because of test code.
+- After the asset variables were configured, `staging-packaged-macos-vm-e2e` downloaded and verified
+  the pinned archive, then failed real VM startup on GitHub-hosted `macos-15-arm64` with
+  `VZErrorDomain` code `2`: `Virtualization is not available on this hardware`.
+- Updated `.5.4` CI wiring to require a self-hosted Apple Silicon runner labelled `self-hosted`,
+  `macOS`, `ARM64`, and `agent-platform-vm`; hosted macOS is no longer treated as a valid staging
+  runner for the production VM gate.
 
 ## Checks Run
 
@@ -129,7 +137,10 @@
 
 ## Next
 
-1. Commit and push the verify/Sonar fix commit, then monitor PR #227 rerun.
-2. Configure the staging repository variables for the pinned prepared VM asset archive URL/SHA.
+1. Register or attach a real Apple Silicon self-hosted GitHub runner with labels `self-hosted`,
+   `macOS`, `ARM64`, and `agent-platform-vm`.
+2. Confirm the repository variables still contain only the raw checksum and release asset URL:
+   `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256` and
+   `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL`.
 3. Rerun the PR into `staging`, then keep `.5.4` open until the
    `staging-packaged-macos-vm-e2e` artifact proves real packaged `macos-vm` command execution.
