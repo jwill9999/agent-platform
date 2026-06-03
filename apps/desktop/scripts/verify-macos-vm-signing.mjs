@@ -31,8 +31,7 @@ function usage(exitCode = 1) {
 }
 
 export function parseArgs(argv) {
-  const scriptArgs = [...argv];
-  if (scriptArgs[0] === '--') scriptArgs.shift();
+  const scriptArgs = stripForwardedSeparator(argv);
   const options = {
     runtimeDir: defaultRuntimeDir,
     requireHardenedRuntime: false,
@@ -49,21 +48,7 @@ export function parseArgs(argv) {
       case '--runtime-dir':
       case '--helper':
       case '--app': {
-        const value = scriptArgs[index + 1];
-        if (!value) usage();
-        if (arg === '--runtime-dir') {
-          options.runtimeDir = resolve(value);
-          delete options.helper;
-          delete options.app;
-        }
-        if (arg === '--helper') {
-          options.helper = resolve(value);
-          delete options.app;
-        }
-        if (arg === '--app') {
-          options.app = resolve(value);
-          delete options.helper;
-        }
+        applyPathOption(options, arg, readOptionValue(scriptArgs, index));
         index += 1;
         break;
       }
@@ -80,6 +65,34 @@ export function parseArgs(argv) {
   }
 
   return options;
+}
+
+function stripForwardedSeparator(argv) {
+  const scriptArgs = [...argv];
+  if (scriptArgs[0] === '--') scriptArgs.shift();
+  return scriptArgs;
+}
+
+function readOptionValue(args, index) {
+  const value = args[index + 1];
+  if (!value) usage();
+  return value;
+}
+
+function applyPathOption(options, arg, value) {
+  if (arg === '--runtime-dir') {
+    options.runtimeDir = resolve(value);
+    delete options.helper;
+    delete options.app;
+    return;
+  }
+  if (arg === '--helper') {
+    options.helper = resolve(value);
+    delete options.app;
+    return;
+  }
+  options.app = resolve(value);
+  delete options.helper;
 }
 
 export function resolveHelperPath(options) {

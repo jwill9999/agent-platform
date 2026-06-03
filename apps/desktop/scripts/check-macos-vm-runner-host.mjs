@@ -60,70 +60,65 @@ export function parseMacosMajor(version) {
 }
 
 function checkHost() {
-  const checks = [];
   const platform = process.platform;
-  checks.push({
-    name: 'platform',
-    ok: platform === 'darwin',
-    actual: platform,
-    expected: 'darwin',
-  });
-
   const arch = runText(UNAME_BINARY, ['-m']) ?? process.arch;
-  checks.push({
-    name: 'architecture',
-    ok: arch === 'arm64',
-    actual: arch,
-    expected: 'arm64',
-  });
-
   const macosVersion = runText(SW_VERS_BINARY, ['-productVersion']);
   const macosMajor = macosVersion ? parseMacosMajor(macosVersion) : undefined;
-  checks.push({
-    name: 'macos_version',
-    ok: typeof macosMajor === 'number' && macosMajor >= MIN_MACOS_MAJOR,
-    actual: macosVersion ?? 'unknown',
-    expected: `macOS ${MIN_MACOS_MAJOR}.0 or newer`,
-  });
-
-  checks.push({
-    name: 'virtualization_framework',
-    ok: existsSync(VIRTUALIZATION_FRAMEWORK),
-    actual: existsSync(VIRTUALIZATION_FRAMEWORK) ? VIRTUALIZATION_FRAMEWORK : 'missing',
-    expected: VIRTUALIZATION_FRAMEWORK,
-  });
-
+  const virtualizationFrameworkPresent = existsSync(VIRTUALIZATION_FRAMEWORK);
   const hypervisorSupport = runText(SYSCTL_BINARY, ['-n', 'kern.hv_support']);
-  checks.push({
-    name: 'hypervisor_support',
-    ok: hypervisorSupport === '1' || hypervisorSupport === undefined,
-    actual: hypervisorSupport ?? 'unknown',
-    expected: '1, or unavailable when sysctl is blocked by the current shell sandbox',
-  });
-
   const developerDir = runText(XCODE_SELECT_BINARY, ['-p']);
-  checks.push({
-    name: 'xcode_select',
-    ok: typeof developerDir === 'string' && developerDir.length > 0,
-    actual: developerDir ?? 'missing',
-    expected: 'configured developer directory',
-  });
-
   const swiftPath = runText(XCRUN_BINARY, ['--find', 'swift']);
-  checks.push({
-    name: 'swift_toolchain',
-    ok: typeof swiftPath === 'string' && swiftPath.length > 0,
-    actual: swiftPath ?? 'missing',
-    expected: 'xcrun --find swift',
-  });
-
   const codesignPath = runText(XCRUN_BINARY, ['--find', 'codesign']);
-  checks.push({
-    name: 'codesign_tool',
-    ok: typeof codesignPath === 'string' && codesignPath.length > 0,
-    actual: codesignPath ?? 'missing',
-    expected: 'xcrun --find codesign',
-  });
+  const checks = [
+    {
+      name: 'platform',
+      ok: platform === 'darwin',
+      actual: platform,
+      expected: 'darwin',
+    },
+    {
+      name: 'architecture',
+      ok: arch === 'arm64',
+      actual: arch,
+      expected: 'arm64',
+    },
+    {
+      name: 'macos_version',
+      ok: typeof macosMajor === 'number' && macosMajor >= MIN_MACOS_MAJOR,
+      actual: macosVersion ?? 'unknown',
+      expected: `macOS ${MIN_MACOS_MAJOR}.0 or newer`,
+    },
+    {
+      name: 'virtualization_framework',
+      ok: virtualizationFrameworkPresent,
+      actual: virtualizationFrameworkPresent ? VIRTUALIZATION_FRAMEWORK : 'missing',
+      expected: VIRTUALIZATION_FRAMEWORK,
+    },
+    {
+      name: 'hypervisor_support',
+      ok: hypervisorSupport === '1' || hypervisorSupport === undefined,
+      actual: hypervisorSupport ?? 'unknown',
+      expected: '1, or unavailable when sysctl is blocked by the current shell sandbox',
+    },
+    {
+      name: 'xcode_select',
+      ok: typeof developerDir === 'string' && developerDir.length > 0,
+      actual: developerDir ?? 'missing',
+      expected: 'configured developer directory',
+    },
+    {
+      name: 'swift_toolchain',
+      ok: typeof swiftPath === 'string' && swiftPath.length > 0,
+      actual: swiftPath ?? 'missing',
+      expected: 'xcrun --find swift',
+    },
+    {
+      name: 'codesign_tool',
+      ok: typeof codesignPath === 'string' && codesignPath.length > 0,
+      actual: codesignPath ?? 'missing',
+      expected: 'xcrun --find codesign',
+    },
+  ];
 
   return {
     schemaVersion: 1,

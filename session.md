@@ -12,11 +12,10 @@
 
 ## Last Updated
 
-- **Date:** 2026-06-03
-- **Session:** Fixed staging VM asset SHA cache and signing verifier entitlement parsing.
+- **Date:** 2026-06-04
+- **Session:** Fixed SonarCloud review comments on the packaged macOS VM staging gate.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `f3df012` fixes pnpm forwarded separator parsing; SHA cache and entitlement
-  parser hardening are pending push.
+- **Latest commit:** pending commit for SonarCloud review-comment fixes.
 
 ## Current State
 
@@ -132,6 +131,12 @@
     `githubactions:S7637` for `promptfoo/code-scan-action@v0`,
   - pinned `promptfoo/code-scan-action` and `actions/checkout` in that workflow to full commit
     SHAs.
+- Fixed the next SonarCloud review comments on PR #227:
+  - reduced `verify-macos-vm-signing.mjs` parser complexity by extracting forwarded-separator,
+    option-value, and path-option helpers,
+  - replaced the packaged VM E2E hard-coded token-looking value with a non-secret host-only canary,
+  - replaced repeated `Array#push()` calls in `check-macos-vm-runner-host.mjs` with a single
+    precomputed checks array.
 
 ## Checks Run
 
@@ -210,14 +215,19 @@
 - `sonar verify --file .github/workflows/promptfoo-code-scan.yml --project jwill9999_agent-platform`
   (blocked: organization has not enabled SonarQube Agentic Analysis)
 - `git diff --check`
+- `pnpm --filter @agent-platform/desktop test -- test/macosVmSigning.test.ts test/macosVmHostCheck.test.ts`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm format:check`
+- `pnpm docs:lint`
+- `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Push the SonarQube workflow action SHA pinning fix, then rerun the SonarCloud/quality gate.
-2. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
-   evidence in `.5.4`.
+1. Commit and push the SonarCloud review-comment fixes, then rerun SonarCloud/quality gate.
+2. If the self-hosted packaged VM job stays green, record passing evidence in `.5.4`.
 3. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
    the epic open until artifacts prove real packaged `macos-vm` command execution, policy behavior,
    repair, signed/notarized helper execution, and final traceability closure.

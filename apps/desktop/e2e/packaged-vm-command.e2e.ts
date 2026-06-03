@@ -20,7 +20,8 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
-const HOST_ONLY_SECRET = 'sk-proj-packaged-vm-e2e-secret-1234567890';
+const HOST_ONLY_CANARY_ENV = 'HOST_ONLY_CANARY';
+const HOST_ONLY_CANARY_VALUE = ['host', 'only', 'packaged', 'vm', 'e2e', 'canary'].join('-');
 const VM_E2E_MARKER_COMMAND = 'env';
 
 type VmFixtureHealth = 'ready' | 'failed';
@@ -65,7 +66,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await toolActivity.getByText('Technical details').first().click();
       await expectVmWorkspaceOutput(toolActivity);
       await expect(page.getByText(fixture.projectDir)).toHaveCount(0);
-      await expect(page.getByText(HOST_ONLY_SECRET)).toHaveCount(0);
+      await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
       writeVmEvidence(fixture, 'success', realVmStatus);
     } finally {
       await app?.close();
@@ -184,7 +185,7 @@ async function launchVmFixture(
         name: 'sys_bash',
         args: { command: VM_E2E_MARKER_COMMAND },
       }),
-      HOST_ONLY_SECRET,
+      [HOST_ONLY_CANARY_ENV]: HOST_ONLY_CANARY_VALUE,
       CI: process.env.CI,
     },
   });
