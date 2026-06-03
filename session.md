@@ -15,7 +15,7 @@
 - **Date:** 2026-06-04
 - **Session:** Fixed SonarCloud review comments on the packaged macOS VM staging gate.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** pending commit for SonarCloud review-comment fixes.
+- **Latest commit:** `e5ca3a1` fixes SonarCloud review comments on PR #227.
 
 ## Current State
 
@@ -221,6 +221,8 @@
 - `pnpm format:check`
 - `pnpm docs:lint`
 - `git diff --check`
+- Pre-push hook: `pnpm --filter @agent-platform/desktop build`, `typecheck`, and full desktop
+  `test` suite.
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
