@@ -125,6 +125,13 @@
   - changed the scripted tool command to read-only `env` and made the assertion accept either the
     synthetic marker or real VM `PWD=/workspace`, avoiding unrelated Project onboarding approval
     state.
+- Fixed the SonarQube security hotspot blocking the quality gate:
+  - gate failure was `new_security_hotspots_reviewed` at `98.6`, not `new_security_rating` (which
+    was `A`),
+  - unreviewed hotspot was `.github/workflows/promptfoo-code-scan.yml:28`
+    `githubactions:S7637` for `promptfoo/code-scan-action@v0`,
+  - pinned `promptfoo/code-scan-action` and `actions/checkout` in that workflow to full commit
+    SHAs.
 
 ## Checks Run
 
@@ -198,14 +205,17 @@
   outside sandbox after moving fixture temp root to `os.tmpdir()`)
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts` (passed
   outside sandbox after aligning real VM output assertions)
+- `sonar api get '/api/qualitygates/project_status?projectKey=jwill9999_agent-platform'`
+- `sonar api get '/api/hotspots/search?projectKey=jwill9999_agent-platform&status=TO_REVIEW&ps=100'`
+- `sonar verify --file .github/workflows/promptfoo-code-scan.yml --project jwill9999_agent-platform`
+  (blocked: organization has not enabled SonarQube Agentic Analysis)
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Push the packaged VM E2E command/output assertion fix, then rerun
-   `staging-packaged-macos-vm-e2e`.
+1. Push the SonarQube workflow action SHA pinning fix, then rerun the SonarCloud/quality gate.
 2. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
    evidence in `.5.4`.
 3. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and

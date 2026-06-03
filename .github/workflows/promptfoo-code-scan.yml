@@ -20,11 +20,11 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
       - name: Run Promptfoo Code Scan
-        uses: promptfoo/code-scan-action@v0
+        uses: promptfoo/code-scan-action@dc21ed36c0624f0bb0465906913e63bae97a64e6 # v0
         with:
           min-severity: medium
