@@ -108,6 +108,12 @@
     reuse,
   - the signing verifier now accepts compact `codesign` entitlement XML using `<true />`, avoiding a
     false missing-entitlement failure when the helper is correctly signed.
+- Investigated the next self-hosted staging failure:
+  - `staging-packaged-macos-vm-e2e` now reaches Playwright but both stories fail while running the
+    desktop DB seed subprocess,
+  - local synthetic packaged VM E2E passes, so the fixture path is valid,
+  - hardened `seedDesktopDatabase` in `packaged-vm-command.e2e.ts` to create the DB parent directory
+    explicitly and include seed script path, SQLite path, exit status, stdout, and stderr on failure.
 
 ## Checks Run
 
@@ -173,15 +179,21 @@
   blocked inside sandbox)
 - `pnpm format:check`
 - `pnpm docs:lint`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts` (failed
+  inside sandbox because localhost binding is blocked)
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts` (passed
+  outside sandbox)
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Push the SHA cache and entitlement parser fix, then rerun `staging-packaged-macos-vm-e2e`.
-2. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
+1. Push the packaged VM E2E seed diagnostics, then rerun `staging-packaged-macos-vm-e2e`.
+2. If DB seeding still fails, use the new stderr/status details to fix the runner-specific seed
+   failure.
+3. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
    evidence in `.5.4`.
-3. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
+4. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
    the epic open until artifacts prove real packaged `macos-vm` command execution, policy behavior,
    repair, signed/notarized helper execution, and final traceability closure.

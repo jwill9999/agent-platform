@@ -353,15 +353,51 @@ function writeRuntimeHealth(
 }
 
 function seedDesktopDatabase(sqlitePath: string): void {
-  execFileSync(process.execPath, [join(repoRoot, 'packages/db/dist/seed/run.js')], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      SQLITE_PATH: sqlitePath,
-      E2E_SEED: '1',
-    },
-    stdio: 'inherit',
-  });
+  mkdirSync(dirname(sqlitePath), { recursive: true });
+  const seedPath = join(repoRoot, 'packages/db/dist/seed/run.js');
+  try {
+    execFileSync(process.execPath, [seedPath], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        SQLITE_PATH: sqlitePath,
+        E2E_SEED: '1',
+      },
+      stdio: 'pipe',
+    });
+  } catch (error) {
+    throw new Error(
+      [
+        `Failed to seed packaged VM E2E database: ${sqlitePath}`,
+        `Seed script: ${seedPath}`,
+        execFileErrorDetails(error),
+      ].join('\n'),
+    );
+  }
+}
+
+function execFileErrorDetails(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const details: string[] = [error.message];
+  const maybeProcessError = error as Error & {
+    readonly status?: number;
+    readonly signal?: NodeJS.Signals;
+    readonly stdout?: string | Buffer;
+    readonly stderr?: string | Buffer;
+  };
+  if (maybeProcessError.status !== undefined) details.push(`status: ${maybeProcessError.status}`);
+  if (maybeProcessError.signal) details.push(`signal: ${maybeProcessError.signal}`);
+  const stdout = outputToString(maybeProcessError.stdout).trim();
+  const stderr = outputToString(maybeProcessError.stderr).trim();
+  if (stdout) details.push(`stdout:\n${stdout}`);
+  if (stderr) details.push(`stderr:\n${stderr}`);
+  return details.join('\n');
+}
+
+function outputToString(output: string | Buffer | undefined): string {
+  if (output === undefined) return '';
+  return typeof output === 'string' ? output : output.toString('utf8');
 }
 
 function sha256(content: string): string {
