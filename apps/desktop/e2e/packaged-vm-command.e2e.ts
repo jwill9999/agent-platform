@@ -21,6 +21,7 @@ const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
 const HOST_ONLY_SECRET = 'sk-proj-packaged-vm-e2e-secret-1234567890';
+const VM_E2E_MARKER_COMMAND = 'env';
 
 type VmFixtureHealth = 'ready' | 'failed';
 
@@ -62,8 +63,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(toolActivity.getByText('Run terminal command').first()).toBeVisible();
       await expect(toolActivity.getByText('Completed').first()).toBeVisible();
       await toolActivity.getByText('Technical details').first().click();
-      await expect(toolActivity.getByText('VM_CWD:/workspace').first()).toBeVisible();
-      await expect(toolActivity.getByText('VM_SECRET_MISSING:true').first()).toBeVisible();
+      await expectVmWorkspaceOutput(toolActivity);
       await expect(page.getByText(fixture.projectDir)).toHaveCount(0);
       await expect(page.getByText(HOST_ONLY_SECRET)).toHaveCount(0);
       writeVmEvidence(fixture, 'success', realVmStatus);
@@ -182,7 +182,7 @@ async function launchVmFixture(
       AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: options.finalText ?? 'VM command complete',
       AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON: JSON.stringify({
         name: 'sys_bash',
-        args: { command: 'pwd' },
+        args: { command: VM_E2E_MARKER_COMMAND },
       }),
       HOST_ONLY_SECRET,
       CI: process.env.CI,
@@ -202,6 +202,18 @@ async function sendChatMessage(page: Page, message: string): Promise<void> {
   await input.fill(message);
   await input.press('Enter');
   await expect(page.getByText(message, { exact: true }).last()).toBeVisible();
+}
+
+async function expectVmWorkspaceOutput(toolActivity: ReturnType<Page['locator']>): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const text = await toolActivity.textContent();
+        return text?.includes('VM_CWD:/workspace') || text?.includes('PWD=/workspace') || false;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
 }
 
 async function openToolActivity(page: Page) {

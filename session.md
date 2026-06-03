@@ -119,6 +119,12 @@
     checkout on `/Volumes/external/...`,
   - moved the packaged VM E2E fixture temp root to `os.tmpdir()` via `mkdtempSync`, keeping runtime
     SQLite and VM state out of the GitHub Actions worktree/external checkout volume.
+- Fixed the next real-VM assertion failure:
+  - the real VM completed the tool call but did not emit the synthetic helper marker
+    `VM_CWD:/workspace` because the command was `pwd`,
+  - changed the scripted tool command to read-only `env` and made the assertion accept either the
+    synthetic marker or real VM `PWD=/workspace`, avoiding unrelated Project onboarding approval
+    state.
 
 ## Checks Run
 
@@ -190,13 +196,16 @@
   outside sandbox)
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts` (passed
   outside sandbox after moving fixture temp root to `os.tmpdir()`)
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts` (passed
+  outside sandbox after aligning real VM output assertions)
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Push the packaged VM E2E temp-root fix, then rerun `staging-packaged-macos-vm-e2e`.
+1. Push the packaged VM E2E command/output assertion fix, then rerun
+   `staging-packaged-macos-vm-e2e`.
 2. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
    evidence in `.5.4`.
 3. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
