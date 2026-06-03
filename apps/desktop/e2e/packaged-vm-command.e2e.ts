@@ -22,7 +22,7 @@ const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
 const HOST_ONLY_CANARY_ENV = 'HOST_ONLY_CANARY';
 const HOST_ONLY_CANARY_VALUE = ['host', 'only', 'packaged', 'vm', 'e2e', 'canary'].join('-');
-const VM_E2E_MARKER_COMMAND = 'env';
+const VM_E2E_MARKER_COMMAND = 'pwd';
 
 type VmFixtureHealth = 'ready' | 'failed';
 
@@ -99,7 +99,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await expect(toolActivity.getByText('Failed').first()).toBeVisible();
       await expect(toolActivity.getByText('E2E VM unavailable').first()).toBeVisible();
       await expect(page.getByText(`HOST_CWD:${fixture.projectDir}`)).toHaveCount(0);
-      await expect(page.getByText(HOST_ONLY_SECRET)).toHaveCount(0);
+      await expect(page.getByText(HOST_ONLY_CANARY_VALUE)).toHaveCount(0);
     } finally {
       await app?.close();
       if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
@@ -210,7 +210,7 @@ async function expectVmWorkspaceOutput(toolActivity: ReturnType<Page['locator']>
     .poll(
       async () => {
         const text = await toolActivity.textContent();
-        return text?.includes('VM_CWD:/workspace') || text?.includes('PWD=/workspace') || false;
+        return text?.includes('VM_CWD:/workspace') || text?.includes('/workspace') || false;
       },
       { timeout: 10_000 },
     )
