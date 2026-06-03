@@ -31,14 +31,16 @@ function usage(exitCode = 1) {
 }
 
 export function parseArgs(argv) {
+  const scriptArgs = [...argv];
+  if (scriptArgs[0] === '--') scriptArgs.shift();
   const options = {
     runtimeDir: defaultRuntimeDir,
     requireHardenedRuntime: false,
     json: false,
   };
 
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
+  for (let index = 0; index < scriptArgs.length; index += 1) {
+    const arg = scriptArgs[index];
     switch (arg) {
       case '--help':
       case '-h':
@@ -47,7 +49,7 @@ export function parseArgs(argv) {
       case '--runtime-dir':
       case '--helper':
       case '--app': {
-        const value = argv[index + 1];
+        const value = scriptArgs[index + 1];
         if (!value) usage();
         if (arg === '--runtime-dir') {
           options.runtimeDir = resolve(value);

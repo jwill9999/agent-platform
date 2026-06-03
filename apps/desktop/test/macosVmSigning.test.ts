@@ -82,6 +82,9 @@ describe('macOS VM signing verification', () => {
     expect(resolveHelperPath(parseArgs(['--runtime-dir', runtimeDir]))).toBe(
       join(runtimeDir, 'macos-vm-runner'),
     );
+    expect(resolveHelperPath(parseArgs(['--', '--runtime-dir', runtimeDir]))).toBe(
+      join(runtimeDir, 'macos-vm-runner'),
+    );
     expect(resolveHelperPath(parseArgs(['--app', appPath]))).toBe(
       join(appPath, 'Contents/Resources/macos-vm/macos-vm-runner'),
     );

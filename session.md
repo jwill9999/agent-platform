@@ -12,11 +12,10 @@
 
 ## Last Updated
 
-- **Date:** 2026-05-26
-- **Session:** Added VM self-hosted runner preflight checks.
+- **Date:** 2026-06-03
+- **Session:** Fixed staging VM signing verifier pnpm argument parsing.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `dcd2e3f` adds `.6.4` platform adapter documentation; VM host preflight is
-  pending commit.
+- **Latest commit:** `e0b5616` adds VM host preflight; signing verifier parser fix is pending push.
 
 ## Current State
 
@@ -99,6 +98,10 @@
   - checks macOS, `arm64`, minimum macOS major, Virtualization.framework, hypervisor support,
     `xcode-select`, Swift, and `codesign`,
   - staging workflow now runs the preflight after install before downloading/publishing VM assets.
+- Fixed the next self-hosted runner failure:
+  - `native:vm:verify-signing -- --runtime-dir ... --json` failed with `Unknown argument: --`,
+  - updated `verify-macos-vm-signing.mjs` to strip pnpm's forwarded separator,
+  - added regression coverage in `macosVmSigning.test.ts`.
 
 ## Checks Run
 
@@ -151,18 +154,17 @@
 - `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/macosVmHostCheck.test.ts`
 - `pnpm --filter @agent-platform/desktop lint`
 - `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop test -- test/macosVmSigning.test.ts test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/desktop native:vm:verify-signing -- --runtime-dir /tmp/nonexistent --json`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Commit and push the VM host preflight support after final checks pass.
-2. Register or attach a real Apple Silicon self-hosted GitHub runner with labels `self-hosted`,
-   `macOS`, `ARM64`, and `agent-platform-vm`.
-3. Confirm the repository variables still contain only the raw checksum and release asset URL:
-   `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256` and
-   `AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL`.
-4. Rerun the PR into `staging`, then keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
+1. Push the signing verifier parser fix, then rerun `staging-packaged-macos-vm-e2e`.
+2. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
+   evidence in `.5.4`.
+3. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
    the epic open until artifacts prove real packaged `macos-vm` command execution, policy behavior,
    repair, signed/notarized helper execution, and final traceability closure.
