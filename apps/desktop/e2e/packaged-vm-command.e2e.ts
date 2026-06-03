@@ -1,7 +1,16 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -99,7 +108,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
 });
 
 async function createVmFixture(options: { health: VmFixtureHealth }): Promise<VmFixture> {
-  const tempRoot = join(repoRoot, '.agent-platform', 'electron-vm-e2e', String(Date.now()));
+  const tempRoot = mkdtempSync(join(tmpdir(), 'agent-platform-electron-vm-e2e-'));
   const runtimeDir = join(tempRoot, 'runtime');
   const fixtureResourcesDir = join(tempRoot, 'resources');
   const evidenceDir = process.env.AGENT_PLATFORM_E2E_EVIDENCE_DIR;

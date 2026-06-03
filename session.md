@@ -114,6 +114,11 @@
   - local synthetic packaged VM E2E passes, so the fixture path is valid,
   - hardened `seedDesktopDatabase` in `packaged-vm-command.e2e.ts` to create the DB parent directory
     explicitly and include seed script path, SQLite path, exit status, stdout, and stderr on failure.
+- Fixed the revealed self-hosted seed failure:
+  - the runner reported `SQLITE_READONLY_DBMOVED` while migrating the E2E SQLite DB under the
+    checkout on `/Volumes/external/...`,
+  - moved the packaged VM E2E fixture temp root to `os.tmpdir()` via `mkdtempSync`, keeping runtime
+    SQLite and VM state out of the GitHub Actions worktree/external checkout volume.
 
 ## Checks Run
 
@@ -183,17 +188,17 @@
   inside sandbox because localhost binding is blocked)
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts` (passed
   outside sandbox)
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts` (passed
+  outside sandbox after moving fixture temp root to `os.tmpdir()`)
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Push the packaged VM E2E seed diagnostics, then rerun `staging-packaged-macos-vm-e2e`.
-2. If DB seeding still fails, use the new stderr/status details to fix the runner-specific seed
-   failure.
-3. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
+1. Push the packaged VM E2E temp-root fix, then rerun `staging-packaged-macos-vm-e2e`.
+2. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
    evidence in `.5.4`.
-4. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
+3. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
    the epic open until artifacts prove real packaged `macos-vm` command execution, policy behavior,
    repair, signed/notarized helper execution, and final traceability closure.
