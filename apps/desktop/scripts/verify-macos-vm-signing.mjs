@@ -88,13 +88,37 @@ export function resolveHelperPath(options) {
   return join(options.runtimeDir, 'macos-vm-runner');
 }
 
-export function hasTrueEntitlement(plist, entitlement) {
-  const lines = plist.split(/\r?\n/).map((line) => line.trim());
-  for (let index = 0; index < lines.length; index += 1) {
-    if (lines[index] !== `<key>${entitlement}</key>`) continue;
-    const nextValue = lines.slice(index + 1).find((line) => line.length > 0);
-    return nextValue === '<true/>';
+function isXmlWhitespace(char) {
+  return char === ' ' || char === '\n' || char === '\r' || char === '\t';
+}
+
+function skipXmlWhitespace(value, index) {
+  let cursor = index;
+  while (cursor < value.length && isXmlWhitespace(value[cursor] ?? '')) {
+    cursor += 1;
   }
+  return cursor;
+}
+
+export function hasTrueEntitlement(plist, entitlement) {
+  const keyToken = `<key>${entitlement}</key>`;
+  let searchStart = 0;
+
+  while (searchStart < plist.length) {
+    const keyIndex = plist.indexOf(keyToken, searchStart);
+    if (keyIndex === -1) return false;
+
+    const valueIndex = skipXmlWhitespace(plist, keyIndex + keyToken.length);
+    if (plist.startsWith('<true/>', valueIndex) || plist.startsWith('<true />', valueIndex)) {
+      return true;
+    }
+    if (plist.startsWith('<false/>', valueIndex) || plist.startsWith('<false />', valueIndex)) {
+      return false;
+    }
+
+    searchStart = keyIndex + keyToken.length;
+  }
+
   return false;
 }
 

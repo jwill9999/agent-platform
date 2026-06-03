@@ -13,9 +13,10 @@
 ## Last Updated
 
 - **Date:** 2026-06-03
-- **Session:** Fixed staging VM signing verifier pnpm argument parsing.
+- **Session:** Fixed staging VM asset SHA cache and signing verifier entitlement parsing.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `e0b5616` adds VM host preflight; signing verifier parser fix is pending push.
+- **Latest commit:** `f3df012` fixes pnpm forwarded separator parsing; SHA cache and entitlement
+  parser hardening are pending push.
 
 ## Current State
 
@@ -102,6 +103,11 @@
   - `native:vm:verify-signing -- --runtime-dir ... --json` failed with `Unknown argument: --`,
   - updated `verify-macos-vm-signing.mjs` to strip pnpm's forwarded separator,
   - added regression coverage in `macosVmSigning.test.ts`.
+- Fixed the next staging runner issues:
+  - the VM asset archive is now cached locally on the self-hosted runner by SHA and verified before
+    reuse,
+  - the signing verifier now accepts compact `codesign` entitlement XML using `<true />`, avoiding a
+    false missing-entitlement failure when the helper is correctly signed.
 
 ## Checks Run
 
@@ -156,13 +162,24 @@
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm --filter @agent-platform/desktop test -- test/macosVmSigning.test.ts test/packageScripts.test.ts`
 - `pnpm --filter @agent-platform/desktop native:vm:verify-signing -- --runtime-dir /tmp/nonexistent --json`
+- `pnpm --filter @agent-platform/desktop test -- test/macosVmSigning.test.ts test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop native:vm:build` (passed outside sandbox after Swift cache
+  write was blocked inside sandbox)
+- `pnpm --filter @agent-platform/desktop native:vm:sign-dev`
+- `pnpm --filter @agent-platform/desktop native:vm:verify-signing -- --helper /Users/letuscode/projects/agent-platform/apps/desktop/native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner --json`
+- `pnpm --filter @agent-platform/desktop test` (passed outside sandbox after localhost binding was
+  blocked inside sandbox)
+- `pnpm format:check`
+- `pnpm docs:lint`
 - `git diff --check`
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
   CodeQL, markdownlint, lychee, and SonarCloud passed before the local `.5.2` changes.
 
 ## Next
 
-1. Push the signing verifier parser fix, then rerun `staging-packaged-macos-vm-e2e`.
+1. Push the SHA cache and entitlement parser fix, then rerun `staging-packaged-macos-vm-e2e`.
 2. If the job reaches packaged VM E2E, inspect the first VM runtime failure or record passing
    evidence in `.5.4`.
 3. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and

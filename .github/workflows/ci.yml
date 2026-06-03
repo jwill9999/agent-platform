@@ -272,13 +272,39 @@ jobs:
       - name: Run macOS VM host preflight
         run: pnpm --filter @agent-platform/desktop native:vm:host-check -- --json
 
-      - name: Download pinned macOS VM assets
+      - name: Restore or download pinned macOS VM assets
         run: |
           test -n "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL"
           test -n "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256"
+          CACHE_ROOT="$HOME/.cache/agent-platform/macos-vm-assets"
+          CACHE_DIR="$CACHE_ROOT/$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256"
+          CACHE_ARCHIVE="$CACHE_DIR/agent-platform-macos-vm-assets-arm64.tgz"
+          CACHE_ARCHIVE_TMP="$CACHE_ARCHIVE.tmp.$$"
           mkdir -p "$RUNNER_TEMP/macos-vm-assets"
-          curl -fsSL "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL" \
-            -o "$RUNNER_TEMP/macos-vm-assets.tgz"
+          mkdir -p "$CACHE_DIR"
+
+          if [ -f "$CACHE_ARCHIVE" ]; then
+            if printf '%s  %s\n' \
+              "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256" \
+              "$CACHE_ARCHIVE" | shasum -a 256 -c -; then
+              echo "Using cached macOS VM asset archive: $CACHE_ARCHIVE"
+            else
+              echo "Cached macOS VM asset archive failed checksum; re-downloading." >&2
+              rm -f "$CACHE_ARCHIVE"
+            fi
+          fi
+
+          if [ ! -f "$CACHE_ARCHIVE" ]; then
+            echo "Downloading macOS VM asset archive into SHA cache: $CACHE_ARCHIVE"
+            curl -fsSL "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL" \
+              -o "$CACHE_ARCHIVE_TMP"
+            printf '%s  %s\n' \
+              "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256" \
+              "$CACHE_ARCHIVE_TMP" | shasum -a 256 -c -
+            mv -f "$CACHE_ARCHIVE_TMP" "$CACHE_ARCHIVE"
+          fi
+
+          cp "$CACHE_ARCHIVE" "$RUNNER_TEMP/macos-vm-assets.tgz"
           printf '%s  %s\n' \
             "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256" \
             "$RUNNER_TEMP/macos-vm-assets.tgz" | shasum -a 256 -c -

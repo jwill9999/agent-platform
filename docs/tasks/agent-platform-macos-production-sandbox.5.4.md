@@ -39,10 +39,17 @@ Make staging require the packaged macOS VM E2E evidence before changes can be pr
   `2`: `Virtualization is not available on this hardware`.
 - The workflow intentionally fails if either required asset variable is missing. Staging must not
   silently fall back to host, Docker, or a synthetic VM asset.
+- The pinned asset archive is cached on the self-hosted runner by SHA at
+  `$HOME/.cache/agent-platform/macos-vm-assets/<sha>/agent-platform-macos-vm-assets-arm64.tgz`.
+  Each job verifies the cached archive checksum before use and re-downloads if the cached file is
+  missing or corrupt.
 - Added `native:vm:host-check`, backed by `apps/desktop/scripts/check-macos-vm-runner-host.mjs`.
   The staging workflow runs it after install so misconfigured self-hosted runners fail before asset
   download/build work. The preflight checks macOS, `arm64`, minimum macOS major version,
   Virtualization.framework presence, hypervisor support, `xcode-select`, Swift, and `codesign`.
+- `native:vm:verify-signing` accepts pnpm's forwarded `--` separator and compact `codesign`
+  entitlement XML such as `<true />`, so the signing report fails only on a genuinely missing
+  `com.apple.security.virtualization` entitlement.
 - The `.5.3` packaged E2E keeps the synthetic failed VM fixture for fail-closed UI coverage, but
   uses real packaged resources when `AGENT_PLATFORM_E2E_PACKAGED_VM_RESOURCES_DIR` is provided.
 - This task should remain open until a staging PR run publishes passing `staging-packaged-macos-vm-evidence`.

@@ -73,6 +73,21 @@ describe('macOS VM signing verification', () => {
     ).toBe(false);
   });
 
+  it('accepts compact codesign entitlement XML with spaced true tags', async () => {
+    const { hasTrueEntitlement } = await loadVerifyModule();
+
+    expect(
+      hasTrueEntitlement(
+        [
+          'Executable=/tmp/macos-vm-runner',
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<plist version="1.0"><dict><key>com.apple.security.virtualization</key><true /></dict></plist>',
+        ].join('\n'),
+        'com.apple.security.virtualization',
+      ),
+    ).toBe(true);
+  });
+
   it('resolves helper paths for resource directories and packaged apps', async () => {
     const { parseArgs, resolveHelperPath } = await loadVerifyModule();
     const root = makeTempDir();
