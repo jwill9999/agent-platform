@@ -13,20 +13,19 @@
 ## Last Updated
 
 - **Date:** 2026-06-04
-- **Session:** Fixed SonarCloud review comments on the packaged macOS VM staging gate.
+- **Session:** Recorded green packaged macOS VM staging gate and closed `.5.4` / `.5`.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commit:** `e5ca3a1` fixes SonarCloud review comments on PR #227.
+- **Latest commit:** `741b49f` removes password-like packaged VM E2E literals.
 
 ## Current State
 
 - Production sandbox work remains on `jwill9999/macos-production-sandbox-vm-lifecycle-exec`; do not push directly to `main`.
 - The macOS VM production path is Apple `Virtualization.framework` with `VZLinuxBootLoader` and a raw ARM64 Linux `Image`.
 - Docker and host command runners remain development-only paths; production/staging must prove `macos-vm` or stay fail-closed.
-- `.4.2`, `.4.2.1`, `.4.2.2`, `.4.2.3`, `.4.3`, `.4.4`, `.4`, `.5.1`, and `.5.2` are complete.
-- `.5.3` is complete and pushed.
-- `.5` / `.5.4` are on hold: implementation reaches real VM startup, but final staging sign-off
-  requires a self-hosted VM-capable Apple Silicon runner labelled `self-hosted`, `macOS`, `ARM64`,
-  and `agent-platform-vm`.
+- `.4.2`, `.4.2.1`, `.4.2.2`, `.4.2.3`, `.4.3`, `.4.4`, `.4`, `.5.1`, `.5.2`, `.5.3`,
+  `.5.4`, and `.5` are complete.
+- PR #227 is green, including `staging-packaged-macos-vm-e2e` on the self-hosted Apple Silicon
+  runner `dev` with labels `self-hosted`, `macOS`, `ARM64`, and `agent-platform-vm`.
 - `.6.1` is in progress: production resource/network/filesystem/user policy hardening is
   implemented locally, but live VM smoke evidence is still required before closing.
 - `.6.2` is in progress: safe VM runtime repair is implemented locally and covered by desktop unit
@@ -34,7 +33,7 @@
 - `.6.3` is in progress: packaged helper signing/quarantine/entitlement verification is implemented
   locally; signed/notarized artifact smoke evidence is still required before closing.
 - `.6.4` is in progress: Windows/Linux adapter boundaries and the epic closure audit are drafted;
-  final closure remains blocked by `.5`, `.5.4`, `.6.1`, `.6.2`, and `.6.3`.
+  final closure remains blocked by `.6.1`, `.6.2`, and `.6.3`.
 
 ## Recent Work
 
@@ -138,6 +137,12 @@
     precomputed checks array.
 - Fixed the remaining SonarCloud hard-coded password warning in `packaged-vm-command.e2e.ts` by
   removing the stale `HOST_ONLY_SECRET` assertion and the `PWD=/workspace` literal.
+- Recorded final `.5.4` staging gate evidence and closed `.5.4` / `.5`:
+  - `staging-packaged-macos-vm-e2e` passed in 4m52s on self-hosted runner `dev`,
+  - job evidence:
+    `https://github.com/jwill9999/agent-platform/actions/runs/26920679670/job/79452394370`,
+  - SonarCloud, verify, desktop-e2e, e2e, security-scan, CodeQL, markdownlint, lychee, and docker
+    are green on PR #227.
 
 ## Checks Run
 
@@ -229,6 +234,8 @@
   inside sandbox because localhost binding is blocked)
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts` (passed
   outside sandbox after removing password-like E2E literals)
+- PR #227 checks: `staging-packaged-macos-vm-e2e`, SonarCloud, `verify`, `desktop-e2e`, `e2e`,
+  `security-scan`, CodeQL, markdownlint, lychee, and docker passed.
 - Pre-push hook: `pnpm --filter @agent-platform/desktop build`, `typecheck`, and full desktop
   `test` suite.
 - GitHub PR #227 after CI setup fix: `verify`, `docker`, `desktop-e2e`, `e2e`, `security-scan`,
@@ -236,8 +243,9 @@
 
 ## Next
 
-1. Commit and push the SonarCloud review-comment fixes, then rerun SonarCloud/quality gate.
-2. If the self-hosted packaged VM job stays green, record passing evidence in `.5.4`.
-3. Keep `.5`, `.5.4`, `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
+1. Merge PR #227 into `staging` once reviewed, then branch remaining release-hardening work from
+   updated `staging`.
+2. Continue closing `.6.1`, `.6.2`, `.6.3`, and `.6.4` with VM evidence where required.
+3. Keep `.6.1`, `.6.2`, `.6.3`, `.6.4`, `.6`, and
    the epic open until artifacts prove real packaged `macos-vm` command execution, policy behavior,
    repair, signed/notarized helper execution, and final traceability closure.
