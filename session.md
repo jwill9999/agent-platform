@@ -16,10 +16,11 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-12
-- **Session:** Closed `.6.2` with signed/packaged VM repair smoke; documented `.6.3` notarization
-  blocker.
+- **Session:** Closed `.6.2`, documented `.6.3` notarization blocker, and recorded production
+  release hold.
 - **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commits:** pending this session.
+- **Latest commits:** `38f2e96` records the production release hold; `bf638b7` closed `.6.2`
+  evidence.
 
 ## Current State
 
@@ -41,6 +42,9 @@ and actionable.
   signed packaged helper execution is proven, but real Developer ID signing/notarization cannot be
   produced locally: `security find-identity -v -p codesigning` returned `0 valid identities found`,
   and no Apple/notary credential environment variables are present.
+- Production macOS release is explicitly blocked until `.6.3` closes with Developer ID signing,
+  Apple notarization success, helper signing/entitlement/quarantine report, and `macos-vm` ready
+  smoke from the signed/notarized artifact.
 - `.6.4` is in progress. Future Windows/Linux adapter docs and traceability draft exist; final
   closure is blocked by `.6.3`.
 - `.5` and `.5.4` are closed. PR #227 recorded green `staging-packaged-macos-vm-e2e` evidence on the
@@ -58,6 +62,8 @@ and actionable.
 - Closed Beads issue `agent-platform-macos-production-sandbox.6.2`.
 - Updated `.6.3` spec/Beads notes with the concrete signing/notarization blocker.
 - Updated `.6.4` audit so `.6.1` and `.6.2` are closed and only `.6.3` blocks final closure.
+- Added production-release hold language to the VM epic, `.6`, and `.6.3`, and appended matching
+  Beads notes.
 
 ## Checks Run
 
