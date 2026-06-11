@@ -11,6 +11,10 @@ const desktopDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(
   readFileSync(join(desktopDir, 'package.json'), 'utf8'),
 ) as DesktopPackageJson;
+const vmAssetBuilder = readFileSync(
+  join(desktopDir, 'scripts/build-macos-vm-linux-assets.mjs'),
+  'utf8',
+);
 
 describe('desktop package scripts', () => {
   it('launches the production-like renderer with the managed local backend', () => {
@@ -44,5 +48,15 @@ describe('desktop package scripts', () => {
     expect(packageJson.scripts['native:vm:test']).toBe(
       'swift test --package-path native/macos-vm-runner',
     );
+  });
+
+  it('generates a guest service compatible with Ubuntu su and shell continuations', () => {
+    expect(vmAssetBuilder).toContain('if ! tar \\');
+    expect(vmAssetBuilder).not.toContain('if ! tar \\\\');
+    expect(vmAssetBuilder).toContain('runuser -u $(shell_quote "$GUEST_USER") -- /bin/sh -c');
+    expect(vmAssetBuilder).toContain(
+      'su -s /bin/sh -c $(shell_quote "$command_line") $(shell_quote "$GUEST_USER")',
+    );
+    expect(vmAssetBuilder).not.toContain('su "$GUEST_USER" -s /bin/sh -c "$command_line"');
   });
 });

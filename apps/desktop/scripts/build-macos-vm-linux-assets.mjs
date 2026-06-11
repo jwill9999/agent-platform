@@ -186,12 +186,12 @@ apk add --no-cache dpkg e2fsprogs kmod tar xz zstd
 ROOTFS="/work/rootfs-$$"
 mkdir -p "$ROOTFS"
 
-if ! tar \\
-  --exclude='dev/*' \\
-  --exclude='var/lib/snapd/void' \\
-  --no-same-owner \\
-  --delay-directory-restore \\
-  -C "$ROOTFS" \\
+if ! tar \
+  --exclude='dev/*' \
+  --exclude='var/lib/snapd/void' \
+  --no-same-owner \
+  --delay-directory-restore \
+  -C "$ROOTFS" \
   -xJf /out/rootfs.tar.xz; then
   if [ ! -x "$ROOTFS/usr/bin/apt-get" ]; then
     echo "Ubuntu rootfs extraction failed before package tooling was available." >&2
@@ -212,10 +212,10 @@ ln -sfn /usr/lib/udev "$ROOTFS/lib/udev"
 kernel_version="$(grep -a -m1 -o 'Linux version [^ ]*' /out/vmlinuz | awk '{print $3}')"
 depmod -b "$ROOTFS" "$kernel_version"
 
-mkdir -p \\
-  "$ROOTFS/etc/systemd/system/multi-user.target.wants" \\
-  "$ROOTFS/usr/local/bin" \\
-  "$ROOTFS/run/agent-platform/commands" \\
+mkdir -p \
+  "$ROOTFS/etc/systemd/system/multi-user.target.wants" \
+  "$ROOTFS/usr/local/bin" \
+  "$ROOTFS/run/agent-platform/commands" \
   "$ROOTFS/workspace"
 
 cat > "$ROOTFS/usr/local/bin/agent-platform-guest-service" <<'SERVICE'
@@ -292,7 +292,12 @@ run_job() {
   command_line="export HOME=$(shell_quote "$GUEST_HOME") TMPDIR=$(shell_quote "$GUEST_SCRATCH/tmp"); if [ -f $(shell_quote "$job/env.sh") ]; then . $(shell_quote "$job/env.sh"); fi; cd $(shell_quote "$cwd") && timeout $(shell_quote "$timeout_seconds") /bin/sh $(shell_quote "$job/command.sh")"
   tmp_stdout="$job/stdout.tmp"
   tmp_stderr="$job/stderr.tmp"
-  if su "$GUEST_USER" -s /bin/sh -c "$command_line" > "$tmp_stdout" 2> "$tmp_stderr"; then
+  if command -v runuser >/dev/null 2>&1; then
+    run_as_guest="runuser -u $(shell_quote "$GUEST_USER") -- /bin/sh -c $(shell_quote "$command_line")"
+  else
+    run_as_guest="su -s /bin/sh -c $(shell_quote "$command_line") $(shell_quote "$GUEST_USER")"
+  fi
+  if sh -c "$run_as_guest" > "$tmp_stdout" 2> "$tmp_stderr"; then
     exit_code=0
   else
     exit_code=$?
@@ -350,7 +355,7 @@ if [ -f "$ROOTFS/etc/gshadow" ] && ! grep -q '^agentplatform:' "$ROOTFS/etc/gsha
 fi
 mkdir -p "$ROOTFS/home/agentplatform"
 chown 1000:1000 "$ROOTFS/home/agentplatform"
-ln -sf /etc/systemd/system/agent-platform-guest-service.service \\
+ln -sf /etc/systemd/system/agent-platform-guest-service.service \
   "$ROOTFS/etc/systemd/system/multi-user.target.wants/agent-platform-guest-service.service"
 
 cat > /out/guest-bootstrap.sh <<'BOOTSTRAP'

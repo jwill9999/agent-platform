@@ -51,6 +51,46 @@ user, filesystem, and network behavior.
 - Runner health/diagnostics snapshot proving effective CPU, memory, timeout, output, user,
   filesystem, and network policy are visible.
 
+Current verification, 2026-06-11:
+
+- Fixed the VM asset builder so the generated Alpine container build script emits POSIX shell line
+  continuations instead of literal `\\` continuations.
+- Fixed the generated Ubuntu guest command service to run commands as `agentplatform` via
+  `runuser -u agentplatform -- /bin/sh -c ...`; the prior `su` invocation failed with
+  `Authentication failure` for the locked service account.
+- `pnpm --filter @agent-platform/desktop native:vm:host-check -- --json` passed on Apple Silicon
+  macOS 26.5.1 with Virtualization.framework, hypervisor support, Xcode, Swift, and codesign.
+- `pnpm --filter @agent-platform/desktop native:vm:test` passed: 21 Swift tests.
+- `pnpm --filter @agent-platform/desktop test -- test/macosVmHostCheck.test.ts
+test/macosVmPackaging.test.ts test/packageScripts.test.ts` passed.
+- `node --check apps/desktop/scripts/build-macos-vm-linux-assets.mjs` passed.
+- Built fresh VM assets with
+  `pnpm --filter @agent-platform/desktop native:vm:assets:build-linux -- --out-dir
+/private/tmp/agent-platform-linux-assets-6-1`.
+- Prepared runtime assets with
+  `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- --source-image
+/private/tmp/agent-platform-linux-assets-6-1/source.raw --kernel
+/private/tmp/agent-platform-linux-assets-6-1/vmlinuz --initrd
+/private/tmp/agent-platform-linux-assets-6-1/initrd.img --bootstrap
+/private/tmp/agent-platform-linux-assets-6-1/guest-bootstrap.sh --out-dir
+/private/tmp/agent-platform-linux-runtime-6-1/images`.
+- `macos-vm-runner start --runtime-dir /private/tmp/agent-platform-linux-runtime-6-1 --workspace
+/private/tmp/agent-platform-vm-workspace-6-1` returned ready.
+- Runtime diagnostics in `/private/tmp/agent-platform-linux-runtime-6-1/logs/vm-config.json`
+  recorded `cpus: 2`, `memoryMB: 2048`, `networkDevices: 0`, `networkPolicy: disabled`,
+  `guestUser: agentplatform`, `guestUid: 1000`, `guestGid: 1000`, `workspaceMount: /workspace`,
+  timeout defaults/maxima, output defaults/maxima, and `virtualizationEntitlementPresent: true`.
+- Live VM command probe returned `whoami=agentplatform`, `uid=1000`, `gid=1000`, only `lo` under
+  `/sys/class/net`, no routes in `/proc/net/route`, `/workspace` as cwd, `/root` not writable, and
+  guest-owned scratch writable under `$HOME/.agent-platform`.
+- `/workspace/policy-write.txt` written from the guest appeared at
+  `/private/tmp/agent-platform-vm-workspace-6-1/policy-write.txt` on the host.
+- Timeout probe with `--timeout-ms 1000` returned exit code `124` in about 1.1 seconds and did not
+  print the post-timeout command output.
+- Output probe with `--max-output-bytes 32` returned exactly the first 32 bytes of stdout.
+- Cwd escape probe with `--cwd /private/tmp` failed closed before guest dispatch with
+  `Command cwd is outside the selected Project workspace.`
+
 ## Definition Of Done
 
 - Production defaults are documented, enforced, and visible in diagnostics.
