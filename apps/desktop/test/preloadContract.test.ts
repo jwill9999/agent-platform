@@ -20,6 +20,7 @@ import {
   openWorkspaceResourceIpcChannel,
   openWorkspaceWebViewIpcChannel,
   reloadWorkspaceWebViewIpcChannel,
+  repairMacosVmRuntimeIpcChannel,
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   resizeTerminalIpcChannel,
@@ -45,7 +46,11 @@ describe('desktop preload bridge contract', () => {
   });
 
   it('limits maintenance helpers to explicit destructive actions', () => {
-    expect(desktopMaintenanceApiKeys).toEqual(['getResetLocalDataConfirmation', 'resetLocalData']);
+    expect(desktopMaintenanceApiKeys).toEqual([
+      'getResetLocalDataConfirmation',
+      'repairMacosVmRuntime',
+      'resetLocalData',
+    ]);
   });
 
   it('limits version helpers to runtime version readers', () => {
@@ -96,8 +101,13 @@ describe('desktop preload bridge contract', () => {
       'agent-platform:get-reset-local-data-confirmation',
     );
     expect(resetLocalDataIpcChannel).toBe('agent-platform:reset-local-data');
+    expect(repairMacosVmRuntimeIpcChannel).toBe('agent-platform:repair-macos-vm-runtime');
 
-    for (const channel of [resetLocalDataConfirmationIpcChannel, resetLocalDataIpcChannel]) {
+    for (const channel of [
+      resetLocalDataConfirmationIpcChannel,
+      resetLocalDataIpcChannel,
+      repairMacosVmRuntimeIpcChannel,
+    ]) {
       expect(channel).toMatch(/^agent-platform:/);
       expect(channel).not.toContain('fs');
       expect(channel).not.toContain('shell');

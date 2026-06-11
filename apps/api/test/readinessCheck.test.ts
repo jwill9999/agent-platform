@@ -1,9 +1,10 @@
 import type { DrizzleDb } from '@agent-platform/db';
 import request from 'supertest';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../src/infrastructure/http/createApp.js';
 import {
+  checkCommandRunner,
   checkDatabase,
   checkDisk,
   runReadinessCheck,
@@ -12,6 +13,10 @@ import {
 function mockDb(overrides: Partial<DrizzleDb> = {}): DrizzleDb {
   return { run: vi.fn(), ...overrides } as unknown as DrizzleDb;
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 // ---------------------------------------------------------------------------
 // Unit: checkDatabase
@@ -56,6 +61,26 @@ describe('checkDisk', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Unit: checkCommandRunner
+// ---------------------------------------------------------------------------
+
+describe('checkCommandRunner', () => {
+  it('returns degraded diagnostics when command execution is disabled', () => {
+    vi.stubEnv('AGENT_PLATFORM_COMMAND_RUNNER', 'disabled');
+
+    const result = checkCommandRunner();
+
+    expect(result.status).toBe('degraded');
+    expect(result.details).toMatchObject({
+      mode: 'disabled',
+      status: 'disabled',
+      canExecute: 'false',
+      reason: 'command_runner_disabled',
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Unit: runReadinessCheck
 // ---------------------------------------------------------------------------
 
@@ -68,11 +93,14 @@ describe('runReadinessCheck', () => {
     expect(result.timestamp).toBeTruthy();
   });
 
-  it('returns healthy when db and disk both pass', async () => {
+  it('returns degraded when db and disk pass but command execution is disabled', async () => {
+    vi.stubEnv('AGENT_PLATFORM_COMMAND_RUNNER', 'disabled');
+
     const result = await runReadinessCheck({ db: mockDb(), sqlitePath: import.meta.filename });
-    expect(result.status).toBe('healthy');
+    expect(result.status).toBe('degraded');
     expect(result.checks['database']?.status).toBe('healthy');
     expect(result.checks['disk']?.status).toBe('healthy');
+    expect(result.checks['commandRunner']?.status).toBe('degraded');
   });
 
   it('overall status is degraded when one check is degraded', async () => {

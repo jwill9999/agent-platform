@@ -28,6 +28,17 @@ export interface DesktopResetLocalDataResult {
   readonly preservedProjectFolders: true;
 }
 
+export interface DesktopRepairMacosVmRuntimeResult {
+  readonly ok: true;
+  readonly runtimeDir: string;
+  readonly stoppedRunningVm: boolean;
+  readonly deletedPaths: readonly string[];
+  readonly missingPaths: readonly string[];
+  readonly repairedAssets: true;
+  readonly preservedDiagnostics: boolean;
+  readonly preservedProjectFolders: true;
+}
+
 export interface DesktopSelectedProjectFolder {
   readonly path: string;
   readonly name: string;
@@ -43,6 +54,7 @@ export type DesktopProjectFolderSelectionResult =
 
 export interface DesktopMaintenanceApi {
   readonly getResetLocalDataConfirmation: () => Promise<string>;
+  readonly repairMacosVmRuntime: () => Promise<DesktopRepairMacosVmRuntimeResult>;
   readonly resetLocalData: (
     request: DesktopResetLocalDataRequest,
   ) => Promise<DesktopResetLocalDataResult>;
@@ -184,6 +196,7 @@ export const desktopBridgeApiName = 'agentPlatformDesktop';
 export const resetLocalDataIpcChannel = 'agent-platform:reset-local-data';
 export const resetLocalDataConfirmationIpcChannel =
   'agent-platform:get-reset-local-data-confirmation';
+export const repairMacosVmRuntimeIpcChannel = 'agent-platform:repair-macos-vm-runtime';
 export const selectProjectFolderIpcChannel = 'agent-platform:select-project-folder';
 export const createProjectFolderIpcChannel = 'agent-platform:create-project-folder';
 export const createTerminalIpcChannel = 'agent-platform:terminal:create';
@@ -215,6 +228,7 @@ export const desktopBridgeApiKeys = [
 
 export const desktopMaintenanceApiKeys = [
   'getResetLocalDataConfirmation',
+  'repairMacosVmRuntime',
   'resetLocalData',
 ] as const satisfies readonly (keyof DesktopMaintenanceApi)[];
 

@@ -2,6 +2,7 @@ const CHAT_ENV_KEYS = [
   'OPENAI_API_KEY',
   'AGENT_OPENAI_API_KEY',
   'OPENAI_ALLOW_LEGACY_ENV',
+  'AGENT_PLATFORM_COMMAND_RUNNER',
 ] as const;
 
 export function snapshotChatEnv(): Map<string, string | undefined> {

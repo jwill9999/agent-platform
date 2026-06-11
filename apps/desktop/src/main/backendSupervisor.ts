@@ -1,8 +1,18 @@
 import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, statSync, rmSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import {
+  cpSync,
+  createWriteStream,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { get } from 'node:http';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import type { DesktopRuntimePaths } from './runtimePaths.js';
@@ -17,6 +27,8 @@ export interface DesktopBackendPaths {
   sqlitePath: string;
   configPath: string;
   tempDir: string;
+  macosVmPackagedAssetsDir: string;
+  macosVmPackagedHelperPath: string;
 }
 
 export interface DesktopBackendHandle {
@@ -50,10 +62,25 @@ export interface DesktopBackendEnvironment {
   readonly AGENT_PLATFORM_DESKTOP_DATA_DIR: string;
   readonly AGENT_PLATFORM_DESKTOP_LOG_DIR: string;
   readonly AGENT_PLATFORM_DESKTOP_TEMP_DIR: string;
+  readonly AGENT_PLATFORM_COMMAND_RUNNER: string;
+  readonly AGENT_PLATFORM_MACOS_VM_RUNNER_PATH?: string;
+  readonly AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: string;
+}
+
+export interface PackagedMacosVmRuntimeRepairResult {
+  readonly ok: true;
+  readonly runtimeDir: string;
+  readonly stoppedRunningVm: boolean;
+  readonly deletedPaths: string[];
+  readonly missingPaths: string[];
+  readonly repairedAssets: true;
+  readonly preservedDiagnostics: boolean;
+  readonly preservedProjectFolders: true;
 }
 
 const defaultBackendPort = 4310;
 const defaultMaxLogBytes = 1024 * 1024;
+const macosVmStopTimeoutMs = 10_000;
 
 export function resolveDesktopBackendMode(env: NodeJS.ProcessEnv): DesktopBackendMode {
   return env.AGENT_PLATFORM_DESKTOP_BACKEND === 'managed' ? 'managed' : 'disabled';
@@ -71,6 +98,8 @@ export function getDesktopBackendPaths(
     sqlitePath: runtimePaths.sqlitePath,
     configPath: runtimePaths.configPath,
     tempDir: runtimePaths.tempDir,
+    macosVmPackagedAssetsDir: runtimePaths.macosVmPackagedAssetsDir,
+    macosVmPackagedHelperPath: runtimePaths.macosVmPackagedHelperPath,
   };
 }
 
@@ -90,6 +119,29 @@ export function desktopBackendAvailable(paths: DesktopBackendPaths): boolean {
   return existsSync(paths.apiEntry);
 }
 
+function packagedMacosVmAssetsAvailable(paths: DesktopBackendPaths): boolean {
+  return existsSync(join(paths.macosVmPackagedAssetsDir, 'manifest.json'));
+}
+
+function resolvePackagedCommandRunner(
+  env: NodeJS.ProcessEnv,
+  paths: DesktopBackendPaths,
+): 'disabled' | 'macos-vm' | 'host' | 'docker-sandbox' {
+  const configured = env.AGENT_PLATFORM_COMMAND_RUNNER ?? env.AGENT_COMMAND_RUNNER;
+  if (
+    configured === 'disabled' ||
+    configured === 'host' ||
+    configured === 'docker-sandbox' ||
+    configured === 'macos-vm'
+  ) {
+    return configured;
+  }
+
+  return existsSync(paths.macosVmPackagedHelperPath) && packagedMacosVmAssetsAvailable(paths)
+    ? 'macos-vm'
+    : 'disabled';
+}
+
 export function buildDesktopBackendEnvironment({
   env,
   paths,
@@ -102,6 +154,10 @@ export function buildDesktopBackendEnvironment({
   secretsMasterKeyB64?: string;
 }): DesktopBackendEnvironment {
   const secretsMasterKey = secretsMasterKeyB64 ?? env.SECRETS_MASTER_KEY?.trim();
+  const macosVmHelperPath =
+    env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH ??
+    (existsSync(paths.macosVmPackagedHelperPath) ? paths.macosVmPackagedHelperPath : undefined);
+  const commandRunner = resolvePackagedCommandRunner(env, paths);
   return {
     HOST: '127.0.0.1',
     NODE_ENV: 'production',
@@ -114,6 +170,9 @@ export function buildDesktopBackendEnvironment({
     AGENT_PLATFORM_DESKTOP_DATA_DIR: dirname(paths.sqlitePath),
     AGENT_PLATFORM_DESKTOP_LOG_DIR: dirname(paths.stdoutLog),
     AGENT_PLATFORM_DESKTOP_TEMP_DIR: paths.tempDir,
+    AGENT_PLATFORM_COMMAND_RUNNER: commandRunner,
+    AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: resolveMacosVmRuntimeDir(paths, env),
+    ...(macosVmHelperPath ? { AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: macosVmHelperPath } : {}),
   };
 }
 
@@ -132,6 +191,7 @@ export async function startDesktopBackend({
   }
 
   mkdirSync(dirname(paths.stdoutLog), { recursive: true });
+  ensurePackagedMacosVmAssets(paths, env);
   rotateLogIfNeeded(paths.stdoutLog, maxLogBytes);
   rotateLogIfNeeded(paths.stderrLog, maxLogBytes);
 
@@ -169,6 +229,166 @@ export async function startDesktopBackend({
     },
     stop: () => stopDesktopChild(child, stdout, stderr),
   };
+}
+
+export function ensurePackagedMacosVmAssets(
+  paths: DesktopBackendPaths,
+  env: NodeJS.ProcessEnv,
+): void {
+  const mode = resolvePackagedCommandRunner(env, paths);
+  if (mode !== 'macos-vm') return;
+
+  const runtimeDir = assertSafeMacosVmRuntimeDir(paths, resolveMacosVmRuntimeDir(paths, env));
+  const runtimeImagesDir = join(runtimeDir, 'images');
+  const manifestPath = join(paths.macosVmPackagedAssetsDir, 'manifest.json');
+
+  if (!existsSync(paths.macosVmPackagedHelperPath)) {
+    throw new Error(
+      `Packaged macOS VM helper is missing at ${paths.macosVmPackagedHelperPath}. Run native:vm:package before packaging the desktop app.`,
+    );
+  }
+
+  if (!existsSync(manifestPath)) {
+    throw new Error(
+      `Packaged macOS VM assets are missing at ${paths.macosVmPackagedAssetsDir}. Run native:vm:package before packaging the desktop app.`,
+    );
+  }
+
+  mkdirSync(runtimeImagesDir, { recursive: true });
+  cpSync(paths.macosVmPackagedAssetsDir, runtimeImagesDir, { recursive: true, force: true });
+}
+
+export function repairPackagedMacosVmRuntime({
+  paths,
+  env = process.env,
+  clearDiagnostics = false,
+}: {
+  paths: DesktopBackendPaths;
+  env?: NodeJS.ProcessEnv;
+  clearDiagnostics?: boolean;
+}): PackagedMacosVmRuntimeRepairResult {
+  const runtimeDir = assertSafeMacosVmRuntimeDir(paths, resolveMacosVmRuntimeDir(paths, env));
+  const stoppedRunningVm = stopMacosVmRunnerIfRunning(paths, runtimeDir);
+  const targets = [
+    join(runtimeDir, 'state'),
+    join(runtimeDir, 'images'),
+    ...(clearDiagnostics ? [join(runtimeDir, 'logs')] : []),
+  ];
+  const deletedPaths: string[] = [];
+  const missingPaths: string[] = [];
+
+  for (const target of targets) {
+    assertSafeMacosVmRuntimeChild(runtimeDir, target);
+    if (!existsSync(target)) {
+      missingPaths.push(target);
+      continue;
+    }
+    rmSync(target, { recursive: true, force: true });
+    deletedPaths.push(target);
+  }
+
+  ensurePackagedMacosVmAssets(paths, { ...env, AGENT_PLATFORM_COMMAND_RUNNER: 'macos-vm' });
+
+  return {
+    ok: true,
+    runtimeDir,
+    stoppedRunningVm,
+    deletedPaths,
+    missingPaths,
+    repairedAssets: true,
+    preservedDiagnostics: !clearDiagnostics,
+    preservedProjectFolders: true,
+  };
+}
+
+function resolveMacosVmRuntimeDir(paths: DesktopBackendPaths, env: NodeJS.ProcessEnv): string {
+  return resolve(env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ?? join(dirname(paths.sqlitePath), 'vm'));
+}
+
+function assertSafeMacosVmRuntimeDir(paths: DesktopBackendPaths, runtimeDir: string): string {
+  const dataDir = resolve(dirname(paths.sqlitePath));
+  const resolvedRuntimeDir = resolve(runtimeDir);
+  if (
+    resolvedRuntimeDir === dataDir ||
+    !isPathInside(resolvedRuntimeDir, dataDir) ||
+    resolvedRuntimeDir.split('/').length < dataDir.split('/').length + 1
+  ) {
+    throw new Error(`Refusing to repair unsafe macOS VM runtime path: ${runtimeDir}`);
+  }
+
+  if (existsSync(resolvedRuntimeDir)) {
+    const stat = lstatSync(resolvedRuntimeDir);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Refusing to repair symlinked macOS VM runtime path: ${runtimeDir}`);
+    }
+    const realRuntimeDir = realpathSync(resolvedRuntimeDir);
+    const realDataDir = realpathSync(dataDir);
+    if (!isPathInside(realRuntimeDir, realDataDir)) {
+      throw new Error(`Refusing to repair macOS VM runtime path outside app data: ${runtimeDir}`);
+    }
+  }
+
+  return resolvedRuntimeDir;
+}
+
+function assertSafeMacosVmRuntimeChild(runtimeDir: string, target: string): void {
+  const resolvedRuntimeDir = resolve(runtimeDir);
+  const resolvedTarget = resolve(target);
+  if (resolvedTarget === resolvedRuntimeDir || !isPathInside(resolvedTarget, resolvedRuntimeDir)) {
+    throw new Error(`Refusing to delete unsafe macOS VM repair path: ${target}`);
+  }
+  if (existsSync(resolvedTarget) && lstatSync(resolvedTarget).isSymbolicLink()) {
+    throw new Error(`Refusing to delete symlinked macOS VM repair path: ${target}`);
+  }
+}
+
+function isPathInside(candidate: string, root: string): boolean {
+  return candidate === root || candidate.startsWith(`${root}/`);
+}
+
+function stopMacosVmRunnerIfRunning(paths: DesktopBackendPaths, runtimeDir: string): boolean {
+  const pidPath = join(runtimeDir, 'state/daemon.pid');
+  const pid = readPid(pidPath);
+  if (!pid || !processIsAlive(pid)) return false;
+
+  if (!existsSync(paths.macosVmPackagedHelperPath)) {
+    throw new Error(
+      'Cannot repair running macOS VM runtime because the packaged helper is missing.',
+    );
+  }
+
+  execFileSync(paths.macosVmPackagedHelperPath, ['stop', '--runtime-dir', runtimeDir], {
+    encoding: 'utf8',
+    timeout: macosVmStopTimeoutMs,
+  });
+
+  if (!existsSync(pidPath)) {
+    return true;
+  }
+
+  if (processIsAlive(pid)) {
+    throw new Error('Cannot repair macOS VM runtime because the VM daemon did not stop.');
+  }
+
+  return true;
+}
+
+function readPid(path: string): number | undefined {
+  try {
+    const pid = Number.parseInt(readFileSync(path, 'utf8').trim(), 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function processIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function spawnBackendProcess({

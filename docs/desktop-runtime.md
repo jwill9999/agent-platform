@@ -13,6 +13,27 @@ paths or shell behavior into product code.
 The current desktop app is a development foundation, not a public packaged release. Packaging,
 signing, notarization, auto-update, and installer cleanup are future release tasks.
 
+## Release runtime requirements
+
+The packaged macOS app must work for an end user after installation without requiring a local
+development toolchain. Release notes and download pages should state the currently validated runtime
+requirements:
+
+| Requirement | Release expectation                                                                                                                                                                                                                                 |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform    | Apple Silicon macOS. Intel Macs are not in the current production VM runner scope because they require separate `x86_64` guest assets.                                                                                                              |
+| macOS       | Apple Virtualization.framework is required. The product must publish the exact tested macOS minimum for each release; current VM lifecycle validation was performed on Apple Silicon macOS `26.5`.                                                  |
+| CPU/RAM     | The VM runner currently starts a local Linux guest with `2` virtual CPUs and `2 GB` memory. Release packaging should require enough free memory for the app, backend, and guest; `4 GB` free system memory is the minimum practical support target. |
+| Disk        | The app needs space for the packaged VM image plus app-owned runtime state under the normal Electron app data directory. Current development images are about `2 GB`; release notes should publish the actual packaged size.                        |
+| User tools  | End users must not need Xcode, Docker, Homebrew, `qemu-img`, `guestfish`, or manual kernel downloads to use the packaged app.                                                                                                                       |
+| Signing     | The packaged helper that starts Virtualization.framework must be signed and notarized with `com.apple.security.virtualization`. The entitlement must be present on the executable that calls the VM APIs, not only on the top-level `.app`.         |
+| VM assets   | The release must include a staged, checksum-verified VM asset set. For the current `VZLinuxBootLoader` path, the kernel must be a raw ARM64 Linux `Image`; EFI-stub `PE32+` kernels are rejected before boot.                                       |
+
+Xcode is a development and release-engineering requirement, not an end-user runtime requirement.
+Full Xcode is recommended for release signing, notarization checks, and reproducing Apple
+Virtualization.framework diagnostics. Docker is required only for the current asset builder or CI
+job that creates the Linux root image; the packaged app consumes the built artifacts.
+
 ## Runtime split
 
 | Mode            | Owner                    | Use it for                                                                         |
@@ -28,6 +49,10 @@ native desktop user experience.
 Electron solves native folder access and local app lifecycle. It does not by itself sandbox code
 execution. Any future command/test execution against user Projects must still run behind a sandbox
 boundary such as Docker, a VM, a macOS sandbox profile, or another approved runner.
+
+Future Windows and Linux production runners must extend the same harness `CommandRunner` contract
+without reclassifying host execution as a production sandbox. The adapter boundaries and required
+evidence are documented in [Command Runner Platform Adapters](design/command-runner-platform-adapters.md).
 
 ## Docker development workflow
 
@@ -81,6 +106,38 @@ That command builds the API and desktop package, starts the compiled API as a ch
 During development the backend supervisor uses the active development Node executable for the API
 child process. The packaging epic must decide whether the released app bundles a Node runtime,
 rebuilds native dependencies for Electron's Node ABI, or packages the backend another way.
+
+## Command sandbox runner
+
+Shell commands issued through `sys_bash` use the harness `CommandRunner` boundary. Packaged desktop
+builds must not use host fallback. Until the macOS VM runner is available, command execution
+defaults to disabled. Docker and host runners are explicit development modes only.
+
+The production macOS runner is the managed VM runner described in
+[ADR-0003](adr/0003-macos-production-sandbox-runner.md). Docker is a development adapter. Staging
+must not merge to `main` unless packaged Electron E2E proves command execution through the managed
+VM runner or command execution remains explicitly disabled.
+
+Supported modes:
+
+- `AGENT_PLATFORM_COMMAND_RUNNER=disabled` — deny command execution because no production sandbox
+  runner is configured.
+- `AGENT_PLATFORM_COMMAND_RUNNER=macos-vm` — use the managed macOS VM runner once implemented.
+  This mode requires `AGENT_PLATFORM_MACOS_VM_RUNNER_PATH` to point at the packaged native helper
+  and `AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR` to point at app-owned VM state. The managed desktop
+  backend defaults the runtime directory to `<desktop data dir>/vm`. If either value is absent,
+  command execution is denied and never falls back to host execution. The runtime asset contract is
+  documented in [macOS VM Runner Assets](desktop-macos-vm-assets.md).
+- `AGENT_PLATFORM_COMMAND_RUNNER=docker-sandbox` — use Docker sandbox execution for development
+  and adapter testing.
+- `AGENT_PLATFORM_COMMAND_RUNNER=host` — use the Project-scoped host runner for explicit local
+  development only.
+
+The Docker sandbox mounts only the selected Project at `/workspace`, runs without host networking,
+uses bounded CPU, memory, process, timeout, and output limits, and does not inherit the host
+environment. It is not the packaged production runner. The existing policy layer still runs first:
+command classification, PathJail checks, Project write gating, and human approvals remain outside
+the runner adapter.
 
 ## Desktop app data
 
@@ -210,6 +267,7 @@ Later release work must add production-like packaged Electron E2E for:
 - Public installers, signing, notarization, update delivery, and uninstall cleanup are not complete.
 - Native Project picker and Project-bound desktop chat have development E2E coverage; packaged-app
   coverage remains future release work.
-- Command/test execution still requires a sandbox design; Electron is not the sandbox.
+- Command/test execution has an initial Docker sandbox runner. Electron is not the sandbox, and VM
+  or remote runners remain future stronger adapters behind the same `CommandRunner` interface.
 - Windows/Linux support should reuse the runtime path resolver and add platform-specific packaging
   and E2E coverage later.

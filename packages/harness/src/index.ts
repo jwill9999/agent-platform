@@ -27,10 +27,21 @@ export type {
 } from './types.js';
 export { contractToolsToDefinitions } from './types.js';
 export {
+  MACOS_VM_PRODUCTION_POLICY,
   commandRunnerResultToOutput,
+  createConfiguredCommandRunner,
+  createDockerSandboxCommandRunner,
   createHostShellCommandRunner,
+  createMacosVmCommandRunner,
   createProjectScopedCommandRunner,
+  getConfiguredCommandRunnerHealth,
+  type CommandRunnerHealth,
+  type CommandRunnerHealthStatus,
+  type CommandRunnerMode,
+  type ConfiguredCommandRunnerOptions,
   type CommandEnvironmentPolicy,
+  type DockerSandboxCommandRunnerOptions,
+  type MacosVmCommandRunnerOptions,
   type CommandRunner,
   type CommandRunnerAuditMetadata,
   type CommandRunnerCompletedResult,

@@ -28,6 +28,7 @@ describe('desktop runtime path resolution', () => {
     const paths = resolveDesktopRuntimePaths({
       userDataDir: '/Users/test/Library/Application Support/Agent Platform',
       logDir: '/Users/test/Library/Logs/Agent Platform',
+      resourcesDir: '/Applications/Agent Platform.app/Contents/Resources',
       tempDir: '/var/folders/test/T',
       env: {},
     });
@@ -36,6 +37,7 @@ describe('desktop runtime path resolution', () => {
     expect(paths.configDir).toBe('/Users/test/Library/Application Support/Agent Platform/config');
     expect(paths.dataDir).toBe('/Users/test/Library/Application Support/Agent Platform/data');
     expect(paths.logDir).toBe('/Users/test/Library/Logs/Agent Platform');
+    expect(paths.resourcesDir).toBe('/Applications/Agent Platform.app/Contents/Resources');
     expect(paths.tempDir).toBe('/var/folders/test/T');
     expect(paths.sqlitePath).toBe(
       '/Users/test/Library/Application Support/Agent Platform/data/agent.sqlite',
@@ -45,6 +47,12 @@ describe('desktop runtime path resolution', () => {
     );
     expect(paths.secretsMasterKeyPath).toBe(
       '/Users/test/Library/Application Support/Agent Platform/config/secrets-master-key.json',
+    );
+    expect(paths.macosVmPackagedHelperPath).toBe(
+      '/Applications/Agent Platform.app/Contents/Resources/macos-vm/macos-vm-runner',
+    );
+    expect(paths.macosVmPackagedAssetsDir).toBe(
+      '/Applications/Agent Platform.app/Contents/Resources/macos-vm/images',
     );
   });
 
@@ -67,6 +75,7 @@ describe('desktop runtime path resolution', () => {
     expect(paths.configDir).toBe(join(repoRuntime, 'config'));
     expect(paths.dataDir).toBe(join(repoRuntime, 'data'));
     expect(paths.logDir).toBe(logDir);
+    expect(paths.resourcesDir).toBe(repoRuntime);
     expect(paths.tempDir).toBe(tempOverride);
     expect(paths.sqlitePath).toBe(join(repoRuntime, 'data/agent.sqlite'));
   });
@@ -84,12 +93,15 @@ describe('desktop runtime path resolution', () => {
         AGENT_PLATFORM_DESKTOP_SQLITE_PATH: sqlitePath,
         AGENT_PLATFORM_DESKTOP_CONFIG_PATH: configPath,
         AGENT_PLATFORM_DESKTOP_LOG_DIR: logDir,
+        AGENT_PLATFORM_DESKTOP_RESOURCES_DIR: join(root, 'resources'),
       },
     });
 
     expect(paths.sqlitePath).toBe(sqlitePath);
     expect(paths.configPath).toBe(configPath);
     expect(paths.logDir).toBe(logDir);
+    expect(paths.resourcesDir).toBe(join(root, 'resources'));
+    expect(paths.macosVmPackagedAssetsDir).toBe(join(root, 'resources/macos-vm/images'));
   });
 
   it('ignores generic Docker SQLite overrides when resolving desktop app data', () => {

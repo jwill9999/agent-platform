@@ -1,11 +1,15 @@
 import { execFile } from 'node:child_process';
+import { accessSync, constants as fsConstants, existsSync, readFileSync, statSync } from 'node:fs';
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import type { Output, RiskTier } from '@agent-platform/contracts';
 
 import { classifyBashCommand } from './security/bashCommandPolicy.js';
 import { validateBashWorkspacePolicy } from './security/bashWorkspacePolicy.js';
 import type { PathJail } from './security/pathJail.js';
-import { toolError, toolResult, truncate } from './tools/toolHelpers.js';
+import { errorMessage, toolError, toolResult, truncate } from './tools/toolHelpers.js';
 
 export type CommandEnvironmentPolicy = {
   mode: 'inherit' | 'explicit';
@@ -66,6 +70,63 @@ export type CommandRunnerResult =
 
 export type CommandRunner = {
   run(request: CommandRunnerRequest): Promise<CommandRunnerResult>;
+};
+
+export type CommandRunnerMode = 'disabled' | 'host' | 'docker-sandbox' | 'macos-vm';
+
+export type CommandRunnerHealthStatus =
+  | 'ready'
+  | 'starting'
+  | 'unavailable'
+  | 'failed'
+  | 'disabled';
+
+export type CommandRunnerHealth = {
+  mode: CommandRunnerMode;
+  status: CommandRunnerHealthStatus;
+  production: boolean;
+  canExecute: boolean;
+  reason?: string;
+  message?: string;
+  details?: Record<string, string | number | boolean>;
+};
+
+type ExecFileLike = typeof execFile;
+
+export const MACOS_VM_PRODUCTION_POLICY = {
+  cpuCount: 2,
+  memoryMB: 2048,
+  commandTimeoutDefaultMs: 30_000,
+  commandTimeoutMaxMs: 120_000,
+  outputDefaultBytes: 65_536,
+  outputMaxBytes: 1_048_576,
+  guestUser: 'agentplatform',
+  guestUid: 1000,
+  guestGid: 1000,
+  workspaceMount: '/workspace',
+  networkPolicy: 'disabled',
+  filesystemPolicy: 'project_rw_workspace_guest_owned_scratch',
+} as const;
+
+export type DockerSandboxCommandRunnerOptions = {
+  execFile?: ExecFileLike;
+  dockerBinary?: string;
+  image?: string;
+  memory?: string;
+  cpus?: string;
+  pidsLimit?: number;
+  user?: string;
+  network?: 'none';
+  tmpSize?: string;
+};
+
+export type ConfiguredCommandRunnerOptions = {
+  env?: Record<string, string | undefined>;
+  dockerRunner?: CommandRunner;
+  hostRunner?: CommandRunner;
+  macosVmRunner?: CommandRunner;
+  macosVmHelperPath?: string;
+  macosVmRuntimeDir?: string;
 };
 
 export type ProjectScopedCommandRunnerOptions = {
@@ -186,4 +247,659 @@ export function createHostShellCommandRunner(): CommandRunner {
         proc.on('error', () => {});
       }),
   };
+}
+
+function dockerUnavailable(message: string): CommandRunnerDeniedResult {
+  return {
+    status: 'denied',
+    code: 'DOCKER_UNAVAILABLE',
+    reason: 'docker_unavailable',
+    message,
+  };
+}
+
+function commandRunnerEnvironment(env: CommandEnvironmentPolicy): Record<string, string> {
+  return {
+    ...env.variables,
+    TERM: env.variables.TERM ?? 'dumb',
+  };
+}
+
+function boundedPositiveInteger(value: number, defaultValue: number, maxValue: number): number {
+  if (!Number.isFinite(value) || value <= 0) return defaultValue;
+  return Math.min(Math.trunc(value), maxValue);
+}
+
+function replaceAll(value: string, search: string, replacement: string): string {
+  return search ? value.split(search).join(replacement) : value;
+}
+
+function cleanupTempDirectory(path: string): void {
+  rm(path, { recursive: true, force: true }).catch(() => undefined);
+}
+
+async function dockerWorkspacePaths(request: CommandRunnerRequest): Promise<{
+  hostWorkspaceRoot: string;
+  containerCwd: string;
+  containerCommand: string;
+}> {
+  const workspaceRoot = await realpath(request.workspace?.root ?? request.cwd);
+  const cwd = await realpath(request.cwd);
+  const containerCwd = cwd.startsWith(workspaceRoot)
+    ? `/workspace${cwd.slice(workspaceRoot.length)}`
+    : '/workspace';
+  const containerCommand = replaceAll(request.command, workspaceRoot, '/workspace');
+  return { hostWorkspaceRoot: workspaceRoot, containerCwd, containerCommand };
+}
+
+export function createDockerSandboxCommandRunner(
+  options: DockerSandboxCommandRunnerOptions = {},
+): CommandRunner {
+  const exec = options.execFile ?? execFile;
+  const dockerBinary = options.dockerBinary ?? 'docker';
+  const image = options.image ?? 'node:20-bookworm-slim';
+  const memory = options.memory ?? '2g';
+  const cpus = options.cpus ?? '2';
+  const pidsLimit = options.pidsLimit ?? 256;
+  const user = options.user ?? '1000:1000';
+  const network = options.network ?? 'none';
+  const tmpSize = options.tmpSize ?? '256m';
+
+  return {
+    run: async (request) => {
+      let paths: Awaited<ReturnType<typeof dockerWorkspacePaths>>;
+      try {
+        paths = await dockerWorkspacePaths(request);
+      } catch (error) {
+        return {
+          status: 'denied',
+          code: 'DOCKER_WORKSPACE_UNAVAILABLE',
+          reason: 'workspace_unavailable',
+          message: `Unable to prepare the Project workspace for sandbox execution: ${errorMessage(error)}`,
+        };
+      }
+
+      return new Promise<CommandRunnerResult>((resolve) => {
+        const startedAt = Date.now();
+        const args = [
+          'run',
+          '--rm',
+          '--network',
+          network,
+          '--memory',
+          memory,
+          '--cpus',
+          cpus,
+          '--pids-limit',
+          String(pidsLimit),
+          '--user',
+          user,
+          '--tmpfs',
+          `/tmp:rw,nosuid,nodev,size=${tmpSize}`,
+          '-v',
+          `${paths.hostWorkspaceRoot}:/workspace:rw`,
+          '-w',
+          paths.containerCwd,
+          image,
+          'sh',
+          '-lc',
+          paths.containerCommand,
+        ];
+        const proc = exec(
+          dockerBinary,
+          args,
+          {
+            cwd: paths.hostWorkspaceRoot,
+            timeout: request.timeoutMs,
+            maxBuffer: request.maxOutputBytes * 2,
+            env: commandRunnerEnvironment(request.env),
+          },
+          (error, stdout, stderr) => {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+              resolve(
+                dockerUnavailable('Docker is not available. Install Docker or use host mode.'),
+              );
+              return;
+            }
+            let exitCode = 0;
+            if (error) {
+              exitCode = 'code' in error && typeof error.code === 'number' ? error.code : 1;
+            }
+            resolve({
+              status: exitCode === 0 ? 'success' : 'failed',
+              stdout: truncate(stdout, request.maxOutputBytes),
+              stderr: truncate(stderr, request.maxOutputBytes),
+              exitCode,
+              durationMs: Date.now() - startedAt,
+            });
+          },
+        );
+        proc.on('error', () => {});
+      });
+    },
+  };
+}
+
+export type MacosVmCommandRunnerOptions = {
+  helperPath: string;
+  runtimeDir: string;
+  execFile?: ExecFileLike;
+};
+
+type MacosVmHelperResponse = {
+  ok: boolean;
+  mode: 'macos-vm';
+  state: 'ready' | 'unavailable' | 'disabled';
+  message: string;
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+  durationMs?: number;
+};
+
+function macosVmUnavailable(reason: string, message: string): CommandRunnerDeniedResult {
+  return {
+    status: 'denied',
+    code: 'MACOS_VM_RUNNER_UNAVAILABLE',
+    reason,
+    message,
+  };
+}
+
+function childProcessErrorCode(error: unknown): string | number | undefined {
+  return error && typeof error === 'object' && 'code' in error
+    ? (error.code as string | number | undefined)
+    : undefined;
+}
+
+function macosVmProcessFailure(error: unknown, stderr: string): CommandRunnerDeniedResult {
+  const code = childProcessErrorCode(error);
+  if (code === 'ENOENT') {
+    return macosVmUnavailable(
+      'macos_vm_runner_helper_missing',
+      'macOS VM runner helper binary was not found.',
+    );
+  }
+  if (code === 'EACCES') {
+    return macosVmUnavailable(
+      'macos_vm_runner_helper_not_executable',
+      'macOS VM runner helper binary is not executable.',
+    );
+  }
+  return macosVmUnavailable('macos_vm_runner_process_failed', stderr || errorMessage(error));
+}
+
+function parseMacosVmHelperResponse(stdout: string): MacosVmHelperResponse | undefined {
+  try {
+    const parsed = JSON.parse(stdout) as Partial<MacosVmHelperResponse>;
+    if (
+      parsed.mode === 'macos-vm' &&
+      typeof parsed.ok === 'boolean' &&
+      typeof parsed.state === 'string' &&
+      typeof parsed.message === 'string'
+    ) {
+      return parsed as MacosVmHelperResponse;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+async function macosVmWorkspacePaths(request: CommandRunnerRequest): Promise<{
+  hostWorkspaceRoot: string;
+  hostCwd: string;
+  guestCommand: string;
+}> {
+  const hostWorkspaceRoot = await realpath(request.workspace?.root ?? request.cwd);
+  const hostCwd = await realpath(request.cwd);
+  const guestCommand = replaceAll(request.command, hostWorkspaceRoot, '/workspace');
+  if (hostCwd !== hostWorkspaceRoot && !hostCwd.startsWith(`${hostWorkspaceRoot}/`)) {
+    return { hostWorkspaceRoot, hostCwd: hostWorkspaceRoot, guestCommand };
+  }
+  return { hostWorkspaceRoot, hostCwd, guestCommand };
+}
+
+export function createMacosVmCommandRunner({
+  helperPath,
+  runtimeDir,
+  execFile: exec = execFile,
+}: MacosVmCommandRunnerOptions): CommandRunner {
+  return {
+    run: async (request) => {
+      if (!runtimeDir.trim()) {
+        return macosVmUnavailable(
+          'macos_vm_runner_runtime_unconfigured',
+          'macOS VM runner runtime directory is not configured.',
+        );
+      }
+
+      let paths: Awaited<ReturnType<typeof macosVmWorkspacePaths>>;
+      try {
+        paths = await macosVmWorkspacePaths(request);
+      } catch (error) {
+        return macosVmUnavailable(
+          'workspace_unavailable',
+          `Unable to prepare the Project workspace for VM execution: ${errorMessage(error)}`,
+        );
+      }
+
+      const envDir = await mkdtemp(join(tmpdir(), 'agent-platform-macos-vm-env-'));
+      const envFile = join(envDir, 'env.json');
+      await writeFile(envFile, JSON.stringify(commandRunnerEnvironment(request.env)), 'utf8');
+      const timeoutMs = boundedPositiveInteger(
+        request.timeoutMs,
+        MACOS_VM_PRODUCTION_POLICY.commandTimeoutDefaultMs,
+        MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs,
+      );
+      const maxOutputBytes = boundedPositiveInteger(
+        request.maxOutputBytes,
+        MACOS_VM_PRODUCTION_POLICY.outputDefaultBytes,
+        MACOS_VM_PRODUCTION_POLICY.outputMaxBytes,
+      );
+
+      return new Promise<CommandRunnerResult>((resolve) => {
+        const startedAt = Date.now();
+        const args = [
+          'exec',
+          '--runtime-dir',
+          runtimeDir,
+          '--workspace',
+          paths.hostWorkspaceRoot,
+          '--cwd',
+          paths.hostCwd,
+          '--timeout-ms',
+          String(timeoutMs),
+          '--max-output-bytes',
+          String(maxOutputBytes),
+          '--env-file',
+          envFile,
+          '--',
+          paths.guestCommand,
+        ];
+        const proc = exec(
+          helperPath,
+          args,
+          {
+            cwd: paths.hostWorkspaceRoot,
+            timeout: timeoutMs,
+            maxBuffer: maxOutputBytes * 2,
+            env: commandRunnerEnvironment(request.env),
+          },
+          (error, stdout, stderr) => {
+            cleanupTempDirectory(envDir);
+            if (error) {
+              resolve(macosVmProcessFailure(error, stderr));
+              return;
+            }
+
+            const response = parseMacosVmHelperResponse(stdout);
+            if (!response) {
+              resolve(
+                macosVmUnavailable(
+                  'macos_vm_runner_invalid_response',
+                  'macOS VM runner returned an invalid response.',
+                ),
+              );
+              return;
+            }
+
+            if (!response.ok) {
+              resolve(macosVmUnavailable('macos_vm_runner_unavailable', response.message));
+              return;
+            }
+
+            const exitCode = response.exitCode ?? 0;
+            resolve({
+              status: exitCode === 0 ? 'success' : 'failed',
+              stdout: truncate(response.stdout ?? '', maxOutputBytes),
+              stderr: truncate(response.stderr ?? '', maxOutputBytes),
+              exitCode,
+              durationMs: response.durationMs ?? Date.now() - startedAt,
+            });
+          },
+        );
+        proc.on('error', () => {});
+      });
+    },
+  };
+}
+
+function createDisabledCommandRunner(): CommandRunner {
+  return {
+    run: async () => ({
+      status: 'denied',
+      code: 'COMMAND_RUNNER_UNAVAILABLE',
+      reason: 'command_runner_disabled',
+      message:
+        'Command execution is unavailable because no production sandbox runner is configured.',
+    }),
+  };
+}
+
+function configuredMode(env: Record<string, string | undefined>): CommandRunnerMode {
+  const raw = env.AGENT_PLATFORM_COMMAND_RUNNER ?? env.AGENT_COMMAND_RUNNER;
+  if (raw === 'host' || raw === 'docker-sandbox' || raw === 'macos-vm' || raw === 'disabled') {
+    return raw;
+  }
+  return 'disabled';
+}
+
+function configuredMacosVmRunner(
+  options: ConfiguredCommandRunnerOptions,
+): CommandRunner | undefined {
+  if (options.macosVmRunner) return options.macosVmRunner;
+  const helperPath =
+    options.macosVmHelperPath ??
+    options.env?.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH ??
+    process.env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH;
+  const runtimeDir =
+    options.macosVmRuntimeDir ??
+    options.env?.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ??
+    process.env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR;
+  return helperPath && runtimeDir
+    ? createMacosVmCommandRunner({ helperPath, runtimeDir })
+    : undefined;
+}
+
+function configuredMacosVmHelperPath(options: ConfiguredCommandRunnerOptions): string | undefined {
+  return (
+    options.macosVmHelperPath ??
+    options.env?.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH ??
+    process.env.AGENT_PLATFORM_MACOS_VM_RUNNER_PATH
+  );
+}
+
+function configuredMacosVmRuntimeDir(options: ConfiguredCommandRunnerOptions): string | undefined {
+  return (
+    options.macosVmRuntimeDir ??
+    options.env?.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR ??
+    process.env.AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR
+  );
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function isExecutableFile(path: string): boolean {
+  try {
+    accessSync(path, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function fileExists(path: string): boolean {
+  try {
+    return statSync(path).isFile() || statSync(path).isSocket();
+  } catch {
+    return false;
+  }
+}
+
+function readSmallTextFile(path: string, maxBytes = 4096): string | undefined {
+  try {
+    return truncate(readFileSync(path, 'utf8').trim(), maxBytes);
+  } catch {
+    return undefined;
+  }
+}
+
+function fileFresh(path: string, maxAgeMs: number): boolean {
+  try {
+    return Date.now() - statSync(path).mtimeMs <= maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
+function processIsAlive(pidPath: string): boolean {
+  const rawPid = readSmallTextFile(pidPath, 64);
+  const pid = rawPid ? Number.parseInt(rawPid, 10) : Number.NaN;
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return childProcessErrorCode(error) === 'EPERM';
+  }
+}
+
+function macosVmPolicyDetails(): Record<string, string | number | boolean> {
+  return {
+    cpuCount: MACOS_VM_PRODUCTION_POLICY.cpuCount,
+    memoryMB: MACOS_VM_PRODUCTION_POLICY.memoryMB,
+    commandTimeoutDefaultMs: MACOS_VM_PRODUCTION_POLICY.commandTimeoutDefaultMs,
+    commandTimeoutMaxMs: MACOS_VM_PRODUCTION_POLICY.commandTimeoutMaxMs,
+    outputDefaultBytes: MACOS_VM_PRODUCTION_POLICY.outputDefaultBytes,
+    outputMaxBytes: MACOS_VM_PRODUCTION_POLICY.outputMaxBytes,
+    guestUser: MACOS_VM_PRODUCTION_POLICY.guestUser,
+    guestUid: MACOS_VM_PRODUCTION_POLICY.guestUid,
+    guestGid: MACOS_VM_PRODUCTION_POLICY.guestGid,
+    workspaceMount: MACOS_VM_PRODUCTION_POLICY.workspaceMount,
+    networkPolicy: MACOS_VM_PRODUCTION_POLICY.networkPolicy,
+    filesystemPolicy: MACOS_VM_PRODUCTION_POLICY.filesystemPolicy,
+  };
+}
+
+function macosVmRuntimeHealth(
+  mode: CommandRunnerMode,
+  helperPath: string | undefined,
+  runtimeDir: string | undefined,
+): CommandRunnerHealth {
+  const details: Record<string, string | number | boolean> = macosVmPolicyDetails();
+  if (helperPath) details['helperPath'] = helperPath;
+  if (runtimeDir) details['runtimeDir'] = runtimeDir;
+
+  if (!helperPath) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_helper_missing',
+      message: 'macOS VM command execution is selected but the VM helper path is not configured.',
+      details,
+    };
+  }
+
+  if (!existsSync(helperPath)) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_helper_missing',
+      message: 'macOS VM runner helper binary was not found.',
+      details,
+    };
+  }
+
+  if (!isExecutableFile(helperPath)) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_helper_not_executable',
+      message: 'macOS VM runner helper binary is not executable.',
+      details,
+    };
+  }
+
+  if (!runtimeDir || !isDirectory(runtimeDir)) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_runtime_missing',
+      message: 'macOS VM command execution is selected but the runtime directory is unavailable.',
+      details,
+    };
+  }
+
+  const imagesDir = join(runtimeDir, 'images');
+  const requiredAssets = [
+    'manifest.json',
+    'base-linux.img',
+    'vmlinuz',
+    'initrd.img',
+    'guest-bootstrap.sh',
+  ];
+  const missingAssets = requiredAssets.filter((asset) => !fileExists(join(imagesDir, asset)));
+  if (missingAssets.length > 0) {
+    return {
+      mode,
+      status: 'unavailable',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_assets_missing',
+      message: `macOS VM runtime assets are missing: ${missingAssets.join(', ')}.`,
+      details: { ...details, imagesDir, missingAssets: missingAssets.join(',') },
+    };
+  }
+
+  const stateDir = join(runtimeDir, 'state');
+  const logsDir = join(runtimeDir, 'logs');
+  const runnerSocket = join(stateDir, 'runner.sock');
+  const daemonPid = join(stateDir, 'daemon.pid');
+  const daemonHeartbeat = join(stateDir, 'daemon.heartbeat');
+  const lastError = join(logsDir, 'last-error.log');
+  const alive = processIsAlive(daemonPid);
+  const freshHeartbeat = fileFresh(daemonHeartbeat, 5_000);
+  const socketExists = existsSync(runnerSocket);
+
+  if (socketExists && alive && freshHeartbeat) {
+    return {
+      mode,
+      status: 'ready',
+      production: true,
+      canExecute: true,
+      reason: 'production_runner_ready',
+      message: 'macOS VM command execution is ready.',
+      details: { ...details, runnerSocket, daemonPid, daemonHeartbeat },
+    };
+  }
+
+  const failure = readSmallTextFile(lastError);
+  if (failure) {
+    return {
+      mode,
+      status: 'failed',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_failed_closed',
+      message: `macOS VM command execution failed closed: ${failure}`,
+      details: { ...details, lastError },
+    };
+  }
+
+  if (socketExists || alive || existsSync(daemonPid) || existsSync(daemonHeartbeat)) {
+    return {
+      mode,
+      status: 'starting',
+      production: true,
+      canExecute: false,
+      reason: 'macos_vm_runner_starting',
+      message: 'macOS VM command execution is starting but is not ready yet.',
+      details: {
+        ...details,
+        runnerSocket,
+        daemonPid,
+        daemonHeartbeat,
+        socketExists,
+        daemonAlive: alive,
+        freshHeartbeat,
+      },
+    };
+  }
+
+  return {
+    mode,
+    status: 'unavailable',
+    production: true,
+    canExecute: false,
+    reason: 'macos_vm_runner_not_started',
+    message: 'macOS VM command execution is configured but the VM daemon is not running.',
+    details,
+  };
+}
+
+export function getConfiguredCommandRunnerHealth(
+  options: ConfiguredCommandRunnerOptions = {},
+): CommandRunnerHealth {
+  const mode = configuredMode(options.env ?? process.env);
+
+  if (mode === 'host') {
+    return {
+      mode,
+      status: 'ready',
+      production: false,
+      canExecute: true,
+      reason: 'development_only',
+      message: 'Host command execution is available for explicit local development only.',
+    };
+  }
+
+  if (mode === 'docker-sandbox') {
+    return {
+      mode,
+      status: 'ready',
+      production: false,
+      canExecute: true,
+      reason: 'development_only',
+      message: 'Docker sandbox execution is available for development and adapter testing only.',
+    };
+  }
+
+  if (mode === 'macos-vm') {
+    const helperPath = configuredMacosVmHelperPath(options);
+    const runtimeDir = configuredMacosVmRuntimeDir(options);
+    if (options.macosVmRunner) {
+      return {
+        mode,
+        status: 'ready',
+        production: true,
+        canExecute: true,
+        reason: 'production_runner_ready',
+        message: 'macOS VM command execution is configured.',
+        details: {
+          ...macosVmPolicyDetails(),
+          ...(helperPath ? { helperPath } : {}),
+          ...(runtimeDir ? { runtimeDir } : {}),
+        },
+      };
+    }
+
+    return macosVmRuntimeHealth(mode, helperPath, runtimeDir);
+  }
+
+  return {
+    mode,
+    status: 'disabled',
+    production: false,
+    canExecute: false,
+    reason: 'command_runner_disabled',
+    message: 'Command execution is disabled because no production runner is configured.',
+  };
+}
+
+export function createConfiguredCommandRunner(
+  options: ConfiguredCommandRunnerOptions = {},
+): CommandRunner {
+  const mode = configuredMode(options.env ?? process.env);
+  const hostRunner = options.hostRunner ?? createHostShellCommandRunner();
+  const dockerRunner = options.dockerRunner ?? createDockerSandboxCommandRunner();
+
+  if (mode === 'disabled') return createDisabledCommandRunner();
+  if (mode === 'host') return hostRunner;
+  if (mode === 'docker-sandbox') return dockerRunner;
+  return configuredMacosVmRunner(options) ?? createDisabledCommandRunner();
 }

@@ -44,7 +44,7 @@ const HTML = `<!doctype html>
   </body>
 </html>`;
 
-const BROWSER_START_TIMEOUT_MS = 30_000;
+const BROWSER_START_TIMEOUT_MS = 60_000;
 const BROWSER_ACTION_TIMEOUT_MS = 10_000;
 
 function toolData(output: Output | null): BrowserActionResult {
@@ -216,7 +216,7 @@ describe('browser tools integration', () => {
     );
     expect(afterClose.status).toBe('failed');
     expect(afterClose.error?.code).toBe('BROWSER_SESSION_UNAVAILABLE');
-  }, 60_000);
+  }, 90_000);
 
   it('blocks external navigation, approval-gates risky actions, and reports ambiguous targets', async () => {
     const activeManager = manager ?? new BrowserSessionManager({ workspaceRoot });

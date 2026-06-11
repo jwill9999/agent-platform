@@ -3,6 +3,7 @@ dist/
 .next/
 .turbo/
 *.tsbuildinfo
+.DS_Store
 .env
 .env.*
 !.env.example
@@ -16,6 +17,8 @@ playwright-report/
 test-results/
 .playwright-mcp/
 .agent-platform/
+apps/desktop/native/macos-vm-runner/.build/
+apps/desktop/resources/macos-vm/
 
 # Beads / Dolt files (added by bd init)
 .beads-credential-key

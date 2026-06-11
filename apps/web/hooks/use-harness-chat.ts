@@ -181,6 +181,7 @@ function isRecoverableToolErrorCode(code: unknown): code is string {
     code === 'PATH_ACCESS_DENIED' ||
     code === 'BASH_COMMAND_BLOCKED' ||
     code === 'QUALITY_GATE_DENIED' ||
+    code.endsWith('_UNAVAILABLE') ||
     code.endsWith('_FAILED') ||
     code.startsWith('TOOL_') ||
     code.startsWith('MCP_') ||

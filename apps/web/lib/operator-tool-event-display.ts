@@ -139,6 +139,7 @@ function resultSummary(
 function errorLabel(code: string | undefined): string {
   if (code === 'PATH_ACCESS_DENIED') return 'Path access blocked';
   if (code === 'BASH_COMMAND_BLOCKED') return 'Terminal command blocked';
+  if (code === 'MACOS_VM_RUNNER_UNAVAILABLE') return 'Command runner unavailable';
   if (code === 'QUALITY_GATE_DENIED') return 'Quality gate blocked completion';
   if (code === 'CONTENT_TOO_LARGE') return 'Content too large to display';
   if (code === 'INVALID_ARGS') return 'Tool input was invalid';

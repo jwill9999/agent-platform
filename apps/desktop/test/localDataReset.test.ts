@@ -31,10 +31,13 @@ function makeRuntimePaths(root: string): DesktopRuntimePaths {
     configDir: join(root, 'config'),
     dataDir: join(root, 'data'),
     logDir: join(root, 'logs'),
+    resourcesDir: join(root, 'resources'),
     tempDir: join(root, 'tmp'),
     sqlitePath: join(root, 'data/agent.sqlite'),
     configPath: join(root, 'config/runtime.json'),
     secretsMasterKeyPath: join(root, 'config/secrets-master-key.json'),
+    macosVmPackagedAssetsDir: join(root, 'resources/macos-vm/images'),
+    macosVmPackagedHelperPath: join(root, 'resources/macos-vm/macos-vm-runner'),
   };
 }
 

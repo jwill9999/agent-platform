@@ -5,6 +5,7 @@ import type {
   ModelConfig,
   ProjectOnboardingDraft,
   ProjectDesktopRecord,
+  ReadinessResponse,
   SensorDashboardResponse,
   SessionRecord,
 } from '@agent-platform/contracts';
@@ -100,11 +101,19 @@ type ErrorBannerProps = Readonly<{
   onDismiss: () => void;
 }>;
 type ProjectChatHeaderProps = Readonly<{
+  commandRunner: CommandRunnerDisplay | null;
   project: ProjectDesktopRecord | null;
   sessionId: string | null;
   onReturnHome: () => void;
   terminalOpen: boolean;
   onToggleTerminal: () => void;
+}>;
+type CommandRunnerDisplay = Readonly<{
+  canExecute: boolean;
+  message: string;
+  mode: string;
+  reason: string;
+  status: string;
 }>;
 type ProjectInstructionsDecision = Readonly<{
   projectId: string;
@@ -179,6 +188,41 @@ function projectChatEmptyStateTitle(
 function projectChatEmptyStateDescription(selectedMode: WorkspaceMode | null): string | undefined {
   if (selectedMode !== 'project-chat') return undefined;
   return 'Tell the assistant what you want done in this Project.';
+}
+
+function commandRunnerDisplayFromReadiness(readiness: ReadinessResponse): CommandRunnerDisplay {
+  const commandRunner = readiness.checks['commandRunner'];
+  const details = commandRunner?.details ?? {};
+  const status = details['status'] ?? commandRunner?.status ?? 'unknown';
+  const mode = details['mode'] ?? 'unknown';
+  return {
+    canExecute: details['canExecute'] === 'true',
+    message: details['message'] ?? commandRunner?.error ?? 'Command runner status unavailable.',
+    mode,
+    reason: details['reason'] ?? '',
+    status,
+  };
+}
+
+function commandRunnerStatusColor(commandRunner: CommandRunnerDisplay): string {
+  if (commandRunner.canExecute) return 'bg-emerald-500';
+  if (commandRunner.status === 'failed') return 'bg-destructive';
+  return 'bg-amber-500';
+}
+
+async function fetchCommandRunnerDisplay(): Promise<CommandRunnerDisplay> {
+  const response = await fetch('/api/health/ready', { cache: 'no-store' });
+  const payload = (await response.json()) as ReadinessResponse;
+  if (!response.ok && !payload.checks?.['commandRunner']) {
+    return {
+      canExecute: false,
+      message: `Command runner health check failed (${response.status}).`,
+      mode: 'unknown',
+      reason: 'health_check_failed',
+      status: 'unavailable',
+    };
+  }
+  return commandRunnerDisplayFromReadiness(payload);
 }
 
 type ProjectInstructionsConversationAccessoryProps = Readonly<{
@@ -460,6 +504,7 @@ function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
 }
 
 function ProjectChatHeader({
+  commandRunner,
   project,
   sessionId,
   onReturnHome,
@@ -488,6 +533,20 @@ function ProjectChatHeader({
           <div className="truncate text-[11px] text-muted-foreground">{folderPathLabel}</div>
         )}
       </div>
+      {commandRunner && (
+        <div
+          aria-label="Command runner status"
+          className="hidden min-w-0 max-w-44 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground md:flex"
+          title={commandRunner.message}
+        >
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${commandRunnerStatusColor(commandRunner)}`}
+          />
+          <span className="truncate">
+            {commandRunner.mode} {commandRunner.status}
+          </span>
+        </div>
+      )}
       <Button
         type="button"
         size="sm"
@@ -526,6 +585,7 @@ export default function HomePage() {
   const [sensorDashboard, setSensorDashboard] = useState<SensorDashboardResponse | null>(null);
   const [sensorLoading, setSensorLoading] = useState(false);
   const [sensorError, setSensorError] = useState<string | null>(null);
+  const [commandRunnerHealth, setCommandRunnerHealth] = useState<CommandRunnerDisplay | null>(null);
   const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
   const [isOpeningProject, setIsOpeningProject] = useState(false);
   const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
@@ -677,6 +737,7 @@ export default function HomePage() {
       setSensorDashboard(null);
       setSensorError(null);
       setSensorLoading(false);
+      setCommandRunnerHealth(null);
       setSessionError(null);
       setIsResuming(false);
       clearAttachments();
@@ -699,6 +760,7 @@ export default function HomePage() {
     setSensorDashboard(null);
     setSensorError(null);
     setSensorLoading(false);
+    setCommandRunnerHealth(null);
     setSessionError(null);
     setIsResuming(false);
     clearAttachments();
@@ -761,6 +823,7 @@ export default function HomePage() {
       setActiveProject(project);
       setSessionId(null);
       setSensorDashboard(null);
+      setCommandRunnerHealth(null);
       setSessionError(null);
       setIsResuming(false);
       clearAttachments();
@@ -888,6 +951,34 @@ export default function HomePage() {
       setProjectGitRefreshKey((value) => value + 1);
     }
   }, [activeProject?.id]);
+
+  const refreshCommandRunnerHealth = useCallback(async () => {
+    try {
+      setCommandRunnerHealth(await fetchCommandRunnerDisplay());
+    } catch (error) {
+      setCommandRunnerHealth({
+        canExecute: false,
+        message: error instanceof Error ? error.message : 'Command runner health check failed.',
+        mode: 'unknown',
+        reason: 'health_check_failed',
+        status: 'unavailable',
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedMode !== 'project-chat') {
+      setCommandRunnerHealth(null);
+      return;
+    }
+    refreshCommandRunnerHealth().catch(() => {});
+    const interval = globalThis.window.setInterval(() => {
+      refreshCommandRunnerHealth().catch(() => {});
+    }, 5_000);
+    return () => {
+      globalThis.window.clearInterval(interval);
+    };
+  }, [refreshCommandRunnerHealth, selectedMode]);
 
   useEffect(() => {
     if (selectedMode !== 'project-chat' || !activeProject?.id) return;
@@ -1285,6 +1376,7 @@ export default function HomePage() {
           />
           {selectedMode === 'project-chat' && (
             <ProjectChatHeader
+              commandRunner={commandRunnerHealth}
               project={activeProject}
               sessionId={sessionId}
               onReturnHome={handleReturnHome}

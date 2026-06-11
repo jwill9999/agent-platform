@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   commandRunnerResultToOutput,
+  createConfiguredCommandRunner,
+  createDockerSandboxCommandRunner,
   createProjectScopedCommandRunner,
   createSystemToolExecutor,
   type CommandRunner,
@@ -283,5 +285,133 @@ describe('CommandRunner boundary', () => {
     expect(runner.run).not.toHaveBeenCalled();
     await rm(workspaceRoot, { recursive: true, force: true });
     await rm(outsideRoot, { recursive: true, force: true });
+  });
+
+  it('runs commands through a Docker sandbox with a project-only mount and no inherited secrets', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const realWorkspaceRoot = await realpath(workspaceRoot);
+    process.env.AGENT_PLATFORM_TEST_SECRET = 'must-not-leak';
+    const execFile = vi.fn((_file, _args, _options, callback) => {
+      callback(null, 'ok\n', '');
+      return { on: vi.fn() };
+    });
+    const runner = createDockerSandboxCommandRunner({ execFile });
+
+    await expect(
+      runner.run(
+        commandRequest(workspaceRoot, {
+          command: `cat ${realWorkspaceRoot}/input.txt`,
+          cwd: realWorkspaceRoot,
+          env: { mode: 'inherit', variables: { CI: '1' } },
+        }),
+      ),
+    ).resolves.toMatchObject({
+      status: 'success',
+      stdout: 'ok\n',
+      exitCode: 0,
+    });
+
+    expect(execFile).toHaveBeenCalledOnce();
+    const [file, args, options] = execFile.mock.calls[0]!;
+    expect(file).toBe('docker');
+    expect(args).toEqual(
+      expect.arrayContaining([
+        'run',
+        '--rm',
+        '--network',
+        'none',
+        '--memory',
+        '2g',
+        '--cpus',
+        '2',
+        '--pids-limit',
+        '256',
+        '--user',
+        '1000:1000',
+        '-v',
+        `${realWorkspaceRoot}:/workspace:rw`,
+        '-w',
+        '/workspace',
+      ]),
+    );
+    expect(args.at(-3)).toBe('sh');
+    expect(args.at(-2)).toBe('-lc');
+    expect(args.at(-1)).toBe('cat /workspace/input.txt');
+    expect(options.cwd).toBe(realWorkspaceRoot);
+    expect(options.env).toEqual({ CI: '1', TERM: 'dumb' });
+    expect(options.env).not.toHaveProperty('AGENT_PLATFORM_TEST_SECRET');
+
+    delete process.env.AGENT_PLATFORM_TEST_SECRET;
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('defaults configured command execution to disabled when no mode is provided', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const dockerRunner: CommandRunner = { run: vi.fn() };
+    const hostRunner: CommandRunner = { run: vi.fn() };
+    const runner = createConfiguredCommandRunner({ env: {}, dockerRunner, hostRunner });
+
+    await expect(runner.run(commandRequest(workspaceRoot))).resolves.toMatchObject({
+      status: 'denied',
+      code: 'COMMAND_RUNNER_UNAVAILABLE',
+      reason: 'command_runner_disabled',
+    });
+    expect(dockerRunner.run).not.toHaveBeenCalled();
+    expect(hostRunner.run).not.toHaveBeenCalled();
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('uses host execution only when explicitly requested', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const dockerRunner: CommandRunner = { run: vi.fn() };
+    const hostRunner: CommandRunner = {
+      run: vi.fn().mockResolvedValue({
+        status: 'success',
+        stdout: 'host\n',
+        stderr: '',
+        exitCode: 0,
+        durationMs: 1,
+      }),
+    };
+    const runner = createConfiguredCommandRunner({
+      env: { AGENT_PLATFORM_COMMAND_RUNNER: 'host' },
+      dockerRunner,
+      hostRunner,
+    });
+
+    await expect(runner.run(commandRequest(workspaceRoot))).resolves.toMatchObject({
+      status: 'success',
+      stdout: 'host\n',
+    });
+    expect(dockerRunner.run).not.toHaveBeenCalled();
+    expect(hostRunner.run).toHaveBeenCalledOnce();
+    await rm(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it('uses Docker sandbox execution only when explicitly requested', async () => {
+    const workspaceRoot = await mkdtemp(join(tmpdir(), 'agent-platform-runner-'));
+    const dockerRunner: CommandRunner = {
+      run: vi.fn().mockResolvedValue({
+        status: 'success',
+        stdout: 'docker\n',
+        stderr: '',
+        exitCode: 0,
+        durationMs: 1,
+      }),
+    };
+    const hostRunner: CommandRunner = { run: vi.fn() };
+    const runner = createConfiguredCommandRunner({
+      env: { AGENT_PLATFORM_COMMAND_RUNNER: 'docker-sandbox' },
+      dockerRunner,
+      hostRunner,
+    });
+
+    await expect(runner.run(commandRequest(workspaceRoot))).resolves.toMatchObject({
+      status: 'success',
+      stdout: 'docker\n',
+    });
+    expect(dockerRunner.run).toHaveBeenCalledOnce();
+    expect(hostRunner.run).not.toHaveBeenCalled();
+    await rm(workspaceRoot, { recursive: true, force: true });
   });
 });
