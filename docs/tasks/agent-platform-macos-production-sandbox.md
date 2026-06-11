@@ -25,6 +25,22 @@ Host/Docker:
   explicit development-only modes
 ```
 
+## Production Release Hold
+
+Do not ship or promote a production macOS release from this epic until
+`agent-platform-macos-production-sandbox.6.3` is closed with real Developer ID signing and
+notarization evidence. Development signing, staging packaged VM E2E, and packaged repair smoke are
+sufficient to merge development work forward, but they are not sufficient production release
+evidence.
+
+Before production release, `.6.3` must record:
+
+- Developer ID signed artifact evidence.
+- Notarization success from Apple notary service.
+- Helper signing/entitlement/quarantine report.
+- Packaged `macos-vm` health reaching `ready` from the signed/notarized artifact.
+- VM helper command smoke evidence from that signed/notarized artifact.
+
 ## Environment Model
 
 | Environment | Purpose                                      | Runner Policy                                                                                                                                                           | Required Evidence                                                                                                                                   |

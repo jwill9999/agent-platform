@@ -8,6 +8,13 @@
 
 Prove the signed and notarized macOS artifact can start and use the VM helper.
 
+## Production Release Hold
+
+This task is a production release gate. Do not ship or promote a production macOS release until this
+task is closed with real Developer ID signed and Apple-notarized artifact evidence. Development
+signing and packaged VM smoke tests are useful development/staging evidence, but they do not satisfy
+this task's Definition of Done.
+
 ## Requirements
 
 - Include the native helper in signing and notarization configuration.

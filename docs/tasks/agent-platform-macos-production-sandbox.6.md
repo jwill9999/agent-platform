@@ -16,6 +16,14 @@ Harden the macOS VM runner for release and document how the same `CommandRunner`
 - Document Windows and Linux runner adapter targets.
 - Keep host execution development-only across all future platforms.
 
+## Production Release Hold
+
+Do not treat `.6`, the parent epic, or a macOS production release as complete until `.6.3` has real
+Developer ID signing and Apple notarization evidence. Merging completed VM development work into the
+staging/integration branch is acceptable after CI/CD passes, but production release promotion is
+blocked until `.6.3` records signed/notarized artifact smoke evidence and `macos-vm` ready health
+from that artifact.
+
 ## Implementation Plan
 
 Follow Stage 10 and Stage 11 in the implementation plan:
