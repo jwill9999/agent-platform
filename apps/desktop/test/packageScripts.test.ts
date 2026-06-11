@@ -41,6 +41,9 @@ describe('desktop package scripts', () => {
     expect(packageJson.scripts['native:vm:package']).toBe(
       'node scripts/package-macos-vm-runtime.mjs',
     );
+    expect(packageJson.scripts['native:vm:smoke-repair']).toBe(
+      'node scripts/smoke-macos-vm-repair.mjs',
+    );
     expect(packageJson.scripts['native:vm:sign-dev']).toBe('node scripts/sign-macos-vm-runner.mjs');
     expect(packageJson.scripts['native:vm:verify-signing']).toBe(
       'node scripts/verify-macos-vm-signing.mjs',

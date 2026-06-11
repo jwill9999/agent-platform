@@ -49,6 +49,19 @@ Remaining sign-off evidence:
 - A signed/notarized artifact smoke on the VM-capable Apple Silicon runner.
 - A runner health report proving `macos-vm` ready state from that signed/notarized artifact.
 
+Current blocker, 2026-06-12:
+
+- Local Apple signing/notarization prerequisites are not available in this environment:
+  `security find-identity -v -p codesigning` returned `0 valid identities found`.
+- `xcrun notarytool` is installed, but no `APPLE_*`, `DEVELOPER_*`, `NOTARY*`, `CODESIGN*`,
+  `CSC*`, `TEAM*`, or `ASC*` environment variable names are present.
+- Development signing and packaged VM helper execution have been proven by `.6.1` and `.6.2`, but
+  this task still requires a real Developer ID signed and notarized artifact smoke before it can be
+  closed.
+- Next required action: run the packaged VM smoke on a VM-capable Apple Silicon runner with the
+  Developer ID signing identity and notary credentials configured, then record the helper signing
+  report, notarization result, and `macos-vm` ready health output here.
+
 ## Definition Of Done
 
 - Signing and notarization preserve VM helper execution.

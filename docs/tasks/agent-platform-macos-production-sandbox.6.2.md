@@ -43,6 +43,41 @@ Add a user-safe reset and repair path for app-owned VM runtime state.
 - Test proving reset refuses arbitrary paths, symlink escapes, and Project folder paths.
 - Test proving reset handles running, stopped, and partially corrupted runtime states.
 
+Current verification, 2026-06-12:
+
+- Added `native:vm:smoke-repair`, backed by `apps/desktop/scripts/smoke-macos-vm-repair.mjs`, so
+  packaged repair evidence is repeatable instead of a one-off shell sequence.
+- Rebuilt and development-signed the packaged macOS VM helper:
+  `pnpm --filter @agent-platform/desktop native:vm:build` and
+  `pnpm --filter @agent-platform/desktop native:vm:sign-dev`.
+- Verified the signed helper with
+  `pnpm --filter @agent-platform/desktop native:vm:verify-signing -- --helper
+/Users/letuscode/projects/agent-platform/apps/desktop/native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner
+--json`; signature verification passed, quarantine was absent, and
+  `com.apple.security.virtualization` was present.
+- Prepared pristine packaged VM assets in `/private/tmp/agent-platform-linux-runtime-6-2/images`
+  from the `.6.1` source asset set.
+- Ran
+  `pnpm --filter @agent-platform/desktop native:vm:smoke-repair -- --assets-dir
+/private/tmp/agent-platform-linux-runtime-6-2/images --work-dir
+/private/tmp/agent-platform-macos-vm-repair-smoke-6-2`.
+- Smoke packaged the signed helper/assets into
+  `/private/tmp/agent-platform-macos-vm-repair-smoke-6-2/resources/macos-vm`, created a corrupt
+  app-owned VM runtime under `user-data/data/vm`, and created a separate Project folder containing
+  `README.md`.
+- Repair result was `ok: true`; deleted only app-owned `state` and `images`; preserved `logs`; set
+  `repairedAssets: true`; set `preservedDiagnostics: true`; and set
+  `preservedProjectFolders: true`.
+- The Project file at `/private/tmp/agent-platform-macos-vm-repair-smoke-6-2/project/README.md`
+  survived repair.
+- The diagnostic log at
+  `/private/tmp/agent-platform-macos-vm-repair-smoke-6-2/user-data/data/vm/logs/support.log`
+  survived repair.
+- The packaged manifest was restored at
+  `/private/tmp/agent-platform-macos-vm-repair-smoke-6-2/user-data/data/vm/images/manifest.json`.
+- After repair, the packaged helper returned `prepare: disabled`, `start: ready`, `status: ready`,
+  and `stop: disabled` using the repaired runtime and Project workspace.
+
 ## Definition Of Done
 
 - Users can recover a broken VM runtime without manual file-system setup.

@@ -14,6 +14,7 @@
     "native:vm:build": "swift build --package-path native/macos-vm-runner",
     "native:vm:host-check": "node scripts/check-macos-vm-runner-host.mjs",
     "native:vm:package": "node scripts/package-macos-vm-runtime.mjs",
+    "native:vm:smoke-repair": "node scripts/smoke-macos-vm-repair.mjs",
     "native:vm:sign-dev": "node scripts/sign-macos-vm-runner.mjs",
     "native:vm:verify-signing": "node scripts/verify-macos-vm-signing.mjs",
     "native:vm:test": "swift test --package-path native/macos-vm-runner",
