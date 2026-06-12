@@ -157,6 +157,10 @@ typecheck:
 format:
 	pnpm format:check
 
+electron-local:
+	export SECRETS_MASTER_KEY="$(openssl rand -base64 32)"
+	pnpm --filter @agent-platform/desktop run start:renderer
+
 # ---------------------------------------------------------------------------
 # Help
 # ---------------------------------------------------------------------------
