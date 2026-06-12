@@ -27,6 +27,9 @@ and actionable.
 - `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
 - `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
   sizes.
+- `.20` is open as a non-blocking follow-up to define the broader E2E expectation matrix across
+  Workspaces, Project Chat/Coding, Personal Chat, secondary file view, and future specialized
+  workflows.
 - `.18` is open for owner manual QA sign-off. It should use
   `docs/qa/electron-stabilisation-automation-matrix.md` to reduce manual scope to native/subjective
   checks and any automation ambiguity.
@@ -44,6 +47,8 @@ and actionable.
   `.12` depend on `.17` and `.18`.
 - Added Beads task `agent-platform-electron-stabilisation.19` for first-load responsive layout E2E
   coverage.
+- Added Beads task `agent-platform-electron-stabilisation.20` as a non-blocking follow-up for the
+  workflow expectation matrix.
 
 ## Checks Run
 
