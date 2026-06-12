@@ -45,7 +45,7 @@ import {
   type ProjectWebViewMode,
 } from '@/components/project/project-webview-panel';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
-import { resolveChatModelConfigId } from '@/lib/modelSelection';
+import { resolveChatModelConfigId, usableModelConfigs } from '@/lib/modelSelection';
 import {
   buildPersonalChatHref,
   createWorkspaceNavigationState,
@@ -663,7 +663,7 @@ export default function HomePage() {
       const nextAgents = agentList ?? [];
       setAgents(nextAgents);
       const def = pickDefaultAgentForMode(nextAgents, 'chat');
-      const withKey = (configList ?? []).filter((c) => c.hasApiKey);
+      const usableConfigs = usableModelConfigs(configList ?? []);
       if (def) {
         setSelectedAgentId((prev) => {
           if (prev) return prev;
@@ -671,12 +671,12 @@ export default function HomePage() {
           return def.id;
         });
       }
-      // Only show configs that have an API key stored; default to the selected agent's config.
-      setModelConfigs(withKey);
+      // Only show configs that can run: saved keyed configs plus local providers.
+      setModelConfigs(usableConfigs);
       setSelectedModelConfigId((prev) =>
-        prev && withKey.some((config) => config.id === prev)
+        prev && usableConfigs.some((config) => config.id === prev)
           ? prev
-          : resolveChatModelConfigId(def?.id ?? null, nextAgents, withKey),
+          : resolveChatModelConfigId(def?.id ?? null, nextAgents, usableConfigs),
       );
     } catch (e) {
       setLoadError(e instanceof ApiRequestError ? e.message : String(e));
@@ -1372,8 +1372,11 @@ export default function HomePage() {
   );
 
   const isLoading = status === 'streaming';
-  const canSend = Boolean(sessionId) && !hasPendingApproval;
-  const inputStatusText = getInputStatusText(hasPendingApproval, selectedMode, sessionId);
+  const hasUsableModelConfig = modelConfigs.length > 0;
+  const canSend = Boolean(sessionId) && !hasPendingApproval && hasUsableModelConfig;
+  const inputStatusText = !hasUsableModelConfig
+    ? 'Create a model in Settings > Models before sending.'
+    : getInputStatusText(hasPendingApproval, selectedMode, sessionId);
   const onboardingDraft = projectOnboardingDraft(activeProject);
   const navigationState = createWorkspaceNavigationState({
     surface: getWorkspaceSurface(selectedMode),

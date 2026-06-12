@@ -16,9 +16,10 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-12
-- **Session:** Fixed Personal Chat send failure after manual desktop QA found missing local seed.
+- **Session:** Fixed Personal Chat send failure and clarified required model-config UX.
 - **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
-- **Latest commit:** pending; previous `b8ae6a4` fixed Personal Chat nav and model default leakage.
+- **Latest commit:** pending; previous `46851e1` fixed local desktop seeding and Personal Chat
+  session repair.
 
 ## Current State
 
@@ -42,10 +43,13 @@ and actionable.
 - `.23` is closed: Workspace Preview sizing/controls are clearer, Open in IDE uses the desktop
   external launcher instead of `/ide`, the command-runner badge says `Agent commands off`, and the
   Push tab/action no longer shows an inline ahead-count badge.
-- `.24` is in final verification: Personal Chat entered from Workspaces now marks the Chat nav item
-  active, desktop/API startup seeds the Personal assistant profile into local runtime DBs, existing
-  bad personal sessions are repaired to the Personal assistant profile, and model selection remains
+- `.24` is closed: Personal Chat entered from Workspaces now marks the Chat nav item active,
+  desktop/API startup seeds the Personal assistant profile into local runtime DBs, existing bad
+  personal sessions are repaired to the Personal assistant profile, and model selection remains
   provider/model agnostic.
+- `.25` is in final verification: zero usable model configs disable chat send with a `Configure
+model` CTA; exactly one usable model config becomes the default; multiple configs remain
+  selectable and agent preference still wins.
 
 ## Recent Work
 
@@ -61,7 +65,12 @@ and actionable.
   baseline that Docker and E2E already seed.
 - Added Personal Chat session repair so previously created `mode=chat` sessions with the wrong
   backend agent owner are normalized before use.
+- Added `usableModelConfigs` so model availability is provider/model agnostic but explicit: keyed
+  saved configs and local `ollama` configs can run.
+- Disabled chat send and surfaced a Settings > Models setup CTA when no usable model config exists.
+- Added focused model-selection tests for zero, one, and multiple usable model configs.
 - Added Beads task/spec `agent-platform-electron-stabilisation.24` for the Personal Chat regression.
+- Added Beads task/spec `agent-platform-electron-stabilisation.25` for required model-config UX.
 - Updated `apps/web/components/project/project-webview-panel.tsx` so native WebView bounds are
   deduped by rounded viewport rectangle and resynced via `ResizeObserver`, window resize, and an
   animation-frame layout check while a WebView is active.
@@ -113,6 +122,7 @@ and actionable.
 - `pnpm --filter @agent-platform/api test -- test/crud.integration.test.ts`
 - `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
 - `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts test/default-agent.test.ts`
+- `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts`
 - `pnpm --filter @agent-platform/api lint`
 - `pnpm --filter @agent-platform/contracts typecheck`
 - `pnpm --filter @agent-platform/desktop test:e2e` (`8 passed`)
