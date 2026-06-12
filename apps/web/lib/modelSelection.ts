@@ -10,5 +10,5 @@ export function resolveChatModelConfigId(
   if (agentConfigId && configList.some((config) => config.id === agentConfigId)) {
     return agentConfigId;
   }
-  return null;
+  return configList.find((config) => config.hasApiKey || config.provider === 'ollama')?.id ?? null;
 }

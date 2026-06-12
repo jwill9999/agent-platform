@@ -123,6 +123,10 @@ test.describe('Electron Project access', () => {
       expect(existsSync(join(newProjectParentDir, newProjectName))).toBe(true);
       const createdProject = await findRecentProject(backendPort, newProjectName);
       expect(createdProject.metadata.source).toBe('desktop');
+      await page.getByRole('combobox', { name: 'Active agent' }).click();
+      await page.getByRole('option', { name: 'Personal assistant' }).click();
+      await page.getByRole('combobox', { name: 'Active agent' }).click();
+      await page.getByRole('option', { name: 'Coding' }).click();
       await page.getByRole('button', { name: 'Workspaces' }).click();
       await expect(page.getByRole('button', { name: 'Open Chat' })).toBeVisible();
 

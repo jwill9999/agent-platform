@@ -41,13 +41,34 @@ describe('resolveChatModelConfigId', () => {
     ).toBe('cfg-b');
   });
 
-  it('does not fall back to the first saved config when the agent has no override', () => {
-    expect(resolveChatModelConfigId('agent-1', [agent()], [configA, configB])).toBeNull();
+  it('falls back to the first saved keyed config when the agent has no override', () => {
+    expect(resolveChatModelConfigId('agent-1', [agent()], [configA, configB])).toBe('cfg-a');
   });
 
   it('falls back to platform defaults when the assigned config is unavailable', () => {
     expect(
       resolveChatModelConfigId('agent-1', [agent({ modelConfigId: 'missing' })], [configA]),
-    ).toBeNull();
+    ).toBe('cfg-a');
+  });
+
+  it('skips saved configs without credentials unless they are local providers', () => {
+    expect(
+      resolveChatModelConfigId(
+        'agent-1',
+        [agent()],
+        [
+          { ...configA, id: 'cfg-unkeyed', hasApiKey: false },
+          { ...configB, id: 'cfg-keyed', hasApiKey: true },
+        ],
+      ),
+    ).toBe('cfg-keyed');
+
+    expect(
+      resolveChatModelConfigId(
+        'agent-1',
+        [agent()],
+        [{ ...configA, id: 'cfg-ollama', provider: 'ollama', hasApiKey: false }],
+      ),
+    ).toBe('cfg-ollama');
   });
 });

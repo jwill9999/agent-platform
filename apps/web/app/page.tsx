@@ -777,9 +777,9 @@ export default function HomePage() {
       setSessionError(null);
       setIsResuming(false);
       clearAttachments();
+      agentSelectionSourceRef.current = 'system';
       const def = pickDefaultAgentForMode(agents, 'chat');
       if (def) {
-        agentSelectionSourceRef.current = 'system';
         setSelectedAgentId(def.id);
         setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
       }
