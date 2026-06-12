@@ -38,7 +38,7 @@ import { Input } from '@/components/ui/input';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { cn } from '@/lib/cn';
 import { getDesktopWorkspaceBridge, openWorkspaceWebUrl } from '@/lib/desktop-workspace';
-import { buildProjectIdeHref } from '@/lib/project-navigation';
+import { openDesktopProjectIde } from '@/lib/desktop-projects';
 
 type ProjectGitHubPanelProps = Readonly<{
   projectId: string | null;
@@ -671,7 +671,7 @@ export function deriveGitPublishState({
         status.ahead === 1 ? 'is' : 'are'
       } ready to push.`,
       statusLabel: 'Ready to push',
-      actionLabel: `Push ${status.ahead}`,
+      actionLabel: 'Push',
       canPublish: true,
       canPull: false,
       canClearStaleUpstream: false,
@@ -865,7 +865,36 @@ function statusTone(file: ProjectGitChangedFile): string {
   return 'text-amber-700 bg-amber-50';
 }
 
+type DiffLineKind = 'added' | 'deleted' | 'hunk' | 'file' | 'context';
+
+function diffLineKind(line: string): DiffLineKind {
+  if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) {
+    return 'file';
+  }
+  if (line.startsWith('@@')) return 'hunk';
+  if (line.startsWith('+')) return 'added';
+  if (line.startsWith('-')) return 'deleted';
+  return 'context';
+}
+
+function diffLineClass(kind: DiffLineKind): string {
+  if (kind === 'added') return 'border-l-emerald-500 bg-emerald-950/35 text-emerald-100';
+  if (kind === 'deleted') return 'border-l-red-500 bg-red-950/35 text-red-100';
+  if (kind === 'hunk') return 'border-l-sky-500 bg-sky-950/45 text-sky-100';
+  if (kind === 'file') return 'border-l-slate-500 bg-slate-900 text-slate-200';
+  return 'border-l-transparent text-slate-300';
+}
+
+function diffPrefixClass(kind: DiffLineKind): string {
+  if (kind === 'added') return 'text-emerald-300';
+  if (kind === 'deleted') return 'text-red-300';
+  if (kind === 'hunk') return 'text-sky-300';
+  return 'text-slate-500';
+}
+
 function DiffPreview({ diff }: Readonly<{ diff: string }>) {
+  const lines = diff.split('\n');
+
   if (!diff.trim()) {
     return (
       <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
@@ -873,10 +902,47 @@ function DiffPreview({ diff }: Readonly<{ diff: string }>) {
       </div>
     );
   }
+
   return (
-    <pre className="max-h-[360px] overflow-auto rounded border border-border bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
-      <code>{diff}</code>
-    </pre>
+    <div className="overflow-hidden rounded-md border border-slate-800 bg-slate-950 shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/95 px-3 py-2">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+          Unified diff
+        </div>
+        <div className="text-[11px] text-slate-500">
+          {lines.length} line{lines.length === 1 ? '' : 's'}
+        </div>
+      </div>
+      <div
+        className="max-h-[430px] overflow-auto overscroll-contain"
+        data-testid="project-git-diff-preview"
+      >
+        <div className="min-w-max py-1 font-mono text-[11px] leading-5">
+          {lines.map((line, index) => {
+            const kind = diffLineKind(line);
+            const prefix = line[0] && ['+', '-', '@'].includes(line[0]) ? line[0] : ' ';
+            return (
+              <div
+                key={`${index}:${line}`}
+                className={cn(
+                  'grid grid-cols-[3rem_1.25rem_minmax(0,1fr)] border-l-2',
+                  diffLineClass(kind),
+                )}
+                data-diff-line-kind={kind}
+              >
+                <span className="select-none border-r border-slate-800/80 pr-2 text-right text-slate-600">
+                  {index + 1}
+                </span>
+                <span className={cn('select-none text-center', diffPrefixClass(kind))}>
+                  {prefix}
+                </span>
+                <code className="whitespace-pre pr-4">{line || ' '}</code>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1701,6 +1767,18 @@ export function ProjectGitHubPanel({
     await loadConflicts();
   }, [loadConflicts]);
 
+  const openProjectInSystemIde = useCallback(async () => {
+    if (!projectId) return;
+    const result = await openDesktopProjectIde(projectId);
+    if (!result) {
+      setError('Open in IDE is available in the desktop app when a Project folder is connected.');
+      return;
+    }
+    if (!result.handled) {
+      setError(result.reason);
+    }
+  }, [projectId]);
+
   const pullRemoteChanges = useCallback(async () => {
     if (!projectId) return;
     setActionPending('pull');
@@ -2120,7 +2198,12 @@ export function ProjectGitHubPanel({
       )}
 
       {conflictResolverOpen && (
-        <div className="fixed inset-0 z-50 flex bg-background text-foreground">
+        <div
+          className="fixed inset-0 z-50 flex bg-background text-foreground"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Merge conflict resolver"
+        >
           <div className="flex w-72 shrink-0 flex-col border-r border-border bg-muted/20 p-4">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
@@ -2202,8 +2285,17 @@ export function ProjectGitHubPanel({
                 <div className="mb-2">
                   You can also open the project in your IDE if a file needs deeper edits.
                 </div>
-                <Button asChild type="button" size="sm" variant="outline" className="w-full">
-                  <a href={buildProjectIdeHref(projectId)}>Open in IDE</a>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  disabled={!projectId}
+                  onClick={() => {
+                    void openProjectInSystemIde();
+                  }}
+                >
+                  Open in IDE
                 </Button>
               </div>
             </div>
@@ -2501,7 +2593,7 @@ export function ProjectGitHubPanel({
                   onClick={() => setActiveTab(id)}
                 >
                   {label}
-                  {badge !== undefined && badge > 0 && (
+                  {id !== 'push' && badge !== undefined && badge > 0 && (
                     <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                       {badge}
                     </span>
@@ -2812,15 +2904,34 @@ export function ProjectGitHubPanel({
                   <GitCard title="Diff">
                     {selectedChange ? (
                       <div className="space-y-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <FileCode2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <div
-                            className="min-w-0 flex-1 truncate font-mono text-xs"
-                            title={selectedChange.path}
-                          >
-                            {selectedChange.path}
+                        <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+                          <div className="flex min-w-0 items-start gap-2">
+                            <FileCode2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0 flex-1">
+                              <div
+                                className="truncate font-mono text-xs font-medium"
+                                title={selectedChange.path}
+                              >
+                                {selectedChange.path}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                                  {selectedDiffMode}
+                                </Badge>
+                                {(selectedChange.additions !== undefined ||
+                                  selectedChange.deletions !== undefined) && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    <span className="font-medium text-emerald-700">
+                                      +{selectedChange.additions ?? 0}
+                                    </span>{' '}
+                                    <span className="font-medium text-red-700">
+                                      -{selectedChange.deletions ?? 0}
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <Badge variant="outline">{selectedDiffMode}</Badge>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {selectedChange.unstaged && (

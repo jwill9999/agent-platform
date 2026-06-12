@@ -19,6 +19,7 @@ import {
   openWorkspaceExternalFallbackIpcChannel,
   openWorkspaceResourceIpcChannel,
   openWorkspaceWebViewIpcChannel,
+  openProjectIdeIpcChannel,
   reloadWorkspaceWebViewIpcChannel,
   repairMacosVmRuntimeIpcChannel,
   resetLocalDataConfirmationIpcChannel,
@@ -57,8 +58,8 @@ describe('desktop preload bridge contract', () => {
     expect(desktopVersionsApiKeys).toEqual(['chrome', 'electron', 'node']);
   });
 
-  it('limits Project helpers to native Project selection and creation', () => {
-    expect(desktopProjectsApiKeys).toEqual(['createFolder', 'selectFolder']);
+  it('limits Project helpers to native Project selection, creation, and IDE launch', () => {
+    expect(desktopProjectsApiKeys).toEqual(['createFolder', 'openInIde', 'selectFolder']);
   });
 
   it('limits terminal helpers to human-controlled terminal lifecycle and IO', () => {
@@ -117,8 +118,13 @@ describe('desktop preload bridge contract', () => {
 
   it('keeps Project IPC channels scoped to explicit desktop actions', () => {
     expect(createProjectFolderIpcChannel).toBe('agent-platform:create-project-folder');
+    expect(openProjectIdeIpcChannel).toBe('agent-platform:project:open-ide');
     expect(selectProjectFolderIpcChannel).toBe('agent-platform:select-project-folder');
-    for (const channel of [createProjectFolderIpcChannel, selectProjectFolderIpcChannel]) {
+    for (const channel of [
+      createProjectFolderIpcChannel,
+      openProjectIdeIpcChannel,
+      selectProjectFolderIpcChannel,
+    ]) {
       expect(channel).not.toContain('fs');
       expect(channel).not.toContain('shell');
       expect(channel).not.toContain('eval');

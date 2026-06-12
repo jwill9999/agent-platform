@@ -48,6 +48,23 @@ export interface DesktopCreateProjectFolderRequest {
   readonly name: string;
 }
 
+export interface DesktopOpenProjectIdeRequest {
+  readonly projectId: string;
+}
+
+export type DesktopOpenProjectIdeResult =
+  | {
+      readonly ok: true;
+      readonly handled: true;
+      readonly projectRoot: string;
+      readonly opener: string;
+    }
+  | {
+      readonly ok: true;
+      readonly handled: false;
+      readonly reason: string;
+    };
+
 export type DesktopProjectFolderSelectionResult =
   | { readonly canceled: true }
   | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
@@ -64,6 +81,9 @@ export interface DesktopProjectsApi {
   readonly createFolder: (
     request: DesktopCreateProjectFolderRequest,
   ) => Promise<DesktopProjectFolderSelectionResult>;
+  readonly openInIde: (
+    request: DesktopOpenProjectIdeRequest,
+  ) => Promise<DesktopOpenProjectIdeResult>;
   readonly selectFolder: () => Promise<DesktopProjectFolderSelectionResult>;
 }
 
@@ -199,6 +219,7 @@ export const resetLocalDataConfirmationIpcChannel =
 export const repairMacosVmRuntimeIpcChannel = 'agent-platform:repair-macos-vm-runtime';
 export const selectProjectFolderIpcChannel = 'agent-platform:select-project-folder';
 export const createProjectFolderIpcChannel = 'agent-platform:create-project-folder';
+export const openProjectIdeIpcChannel = 'agent-platform:project:open-ide';
 export const createTerminalIpcChannel = 'agent-platform:terminal:create';
 export const inputTerminalIpcChannel = 'agent-platform:terminal:input';
 export const resizeTerminalIpcChannel = 'agent-platform:terminal:resize';
@@ -234,6 +255,7 @@ export const desktopMaintenanceApiKeys = [
 
 export const desktopProjectsApiKeys = [
   'createFolder',
+  'openInIde',
   'selectFolder',
 ] as const satisfies readonly (keyof DesktopProjectsApi)[];
 

@@ -49,6 +49,7 @@ interface DesktopWebViewSession {
   origin: string;
   externalFallbackUrl?: string;
   blockedUrl?: string;
+  bounds?: Rectangle;
   error?: string;
   updatedAt: string;
 }
@@ -305,6 +306,7 @@ export class DesktopWebViewService {
   setBounds(request: DesktopWebViewBoundsRequest): DesktopWebViewState | null {
     const session = this.#sessions.get(request.webviewId);
     if (!session || session.status === 'closed') return null;
+    session.bounds = request.bounds;
     session.view.setBounds(request.bounds);
     session.view.setVisible(this.#activeWebViewId === session.webviewId);
     return this.#state(session);
@@ -451,6 +453,7 @@ export class DesktopWebViewService {
       ...(session.externalFallbackUrl ? { externalFallbackUrl: session.externalFallbackUrl } : {}),
       ...(session.blockedUrl ? { blockedUrl: session.blockedUrl } : {}),
       ...(session.error ? { error: session.error } : {}),
+      ...(session.bounds ? { bounds: session.bounds } : {}),
     };
   }
 }

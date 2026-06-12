@@ -119,6 +119,12 @@ export interface DesktopWorkspaceWebViewState {
   readonly error?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly bounds?: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
 }
 
 export type DesktopWebViewState = DesktopWorkspaceWebViewState;

@@ -15,6 +15,23 @@ export interface DesktopCreateProjectFolderRequest {
   readonly name: string;
 }
 
+export interface DesktopOpenProjectIdeRequest {
+  readonly projectId: string;
+}
+
+export type DesktopOpenProjectIdeResult =
+  | {
+      readonly ok: true;
+      readonly handled: true;
+      readonly projectRoot: string;
+      readonly opener: string;
+    }
+  | {
+      readonly ok: true;
+      readonly handled: false;
+      readonly reason: string;
+    };
+
 export type DesktopProjectFolderSelectionResult =
   | { readonly canceled: true }
   | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
@@ -24,6 +41,9 @@ export interface DesktopProjectBridge {
     readonly createFolder?: (
       request: DesktopCreateProjectFolderRequest,
     ) => Promise<DesktopProjectFolderSelectionResult>;
+    readonly openInIde?: (
+      request: DesktopOpenProjectIdeRequest,
+    ) => Promise<DesktopOpenProjectIdeResult>;
     readonly selectFolder?: () => Promise<DesktopProjectFolderSelectionResult>;
   };
   readonly terminal?: DesktopTerminalBridge;
@@ -116,6 +136,14 @@ export async function createAndRegisterDesktopProject(
   const selection = await createFolder(request);
   if (selection.canceled) return null;
   return registerDesktopProject(selection.folder);
+}
+
+export async function openDesktopProjectIde(
+  projectId: string,
+): Promise<DesktopOpenProjectIdeResult | null> {
+  const openInIde = getDesktopProjectBridge()?.projects?.openInIde;
+  if (!openInIde) return null;
+  return openInIde({ projectId });
 }
 
 export async function loadRecentDesktopProjects(): Promise<ProjectDesktopRecord[]> {

@@ -13,7 +13,6 @@ import {
   ProjectOnboardingDraftSchema,
   ProjectOnboardingStateSchema,
 } from '@agent-platform/contracts';
-import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Chat } from '../components/chat/chat';
 import { AgentModelProvider } from '../components/chat/agent-model-context';
@@ -49,7 +48,6 @@ import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId } from '@/lib/modelSelection';
 import {
   buildPersonalChatHref,
-  buildProjectIdeHref,
   createWorkspaceNavigationState,
   desktopProjectIsAvailable,
   desktopProjectPathLabel,
@@ -72,6 +70,7 @@ import {
   createAndRegisterDesktopProject,
   hasDesktopProjectBridge,
   loadRecentDesktopProjects,
+  openDesktopProjectIde,
   selectAndRegisterDesktopProject,
 } from '@/lib/desktop-projects';
 import { Terminal as TerminalIcon } from 'lucide-react';
@@ -103,10 +102,11 @@ type ErrorBannerProps = Readonly<{
 type ProjectChatHeaderProps = Readonly<{
   commandRunner: CommandRunnerDisplay | null;
   project: ProjectDesktopRecord | null;
-  sessionId: string | null;
   onReturnHome: () => void;
   terminalOpen: boolean;
   onToggleTerminal: () => void;
+  isOpeningIde: boolean;
+  onOpenIde: () => void;
 }>;
 type CommandRunnerDisplay = Readonly<{
   canExecute: boolean;
@@ -208,6 +208,16 @@ function commandRunnerStatusColor(commandRunner: CommandRunnerDisplay): string {
   if (commandRunner.canExecute) return 'bg-emerald-500';
   if (commandRunner.status === 'failed') return 'bg-destructive';
   return 'bg-amber-500';
+}
+
+function commandRunnerStatusLabel(commandRunner: CommandRunnerDisplay): string {
+  if (commandRunner.mode === 'disabled' && commandRunner.status === 'disabled') {
+    return 'Agent commands off';
+  }
+  if (commandRunner.mode === commandRunner.status) {
+    return commandRunner.status;
+  }
+  return `${commandRunner.mode} ${commandRunner.status}`;
 }
 
 async function fetchCommandRunnerDisplay(): Promise<CommandRunnerDisplay> {
@@ -506,10 +516,11 @@ function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
 function ProjectChatHeader({
   commandRunner,
   project,
-  sessionId,
   onReturnHome,
   terminalOpen,
   onToggleTerminal,
+  isOpeningIde,
+  onOpenIde,
 }: ProjectChatHeaderProps) {
   if (!project) {
     return null;
@@ -542,9 +553,7 @@ function ProjectChatHeader({
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${commandRunnerStatusColor(commandRunner)}`}
           />
-          <span className="truncate">
-            {commandRunner.mode} {commandRunner.status}
-          </span>
+          <span className="truncate">{commandRunnerStatusLabel(commandRunner)}</span>
         </div>
       )}
       <Button
@@ -561,8 +570,16 @@ function ProjectChatHeader({
       <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onReturnHome}>
         Workspaces
       </Button>
-      <Button asChild size="sm" variant="outline" className="shrink-0">
-        <Link href={buildProjectIdeHref(project.id, sessionId)}>Open IDE</Link>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="shrink-0"
+        onClick={onOpenIde}
+        disabled={isOpeningIde}
+        title="Open this Project folder in your system IDE"
+      >
+        {isOpeningIde ? 'Opening...' : 'Open in IDE'}
       </Button>
     </div>
   );
@@ -588,6 +605,7 @@ export default function HomePage() {
   const [commandRunnerHealth, setCommandRunnerHealth] = useState<CommandRunnerDisplay | null>(null);
   const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
   const [isOpeningProject, setIsOpeningProject] = useState(false);
+  const [isOpeningProjectIde, setIsOpeningProjectIde] = useState(false);
   const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectError, setNewProjectError] = useState<string | null>(null);
@@ -1295,6 +1313,29 @@ export default function HomePage() {
     [decideApproval, selectedModelConfigId],
   );
 
+  const handleOpenProjectIde = useCallback(() => {
+    if (!activeProject?.id) return;
+    setIsOpeningProjectIde(true);
+    openDesktopProjectIde(activeProject.id)
+      .then((result) => {
+        if (!result) {
+          setError(
+            'Open in IDE is available in the desktop app when a Project folder is connected.',
+          );
+          return;
+        }
+        if (!result.handled) {
+          setError(result.reason);
+        }
+      })
+      .catch(() => {
+        setError('Failed to open the Project folder in your system IDE.');
+      })
+      .finally(() => {
+        setIsOpeningProjectIde(false);
+      });
+  }, [activeProject?.id, setError]);
+
   if (!selectedMode) {
     return (
       <>
@@ -1378,10 +1419,11 @@ export default function HomePage() {
             <ProjectChatHeader
               commandRunner={commandRunnerHealth}
               project={activeProject}
-              sessionId={sessionId}
               onReturnHome={handleReturnHome}
               terminalOpen={projectTerminalOpen}
               onToggleTerminal={() => setProjectTerminalOpen((open) => !open)}
+              isOpeningIde={isOpeningProjectIde}
+              onOpenIde={handleOpenProjectIde}
             />
           )}
         </div>

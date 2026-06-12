@@ -104,6 +104,7 @@ test.describe('Electron Project access', () => {
             firstProjectDir,
             secondProjectDir,
           ]),
+          AGENT_PLATFORM_DESKTOP_TEST_OPEN_IDE: '1',
           CI: process.env.CI,
         },
       });
@@ -246,14 +247,12 @@ test.describe('Electron Project access', () => {
       const project = await findRecentProject(backendPort, firstProjectName);
       expect(project.metadata.source).toBe('desktop');
       expect(project.metadata.folderName).toBe(firstProjectName);
-      const firstProjectPathLabel = requiredFolderPathLabel(project);
+      expect(requiredFolderPathLabel(project)).toContain(firstProjectName);
       expect(project.metadata.activeBranch).toBe('feature/e2e-branch');
       const session = await findProjectSession(backendPort, project.id);
       expect(session.mode).toBe('project');
-      await expect(page.getByRole('link', { name: 'Open IDE' })).toHaveAttribute(
-        'href',
-        `/ide?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(session.id)}`,
-      );
+      await expect(page.getByRole('button', { name: 'Open in IDE' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Open IDE' })).toHaveCount(0);
 
       await sendChatMessage(page, '/help', 'Ask about this Project...');
       await expect(page.getByText('Available slash commands:').last()).toBeVisible();
@@ -317,7 +316,6 @@ test.describe('Electron Project access', () => {
       );
       await expect(page.getByText('Opening Project chat...')).toHaveCount(0, { timeout: 15_000 });
       await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
-      await expect(projectChatHeader.getByText(firstProjectPathLabel)).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByText('/help init', { exact: true }).last()).toBeVisible({
@@ -330,11 +328,8 @@ test.describe('Electron Project access', () => {
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
       await expect(page.getByText(secondProjectDir)).toHaveCount(0);
-      const reopenedIdeHref = await page
-        .getByRole('link', { name: 'Open IDE' })
-        .getAttribute('href');
-      expect(reopenedIdeHref).toContain(`/ide?projectId=${encodeURIComponent(project.id)}`);
-      const reopenedSessionId = sessionIdFromHref(reopenedIdeHref);
+      await page.getByRole('button', { name: 'Open in IDE' }).click();
+      await expect(page).not.toHaveURL(/\/ide/);
 
       await sendChatMessage(page, '/init', 'Ask about this Project...');
       await expect(
@@ -344,43 +339,16 @@ test.describe('Electron Project access', () => {
       await expect(page.getByRole('button', { name: 'Reject draft' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
 
-      await page.getByRole('link', { name: 'Open IDE' }).click();
-      await page.waitForURL(/\/ide/);
-      const binding = page.getByLabel('Project binding');
-      await expect(binding.getByText(firstProjectName).first()).toBeVisible();
-      await expect(page.getByText('Project activity')).toBeVisible();
-      await expect(page.getByText('Branch not connected')).toHaveCount(0);
-      await expect(page.getByText('Git branch unavailable')).toHaveCount(0);
-      await expect(page.getByText('Remote checks unavailable')).toHaveCount(0);
-      await expect(page.getByText('guide.md')).toBeVisible();
-      await expect(page.getByText(firstProjectDir)).toHaveCount(0);
-      await page.getByText('guide.md').click();
-      await expect(page.getByText('hello from first electron project')).toBeVisible();
-      await expect(page.getByText('docs/guide.md')).toBeVisible();
-      await expect(page.getByText(firstProjectDir)).toHaveCount(0);
-      await expect(page.getByRole('link', { name: /Project .* IDE/ })).toHaveAttribute(
-        'href',
-        `/?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(reopenedSessionId)}`,
-      );
-      await page.getByRole('link', { name: /Project .* IDE/ }).click();
+      await page.getByRole('button', { name: 'Open in IDE' }).click();
       await expect(page).not.toHaveURL(/\/ide/);
-      await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
-      await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
-      await page.getByRole('link', { name: 'Open IDE' }).click();
-      await page.waitForURL(/\/ide/);
-      await expect(
-        page.getByLabel('Project binding').getByText(firstProjectName).first(),
-      ).toBeVisible();
 
-      await sendChatMessage(page, '/help init', 'Ask about your code...');
+      await sendChatMessage(page, '/help init', 'Ask about this Project...');
       await expect(page.getByText('Usage: /init').last()).toBeVisible();
       await expect(page.getByText('Scope: Selected Project').last()).toBeVisible();
 
-      await expect(binding.getByText('Project setup in progress')).toBeVisible();
-      await expect(binding.getByRole('button', { name: 'Approve draft' })).toBeVisible();
-      await binding.getByRole('button', { name: 'Approve draft' }).click();
-      await expect(binding.getByText('Project ready')).toBeVisible();
-      await expect(binding.getByText('Project instructions are approved')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
+      await page.getByRole('button', { name: 'Approve instructions' }).click();
+      await expect(page.getByText('Project instructions approved')).toBeVisible();
 
       const agentsPath = join(firstProjectDir, 'AGENTS.md');
       await expect.poll(() => existsSync(agentsPath)).toBe(true);
@@ -388,7 +356,7 @@ test.describe('Electron Project access', () => {
       expect(existsSync(join(tempRoot, 'AGENTS.md'))).toBe(false);
 
       const refreshedSession = await fetchJson<ApiEnvelope<SessionRecord>>(
-        `http://127.0.0.1:${backendPort}/v1/sessions/${reopenedSessionId}`,
+        `http://127.0.0.1:${backendPort}/v1/sessions/${session.id}`,
       );
       expect(refreshedSession.data.projectId).toBe(project.id);
     } finally {
@@ -458,14 +426,6 @@ async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   expect(response.ok).toBeTruthy();
   return (await response.json()) as T;
-}
-
-function sessionIdFromHref(href: string | null): string {
-  expect(href).toBeTruthy();
-  const url = new URL(href ?? '', 'http://127.0.0.1');
-  const sessionId = url.searchParams.get('sessionId');
-  expect(sessionId).toBeTruthy();
-  return sessionId as string;
 }
 
 function seedDesktopDatabase(sqlitePath: string): void {

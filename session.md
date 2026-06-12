@@ -16,11 +16,11 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-12
-- **Session:** Backfilled Electron stabilisation Playwright coverage, created owner manual QA
-  follow-ups, and set the terminal default font to MesloLGS NF.
+- **Session:** Fixed Workspace Preview sizing/bounds, improved Git diff rendering, moved Open in
+  IDE to system IDE launch, and cleaned command-runner/Push/recent-project refresh copy.
 - **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
-- **Latest commits:** `8afcd39` sets the terminal default font to MesloLGS NF; `732b283` defines
-  workflow E2E expectation follow-up; `3adca89` adds first-load responsive layout coverage.
+- **Latest commit:** `64ac82b` polishes desktop preview, Git, external IDE, status, Push, and
+  recent-project refresh UX.
 
 ## Current State
 
@@ -37,9 +37,43 @@ and actionable.
 - `.12` should remain blocked until `.18` records owner sign-off and any findings are classified.
 - Terminal dock now defaults to `MesloLGS NF`; users can still choose the other terminal fonts from
   the toolbar.
+- `.21` is closed: the Workspace Preview native WebView bounds regression shown when the Git/GitHub
+  rail collapses is fixed and covered by targeted Electron E2E.
+- `.22` is closed: the Git & GitHub Changes tab now renders structured, readable unified diffs in
+  the desktop side panel and is covered by targeted Electron E2E.
+- `.23` is closed: Workspace Preview sizing/controls are clearer, Open in IDE uses the desktop
+  external launcher instead of `/ide`, the command-runner badge says `Agent commands off`, and the
+  Push tab/action no longer shows an inline ahead-count badge.
 
 ## Recent Work
 
+- Updated `apps/web/components/project/project-webview-panel.tsx` so native WebView bounds are
+  deduped by rounded viewport rectangle and resynced via `ResizeObserver`, window resize, and an
+  animation-frame layout check while a WebView is active.
+- Added optional `bounds` to `DesktopWorkspaceWebViewState` and recorded the last applied bounds in
+  `apps/desktop/src/main/webviewService.ts` for diagnostics/E2E verification.
+- Extended `apps/desktop/e2e/webview-runtime.e2e.ts` to collapse the Git/GitHub panel and assert the
+  recorded native bounds still match the visible preview viewport.
+- Added Beads task/spec `agent-platform-electron-stabilisation.21` for this regression.
+- Updated `apps/web/components/project/project-git-github-panel.tsx` so the diff preview renders
+  file headers, hunks, additions, deletions, and context lines with readable row styling, line
+  numbers, stable scroll, and compact selected-file metadata.
+- Extended `apps/desktop/e2e/project-git-workflow.e2e.ts` to select a modified README diff and
+  assert hunk/addition rows render in the improved preview.
+- Added Beads task/spec `agent-platform-electron-stabilisation.22` for the Git diff rendering
+  improvement.
+- Updated Workspace Preview controls to labeled `Wide` and `Focus` actions and responsive panel
+  widths.
+- Added desktop `projects.openInIde` bridge plus a system IDE/folder launcher with
+  `AGENT_PLATFORM_DESKTOP_IDE_COMMAND` override and common IDE fallbacks.
+- Updated Project Chat and Git conflict resolver Open in IDE actions to use the desktop launcher
+  instead of the internal `/ide` route.
+- Changed the command-runner badge from duplicate `disabled disabled` to `Agent commands off` and
+  kept the Push tab/action label to `Push` without an inline count badge.
+- Added explicit short-lived `Refreshing` feedback to the left-sidebar Recent Projects refresh
+  control so fast reloads no longer feel inert.
+- Added Beads task/spec `agent-platform-electron-stabilisation.23` for the preview/IDE/status UI
+  refinement.
 - Added `apps/desktop/e2e/stabilisation-backfill.e2e.ts`.
 - Covered settings/model/API key persistence, restart persistence, Project-scoped versus Personal
   Chat sessions, missing/unavailable Projects, and UI leakage/layout smoke.
@@ -58,6 +92,10 @@ and actionable.
 ## Checks Run
 
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/stabilisation-backfill.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/webview-runtime.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-git-workflow.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts`
+- `pnpm --filter @agent-platform/contracts typecheck`
 - `pnpm --filter @agent-platform/desktop test:e2e` (`8 passed`)
 - `pnpm --filter @agent-platform/desktop lint`
 - `pnpm --filter @agent-platform/desktop typecheck`
