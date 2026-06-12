@@ -128,6 +128,17 @@ test.describe('Electron Project access', () => {
 
       await page.getByRole('button', { name: 'Open Chat' }).click();
       await expect(page.getByPlaceholder('Send a message... (drop files to attach)')).toBeVisible();
+      await expect(page.locator('nav a[href="/?mode=chat"]')).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      await expect(page.locator('nav a[href="/"]').first()).not.toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      await expect(page.getByRole('combobox', { name: 'Active agent' })).toContainText(
+        'Personal assistant',
+      );
       await attachFilesToComposer(page, [
         {
           name: 'personal-chat-screenshot.png',

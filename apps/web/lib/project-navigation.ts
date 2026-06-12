@@ -73,6 +73,7 @@ export const workspaceModeSearchParam = 'mode';
 export const personalChatModeSearchValue = 'chat';
 export const recentProjectsUpdatedEvent = 'agent-platform:desktop-projects-updated';
 export const projectReopenRequestedEvent = 'agent-platform:project-reopen-requested';
+export const workspaceNavigationChangedEvent = 'agent-platform:workspace-navigation-changed';
 export const workspaceHomeRequestedEvent = 'agent-platform:workspace-home-requested';
 export const workspacePersonalChatRequestedEvent =
   'agent-platform:workspace-personal-chat-requested';

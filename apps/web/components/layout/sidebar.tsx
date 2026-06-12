@@ -48,6 +48,7 @@ import {
   recentProjectsUpdatedEvent,
   visibleRecentDesktopProjects,
   workspaceHomeRequestedEvent,
+  workspaceNavigationChangedEvent,
   workspaceModeSearchParam,
   workspaceNavigationItems,
   workspacePersonalChatRequestedEvent,
@@ -357,8 +358,10 @@ export function Sidebar() {
     };
     syncSearchString();
     globalThis.window.addEventListener('popstate', syncSearchString);
+    globalThis.window.addEventListener(workspaceNavigationChangedEvent, syncSearchString);
     return () => {
       globalThis.window.removeEventListener('popstate', syncSearchString);
+      globalThis.window.removeEventListener(workspaceNavigationChangedEvent, syncSearchString);
     };
   }, []);
 
@@ -425,6 +428,7 @@ export function Sidebar() {
                   );
                 }
               }}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group',
                 isActive

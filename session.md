@@ -16,11 +16,10 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-12
-- **Session:** Fixed Workspace Preview sizing/bounds, improved Git diff rendering, moved Open in
-  IDE to system IDE launch, and cleaned command-runner/Push/recent-project refresh copy.
+- **Session:** Fixed Personal Chat workspace state leak after recent desktop UI polish.
 - **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
-- **Latest commit:** `64ac82b` polishes desktop preview, Git, external IDE, status, Push, and
-  recent-project refresh UX.
+- **Latest commit:** pending; previous `c023aaa` polishes desktop preview, Git, external IDE,
+  status, Push, and recent-project refresh UX.
 
 ## Current State
 
@@ -44,9 +43,19 @@ and actionable.
 - `.23` is closed: Workspace Preview sizing/controls are clearer, Open in IDE uses the desktop
   external launcher instead of `/ide`, the command-runner badge says `Agent commands off`, and the
   Push tab/action no longer shows an inline ahead-count badge.
+- `.24` is closed: Personal Chat entered from Workspaces now marks the Chat nav item active and
+  resets stale system-selected Coding agent state back to Personal assistant before creating the
+  personal chat session.
 
 ## Recent Work
 
+- Added `workspaceNavigationChangedEvent` so programmatic `history.pushState` navigation updates
+  the left sidebar active state.
+- Added `aria-current` to workspace sidebar links and covered the Chat active state in Electron
+  E2E.
+- Guarded Chat agent selection with system/user ownership so Personal Chat defaults to Personal
+  assistant without overriding a deliberate manual selector choice.
+- Added Beads task/spec `agent-platform-electron-stabilisation.24` for the Personal Chat regression.
 - Updated `apps/web/components/project/project-webview-panel.tsx` so native WebView bounds are
   deduped by rounded viewport rectangle and resynced via `ResizeObserver`, window resize, and an
   animation-frame layout check while a WebView is active.

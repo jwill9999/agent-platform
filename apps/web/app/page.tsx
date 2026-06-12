@@ -63,6 +63,7 @@ import {
   workspaceHomeRequestedEvent,
   workspaceEntryCopy,
   workspaceModeSearchParam,
+  workspaceNavigationChangedEvent,
   workspacePersonalChatRequestedEvent,
 } from '@/lib/project-navigation';
 import {
@@ -619,6 +620,7 @@ export default function HomePage() {
     useState<ProjectInstructionsDecision | null>(null);
   const attemptedProjectReopenIdRef = useRef<string | null>(null);
   const projectGitRefreshTimeoutRef = useRef<number | null>(null);
+  const agentSelectionSourceRef = useRef<'system' | 'user'>('system');
 
   const {
     messages,
@@ -662,7 +664,11 @@ export default function HomePage() {
       const def = pickDefaultAgentForMode(nextAgents, 'chat');
       const withKey = (configList ?? []).filter((c) => c.hasApiKey);
       if (def) {
-        setSelectedAgentId((prev) => prev ?? def.id);
+        setSelectedAgentId((prev) => {
+          if (prev) return prev;
+          agentSelectionSourceRef.current = 'system';
+          return def.id;
+        });
       }
       // Only show configs that have an API key stored; default to the selected agent's config.
       setModelConfigs(withKey);
@@ -727,6 +733,16 @@ export default function HomePage() {
 
   useEffect(() => {
     if (selectedMode !== 'chat') return;
+    if (isResuming || agents.length === 0 || agentSelectionSourceRef.current === 'user') return;
+    const def = pickDefaultAgentForMode(agents, 'chat');
+    if (!def || selectedAgentId === def.id) return;
+    agentSelectionSourceRef.current = 'system';
+    setSelectedAgentId(def.id);
+    setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
+  }, [agents, isResuming, modelConfigs, selectedAgentId, selectedMode]);
+
+  useEffect(() => {
+    if (selectedMode !== 'chat') return;
     if (!selectedAgentId) return;
     // Only create a new session when agent selection changes organically
     // (not via resume, which sets sessionId directly)
@@ -737,6 +753,7 @@ export default function HomePage() {
 
   const handleAgentChange = useCallback(
     (agentId: string) => {
+      agentSelectionSourceRef.current = 'user';
       setIsResuming(false);
       setSelectedAgentId(agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
@@ -748,6 +765,7 @@ export default function HomePage() {
     (options?: { readonly updateUrl?: boolean }) => {
       if (options?.updateUrl !== false && globalThis.window !== undefined) {
         globalThis.window.history.pushState(null, '', buildPersonalChatHref());
+        globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
       }
       setSelectedMode('chat');
       setActiveProject(null);
@@ -761,6 +779,7 @@ export default function HomePage() {
       clearAttachments();
       const def = pickDefaultAgentForMode(agents, 'chat');
       if (def) {
+        agentSelectionSourceRef.current = 'system';
         setSelectedAgentId(def.id);
         setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
       }
@@ -771,6 +790,7 @@ export default function HomePage() {
   const handleReturnHome = useCallback(() => {
     if (globalThis.window !== undefined) {
       globalThis.window.history.pushState(null, '', '/');
+      globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
     }
     setSelectedMode(null);
     setActiveProject(null);
@@ -848,6 +868,7 @@ export default function HomePage() {
       const def = pickDefaultAgentForMode(agents, 'project');
       const nextAgentId = def?.id ?? selectedAgentId;
       if (def) {
+        agentSelectionSourceRef.current = 'system';
         setSelectedAgentId(def.id);
         setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
       }
@@ -1197,6 +1218,7 @@ export default function HomePage() {
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {
+      agentSelectionSourceRef.current = 'system';
       setIsResuming(true);
       setSelectedMode(session.mode === 'project' ? 'project-chat' : 'chat');
       setSelectedAgentId(session.agentId);
@@ -1216,6 +1238,7 @@ export default function HomePage() {
 
   const handleNewChatForAgent = useCallback(
     (agentId: string) => {
+      agentSelectionSourceRef.current = 'user';
       setIsResuming(false);
       setSelectedAgentId(agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
