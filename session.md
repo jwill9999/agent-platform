@@ -16,10 +16,11 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-12
-- **Session:** Backfilled Electron stabilisation Playwright coverage and created owner manual QA
-  sign-off task.
+- **Session:** Backfilled Electron stabilisation Playwright coverage, created owner manual QA
+  follow-ups, and set the terminal default font to MesloLGS NF.
 - **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
-- **Latest commits:** pending this session.
+- **Latest commits:** `8afcd39` sets the terminal default font to MesloLGS NF; `732b283` defines
+  workflow E2E expectation follow-up; `3adca89` adds first-load responsive layout coverage.
 
 ## Current State
 
@@ -34,6 +35,8 @@ and actionable.
   `docs/qa/electron-stabilisation-automation-matrix.md` to reduce manual scope to native/subjective
   checks and any automation ambiguity.
 - `.12` should remain blocked until `.18` records owner sign-off and any findings are classified.
+- Terminal dock now defaults to `MesloLGS NF`; users can still choose the other terminal fonts from
+  the toolbar.
 
 ## Recent Work
 
@@ -49,6 +52,8 @@ and actionable.
   coverage.
 - Added Beads task `agent-platform-electron-stabilisation.20` as a non-blocking follow-up for the
   workflow expectation matrix.
+- Changed `apps/web/components/project/project-terminal-dock.tsx` so new terminal sessions default
+  to `MesloLGS NF`.
 
 ## Checks Run
 
@@ -56,6 +61,8 @@ and actionable.
 - `pnpm --filter @agent-platform/desktop test:e2e` (`8 passed`)
 - `pnpm --filter @agent-platform/desktop lint`
 - `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/web lint`
+- `pnpm --filter @agent-platform/web typecheck`
 - `pnpm docs:lint`
 - `pnpm format:check`
 - `git diff --check`
