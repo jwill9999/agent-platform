@@ -172,6 +172,15 @@ export function buildDesktopBackendEnvironment({
     AGENT_PLATFORM_DESKTOP_TEMP_DIR: paths.tempDir,
     AGENT_PLATFORM_COMMAND_RUNNER: commandRunner,
     AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: resolveMacosVmRuntimeDir(paths, env),
+    ...(env.AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT
+      ? { AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: env.AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT }
+      : {}),
+    ...(env.AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON
+      ? {
+          AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON:
+            env.AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON,
+        }
+      : {}),
     ...(macosVmHelperPath ? { AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: macosVmHelperPath } : {}),
   };
 }

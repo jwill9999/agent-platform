@@ -151,6 +151,8 @@ describe('desktop backend supervisor helpers', () => {
         SCHEDULER_ENABLED: 'true',
         SQLITE_PATH: '/data/agent.sqlite',
         AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/app/macos-vm-runner',
+        AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: 'E2E response',
+        AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON: '{"name":"sys_get_current_time","args":{}}',
       },
       paths,
       port: '4500',
@@ -172,6 +174,8 @@ describe('desktop backend supervisor helpers', () => {
       AGENT_PLATFORM_COMMAND_RUNNER: 'disabled',
       AGENT_PLATFORM_MACOS_VM_RUNTIME_DIR: join(runtimeRoot, 'data/vm'),
       AGENT_PLATFORM_MACOS_VM_RUNNER_PATH: '/app/macos-vm-runner',
+      AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: 'E2E response',
+      AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON: '{"name":"sys_get_current_time","args":{}}',
     });
   });
 

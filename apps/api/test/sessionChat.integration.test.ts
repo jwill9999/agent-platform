@@ -1500,6 +1500,50 @@ describe('POST /v1/chat (session-aware)', () => {
       closeDatabase(sqlite);
     }
   });
+
+  it('returns an actionable error when a saved model config key cannot be decrypted', async () => {
+    const envSnap = snapshotChatEnv();
+    const previousMasterKey = process.env.SECRETS_MASTER_KEY;
+    const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
+    try {
+      const originalMasterKeyB64 = Buffer.alloc(32, 9).toString('base64');
+      const wrongMasterKeyB64 = Buffer.alloc(32, 8).toString('base64');
+      process.env.SECRETS_MASTER_KEY = wrongMasterKeyB64;
+      delete process.env.AGENT_OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_ALLOW_LEGACY_ENV;
+
+      createModelConfig(
+        db,
+        {
+          name: 'Unreadable model key',
+          provider: 'openai',
+          model: 'gpt-4.1-mini',
+          apiKey: 'sk-original-test-key',
+        },
+        parseMasterKeyFromBase64(originalMasterKeyB64),
+        1,
+      );
+
+      const sessionId = await createDefaultSession(app);
+
+      const res = await request(app)
+        .post('/v1/chat')
+        .send({ sessionId, message: 'hello' })
+        .expect(409);
+
+      expect(res.body.error).toEqual({
+        code: 'MODEL_CONFIG_KEY_DECRYPTION_FAILED',
+        message:
+          'The selected model API key can no longer be decrypted. Re-enter the API key in Settings > Models.',
+      });
+    } finally {
+      restoreChatEnv(envSnap);
+      if (previousMasterKey === undefined) delete process.env.SECRETS_MASTER_KEY;
+      else process.env.SECRETS_MASTER_KEY = previousMasterKey;
+      closeDatabase(sqlite);
+    }
+  });
   it('persists inspectable working memory and includes it on later turns', async () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });

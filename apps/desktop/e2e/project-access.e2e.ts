@@ -37,6 +37,8 @@ const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
 const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
+const E2E_MODEL_RESPONSE = 'E2E model response received';
+const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 test.describe('Electron Project access', () => {
   test('opens a local Project and binds chat/slash commands to the same Project session', async () => {
@@ -108,6 +110,8 @@ test.describe('Electron Project access', () => {
             secondProjectDir,
           ]),
           AGENT_PLATFORM_DESKTOP_TEST_OPEN_IDE: '1',
+          AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: E2E_MODEL_RESPONSE,
+          SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
           CI: process.env.CI,
         },
       });
@@ -172,6 +176,8 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('personal-chat-screenshot.png')).toBeVisible();
       await expect(page.getByText('personal-chat-notes.md')).toBeVisible();
       await expect(page.getByText('not an allowed text format')).toHaveCount(0);
+      await sendChatMessage(page, 'personal chat model response smoke', 'Send a message...');
+      await expect(page.getByText(E2E_MODEL_RESPONSE).last()).toBeVisible({ timeout: 15_000 });
 
       await page.getByRole('link', { name: /Workspaces/ }).click();
       await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
@@ -267,6 +273,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('project-chat-notes.md')).toBeVisible();
       await expect(page.getByText('not an allowed text format')).toHaveCount(0);
       await sendChatMessage(page, 'attachment smoke test', 'Ask about this Project...');
+      await expect(page.getByText(E2E_MODEL_RESPONSE).last()).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText('project-chat-screenshot.jpg')).toHaveCount(0);
       await expect(page.getByText('project-chat-notes.md')).toHaveCount(0);
 
@@ -471,6 +478,47 @@ function seedDesktopDatabase(sqlitePath: string): void {
     },
     stdio: 'inherit',
   });
+  execFileSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '--eval',
+      `
+        import {
+          closeDatabase,
+          createModelConfig,
+          openDatabase,
+          parseMasterKeyFromBase64,
+        } from './packages/db/dist/index.js';
+
+        const { db, sqlite } = openDatabase(process.env.SQLITE_PATH);
+        try {
+          createModelConfig(
+            db,
+            {
+              name: 'E2E model',
+              provider: 'openai',
+              model: 'gpt-e2e',
+              apiKey: 'e2e-api-key',
+            },
+            parseMasterKeyFromBase64(process.env.SECRETS_MASTER_KEY),
+            1,
+          );
+        } finally {
+          closeDatabase(sqlite);
+        }
+      `,
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        SQLITE_PATH: sqlitePath,
+        SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
+      },
+      stdio: 'inherit',
+    },
+  );
 }
 
 function getOpenPort(): Promise<number> {

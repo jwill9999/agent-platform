@@ -10,6 +10,7 @@ AGENT_PLATFORM_HOME ?= $(CURDIR)/.agent-platform
 AGENT_WORKSPACE_HOST_PATH ?= $(AGENT_PLATFORM_HOME)/workspaces/default
 AGENT_WORKSPACE_CONTAINER_PATH ?= /workspace
 AGENT_DATA_HOST_PATH ?= $(AGENT_PLATFORM_HOME)/data
+ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH ?= $(AGENT_PLATFORM_HOME)/desktop-runtime/config/secrets-master-key.b64
 export AGENT_PLATFORM_HOME
 export AGENT_WORKSPACE_HOST_PATH
 export AGENT_WORKSPACE_CONTAINER_PATH
@@ -158,8 +159,9 @@ format:
 	pnpm format:check
 
 electron-local:
-	export SECRETS_MASTER_KEY="$(openssl rand -base64 32)"
-	pnpm --filter @agent-platform/desktop run start:renderer
+	@mkdir -p "$(dir $(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH))"
+	@[ -s "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)" ] || openssl rand -base64 32 > "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)"
+	SECRETS_MASTER_KEY="$$(cat "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)")" pnpm --filter @agent-platform/desktop run start:renderer
 
 # ---------------------------------------------------------------------------
 # Help

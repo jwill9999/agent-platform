@@ -55,18 +55,20 @@ process.on('SIGTERM', shutdown);
 
 function e2eMockV1Options(): { v1: V1RouterOptions } | Record<string, never> {
   const rawToolCall = process.env.AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON?.trim();
-  if (!rawToolCall) return {};
+  const configuredFinalText = process.env.AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT;
+  if (!rawToolCall && !configuredFinalText) return {};
 
-  const toolCall = parseE2eToolCall(rawToolCall);
-  const finalText = process.env.AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT ?? 'E2E tool call complete';
+  const toolCall = rawToolCall ? parseE2eToolCall(rawToolCall) : null;
+  const finalText = configuredFinalText ?? 'E2E tool call complete';
 
   return {
     v1: {
       chat: {
         disableEvaluatorNodes: true,
+        emitFinalAssistantMessage: true,
         llmReasonNode: async (state: HarnessStateType) => {
           const step = state.taskIndex ?? 0;
-          if (state.messages.some((message) => message.role === 'tool')) {
+          if (!toolCall || state.messages.some((message) => message.role === 'tool')) {
             return {
               llmOutput: { kind: 'text', content: finalText },
               messages: [{ role: 'assistant', content: finalText }],

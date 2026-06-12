@@ -112,6 +112,19 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   workflow expectation matrix.
 - Changed `apps/web/components/project/project-terminal-dock.tsx` so new terminal sessions default
   to `MesloLGS NF`.
+- Added `agent-platform-electron-stabilisation.26` for the local desktop model-chat failure caused
+  by unstable `make electron-local` secrets master keys.
+- Changed `make electron-local` to create and reuse
+  `.agent-platform/desktop-runtime/config/secrets-master-key.b64` so saved model API keys remain
+  decryptable across local restarts.
+- Added an actionable `MODEL_CONFIG_KEY_DECRYPTION_FAILED` chat error when an existing saved model
+  key was encrypted with an old/unavailable master key; users must re-enter that API key once.
+- Extended managed Electron E2E model mocking so Playwright can assert visible assistant responses
+  in both Personal Chat and Project/Coding workspaces.
+- Seeded a throwaway encrypted E2E model config in `apps/desktop/e2e/project-access.e2e.ts` and
+  asserted both workspace flows can send a prompt and receive `E2E model response received`.
+- Added desktop supervisor and package-script unit coverage for E2E mock passthrough and stable
+  `make electron-local` secrets key behavior.
 
 ## Checks Run
 
@@ -119,6 +132,13 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/webview-runtime.e2e.ts`
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-git-workflow.e2e.ts`
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts`
+- `pnpm --filter @agent-platform/api test -- test/sessionChat.integration.test.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
+- `pnpm --filter @agent-platform/api typecheck`
+- `pnpm --filter @agent-platform/api lint`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
 - `pnpm --filter @agent-platform/api test -- test/crud.integration.test.ts`
 - `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
 - `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts test/default-agent.test.ts`
