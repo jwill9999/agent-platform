@@ -8,6 +8,11 @@ The goal is to find regressions before the staging branch is merged toward `main
 finding to Beads as either existing coverage, a merge blocker, a follow-up task, a known limitation,
 or a product decision.
 
+Before running this checklist, review
+`docs/qa/electron-stabilisation-automation-matrix.md`. Playwright now covers the deterministic
+checks listed there, so owner manual QA should focus on native dialog feel, visual polish, real local
+environment quirks, and copy/flow judgment unless automation fails or the owner wants a spot-check.
+
 The current Product direction is Project Chat-first:
 
 - Opening a Project should land in Project Chat.

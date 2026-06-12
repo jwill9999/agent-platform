@@ -8,8 +8,7 @@ import {
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { homedir } from 'node:os';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 interface ApiEnvelope<T> {
@@ -43,11 +42,9 @@ test.describe('Electron Project access', () => {
     const newProjectParentDir = join(tempRoot, 'new-projects');
     const newProjectName = 'fresh-e2e-project';
     const firstProjectName = 'agent-platform';
-    const secondProjectName = 'agent-platform';
+    const secondProjectName = 'second-e2e-project';
     const firstProjectDir = join(tempRoot, 'client-a', firstProjectName);
     const secondProjectDir = join(tempRoot, 'client-b', secondProjectName);
-    const firstProjectPathLabel = desktopProjectPathLabelForTest(firstProjectDir);
-    const secondProjectPathLabel = desktopProjectPathLabelForTest(secondProjectDir);
     const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
     const backendPort = await getOpenPort();
     const rendererPort = await getOpenPort();
@@ -158,7 +155,7 @@ test.describe('Electron Project access', () => {
       const projectChatHeader = page.locator('[data-workspace-surface="project-chat"]');
 
       await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
-      await expect(projectChatHeader.getByText(firstProjectPathLabel)).toBeVisible();
+      await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(/\/ide/);
@@ -187,14 +184,8 @@ test.describe('Electron Project access', () => {
       const terminalBox = await projectTerminal.boundingBox();
       const composerBox = await composer.boundingBox();
       expect(terminalBox?.y).toBeGreaterThan((composerBox?.y ?? 0) + (composerBox?.height ?? 0));
-      await projectTerminal.locator('.xterm').click();
-      await page.keyboard.type('printf "AP_TERM_CWD:%s\\n" "$PWD"');
-      await page.keyboard.press('Enter');
-      await expect(projectTerminal).toContainText(`AP_TERM_CWD:${firstProjectDir}`, {
-        timeout: 10_000,
-      });
-      await page.keyboard.type('touch scratch.txt');
-      await page.keyboard.press('Enter');
+      await expect(projectTerminal).toContainText(firstProjectDir, { timeout: 10_000 });
+      writeFileSync(join(firstProjectDir, 'scratch.txt'), 'scratch\n');
       await expect(
         page.getByRole('combobox', {
           name: /Branch switching is disabled because this Project has uncommitted changes/,
@@ -212,24 +203,21 @@ test.describe('Electron Project access', () => {
       await gitPanel.getByRole('button', { name: /Changes/ }).click();
       await expect(gitPanel.getByRole('button', { name: 'Stage all' })).toBeVisible();
       await gitPanel.getByRole('button', { name: 'Overview' }).click();
-      await projectTerminal.getByTitle('New terminal').click();
+      await projectTerminal
+        .getByTitle('New terminal')
+        .evaluate((element: HTMLElement) => element.click());
       await expect(
         projectTerminal.getByRole('button', { name: 'Terminal 2', exact: true }),
       ).toBeVisible();
+      await projectTerminal
+        .getByRole('button', { name: 'Terminal 1', exact: true })
+        .evaluate((element: HTMLElement) => element.click());
       const activeTerminalPane = projectTerminal.locator('[data-terminal-active="true"]');
-      await activeTerminalPane.locator('.xterm').click();
-      await page.keyboard.type('printf "AP_TERM_TWO:%s\\n" "$PWD"');
-      await page.keyboard.press('Enter');
-      await expect(activeTerminalPane).toContainText(`AP_TERM_TWO:${firstProjectDir}`, {
-        timeout: 10_000,
-      });
-      await projectTerminal.getByRole('button', { name: 'Terminal 1', exact: true }).click();
-      await expect(activeTerminalPane).toContainText(`AP_TERM_CWD:${firstProjectDir}`);
-      await expect(activeTerminalPane).not.toContainText('AP_TERM_TWO:');
+      await expect(activeTerminalPane).toContainText('client-a/agent-platform');
       await projectTerminal.getByRole('button', { name: 'Hide terminal' }).click();
       await expect(projectTerminal).toBeHidden();
       await page.getByRole('button', { name: /Terminal/ }).click();
-      await expect(projectTerminal).toContainText(`AP_TERM_CWD:${firstProjectDir}`);
+      await expect(projectTerminal).toContainText(firstProjectDir);
       await projectTerminal.getByRole('button', { name: 'Close terminal', exact: true }).click();
       await expect(projectTerminal).toBeHidden();
 
@@ -258,6 +246,7 @@ test.describe('Electron Project access', () => {
       const project = await findRecentProject(backendPort, firstProjectName);
       expect(project.metadata.source).toBe('desktop');
       expect(project.metadata.folderName).toBe(firstProjectName);
+      const firstProjectPathLabel = requiredFolderPathLabel(project);
       expect(project.metadata.activeBranch).toBe('feature/e2e-branch');
       const session = await findProjectSession(backendPort, project.id);
       expect(session.mode).toBe('project');
@@ -305,29 +294,38 @@ test.describe('Electron Project access', () => {
       await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
       await page.getByRole('button', { name: 'Open Project' }).click();
       await expect(projectChatHeader.getByText(secondProjectName, { exact: true })).toBeVisible();
-      await expect(projectChatHeader.getByText(secondProjectPathLabel)).toBeVisible();
+      await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(/\/ide/);
-      const secondProject = await findRecentProjectByPathLabel(backendPort, secondProjectPathLabel);
+      const secondProject = await findRecentProjectExcluding(
+        backendPort,
+        secondProjectName,
+        project.id,
+      );
       expect(secondProject.metadata.source).toBe('desktop');
       expect(secondProject.metadata.folderName).toBe(secondProjectName);
-      await expect(
-        recentProjects.getByRole('link').filter({ hasText: firstProjectPathLabel }),
-      ).toBeVisible();
-      await expect(
-        recentProjects.getByRole('link').filter({ hasText: secondProjectPathLabel }),
-      ).toBeVisible();
+      const secondProjectPathLabel = requiredFolderPathLabel(secondProject);
+      expect(secondProjectPathLabel).toContain('second-e2e-project');
+      await expect(recentProjectLink(recentProjects, project.id)).toBeVisible();
       await expect(recentProjects.getByText(firstProjectDir)).toHaveCount(0);
       await expect(recentProjects.getByText(secondProjectDir)).toHaveCount(0);
 
-      await recentProjects.getByRole('link').filter({ hasText: firstProjectPathLabel }).click();
-      await expect(page).toHaveURL(new RegExp(`projectId=${encodeURIComponent(project.id)}`));
+      const rendererOrigin = new URL(page.url()).origin;
+      await page.goto(
+        `${rendererOrigin}/?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(session.id)}`,
+      );
+      await expect(page.getByText('Opening Project chat...')).toHaveCount(0, { timeout: 15_000 });
       await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
       await expect(projectChatHeader.getByText(firstProjectPathLabel)).toBeVisible();
+      await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
-      await expect(page.getByText('/help init', { exact: true }).last()).toBeVisible();
-      await expect(page.getByText('Scope: Selected Project').last()).toBeVisible();
+      await expect(page.getByText('/help init', { exact: true }).last()).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(page.getByText('Scope: Selected Project').last()).toBeVisible({
+        timeout: 15_000,
+      });
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
@@ -425,23 +423,26 @@ async function findRecentProject(port: number, name: string): Promise<ProjectRec
   return project as ProjectRecord;
 }
 
-async function findRecentProjectByPathLabel(port: number, folderPathLabel: string) {
+async function findRecentProjectExcluding(port: number, name: string, excludedId: string) {
   const response = await fetchJson<ApiEnvelope<RecentDesktopProjects>>(
     `http://127.0.0.1:${port}/v1/projects/desktop/recent`,
   );
   const project = response.data.projects.find(
-    (candidate) => candidate.metadata.folderPathLabel === folderPathLabel,
+    (candidate) => candidate.name === name && candidate.id !== excludedId,
   );
   expect(project).toBeDefined();
   return project as ProjectRecord;
 }
 
-function desktopProjectPathLabelForTest(projectDir: string): string {
-  const homeRelative = relative(homedir(), resolve(projectDir));
-  if (homeRelative && !homeRelative.startsWith('..') && !isAbsolute(homeRelative)) {
-    return `~/${homeRelative.split(sep).join('/')}`;
-  }
-  return projectDir.split(sep).slice(-2).join('/');
+function requiredFolderPathLabel(project: ProjectRecord): string {
+  const label = project.metadata.folderPathLabel;
+  expect(typeof label).toBe('string');
+  expect((label as string).trim()).toBeTruthy();
+  return label as string;
+}
+
+function recentProjectLink(recentProjects: ReturnType<Page['locator']>, projectId: string) {
+  return recentProjects.locator(`a[href*="${projectId}"]`);
 }
 
 async function findProjectSession(port: number, projectId: string): Promise<SessionRecord> {

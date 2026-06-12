@@ -16,75 +16,41 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-12
-- **Session:** Closed `.6.2`, documented `.6.3` notarization blocker, and recorded production
-  release hold.
-- **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commits:** `38f2e96` records the production release hold; `bf638b7` closed `.6.2`
-  evidence.
+- **Session:** Backfilled Electron stabilisation Playwright coverage and created owner manual QA
+  sign-off task.
+- **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
+- **Latest commits:** pending this session.
 
 ## Current State
 
-- Production sandbox work remains on `jwill9999/macos-production-sandbox-vm-lifecycle-exec`; do not
-  push directly to `main`.
-- Parent epic `agent-platform-macos-production-sandbox` is open at `5/6` complete because `.6`
-  remains open.
-- `.6.1` is closed. Live VM proof on Apple Silicon macOS verified:
-  - VM diagnostics: `2` vCPU, `2048` MiB RAM, `networkDevices: 0`, `networkPolicy: disabled`,
-    `agentplatform` uid/gid `1000`, `/workspace` mount, timeout/output limits, and virtualization
-    entitlement present.
-  - Guest commands run non-root, only `lo` exists under `/sys/class/net`, `/proc/net/route` has no
-    routes, `/workspace` writes persist to the host Project path, `/root` is not writable, scratch is
-    guest-owned, timeout exits `124`, output clamps at requested bytes, and cwd escape fails closed.
-- `.6.2` is closed. Signed/packaged repair smoke packaged the signed helper/assets, repaired corrupt
-  app-owned VM runtime state, preserved Project data and diagnostics, restored assets, and proved
-  packaged helper `prepare/start/status/stop` works after repair.
-- `.6.3` is in progress but externally blocked. Signing/quarantine/entitlement verifier exists, and
-  signed packaged helper execution is proven, but real Developer ID signing/notarization cannot be
-  produced locally: `security find-identity -v -p codesigning` returned `0 valid identities found`,
-  and no Apple/notary credential environment variables are present.
-- Production macOS release is explicitly blocked until `.6.3` closes with Developer ID signing,
-  Apple notarization success, helper signing/entitlement/quarantine report, and `macos-vm` ready
-  smoke from the signed/notarized artifact.
-- `.6.4` is in progress. Future Windows/Linux adapter docs and traceability draft exist; final
-  closure is blocked by `.6.3`.
-- `.5` and `.5.4` are closed. PR #227 recorded green `staging-packaged-macos-vm-e2e` evidence on the
-  self-hosted Apple Silicon runner.
+- Electron stabilisation remains gated by `.12`, which is blocked on automation backfill `.17` and
+  owner manual sign-off `.18`.
+- `.17` is implemented locally and ready to close after commit/push: deterministic `.12` gaps now
+  have Electron Playwright coverage.
+- `.18` is open for owner manual QA sign-off. It should use
+  `docs/qa/electron-stabilisation-automation-matrix.md` to reduce manual scope to native/subjective
+  checks and any automation ambiguity.
+- `.12` should remain blocked until `.18` records owner sign-off and any findings are classified.
 
 ## Recent Work
 
-- Added `apps/desktop/scripts/smoke-macos-vm-repair.mjs` and `native:vm:smoke-repair` to make `.6.2`
-  packaged repair evidence repeatable.
-- Ran `.6.2` smoke with pristine prepared VM assets from `/private/tmp/agent-platform-linux-runtime-6-2/images`
-  and work dir `/private/tmp/agent-platform-macos-vm-repair-smoke-6-2`.
-- Smoke result: repair deleted only app-owned `state`/`images`, preserved `logs/support.log`,
-  preserved Project `README.md`, restored `images/manifest.json`, and the packaged helper returned
-  `prepare: disabled`, `start: ready`, `status: ready`, `stop: disabled`.
-- Closed Beads issue `agent-platform-macos-production-sandbox.6.2`.
-- Updated `.6.3` spec/Beads notes with the concrete signing/notarization blocker.
-- Updated `.6.4` audit so `.6.1` and `.6.2` are closed and only `.6.3` blocks final closure.
-- Added production-release hold language to the VM epic, `.6`, and `.6.3`, and appended matching
-  Beads notes.
+- Added `apps/desktop/e2e/stabilisation-backfill.e2e.ts`.
+- Covered settings/model/API key persistence, restart persistence, Project-scoped versus Personal
+  Chat sessions, missing/unavailable Projects, and UI leakage/layout smoke.
+- Updated `apps/desktop/e2e/project-access.e2e.ts` to remove stale/flaky assumptions uncovered by
+  full-suite ordering.
+- Added `docs/qa/electron-stabilisation-automation-matrix.md`.
+- Added Beads task `agent-platform-electron-stabilisation.18` for owner manual QA sign-off and made
+  `.12` depend on `.17` and `.18`.
 
 ## Checks Run
 
-- `pnpm --filter @agent-platform/desktop native:vm:host-check -- --json`
-- `node --check apps/desktop/scripts/build-macos-vm-linux-assets.mjs`
-- `node --check apps/desktop/scripts/smoke-macos-vm-repair.mjs`
-- `pnpm --filter @agent-platform/desktop native:vm:assets:build-linux -- --out-dir /private/tmp/agent-platform-linux-assets-6-1`
-- `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- --source-image /private/tmp/agent-platform-linux-assets-6-1/source.raw --kernel /private/tmp/agent-platform-linux-assets-6-1/vmlinuz --initrd /private/tmp/agent-platform-linux-assets-6-1/initrd.img --bootstrap /private/tmp/agent-platform-linux-assets-6-1/guest-bootstrap.sh --out-dir /private/tmp/agent-platform-linux-runtime-6-1/images`
-- `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- --source-image /private/tmp/agent-platform-linux-assets-6-1/source.raw --kernel /private/tmp/agent-platform-linux-assets-6-1/vmlinuz --initrd /private/tmp/agent-platform-linux-assets-6-1/initrd.img --bootstrap /private/tmp/agent-platform-linux-assets-6-1/guest-bootstrap.sh --out-dir /private/tmp/agent-platform-linux-runtime-6-2/images`
-- `pnpm --filter @agent-platform/desktop native:vm:build`
-- `pnpm --filter @agent-platform/desktop native:vm:sign-dev`
-- `pnpm --filter @agent-platform/desktop native:vm:verify-signing -- --helper /Users/letuscode/projects/agent-platform/apps/desktop/native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner --json`
-- `pnpm --filter @agent-platform/desktop native:vm:smoke-repair -- --assets-dir /private/tmp/agent-platform-linux-runtime-6-2/images --work-dir /private/tmp/agent-platform-macos-vm-repair-smoke-6-2`
-- `macos-vm-runner start/status/exec/stop` live proof against `/private/tmp/agent-platform-linux-runtime-6-1`
-- `pnpm --filter @agent-platform/desktop native:vm:test`
-- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/macosVmHostCheck.test.ts test/macosVmPackaging.test.ts`
-- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/backendSupervisor.test.ts test/macosVmSigning.test.ts test/macosVmPackaging.test.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/stabilisation-backfill.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e` (`8 passed`)
 - `pnpm --filter @agent-platform/desktop lint`
 - `pnpm --filter @agent-platform/desktop typecheck`
-- `pnpm format:check`
 - `pnpm docs:lint`
+- `pnpm format:check`
 - `git diff --check`
 
 SonarQube MCP/tools were not exposed by tool discovery in this session, so the completion gate used
@@ -92,11 +58,7 @@ the documented fallback checks above.
 
 ## Next
 
-1. Provide a VM-capable Apple Silicon runner/session with Developer ID signing identity and Apple
-   notary credentials.
-2. Complete `.6.3`: produce signed/notarized artifact smoke evidence proving helper execution,
-   entitlements, no quarantine block, notarization success, and `macos-vm` ready health.
-3. Complete `.6.4`: refresh final traceability audit, close `.6`, then close
-   `agent-platform-macos-production-sandbox`.
-4. After the epic closes, decide whether the next focus is the divergent pull/merge resolver or the
-   broader Git workflow UI epic.
+1. Commit and push `jwill9999/electron-stabilisation-e2e-backfill`.
+2. Close `agent-platform-electron-stabilisation.17` after the pushed evidence is recorded.
+3. Owner runs/signs off `agent-platform-electron-stabilisation.18`.
+4. Close `.12` only after `.18` sign-off and finding classification.
