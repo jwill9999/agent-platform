@@ -24,6 +24,7 @@ can focus on checks automation cannot fully prove.
 | Missing/unavailable Project state                | `apps/desktop/e2e/stabilisation-backfill.e2e.ts`                                           |
 | Internal path/state leakage smoke                | `apps/desktop/e2e/project-access.e2e.ts`, `apps/desktop/e2e/stabilisation-backfill.e2e.ts` |
 | Layout/readability smoke                         | `apps/desktop/e2e/stabilisation-backfill.e2e.ts`                                           |
+| First-load compact/expanded desktop layout       | `apps/desktop/e2e/stabilisation-backfill.e2e.ts`                                           |
 | Packaged VM command execution                    | `apps/desktop/e2e/packaged-vm-command.e2e.ts`                                              |
 | Git workflow panel and merge resolver            | `apps/desktop/e2e/project-git-workflow.e2e.ts`                                             |
 | Workspace preview/WebView runtime                | `apps/desktop/e2e/webview-runtime.e2e.ts`                                                  |

@@ -89,11 +89,11 @@ gaps. Future Project UI tasks must include Electron E2E when they touch native f
 Project binding, Recent Projects, external IDE handoff, desktop app data, or preload/main-process
 behavior.
 
-`agent-platform-electron-stabilisation.17` adds the deterministic automation backfill for the `.12`
-manual QA gaps. The automation/manual split is now recorded in
-`docs/qa/electron-stabilisation-automation-matrix.md`; owner manual QA should use that matrix to
-skip deterministic checks already covered by Playwright and focus on native picker feel, visual
-polish, real local environment quirks, and copy/flow judgment.
+`agent-platform-electron-stabilisation.17` and `agent-platform-electron-stabilisation.19` add the
+deterministic automation backfill for the `.12` manual QA gaps. The automation/manual split is now
+recorded in `docs/qa/electron-stabilisation-automation-matrix.md`; owner manual QA should use that
+matrix to skip deterministic checks already covered by Playwright and focus on native picker feel,
+visual polish, real local environment quirks, and copy/flow judgment.
 
 Latest local evidence on 2026-06-12:
 

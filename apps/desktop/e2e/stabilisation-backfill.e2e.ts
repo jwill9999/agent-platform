@@ -36,6 +36,25 @@ const GIT_BINARY = '/usr/bin/git';
 const masterKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 test.describe('Electron stabilisation automation backfill', () => {
+  test('keeps first-loaded Workspaces responsive at compact and expanded desktop sizes', async () => {
+    const fixture = await createFixture();
+    let app: ElectronApplication | undefined;
+
+    try {
+      app = await launchFixture(fixture);
+      const page = await app.firstWindow();
+
+      await resizeWindowForFirstLoad(app, page, { width: 960, height: 640 });
+      await expectResponsiveFirstLoad(page, 'compact first-load Workspaces');
+
+      await resizeWindowForFirstLoad(app, page, { width: 1600, height: 1000 });
+      await expectResponsiveFirstLoad(page, 'expanded first-load Workspaces');
+    } finally {
+      await app?.close();
+      rmSync(fixture.tempRoot, { recursive: true, force: true });
+    }
+  });
+
   test('persists settings and recent Project state across restart, scopes sessions, and handles unavailable Projects safely', async () => {
     const fixture = await createFixture();
     let app: ElectronApplication | undefined;
@@ -168,6 +187,18 @@ function launchFixture(fixture: Fixture): Promise<ElectronApplication> {
   });
 }
 
+async function resizeWindowForFirstLoad(
+  app: ElectronApplication,
+  page: Page,
+  size: { width: number; height: number },
+): Promise<void> {
+  const windowHandle = await app.browserWindow(page);
+  await windowHandle.evaluate((window, nextSize) => {
+    window.setSize(nextSize.width, nextSize.height);
+  }, size);
+  await page.waitForTimeout(250);
+}
+
 async function openModelsSettings(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
   await expect(page.getByLabel('Open settings menu')).toBeVisible();
@@ -230,6 +261,27 @@ async function expectUsableSurface(page: Page, label: string): Promise<void> {
   const box = await main.boundingBox();
   expect(box?.width, `${label} has usable width`).toBeGreaterThan(500);
   expect(box?.height, `${label} has usable height`).toBeGreaterThan(400);
+}
+
+async function expectResponsiveFirstLoad(page: Page, label: string): Promise<void> {
+  await expect(page.getByRole('link', { name: /Workspaces/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Chat/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
+  await expect(page.getByLabel('Open settings menu')).toBeVisible();
+  await expectUsableSurface(page, label);
+
+  const viewport = await page.evaluate(() => ({
+    bodyScrollWidth: document.body.scrollWidth,
+    clientHeight: document.documentElement.clientHeight,
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(viewport.clientWidth, `${label} viewport width`).toBeGreaterThanOrEqual(900);
+  expect(viewport.clientHeight, `${label} viewport height`).toBeGreaterThanOrEqual(600);
+  expect(
+    Math.max(viewport.scrollWidth, viewport.bodyScrollWidth),
+    `${label} avoids page-level horizontal overflow`,
+  ).toBeLessThanOrEqual(viewport.clientWidth + 4);
 }
 
 function seedTitledSessions(sqlitePath: string, projectId: string): void {

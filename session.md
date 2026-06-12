@@ -23,10 +23,10 @@ and actionable.
 
 ## Current State
 
-- Electron stabilisation remains gated by `.12`, which is blocked on automation backfill `.17` and
-  owner manual sign-off `.18`.
-- `.17` is implemented locally and ready to close after commit/push: deterministic `.12` gaps now
-  have Electron Playwright coverage.
+- Electron stabilisation remains gated by `.12`, which is blocked on owner manual sign-off `.18`.
+- `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
+- `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
+  sizes.
 - `.18` is open for owner manual QA sign-off. It should use
   `docs/qa/electron-stabilisation-automation-matrix.md` to reduce manual scope to native/subjective
   checks and any automation ambiguity.
@@ -42,6 +42,8 @@ and actionable.
 - Added `docs/qa/electron-stabilisation-automation-matrix.md`.
 - Added Beads task `agent-platform-electron-stabilisation.18` for owner manual QA sign-off and made
   `.12` depend on `.17` and `.18`.
+- Added Beads task `agent-platform-electron-stabilisation.19` for first-load responsive layout E2E
+  coverage.
 
 ## Checks Run
 
@@ -58,7 +60,5 @@ the documented fallback checks above.
 
 ## Next
 
-1. Commit and push `jwill9999/electron-stabilisation-e2e-backfill`.
-2. Close `agent-platform-electron-stabilisation.17` after the pushed evidence is recorded.
-3. Owner runs/signs off `agent-platform-electron-stabilisation.18`.
-4. Close `.12` only after `.18` sign-off and finding classification.
+1. Owner runs/signs off `agent-platform-electron-stabilisation.18`.
+2. Close `.12` only after `.18` sign-off and finding classification.
