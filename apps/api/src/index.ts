@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 
-import { closeDatabase, openDatabase } from '@agent-platform/db';
+import { closeDatabase, openDatabase, runSeed } from '@agent-platform/db';
 import type { HarnessStateType, ToolCallIntent } from '@agent-platform/harness';
 
 import { createApp } from './infrastructure/http/createApp.js';
@@ -16,6 +16,7 @@ let dbHandle: ReturnType<typeof openDatabase> | null = null;
 
 if (sqlitePath) {
   dbHandle = openDatabase(sqlitePath);
+  runSeed(dbHandle.db);
   log.info('db.ready', { sqlitePath });
 }
 

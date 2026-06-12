@@ -23,8 +23,10 @@ interface ProjectRecord {
 
 interface SessionRecord {
   id: string;
+  agentId: string;
   mode: string;
   projectId: string | null;
+  updatedAtMs: number;
 }
 
 interface RecentDesktopProjects {
@@ -34,6 +36,7 @@ interface RecentDesktopProjects {
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
+const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
 
 test.describe('Electron Project access', () => {
   test('opens a local Project and binds chat/slash commands to the same Project session', async () => {
@@ -143,6 +146,14 @@ test.describe('Electron Project access', () => {
       await expect(page.getByRole('combobox', { name: 'Active agent' })).toContainText(
         'Personal assistant',
       );
+      await expect
+        .poll(async () => {
+          const sessions = await fetchSessions(backendPort);
+          return sessions
+            .filter((session) => session.mode === 'chat' && !session.projectId)
+            .sort((a, b) => b.updatedAtMs - a.updatedAtMs)[0]?.agentId;
+        })
+        .toBe(DEFAULT_AGENT_ID);
       await attachFilesToComposer(page, [
         {
           name: 'personal-chat-screenshot.png',
@@ -435,6 +446,13 @@ async function findProjectSession(port: number, projectId: string): Promise<Sess
   const session = response.data.find((candidate) => candidate.projectId === projectId);
   expect(session).toBeDefined();
   return session as SessionRecord;
+}
+
+async function fetchSessions(port: number): Promise<SessionRecord[]> {
+  const response = await fetchJson<ApiEnvelope<SessionRecord[]>>(
+    `http://127.0.0.1:${port}/v1/sessions`,
+  );
+  return response.data;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

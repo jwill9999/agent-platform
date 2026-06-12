@@ -21,7 +21,7 @@ import type { ApprovalDecision } from '@/hooks/use-harness-chat';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
-import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
+import { apiGet, apiPath, apiPost, apiPut, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -621,6 +621,7 @@ export default function HomePage() {
   const attemptedProjectReopenIdRef = useRef<string | null>(null);
   const projectGitRefreshTimeoutRef = useRef<number | null>(null);
   const agentSelectionSourceRef = useRef<'system' | 'user'>('system');
+  const personalChatRepairRef = useRef<string | null>(null);
 
   const {
     messages,
@@ -706,30 +707,55 @@ export default function HomePage() {
     }
   }, []);
 
-  const createSessionForAgent = useCallback(async (agentId: string) => {
-    setSessionError(null);
-    setIsResuming(false);
-    try {
-      const session = await apiPost<SessionRecord>(apiPath('sessions'), {
-        agentId,
-        mode: 'chat',
-      });
-      if (!session?.id) {
-        setSessionError('Failed to create session');
+  const createSessionForAgent = useCallback(
+    async (agentId: string) => {
+      const chatAgentId = pickDefaultAgentForMode(agents, 'chat')?.id ?? agentId;
+      setSessionError(null);
+      setIsResuming(false);
+      try {
+        const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+          agentId: chatAgentId,
+          mode: 'chat',
+        });
+        if (!session?.id) {
+          setSessionError('Failed to create session');
+          setSessionId(null);
+          setSensorDashboard(null);
+          return;
+        }
+        setSelectedAgentId(chatAgentId);
+        setSelectedModelConfigId(resolveChatModelConfigId(chatAgentId, agents, modelConfigs));
+        setSessionId(session.id);
+        setSensorDashboard(null);
+        setSensorError(null);
+        setSensorLoading(false);
+      } catch (e) {
+        setSessionError(e instanceof ApiRequestError ? e.message : String(e));
         setSessionId(null);
         setSensorDashboard(null);
-        return;
       }
-      setSessionId(session.id);
-      setSensorDashboard(null);
-      setSensorError(null);
-      setSensorLoading(false);
-    } catch (e) {
-      setSessionError(e instanceof ApiRequestError ? e.message : String(e));
-      setSessionId(null);
-      setSensorDashboard(null);
-    }
-  }, []);
+    },
+    [agents, modelConfigs],
+  );
+
+  const normalizePersonalChatSession = useCallback(
+    async (session: SessionRecord): Promise<SessionRecord> => {
+      const chatDefaultAgent = pickDefaultAgentForMode(agents, 'chat');
+      if (session.mode !== 'chat' || !chatDefaultAgent || chatDefaultAgent.id === session.agentId) {
+        return session;
+      }
+
+      const updatedSession: SessionRecord = {
+        ...session,
+        agentId: chatDefaultAgent.id,
+        mode: 'chat',
+        projectId: null,
+        updatedAtMs: Date.now(),
+      };
+      return (await apiPut<SessionRecord>(apiPath('sessions', session.id), updatedSession)) ?? updatedSession;
+    },
+    [agents],
+  );
 
   useEffect(() => {
     if (selectedMode !== 'chat') return;
@@ -750,6 +776,47 @@ export default function HomePage() {
       createSessionForAgent(selectedAgentId).catch(() => {});
     }
   }, [selectedAgentId, createSessionForAgent, isResuming, selectedMode]);
+
+  useEffect(() => {
+    if (selectedMode !== 'chat' || !sessionId || agents.length === 0) return;
+    const session = sessions.find((candidate) => candidate.id === sessionId);
+    if (!session || session.mode !== 'chat') return;
+    const chatDefaultAgent = pickDefaultAgentForMode(agents, 'chat');
+    if (!chatDefaultAgent || session.agentId === chatDefaultAgent.id) return;
+    if (personalChatRepairRef.current === session.id) return;
+
+    personalChatRepairRef.current = session.id;
+    normalizePersonalChatSession(session)
+      .then((normalizedSession) => {
+        agentSelectionSourceRef.current = 'system';
+        setSelectedAgentId(normalizedSession.agentId);
+        setSelectedModelConfigId(
+          resolveChatModelConfigId(normalizedSession.agentId, agents, modelConfigs),
+        );
+        setSensorDashboard(null);
+        setSensorError(null);
+        setSensorLoading(false);
+        refreshSessions().catch(() => {});
+      })
+      .catch((repairError) => {
+        setSessionError(
+          repairError instanceof ApiRequestError
+            ? repairError.message
+            : 'Failed to prepare personal chat session',
+        );
+      })
+      .finally(() => {
+        personalChatRepairRef.current = null;
+      });
+  }, [
+    agents,
+    modelConfigs,
+    normalizePersonalChatSession,
+    refreshSessions,
+    selectedMode,
+    sessionId,
+    sessions,
+  ]);
 
   const handleAgentChange = useCallback(
     (agentId: string) => {
@@ -1218,35 +1285,59 @@ export default function HomePage() {
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {
-      agentSelectionSourceRef.current = 'system';
-      setIsResuming(true);
-      setSelectedMode(session.mode === 'project' ? 'project-chat' : 'chat');
-      setSelectedAgentId(session.agentId);
-      setSelectedModelConfigId(resolveChatModelConfigId(session.agentId, agents, modelConfigs));
-      setSessionId(session.id);
-      clearAttachments();
-      if (session.mode === 'project') {
-        refreshSensors(session.id).catch(() => {});
-      } else {
-        setSensorDashboard(null);
-        setSensorError(null);
-        setSensorLoading(false);
-      }
+      void (async () => {
+        agentSelectionSourceRef.current = 'system';
+        setIsResuming(true);
+        const normalizedSession = await normalizePersonalChatSession(session);
+        const repairedPersonalSession = normalizedSession.agentId !== session.agentId;
+
+        setSelectedMode(normalizedSession.mode === 'project' ? 'project-chat' : 'chat');
+        setSelectedAgentId(normalizedSession.agentId);
+        setSelectedModelConfigId(
+          resolveChatModelConfigId(normalizedSession.agentId, agents, modelConfigs),
+        );
+        setSessionId(normalizedSession.id);
+        clearAttachments();
+        if (normalizedSession.mode === 'project') {
+          refreshSensors(normalizedSession.id).catch(() => {});
+        } else {
+          setSensorDashboard(null);
+          setSensorError(null);
+          setSensorLoading(false);
+        }
+        if (repairedPersonalSession) {
+          refreshSessions().catch(() => {});
+        }
+      })().catch((error) => {
+        setSessionError(
+          error instanceof ApiRequestError ? error.message : 'Failed to open chat session',
+        );
+      });
     },
-    [agents, clearAttachments, modelConfigs, refreshSensors],
+    [
+      clearAttachments,
+      modelConfigs,
+      normalizePersonalChatSession,
+      refreshSensors,
+      refreshSessions,
+    ],
   );
 
   const handleNewChatForAgent = useCallback(
     (agentId: string) => {
-      agentSelectionSourceRef.current = 'user';
+      const chatAgentId =
+        selectedMode === 'project-chat'
+          ? agentId
+          : (pickDefaultAgentForMode(agents, 'chat')?.id ?? agentId);
+      agentSelectionSourceRef.current = selectedMode === 'project-chat' ? 'user' : 'system';
       setIsResuming(false);
-      setSelectedAgentId(agentId);
-      setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
+      setSelectedAgentId(chatAgentId);
+      setSelectedModelConfigId(resolveChatModelConfigId(chatAgentId, agents, modelConfigs));
       clearAttachments();
       if (selectedMode === 'project-chat' && activeProject?.id) {
         setSessionError(null);
         apiPost<SessionRecord>(apiPath('sessions'), {
-          agentId,
+          agentId: chatAgentId,
           mode: 'project',
           projectId: activeProject.id,
         })
@@ -1266,7 +1357,7 @@ export default function HomePage() {
           });
         return;
       }
-      createSessionForAgent(agentId).catch(() => {});
+      createSessionForAgent(chatAgentId).catch(() => {});
     },
     [
       activeProject?.id,
