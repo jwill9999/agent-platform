@@ -363,6 +363,9 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText(secondProjectDir)).toHaveCount(0);
       await page.getByRole('button', { name: 'Open in IDE' }).click();
       await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page.getByText(/Open in IDE is available/)).toHaveCount(0);
+      await expect(page.getByText(/Project folder is unavailable/)).toHaveCount(0);
+      await expect(page.getByText(/Failed to open the Project folder/)).toHaveCount(0);
 
       await sendChatMessage(page, '/init', 'Ask about this Project...');
       await expect(
@@ -374,6 +377,9 @@ test.describe('Electron Project access', () => {
 
       await page.getByRole('button', { name: 'Open in IDE' }).click();
       await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page.getByText(/Open in IDE is available/)).toHaveCount(0);
+      await expect(page.getByText(/Project folder is unavailable/)).toHaveCount(0);
+      await expect(page.getByText(/Failed to open the Project folder/)).toHaveCount(0);
 
       await sendChatMessage(page, '/help init', 'Ask about this Project...');
       await expect(page.getByText('Usage: /init').last()).toBeVisible();

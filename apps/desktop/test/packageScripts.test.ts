@@ -17,6 +17,7 @@ const vmAssetBuilder = readFileSync(
   join(desktopDir, 'scripts/build-macos-vm-linux-assets.mjs'),
   'utf8',
 );
+const preloadBuilder = readFileSync(join(desktopDir, 'scripts/build-preload-cjs.mjs'), 'utf8');
 
 describe('desktop package scripts', () => {
   it('launches the production-like renderer with the managed local backend', () => {
@@ -38,6 +39,17 @@ describe('desktop package scripts', () => {
       'SECRETS_MASTER_KEY="$$(cat "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)")" pnpm --filter @agent-platform/desktop run start:renderer',
     );
     expect(makefile).not.toContain('export SECRETS_MASTER_KEY="$(openssl rand -base64 32)"');
+  });
+
+  it('keeps the generated CommonJS preload bridge aligned with desktop APIs', () => {
+    expect(preloadBuilder).toContain('repairMacosVmRuntimeIpcChannel');
+    expect(preloadBuilder).toContain(
+      'repairMacosVmRuntime: () => ipcRenderer.invoke(repairMacosVmRuntimeIpcChannel)',
+    );
+    expect(preloadBuilder).toContain('openProjectIdeIpcChannel');
+    expect(preloadBuilder).toContain(
+      'openInIde: (request) => ipcRenderer.invoke(openProjectIdeIpcChannel, request)',
+    );
   });
 
   it('builds and tests the native macOS VM runner helper', () => {

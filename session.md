@@ -125,6 +125,11 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   asserted both workspace flows can send a prompt and receive `E2E model response received`.
 - Added desktop supervisor and package-script unit coverage for E2E mock passthrough and stable
   `make electron-local` secrets key behavior.
+- Fixed `agent-platform-287`: the generated CommonJS preload used by Electron now exposes
+  `projects.openInIde` and `maintenance.repairMacosVmRuntime`, matching the TypeScript preload
+  bridge. This resolves the connected-Project `Open in IDE is available...` banner.
+- Extended Project access E2E so clicking `Open in IDE` fails the test if missing-bridge,
+  missing-folder, or generic open-failure banners appear.
 
 ## Checks Run
 
@@ -139,6 +144,8 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - `pnpm --filter @agent-platform/api lint`
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/desktop build`
 - `pnpm --filter @agent-platform/api test -- test/crud.integration.test.ts`
 - `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
 - `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts test/default-agent.test.ts`

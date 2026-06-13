@@ -43,8 +43,12 @@ const resetLocalDataIpcChannel = ${JSON.stringify(desktopBridge.resetLocalDataIp
 const resetLocalDataConfirmationIpcChannel = ${JSON.stringify(
     desktopBridge.resetLocalDataConfirmationIpcChannel,
   )};
+const repairMacosVmRuntimeIpcChannel = ${JSON.stringify(
+    desktopBridge.repairMacosVmRuntimeIpcChannel,
+  )};
 const createProjectFolderIpcChannel = ${JSON.stringify(desktopBridge.createProjectFolderIpcChannel)};
 const selectProjectFolderIpcChannel = ${JSON.stringify(desktopBridge.selectProjectFolderIpcChannel)};
+const openProjectIdeIpcChannel = ${JSON.stringify(desktopBridge.openProjectIdeIpcChannel)};
 const createTerminalIpcChannel = ${JSON.stringify(desktopBridge.createTerminalIpcChannel)};
 const inputTerminalIpcChannel = ${JSON.stringify(desktopBridge.inputTerminalIpcChannel)};
 const resizeTerminalIpcChannel = ${JSON.stringify(desktopBridge.resizeTerminalIpcChannel)};
@@ -86,10 +90,12 @@ const workspaceWebViewUpdatedIpcChannel = ${JSON.stringify(
 const desktopApi = {
   maintenance: {
     getResetLocalDataConfirmation: () => ipcRenderer.invoke(resetLocalDataConfirmationIpcChannel),
+    repairMacosVmRuntime: () => ipcRenderer.invoke(repairMacosVmRuntimeIpcChannel),
     resetLocalData: (request) => ipcRenderer.invoke(resetLocalDataIpcChannel, request),
   },
   projects: {
     createFolder: (request) => ipcRenderer.invoke(createProjectFolderIpcChannel, request),
+    openInIde: (request) => ipcRenderer.invoke(openProjectIdeIpcChannel, request),
     selectFolder: () => ipcRenderer.invoke(selectProjectFolderIpcChannel),
   },
   terminal: {
@@ -152,6 +158,10 @@ function loadDesktopBridgeContract() {
       sourceFile,
       'resetLocalDataConfirmationIpcChannel',
     ),
+    repairMacosVmRuntimeIpcChannel: readExportedStringConst(
+      sourceFile,
+      'repairMacosVmRuntimeIpcChannel',
+    ),
     createProjectFolderIpcChannel: readExportedStringConst(
       sourceFile,
       'createProjectFolderIpcChannel',
@@ -160,6 +170,7 @@ function loadDesktopBridgeContract() {
       sourceFile,
       'selectProjectFolderIpcChannel',
     ),
+    openProjectIdeIpcChannel: readExportedStringConst(sourceFile, 'openProjectIdeIpcChannel'),
     createTerminalIpcChannel: readExportedStringConst(sourceFile, 'createTerminalIpcChannel'),
     inputTerminalIpcChannel: readExportedStringConst(sourceFile, 'inputTerminalIpcChannel'),
     resizeTerminalIpcChannel: readExportedStringConst(sourceFile, 'resizeTerminalIpcChannel'),
