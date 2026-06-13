@@ -57,11 +57,10 @@ interface DesktopWebViewSession {
 export interface DesktopWebViewView {
   readonly webContents: Pick<
     WebContents,
-    | 'canGoBack'
-    | 'canGoForward'
     | 'goBack'
     | 'goForward'
     | 'loadURL'
+    | 'navigationHistory'
     | 'on'
     | 'reload'
     | 'setWindowOpenHandler'
@@ -314,7 +313,7 @@ export class DesktopWebViewService {
 
   goBack(webviewId: string): DesktopWebViewState | null {
     const session = this.#sessions.get(webviewId);
-    if (!session || !session.view.webContents.canGoBack()) {
+    if (!session || !session.view.webContents.navigationHistory.canGoBack()) {
       return session ? this.#state(session) : null;
     }
     session.view.webContents.goBack();
@@ -323,7 +322,7 @@ export class DesktopWebViewService {
 
   goForward(webviewId: string): DesktopWebViewState | null {
     const session = this.#sessions.get(webviewId);
-    if (!session || !session.view.webContents.canGoForward()) {
+    if (!session || !session.view.webContents.navigationHistory.canGoForward()) {
       return session ? this.#state(session) : null;
     }
     session.view.webContents.goForward();
@@ -439,8 +438,8 @@ export class DesktopWebViewService {
 
   #state(session: DesktopWebViewSession): DesktopWebViewState {
     return {
-      canGoBack: session.view.webContents.canGoBack(),
-      canGoForward: session.view.webContents.canGoForward(),
+      canGoBack: session.view.webContents.navigationHistory.canGoBack(),
+      canGoForward: session.view.webContents.navigationHistory.canGoForward(),
       createdAt: session.createdAt,
       origin: session.origin,
       policyTier: session.policyTier,

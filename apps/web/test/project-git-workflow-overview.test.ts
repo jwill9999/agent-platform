@@ -1,4 +1,5 @@
 import type {
+  ProjectBranchListResult,
   ProjectGitChecksResult,
   ProjectGitPullRequestsResult,
   ProjectGitStatusResult,
@@ -11,7 +12,9 @@ import {
   deriveGitPublishState,
   deriveGitWorkflowOverview,
   deriveGitWorkflowTabs,
+  derivePullRequestBaseBranchOptions,
   resolveGitWorkflowActiveTab,
+  resolvePullRequestBaseBranchValue,
   shouldRenderGitStatusLoader,
   shouldRequestProjectGitDiff,
 } from '@/components/project/project-git-github-panel';
@@ -612,6 +615,57 @@ describe('deriveGitWorkflowTabs', () => {
 });
 
 describe('deriveGitPullRequestCreateState', () => {
+  it('builds editable pull request base branch options without the current branch', () => {
+    const branches: ProjectBranchListResult = {
+      currentBranch: 'feature/work',
+      clean: true,
+      branches: [
+        {
+          name: 'main',
+          current: false,
+          upstreamState: 'active',
+        },
+        {
+          name: 'staging',
+          current: false,
+          upstreamState: 'active',
+        },
+        {
+          name: 'feature/work',
+          current: true,
+          upstreamState: 'active',
+        },
+      ],
+    };
+
+    expect(
+      derivePullRequestBaseBranchOptions({
+        status: status({
+          currentBranch: 'feature/work',
+          upstreamBranch: 'origin/feature/work',
+          baseBranch: 'develop',
+        }),
+        branches,
+      }),
+    ).toEqual(['develop', 'staging', 'main']);
+  });
+
+  it('resolves the selected pull request base branch before using the fallback', () => {
+    expect(
+      resolvePullRequestBaseBranchValue({
+        selectedBaseBranch: ' staging ',
+        fallbackBaseBranch: 'main',
+      }),
+    ).toBe('staging');
+
+    expect(
+      resolvePullRequestBaseBranchValue({
+        selectedBaseBranch: ' ',
+        fallbackBaseBranch: 'main',
+      }),
+    ).toBe('main');
+  });
+
   it('allows creating a pull request for a published feature branch without an open PR', () => {
     expect(
       deriveGitPullRequestCreateState({

@@ -15,11 +15,10 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-12
-- **Session:** Fixed Personal Chat send failure and clarified required model-config UX.
+- **Date:** 2026-06-14
+- **Session:** Added PR base branch selection and cleared Electron WebView navigation deprecations.
 - **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
-- **Latest commit:** pending; previous `46851e1` fixed local desktop seeding and Personal Chat
-  session repair.
+- **Latest commit:** branch tip fixes PR base branch selection and WebView navigationHistory usage.
 
 ## Current State
 
@@ -50,6 +49,11 @@ and actionable.
 - `.25` is in final verification: zero usable model configs disable chat send with a `Configure
 model` CTA; exactly one usable model config becomes the default; multiple configs remain
   selectable and agent preference still wins.
+- `agent-platform-287` is closed: generated Electron preload now exposes `projects.openInIde`, so
+  connected Project workspaces no longer hit the missing desktop bridge banner.
+- `agent-platform-288` is closed: the PR creation panel now lets users choose the base branch, and
+  Electron WebView navigation state uses `webContents.navigationHistory` instead of deprecated
+  `canGoBack`/`canGoForward`.
 
 ## Recent Work
 
@@ -130,6 +134,13 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   bridge. This resolves the connected-Project `Open in IDE is available...` banner.
 - Extended Project access E2E so clicking `Open in IDE` fails the test if missing-bridge,
   missing-folder, or generic open-failure banners appear.
+- Added `agent-platform-288` for the latest Git/GitHub panel follow-ups.
+- Added branch-option derivation and an editable `Base branch` field to the PR creation card so
+  users can merge a published feature branch into `staging`, `develop`, or another branch instead
+  of silently defaulting to `main`.
+- Updated PR creation tests so the fake GitHub CLI fails unless `--base staging` is passed.
+- Replaced Electron WebView `webContents.canGoBack()` / `canGoForward()` calls with
+  `webContents.navigationHistory.canGoBack()` / `canGoForward()` and updated tests.
 
 ## Checks Run
 
@@ -148,9 +159,13 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - `pnpm --filter @agent-platform/desktop build`
 - `pnpm --filter @agent-platform/api test -- test/crud.integration.test.ts`
 - `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
+- `pnpm --filter @agent-platform/web test -- test/project-git-workflow-overview.test.ts`
+- `pnpm --filter @agent-platform/api test -- test/projectsRouter.test.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/webviewService.test.ts`
 - `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts test/default-agent.test.ts`
 - `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts`
 - `pnpm --filter @agent-platform/api lint`
+- `pnpm --filter @agent-platform/api typecheck`
 - `pnpm --filter @agent-platform/contracts typecheck`
 - `pnpm --filter @agent-platform/desktop test:e2e` (`8 passed`)
 - `pnpm --filter @agent-platform/desktop lint`
@@ -168,3 +183,5 @@ the documented fallback checks above.
 
 1. Owner runs/signs off `agent-platform-electron-stabilisation.18`.
 2. Close `.12` only after `.18` sign-off and finding classification.
+3. Manually verify PR creation from the desktop Git/GitHub panel against the desired staging base
+   branch before relying on the workflow in staging.

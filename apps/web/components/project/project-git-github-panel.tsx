@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  ProjectBranchListResult,
   ProjectGitChangedFile,
   ProjectGitChangesResult,
   ProjectGitChecksResult,
@@ -89,6 +90,39 @@ type GitPullRequestCreateState = Readonly<{
   repositoryUrl: string | null;
   reason?: string;
 }>;
+
+export function derivePullRequestBaseBranchOptions({
+  status,
+  branches,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  branches?: ProjectBranchListResult | null;
+}>): string[] {
+  const seen = new Set<string>();
+  const add = (branch: string | undefined) => {
+    const trimmed = branch?.trim();
+    if (!trimmed || trimmed === status.currentBranch || seen.has(trimmed)) return;
+    seen.add(trimmed);
+  };
+
+  add(status.baseBranch && status.baseBranch !== status.currentBranch ? status.baseBranch : 'main');
+  add('staging');
+  add('develop');
+  for (const branch of branches?.branches ?? []) {
+    add(branch.name);
+  }
+  return [...seen];
+}
+
+export function resolvePullRequestBaseBranchValue({
+  selectedBaseBranch,
+  fallbackBaseBranch,
+}: Readonly<{
+  selectedBaseBranch: string;
+  fallbackBaseBranch: string;
+}>): string {
+  return selectedBaseBranch.trim() || fallbackBaseBranch.trim();
+}
 
 type RepositoryConnectionMode = 'create' | 'connect';
 
@@ -1103,6 +1137,8 @@ export function ProjectGitHubPanel({
   const [checksProjectId, setChecksProjectId] = useState<string | null>(null);
   const [pullRequests, setPullRequests] = useState<ProjectGitPullRequestsResult | null>(null);
   const [pullRequestsProjectId, setPullRequestsProjectId] = useState<string | null>(null);
+  const [branches, setBranches] = useState<ProjectBranchListResult | null>(null);
+  const [branchesProjectId, setBranchesProjectId] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<ProjectGitConflictSummary | null>(null);
   const [conflictFile, setConflictFile] = useState<ProjectGitConflictFileResult | null>(null);
   const [selectedConflictPath, setSelectedConflictPath] = useState<string | null>(null);
@@ -1114,6 +1150,7 @@ export function ProjectGitHubPanel({
   const [changesLoading, setChangesLoading] = useState(false);
   const [checksLoading, setChecksLoading] = useState(false);
   const [pullRequestsLoading, setPullRequestsLoading] = useState(false);
+  const [branchesLoading, setBranchesLoading] = useState(false);
   const [conflictsLoading, setConflictsLoading] = useState(false);
   const [conflictFileLoading, setConflictFileLoading] = useState(false);
   const [diffLoading, setDiffLoading] = useState(false);
@@ -1125,8 +1162,10 @@ export function ProjectGitHubPanel({
   const [changesError, setChangesError] = useState<string | null>(null);
   const [checksError, setChecksError] = useState<string | null>(null);
   const [pullRequestsError, setPullRequestsError] = useState<string | null>(null);
+  const [branchesError, setBranchesError] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [pullRequestTitle, setPullRequestTitle] = useState('');
+  const [pullRequestBaseBranch, setPullRequestBaseBranch] = useState('');
   const [pullRequestBody, setPullRequestBody] = useState('');
   const [pullRequestSuccess, setPullRequestSuccess] = useState<string | null>(null);
   const [mergeCommitMessage, setMergeCommitMessage] = useState('Resolve merge conflicts');
@@ -1249,6 +1288,34 @@ export function ProjectGitHubPanel({
     }
   }, [projectId]);
 
+  const loadBranches = useCallback(async () => {
+    if (!projectId) {
+      setBranches(null);
+      setBranchesProjectId(null);
+      setBranchesError(null);
+      return;
+    }
+    setBranchesLoading(true);
+    try {
+      const next = await apiGet<ProjectBranchListResult>(apiPath('projects', projectId, 'branches'));
+      setBranches(next ?? null);
+      setBranchesProjectId(projectId);
+      setBranchesError(null);
+    } catch (cause) {
+      setBranches(null);
+      setBranchesProjectId(projectId);
+      if (cause instanceof ApiRequestError && cause.code === 'PROJECT_GIT_UNAVAILABLE') {
+        setBranchesError(null);
+      } else {
+        setBranchesError(
+          cause instanceof ApiRequestError ? cause.message : 'Branch information is unavailable.',
+        );
+      }
+    } finally {
+      setBranchesLoading(false);
+    }
+  }, [projectId]);
+
   const loadConflicts = useCallback(async () => {
     if (!projectId) {
       setConflicts(null);
@@ -1288,6 +1355,8 @@ export function ProjectGitHubPanel({
     setChecksProjectId(null);
     setPullRequests(null);
     setPullRequestsProjectId(null);
+    setBranches(null);
+    setBranchesProjectId(null);
     setConflicts(null);
     setConflictFile(null);
     setSelectedConflictPath(null);
@@ -1298,8 +1367,10 @@ export function ProjectGitHubPanel({
     setChangesError(null);
     setChecksError(null);
     setPullRequestsError(null);
+    setBranchesError(null);
     setConflictError(null);
     setPullRequestTitle('');
+    setPullRequestBaseBranch('');
     setPullRequestBody('');
     setPullRequestSuccess(null);
     setCommitSuccess(null);
@@ -1325,6 +1396,10 @@ export function ProjectGitHubPanel({
   useEffect(() => {
     if (activeTab === 'prs' || activeTab === 'overview') void loadPullRequests();
   }, [activeTab, loadPullRequests, refreshKey]);
+
+  useEffect(() => {
+    if (activeTab === 'prs') void loadBranches();
+  }, [activeTab, loadBranches, refreshKey]);
 
   useEffect(() => {
     if (conflictResolverOpen || currentStatusHasConflicts(status)) void loadConflicts();
@@ -1885,6 +1960,7 @@ export function ProjectGitHubPanel({
   const currentChanges = changesProjectId === projectId ? changes : null;
   const currentChecks = checksProjectId === projectId ? checks : null;
   const currentPullRequests = pullRequestsProjectId === projectId ? pullRequests : null;
+  const currentBranches = branchesProjectId === projectId ? branches : null;
   const workflowOverview = deriveGitWorkflowOverview({
     status: currentStatus,
     pullRequests: currentPullRequests,
@@ -1900,6 +1976,14 @@ export function ProjectGitHubPanel({
   const pullRequestCreateState = deriveGitPullRequestCreateState({
     status: currentStatus,
     pullRequests: currentPullRequests,
+  });
+  const pullRequestBaseBranchOptions = derivePullRequestBaseBranchOptions({
+    status: currentStatus,
+    branches: currentBranches,
+  });
+  const effectivePullRequestBaseBranch = resolvePullRequestBaseBranchValue({
+    selectedBaseBranch: pullRequestBaseBranch,
+    fallbackBaseBranch: pullRequestCreateState.baseBranch,
   });
   const currentBranchPullRequest = pullRequestCreateState.currentPullRequest;
   const sortedPullRequests = currentPullRequests?.pullRequests
@@ -1935,6 +2019,10 @@ export function ProjectGitHubPanel({
       setPullRequestsError('Enter a pull request title.');
       return;
     }
+    if (!effectivePullRequestBaseBranch) {
+      setPullRequestsError('Enter a base branch.');
+      return;
+    }
     setActionPending('create-pull-request');
     try {
       const result = await apiPost<ProjectGitCreatePullRequestResult>(
@@ -1942,7 +2030,7 @@ export function ProjectGitHubPanel({
         {
           title,
           body: pullRequestBody.trim() || undefined,
-          baseBranch: pullRequestCreateState.baseBranch,
+          baseBranch: effectivePullRequestBaseBranch,
           draft: false,
         },
       );
@@ -1972,11 +2060,11 @@ export function ProjectGitHubPanel({
       setActionPending(null);
     }
   }, [
+    effectivePullRequestBaseBranch,
     loadChecks,
     loadStatus,
     projectId,
     pullRequestBody,
-    pullRequestCreateState.baseBranch,
     pullRequestCreateState.defaultTitle,
     pullRequestTitle,
   ]);
@@ -1985,8 +2073,13 @@ export function ProjectGitHubPanel({
     if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestTitle) {
       setPullRequestTitle(pullRequestCreateState.defaultTitle);
     }
+    if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestBaseBranch) {
+      setPullRequestBaseBranch(pullRequestCreateState.baseBranch);
+    }
   }, [
     activeTab,
+    pullRequestBaseBranch,
+    pullRequestCreateState.baseBranch,
     pullRequestCreateState.canCreate,
     pullRequestCreateState.defaultTitle,
     pullRequestTitle,
@@ -3354,6 +3447,37 @@ export function ProjectGitHubPanel({
                                   placeholder={pullRequestCreateState.defaultTitle}
                                   disabled={actionPending !== null}
                                 />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="block text-xs font-medium text-muted-foreground">
+                                  Base branch
+                                </label>
+                                <Input
+                                  list="project-pr-base-branches"
+                                  value={pullRequestBaseBranch}
+                                  onChange={(event) =>
+                                    setPullRequestBaseBranch(event.target.value)
+                                  }
+                                  placeholder={pullRequestCreateState.baseBranch}
+                                  disabled={actionPending !== null}
+                                />
+                                <datalist id="project-pr-base-branches">
+                                  {pullRequestBaseBranchOptions.map((branch) => (
+                                    <option key={branch} value={branch} />
+                                  ))}
+                                </datalist>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {branchesLoading
+                                    ? 'Loading branch options...'
+                                    : branchesError
+                                      ? branchesError
+                                      : `Merges ${
+                                          currentStatus.currentBranch ?? 'this branch'
+                                        } into ${
+                                          effectivePullRequestBaseBranch ||
+                                          pullRequestCreateState.baseBranch
+                                        }.`}
+                                </p>
                               </div>
                               <div className="space-y-2">
                                 <label className="block text-xs font-medium text-muted-foreground">

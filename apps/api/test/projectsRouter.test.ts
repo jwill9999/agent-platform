@@ -1147,11 +1147,22 @@ if [ "$1" = "auth" ]; then
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "$2" = "create" ]; then
-  printf '%s\\n' '{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"main","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}'
+  found_base=0
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "--base" ] && [ "$2" = "staging" ]; then
+      found_base=1
+    fi
+    shift
+  done
+  if [ "$found_base" != "1" ]; then
+    echo "expected --base staging" >&2
+    exit 1
+  fi
+  printf '%s\\n' '{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"staging","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}'
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
-  printf '%s\\n' '[{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"main","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}]'
+  printf '%s\\n' '[{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"staging","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}]'
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
@@ -1205,7 +1216,7 @@ exit 1
 
     const created = await request(app)
       .post(`/v1/projects/${registered.body.data.project.id}/github/pull-requests`)
-      .send({ title: 'Add PR creation flow', baseBranch: 'main' })
+      .send({ title: 'Add PR creation flow', baseBranch: 'staging' })
       .expect(200);
 
     expect(created.body.data).toMatchObject({
@@ -1214,7 +1225,7 @@ exit 1
         title: 'Add PR creation flow',
         url: 'https://github.com/user/repo/pull/43',
         headRefName: 'task/pr-flow',
-        baseRefName: 'main',
+        baseRefName: 'staging',
         currentBranch: true,
       },
       pullRequests: {
