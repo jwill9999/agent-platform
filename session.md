@@ -23,6 +23,11 @@ and actionable.
 ## Current State
 
 - Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15.
+- PR #231 (`jwill9999/staging-electron-stabilisation-signoff` -> `staging`) is the current staging
+  signoff follow-up. GitHub run `27580073846` failed in `desktop-e2e` because the Radix Active agent
+  option detached during the Project access E2E select click.
+- Local fix is committed on PR #231: Project access E2E now selects Active agent values through a
+  retrying helper that waits for visibility and confirms the selected value.
 - `.18` is closed: owner manual QA sign-off is recorded after the automation backfill.
 - `.12` is ready to close: blockers are resolved/deferred, manual QA passed, and the staging merge
   recommendation has been executed.
@@ -219,6 +224,8 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm --filter @agent-platform/web lint`
 - `pnpm --filter @agent-platform/web typecheck`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts` (`1 passed`)
+- `pnpm --filter @agent-platform/desktop test:e2e` (`9 passed`)
 - `pnpm docs:lint`
 - `pnpm format:check`
 - `git diff --check`
