@@ -16,27 +16,22 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-15
-- **Session:** Re-baselined Project Experience epic after Electron stabilisation.
-- **Branch:** `jwill9999/project-experience-rebaseline`
-- **Latest commit:** stacked on PR #231's Electron stabilisation sign-off branch.
+- **Session:** Synced `staging` after Electron sign-off and Project Experience re-baseline merges.
+- **Branch:** `staging`
+- **Latest commit:** `f54d116` records the Electron stabilisation staging sign-off and re-baseline docs.
 
 ## Current State
 
-- Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15.
-- PR #231 (`jwill9999/staging-electron-stabilisation-signoff` -> `staging`) is the current staging
-  signoff follow-up. GitHub run `27580073846` failed in `desktop-e2e` because the Radix Active agent
-  option detached during the Project access E2E select click.
-- Local fix is committed on PR #231: Project access E2E now selects Active agent values through a
-  retrying helper that waits for visibility and confirms the selected value.
+- `staging` is synced with `origin/staging` at `f54d116`.
+- Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15 and
+  `agent-platform-electron-stabilisation.12` is closed.
+- PR #231's desktop E2E flake is resolved on `staging`: Project access E2E now selects Active agent
+  values through a retrying helper that waits for visibility and confirms the selected value.
 - `.18` is closed: owner manual QA sign-off is recorded after the automation backfill.
-- `.12` is ready to close: blockers are resolved/deferred, manual QA passed, and the staging merge
-  recommendation has been executed.
-- Project Experience re-baseline is in progress on
-  `jwill9999/project-experience-rebaseline`, stacked on PR #231's sign-off branch.
-- `agent-platform-project-experience.14` tracks the re-baseline. It updates the epic and remaining
-  child specs so completed stabilisation work is not rebuilt.
-- The next implementation task remains `agent-platform-project-experience.1`, now dependent on
-  `.14`.
+- Project Experience re-baseline is merged to `staging`; `agent-platform-project-experience.14` is
+  closed and the epic is now 7/14 complete.
+- The next implementation task is `agent-platform-project-experience.1`, which generalizes Project
+  profiles and capability metadata.
 - `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
 - `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
   sizes.
@@ -235,10 +230,8 @@ the documented fallback checks above.
 
 ## Next
 
-1. Review/merge PR #231 so staging has the Electron closeout documentation.
-2. Review/merge the Project Experience re-baseline branch.
-3. Start `agent-platform-project-experience.1` from the accepted re-baselined plan.
-4. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
+1. Start `agent-platform-project-experience.1` from the accepted re-baselined `staging` plan.
+2. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
    Electron stabilisation epic.
-5. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
+3. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
    signed/notarized artifact evidence.
