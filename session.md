@@ -18,11 +18,12 @@ and actionable.
 - **Date:** 2026-06-15
 - **Session:** Synced `staging` after Electron sign-off and Project Experience re-baseline merges.
 - **Branch:** `staging`
-- **Latest commit:** `f54d116` records the Electron stabilisation staging sign-off and re-baseline docs.
+- **Latest commit:** current `origin/staging` includes the post-merge handoff update.
 
 ## Current State
 
-- `staging` is synced with `origin/staging` at `f54d116`.
+- `staging` is synced with `origin/staging` after the Electron sign-off, Project Experience
+  re-baseline, and post-merge handoff updates.
 - Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15 and
   `agent-platform-electron-stabilisation.12` is closed.
 - PR #231's desktop E2E flake is resolved on `staging`: Project access E2E now selects Active agent
