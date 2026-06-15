@@ -19,8 +19,8 @@ user-facing labels.
 
 ## Desktop Re-scope Status
 
-This epic remains the product experience reference, but desktop acceptance now depends on the
-Electron Project model.
+This epic remains the product experience reference, and desktop acceptance now depends on the
+Electron Project model that has merged to `staging`.
 
 After Electron manual QA, the Product direction is chat-first and the built-in IDE is not a product
 investment path. The desktop implementation should prioritise Project Chat, Project activity, slash
@@ -28,9 +28,9 @@ commands, branch context, terminal access, native Project binding, and rendered 
 manual editing should be explicit through a user-configured/default IDE handoff. Any remaining
 built-in file view is transitional and must not become the proof path for the product experience.
 
-Do not start this epic until
-[Stabilisation closeout and next-epic gate](./agent-platform-electron-stabilisation.12.md) has
-confirmed the Electron stabilisation work is ready to move forward.
+[Stabilisation closeout and next-epic gate](./agent-platform-electron-stabilisation.12.md) is
+closed. Owner manual testing passed, and the Electron stabilisation branch has merged to `staging`.
+Project Experience work can now resume from that baseline.
 
 The desktop implementation must start with a backend-bound Project created by
 [Native Project access and session binding](./agent-platform-electron-project-access.md). Browser
@@ -78,6 +78,37 @@ For desktop Product work:
 - Font sizing should match the existing interface: sidebar rows around `text-sm`/14px, metadata
   `text-xs`, no oversized card-style navigation.
 
+## Re-baseline Status
+
+As of 2026-06-15, Electron stabilisation completed several tasks that originally belonged to this
+epic. Those tasks remain part of the epic history, but the remaining implementation plan should not
+rebuild them:
+
+- Project Chat is already the default Project surface (`.3`).
+- Project Chat already has branch context/selection for Git-backed Projects (`.9`).
+- Project Chat already has a governed desktop terminal dock (`.10`).
+- Duplicate Project names and Project-scoped session restore are implemented (`.11`).
+- New Project creation is implemented (`.12`).
+- New Project first-write approval behavior is fixed (`.13`).
+
+The remaining Product work is now:
+
+1. define a generic profile/capability model that can drive workspace expectations;
+2. audit and finish Workspaces/sidebar navigation around current behavior;
+3. polish and verify external/default IDE handoff instead of building an IDE;
+4. clean remaining labels/location context;
+5. add generated output previews and the Project activity/evidence panel;
+6. add a staged E2E gate that tests the coding workflow deeply first and expands as other profiles
+   become real product surfaces.
+
+`agent-platform-electron-stabilisation.20` should feed the coding-workflow matrix into `.6`. Broader
+workspace matrices for future specialized profiles should move to a later automation/testing epic
+instead of blocking this epic.
+
+Production macOS release readiness remains separate. Do not block this epic on
+`agent-platform-macos-production-sandbox.6.3`, but do not promote a production macOS release until
+that signing/notarization gate is closed.
+
 ## Scope
 
 In scope:
@@ -118,45 +149,37 @@ Out of scope:
 
 ## Proposed Task Chain
 
-| Task                                   | Purpose                                                   |
-| -------------------------------------- | --------------------------------------------------------- |
-| `agent-platform-project-experience.1`  | Generalize Project profiles and capability metadata       |
-| `agent-platform-project-experience.2`  | Add left explorer Project and Chat navigation             |
-| `agent-platform-project-experience.3`  | Make Project Chat the default Project surface             |
-| `agent-platform-project-experience.4`  | Add optional external/default-IDE handoff with continuity |
-| `agent-platform-project-experience.5`  | Clean Project labels and add breadcrumbs                  |
-| `agent-platform-project-experience.6`  | Verify Project experience navigation with Playwright E2E  |
-| `agent-platform-project-experience.7`  | Render generated outputs in Project Chat                  |
-| `agent-platform-project-experience.8`  | Add Project activity side panel                           |
-| `agent-platform-project-experience.9`  | Add Project Chat branch selector                          |
-| `agent-platform-project-experience.10` | Add governed terminal dock                                |
-| `agent-platform-project-experience.11` | Disambiguate duplicate Projects and restore history       |
-| `agent-platform-project-experience.12` | Add New Project creation flow                             |
+| Task                                   | Re-baselined purpose                                 | Status         |
+| -------------------------------------- | ---------------------------------------------------- | -------------- |
+| `agent-platform-project-experience.14` | Re-baseline the epic after Electron stabilisation    | Current task   |
+| `agent-platform-project-experience.1`  | Define Project profiles and capability metadata      | Next task      |
+| `agent-platform-project-experience.2`  | Audit/finish Workspaces and sidebar navigation       | Refine         |
+| `agent-platform-project-experience.4`  | Polish/verify external/default IDE handoff           | Refine         |
+| `agent-platform-project-experience.5`  | Clean labels and location context                    | Refine         |
+| `agent-platform-project-experience.7`  | Render generated outputs from Project Chat/activity  | Still relevant |
+| `agent-platform-project-experience.8`  | Add Project activity/evidence panel                  | Still relevant |
+| `agent-platform-project-experience.6`  | Stage the Project Experience E2E gate                | Final gate     |
+| `agent-platform-project-experience.3`  | Make Project Chat the default Project surface        | Done           |
+| `agent-platform-project-experience.9`  | Add Project Chat branch selector                     | Done           |
+| `agent-platform-project-experience.10` | Add governed terminal dock                           | Done           |
+| `agent-platform-project-experience.11` | Disambiguate duplicate Projects and restore history  | Done           |
+| `agent-platform-project-experience.12` | Add New Project creation flow                        | Done           |
+| `agent-platform-project-experience.13` | Ask for Project write approval from new Project Chat | Done           |
 
 ## Parallel Implementation Notes
 
-After `agent-platform-project-experience.3` has made Project Chat the default Project surface:
+After the re-baseline task:
 
-- `agent-platform-project-experience.4` and `.5` should remain sequential because the handoff and
-  breadcrumb copy touch shared navigation.
-- `agent-platform-project-experience.7` can run in parallel with `.4`/`.5` if it is limited to
-  generated-output preview components and chat artifact rendering.
-- `agent-platform-project-experience.8` can run in parallel after the panel data contract is agreed,
-  but should avoid editing the same preview components owned by `.7`.
-- `agent-platform-project-experience.9` can run in parallel with preview/activity work if it owns
-  only branch discovery, branch switching UX, and Project Chat branch context.
-- `agent-platform-project-experience.10` should be planned carefully before implementation because
-  it touches Electron main/preload, native PTY lifecycle, command safety, Project-root scoping, and
-  terminal rendering. It can run in parallel only if its write set is isolated from preview/activity
-  components.
-- `agent-platform-project-experience.11` should run after Project Chat is the default surface. It can
-  run in parallel with branch selector, preview, and activity work if it owns only Project display
-  naming, Recent Projects, and Project-scoped session history.
-- `agent-platform-project-experience.12` should run after `.11` so new Projects participate in the
-  same display-name and Recent Projects rules. It should avoid touching terminal, branch selector,
-  or preview components.
-- `agent-platform-project-experience.6` remains the integration verification gate and should absorb
-  E2E coverage from `.4`, `.5`, `.7`, `.8`, `.9`, `.10`, `.11`, and `.12`.
+- Start with `agent-platform-project-experience.1`; it defines the profile/capability vocabulary
+  used by navigation, preview, activity, and E2E expectations.
+- Run `agent-platform-project-experience.2`, `.4`, and `.5` as a small UX/navigation cleanup slice
+  after `.1`; these tasks should mostly audit and polish existing staging behavior.
+- Run `agent-platform-project-experience.7` and `.8` after the profile/capability boundary is clear.
+  `.7` owns preview cards and preview metadata. `.8` owns panel composition and normalized activity
+  data.
+- Keep `agent-platform-project-experience.6` as the integration gate. It should absorb coding-flow
+  coverage from completed tasks immediately, then add preview/activity assertions after `.7` and
+  `.8` land.
 
 ## Testing Strategy Requirements
 
@@ -174,19 +197,20 @@ Each child task must include concrete local and remote verification:
 ## Epic Definition Of Done
 
 - [ ] Project records can represent generic folder/work contexts with profile/capability metadata.
-- [ ] Users can see Projects and Chats/Sessions in the left explorer without scattered CTAs.
-- [ ] Users can reopen previous Projects from stored metadata.
-- [ ] Users can create a new Project folder from Workspaces without typing an absolute path.
-- [ ] Users can distinguish Start from scratch, Use existing folder, and Import from Chat flows.
-- [ ] Projects with the same folder name are distinguishable through short user-facing parent-path
+- [ ] Users can see Projects and Chats/Sessions in Workspaces/sidebar navigation without scattered
+      CTAs.
+- [x] Users can reopen previous Projects from stored metadata.
+- [x] Users can create a new Project folder from Workspaces without typing an absolute path.
+- [x] Users can distinguish Start from scratch, Use existing folder, and Import from Chat flows.
+- [x] Projects with the same folder name are distinguishable through short user-facing parent-path
       labels such as `~/projects/agent-platform` and `~/work/client-a/agent-platform`.
-- [ ] Project Chat restores the last active Project-scoped session, while Personal Chat sessions
+- [x] Project Chat restores the last active Project-scoped session, while Personal Chat sessions
       remain separate.
-- [ ] Opening a Project lands in project-scoped chat by default.
-- [ ] Users can hand off to their configured/default IDE from a Project without making the built-in
-      IDE the primary workflow.
-- [ ] Users can choose the active branch from Project Chat when the Project is a Git repository.
-- [ ] Users can open a governed Project terminal dock backed by `node-pty`/`xterm.js`.
+- [x] Opening a Project lands in project-scoped chat by default.
+- [ ] Users can hand off to their configured/default IDE from a Project with polished fallback and
+      verification, without making the built-in IDE the primary workflow.
+- [x] Users can choose the active branch from Project Chat when the Project is a Git repository.
+- [x] Users can open a governed Project terminal dock backed by `node-pty`/`xterm.js`.
 - [ ] Users can return to Home/Project Chat through breadcrumbs or equivalent quiet navigation.
 - [ ] Generated artifacts can be previewed from chat/activity surfaces where supported.
 - [ ] Right-side Project activity shows changed files, previews, tests, CI, review feedback, and

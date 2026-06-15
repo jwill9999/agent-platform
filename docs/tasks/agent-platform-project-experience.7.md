@@ -15,6 +15,8 @@ navigate the file tree.
 ## Requirements
 
 - Generated output messages include preview metadata for supported artifact types.
+- Preview metadata should be independent of one agent/model and should work for coding, docs/content,
+  research, automation, and mixed Projects when those profiles produce artifacts.
 - Project Chat renders preview cards for:
   - HTML/static app output,
   - Markdown/document output,
@@ -26,6 +28,8 @@ navigate the file tree.
 - Users can open the source file or hand off externally from the preview where supported.
 - Preview state follows the active Project/session and is available after reopening the Project
   where metadata exists.
+- Preview cards should be reusable by the Project activity/evidence panel in
+  `agent-platform-project-experience.8`.
 
 ## Dependency Order
 
@@ -43,14 +47,17 @@ generated-output preview data/components. Avoid editing right-side panel composi
 
 ## Implementation Plan
 
-1. Review existing chat artifact, browser artifact, and workbench evidence preview components.
+1. Review existing chat artifact, browser artifact, workspace preview, and workbench evidence
+   preview components.
 2. Define a small preview registry or equivalent mapping from artifact type to render behavior.
-3. Add Project Chat preview cards for HTML/app, Markdown/document, PDF, and unsupported output.
-4. Add safe preview fallback states for missing files, unavailable Project context, unsupported MIME
+3. Define the preview-card contract consumed by Project Chat and the future activity/evidence panel.
+4. Add Project Chat preview cards for HTML/app, Markdown/document, PDF, screenshots where available,
+   and unsupported output.
+5. Add safe preview fallback states for missing files, unavailable Project context, unsupported MIME
    types, and unsafe HTML/app previews.
-5. Persist or resolve preview metadata through the existing Project/session artifact model where
+6. Persist or resolve preview metadata through the existing Project/session artifact model where
    possible.
-6. Add focused component tests and Electron/Playwright coverage for generated previews.
+7. Add focused component tests and Electron/Playwright coverage for generated previews.
 
 ## Tests And Verification
 
@@ -70,4 +77,5 @@ generated-output preview data/components. Avoid editing right-side panel composi
 - [ ] Unsupported or unsafe outputs show a user-facing unavailable/fallback state.
 - [ ] Preview cards do not require users to navigate the file tree.
 - [ ] Preview cards preserve active Project/session context.
+- [ ] Preview cards can be reused by the Project activity/evidence panel.
 - [ ] Tests and CI/CD gates pass before the Beads task is closed.
