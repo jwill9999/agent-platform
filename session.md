@@ -156,9 +156,15 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   of the removed internal `/ide` route.
 - Addressed SonarCloud annotations in WebView navigation, Project PR UI, app-page conditions, and
   WebView runtime E2E globals; also removed duplicated project-access model seeding.
+- Added `agent-platform-24u` after the E2E fix cleared CI but SonarCloud still reported `4.4%`
+  duplicated new code.
+- Moved shared desktop bridge DTO types into contracts so preload and web helpers stop duplicating
+  project-folder, IDE handoff, and terminal event type definitions.
 
 ## Checks Run
 
+- `pnpm --filter @agent-platform/contracts build`
+- `pnpm --filter @agent-platform/contracts typecheck`
 - `pnpm --filter @agent-platform/db build`
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts`
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts`

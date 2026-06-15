@@ -1,40 +1,19 @@
 import type {
+  DesktopCreateProjectFolderRequest,
+  DesktopOpenProjectIdeRequest,
+  DesktopOpenProjectIdeResult,
+  DesktopProjectFolderSelectionResult,
+  DesktopSelectedProjectFolder,
+  DesktopTerminalCreateRequest,
+  DesktopTerminalCreateResult,
+  DesktopTerminalDataEvent,
+  DesktopTerminalExitEvent,
   ProjectDesktopRecentProjectsResult,
   ProjectDesktopRecord,
   ProjectDesktopRegistrationResult,
   SessionProjectBindingResult,
 } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
-
-export interface DesktopSelectedProjectFolder {
-  readonly path: string;
-  readonly name: string;
-}
-
-export interface DesktopCreateProjectFolderRequest {
-  readonly name: string;
-}
-
-export interface DesktopOpenProjectIdeRequest {
-  readonly projectId: string;
-}
-
-export type DesktopOpenProjectIdeResult =
-  | {
-      readonly ok: true;
-      readonly handled: true;
-      readonly projectRoot: string;
-      readonly opener: string;
-    }
-  | {
-      readonly ok: true;
-      readonly handled: false;
-      readonly reason: string;
-    };
-
-export type DesktopProjectFolderSelectionResult =
-  | { readonly canceled: true }
-  | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
 
 export interface DesktopProjectBridge {
   readonly projects?: {
@@ -47,30 +26,6 @@ export interface DesktopProjectBridge {
     readonly selectFolder?: () => Promise<DesktopProjectFolderSelectionResult>;
   };
   readonly terminal?: DesktopTerminalBridge;
-}
-
-export interface DesktopTerminalCreateRequest {
-  readonly projectId?: string;
-  readonly cols: number;
-  readonly rows: number;
-}
-
-export interface DesktopTerminalCreateResult {
-  readonly terminalId: string;
-  readonly cwd: string;
-  readonly shell: string;
-  readonly pid: number;
-}
-
-export interface DesktopTerminalDataEvent {
-  readonly terminalId: string;
-  readonly data: string;
-}
-
-export interface DesktopTerminalExitEvent {
-  readonly terminalId: string;
-  readonly exitCode: number;
-  readonly signal?: number;
 }
 
 export interface DesktopTerminalBridge {

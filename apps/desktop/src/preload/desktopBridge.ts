@@ -1,4 +1,12 @@
 import type {
+  DesktopCreateProjectFolderRequest,
+  DesktopOpenProjectIdeRequest,
+  DesktopOpenProjectIdeResult,
+  DesktopProjectFolderSelectionResult,
+  DesktopTerminalCreateRequest,
+  DesktopTerminalCreateResult,
+  DesktopTerminalDataEvent,
+  DesktopTerminalExitEvent,
   DesktopWorkspaceOpenExternalFallbackResult,
   DesktopWorkspaceOpenResult,
   DesktopWorkspaceWebViewState,
@@ -6,6 +14,14 @@ import type {
 export type {
   DesktopWebViewPolicyTier,
   DesktopWebViewStatus,
+  DesktopCreateProjectFolderRequest,
+  DesktopOpenProjectIdeRequest,
+  DesktopOpenProjectIdeResult,
+  DesktopProjectFolderSelectionResult,
+  DesktopTerminalCreateRequest,
+  DesktopTerminalCreateResult,
+  DesktopTerminalDataEvent,
+  DesktopTerminalExitEvent,
   DesktopWorkspaceOpenExternalFallbackResult,
   DesktopWorkspaceOpenResult,
   DesktopWorkspaceWebViewState,
@@ -39,36 +55,6 @@ export interface DesktopRepairMacosVmRuntimeResult {
   readonly preservedProjectFolders: true;
 }
 
-export interface DesktopSelectedProjectFolder {
-  readonly path: string;
-  readonly name: string;
-}
-
-export interface DesktopCreateProjectFolderRequest {
-  readonly name: string;
-}
-
-export interface DesktopOpenProjectIdeRequest {
-  readonly projectId: string;
-}
-
-export type DesktopOpenProjectIdeResult =
-  | {
-      readonly ok: true;
-      readonly handled: true;
-      readonly projectRoot: string;
-      readonly opener: string;
-    }
-  | {
-      readonly ok: true;
-      readonly handled: false;
-      readonly reason: string;
-    };
-
-export type DesktopProjectFolderSelectionResult =
-  | { readonly canceled: true }
-  | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
-
 export interface DesktopMaintenanceApi {
   readonly getResetLocalDataConfirmation: () => Promise<string>;
   readonly repairMacosVmRuntime: () => Promise<DesktopRepairMacosVmRuntimeResult>;
@@ -87,12 +73,6 @@ export interface DesktopProjectsApi {
   readonly selectFolder: () => Promise<DesktopProjectFolderSelectionResult>;
 }
 
-export interface DesktopTerminalCreateRequest {
-  readonly projectId?: string;
-  readonly cols: number;
-  readonly rows: number;
-}
-
 export interface DesktopTerminalInputRequest {
   readonly terminalId: string;
   readonly data: string;
@@ -106,24 +86,6 @@ export interface DesktopTerminalResizeRequest {
 
 export interface DesktopTerminalDisposeRequest {
   readonly terminalId: string;
-}
-
-export interface DesktopTerminalCreateResult {
-  readonly terminalId: string;
-  readonly cwd: string;
-  readonly shell: string;
-  readonly pid: number;
-}
-
-export interface DesktopTerminalDataEvent {
-  readonly terminalId: string;
-  readonly data: string;
-}
-
-export interface DesktopTerminalExitEvent {
-  readonly terminalId: string;
-  readonly exitCode: number;
-  readonly signal?: number;
 }
 
 export type DesktopTerminalUnsubscribe = () => void;
