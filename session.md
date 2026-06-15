@@ -23,7 +23,7 @@ and actionable.
 ## Current State
 
 - Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15.
-- `.18` is closed: owner manual QA sign-off is recorded after automation backfill.
+- `.18` is closed: owner manual QA sign-off is recorded after the automation backfill.
 - `.12` is ready to close: blockers are resolved/deferred, manual QA passed, and the staging merge
   recommendation has been executed.
 - `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
