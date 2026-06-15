@@ -16,13 +16,18 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-15
-- **Session:** Synced staging after Electron stabilisation merge and recorded owner QA sign-off.
-- **Branch:** `staging`
-- **Latest commit:** `ba0be9b` merged `jwill9999/electron-stabilisation-e2e-backfill` to staging.
+- **Session:** Fixed PR #231 desktop E2E flake before staging merge.
+- **Branch:** `jwill9999/staging-electron-stabilisation-signoff`
+- **Latest commit:** `c3fa317` stabilises the Active agent select interaction in Electron E2E.
 
 ## Current State
 
 - Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15.
+- PR #231 (`jwill9999/staging-electron-stabilisation-signoff` -> `staging`) is the current staging
+  signoff follow-up. GitHub run `27580073846` failed in `desktop-e2e` because the Radix Active agent
+  option detached during the Project access E2E select click.
+- Local fix is committed on PR #231: Project access E2E now selects Active agent values through a
+  retrying helper that waits for visibility and confirms the selected value.
 - `.18` is closed: owner manual QA sign-off is recorded after the automation backfill.
 - `.12` is ready to close: blockers are resolved/deferred, manual QA passed, and the staging merge
   recommendation has been executed.
@@ -164,6 +169,10 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - Merged `jwill9999/electron-stabilisation-e2e-backfill` to `staging` as `ba0be9b`; staging CI/CD
   was green per owner report.
 - Closed `agent-platform-electron-stabilisation.18` after owner manual testing passed.
+- Investigated PR #231 failing GitHub Actions job `81537965052`; root cause was a flaky Active agent
+  dropdown option click in `apps/desktop/e2e/project-access.e2e.ts`.
+- Added `selectActiveAgent` helper with retry/confirmation and replaced the fragile direct option
+  clicks in the Project access Electron E2E.
 
 ## Checks Run
 
@@ -209,6 +218,8 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm --filter @agent-platform/web lint`
 - `pnpm --filter @agent-platform/web typecheck`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts` (`1 passed`)
+- `pnpm --filter @agent-platform/desktop test:e2e` (`9 passed`)
 - `pnpm docs:lint`
 - `pnpm format:check`
 - `git diff --check`
@@ -218,9 +229,11 @@ the documented fallback checks above.
 
 ## Next
 
-1. Close `agent-platform-electron-stabilisation.12` now that owner QA and staging merge are recorded.
-2. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
+1. Push `jwill9999/staging-electron-stabilisation-signoff` and confirm PR #231 GitHub checks rerun
+   green before merging to `staging`.
+2. Close `agent-platform-electron-stabilisation.12` now that owner QA and staging merge are recorded.
+3. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
    Electron stabilisation epic.
-3. Start `agent-platform-project-experience.1` from the `staging` baseline.
-4. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
+4. Start `agent-platform-project-experience.1` from the `staging` baseline.
+5. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
    signed/notarized artifact evidence.

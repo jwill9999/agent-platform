@@ -130,10 +130,8 @@ test.describe('Electron Project access', () => {
       expect(existsSync(join(newProjectParentDir, newProjectName))).toBe(true);
       const createdProject = await findRecentProject(backendPort, newProjectName);
       expect(createdProject.metadata.source).toBe('desktop');
-      await page.getByRole('combobox', { name: 'Active agent' }).click();
-      await page.getByRole('option', { name: 'Personal assistant' }).click();
-      await page.getByRole('combobox', { name: 'Active agent' }).click();
-      await page.getByRole('option', { name: 'Coding' }).click();
+      await selectActiveAgent(page, 'Personal assistant');
+      await selectActiveAgent(page, 'Coding');
       await page.getByRole('button', { name: 'Workspaces' }).click();
       await expect(page.getByRole('button', { name: 'Open Chat' })).toBeVisible();
 
@@ -408,6 +406,23 @@ test.describe('Electron Project access', () => {
 async function openProjectChat(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForLoadState('networkidle');
+}
+
+async function selectActiveAgent(page: Page, name: string): Promise<void> {
+  const agentSelector = page.getByRole('combobox', { name: 'Active agent' });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await agentSelector.click();
+    const option = page.getByRole('option', { name }).first();
+    await expect(option).toBeVisible();
+    try {
+      await option.click({ force: true, timeout: 5_000 });
+      await expect(agentSelector).toContainText(name);
+      return;
+    } catch (error) {
+      await page.keyboard.press('Escape').catch(() => undefined);
+      if (attempt === 2) throw error;
+    }
+  }
 }
 
 async function sendChatMessage(page: Page, message: string, placeholder: string): Promise<void> {
