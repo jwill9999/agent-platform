@@ -16,9 +16,9 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-15
-- **Session:** Fixed PR #231 desktop E2E flake before staging merge.
-- **Branch:** `jwill9999/staging-electron-stabilisation-signoff`
-- **Latest commit:** `c3fa317` stabilises the Active agent select interaction in Electron E2E.
+- **Session:** Re-baselined Project Experience epic after Electron stabilisation.
+- **Branch:** `jwill9999/project-experience-rebaseline`
+- **Latest commit:** stacked on PR #231's Electron stabilisation sign-off branch.
 
 ## Current State
 
@@ -31,6 +31,12 @@ and actionable.
 - `.18` is closed: owner manual QA sign-off is recorded after the automation backfill.
 - `.12` is ready to close: blockers are resolved/deferred, manual QA passed, and the staging merge
   recommendation has been executed.
+- Project Experience re-baseline is in progress on
+  `jwill9999/project-experience-rebaseline`, stacked on PR #231's sign-off branch.
+- `agent-platform-project-experience.14` tracks the re-baseline. It updates the epic and remaining
+  child specs so completed stabilisation work is not rebuilt.
+- The next implementation task remains `agent-platform-project-experience.1`, now dependent on
+  `.14`.
 - `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
 - `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
   sizes.
@@ -169,10 +175,10 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - Merged `jwill9999/electron-stabilisation-e2e-backfill` to `staging` as `ba0be9b`; staging CI/CD
   was green per owner report.
 - Closed `agent-platform-electron-stabilisation.18` after owner manual testing passed.
-- Investigated PR #231 failing GitHub Actions job `81537965052`; root cause was a flaky Active agent
-  dropdown option click in `apps/desktop/e2e/project-access.e2e.ts`.
-- Added `selectActiveAgent` helper with retry/confirmation and replaced the fragile direct option
-  clicks in the Project access Electron E2E.
+- Added `agent-platform-project-experience.14` and re-baselined the Project Experience epic around
+  the current chat-first staging product direction.
+- Refined `.2`, `.4`, `.5`, and `.6` into audit/polish/staged-verification tasks rather than
+  rebuild tasks; clarified `.7` previews and `.8` activity/evidence panel.
 
 ## Checks Run
 
@@ -229,11 +235,10 @@ the documented fallback checks above.
 
 ## Next
 
-1. Push `jwill9999/staging-electron-stabilisation-signoff` and confirm PR #231 GitHub checks rerun
-   green before merging to `staging`.
-2. Close `agent-platform-electron-stabilisation.12` now that owner QA and staging merge are recorded.
-3. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
+1. Review/merge PR #231 so staging has the Electron closeout documentation.
+2. Review/merge the Project Experience re-baseline branch.
+3. Start `agent-platform-project-experience.1` from the accepted re-baselined plan.
+4. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
    Electron stabilisation epic.
-4. Start `agent-platform-project-experience.1` from the `staging` baseline.
 5. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
    signed/notarized artifact evidence.

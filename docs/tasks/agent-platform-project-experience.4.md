@@ -1,13 +1,13 @@
-# Task: Add optional external/default-IDE handoff with session continuity
+# Task: Polish and verify external/default IDE handoff with session continuity
 
 **Beads issue:** `agent-platform-project-experience.4`  
 **Spec file:** `docs/tasks/agent-platform-project-experience.4.md`
 
 ## Summary
 
-Let users explicitly open their configured/default IDE from an active Project Chat while preserving
-the same Project/session context in Agent Platform. This is an external handoff, not further
-development of the built-in IDE.
+Polish and verify the external/default IDE handoff from Project Chat. The staging baseline already
+has desktop IDE launch plumbing; this task should close remaining configuration, unavailable-state,
+copy, and regression-test gaps rather than rebuilding the feature.
 
 ## Desktop Re-scope Note
 
@@ -23,8 +23,10 @@ read-only inspection, not as the primary Project workflow or an investment area.
 - Project Chat exposes a clear but secondary "Open in local IDE" or equivalent handoff action.
 - The handoff uses the active Project selected by the Electron native Project picker; users do not
   type or memorize absolute paths.
-- The first macOS implementation supports opening the active Project folder in a detected/configured
-  editor, with safe fallback copy when no supported editor is available.
+- The macOS implementation opens the active Project folder in a detected/configured editor, with
+  safe fallback copy when no supported editor is available.
+- Settings or environment override behavior is documented clearly enough for development and manual
+  QA.
 - The design leaves room for file-and-line handoff when editor support exists.
 - Returning to Agent Platform preserves the active Project, session, agent, and conversation context.
 - If the built-in file view remains available, it is secondary, preferably read-only, and uses the
@@ -34,12 +36,11 @@ read-only inspection, not as the primary Project workflow or an investment area.
 
 ## Implementation Plan
 
-1. Define editor handoff capability detection and unavailable states for macOS first.
-2. Add a Project Chat action that asks Electron main/preload to open the active Project in the
-   configured/default editor.
+1. Audit the existing desktop IDE launcher, preload bridge, settings/override behavior, and UI copy.
+2. Fill remaining unavailable/fallback states and documentation gaps.
 3. Preserve Project/session context in Agent Platform after the external handoff.
 4. Keep any built-in file route secondary and context-bound if it remains visible.
-5. Add regression tests for handoff state, unavailable states, and context preservation.
+5. Add or tighten regression tests for handoff state, unavailable states, and context preservation.
 
 ## Dependency Order
 
@@ -60,7 +61,8 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] External/default IDE handoff opens only after explicit user action from Project context.
+- [ ] External/default IDE handoff is polished and opens only after explicit user action from
+      Project context.
 - [ ] Handoff uses the Electron-selected Project without asking the user to type a path.
 - [ ] Agent Platform preserves Project/session/conversation context after handoff.
 - [ ] Any remaining built-in file view is secondary and uses the same backend Project id/root as

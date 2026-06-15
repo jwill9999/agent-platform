@@ -1,13 +1,13 @@
-# Task: Verify Project experience navigation with Playwright E2E
+# Task: Stage Project Experience Playwright/Electron E2E gate
 
 **Beads issue:** `agent-platform-project-experience.6`  
 **Spec file:** `docs/tasks/agent-platform-project-experience.6.md`
 
 ## Summary
 
-Prove the full Project experience navigation through Playwright: open Chat, open/reopen Projects,
-use Project Chat, select branches, use the terminal dock, hand off to a local/default IDE, return,
-and preserve context.
+Create a staged Project Experience automation gate. Coding Project workflow gets the deepest
+coverage first because it is the primary desktop use case; Personal Chat and non-code Project
+profiles get explicit lighter expectations until their product surfaces are implemented.
 
 ## Desktop Re-scope Note
 
@@ -21,8 +21,9 @@ absolute path entry.
 - Playwright tests must act through user-visible UI.
 - Electron E2E must exercise the native Project opener or a production-like test bridge that creates
   the same backend-bound Project/session records.
-- Fixtures must include at least one coding Project and one mixed/non-code Project.
-- E2E must verify:
+- Fixtures must include at least one coding Project and one mixed/non-code Project once profile
+  metadata exists.
+- Phase 1 E2E must verify the coding workflow:
   - left explorer shows Projects and Chats/Sessions.
   - a stored Project can be reopened.
   - opening a Project lands in Project Chat.
@@ -36,23 +37,26 @@ absolute path entry.
   - the terminal dock can open, run a harmless command, resize/hide, and close in the Electron
     runtime.
   - breadcrumbs or equivalent navigation can return to Home/Project Chat.
-  - generated HTML/app, Markdown/document, and PDF outputs render as previews or safe fallback
-    cards when those features are implemented.
-  - the right-side Project activity panel shows changed/generated files, previews, checks, CI, and
-    review feedback when those features are implemented.
   - primary UI hides runtime implementation details, including `/workspace`, backend roots, host
     absolute paths, and internal state names.
+- Phase 2 E2E adds generated HTML/app, Markdown/document, and PDF preview assertions after `.7`.
+- Phase 3 E2E adds right-side Project activity/evidence panel assertions after `.8`.
+- Phase 4 E2E adds profile-specific expectations for docs/content, research, automation, mixed, and
+  unknown Projects after those workflows have product behavior beyond fallback states.
+- Fold the coding-workflow parts of `agent-platform-electron-stabilisation.20` into this task.
 - Test output must be deterministic enough for CI.
 
 ## Implementation Plan
 
-1. Add deterministic Project fixtures and seeding helpers.
-2. Add Playwright helpers for explorer navigation, Project reopen, Project Chat, branch selection,
-   terminal dock, external/default IDE handoff, preview cards, activity-panel states, and breadcrumb
+1. Inventory existing Electron/browser E2E coverage from stabilisation.
+2. Add deterministic Project fixtures and seeding helpers for coding and mixed/non-code Projects.
+3. Add Playwright helpers for explorer navigation, Project reopen, Project Chat, branch selection,
+   terminal dock, external/default IDE handoff, preview cards, activity-panel states, and location
    navigation.
-3. Write E2E flows for coding and mixed/non-code Projects.
-4. Verify primary UI labels do not expose runtime implementation terms.
-5. Update docs with the final Project experience flow.
+4. Write Phase 1 coding-workflow E2E first.
+5. Add preview/activity/profile phases as their product tasks land.
+6. Verify primary UI labels do not expose runtime implementation terms.
+7. Update docs with the final Project experience flow.
 
 ## Dependency Order
 
@@ -78,11 +82,12 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Playwright covers the complete Project experience navigation flow.
+- [ ] Playwright/Electron defines a staged Project Experience automation gate.
+- [ ] Phase 1 covers the coding Project workflow deeply.
 - [ ] Tests verify Project reopen and context preservation across Project Chat and external/default
       IDE handoff.
 - [ ] Tests verify branch selection and terminal dock behavior from Project Chat.
 - [ ] Tests verify `/help` and `/init` run with the same Project context as ordinary Project chat.
 - [ ] Tests verify general Chat remains independent.
-- [ ] Tests verify rendered preview and right-side activity-panel behavior once implemented.
+- [ ] Tests verify rendered preview and right-side activity-panel behavior once `.7` and `.8` land.
 - [ ] Tests verify runtime implementation labels are hidden from primary UI.

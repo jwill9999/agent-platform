@@ -8,14 +8,14 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Summary
 
-Add a right-side Project activity panel that shows what changed, what was generated, what checks are
-running or complete, and what needs review. This becomes the main evidence surface beside Project
-Chat and reduces pressure to keep expanding the built-in IDE.
+Add a right-side Project activity/evidence panel that shows what changed, what was generated, what
+checks are running or complete, and what needs review. This becomes the main evidence surface beside
+Project Chat and reduces pressure to keep expanding the built-in IDE.
 
 ## Requirements
 
 - The panel is available from Project Chat and follows the active Project/session.
-- The panel can show:
+- The panel can show profile-aware activity where available:
   - changed files,
   - generated files,
   - preview cards for generated HTML/app, Markdown/document, PDF, screenshots, or other artifacts,
@@ -23,6 +23,9 @@ Chat and reduces pressure to keep expanding the built-in IDE.
   - CI status when branch feedback is available,
   - review comments and tool findings when available,
   - approval or next-action states.
+- Coding Projects should get the richest first implementation. Docs/content, research, automation,
+  mixed, and unknown Projects should have explicit fallback or empty states until those profiles
+  produce normalized activity.
 - The panel uses user-facing labels and compact typography consistent with the existing interface.
 - Raw implementation details such as `/workspace`, backend roots, host absolute paths, hashes,
   provider debug diagnostics, and internal state enums are hidden from normal copy.
@@ -46,13 +49,13 @@ and activity summaries. It should consume preview card components from
 
 ## Implementation Plan
 
-1. Review current right-side assistant/workbench panels, branch summary, artifact previews, and
-   review/check status surfaces.
+1. Review current right-side assistant/workbench panels, Git/GitHub panel, branch summary, artifact
+   previews, approval surfaces, and check/status surfaces.
 2. Define a normalized Project activity data shape for changed files, generated files, previews,
-   checks, CI, review comments, findings, and approvals.
+   checks, CI, review comments, findings, approvals, and next actions.
 3. Implement panel composition and compact states for empty/loading/unavailable/disconnected data.
-4. Wire available existing data sources first, with placeholders only where future provider work is
-   explicitly tracked.
+4. Wire available existing data sources first, especially coding Project Git/check/generated-output
+   evidence, with placeholders only where future provider work is explicitly tracked.
 5. Add tests for status grouping, copy, unavailable states, and implementation-detail hiding.
 6. Add Electron/Playwright coverage for visible panel states in Project Chat.
 
@@ -68,10 +71,11 @@ and activity summaries. It should consume preview card components from
 
 ## Definition Of Done
 
-- [ ] Project Chat has a right-side Project activity panel.
+- [ ] Project Chat has a right-side Project activity/evidence panel.
 - [ ] Panel shows changed/generated files and preview entries when available.
 - [ ] Panel shows local checks, CI, review comments, findings, and approval states when available.
 - [ ] Panel handles empty/loading/unavailable/disconnected states without leaking implementation
       details.
 - [ ] Panel consumes a normalized/swappable activity boundary rather than hard-coding one provider.
+- [ ] Coding Project evidence is implemented first, with clear fallback states for other profiles.
 - [ ] Tests and CI/CD gates pass before the Beads task is closed.
