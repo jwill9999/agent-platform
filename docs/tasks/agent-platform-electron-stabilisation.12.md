@@ -107,12 +107,12 @@ Latest local evidence on 2026-06-12:
 
 ### Human sign-off status
 
-Owner manual QA has **not** been rerun by the agent after the final stabilisation fixes. That is a
-human gate, not an automated one.
+Owner manual QA passed on 2026-06-15 after the automation backfill and staging PR checks were green.
+The sign-off is recorded in `agent-platform-electron-stabilisation.18`.
 
-`agent-platform-electron-stabilisation.18` now tracks the required owner manual sign-off after the
-automation backfill. `.12` remains blocked until that sign-off is recorded and any findings are
-classified.
+No new blocker findings were reported during this sign-off. Remaining known follow-ups are already
+tracked in Beads, including the non-blocking workflow expectation matrix
+`agent-platform-electron-stabilisation.20`.
 
 Recommended state:
 
@@ -128,16 +128,20 @@ Recommended state:
   - Personal Chat state/chrome separation belongs to `agent-platform-electron-stabilisation.16`;
   - duplicate Project names and Project-scoped session history belong to
     `agent-platform-project-experience.11`.
-- Do not merge `feature/agent-platform-electron-stabilisation` into `main` for release until the
-  owner reruns or signs off the checklist.
+- Do not promote a production macOS release until the pre-production VM signing/notarization gate
+  `agent-platform-macos-production-sandbox.6.3` is closed with real Developer ID and Apple
+  notarization evidence.
 - Follow-on Project Experience planning can proceed from the stabilised direction, but release/main
-  promotion remains gated on owner QA.
+  promotion remains gated on the remaining production release tasks.
 
 ### Merge and next-epic recommendation
 
-Recommendation: keep `feature/agent-platform-electron-stabilisation` as the current stable
-integration branch until owner manual QA is complete. If manual QA passes, merge the feature branch
-to `main` and begin `agent-platform-project-experience.1`.
+The `jwill9999/electron-stabilisation-e2e-backfill` branch was merged to `staging` on 2026-06-15
+after CI/CD and owner manual testing passed. The Electron stabilisation closeout gate is satisfied
+for staging/integration.
+
+Recommendation: proceed with follow-on Project Experience work from the staging baseline. Do not
+promote a production macOS release until the deferred VM signing/notarization evidence is complete.
 
 If manual QA finds more blocker regressions, create fix-forward tasks under this stabilisation epic
 or the Project Experience epic depending on scope:

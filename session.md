@@ -16,23 +16,35 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-15
-- **Session:** Made PR target branch selection explicit and defaulted staging when available.
-- **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
-- **Latest commit:** branch tip fixes PR base branch selection and WebView navigationHistory usage.
+- **Session:** Re-baselined Project Experience epic after Electron stabilisation.
+- **Branch:** `jwill9999/project-experience-rebaseline`
+- **Latest commit:** stacked on PR #231's Electron stabilisation sign-off branch.
 
 ## Current State
 
-- Electron stabilisation remains gated by `.12`, which is blocked on owner manual sign-off `.18`.
+- Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15.
+- PR #231 (`jwill9999/staging-electron-stabilisation-signoff` -> `staging`) is the current staging
+  signoff follow-up. GitHub run `27580073846` failed in `desktop-e2e` because the Radix Active agent
+  option detached during the Project access E2E select click.
+- Local fix is committed on PR #231: Project access E2E now selects Active agent values through a
+  retrying helper that waits for visibility and confirms the selected value.
+- `.18` is closed: owner manual QA sign-off is recorded after the automation backfill.
+- `.12` is ready to close: blockers are resolved/deferred, manual QA passed, and the staging merge
+  recommendation has been executed.
+- Project Experience re-baseline is in progress on
+  `jwill9999/project-experience-rebaseline`, stacked on PR #231's sign-off branch.
+- `agent-platform-project-experience.14` tracks the re-baseline. It updates the epic and remaining
+  child specs so completed stabilisation work is not rebuilt.
+- The next implementation task remains `agent-platform-project-experience.1`, now dependent on
+  `.14`.
 - `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
 - `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
   sizes.
 - `.20` is open as a non-blocking follow-up to define the broader E2E expectation matrix across
   Workspaces, Project Chat/Coding, Personal Chat, secondary file view, and future specialized
   workflows.
-- `.18` is open for owner manual QA sign-off. It should use
-  `docs/qa/electron-stabilisation-automation-matrix.md` to reduce manual scope to native/subjective
-  checks and any automation ambiguity.
-- `.12` should remain blocked until `.18` records owner sign-off and any findings are classified.
+- Production macOS release remains blocked by `agent-platform-macos-production-sandbox.6.3`, which
+  still requires real Developer ID signing and Apple notarization evidence.
 - Terminal dock now defaults to `MesloLGS NF`; users can still choose the other terminal fonts from
   the toolbar.
 - `.21` is closed: the Workspace Preview native WebView bounds regression shown when the Git/GitHub
@@ -160,6 +172,13 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   duplicated new code.
 - Moved shared desktop bridge DTO types into contracts so preload and web helpers stop duplicating
   project-folder, IDE handoff, and terminal event type definitions.
+- Merged `jwill9999/electron-stabilisation-e2e-backfill` to `staging` as `ba0be9b`; staging CI/CD
+  was green per owner report.
+- Closed `agent-platform-electron-stabilisation.18` after owner manual testing passed.
+- Added `agent-platform-project-experience.14` and re-baselined the Project Experience epic around
+  the current chat-first staging product direction.
+- Refined `.2`, `.4`, `.5`, and `.6` into audit/polish/staged-verification tasks rather than
+  rebuild tasks; clarified `.7` previews and `.8` activity/evidence panel.
 
 ## Checks Run
 
@@ -205,6 +224,8 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - `pnpm --filter @agent-platform/desktop typecheck`
 - `pnpm --filter @agent-platform/web lint`
 - `pnpm --filter @agent-platform/web typecheck`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts` (`1 passed`)
+- `pnpm --filter @agent-platform/desktop test:e2e` (`9 passed`)
 - `pnpm docs:lint`
 - `pnpm format:check`
 - `git diff --check`
@@ -214,7 +235,10 @@ the documented fallback checks above.
 
 ## Next
 
-1. Owner runs/signs off `agent-platform-electron-stabilisation.18`.
-2. Close `.12` only after `.18` sign-off and finding classification.
-3. Manually verify PR creation from the desktop Git/GitHub panel against the desired staging base
-   branch before relying on the workflow in staging.
+1. Review/merge PR #231 so staging has the Electron closeout documentation.
+2. Review/merge the Project Experience re-baseline branch.
+3. Start `agent-platform-project-experience.1` from the accepted re-baselined plan.
+4. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
+   Electron stabilisation epic.
+5. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
+   signed/notarized artifact evidence.

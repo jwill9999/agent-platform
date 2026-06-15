@@ -1,29 +1,33 @@
-# Task: Add left explorer Project and Chat navigation
+# Task: Audit and finish Workspaces/sidebar Project and Chat navigation
 
 **Beads issue:** `agent-platform-project-experience.2`  
 **Spec file:** `docs/tasks/agent-platform-project-experience.2.md`
 
 ## Summary
 
-Move Project and Chat navigation into the left explorer so users can see recent Projects, reopen
-Projects, start/open Chats, and avoid scattered calls to action.
+Audit the current Workspaces/sidebar navigation after Electron stabilisation and finish any remaining
+gaps so users can clearly distinguish Projects from Personal Chat, reopen Projects, and start/open
+Project flows without scattered calls to action.
 
 ## Requirements
 
-- Left explorer should show primary routes plus compact Projects and Chats/Sessions sections.
+- Preserve the current left navigation structure where it is working; do not rebuild navigation for
+  its own sake.
+- Workspaces/sidebar should clearly distinguish Projects from Personal Chat.
+- Recent Projects should remain compact and responsive with visible refresh/loading feedback.
 - Project rows should use readable `text-sm` sizing and compact metadata.
-- Users can open a new Project from the explorer.
+- Users can open or create Projects from Workspaces/sidebar without duplicate or conflicting CTAs.
 - Users can reopen previously opened Projects from persisted Project records.
-- Chat/session list remains accessible without overwhelming the Project list.
-- Navigation must work from Home, Chat, Project Chat, and IDE.
+- Chat/session access remains available without making Project navigation ambiguous.
+- Navigation must work from Workspaces, Personal Chat, Project Chat/Coding, and secondary panels.
 
 ## Implementation Plan
 
-1. Fetch Project records in the app shell/sidebar or a dedicated explorer component.
-2. Add compact Projects and Chats/Sessions sections below top-level menu items.
-3. Add Open Project/New Project affordance in the Projects section.
-4. Route Project clicks to the project-scoped chat surface from task `.3`.
-5. Add empty/loading/error states that avoid implementation terminology.
+1. Audit current Workspaces/sidebar behavior against the requirements above.
+2. Identify remaining duplicated CTAs, missing loading/error states, or confusing labels.
+3. Make focused UI changes rather than a wholesale navigation rebuild.
+4. Ensure Project clicks route to the project-scoped chat surface.
+5. Add tests for any remaining gaps.
 
 ## Dependency Order
 
@@ -43,7 +47,7 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Left explorer shows compact Projects and Chats/Sessions sections.
+- [ ] Workspaces/sidebar clearly separates Projects and Personal Chat.
 - [ ] Users can reopen stored Projects from the explorer.
-- [ ] Users can start/open Project flow from the explorer.
+- [ ] Users can start/open/create Project flows without duplicate or conflicting CTAs.
 - [ ] Labels remain user-facing and avoid `/workspace`/backend wording.
