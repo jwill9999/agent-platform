@@ -149,9 +149,26 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   `current branch -> selected target` copy.
 - Added `recommendPullRequestBaseBranch` so `staging` is the recommended PR target when available,
   while `main`, `develop`, and detected branches remain selectable.
+- Added `agent-platform-290` for the CI regressions reported on run `27551242386`.
+- Moved the encrypted `E2E model` fixture into shared `E2E_SEED` database seeding so browser,
+  desktop, and packaged VM E2E runs have a usable model config whenever `SECRETS_MASTER_KEY` is set.
+- Updated the parked IDE browser E2E to expect the current desktop-only Open in IDE guard instead
+  of the removed internal `/ide` route.
+- Addressed SonarCloud annotations in WebView navigation, Project PR UI, app-page conditions, and
+  WebView runtime E2E globals; also removed duplicated project-access model seeding.
 
 ## Checks Run
 
+- `pnpm --filter @agent-platform/db build`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts`
+- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm exec playwright test -c e2e/playwright.config.ts e2e/ide-project-opening-parked.spec.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/webviewService.test.ts test/backendSupervisor.test.ts test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/web typecheck`
+- `pnpm --filter @agent-platform/web lint`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/api typecheck`
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/stabilisation-backfill.e2e.ts`
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/webview-runtime.e2e.ts`
 - `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-git-workflow.e2e.ts`

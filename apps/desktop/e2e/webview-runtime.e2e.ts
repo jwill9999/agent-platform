@@ -183,7 +183,7 @@ async function expectWebViewBoundsToMatchViewport(page: Page): Promise<void> {
             width: Math.round(rect.width),
             height: Math.round(rect.height),
           };
-          return window.agentPlatformDesktop.workspace.listWebViews().then((webviews) => {
+          return globalThis.agentPlatformDesktop.workspace.listWebViews().then((webviews) => {
             const activeWebView = webviews[0];
             if (!activeWebView) return { matches: false, reason: 'missing webview state' };
             if (!activeWebView.bounds) return { matches: false, reason: 'missing bounds state' };

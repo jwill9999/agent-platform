@@ -1417,7 +1417,9 @@ export function ProjectGitHubPanel({
   }, [activeTab, loadPullRequests, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'prs') void loadBranches();
+    if (activeTab === 'prs') {
+      loadBranches().catch(() => undefined);
+    }
   }, [activeTab, loadBranches, refreshKey]);
 
   useEffect(() => {
@@ -2008,6 +2010,14 @@ export function ProjectGitHubPanel({
     selectedBaseBranch: pullRequestBaseBranch,
     fallbackBaseBranch: recommendedPullRequestBaseBranch,
   });
+  const pullRequestTargetBranch =
+    effectivePullRequestBaseBranch || pullRequestCreateState.baseBranch;
+  const pullRequestBaseBranchHelperText = branchesLoading
+    ? 'Loading branch options...'
+    : (branchesError ??
+      `This will open a pull request from ${
+        currentStatus.currentBranch ?? 'this branch'
+      } into ${pullRequestTargetBranch}.`);
   const currentBranchPullRequest = pullRequestCreateState.currentPullRequest;
   const sortedPullRequests = currentPullRequests?.pullRequests
     ? [
@@ -2413,7 +2423,7 @@ export function ProjectGitHubPanel({
                   className="w-full"
                   disabled={!projectId}
                   onClick={() => {
-                    void openProjectInSystemIde();
+                    openProjectInSystemIde().catch(() => undefined);
                   }}
                 >
                   Open in IDE
@@ -3505,8 +3515,7 @@ export function ProjectGitHubPanel({
                                   </span>
                                   <span className="text-muted-foreground">-&gt;</span>
                                   <span className="min-w-0 truncate font-mono font-semibold">
-                                    {effectivePullRequestBaseBranch ||
-                                      pullRequestCreateState.baseBranch}
+                                    {pullRequestTargetBranch}
                                   </span>
                                 </div>
                                 <div className="flex flex-wrap gap-1.5">
@@ -3529,23 +3538,18 @@ export function ProjectGitHubPanel({
                                   ))}
                                 </div>
                                 <p className="text-[11px] text-muted-foreground">
-                                  {branchesLoading
-                                    ? 'Loading branch options...'
-                                    : branchesError
-                                      ? branchesError
-                                      : `This will open a pull request from ${
-                                          currentStatus.currentBranch ?? 'this branch'
-                                        } into ${
-                                          effectivePullRequestBaseBranch ||
-                                          pullRequestCreateState.baseBranch
-                                        }.`}
+                                  {pullRequestBaseBranchHelperText}
                                 </p>
                               </div>
                               <div className="space-y-2">
-                                <label className="block text-xs font-medium text-muted-foreground">
+                                <label
+                                  htmlFor="project-pull-request-description"
+                                  className="block text-xs font-medium text-muted-foreground"
+                                >
                                   Description
                                 </label>
                                 <textarea
+                                  id="project-pull-request-description"
                                   value={pullRequestBody}
                                   onChange={(event) => setPullRequestBody(event.target.value)}
                                   disabled={actionPending !== null}

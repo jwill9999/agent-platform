@@ -481,50 +481,10 @@ function seedDesktopDatabase(sqlitePath: string): void {
       ...process.env,
       SQLITE_PATH: sqlitePath,
       E2E_SEED: '1',
+      SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
     },
     stdio: 'inherit',
   });
-  execFileSync(
-    process.execPath,
-    [
-      '--input-type=module',
-      '--eval',
-      `
-        import {
-          closeDatabase,
-          createModelConfig,
-          openDatabase,
-          parseMasterKeyFromBase64,
-        } from './packages/db/dist/index.js';
-
-        const { db, sqlite } = openDatabase(process.env.SQLITE_PATH);
-        try {
-          createModelConfig(
-            db,
-            {
-              name: 'E2E model',
-              provider: 'openai',
-              model: 'gpt-e2e',
-              apiKey: 'e2e-api-key',
-            },
-            parseMasterKeyFromBase64(process.env.SECRETS_MASTER_KEY),
-            1,
-          );
-        } finally {
-          closeDatabase(sqlite);
-        }
-      `,
-    ],
-    {
-      cwd: repoRoot,
-      env: {
-        ...process.env,
-        SQLITE_PATH: sqlitePath,
-        SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
-      },
-      stdio: 'inherit',
-    },
-  );
 }
 
 function getOpenPort(): Promise<number> {

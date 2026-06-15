@@ -780,7 +780,7 @@ export default function HomePage() {
   useEffect(() => {
     if (selectedMode !== 'chat' || !sessionId || agents.length === 0) return;
     const session = sessions.find((candidate) => candidate.id === sessionId);
-    if (!session || session.mode !== 'chat') return;
+    if (session?.mode !== 'chat') return;
     const chatDefaultAgent = pickDefaultAgentForMode(agents, 'chat');
     if (!chatDefaultAgent || session.agentId === chatDefaultAgent.id) return;
     if (personalChatRepairRef.current === session.id) return;
@@ -1374,9 +1374,9 @@ export default function HomePage() {
   const isLoading = status === 'streaming';
   const hasUsableModelConfig = modelConfigs.length > 0;
   const canSend = Boolean(sessionId) && !hasPendingApproval && hasUsableModelConfig;
-  const inputStatusText = !hasUsableModelConfig
-    ? 'Create a model in Settings > Models before sending.'
-    : getInputStatusText(hasPendingApproval, selectedMode, sessionId);
+  const inputStatusText = hasUsableModelConfig
+    ? getInputStatusText(hasPendingApproval, selectedMode, sessionId)
+    : 'Create a model in Settings > Models before sending.';
   const onboardingDraft = projectOnboardingDraft(activeProject);
   const navigationState = createWorkspaceNavigationState({
     surface: getWorkspaceSurface(selectedMode),
