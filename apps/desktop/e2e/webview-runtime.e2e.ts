@@ -10,6 +10,25 @@ const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
 
+type WebViewBoundsMatchResult =
+  | { matches: true }
+  | {
+      matches: false;
+      reason: string;
+      actual?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+      expected?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+    };
+
 test.describe('Electron workspace WebView runtime', () => {
   test('opens repository, chat, and local preview URLs inside the visible WebView panel', async () => {
     const tempRoot = join(repoRoot, '.agent-platform', 'electron-webview-e2e', String(Date.now()));
@@ -78,8 +97,13 @@ test.describe('Electron workspace WebView runtime', () => {
       await expect(previewPanel).toBeVisible({ timeout: 10_000 });
       await expectAnyWebViewUrl(page, 'https://github.com/jwill9999/node1');
       await expectUsableViewport(page, 480);
+      await expectWebViewBoundsToMatchViewport(page);
 
-      await previewPanel.getByTitle('Use wide preview').click();
+      await gitPanel.getByTitle('Close Git and GitHub panel').click();
+      await expect(gitPanel.getByTitle('Open Git and GitHub panel')).toBeVisible();
+      await expectWebViewBoundsToMatchViewport(page);
+
+      await previewPanel.getByTitle('Make the side preview wider').click();
       await expect(gitPanel).toHaveCount(0);
       await expectUsableViewport(page, 640);
 
@@ -99,7 +123,7 @@ test.describe('Electron workspace WebView runtime', () => {
         externalFallbackUrl: 'http://example.com/',
       });
 
-      await previewPanel.getByTitle('Focus preview').click();
+      await previewPanel.getByTitle('Open preview in a focused overlay').click();
       const focusedPreview = page.getByRole('dialog', { name: 'Focused workspace preview' });
       await expect(focusedPreview).toBeVisible();
       await page.keyboard.press('Escape');
@@ -142,6 +166,47 @@ async function expectDesktopWorkspaceBridge(page: Page): Promise<void> {
     undefined,
     { timeout: 10_000 },
   );
+}
+
+async function expectWebViewBoundsToMatchViewport(page: Page): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const viewport = document.querySelector('[data-testid="project-webview-viewport"]');
+          if (!viewport) return { matches: false, reason: 'missing viewport' };
+
+          const rect = viewport.getBoundingClientRect();
+          const expected = {
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          };
+          return globalThis.agentPlatformDesktop.workspace.listWebViews().then((webviews) => {
+            const activeWebView = webviews[0];
+            if (!activeWebView) return { matches: false, reason: 'missing webview state' };
+            if (!activeWebView.bounds) return { matches: false, reason: 'missing bounds state' };
+
+            const actual = activeWebView.bounds;
+            const matches =
+              Math.abs(actual.x - expected.x) <= 2 &&
+              Math.abs(actual.y - expected.y) <= 2 &&
+              Math.abs(actual.width - expected.width) <= 2 &&
+              Math.abs(actual.height - expected.height) <= 2;
+            return matches
+              ? { matches: true }
+              : {
+                  matches: false,
+                  reason: 'bounds mismatch',
+                  actual,
+                  expected,
+                };
+          });
+        }),
+      { timeout: 10_000 },
+    )
+    .toEqual({ matches: true } satisfies WebViewBoundsMatchResult);
 }
 
 async function expectAnyWebViewUrl(page: Page, expectedUrlPrefix: string): Promise<void> {

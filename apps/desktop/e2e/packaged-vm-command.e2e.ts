@@ -23,6 +23,7 @@ const GIT_BINARY = '/usr/bin/git';
 const HOST_ONLY_CANARY_ENV = 'HOST_ONLY_CANARY';
 const HOST_ONLY_CANARY_VALUE = ['host', 'only', 'packaged', 'vm', 'e2e', 'canary'].join('-');
 const VM_E2E_MARKER_COMMAND = 'pwd';
+const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 type VmFixtureHealth = 'ready' | 'failed';
 
@@ -185,6 +186,7 @@ async function launchVmFixture(
         name: 'sys_bash',
         args: { command: VM_E2E_MARKER_COMMAND },
       }),
+      SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
       [HOST_ONLY_CANARY_ENV]: HOST_ONLY_CANARY_VALUE,
       CI: process.env.CI,
     },
@@ -385,6 +387,7 @@ function seedDesktopDatabase(sqlitePath: string): void {
         ...process.env,
         SQLITE_PATH: sqlitePath,
         E2E_SEED: '1',
+        SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
       },
       stdio: 'pipe',
     });

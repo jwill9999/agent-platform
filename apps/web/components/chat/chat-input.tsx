@@ -17,7 +17,9 @@ import {
   AlertTriangle,
   Image,
   FileWarning,
+  Cpu,
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/cn';
 import type { AttachmentEntry } from '@/hooks/use-context-attachments';
 import { useAgentModelContext } from './agent-model-context';
@@ -284,6 +286,15 @@ export function ChatInput({
                 onSelect={(id) => ctx.onSelectAgent?.(id)}
                 disabled={ctx.selectorDisabled || isLoading}
               />
+              {(ctx.modelConfigs?.length ?? 0) === 0 && (
+                <Link
+                  href="/settings/models"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                >
+                  <Cpu className="h-3.5 w-3.5" aria-hidden />
+                  Configure model
+                </Link>
+              )}
               <ChatModelSelector
                 modelConfigs={ctx.modelConfigs ?? []}
                 selectedId={ctx.selectedModelConfigId ?? null}

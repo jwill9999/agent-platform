@@ -11,6 +11,7 @@ import {
   goForwardWorkspaceWebViewIpcChannel,
   inputTerminalIpcChannel,
   listWorkspaceWebViewsIpcChannel,
+  openProjectIdeIpcChannel,
   openWorkspaceExternalFallbackIpcChannel,
   openWorkspaceResourceIpcChannel,
   openWorkspaceWebViewIpcChannel,
@@ -47,6 +48,10 @@ const desktopApi = {
     createFolder: (request) =>
       ipcRenderer.invoke(createProjectFolderIpcChannel, request) as ReturnType<
         AgentPlatformDesktopApi['projects']['createFolder']
+      >,
+    openInIde: (request) =>
+      ipcRenderer.invoke(openProjectIdeIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['projects']['openInIde']
       >,
     selectFolder: () =>
       ipcRenderer.invoke(selectProjectFolderIpcChannel) as ReturnType<

@@ -20,6 +20,7 @@ import {
   listModelConfigs,
   resolveModelConfigKey,
   parseMasterKeyFromBase64,
+  SecretDecryptionError,
   upsertWorkingMemoryArtifact,
   createMemoryCandidates,
   retrievePromptMemories,
@@ -150,6 +151,7 @@ export type ChatRouterOptions = {
   observabilityStore?: ObservabilityStore;
   llmReasonNode?: ReturnType<typeof createLlmReasonNode>;
   disableEvaluatorNodes?: boolean;
+  emitFinalAssistantMessage?: boolean;
   sessionLock?: SessionLock;
   slashCommands?: RunSlashCommandOptions;
   systemToolExecutorFactory?: (context: {
@@ -234,7 +236,7 @@ function resolveModelOrThrow(
         throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
       }
       const masterKey = parseMasterKeyFromBase64(masterKeyB64);
-      apiKey = resolveModelConfigKey(db, effectiveModelConfigId, masterKey);
+      apiKey = resolveStoredModelConfigKeyOrThrow(db, effectiveModelConfigId, masterKey);
     }
     return { provider: cfg.provider, model: cfg.model, apiKey };
   }
@@ -250,7 +252,7 @@ function resolveModelOrThrow(
         throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
       }
       const masterKey = parseMasterKeyFromBase64(masterKeyB64);
-      apiKey = resolveModelConfigKey(db, defaultModelConfig.id, masterKey);
+      apiKey = resolveStoredModelConfigKeyOrThrow(db, defaultModelConfig.id, masterKey);
     }
     return {
       provider: defaultModelConfig.provider,
@@ -268,6 +270,25 @@ function resolveModelOrThrow(
     throw new HttpError(400, resolution.code, resolution.message);
   }
   return resolution.config;
+}
+
+function resolveStoredModelConfigKeyOrThrow(
+  db: DrizzleDb,
+  modelConfigId: string,
+  masterKey: Buffer,
+): string {
+  try {
+    return resolveModelConfigKey(db, modelConfigId, masterKey);
+  } catch (error) {
+    if (error instanceof SecretDecryptionError) {
+      throw new HttpError(
+        409,
+        'MODEL_CONFIG_KEY_DECRYPTION_FAILED',
+        'The selected model API key can no longer be decrypted. Re-enter the API key in Settings > Models.',
+      );
+    }
+    throw error;
+  }
 }
 
 /** Map persisted MessageRecord rows to ChatMessage objects. */
@@ -380,6 +401,19 @@ function persistNewMessages(
       });
     }
   });
+}
+
+async function emitFinalAssistantMessage(
+  emitter: OutputEmitter,
+  allMessages: ChatMessage[] | undefined,
+  initialCount: number,
+): Promise<void> {
+  const assistantText = allMessages
+    ?.slice(initialCount)
+    .find((msg) => msg.role === 'assistant' && msg.content.trim())?.content;
+  if (assistantText) {
+    await emitter.emit({ type: 'text', content: assistantText });
+  }
 }
 
 /** Safely fire a plugin hook, swallowing errors. */
@@ -1350,6 +1384,9 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
           finalState?.messages,
           projectContext,
         );
+        if (options.emitFinalAssistantMessage) {
+          await emitFinalAssistantMessage(emitter, persistedMessages, messages.length);
+        }
         persistNewMessages(db, sessionId, persistedMessages, messages.length);
         refreshWorkingMemory({
           db,

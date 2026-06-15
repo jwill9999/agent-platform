@@ -22,6 +22,7 @@ import {
   selectDesktopProjectFolder,
   validateDesktopCreateProjectFolderRequest,
 } from './projectFolderPicker.js';
+import { openProjectRootInIde } from './ideLauncher.js';
 import {
   getRepoRootFromMainDir,
   getStandaloneRendererPaths,
@@ -52,6 +53,7 @@ import {
   goForwardWorkspaceWebViewIpcChannel,
   inputTerminalIpcChannel,
   listWorkspaceWebViewsIpcChannel,
+  openProjectIdeIpcChannel,
   openWorkspaceExternalFallbackIpcChannel,
   openWorkspaceResourceIpcChannel,
   openWorkspaceWebViewIpcChannel,
@@ -278,6 +280,30 @@ function registerDesktopProjectIpc(window: BrowserWindow): void {
     validateIpcPayload(payload, validateNoPayload);
 
     return selectDesktopProjectFolder({ dialog, window });
+  });
+
+  ipcMain.removeHandler(openProjectIdeIpcChannel);
+  ipcMain.handle(openProjectIdeIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const object =
+      typeof payload === 'object' && payload !== null
+        ? (payload as { projectId?: unknown })
+        : undefined;
+    const projectId = typeof object?.projectId === 'string' ? object.projectId.trim() : '';
+    if (!projectId) {
+      return { ok: true, handled: false, reason: 'Project id is required.' };
+    }
+
+    const projectRoot = await fetchDesktopProjectRootFromApi(
+      resolveDesktopTerminalApiBaseUrl(),
+      projectId,
+    );
+    return openProjectRootInIde({
+      env: process.env,
+      platform: process.platform,
+      projectRoot,
+      shell,
+    });
   });
 }
 

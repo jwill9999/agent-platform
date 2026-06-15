@@ -33,7 +33,11 @@ const observabilityLog = createLogger('api:observability');
 export type V1RouterOptions = {
   chat?: Pick<
     ChatRouterOptions,
-    'llmReasonNode' | 'disableEvaluatorNodes' | 'sessionLock' | 'systemToolExecutorFactory'
+    | 'llmReasonNode'
+    | 'disableEvaluatorNodes'
+    | 'emitFinalAssistantMessage'
+    | 'sessionLock'
+    | 'systemToolExecutorFactory'
   >;
   observabilityStore?: ObservabilityStore;
 };

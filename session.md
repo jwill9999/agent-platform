@@ -15,76 +15,198 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-12
-- **Session:** Closed `.6.2`, documented `.6.3` notarization blocker, and recorded production
-  release hold.
-- **Branch:** `jwill9999/macos-production-sandbox-vm-lifecycle-exec`
-- **Latest commits:** `38f2e96` records the production release hold; `bf638b7` closed `.6.2`
-  evidence.
+- **Date:** 2026-06-15
+- **Session:** Made PR target branch selection explicit and defaulted staging when available.
+- **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
+- **Latest commit:** branch tip fixes PR base branch selection and WebView navigationHistory usage.
 
 ## Current State
 
-- Production sandbox work remains on `jwill9999/macos-production-sandbox-vm-lifecycle-exec`; do not
-  push directly to `main`.
-- Parent epic `agent-platform-macos-production-sandbox` is open at `5/6` complete because `.6`
-  remains open.
-- `.6.1` is closed. Live VM proof on Apple Silicon macOS verified:
-  - VM diagnostics: `2` vCPU, `2048` MiB RAM, `networkDevices: 0`, `networkPolicy: disabled`,
-    `agentplatform` uid/gid `1000`, `/workspace` mount, timeout/output limits, and virtualization
-    entitlement present.
-  - Guest commands run non-root, only `lo` exists under `/sys/class/net`, `/proc/net/route` has no
-    routes, `/workspace` writes persist to the host Project path, `/root` is not writable, scratch is
-    guest-owned, timeout exits `124`, output clamps at requested bytes, and cwd escape fails closed.
-- `.6.2` is closed. Signed/packaged repair smoke packaged the signed helper/assets, repaired corrupt
-  app-owned VM runtime state, preserved Project data and diagnostics, restored assets, and proved
-  packaged helper `prepare/start/status/stop` works after repair.
-- `.6.3` is in progress but externally blocked. Signing/quarantine/entitlement verifier exists, and
-  signed packaged helper execution is proven, but real Developer ID signing/notarization cannot be
-  produced locally: `security find-identity -v -p codesigning` returned `0 valid identities found`,
-  and no Apple/notary credential environment variables are present.
-- Production macOS release is explicitly blocked until `.6.3` closes with Developer ID signing,
-  Apple notarization success, helper signing/entitlement/quarantine report, and `macos-vm` ready
-  smoke from the signed/notarized artifact.
-- `.6.4` is in progress. Future Windows/Linux adapter docs and traceability draft exist; final
-  closure is blocked by `.6.3`.
-- `.5` and `.5.4` are closed. PR #227 recorded green `staging-packaged-macos-vm-e2e` evidence on the
-  self-hosted Apple Silicon runner.
+- Electron stabilisation remains gated by `.12`, which is blocked on owner manual sign-off `.18`.
+- `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
+- `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
+  sizes.
+- `.20` is open as a non-blocking follow-up to define the broader E2E expectation matrix across
+  Workspaces, Project Chat/Coding, Personal Chat, secondary file view, and future specialized
+  workflows.
+- `.18` is open for owner manual QA sign-off. It should use
+  `docs/qa/electron-stabilisation-automation-matrix.md` to reduce manual scope to native/subjective
+  checks and any automation ambiguity.
+- `.12` should remain blocked until `.18` records owner sign-off and any findings are classified.
+- Terminal dock now defaults to `MesloLGS NF`; users can still choose the other terminal fonts from
+  the toolbar.
+- `.21` is closed: the Workspace Preview native WebView bounds regression shown when the Git/GitHub
+  rail collapses is fixed and covered by targeted Electron E2E.
+- `.22` is closed: the Git & GitHub Changes tab now renders structured, readable unified diffs in
+  the desktop side panel and is covered by targeted Electron E2E.
+- `.23` is closed: Workspace Preview sizing/controls are clearer, Open in IDE uses the desktop
+  external launcher instead of `/ide`, the command-runner badge says `Agent commands off`, and the
+  Push tab/action no longer shows an inline ahead-count badge.
+- `.24` is closed: Personal Chat entered from Workspaces now marks the Chat nav item active,
+  desktop/API startup seeds the Personal assistant profile into local runtime DBs, existing bad
+  personal sessions are repaired to the Personal assistant profile, and model selection remains
+  provider/model agnostic.
+- `.25` is in final verification: zero usable model configs disable chat send with a `Configure
+model` CTA; exactly one usable model config becomes the default; multiple configs remain
+  selectable and agent preference still wins.
+- `agent-platform-287` is closed: generated Electron preload now exposes `projects.openInIde`, so
+  connected Project workspaces no longer hit the missing desktop bridge banner.
+- `agent-platform-288` is closed: the PR creation panel now lets users choose the base branch, and
+  Electron WebView navigation state uses `webContents.navigationHistory` instead of deprecated
+  `canGoBack`/`canGoForward`.
+- `agent-platform-289` is closed: PR creation now has an explicit target branch selector, visible
+  quick choices, `source -> target` copy, and recommends `staging` when that branch exists.
 
 ## Recent Work
 
-- Added `apps/desktop/scripts/smoke-macos-vm-repair.mjs` and `native:vm:smoke-repair` to make `.6.2`
-  packaged repair evidence repeatable.
-- Ran `.6.2` smoke with pristine prepared VM assets from `/private/tmp/agent-platform-linux-runtime-6-2/images`
-  and work dir `/private/tmp/agent-platform-macos-vm-repair-smoke-6-2`.
-- Smoke result: repair deleted only app-owned `state`/`images`, preserved `logs/support.log`,
-  preserved Project `README.md`, restored `images/manifest.json`, and the packaged helper returned
-  `prepare: disabled`, `start: ready`, `status: ready`, `stop: disabled`.
-- Closed Beads issue `agent-platform-macos-production-sandbox.6.2`.
-- Updated `.6.3` spec/Beads notes with the concrete signing/notarization blocker.
-- Updated `.6.4` audit so `.6.1` and `.6.2` are closed and only `.6.3` blocks final closure.
-- Added production-release hold language to the VM epic, `.6`, and `.6.3`, and appended matching
-  Beads notes.
+- Added `workspaceNavigationChangedEvent` so programmatic `history.pushState` navigation updates
+  the left sidebar active state.
+- Added `aria-current` to workspace sidebar links and covered the Chat active state in Electron
+  E2E.
+- Guarded Chat agent selection with system/user ownership so Personal Chat defaults to Personal
+  assistant and Project/Coding selections do not leak into global Chat.
+- Aligned frontend model selection with backend precedence: agent-assigned model first, otherwise
+  the first usable platform default model config.
+- Added API startup seeding so local managed desktop runs get the same Personal assistant/Coding
+  baseline that Docker and E2E already seed.
+- Added Personal Chat session repair so previously created `mode=chat` sessions with the wrong
+  backend agent owner are normalized before use.
+- Added `usableModelConfigs` so model availability is provider/model agnostic but explicit: keyed
+  saved configs and local `ollama` configs can run.
+- Disabled chat send and surfaced a Settings > Models setup CTA when no usable model config exists.
+- Added focused model-selection tests for zero, one, and multiple usable model configs.
+- Added Beads task/spec `agent-platform-electron-stabilisation.24` for the Personal Chat regression.
+- Added Beads task/spec `agent-platform-electron-stabilisation.25` for required model-config UX.
+- Updated `apps/web/components/project/project-webview-panel.tsx` so native WebView bounds are
+  deduped by rounded viewport rectangle and resynced via `ResizeObserver`, window resize, and an
+  animation-frame layout check while a WebView is active.
+- Added optional `bounds` to `DesktopWorkspaceWebViewState` and recorded the last applied bounds in
+  `apps/desktop/src/main/webviewService.ts` for diagnostics/E2E verification.
+- Extended `apps/desktop/e2e/webview-runtime.e2e.ts` to collapse the Git/GitHub panel and assert the
+  recorded native bounds still match the visible preview viewport.
+- Added Beads task/spec `agent-platform-electron-stabilisation.21` for this regression.
+- Updated `apps/web/components/project/project-git-github-panel.tsx` so the diff preview renders
+  file headers, hunks, additions, deletions, and context lines with readable row styling, line
+  numbers, stable scroll, and compact selected-file metadata.
+- Extended `apps/desktop/e2e/project-git-workflow.e2e.ts` to select a modified README diff and
+  assert hunk/addition rows render in the improved preview.
+- Added Beads task/spec `agent-platform-electron-stabilisation.22` for the Git diff rendering
+  improvement.
+- Updated Workspace Preview controls to labeled `Wide` and `Focus` actions and responsive panel
+  widths.
+- Added desktop `projects.openInIde` bridge plus a system IDE/folder launcher with
+  `AGENT_PLATFORM_DESKTOP_IDE_COMMAND` override and common IDE fallbacks.
+- Updated Project Chat and Git conflict resolver Open in IDE actions to use the desktop launcher
+  instead of the internal `/ide` route.
+- Changed the command-runner badge from duplicate `disabled disabled` to `Agent commands off` and
+  kept the Push tab/action label to `Push` without an inline count badge.
+- Added explicit short-lived `Refreshing` feedback to the left-sidebar Recent Projects refresh
+  control so fast reloads no longer feel inert.
+- Added Beads task/spec `agent-platform-electron-stabilisation.23` for the preview/IDE/status UI
+  refinement.
+- Added `apps/desktop/e2e/stabilisation-backfill.e2e.ts`.
+- Covered settings/model/API key persistence, restart persistence, Project-scoped versus Personal
+  Chat sessions, missing/unavailable Projects, and UI leakage/layout smoke.
+- Updated `apps/desktop/e2e/project-access.e2e.ts` to remove stale/flaky assumptions uncovered by
+  full-suite ordering.
+- Added `docs/qa/electron-stabilisation-automation-matrix.md`.
+- Added Beads task `agent-platform-electron-stabilisation.18` for owner manual QA sign-off and made
+  `.12` depend on `.17` and `.18`.
+- Added Beads task `agent-platform-electron-stabilisation.19` for first-load responsive layout E2E
+  coverage.
+- Added Beads task `agent-platform-electron-stabilisation.20` as a non-blocking follow-up for the
+  workflow expectation matrix.
+- Changed `apps/web/components/project/project-terminal-dock.tsx` so new terminal sessions default
+  to `MesloLGS NF`.
+- Added `agent-platform-electron-stabilisation.26` for the local desktop model-chat failure caused
+  by unstable `make electron-local` secrets master keys.
+- Changed `make electron-local` to create and reuse
+  `.agent-platform/desktop-runtime/config/secrets-master-key.b64` so saved model API keys remain
+  decryptable across local restarts.
+- Added an actionable `MODEL_CONFIG_KEY_DECRYPTION_FAILED` chat error when an existing saved model
+  key was encrypted with an old/unavailable master key; users must re-enter that API key once.
+- Extended managed Electron E2E model mocking so Playwright can assert visible assistant responses
+  in both Personal Chat and Project/Coding workspaces.
+- Seeded a throwaway encrypted E2E model config in `apps/desktop/e2e/project-access.e2e.ts` and
+  asserted both workspace flows can send a prompt and receive `E2E model response received`.
+- Added desktop supervisor and package-script unit coverage for E2E mock passthrough and stable
+  `make electron-local` secrets key behavior.
+- Fixed `agent-platform-287`: the generated CommonJS preload used by Electron now exposes
+  `projects.openInIde` and `maintenance.repairMacosVmRuntime`, matching the TypeScript preload
+  bridge. This resolves the connected-Project `Open in IDE is available...` banner.
+- Extended Project access E2E so clicking `Open in IDE` fails the test if missing-bridge,
+  missing-folder, or generic open-failure banners appear.
+- Added `agent-platform-288` for the latest Git/GitHub panel follow-ups.
+- Added branch-option derivation and an editable `Base branch` field to the PR creation card so
+  users can merge a published feature branch into `staging`, `develop`, or another branch instead
+  of silently defaulting to `main`.
+- Updated PR creation tests so the fake GitHub CLI fails unless `--base staging` is passed.
+- Replaced Electron WebView `webContents.canGoBack()` / `canGoForward()` calls with
+  `webContents.navigationHistory.canGoBack()` / `canGoForward()` and updated tests.
+- Added `agent-platform-289` after manual testing showed the base branch field was still too
+  subtle and appeared to create `branch -> main` PRs.
+- Replaced the PR target input with an explicit dropdown plus quick branch buttons and visible
+  `current branch -> selected target` copy.
+- Added `recommendPullRequestBaseBranch` so `staging` is the recommended PR target when available,
+  while `main`, `develop`, and detected branches remain selectable.
+- Added `agent-platform-290` for the CI regressions reported on run `27551242386`.
+- Moved the encrypted `E2E model` fixture into shared `E2E_SEED` database seeding so browser,
+  desktop, and packaged VM E2E runs have a usable model config whenever `SECRETS_MASTER_KEY` is set.
+- Updated the parked IDE browser E2E to expect the current desktop-only Open in IDE guard instead
+  of the removed internal `/ide` route.
+- Addressed SonarCloud annotations in WebView navigation, Project PR UI, app-page conditions, and
+  WebView runtime E2E globals; also removed duplicated project-access model seeding.
+- Added `agent-platform-24u` after the E2E fix cleared CI but SonarCloud still reported `4.4%`
+  duplicated new code.
+- Moved shared desktop bridge DTO types into contracts so preload and web helpers stop duplicating
+  project-folder, IDE handoff, and terminal event type definitions.
 
 ## Checks Run
 
-- `pnpm --filter @agent-platform/desktop native:vm:host-check -- --json`
-- `node --check apps/desktop/scripts/build-macos-vm-linux-assets.mjs`
-- `node --check apps/desktop/scripts/smoke-macos-vm-repair.mjs`
-- `pnpm --filter @agent-platform/desktop native:vm:assets:build-linux -- --out-dir /private/tmp/agent-platform-linux-assets-6-1`
-- `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- --source-image /private/tmp/agent-platform-linux-assets-6-1/source.raw --kernel /private/tmp/agent-platform-linux-assets-6-1/vmlinuz --initrd /private/tmp/agent-platform-linux-assets-6-1/initrd.img --bootstrap /private/tmp/agent-platform-linux-assets-6-1/guest-bootstrap.sh --out-dir /private/tmp/agent-platform-linux-runtime-6-1/images`
-- `pnpm --filter @agent-platform/desktop native:vm:assets:prepare -- --source-image /private/tmp/agent-platform-linux-assets-6-1/source.raw --kernel /private/tmp/agent-platform-linux-assets-6-1/vmlinuz --initrd /private/tmp/agent-platform-linux-assets-6-1/initrd.img --bootstrap /private/tmp/agent-platform-linux-assets-6-1/guest-bootstrap.sh --out-dir /private/tmp/agent-platform-linux-runtime-6-2/images`
-- `pnpm --filter @agent-platform/desktop native:vm:build`
-- `pnpm --filter @agent-platform/desktop native:vm:sign-dev`
-- `pnpm --filter @agent-platform/desktop native:vm:verify-signing -- --helper /Users/letuscode/projects/agent-platform/apps/desktop/native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner --json`
-- `pnpm --filter @agent-platform/desktop native:vm:smoke-repair -- --assets-dir /private/tmp/agent-platform-linux-runtime-6-2/images --work-dir /private/tmp/agent-platform-macos-vm-repair-smoke-6-2`
-- `macos-vm-runner start/status/exec/stop` live proof against `/private/tmp/agent-platform-linux-runtime-6-1`
-- `pnpm --filter @agent-platform/desktop native:vm:test`
-- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/macosVmHostCheck.test.ts test/macosVmPackaging.test.ts`
-- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts test/backendSupervisor.test.ts test/macosVmSigning.test.ts test/macosVmPackaging.test.ts`
+- `pnpm --filter @agent-platform/contracts build`
+- `pnpm --filter @agent-platform/contracts typecheck`
+- `pnpm --filter @agent-platform/db build`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/packaged-vm-command.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts`
+- `BASE_URL=http://127.0.0.1:3001 API_URL=http://127.0.0.1:3000 pnpm exec playwright test -c e2e/playwright.config.ts e2e/ide-project-opening-parked.spec.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/webviewService.test.ts test/backendSupervisor.test.ts test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/web typecheck`
+- `pnpm --filter @agent-platform/web lint`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/api typecheck`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/stabilisation-backfill.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/webview-runtime.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-git-workflow.e2e.ts`
+- `pnpm --filter @agent-platform/desktop test:e2e -- e2e/project-access.e2e.ts`
+- `pnpm --filter @agent-platform/api test -- test/sessionChat.integration.test.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
+- `pnpm --filter @agent-platform/api typecheck`
+- `pnpm --filter @agent-platform/api lint`
+- `pnpm --filter @agent-platform/desktop typecheck`
+- `pnpm --filter @agent-platform/desktop lint`
+- `pnpm --filter @agent-platform/desktop test -- test/packageScripts.test.ts`
+- `pnpm --filter @agent-platform/desktop build`
+- `pnpm --filter @agent-platform/api test -- test/crud.integration.test.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/backendSupervisor.test.ts`
+- `pnpm --filter @agent-platform/web test -- test/project-git-workflow-overview.test.ts`
+- `pnpm --filter @agent-platform/api test -- test/projectsRouter.test.ts`
+- `pnpm --filter @agent-platform/desktop test -- test/webviewService.test.ts`
+- `pnpm --filter @agent-platform/web typecheck`
+- `pnpm --filter @agent-platform/web lint`
+- `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts test/default-agent.test.ts`
+- `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts`
+- `pnpm --filter @agent-platform/api lint`
+- `pnpm --filter @agent-platform/api typecheck`
+- `pnpm --filter @agent-platform/contracts typecheck`
+- `pnpm --filter @agent-platform/desktop test:e2e` (`8 passed`)
 - `pnpm --filter @agent-platform/desktop lint`
 - `pnpm --filter @agent-platform/desktop typecheck`
-- `pnpm format:check`
+- `pnpm --filter @agent-platform/web lint`
+- `pnpm --filter @agent-platform/web typecheck`
 - `pnpm docs:lint`
+- `pnpm format:check`
 - `git diff --check`
 
 SonarQube MCP/tools were not exposed by tool discovery in this session, so the completion gate used
@@ -92,11 +214,7 @@ the documented fallback checks above.
 
 ## Next
 
-1. Provide a VM-capable Apple Silicon runner/session with Developer ID signing identity and Apple
-   notary credentials.
-2. Complete `.6.3`: produce signed/notarized artifact smoke evidence proving helper execution,
-   entitlements, no quarantine block, notarization success, and `macos-vm` ready health.
-3. Complete `.6.4`: refresh final traceability audit, close `.6`, then close
-   `agent-platform-macos-production-sandbox`.
-4. After the epic closes, decide whether the next focus is the divergent pull/merge resolver or the
-   broader Git workflow UI epic.
+1. Owner runs/signs off `agent-platform-electron-stabilisation.18`.
+2. Close `.12` only after `.18` sign-off and finding classification.
+3. Manually verify PR creation from the desktop Git/GitHub panel against the desired staging base
+   branch before relying on the workflow in staging.

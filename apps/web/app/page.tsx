@@ -13,7 +13,6 @@ import {
   ProjectOnboardingDraftSchema,
   ProjectOnboardingStateSchema,
 } from '@agent-platform/contracts';
-import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Chat } from '../components/chat/chat';
 import { AgentModelProvider } from '../components/chat/agent-model-context';
@@ -22,7 +21,7 @@ import type { ApprovalDecision } from '@/hooks/use-harness-chat';
 import { useHarnessChat } from '@/hooks/use-harness-chat';
 import { useContextAttachments } from '@/hooks/use-context-attachments';
 import { useSessions } from '@/hooks/use-sessions';
-import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
+import { apiGet, apiPath, apiPost, apiPut, ApiRequestError } from '@/lib/apiClient';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -46,10 +45,9 @@ import {
   type ProjectWebViewMode,
 } from '@/components/project/project-webview-panel';
 import { pickDefaultAgentForMode } from '@/lib/default-agent';
-import { resolveChatModelConfigId } from '@/lib/modelSelection';
+import { resolveChatModelConfigId, usableModelConfigs } from '@/lib/modelSelection';
 import {
   buildPersonalChatHref,
-  buildProjectIdeHref,
   createWorkspaceNavigationState,
   desktopProjectIsAvailable,
   desktopProjectPathLabel,
@@ -65,6 +63,7 @@ import {
   workspaceHomeRequestedEvent,
   workspaceEntryCopy,
   workspaceModeSearchParam,
+  workspaceNavigationChangedEvent,
   workspacePersonalChatRequestedEvent,
 } from '@/lib/project-navigation';
 import {
@@ -72,6 +71,7 @@ import {
   createAndRegisterDesktopProject,
   hasDesktopProjectBridge,
   loadRecentDesktopProjects,
+  openDesktopProjectIde,
   selectAndRegisterDesktopProject,
 } from '@/lib/desktop-projects';
 import { Terminal as TerminalIcon } from 'lucide-react';
@@ -103,10 +103,11 @@ type ErrorBannerProps = Readonly<{
 type ProjectChatHeaderProps = Readonly<{
   commandRunner: CommandRunnerDisplay | null;
   project: ProjectDesktopRecord | null;
-  sessionId: string | null;
   onReturnHome: () => void;
   terminalOpen: boolean;
   onToggleTerminal: () => void;
+  isOpeningIde: boolean;
+  onOpenIde: () => void;
 }>;
 type CommandRunnerDisplay = Readonly<{
   canExecute: boolean;
@@ -208,6 +209,16 @@ function commandRunnerStatusColor(commandRunner: CommandRunnerDisplay): string {
   if (commandRunner.canExecute) return 'bg-emerald-500';
   if (commandRunner.status === 'failed') return 'bg-destructive';
   return 'bg-amber-500';
+}
+
+function commandRunnerStatusLabel(commandRunner: CommandRunnerDisplay): string {
+  if (commandRunner.mode === 'disabled' && commandRunner.status === 'disabled') {
+    return 'Agent commands off';
+  }
+  if (commandRunner.mode === commandRunner.status) {
+    return commandRunner.status;
+  }
+  return `${commandRunner.mode} ${commandRunner.status}`;
 }
 
 async function fetchCommandRunnerDisplay(): Promise<CommandRunnerDisplay> {
@@ -506,10 +517,11 @@ function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
 function ProjectChatHeader({
   commandRunner,
   project,
-  sessionId,
   onReturnHome,
   terminalOpen,
   onToggleTerminal,
+  isOpeningIde,
+  onOpenIde,
 }: ProjectChatHeaderProps) {
   if (!project) {
     return null;
@@ -542,9 +554,7 @@ function ProjectChatHeader({
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${commandRunnerStatusColor(commandRunner)}`}
           />
-          <span className="truncate">
-            {commandRunner.mode} {commandRunner.status}
-          </span>
+          <span className="truncate">{commandRunnerStatusLabel(commandRunner)}</span>
         </div>
       )}
       <Button
@@ -561,8 +571,16 @@ function ProjectChatHeader({
       <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onReturnHome}>
         Workspaces
       </Button>
-      <Button asChild size="sm" variant="outline" className="shrink-0">
-        <Link href={buildProjectIdeHref(project.id, sessionId)}>Open IDE</Link>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="shrink-0"
+        onClick={onOpenIde}
+        disabled={isOpeningIde}
+        title="Open this Project folder in your system IDE"
+      >
+        {isOpeningIde ? 'Opening...' : 'Open in IDE'}
       </Button>
     </div>
   );
@@ -588,6 +606,7 @@ export default function HomePage() {
   const [commandRunnerHealth, setCommandRunnerHealth] = useState<CommandRunnerDisplay | null>(null);
   const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
   const [isOpeningProject, setIsOpeningProject] = useState(false);
+  const [isOpeningProjectIde, setIsOpeningProjectIde] = useState(false);
   const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectError, setNewProjectError] = useState<string | null>(null);
@@ -601,6 +620,8 @@ export default function HomePage() {
     useState<ProjectInstructionsDecision | null>(null);
   const attemptedProjectReopenIdRef = useRef<string | null>(null);
   const projectGitRefreshTimeoutRef = useRef<number | null>(null);
+  const agentSelectionSourceRef = useRef<'system' | 'user'>('system');
+  const personalChatRepairRef = useRef<string | null>(null);
 
   const {
     messages,
@@ -642,16 +663,20 @@ export default function HomePage() {
       const nextAgents = agentList ?? [];
       setAgents(nextAgents);
       const def = pickDefaultAgentForMode(nextAgents, 'chat');
-      const withKey = (configList ?? []).filter((c) => c.hasApiKey);
+      const usableConfigs = usableModelConfigs(configList ?? []);
       if (def) {
-        setSelectedAgentId((prev) => prev ?? def.id);
+        setSelectedAgentId((prev) => {
+          if (prev) return prev;
+          agentSelectionSourceRef.current = 'system';
+          return def.id;
+        });
       }
-      // Only show configs that have an API key stored; default to the selected agent's config.
-      setModelConfigs(withKey);
+      // Only show configs that can run: saved keyed configs plus local providers.
+      setModelConfigs(usableConfigs);
       setSelectedModelConfigId((prev) =>
-        prev && withKey.some((config) => config.id === prev)
+        prev && usableConfigs.some((config) => config.id === prev)
           ? prev
-          : resolveChatModelConfigId(def?.id ?? null, nextAgents, withKey),
+          : resolveChatModelConfigId(def?.id ?? null, nextAgents, usableConfigs),
       );
     } catch (e) {
       setLoadError(e instanceof ApiRequestError ? e.message : String(e));
@@ -682,30 +707,65 @@ export default function HomePage() {
     }
   }, []);
 
-  const createSessionForAgent = useCallback(async (agentId: string) => {
-    setSessionError(null);
-    setIsResuming(false);
-    try {
-      const session = await apiPost<SessionRecord>(apiPath('sessions'), {
-        agentId,
-        mode: 'chat',
-      });
-      if (!session?.id) {
-        setSessionError('Failed to create session');
+  const createSessionForAgent = useCallback(
+    async (agentId: string) => {
+      const chatAgentId = pickDefaultAgentForMode(agents, 'chat')?.id ?? agentId;
+      setSessionError(null);
+      setIsResuming(false);
+      try {
+        const session = await apiPost<SessionRecord>(apiPath('sessions'), {
+          agentId: chatAgentId,
+          mode: 'chat',
+        });
+        if (!session?.id) {
+          setSessionError('Failed to create session');
+          setSessionId(null);
+          setSensorDashboard(null);
+          return;
+        }
+        setSelectedAgentId(chatAgentId);
+        setSelectedModelConfigId(resolveChatModelConfigId(chatAgentId, agents, modelConfigs));
+        setSessionId(session.id);
+        setSensorDashboard(null);
+        setSensorError(null);
+        setSensorLoading(false);
+      } catch (e) {
+        setSessionError(e instanceof ApiRequestError ? e.message : String(e));
         setSessionId(null);
         setSensorDashboard(null);
-        return;
       }
-      setSessionId(session.id);
-      setSensorDashboard(null);
-      setSensorError(null);
-      setSensorLoading(false);
-    } catch (e) {
-      setSessionError(e instanceof ApiRequestError ? e.message : String(e));
-      setSessionId(null);
-      setSensorDashboard(null);
-    }
-  }, []);
+    },
+    [agents, modelConfigs],
+  );
+
+  const normalizePersonalChatSession = useCallback(
+    async (session: SessionRecord): Promise<SessionRecord> => {
+      const chatDefaultAgent = pickDefaultAgentForMode(agents, 'chat');
+      if (session.mode !== 'chat' || !chatDefaultAgent || chatDefaultAgent.id === session.agentId) {
+        return session;
+      }
+
+      const updatedSession: SessionRecord = {
+        ...session,
+        agentId: chatDefaultAgent.id,
+        mode: 'chat',
+        projectId: null,
+        updatedAtMs: Date.now(),
+      };
+      return (await apiPut<SessionRecord>(apiPath('sessions', session.id), updatedSession)) ?? updatedSession;
+    },
+    [agents],
+  );
+
+  useEffect(() => {
+    if (selectedMode !== 'chat') return;
+    if (isResuming || agents.length === 0 || agentSelectionSourceRef.current === 'user') return;
+    const def = pickDefaultAgentForMode(agents, 'chat');
+    if (!def || selectedAgentId === def.id) return;
+    agentSelectionSourceRef.current = 'system';
+    setSelectedAgentId(def.id);
+    setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
+  }, [agents, isResuming, modelConfigs, selectedAgentId, selectedMode]);
 
   useEffect(() => {
     if (selectedMode !== 'chat') return;
@@ -717,8 +777,50 @@ export default function HomePage() {
     }
   }, [selectedAgentId, createSessionForAgent, isResuming, selectedMode]);
 
+  useEffect(() => {
+    if (selectedMode !== 'chat' || !sessionId || agents.length === 0) return;
+    const session = sessions.find((candidate) => candidate.id === sessionId);
+    if (session?.mode !== 'chat') return;
+    const chatDefaultAgent = pickDefaultAgentForMode(agents, 'chat');
+    if (!chatDefaultAgent || session.agentId === chatDefaultAgent.id) return;
+    if (personalChatRepairRef.current === session.id) return;
+
+    personalChatRepairRef.current = session.id;
+    normalizePersonalChatSession(session)
+      .then((normalizedSession) => {
+        agentSelectionSourceRef.current = 'system';
+        setSelectedAgentId(normalizedSession.agentId);
+        setSelectedModelConfigId(
+          resolveChatModelConfigId(normalizedSession.agentId, agents, modelConfigs),
+        );
+        setSensorDashboard(null);
+        setSensorError(null);
+        setSensorLoading(false);
+        refreshSessions().catch(() => {});
+      })
+      .catch((repairError) => {
+        setSessionError(
+          repairError instanceof ApiRequestError
+            ? repairError.message
+            : 'Failed to prepare personal chat session',
+        );
+      })
+      .finally(() => {
+        personalChatRepairRef.current = null;
+      });
+  }, [
+    agents,
+    modelConfigs,
+    normalizePersonalChatSession,
+    refreshSessions,
+    selectedMode,
+    sessionId,
+    sessions,
+  ]);
+
   const handleAgentChange = useCallback(
     (agentId: string) => {
+      agentSelectionSourceRef.current = 'user';
       setIsResuming(false);
       setSelectedAgentId(agentId);
       setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
@@ -730,6 +832,7 @@ export default function HomePage() {
     (options?: { readonly updateUrl?: boolean }) => {
       if (options?.updateUrl !== false && globalThis.window !== undefined) {
         globalThis.window.history.pushState(null, '', buildPersonalChatHref());
+        globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
       }
       setSelectedMode('chat');
       setActiveProject(null);
@@ -741,6 +844,7 @@ export default function HomePage() {
       setSessionError(null);
       setIsResuming(false);
       clearAttachments();
+      agentSelectionSourceRef.current = 'system';
       const def = pickDefaultAgentForMode(agents, 'chat');
       if (def) {
         setSelectedAgentId(def.id);
@@ -753,6 +857,7 @@ export default function HomePage() {
   const handleReturnHome = useCallback(() => {
     if (globalThis.window !== undefined) {
       globalThis.window.history.pushState(null, '', '/');
+      globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
     }
     setSelectedMode(null);
     setActiveProject(null);
@@ -830,6 +935,7 @@ export default function HomePage() {
       const def = pickDefaultAgentForMode(agents, 'project');
       const nextAgentId = def?.id ?? selectedAgentId;
       if (def) {
+        agentSelectionSourceRef.current = 'system';
         setSelectedAgentId(def.id);
         setSelectedModelConfigId(resolveChatModelConfigId(def.id, agents, modelConfigs));
       }
@@ -1179,33 +1285,59 @@ export default function HomePage() {
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {
-      setIsResuming(true);
-      setSelectedMode(session.mode === 'project' ? 'project-chat' : 'chat');
-      setSelectedAgentId(session.agentId);
-      setSelectedModelConfigId(resolveChatModelConfigId(session.agentId, agents, modelConfigs));
-      setSessionId(session.id);
-      clearAttachments();
-      if (session.mode === 'project') {
-        refreshSensors(session.id).catch(() => {});
-      } else {
-        setSensorDashboard(null);
-        setSensorError(null);
-        setSensorLoading(false);
-      }
+      void (async () => {
+        agentSelectionSourceRef.current = 'system';
+        setIsResuming(true);
+        const normalizedSession = await normalizePersonalChatSession(session);
+        const repairedPersonalSession = normalizedSession.agentId !== session.agentId;
+
+        setSelectedMode(normalizedSession.mode === 'project' ? 'project-chat' : 'chat');
+        setSelectedAgentId(normalizedSession.agentId);
+        setSelectedModelConfigId(
+          resolveChatModelConfigId(normalizedSession.agentId, agents, modelConfigs),
+        );
+        setSessionId(normalizedSession.id);
+        clearAttachments();
+        if (normalizedSession.mode === 'project') {
+          refreshSensors(normalizedSession.id).catch(() => {});
+        } else {
+          setSensorDashboard(null);
+          setSensorError(null);
+          setSensorLoading(false);
+        }
+        if (repairedPersonalSession) {
+          refreshSessions().catch(() => {});
+        }
+      })().catch((error) => {
+        setSessionError(
+          error instanceof ApiRequestError ? error.message : 'Failed to open chat session',
+        );
+      });
     },
-    [agents, clearAttachments, modelConfigs, refreshSensors],
+    [
+      clearAttachments,
+      modelConfigs,
+      normalizePersonalChatSession,
+      refreshSensors,
+      refreshSessions,
+    ],
   );
 
   const handleNewChatForAgent = useCallback(
     (agentId: string) => {
+      const chatAgentId =
+        selectedMode === 'project-chat'
+          ? agentId
+          : (pickDefaultAgentForMode(agents, 'chat')?.id ?? agentId);
+      agentSelectionSourceRef.current = selectedMode === 'project-chat' ? 'user' : 'system';
       setIsResuming(false);
-      setSelectedAgentId(agentId);
-      setSelectedModelConfigId(resolveChatModelConfigId(agentId, agents, modelConfigs));
+      setSelectedAgentId(chatAgentId);
+      setSelectedModelConfigId(resolveChatModelConfigId(chatAgentId, agents, modelConfigs));
       clearAttachments();
       if (selectedMode === 'project-chat' && activeProject?.id) {
         setSessionError(null);
         apiPost<SessionRecord>(apiPath('sessions'), {
-          agentId,
+          agentId: chatAgentId,
           mode: 'project',
           projectId: activeProject.id,
         })
@@ -1225,7 +1357,7 @@ export default function HomePage() {
           });
         return;
       }
-      createSessionForAgent(agentId).catch(() => {});
+      createSessionForAgent(chatAgentId).catch(() => {});
     },
     [
       activeProject?.id,
@@ -1240,8 +1372,11 @@ export default function HomePage() {
   );
 
   const isLoading = status === 'streaming';
-  const canSend = Boolean(sessionId) && !hasPendingApproval;
-  const inputStatusText = getInputStatusText(hasPendingApproval, selectedMode, sessionId);
+  const hasUsableModelConfig = modelConfigs.length > 0;
+  const canSend = Boolean(sessionId) && !hasPendingApproval && hasUsableModelConfig;
+  const inputStatusText = hasUsableModelConfig
+    ? getInputStatusText(hasPendingApproval, selectedMode, sessionId)
+    : 'Create a model in Settings > Models before sending.';
   const onboardingDraft = projectOnboardingDraft(activeProject);
   const navigationState = createWorkspaceNavigationState({
     surface: getWorkspaceSurface(selectedMode),
@@ -1294,6 +1429,29 @@ export default function HomePage() {
     },
     [decideApproval, selectedModelConfigId],
   );
+
+  const handleOpenProjectIde = useCallback(() => {
+    if (!activeProject?.id) return;
+    setIsOpeningProjectIde(true);
+    openDesktopProjectIde(activeProject.id)
+      .then((result) => {
+        if (!result) {
+          setError(
+            'Open in IDE is available in the desktop app when a Project folder is connected.',
+          );
+          return;
+        }
+        if (!result.handled) {
+          setError(result.reason);
+        }
+      })
+      .catch(() => {
+        setError('Failed to open the Project folder in your system IDE.');
+      })
+      .finally(() => {
+        setIsOpeningProjectIde(false);
+      });
+  }, [activeProject?.id, setError]);
 
   if (!selectedMode) {
     return (
@@ -1378,10 +1536,11 @@ export default function HomePage() {
             <ProjectChatHeader
               commandRunner={commandRunnerHealth}
               project={activeProject}
-              sessionId={sessionId}
               onReturnHome={handleReturnHome}
               terminalOpen={projectTerminalOpen}
               onToggleTerminal={() => setProjectTerminalOpen((open) => !open)}
+              isOpeningIde={isOpeningProjectIde}
+              onOpenIde={handleOpenProjectIde}
             />
           )}
         </div>

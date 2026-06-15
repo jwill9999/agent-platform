@@ -1,6 +1,8 @@
 import type { Agent, McpServer, Skill } from '@agent-platform/contracts';
 
+import { parseMasterKeyFromBase64 } from '../crypto/envelope.js';
 import type { DrizzleDb } from '../database.js';
+import { createModelConfig, listModelConfigs } from '../repositories/modelConfigs.js';
 import { replaceAgent, upsertMcpServer, upsertSkill } from '../repositories/registry.js';
 import { updateSettings } from '../repositories/settings.js';
 
@@ -15,6 +17,7 @@ export const E2E_SPECIALIST_ID = '00000000-0000-4000-8000-e2e000000003';
  */
 export function runE2eSeed(db: DrizzleDb): void {
   updateSettings(db, { rateLimits: { max: 1_000 } });
+  seedE2eModelConfig(db);
 
   const mcp: McpServer = {
     id: E2E_MCP_ID,
@@ -53,4 +56,21 @@ export function runE2eSeed(db: DrizzleDb): void {
     },
   };
   replaceAgent(db, specialist);
+}
+
+function seedE2eModelConfig(db: DrizzleDb): void {
+  if (listModelConfigs(db).some((config) => config.name === 'E2E model')) return;
+  const masterKeyB64 = process.env.SECRETS_MASTER_KEY;
+  if (!masterKeyB64) return;
+  createModelConfig(
+    db,
+    {
+      name: 'E2E model',
+      provider: 'openai',
+      model: 'gpt-e2e',
+      apiKey: 'e2e-api-key',
+    },
+    parseMasterKeyFromBase64(masterKeyB64),
+    1,
+  );
 }

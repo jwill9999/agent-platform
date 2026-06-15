@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 test.describe('IDE Project opening is parked for desktop', () => {
-  test('opens desktop Project into Project chat by default and keeps IDE available', async ({
+  test('opens desktop Project into Project chat by default and guards IDE handoff in browser', async ({
     page,
   }) => {
     const projectId = `agent-platform-e2e-project-chat-${Date.now()}`;
@@ -40,20 +40,14 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page.getByText(backendProjectRoot)).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
-      await expect(page.getByRole('link', { name: 'Open IDE' })).toHaveAttribute(
-        'href',
-        /\/ide\?projectId=.*&sessionId=.+/,
-      );
+      await expect(page.getByRole('button', { name: 'Open in IDE' })).toBeVisible();
 
-      await page.getByRole('link', { name: 'Open IDE' }).click();
-      await page.waitForURL(/\/ide/);
-      await expect(page.getByLabel('Project binding').getByText(projectName).first()).toBeVisible();
-      await expect(page.getByText('guide.md')).toBeVisible();
-      await expect(page.getByRole('link', { name: /Project .* IDE/ })).toHaveAttribute(
-        'href',
-        /\/\?projectId=.*&sessionId=.+/,
-      );
-      await page.getByRole('link', { name: /Project .* IDE/ }).click();
+      await page.getByRole('button', { name: 'Open in IDE' }).click();
+      await expect(
+        page.getByText(
+          'Open in IDE is available in the desktop app when a Project folder is connected.',
+        ),
+      ).toBeVisible();
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(projectName).first()).toBeVisible();
       await expect(page.getByText('Project / Chat', { exact: true })).toBeVisible();

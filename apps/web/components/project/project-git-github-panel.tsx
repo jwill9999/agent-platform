@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  ProjectBranchListResult,
   ProjectGitChangedFile,
   ProjectGitChangesResult,
   ProjectGitChecksResult,
@@ -35,10 +36,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { cn } from '@/lib/cn';
 import { getDesktopWorkspaceBridge, openWorkspaceWebUrl } from '@/lib/desktop-workspace';
-import { buildProjectIdeHref } from '@/lib/project-navigation';
+import { openDesktopProjectIde } from '@/lib/desktop-projects';
 
 type ProjectGitHubPanelProps = Readonly<{
   projectId: string | null;
@@ -89,6 +97,51 @@ type GitPullRequestCreateState = Readonly<{
   repositoryUrl: string | null;
   reason?: string;
 }>;
+
+export function derivePullRequestBaseBranchOptions({
+  status,
+  branches,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  branches?: ProjectBranchListResult | null;
+}>): string[] {
+  const seen = new Set<string>();
+  const add = (branch: string | undefined) => {
+    const trimmed = branch?.trim();
+    if (!trimmed || trimmed === status.currentBranch || seen.has(trimmed)) return;
+    seen.add(trimmed);
+  };
+
+  add(status.baseBranch && status.baseBranch !== status.currentBranch ? status.baseBranch : 'main');
+  add('staging');
+  add('develop');
+  for (const branch of branches?.branches ?? []) {
+    add(branch.name);
+  }
+  return [...seen];
+}
+
+export function resolvePullRequestBaseBranchValue({
+  selectedBaseBranch,
+  fallbackBaseBranch,
+}: Readonly<{
+  selectedBaseBranch: string;
+  fallbackBaseBranch: string;
+}>): string {
+  return selectedBaseBranch.trim() || fallbackBaseBranch.trim();
+}
+
+export function recommendPullRequestBaseBranch({
+  fallbackBaseBranch,
+  options,
+}: Readonly<{
+  fallbackBaseBranch: string;
+  options: readonly string[];
+}>): string {
+  if (options.includes('staging')) return 'staging';
+  if (options.includes(fallbackBaseBranch)) return fallbackBaseBranch;
+  return options[0] ?? fallbackBaseBranch;
+}
 
 type RepositoryConnectionMode = 'create' | 'connect';
 
@@ -671,7 +724,7 @@ export function deriveGitPublishState({
         status.ahead === 1 ? 'is' : 'are'
       } ready to push.`,
       statusLabel: 'Ready to push',
-      actionLabel: `Push ${status.ahead}`,
+      actionLabel: 'Push',
       canPublish: true,
       canPull: false,
       canClearStaleUpstream: false,
@@ -865,7 +918,36 @@ function statusTone(file: ProjectGitChangedFile): string {
   return 'text-amber-700 bg-amber-50';
 }
 
+type DiffLineKind = 'added' | 'deleted' | 'hunk' | 'file' | 'context';
+
+function diffLineKind(line: string): DiffLineKind {
+  if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) {
+    return 'file';
+  }
+  if (line.startsWith('@@')) return 'hunk';
+  if (line.startsWith('+')) return 'added';
+  if (line.startsWith('-')) return 'deleted';
+  return 'context';
+}
+
+function diffLineClass(kind: DiffLineKind): string {
+  if (kind === 'added') return 'border-l-emerald-500 bg-emerald-950/35 text-emerald-100';
+  if (kind === 'deleted') return 'border-l-red-500 bg-red-950/35 text-red-100';
+  if (kind === 'hunk') return 'border-l-sky-500 bg-sky-950/45 text-sky-100';
+  if (kind === 'file') return 'border-l-slate-500 bg-slate-900 text-slate-200';
+  return 'border-l-transparent text-slate-300';
+}
+
+function diffPrefixClass(kind: DiffLineKind): string {
+  if (kind === 'added') return 'text-emerald-300';
+  if (kind === 'deleted') return 'text-red-300';
+  if (kind === 'hunk') return 'text-sky-300';
+  return 'text-slate-500';
+}
+
 function DiffPreview({ diff }: Readonly<{ diff: string }>) {
+  const lines = diff.split('\n');
+
   if (!diff.trim()) {
     return (
       <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
@@ -873,10 +955,47 @@ function DiffPreview({ diff }: Readonly<{ diff: string }>) {
       </div>
     );
   }
+
   return (
-    <pre className="max-h-[360px] overflow-auto rounded border border-border bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
-      <code>{diff}</code>
-    </pre>
+    <div className="overflow-hidden rounded-md border border-slate-800 bg-slate-950 shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/95 px-3 py-2">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+          Unified diff
+        </div>
+        <div className="text-[11px] text-slate-500">
+          {lines.length} line{lines.length === 1 ? '' : 's'}
+        </div>
+      </div>
+      <div
+        className="max-h-[430px] overflow-auto overscroll-contain"
+        data-testid="project-git-diff-preview"
+      >
+        <div className="min-w-max py-1 font-mono text-[11px] leading-5">
+          {lines.map((line, index) => {
+            const kind = diffLineKind(line);
+            const prefix = line[0] && ['+', '-', '@'].includes(line[0]) ? line[0] : ' ';
+            return (
+              <div
+                key={`${index}:${line}`}
+                className={cn(
+                  'grid grid-cols-[3rem_1.25rem_minmax(0,1fr)] border-l-2',
+                  diffLineClass(kind),
+                )}
+                data-diff-line-kind={kind}
+              >
+                <span className="select-none border-r border-slate-800/80 pr-2 text-right text-slate-600">
+                  {index + 1}
+                </span>
+                <span className={cn('select-none text-center', diffPrefixClass(kind))}>
+                  {prefix}
+                </span>
+                <code className="whitespace-pre pr-4">{line || ' '}</code>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1037,6 +1156,8 @@ export function ProjectGitHubPanel({
   const [checksProjectId, setChecksProjectId] = useState<string | null>(null);
   const [pullRequests, setPullRequests] = useState<ProjectGitPullRequestsResult | null>(null);
   const [pullRequestsProjectId, setPullRequestsProjectId] = useState<string | null>(null);
+  const [branches, setBranches] = useState<ProjectBranchListResult | null>(null);
+  const [branchesProjectId, setBranchesProjectId] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<ProjectGitConflictSummary | null>(null);
   const [conflictFile, setConflictFile] = useState<ProjectGitConflictFileResult | null>(null);
   const [selectedConflictPath, setSelectedConflictPath] = useState<string | null>(null);
@@ -1048,6 +1169,7 @@ export function ProjectGitHubPanel({
   const [changesLoading, setChangesLoading] = useState(false);
   const [checksLoading, setChecksLoading] = useState(false);
   const [pullRequestsLoading, setPullRequestsLoading] = useState(false);
+  const [branchesLoading, setBranchesLoading] = useState(false);
   const [conflictsLoading, setConflictsLoading] = useState(false);
   const [conflictFileLoading, setConflictFileLoading] = useState(false);
   const [diffLoading, setDiffLoading] = useState(false);
@@ -1059,8 +1181,10 @@ export function ProjectGitHubPanel({
   const [changesError, setChangesError] = useState<string | null>(null);
   const [checksError, setChecksError] = useState<string | null>(null);
   const [pullRequestsError, setPullRequestsError] = useState<string | null>(null);
+  const [branchesError, setBranchesError] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [pullRequestTitle, setPullRequestTitle] = useState('');
+  const [pullRequestBaseBranch, setPullRequestBaseBranch] = useState('');
   const [pullRequestBody, setPullRequestBody] = useState('');
   const [pullRequestSuccess, setPullRequestSuccess] = useState<string | null>(null);
   const [mergeCommitMessage, setMergeCommitMessage] = useState('Resolve merge conflicts');
@@ -1183,6 +1307,34 @@ export function ProjectGitHubPanel({
     }
   }, [projectId]);
 
+  const loadBranches = useCallback(async () => {
+    if (!projectId) {
+      setBranches(null);
+      setBranchesProjectId(null);
+      setBranchesError(null);
+      return;
+    }
+    setBranchesLoading(true);
+    try {
+      const next = await apiGet<ProjectBranchListResult>(apiPath('projects', projectId, 'branches'));
+      setBranches(next ?? null);
+      setBranchesProjectId(projectId);
+      setBranchesError(null);
+    } catch (cause) {
+      setBranches(null);
+      setBranchesProjectId(projectId);
+      if (cause instanceof ApiRequestError && cause.code === 'PROJECT_GIT_UNAVAILABLE') {
+        setBranchesError(null);
+      } else {
+        setBranchesError(
+          cause instanceof ApiRequestError ? cause.message : 'Branch information is unavailable.',
+        );
+      }
+    } finally {
+      setBranchesLoading(false);
+    }
+  }, [projectId]);
+
   const loadConflicts = useCallback(async () => {
     if (!projectId) {
       setConflicts(null);
@@ -1222,6 +1374,8 @@ export function ProjectGitHubPanel({
     setChecksProjectId(null);
     setPullRequests(null);
     setPullRequestsProjectId(null);
+    setBranches(null);
+    setBranchesProjectId(null);
     setConflicts(null);
     setConflictFile(null);
     setSelectedConflictPath(null);
@@ -1232,8 +1386,10 @@ export function ProjectGitHubPanel({
     setChangesError(null);
     setChecksError(null);
     setPullRequestsError(null);
+    setBranchesError(null);
     setConflictError(null);
     setPullRequestTitle('');
+    setPullRequestBaseBranch('');
     setPullRequestBody('');
     setPullRequestSuccess(null);
     setCommitSuccess(null);
@@ -1259,6 +1415,12 @@ export function ProjectGitHubPanel({
   useEffect(() => {
     if (activeTab === 'prs' || activeTab === 'overview') void loadPullRequests();
   }, [activeTab, loadPullRequests, refreshKey]);
+
+  useEffect(() => {
+    if (activeTab === 'prs') {
+      loadBranches().catch(() => undefined);
+    }
+  }, [activeTab, loadBranches, refreshKey]);
 
   useEffect(() => {
     if (conflictResolverOpen || currentStatusHasConflicts(status)) void loadConflicts();
@@ -1701,6 +1863,18 @@ export function ProjectGitHubPanel({
     await loadConflicts();
   }, [loadConflicts]);
 
+  const openProjectInSystemIde = useCallback(async () => {
+    if (!projectId) return;
+    const result = await openDesktopProjectIde(projectId);
+    if (!result) {
+      setError('Open in IDE is available in the desktop app when a Project folder is connected.');
+      return;
+    }
+    if (!result.handled) {
+      setError(result.reason);
+    }
+  }, [projectId]);
+
   const pullRemoteChanges = useCallback(async () => {
     if (!projectId) return;
     setActionPending('pull');
@@ -1807,6 +1981,7 @@ export function ProjectGitHubPanel({
   const currentChanges = changesProjectId === projectId ? changes : null;
   const currentChecks = checksProjectId === projectId ? checks : null;
   const currentPullRequests = pullRequestsProjectId === projectId ? pullRequests : null;
+  const currentBranches = branchesProjectId === projectId ? branches : null;
   const workflowOverview = deriveGitWorkflowOverview({
     status: currentStatus,
     pullRequests: currentPullRequests,
@@ -1823,6 +1998,26 @@ export function ProjectGitHubPanel({
     status: currentStatus,
     pullRequests: currentPullRequests,
   });
+  const pullRequestBaseBranchOptions = derivePullRequestBaseBranchOptions({
+    status: currentStatus,
+    branches: currentBranches,
+  });
+  const recommendedPullRequestBaseBranch = recommendPullRequestBaseBranch({
+    fallbackBaseBranch: pullRequestCreateState.baseBranch,
+    options: pullRequestBaseBranchOptions,
+  });
+  const effectivePullRequestBaseBranch = resolvePullRequestBaseBranchValue({
+    selectedBaseBranch: pullRequestBaseBranch,
+    fallbackBaseBranch: recommendedPullRequestBaseBranch,
+  });
+  const pullRequestTargetBranch =
+    effectivePullRequestBaseBranch || pullRequestCreateState.baseBranch;
+  const pullRequestBaseBranchHelperText = branchesLoading
+    ? 'Loading branch options...'
+    : (branchesError ??
+      `This will open a pull request from ${
+        currentStatus.currentBranch ?? 'this branch'
+      } into ${pullRequestTargetBranch}.`);
   const currentBranchPullRequest = pullRequestCreateState.currentPullRequest;
   const sortedPullRequests = currentPullRequests?.pullRequests
     ? [
@@ -1857,6 +2052,10 @@ export function ProjectGitHubPanel({
       setPullRequestsError('Enter a pull request title.');
       return;
     }
+    if (!effectivePullRequestBaseBranch) {
+      setPullRequestsError('Enter a base branch.');
+      return;
+    }
     setActionPending('create-pull-request');
     try {
       const result = await apiPost<ProjectGitCreatePullRequestResult>(
@@ -1864,7 +2063,7 @@ export function ProjectGitHubPanel({
         {
           title,
           body: pullRequestBody.trim() || undefined,
-          baseBranch: pullRequestCreateState.baseBranch,
+          baseBranch: effectivePullRequestBaseBranch,
           draft: false,
         },
       );
@@ -1894,11 +2093,11 @@ export function ProjectGitHubPanel({
       setActionPending(null);
     }
   }, [
+    effectivePullRequestBaseBranch,
     loadChecks,
     loadStatus,
     projectId,
     pullRequestBody,
-    pullRequestCreateState.baseBranch,
     pullRequestCreateState.defaultTitle,
     pullRequestTitle,
   ]);
@@ -1907,11 +2106,21 @@ export function ProjectGitHubPanel({
     if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestTitle) {
       setPullRequestTitle(pullRequestCreateState.defaultTitle);
     }
+    if (
+      activeTab === 'prs' &&
+      pullRequestCreateState.canCreate &&
+      (!pullRequestBaseBranch || pullRequestBaseBranch === pullRequestCreateState.baseBranch)
+    ) {
+      setPullRequestBaseBranch(recommendedPullRequestBaseBranch);
+    }
   }, [
     activeTab,
+    pullRequestBaseBranch,
+    pullRequestCreateState.baseBranch,
     pullRequestCreateState.canCreate,
     pullRequestCreateState.defaultTitle,
     pullRequestTitle,
+    recommendedPullRequestBaseBranch,
   ]);
 
   useEffect(() => {
@@ -2120,7 +2329,12 @@ export function ProjectGitHubPanel({
       )}
 
       {conflictResolverOpen && (
-        <div className="fixed inset-0 z-50 flex bg-background text-foreground">
+        <div
+          className="fixed inset-0 z-50 flex bg-background text-foreground"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Merge conflict resolver"
+        >
           <div className="flex w-72 shrink-0 flex-col border-r border-border bg-muted/20 p-4">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
@@ -2202,8 +2416,17 @@ export function ProjectGitHubPanel({
                 <div className="mb-2">
                   You can also open the project in your IDE if a file needs deeper edits.
                 </div>
-                <Button asChild type="button" size="sm" variant="outline" className="w-full">
-                  <a href={buildProjectIdeHref(projectId)}>Open in IDE</a>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  disabled={!projectId}
+                  onClick={() => {
+                    openProjectInSystemIde().catch(() => undefined);
+                  }}
+                >
+                  Open in IDE
                 </Button>
               </div>
             </div>
@@ -2501,7 +2724,7 @@ export function ProjectGitHubPanel({
                   onClick={() => setActiveTab(id)}
                 >
                   {label}
-                  {badge !== undefined && badge > 0 && (
+                  {id !== 'push' && badge !== undefined && badge > 0 && (
                     <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                       {badge}
                     </span>
@@ -2812,15 +3035,34 @@ export function ProjectGitHubPanel({
                   <GitCard title="Diff">
                     {selectedChange ? (
                       <div className="space-y-3">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <FileCode2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <div
-                            className="min-w-0 flex-1 truncate font-mono text-xs"
-                            title={selectedChange.path}
-                          >
-                            {selectedChange.path}
+                        <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+                          <div className="flex min-w-0 items-start gap-2">
+                            <FileCode2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0 flex-1">
+                              <div
+                                className="truncate font-mono text-xs font-medium"
+                                title={selectedChange.path}
+                              >
+                                {selectedChange.path}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                                  {selectedDiffMode}
+                                </Badge>
+                                {(selectedChange.additions !== undefined ||
+                                  selectedChange.deletions !== undefined) && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    <span className="font-medium text-emerald-700">
+                                      +{selectedChange.additions ?? 0}
+                                    </span>{' '}
+                                    <span className="font-medium text-red-700">
+                                      -{selectedChange.deletions ?? 0}
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <Badge variant="outline">{selectedDiffMode}</Badge>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {selectedChange.unstaged && (
@@ -3229,8 +3471,8 @@ export function ProjectGitHubPanel({
                               <div>
                                 <div className="font-medium">Create a pull request</div>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                  {currentStatus.currentBranch} is published. Open a pull request to
-                                  review checks and collaborate from this panel.
+                                  Choose the target branch before creating a pull request for{' '}
+                                  {currentStatus.currentBranch}.
                                 </p>
                               </div>
                               <div className="space-y-2">
@@ -3246,9 +3488,68 @@ export function ProjectGitHubPanel({
                               </div>
                               <div className="space-y-2">
                                 <label className="block text-xs font-medium text-muted-foreground">
+                                  Target branch
+                                </label>
+                                <Select
+                                  value={pullRequestBaseBranch}
+                                  onValueChange={setPullRequestBaseBranch}
+                                  disabled={actionPending !== null}
+                                >
+                                  <SelectTrigger
+                                    aria-label="Pull request target branch"
+                                    className="h-9"
+                                  >
+                                    <SelectValue placeholder="Select target branch" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {pullRequestBaseBranchOptions.map((branch) => (
+                                      <SelectItem key={branch} value={branch}>
+                                        {branch}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex min-w-0 items-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-2 py-2 text-xs">
+                                  <span className="min-w-0 truncate font-mono">
+                                    {currentStatus.currentBranch ?? 'this branch'}
+                                  </span>
+                                  <span className="text-muted-foreground">-&gt;</span>
+                                  <span className="min-w-0 truncate font-mono font-semibold">
+                                    {pullRequestTargetBranch}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {pullRequestBaseBranchOptions.map((branch) => (
+                                    <Button
+                                      key={branch}
+                                      type="button"
+                                      size="sm"
+                                      variant={
+                                        effectivePullRequestBaseBranch === branch
+                                          ? 'default'
+                                          : 'outline'
+                                      }
+                                      className="h-7 px-2 text-xs"
+                                      disabled={actionPending !== null}
+                                      onClick={() => setPullRequestBaseBranch(branch)}
+                                    >
+                                      {branch}
+                                    </Button>
+                                  ))}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {pullRequestBaseBranchHelperText}
+                                </p>
+                              </div>
+                              <div className="space-y-2">
+                                <label
+                                  htmlFor="project-pull-request-description"
+                                  className="block text-xs font-medium text-muted-foreground"
+                                >
                                   Description
                                 </label>
                                 <textarea
+                                  id="project-pull-request-description"
                                   value={pullRequestBody}
                                   onChange={(event) => setPullRequestBody(event.target.value)}
                                   disabled={actionPending !== null}

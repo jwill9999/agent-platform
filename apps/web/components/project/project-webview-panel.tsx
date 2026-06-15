@@ -62,6 +62,7 @@ export function ProjectWebViewPanel({
   const [bridgeAvailable, setBridgeAvailable] = useState(false);
   const dockedViewportRef = useRef<HTMLDivElement | null>(null);
   const overlayViewportRef = useRef<HTMLDivElement | null>(null);
+  const lastBoundsKeyRef = useRef<string | null>(null);
 
   const activeWebView = useMemo(
     () => webviews.find((webview) => webview.webviewId === activeId) ?? webviews[0] ?? null,
@@ -111,41 +112,61 @@ export function ProjectWebViewPanel({
     if (!bridge?.setWebViewBounds || !activeWebView) return;
     const element = viewMode === 'overlay' ? overlayViewportRef.current : dockedViewportRef.current;
     const rect = element?.getBoundingClientRect();
-    if (!rect || !open || activeWebView.status === 'closed') {
-      void bridge.setWebViewBounds({
-        webviewId: activeWebView.webviewId,
-        bounds: { x: 0, y: 0, width: 0, height: 0 },
-      });
-      return;
-    }
+    const nextBounds =
+      !rect || !open || activeWebView.status === 'closed'
+        ? { x: 0, y: 0, width: 0, height: 0 }
+        : {
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          };
+    const nextBoundsKey = `${activeWebView.webviewId}:${nextBounds.x}:${nextBounds.y}:${nextBounds.width}:${nextBounds.height}`;
+    if (lastBoundsKeyRef.current === nextBoundsKey) return;
+    lastBoundsKeyRef.current = nextBoundsKey;
     void bridge.setWebViewBounds({
       webviewId: activeWebView.webviewId,
-      bounds: {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-      },
+      bounds: nextBounds,
     });
   }, [activeWebView, open, viewMode]);
 
+  const resetBounds = useCallback(() => {
+    const bridge = getDesktopWorkspaceBridge();
+    if (!bridge?.setWebViewBounds || !activeWebView) return;
+    lastBoundsKeyRef.current = null;
+    void bridge.setWebViewBounds({
+      webviewId: activeWebView.webviewId,
+      bounds: { x: 0, y: 0, width: 0, height: 0 },
+    });
+  }, [activeWebView]);
+
   useEffect(() => {
+    lastBoundsKeyRef.current = null;
+  }, [activeWebView?.webviewId, viewMode]);
+
+  useEffect(() => {
+    if (!activeWebView) return undefined;
+
     updateBounds();
     const element = viewMode === 'overlay' ? overlayViewportRef.current : dockedViewportRef.current;
     const observer = element ? new ResizeObserver(updateBounds) : null;
+    let animationFrame = 0;
+    const syncBounds = () => {
+      updateBounds();
+      animationFrame = requestAnimationFrame(syncBounds);
+    };
+
+    animationFrame = requestAnimationFrame(syncBounds);
     if (element) observer?.observe(element);
     window.addEventListener('resize', updateBounds);
+
     return () => {
+      cancelAnimationFrame(animationFrame);
       observer?.disconnect();
       window.removeEventListener('resize', updateBounds);
-      if (activeWebView) {
-        void getDesktopWorkspaceBridge()?.setWebViewBounds?.({
-          webviewId: activeWebView.webviewId,
-          bounds: { x: 0, y: 0, width: 0, height: 0 },
-        });
-      }
+      resetBounds();
     };
-  }, [activeWebView, updateBounds, viewMode]);
+  }, [activeWebView, resetBounds, updateBounds, viewMode]);
 
   useEffect(() => {
     if (viewMode !== 'overlay') return undefined;
@@ -196,10 +217,10 @@ export function ProjectWebViewPanel({
     <>
       <aside
         className={cn(
-          'hidden h-full max-h-full min-h-0 shrink-0 overflow-hidden border-l border-border bg-background/95 lg:flex',
+          'hidden h-full max-h-full min-h-0 min-w-0 shrink-0 overflow-hidden border-l border-border bg-background/95 lg:flex',
           !open && 'w-12',
-          open && viewMode === 'wide' && 'w-[min(980px,70vw)] min-w-[640px]',
-          open && viewMode !== 'wide' && 'w-[min(640px,46vw)] min-w-[480px] max-w-[900px]',
+          open && viewMode === 'wide' && 'w-[clamp(520px,62vw,980px)]',
+          open && viewMode !== 'wide' && 'w-[clamp(360px,38vw,640px)] max-w-[900px]',
         )}
         aria-label="Workspace preview"
         data-testid="project-webview-panel"
@@ -309,34 +330,46 @@ function PreviewChrome({
             {activeWebView?.title ?? activeWebView?.url ?? webviewStatusLabel(activeWebView)}
           </div>
         </div>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8"
-          onClick={onWide}
-          title={viewMode === 'wide' ? 'Return to docked preview' : 'Use wide preview'}
-        >
-          {viewMode === 'wide' ? (
-            <Minimize2 className="h-4 w-4" />
-          ) : (
-            <Maximize2 className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8"
-          onClick={viewMode === 'overlay' ? onDock : onOverlay}
-          title={viewMode === 'overlay' ? 'Return to docked preview' : 'Focus preview'}
-        >
-          {viewMode === 'overlay' ? (
-            <Minimize2 className="h-4 w-4" />
-          ) : (
-            <Maximize2 className="h-4 w-4" />
-          )}
-        </Button>
+        <div className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-muted/30 p-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={viewMode === 'wide' ? 'secondary' : 'ghost'}
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={onWide}
+            title={
+              viewMode === 'wide'
+                ? 'Return preview to standard side width'
+                : 'Make the side preview wider'
+            }
+          >
+            {viewMode === 'wide' ? (
+              <Minimize2 className="h-3.5 w-3.5" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5" />
+            )}
+            Wide
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={viewMode === 'overlay' ? 'secondary' : 'ghost'}
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={viewMode === 'overlay' ? onDock : onOverlay}
+            title={
+              viewMode === 'overlay'
+                ? 'Return focused preview to the side panel'
+                : 'Open preview in a focused overlay'
+            }
+          >
+            {viewMode === 'overlay' ? (
+              <Minimize2 className="h-3.5 w-3.5" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5" />
+            )}
+            Focus
+          </Button>
+        </div>
         <Button
           type="button"
           size="icon"

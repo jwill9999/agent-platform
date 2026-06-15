@@ -23,8 +23,10 @@ function createFakeView(): DesktopWebViewView & {
     visibleStates,
     bounds,
     webContents: {
-      canGoBack: () => false,
-      canGoForward: () => false,
+      navigationHistory: {
+        canGoBack: () => false,
+        canGoForward: () => false,
+      },
       goBack: vi.fn(),
       goForward: vi.fn(),
       loadURL: (url: string) => {

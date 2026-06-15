@@ -62,6 +62,7 @@ test.describe('Electron Project Git workflow panel', () => {
       await expect(gitPanel.getByRole('button', { name: 'PRs' })).toHaveCount(0);
       await expect(gitPanel.getByRole('button', { name: 'Checks' })).toHaveCount(0);
 
+      writeFileSync(join(projectDir, 'README.md'), '# Workflow Project\n\nChanged in Git E2E\n');
       writeFileSync(join(projectDir, 'scratch.txt'), 'created during Git workflow e2e\n');
       await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
 
@@ -73,6 +74,15 @@ test.describe('Electron Project Git workflow panel', () => {
       await expect(gitPanel.getByRole('button', { name: 'Checks' })).toHaveCount(0);
 
       await gitPanel.getByRole('button', { name: /Changes/ }).click();
+      await gitPanel.getByRole('button', { name: /README\.md/ }).click();
+      const diffPreview = gitPanel.getByTestId('project-git-diff-preview');
+      await expect(diffPreview).toBeVisible({ timeout: 10_000 });
+      await expect(diffPreview.locator('[data-diff-line-kind="hunk"]')).toContainText('@@');
+      await expect(
+        diffPreview
+          .locator('[data-diff-line-kind="added"]')
+          .filter({ hasText: 'Changed in Git E2E' }),
+      ).toBeVisible();
       await gitPanel.getByRole('button', { name: 'Stage all' }).click();
       await expect(gitPanel.getByRole('button', { name: 'Continue to commit' })).toBeVisible({
         timeout: 10_000,
@@ -211,8 +221,9 @@ test.describe('Electron Project Git workflow panel', () => {
       await expect(page.getByRole('heading', { name: 'Resolve Merge Conflicts' })).toBeVisible({
         timeout: 15_000,
       });
+      const conflictResolver = page.getByRole('dialog', { name: 'Merge conflict resolver' });
       await expect(page.getByRole('button', { name: /README\.md/ })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Open in IDE' })).toBeVisible();
+      await expect(conflictResolver.getByRole('button', { name: 'Open in IDE' })).toBeVisible();
       await expect(page.getByText('Current local line', { exact: true })).toBeVisible();
       await expect(page.getByText('Incoming remote line', { exact: true })).toBeVisible();
 
@@ -225,11 +236,16 @@ test.describe('Electron Project Git workflow panel', () => {
       await expect(page.getByRole('heading', { name: 'Merge Conflicts Resolved' })).toHaveCount(0, {
         timeout: 15_000,
       });
-      await expect(gitPanel.getByRole('button', { name: /^Push\d*$/ })).toBeVisible({
+      await expect(gitPanel.getByText('Push local commits')).toBeVisible();
+      await expect(
+        gitPanel
+          .locator('section')
+          .filter({ hasText: 'Push local commits' })
+          .getByRole('button', { name: 'Push' }),
+      ).toBeVisible({
         timeout: 10_000,
       });
-      await expect(gitPanel.getByText('Push local commits')).toBeVisible();
-      await expect(gitPanel.getByRole('button', { name: 'Push 2' })).toBeVisible();
+      await expect(gitPanel.getByText('2 local commits are ready to push.')).toBeVisible();
     } finally {
       await app?.close();
       rmSync(tempRoot, { recursive: true, force: true });

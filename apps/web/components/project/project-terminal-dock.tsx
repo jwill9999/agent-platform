@@ -68,6 +68,8 @@ const TERMINAL_FONT_OPTIONS = [
   },
 ] as const;
 
+const DEFAULT_TERMINAL_FONT = TERMINAL_FONT_OPTIONS[1].value;
+
 function terminalStatusLabel(state: TerminalState): string {
   if (state === 'open') return 'Running';
   if (state === 'starting') return 'Starting';
@@ -87,7 +89,7 @@ export function ProjectTerminalDock({
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [height, setHeight] = useState(300);
-  const [terminalFont, setTerminalFont] = useState<string>(TERMINAL_FONT_OPTIONS[0].value);
+  const [terminalFont, setTerminalFont] = useState<string>(DEFAULT_TERMINAL_FONT);
   const tabCounterRef = useRef(0);
   const runtimesRef = useRef(new Map<string, TerminalRuntime>());
   const containersRef = useRef(new Map<string, HTMLDivElement>());

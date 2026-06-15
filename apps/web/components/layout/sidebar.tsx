@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   ProjectDesktopRecentProjectsResult,
   ProjectDesktopRecord,
@@ -48,6 +48,7 @@ import {
   recentProjectsUpdatedEvent,
   visibleRecentDesktopProjects,
   workspaceHomeRequestedEvent,
+  workspaceNavigationChangedEvent,
   workspaceModeSearchParam,
   workspaceNavigationItems,
   workspacePersonalChatRequestedEvent,
@@ -126,16 +127,39 @@ export function RecentProjectsNavSection({
 }: Readonly<{
   projects: readonly ProjectDesktopRecord[];
   isLoading: boolean;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
   onForgetProject?: (project: ProjectDesktopRecord) => void;
 }>) {
   const visibleProjects = visibleRecentDesktopProjects(projects);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isRefreshFeedbackVisible, setIsRefreshFeedbackVisible] = useState(false);
+  const refreshFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasOverflow = visibleProjects.length > COLLAPSED_RECENT_PROJECT_COUNT;
   const displayedProjects =
     hasOverflow && !isExpanded
       ? visibleProjects.slice(0, COLLAPSED_RECENT_PROJECT_COUNT)
       : visibleProjects;
+  const isRefreshing = isLoading || isRefreshFeedbackVisible;
+
+  useEffect(() => {
+    return () => {
+      if (refreshFeedbackTimeoutRef.current !== null) {
+        clearTimeout(refreshFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshFeedbackVisible(true);
+    if (refreshFeedbackTimeoutRef.current !== null) {
+      clearTimeout(refreshFeedbackTimeoutRef.current);
+    }
+    refreshFeedbackTimeoutRef.current = setTimeout(() => {
+      refreshFeedbackTimeoutRef.current = null;
+      setIsRefreshFeedbackVisible(false);
+    }, 650);
+    void onRefresh();
+  }, [onRefresh]);
 
   return (
     <section className="mt-5 border-t border-border pt-4" aria-label="Recent Projects">
@@ -143,17 +167,23 @@ export function RecentProjectsNavSection({
         <div className="truncate text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Recent Projects
         </div>
+        {isRefreshing && (
+          <span className="shrink-0 text-[11px] font-medium text-primary">Refreshing</span>
+        )}
         <Button
           type="button"
           size="icon"
           variant="ghost"
-          className="h-7 w-7 shrink-0"
-          aria-label="Refresh recent Projects"
-          title="Refresh recent Projects"
-          onClick={onRefresh}
-          disabled={isLoading}
+          className={cn(
+            'h-7 w-7 shrink-0',
+            isRefreshing && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
+          )}
+          aria-label={isRefreshing ? 'Refreshing recent Projects' : 'Refresh recent Projects'}
+          title={isRefreshing ? 'Refreshing recent Projects' : 'Refresh recent Projects'}
+          onClick={handleRefresh}
+          disabled={isRefreshing}
         >
-          <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} aria-hidden />
+          <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden />
         </Button>
       </div>
       {visibleProjects.length === 0 ? (
@@ -328,8 +358,10 @@ export function Sidebar() {
     };
     syncSearchString();
     globalThis.window.addEventListener('popstate', syncSearchString);
+    globalThis.window.addEventListener(workspaceNavigationChangedEvent, syncSearchString);
     return () => {
       globalThis.window.removeEventListener('popstate', syncSearchString);
+      globalThis.window.removeEventListener(workspaceNavigationChangedEvent, syncSearchString);
     };
   }, []);
 
@@ -396,6 +428,7 @@ export function Sidebar() {
                   );
                 }
               }}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group',
                 isActive

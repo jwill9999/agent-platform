@@ -54,6 +54,15 @@ export {
   type DesktopWebViewState,
   type DesktopWorkspaceOpenResult,
   type DesktopWorkspaceOpenExternalFallbackResult,
+  type DesktopSelectedProjectFolder,
+  type DesktopCreateProjectFolderRequest,
+  type DesktopOpenProjectIdeRequest,
+  type DesktopOpenProjectIdeResult,
+  type DesktopProjectFolderSelectionResult,
+  type DesktopTerminalCreateRequest,
+  type DesktopTerminalCreateResult,
+  type DesktopTerminalDataEvent,
+  type DesktopTerminalExitEvent,
 } from './workspaceResource.js';
 export {
   MessageRecordSchema,

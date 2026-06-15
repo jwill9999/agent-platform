@@ -1,4 +1,13 @@
 import type {
+  DesktopCreateProjectFolderRequest,
+  DesktopOpenProjectIdeRequest,
+  DesktopOpenProjectIdeResult,
+  DesktopProjectFolderSelectionResult,
+  DesktopSelectedProjectFolder,
+  DesktopTerminalCreateRequest,
+  DesktopTerminalCreateResult,
+  DesktopTerminalDataEvent,
+  DesktopTerminalExitEvent,
   ProjectDesktopRecentProjectsResult,
   ProjectDesktopRecord,
   ProjectDesktopRegistrationResult,
@@ -6,51 +15,17 @@ import type {
 } from '@agent-platform/contracts';
 import { apiGet, apiPath, apiPost } from '@/lib/apiClient';
 
-export interface DesktopSelectedProjectFolder {
-  readonly path: string;
-  readonly name: string;
-}
-
-export interface DesktopCreateProjectFolderRequest {
-  readonly name: string;
-}
-
-export type DesktopProjectFolderSelectionResult =
-  | { readonly canceled: true }
-  | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
-
 export interface DesktopProjectBridge {
   readonly projects?: {
     readonly createFolder?: (
       request: DesktopCreateProjectFolderRequest,
     ) => Promise<DesktopProjectFolderSelectionResult>;
+    readonly openInIde?: (
+      request: DesktopOpenProjectIdeRequest,
+    ) => Promise<DesktopOpenProjectIdeResult>;
     readonly selectFolder?: () => Promise<DesktopProjectFolderSelectionResult>;
   };
   readonly terminal?: DesktopTerminalBridge;
-}
-
-export interface DesktopTerminalCreateRequest {
-  readonly projectId?: string;
-  readonly cols: number;
-  readonly rows: number;
-}
-
-export interface DesktopTerminalCreateResult {
-  readonly terminalId: string;
-  readonly cwd: string;
-  readonly shell: string;
-  readonly pid: number;
-}
-
-export interface DesktopTerminalDataEvent {
-  readonly terminalId: string;
-  readonly data: string;
-}
-
-export interface DesktopTerminalExitEvent {
-  readonly terminalId: string;
-  readonly exitCode: number;
-  readonly signal?: number;
 }
 
 export interface DesktopTerminalBridge {
@@ -116,6 +91,14 @@ export async function createAndRegisterDesktopProject(
   const selection = await createFolder(request);
   if (selection.canceled) return null;
   return registerDesktopProject(selection.folder);
+}
+
+export async function openDesktopProjectIde(
+  projectId: string,
+): Promise<DesktopOpenProjectIdeResult | null> {
+  const openInIde = getDesktopProjectBridge()?.projects?.openInIde;
+  if (!openInIde) return null;
+  return openInIde({ projectId });
 }
 
 export async function loadRecentDesktopProjects(): Promise<ProjectDesktopRecord[]> {

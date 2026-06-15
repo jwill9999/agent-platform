@@ -1,5 +1,13 @@
 import type { Agent, ModelConfig } from '@agent-platform/contracts';
 
+export function isUsableModelConfig(config: ModelConfig): boolean {
+  return config.hasApiKey || config.provider === 'ollama';
+}
+
+export function usableModelConfigs(configList: readonly ModelConfig[]): ModelConfig[] {
+  return configList.filter(isUsableModelConfig);
+}
+
 export function resolveChatModelConfigId(
   agentId: string | null,
   agentList: readonly Agent[],
@@ -10,5 +18,5 @@ export function resolveChatModelConfigId(
   if (agentConfigId && configList.some((config) => config.id === agentConfigId)) {
     return agentConfigId;
   }
-  return null;
+  return configList.find(isUsableModelConfig)?.id ?? null;
 }

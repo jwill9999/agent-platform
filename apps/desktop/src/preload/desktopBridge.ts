@@ -1,4 +1,12 @@
 import type {
+  DesktopCreateProjectFolderRequest,
+  DesktopOpenProjectIdeRequest,
+  DesktopOpenProjectIdeResult,
+  DesktopProjectFolderSelectionResult,
+  DesktopTerminalCreateRequest,
+  DesktopTerminalCreateResult,
+  DesktopTerminalDataEvent,
+  DesktopTerminalExitEvent,
   DesktopWorkspaceOpenExternalFallbackResult,
   DesktopWorkspaceOpenResult,
   DesktopWorkspaceWebViewState,
@@ -6,6 +14,14 @@ import type {
 export type {
   DesktopWebViewPolicyTier,
   DesktopWebViewStatus,
+  DesktopCreateProjectFolderRequest,
+  DesktopOpenProjectIdeRequest,
+  DesktopOpenProjectIdeResult,
+  DesktopProjectFolderSelectionResult,
+  DesktopTerminalCreateRequest,
+  DesktopTerminalCreateResult,
+  DesktopTerminalDataEvent,
+  DesktopTerminalExitEvent,
   DesktopWorkspaceOpenExternalFallbackResult,
   DesktopWorkspaceOpenResult,
   DesktopWorkspaceWebViewState,
@@ -39,19 +55,6 @@ export interface DesktopRepairMacosVmRuntimeResult {
   readonly preservedProjectFolders: true;
 }
 
-export interface DesktopSelectedProjectFolder {
-  readonly path: string;
-  readonly name: string;
-}
-
-export interface DesktopCreateProjectFolderRequest {
-  readonly name: string;
-}
-
-export type DesktopProjectFolderSelectionResult =
-  | { readonly canceled: true }
-  | { readonly canceled: false; readonly folder: DesktopSelectedProjectFolder };
-
 export interface DesktopMaintenanceApi {
   readonly getResetLocalDataConfirmation: () => Promise<string>;
   readonly repairMacosVmRuntime: () => Promise<DesktopRepairMacosVmRuntimeResult>;
@@ -64,13 +67,10 @@ export interface DesktopProjectsApi {
   readonly createFolder: (
     request: DesktopCreateProjectFolderRequest,
   ) => Promise<DesktopProjectFolderSelectionResult>;
+  readonly openInIde: (
+    request: DesktopOpenProjectIdeRequest,
+  ) => Promise<DesktopOpenProjectIdeResult>;
   readonly selectFolder: () => Promise<DesktopProjectFolderSelectionResult>;
-}
-
-export interface DesktopTerminalCreateRequest {
-  readonly projectId?: string;
-  readonly cols: number;
-  readonly rows: number;
 }
 
 export interface DesktopTerminalInputRequest {
@@ -86,24 +86,6 @@ export interface DesktopTerminalResizeRequest {
 
 export interface DesktopTerminalDisposeRequest {
   readonly terminalId: string;
-}
-
-export interface DesktopTerminalCreateResult {
-  readonly terminalId: string;
-  readonly cwd: string;
-  readonly shell: string;
-  readonly pid: number;
-}
-
-export interface DesktopTerminalDataEvent {
-  readonly terminalId: string;
-  readonly data: string;
-}
-
-export interface DesktopTerminalExitEvent {
-  readonly terminalId: string;
-  readonly exitCode: number;
-  readonly signal?: number;
 }
 
 export type DesktopTerminalUnsubscribe = () => void;
@@ -199,6 +181,7 @@ export const resetLocalDataConfirmationIpcChannel =
 export const repairMacosVmRuntimeIpcChannel = 'agent-platform:repair-macos-vm-runtime';
 export const selectProjectFolderIpcChannel = 'agent-platform:select-project-folder';
 export const createProjectFolderIpcChannel = 'agent-platform:create-project-folder';
+export const openProjectIdeIpcChannel = 'agent-platform:project:open-ide';
 export const createTerminalIpcChannel = 'agent-platform:terminal:create';
 export const inputTerminalIpcChannel = 'agent-platform:terminal:input';
 export const resizeTerminalIpcChannel = 'agent-platform:terminal:resize';
@@ -234,6 +217,7 @@ export const desktopMaintenanceApiKeys = [
 
 export const desktopProjectsApiKeys = [
   'createFolder',
+  'openInIde',
   'selectFolder',
 ] as const satisfies readonly (keyof DesktopProjectsApi)[];
 
