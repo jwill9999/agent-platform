@@ -16,23 +16,24 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-15
-- **Session:** Made PR target branch selection explicit and defaulted staging when available.
-- **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
-- **Latest commit:** branch tip fixes PR base branch selection and WebView navigationHistory usage.
+- **Session:** Synced staging after Electron stabilisation merge and recorded owner QA sign-off.
+- **Branch:** `staging`
+- **Latest commit:** `ba0be9b` merged `jwill9999/electron-stabilisation-e2e-backfill` to staging.
 
 ## Current State
 
-- Electron stabilisation remains gated by `.12`, which is blocked on owner manual sign-off `.18`.
+- Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15.
+- `.18` is closed: owner manual QA sign-off is recorded after automation backfill.
+- `.12` is ready to close: blockers are resolved/deferred, manual QA passed, and the staging merge
+  recommendation has been executed.
 - `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
 - `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
   sizes.
 - `.20` is open as a non-blocking follow-up to define the broader E2E expectation matrix across
   Workspaces, Project Chat/Coding, Personal Chat, secondary file view, and future specialized
   workflows.
-- `.18` is open for owner manual QA sign-off. It should use
-  `docs/qa/electron-stabilisation-automation-matrix.md` to reduce manual scope to native/subjective
-  checks and any automation ambiguity.
-- `.12` should remain blocked until `.18` records owner sign-off and any findings are classified.
+- Production macOS release remains blocked by `agent-platform-macos-production-sandbox.6.3`, which
+  still requires real Developer ID signing and Apple notarization evidence.
 - Terminal dock now defaults to `MesloLGS NF`; users can still choose the other terminal fonts from
   the toolbar.
 - `.21` is closed: the Workspace Preview native WebView bounds regression shown when the Git/GitHub
@@ -160,6 +161,9 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   duplicated new code.
 - Moved shared desktop bridge DTO types into contracts so preload and web helpers stop duplicating
   project-folder, IDE handoff, and terminal event type definitions.
+- Merged `jwill9999/electron-stabilisation-e2e-backfill` to `staging` as `ba0be9b`; staging CI/CD
+  was green per owner report.
+- Closed `agent-platform-electron-stabilisation.18` after owner manual testing passed.
 
 ## Checks Run
 
@@ -214,7 +218,9 @@ the documented fallback checks above.
 
 ## Next
 
-1. Owner runs/signs off `agent-platform-electron-stabilisation.18`.
-2. Close `.12` only after `.18` sign-off and finding classification.
-3. Manually verify PR creation from the desktop Git/GitHub panel against the desired staging base
-   branch before relying on the workflow in staging.
+1. Close `agent-platform-electron-stabilisation.12` now that owner QA and staging merge are recorded.
+2. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
+   Electron stabilisation epic.
+3. Start `agent-platform-project-experience.1` from the `staging` baseline.
+4. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
+   signed/notarized artifact evidence.

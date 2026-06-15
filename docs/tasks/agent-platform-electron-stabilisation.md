@@ -48,13 +48,16 @@ primary Project workflow.
 
 ## Closeout Status
 
-As of 2026-05-13, stabilisation implementation tasks `.6` through `.10` are merged into
-`feature/agent-platform-electron-stabilisation`; `.11` and `.5` document the follow-up design and
-coverage plan. The remaining gate is owner manual QA against the latest feature branch.
+As of 2026-06-15, the Electron stabilisation implementation work and automation backfill have merged
+to `staging` through `jwill9999/electron-stabilisation-e2e-backfill`. Owner manual testing passed,
+and the staging request CI/CD checks were green.
 
-The feature branch should not be promoted to `main` for release until the owner reruns or signs off
-`docs/qa/electron-project-experience-manual-qa.md`. Follow-on Project Experience work can use the
-documented chat-first direction, but release/main promotion remains gated on that manual QA result.
+The stabilisation closeout gate is satisfied for staging/integration. Follow-on Project Experience
+work can use the documented chat-first direction from the staging baseline.
+
+Production macOS release promotion remains blocked by the separate pre-production VM signing and
+notarization gate `agent-platform-macos-production-sandbox.6.3`. The broader workflow expectation
+matrix `agent-platform-electron-stabilisation.20` remains a non-blocking automation follow-up.
 
 ## Parallel Worktree Strategy
 

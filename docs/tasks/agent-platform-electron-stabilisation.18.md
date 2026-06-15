@@ -18,6 +18,16 @@ been automated.
 - Classify every finding as blocker, follow-up, known limitation, or decision.
 - Feed blocker/follow-up findings back into Beads.
 
+## Sign-off Evidence
+
+Owner manual testing passed on 2026-06-15 after the Electron stabilisation automation backfill and
+the `jwill9999/electron-stabilisation-e2e-backfill` staging PR checks were green.
+
+No new blocker findings were reported during this sign-off. Remaining known follow-ups stay tracked
+in Beads, including the broader non-blocking workflow expectation matrix task
+`agent-platform-electron-stabilisation.20` and the pre-production macOS VM signing/notarization gate
+`agent-platform-macos-production-sandbox.6.3`.
+
 ## Implementation Plan
 
 1. Run the automated Electron E2E gate from `.17`.
