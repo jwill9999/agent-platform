@@ -36,6 +36,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { apiGet, apiPath, apiPost, ApiRequestError } from '@/lib/apiClient';
 import { cn } from '@/lib/cn';
 import { getDesktopWorkspaceBridge, openWorkspaceWebUrl } from '@/lib/desktop-workspace';
@@ -122,6 +129,18 @@ export function resolvePullRequestBaseBranchValue({
   fallbackBaseBranch: string;
 }>): string {
   return selectedBaseBranch.trim() || fallbackBaseBranch.trim();
+}
+
+export function recommendPullRequestBaseBranch({
+  fallbackBaseBranch,
+  options,
+}: Readonly<{
+  fallbackBaseBranch: string;
+  options: readonly string[];
+}>): string {
+  if (options.includes('staging')) return 'staging';
+  if (options.includes(fallbackBaseBranch)) return fallbackBaseBranch;
+  return options[0] ?? fallbackBaseBranch;
 }
 
 type RepositoryConnectionMode = 'create' | 'connect';
@@ -1981,9 +2000,13 @@ export function ProjectGitHubPanel({
     status: currentStatus,
     branches: currentBranches,
   });
+  const recommendedPullRequestBaseBranch = recommendPullRequestBaseBranch({
+    fallbackBaseBranch: pullRequestCreateState.baseBranch,
+    options: pullRequestBaseBranchOptions,
+  });
   const effectivePullRequestBaseBranch = resolvePullRequestBaseBranchValue({
     selectedBaseBranch: pullRequestBaseBranch,
-    fallbackBaseBranch: pullRequestCreateState.baseBranch,
+    fallbackBaseBranch: recommendedPullRequestBaseBranch,
   });
   const currentBranchPullRequest = pullRequestCreateState.currentPullRequest;
   const sortedPullRequests = currentPullRequests?.pullRequests
@@ -2073,8 +2096,12 @@ export function ProjectGitHubPanel({
     if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestTitle) {
       setPullRequestTitle(pullRequestCreateState.defaultTitle);
     }
-    if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestBaseBranch) {
-      setPullRequestBaseBranch(pullRequestCreateState.baseBranch);
+    if (
+      activeTab === 'prs' &&
+      pullRequestCreateState.canCreate &&
+      (!pullRequestBaseBranch || pullRequestBaseBranch === pullRequestCreateState.baseBranch)
+    ) {
+      setPullRequestBaseBranch(recommendedPullRequestBaseBranch);
     }
   }, [
     activeTab,
@@ -2083,6 +2110,7 @@ export function ProjectGitHubPanel({
     pullRequestCreateState.canCreate,
     pullRequestCreateState.defaultTitle,
     pullRequestTitle,
+    recommendedPullRequestBaseBranch,
   ]);
 
   useEffect(() => {
@@ -3433,8 +3461,8 @@ export function ProjectGitHubPanel({
                               <div>
                                 <div className="font-medium">Create a pull request</div>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                  {currentStatus.currentBranch} is published. Open a pull request to
-                                  review checks and collaborate from this panel.
+                                  Choose the target branch before creating a pull request for{' '}
+                                  {currentStatus.currentBranch}.
                                 </p>
                               </div>
                               <div className="space-y-2">
@@ -3450,28 +3478,62 @@ export function ProjectGitHubPanel({
                               </div>
                               <div className="space-y-2">
                                 <label className="block text-xs font-medium text-muted-foreground">
-                                  Base branch
+                                  Target branch
                                 </label>
-                                <Input
-                                  list="project-pr-base-branches"
+                                <Select
                                   value={pullRequestBaseBranch}
-                                  onChange={(event) =>
-                                    setPullRequestBaseBranch(event.target.value)
-                                  }
-                                  placeholder={pullRequestCreateState.baseBranch}
+                                  onValueChange={setPullRequestBaseBranch}
                                   disabled={actionPending !== null}
-                                />
-                                <datalist id="project-pr-base-branches">
+                                >
+                                  <SelectTrigger
+                                    aria-label="Pull request target branch"
+                                    className="h-9"
+                                  >
+                                    <SelectValue placeholder="Select target branch" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {pullRequestBaseBranchOptions.map((branch) => (
+                                      <SelectItem key={branch} value={branch}>
+                                        {branch}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex min-w-0 items-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-2 py-2 text-xs">
+                                  <span className="min-w-0 truncate font-mono">
+                                    {currentStatus.currentBranch ?? 'this branch'}
+                                  </span>
+                                  <span className="text-muted-foreground">-&gt;</span>
+                                  <span className="min-w-0 truncate font-mono font-semibold">
+                                    {effectivePullRequestBaseBranch ||
+                                      pullRequestCreateState.baseBranch}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
                                   {pullRequestBaseBranchOptions.map((branch) => (
-                                    <option key={branch} value={branch} />
+                                    <Button
+                                      key={branch}
+                                      type="button"
+                                      size="sm"
+                                      variant={
+                                        effectivePullRequestBaseBranch === branch
+                                          ? 'default'
+                                          : 'outline'
+                                      }
+                                      className="h-7 px-2 text-xs"
+                                      disabled={actionPending !== null}
+                                      onClick={() => setPullRequestBaseBranch(branch)}
+                                    >
+                                      {branch}
+                                    </Button>
                                   ))}
-                                </datalist>
+                                </div>
                                 <p className="text-[11px] text-muted-foreground">
                                   {branchesLoading
                                     ? 'Loading branch options...'
                                     : branchesError
                                       ? branchesError
-                                      : `Merges ${
+                                      : `This will open a pull request from ${
                                           currentStatus.currentBranch ?? 'this branch'
                                         } into ${
                                           effectivePullRequestBaseBranch ||

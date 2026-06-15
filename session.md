@@ -15,8 +15,8 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-14
-- **Session:** Added PR base branch selection and cleared Electron WebView navigation deprecations.
+- **Date:** 2026-06-15
+- **Session:** Made PR target branch selection explicit and defaulted staging when available.
 - **Branch:** `jwill9999/electron-stabilisation-e2e-backfill`
 - **Latest commit:** branch tip fixes PR base branch selection and WebView navigationHistory usage.
 
@@ -54,6 +54,8 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - `agent-platform-288` is closed: the PR creation panel now lets users choose the base branch, and
   Electron WebView navigation state uses `webContents.navigationHistory` instead of deprecated
   `canGoBack`/`canGoForward`.
+- `agent-platform-289` is closed: PR creation now has an explicit target branch selector, visible
+  quick choices, `source -> target` copy, and recommends `staging` when that branch exists.
 
 ## Recent Work
 
@@ -141,6 +143,12 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - Updated PR creation tests so the fake GitHub CLI fails unless `--base staging` is passed.
 - Replaced Electron WebView `webContents.canGoBack()` / `canGoForward()` calls with
   `webContents.navigationHistory.canGoBack()` / `canGoForward()` and updated tests.
+- Added `agent-platform-289` after manual testing showed the base branch field was still too
+  subtle and appeared to create `branch -> main` PRs.
+- Replaced the PR target input with an explicit dropdown plus quick branch buttons and visible
+  `current branch -> selected target` copy.
+- Added `recommendPullRequestBaseBranch` so `staging` is the recommended PR target when available,
+  while `main`, `develop`, and detected branches remain selectable.
 
 ## Checks Run
 
@@ -162,6 +170,8 @@ model` CTA; exactly one usable model config becomes the default; multiple config
 - `pnpm --filter @agent-platform/web test -- test/project-git-workflow-overview.test.ts`
 - `pnpm --filter @agent-platform/api test -- test/projectsRouter.test.ts`
 - `pnpm --filter @agent-platform/desktop test -- test/webviewService.test.ts`
+- `pnpm --filter @agent-platform/web typecheck`
+- `pnpm --filter @agent-platform/web lint`
 - `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts test/default-agent.test.ts`
 - `pnpm --filter @agent-platform/web test -- test/modelSelection.test.ts`
 - `pnpm --filter @agent-platform/api lint`

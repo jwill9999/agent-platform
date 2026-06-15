@@ -13,6 +13,7 @@ import {
   deriveGitWorkflowOverview,
   deriveGitWorkflowTabs,
   derivePullRequestBaseBranchOptions,
+  recommendPullRequestBaseBranch,
   resolveGitWorkflowActiveTab,
   resolvePullRequestBaseBranchValue,
   shouldRenderGitStatusLoader,
@@ -662,6 +663,22 @@ describe('deriveGitPullRequestCreateState', () => {
       resolvePullRequestBaseBranchValue({
         selectedBaseBranch: ' ',
         fallbackBaseBranch: 'main',
+      }),
+    ).toBe('main');
+  });
+
+  it('recommends staging as the pull request target when available', () => {
+    expect(
+      recommendPullRequestBaseBranch({
+        fallbackBaseBranch: 'main',
+        options: ['main', 'staging', 'develop'],
+      }),
+    ).toBe('staging');
+
+    expect(
+      recommendPullRequestBaseBranch({
+        fallbackBaseBranch: 'main',
+        options: ['main', 'develop'],
       }),
     ).toBe('main');
   });
