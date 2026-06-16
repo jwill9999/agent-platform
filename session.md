@@ -16,14 +16,15 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-16
-- **Session:** Moved the workflow E2E matrix to a pre-production automation gate.
-- **Branch:** `staging`
-- **Latest commit:** current `origin/staging` includes the post-merge handoff update.
+- **Session:** Refined Project Experience Workspaces plan and addressed Sourcery docs feedback.
+- **Branch:** `jwill9999/pre-production-automation-gate` -> PR #235 to `staging`
+- **Latest commit:** `8428ba1` fixes Sourcery terminology feedback in the workflow matrix task.
 
 ## Current State
 
-- `staging` is synced with `origin/staging` after the Electron sign-off, Project Experience
-  re-baseline, and post-merge handoff update.
+- PR #235 is open from `jwill9999/pre-production-automation-gate` to `staging`; wait for GitHub
+  Actions to go green before merging.
+- `staging` was synced with `origin/staging` before the PR #235 docs/tracker follow-up branch.
 - Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15 and
   `agent-platform-electron-stabilisation.12` is closed.
 - PR #231's desktop E2E flake is resolved on `staging`: Project access E2E now selects Active agent
@@ -179,6 +180,8 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   Coding Project owns new/open folder flows, branch/Git/GitHub, terminal, previews, activity, and
   external/default IDE handoff. Automation, scheduled-task, email/application, docs/research, and
   generated-app workspaces are deferred until their own product decisions and epics.
+- Addressed Sourcery docs feedback in `agent-platform-electron-stabilisation.20` by changing
+  `user-case` to `use-case`.
 
 ## Checks Run
 
