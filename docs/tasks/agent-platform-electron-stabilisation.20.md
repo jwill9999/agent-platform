@@ -2,12 +2,15 @@
 
 **Beads issue:** `agent-platform-electron-stabilisation.20`  
 **Spec file:** `docs/tasks/agent-platform-electron-stabilisation.20.md`
+**Parent epic:** `agent-platform-pre-production-automation` — pre-production automation and release
+test gates
 
 ## Summary
 
-Define a durable E2E expectation matrix for each desktop workspace/workflow surface. Coding/Project
-Chat remains the primary desktop use case and should keep the deepest automated coverage. Generalized
-chat and future user-case workflows should gain E2E coverage as their epics mature.
+Define a durable E2E expectation matrix for each desktop workspace/workflow surface before
+production release promotion. Coding/Project Chat remains the primary desktop use case and should
+keep the deepest automated coverage. Generalized chat and future user-case workflows should gain E2E
+coverage as their epics mature.
 
 ## Requirements
 
@@ -20,8 +23,9 @@ chat and future user-case workflows should gain E2E coverage as their epics matu
   every mode.
 - Preserve the current priority: Coding/Project Chat is the primary desktop workflow and should be
   the most heavily tested.
-- Mark generalized chat and future user-case workflows as expansion points for later epics, not
-  blockers for the current stabilisation closeout.
+- Mark generalized chat and future user-case workflows as expansion points for later epics.
+- Keep this as a pre-production release gate, not a blocker for Electron stabilisation closeout,
+  Project Experience development, or staging merges.
 - For each surface, define expected:
   - visible controls;
   - hidden or unavailable panels;
@@ -59,7 +63,8 @@ chat and future user-case workflows should gain E2E coverage as their epics matu
 
 ## Definition Of Done
 
-- The expectation matrix exists and is linked from the automation/manual QA documentation.
+- The expectation matrix exists and is linked from the automation/manual QA documentation before
+  production release promotion.
 - Coding/Project Chat is explicitly identified as the deepest E2E coverage priority.
-- Non-coding/generalized workflows have clear future expansion expectations without blocking current
-  stabilisation closeout.
+- Non-coding/generalized workflows have clear future expansion expectations without blocking
+  Electron stabilisation closeout, Project Experience development, or staging merges.

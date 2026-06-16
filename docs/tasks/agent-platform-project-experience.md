@@ -101,9 +101,10 @@ The remaining Product work is now:
 6. add a staged E2E gate that tests the coding workflow deeply first and expands as other profiles
    become real product surfaces.
 
-`agent-platform-electron-stabilisation.20` should feed the coding-workflow matrix into `.6`. Broader
-workspace matrices for future specialized profiles should move to a later automation/testing epic
-instead of blocking this epic.
+`agent-platform-electron-stabilisation.20` now lives under
+`agent-platform-pre-production-automation` and should feed the coding-workflow matrix into `.6`.
+Broader workspace matrices for future specialized profiles should stay out of this epic unless they
+are needed for a specific Project Experience acceptance path.
 
 Production macOS release readiness remains separate. Do not block this epic on
 `agent-platform-macos-production-sandbox.6.3`, but do not promote a production macOS release until

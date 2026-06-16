@@ -15,8 +15,8 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-15
-- **Session:** Synced `staging` after Electron sign-off and Project Experience re-baseline merges.
+- **Date:** 2026-06-16
+- **Session:** Moved the workflow E2E matrix to a pre-production automation gate.
 - **Branch:** `staging`
 - **Latest commit:** current `origin/staging` includes the post-merge handoff update.
 
@@ -36,9 +36,8 @@ and actionable.
 - `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
 - `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
   sizes.
-- `.20` is open as a non-blocking follow-up to define the broader E2E expectation matrix across
-  Workspaces, Project Chat/Coding, Personal Chat, secondary file view, and future specialized
-  workflows.
+- `.20` has moved to `agent-platform-pre-production-automation` as a production-release gate for
+  the broader E2E workflow expectation matrix.
 - Production macOS release remains blocked by `agent-platform-macos-production-sandbox.6.3`, which
   still requires real Developer ID signing and Apple notarization evidence.
 - Terminal dock now defaults to `MesloLGS NF`; users can still choose the other terminal fonts from
@@ -232,7 +231,6 @@ the documented fallback checks above.
 ## Next
 
 1. Start `agent-platform-project-experience.1` from the accepted re-baselined `staging` plan.
-2. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
-   Electron stabilisation epic.
-3. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
+2. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
    signed/notarized artifact evidence.
+3. Complete `agent-platform-pre-production-automation` before promoting any production release.

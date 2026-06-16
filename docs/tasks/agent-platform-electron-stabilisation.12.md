@@ -111,8 +111,8 @@ Owner manual QA passed on 2026-06-15 after the automation backfill and staging P
 The sign-off is recorded in `agent-platform-electron-stabilisation.18`.
 
 No new blocker findings were reported during this sign-off. Remaining known follow-ups are already
-tracked in Beads, including the non-blocking workflow expectation matrix
-`agent-platform-electron-stabilisation.20`.
+tracked in Beads. The workflow expectation matrix `agent-platform-electron-stabilisation.20` has
+moved to the pre-production automation epic as a production-release gate.
 
 Recommended state:
 
