@@ -7,15 +7,15 @@ The Beads issue **description** must begin with: `Spec: docs/tasks/agent-platfor
 
 ## Objective
 
-Turn Project into a clear, generic work context that users can reopen, chat with, run commands
-against, preview generated outputs from, and optionally hand off to their local/default IDE without
-being forced into coding or runtime implementation details.
+Turn Workspaces into a clear entry point for two current product surfaces: a general Chat workspace
+for assistant/tooling work, and Coding Projects that users can create or reopen with branch, Git,
+terminal, preview, and local/default IDE handoff support.
 
 This epic follows `agent-platform-project-onboarding`. The onboarding epic may remain focused on
-`AGENTS.md` and coding-capable Projects, while this epic implements the broader Project product
-experience: profile-aware Projects, chat-first entry, left-side navigation, recent/reopen Projects,
-branch selection, terminal access, preview rendering, external/default IDE handoff, breadcrumbs, and
-user-facing labels.
+`AGENTS.md` and coding-capable Projects, while this epic implements the broader Workspaces product
+experience: chat-first entry, a simplified Workspaces screen, left-side navigation, recent/reopen
+Projects, branch selection, terminal access, preview rendering, external/default IDE handoff,
+breadcrumbs, and user-facing labels.
 
 ## Desktop Re-scope Status
 
@@ -52,9 +52,17 @@ For desktop Product work:
 
 ## Product Decisions
 
-- Project means a folder/work context. It may be a code repository, docs/content folder, research
-  folder, automation workspace, generated app, or mixed files.
-- The coding agent is a Project profile/tooling choice, not the definition of Project.
+- Chat is the general non-Project workspace. It should support assistant conversation, model
+  selection, and general tooling/app context without exposing branch, Git, terminal, or Project
+  folder controls.
+- Coding Project is the current Project workspace. It represents a folder/repository with branch,
+  Git/GitHub, terminal, preview, activity, and external/default IDE handoff capabilities.
+- Workspaces should collapse the current `New Project` and `Open Project` cards into one Coding
+  Project entry with two explicit actions: create a new coding project or open an existing folder.
+- Project profile/capability metadata should remain extensible, but docs/content, research,
+  automation, scheduled-task, and email/application workflow surfaces are deferred until their own
+  product decisions and epics make them real user-facing workspaces.
+- The coding agent is a Project profile/tooling choice, not the definition of all assistant work.
 - Backend Project architecture should separate Project identity/folder binding from profile
   detection, capability policy, chat/session state, scheduled work, and generated artifacts.
 - Opening a Project should land in project-scoped chat by default.
@@ -70,8 +78,8 @@ For desktop Product work:
   CI, review comments, and approvals in user-facing language.
 - Primary navigation belongs in the left explorer: top-level app routes, recent/reopen Projects, and
   recent Chats/Sessions.
-- Workspaces should support creating a new Project, opening an existing folder, and importing a
-  Project from previous Chat artifacts when available.
+- Workspaces should initially expose Chat and Coding Project. Importing a Project from Chat
+  artifacts can be added later when generated-app/document workflows are productized.
 - User-facing copy should show Project name, folder/relevant relative path, profile/status, and
   branch only where useful. Runtime details such as `/workspace`, backend root, repository root, and
   backend accessibility are technical details.
@@ -93,7 +101,8 @@ rebuild them:
 
 The remaining Product work is now:
 
-1. define a generic profile/capability model that can drive workspace expectations;
+1. define a near-term workspace/profile/capability model that can drive Chat and Coding Project
+   expectations while preserving future extensibility;
 2. audit and finish Workspaces/sidebar navigation around current behavior;
 3. polish and verify external/default IDE handoff instead of building an IDE;
 4. clean remaining labels/location context;
@@ -114,15 +123,16 @@ that signing/notarization gate is closed.
 
 In scope:
 
-- Project profile/capability model for coding, docs/content, research, automation, mixed, and
-  unknown Projects.
+- Workspace/profile/capability model for Chat and Coding Projects, with extension points for future
+  docs/content, research, automation, scheduled-task, and mixed workspaces that are not product
+  visible yet.
 - Clear backend boundaries between Project records, capability/tool policy, Project sessions,
   scheduled jobs, and generated artifacts.
 - Left explorer navigation for Projects and Chats/Sessions.
 - Recent/reopen Project list backed by existing Project records and metadata.
 - Open/New Project flow from the explorer.
-- New Project creation from Workspaces, including Start from scratch, Use existing folder, and
-  Import from Chat where available.
+- Coding Project creation/opening from Workspaces, with `New project` and `Open folder` actions
+  grouped under one Coding Project entry.
 - Native desktop Project selection and reopen semantics are implemented in the Electron Project
   access epic; this epic consumes that backend-bound Project model.
 - Project-scoped chat as the default Project surface.
@@ -146,15 +156,18 @@ Out of scope:
 - Full embedded IDE implementation or further investment in the built-in IDE as a primary product
   surface.
 - Multi-user permissions or remote checkout management.
-- Scheduled task/cron runtime implementation beyond representing automation as a Project profile.
+- Scheduled task/cron, email workflow, MCP application workflow, and broader automation workspace
+  implementation.
+- User-facing docs/content, research, generated-app, or automation workspace cards before their
+  product definitions are agreed.
 
 ## Proposed Task Chain
 
 | Task                                   | Re-baselined purpose                                 | Status         |
 | -------------------------------------- | ---------------------------------------------------- | -------------- |
 | `agent-platform-project-experience.14` | Re-baseline the epic after Electron stabilisation    | Current task   |
-| `agent-platform-project-experience.1`  | Define Project profiles and capability metadata      | Next task      |
-| `agent-platform-project-experience.2`  | Audit/finish Workspaces and sidebar navigation       | Refine         |
+| `agent-platform-project-experience.1`  | Define Chat/Coding Project capability metadata       | Next task      |
+| `agent-platform-project-experience.2`  | Simplify Workspaces and sidebar navigation           | Refine         |
 | `agent-platform-project-experience.4`  | Polish/verify external/default IDE handoff           | Refine         |
 | `agent-platform-project-experience.5`  | Clean labels and location context                    | Refine         |
 | `agent-platform-project-experience.7`  | Render generated outputs from Project Chat/activity  | Still relevant |
@@ -171,8 +184,8 @@ Out of scope:
 
 After the re-baseline task:
 
-- Start with `agent-platform-project-experience.1`; it defines the profile/capability vocabulary
-  used by navigation, preview, activity, and E2E expectations.
+- Start with `agent-platform-project-experience.1`; it defines the Chat/Coding Project capability
+  vocabulary used by navigation, preview, activity, and E2E expectations.
 - Run `agent-platform-project-experience.2`, `.4`, and `.5` as a small UX/navigation cleanup slice
   after `.1`; these tasks should mostly audit and polish existing staging behavior.
 - Run `agent-platform-project-experience.7` and `.8` after the profile/capability boundary is clear.
@@ -197,12 +210,12 @@ Each child task must include concrete local and remote verification:
 
 ## Epic Definition Of Done
 
-- [ ] Project records can represent generic folder/work contexts with profile/capability metadata.
-- [ ] Users can see Projects and Chats/Sessions in Workspaces/sidebar navigation without scattered
+- [ ] Workspace/profile contracts distinguish general Chat from Coding Project capabilities.
+- [ ] Users can see Chat and Coding Projects in Workspaces/sidebar navigation without scattered
       CTAs.
 - [x] Users can reopen previous Projects from stored metadata.
 - [x] Users can create a new Project folder from Workspaces without typing an absolute path.
-- [x] Users can distinguish Start from scratch, Use existing folder, and Import from Chat flows.
+- [ ] Users can access New project and Open folder from one Coding Project entry.
 - [x] Projects with the same folder name are distinguishable through short user-facing parent-path
       labels such as `~/projects/agent-platform` and `~/work/client-a/agent-platform`.
 - [x] Project Chat restores the last active Project-scoped session, while Personal Chat sessions

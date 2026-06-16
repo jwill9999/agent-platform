@@ -1,24 +1,31 @@
-# Task: Audit and finish Workspaces/sidebar Project and Chat navigation
+# Task: Simplify Workspaces/sidebar Chat and Coding Project navigation
 
 **Beads issue:** `agent-platform-project-experience.2`  
 **Spec file:** `docs/tasks/agent-platform-project-experience.2.md`
 
 ## Summary
 
-Audit the current Workspaces/sidebar navigation after Electron stabilisation and finish any remaining
-gaps so users can clearly distinguish Projects from Personal Chat, reopen Projects, and start/open
-Project flows without scattered calls to action.
+Audit the current Workspaces/sidebar navigation after Electron stabilisation and simplify the visible
+choices to general Chat plus one Coding Project entry that offers both New project and Open folder
+actions.
 
 ## Requirements
 
 - Preserve the current left navigation structure where it is working; do not rebuild navigation for
   its own sake.
-- Workspaces/sidebar should clearly distinguish Projects from Personal Chat.
+- Workspaces/sidebar should clearly distinguish general Chat from Coding Projects.
+- The Workspaces screen should expose one general Chat entry and one Coding Project entry, not
+  separate `New Project` and `Open Project` cards.
+- The Coding Project entry should offer two clear actions: create a new coding project or open an
+  existing folder.
 - Recent Projects should remain compact and responsive with visible refresh/loading feedback.
 - Project rows should use readable `text-sm` sizing and compact metadata.
-- Users can open or create Projects from Workspaces/sidebar without duplicate or conflicting CTAs.
+- Users can open or create Coding Projects from Workspaces/sidebar without duplicate or conflicting
+  CTAs.
 - Users can reopen previously opened Projects from persisted Project records.
-- Chat/session access remains available without making Project navigation ambiguous.
+- Chat/session access remains available without making Coding Project navigation ambiguous.
+- Automation, scheduled-task, email, docs/research, and generated-app workspaces should not be
+  added to this screen until their product definitions are agreed.
 - Navigation must work from Workspaces, Personal Chat, Project Chat/Coding, and secondary panels.
 
 ## Implementation Plan
@@ -33,7 +40,7 @@ Project flows without scattered calls to action.
 
 | Upstream                              | Downstream                            |
 | ------------------------------------- | ------------------------------------- |
-| `agent-platform-project-experience.1` | `agent-platform-project-experience.3` |
+| `agent-platform-project-experience.1` | `agent-platform-project-experience.2` |
 
 Keep Beads dependencies aligned with this table.
 
@@ -41,13 +48,15 @@ Keep Beads dependencies aligned with this table.
 
 - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, and `pnpm test`.
 - Component tests for Projects/Chats explorer rows, empty states, and loading/error states.
-- Playwright: verify the left explorer shows Projects/Chats, opens a stored Project, and exposes the
-  new/open Project action.
+- Playwright: verify the left explorer shows Chat/Coding Project navigation, opens a stored Coding
+  Project, and exposes both New project and Open folder actions from the Coding Project entry.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
 ## Definition Of Done
 
-- [ ] Workspaces/sidebar clearly separates Projects and Personal Chat.
+- [ ] Workspaces/sidebar clearly separates general Chat and Coding Projects.
+- [ ] Workspaces shows one Coding Project entry with New project and Open folder actions.
 - [ ] Users can reopen stored Projects from the explorer.
-- [ ] Users can start/open/create Project flows without duplicate or conflicting CTAs.
+- [ ] Users can start/open/create Coding Project flows without duplicate or conflicting CTAs.
+- [ ] Deferred automation/task/docs/research surfaces are not exposed as current workspace cards.
 - [ ] Labels remain user-facing and avoid `/workspace`/backend wording.

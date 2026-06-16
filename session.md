@@ -174,6 +174,11 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   the current chat-first staging product direction.
 - Refined `.2`, `.4`, `.5`, and `.6` into audit/polish/staged-verification tasks rather than
   rebuild tasks; clarified `.7` previews and `.8` activity/evidence panel.
+- Refined the Project Experience plan after Workspaces review: the current product surfaces are
+  general Chat plus Coding Project. Chat owns assistant conversation and general tooling/app context.
+  Coding Project owns new/open folder flows, branch/Git/GitHub, terminal, previews, activity, and
+  external/default IDE handoff. Automation, scheduled-task, email/application, docs/research, and
+  generated-app workspaces are deferred until their own product decisions and epics.
 
 ## Checks Run
 
