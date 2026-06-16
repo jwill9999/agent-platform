@@ -57,7 +57,9 @@ work can use the documented chat-first direction from the staging baseline.
 
 Production macOS release promotion remains blocked by the separate pre-production VM signing and
 notarization gate `agent-platform-macos-production-sandbox.6.3`. The broader workflow expectation
-matrix `agent-platform-electron-stabilisation.20` remains a non-blocking automation follow-up.
+matrix `agent-platform-electron-stabilisation.20` has moved to
+`agent-platform-pre-production-automation` as a production-release gate, not an Electron
+stabilisation or Project Experience blocker.
 
 ## Parallel Worktree Strategy
 

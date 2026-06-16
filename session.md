@@ -15,15 +15,16 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-15
-- **Session:** Synced `staging` after Electron sign-off and Project Experience re-baseline merges.
-- **Branch:** `staging`
-- **Latest commit:** current `origin/staging` includes the post-merge handoff update.
+- **Date:** 2026-06-16
+- **Session:** Refined Project Experience Workspaces plan and addressed Sourcery docs feedback.
+- **Branch:** `jwill9999/pre-production-automation-gate` -> PR #235 to `staging`
+- **Latest commit:** `8428ba1` fixes Sourcery terminology feedback in the workflow matrix task.
 
 ## Current State
 
-- `staging` is synced with `origin/staging` after the Electron sign-off, Project Experience
-  re-baseline, and post-merge handoff update.
+- PR #235 is open from `jwill9999/pre-production-automation-gate` to `staging`; wait for GitHub
+  Actions to go green before merging.
+- `staging` was synced with `origin/staging` before the PR #235 docs/tracker follow-up branch.
 - Electron stabilisation has merged to `staging`; owner manual testing passed on 2026-06-15 and
   `agent-platform-electron-stabilisation.12` is closed.
 - PR #231's desktop E2E flake is resolved on `staging`: Project access E2E now selects Active agent
@@ -36,9 +37,8 @@ and actionable.
 - `.17` is closed: deterministic `.12` gaps now have Electron Playwright coverage.
 - `.19` is closed: first-loaded Workspaces layout is covered at compact and expanded Electron window
   sizes.
-- `.20` is open as a non-blocking follow-up to define the broader E2E expectation matrix across
-  Workspaces, Project Chat/Coding, Personal Chat, secondary file view, and future specialized
-  workflows.
+- `.20` has moved to `agent-platform-pre-production-automation` as a production-release gate for
+  the broader E2E workflow expectation matrix.
 - Production macOS release remains blocked by `agent-platform-macos-production-sandbox.6.3`, which
   still requires real Developer ID signing and Apple notarization evidence.
 - Terminal dock now defaults to `MesloLGS NF`; users can still choose the other terminal fonts from
@@ -175,6 +175,13 @@ model` CTA; exactly one usable model config becomes the default; multiple config
   the current chat-first staging product direction.
 - Refined `.2`, `.4`, `.5`, and `.6` into audit/polish/staged-verification tasks rather than
   rebuild tasks; clarified `.7` previews and `.8` activity/evidence panel.
+- Refined the Project Experience plan after Workspaces review: the current product surfaces are
+  general Chat plus Coding Project. Chat owns assistant conversation and general tooling/app context.
+  Coding Project owns new/open folder flows, branch/Git/GitHub, terminal, previews, activity, and
+  external/default IDE handoff. Automation, scheduled-task, email/application, docs/research, and
+  generated-app workspaces are deferred until their own product decisions and epics.
+- Addressed Sourcery docs feedback in `agent-platform-electron-stabilisation.20` by changing
+  `user-case` to `use-case`.
 
 ## Checks Run
 
@@ -232,7 +239,6 @@ the documented fallback checks above.
 ## Next
 
 1. Start `agent-platform-project-experience.1` from the accepted re-baselined `staging` plan.
-2. Decide whether to move non-blocking `.20` to a broader automation/testing epic before closing the
-   Electron stabilisation epic.
-3. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
+2. Keep production macOS release blocked until `agent-platform-macos-production-sandbox.6.3` has
    signed/notarized artifact evidence.
+3. Complete `agent-platform-pre-production-automation` before promoting any production release.
