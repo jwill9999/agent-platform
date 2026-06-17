@@ -13,6 +13,10 @@ fi
 
 echo "[pre-push] Changed packages: $(echo "$CHANGED_PKGS" | tr '\n' ' ')"
 
+# Run circular dependency check for developer feedback
+echo "[pre-push] Running circular dependency check..."
+pnpm deps:check-cycles || { echo "[pre-push] Circular dependency check failed. Run 'pnpm deps:check-cycles' to inspect."; exit 1; }
+
 # Build filter args for pnpm
 FILTERS=""
 for pkg in $CHANGED_PKGS; do

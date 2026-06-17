@@ -1,4 +1,4 @@
-.PHONY: build rebuild up down restart reset new workspace-init workspace-clean-dry-run workspace-clean workspace-clean-force runtime-config-backup runtime-config-restore coding-runtime-verify seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format help
+.PHONY: build rebuild up down restart reset new workspace-init workspace-clean-dry-run workspace-clean workspace-clean-force runtime-config-backup runtime-config-restore coding-runtime-verify seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format deps:check-cycles help
 
 # ---------------------------------------------------------------------------
 # Docker-only Makefile — all runtime commands run inside containers.
@@ -158,6 +158,10 @@ typecheck:
 format:
 	pnpm format:check
 
+## Check for circular dependencies between packages
+deps:check-cycles:
+	pnpm deps:check-cycles
+
 electron-local:
 	@mkdir -p "$(dir $(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH))"
 	@[ -s "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)" ] || openssl rand -base64 32 > "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)"
@@ -192,3 +196,5 @@ help:
 	@echo "  make test      Run unit tests"
 	@echo "  make lint      Run linter"
 	@echo "  make typecheck Run TypeScript checks"
+	@echo "  make format    Check code formatting"
+	@echo "  make deps:check-cycles Check for circular dependencies"
