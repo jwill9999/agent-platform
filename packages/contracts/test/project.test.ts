@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ProjectModeSchema,
+  WorkspaceProfileSchema,
+  WorkspaceCapabilitySchema,
   ProjectBranchCheckoutBodySchema,
   ProjectGitChecksResultSchema,
   ProjectGitCreatePullRequestBodySchema,
@@ -13,11 +15,91 @@ import {
   ProjectWorkspaceBindingSchema,
   ProjectCapabilityStateSchema,
   ProjectOnboardingStateSchema,
+  getDefaultWorkspaceCapabilitiesForProfile,
+  deriveWorkspaceProfileMetadata,
   getDefaultAgentProfileForMode,
   getProjectAccessPolicy,
 } from '../src/project.js';
 
 describe('Project mode and workspace binding contracts', () => {
+  it('defines current Chat and Coding Project workspace profiles without exposing deferred flows', () => {
+    expect(WorkspaceProfileSchema.options).toEqual([
+      'general_chat',
+      'coding_project',
+      'deferred_docs_content',
+      'deferred_research',
+      'deferred_automation',
+      'deferred_scheduled_task',
+      'deferred_application_workflow',
+      'unknown',
+    ]);
+  });
+
+  it('keeps workspace capabilities separate from legacy Project file assessment capabilities', () => {
+    expect(WorkspaceCapabilitySchema.options).toContain('general_tools');
+    expect(WorkspaceCapabilitySchema.options).toContain('branch_selection');
+    expect(WorkspaceCapabilitySchema.options).toContain('github');
+    expect(WorkspaceCapabilitySchema.options).toContain('generated_previews');
+    expect(WorkspaceCapabilitySchema.options).toContain('activity_evidence');
+    expect(WorkspaceCapabilitySchema.options).toContain('ide_handoff');
+  });
+
+  it('derives a general Chat profile without Project-only capabilities', () => {
+    const metadata = deriveWorkspaceProfileMetadata({ mode: 'chat' });
+
+    expect(metadata.workspaceProfile).toBe('general_chat');
+    expect(metadata.workspaceCapabilities).toEqual(['chat', 'general_tools']);
+    expect(metadata.workspaceCapabilities).not.toContain('project_files');
+    expect(metadata.workspaceCapabilities).not.toContain('git');
+    expect(metadata.workspaceCapabilities).not.toContain('terminal');
+    expect(metadata.workspaceCapabilities).not.toContain('ide_handoff');
+  });
+
+  it('derives a Coding Project profile for legacy Projects without explicit metadata', () => {
+    const metadata = deriveWorkspaceProfileMetadata({ mode: 'project', metadata: {} });
+
+    expect(metadata.workspaceProfile).toBe('coding_project');
+    expect(metadata.workspaceCapabilities).toEqual([
+      'chat',
+      'project_files',
+      'coding_tools',
+      'terminal',
+      'git',
+      'github',
+      'branch_selection',
+      'tests_checks',
+      'generated_previews',
+      'activity_evidence',
+      'ide_handoff',
+    ]);
+  });
+
+  it('keeps deferred workspace profiles limited until their owning epics define UI behavior', () => {
+    expect(getDefaultWorkspaceCapabilitiesForProfile('deferred_automation')).toEqual([
+      'chat',
+      'general_tools',
+    ]);
+    expect(getDefaultWorkspaceCapabilitiesForProfile('deferred_docs_content')).toEqual([
+      'chat',
+      'general_tools',
+    ]);
+  });
+
+  it('preserves valid explicit workspace metadata while normalizing duplicate capabilities', () => {
+    expect(
+      deriveWorkspaceProfileMetadata({
+        mode: 'project',
+        metadata: {
+          workspaceProfile: 'coding_project',
+          workspaceCapabilities: ['chat', 'git', 'chat', 'branch_selection'],
+        },
+      }),
+    ).toEqual({
+      workspaceProfile: 'coding_project',
+      workspaceCapabilities: ['chat', 'git', 'branch_selection'],
+    });
+  });
+
   it('uses coding by default for Project mode and personal assistant by default for Chat mode', () => {
     expect(ProjectModeSchema.options).toEqual(['project', 'chat']);
     expect(getDefaultAgentProfileForMode('project')).toBe('coding');

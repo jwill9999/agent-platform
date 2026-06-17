@@ -1,7 +1,10 @@
 import { createElement } from 'react';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { ProjectDesktopRecord } from '@agent-platform/contracts';
+import {
+  CODING_PROJECT_WORKSPACE_CAPABILITIES,
+  type ProjectDesktopRecord,
+} from '@agent-platform/contracts';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -33,6 +36,8 @@ function desktopProjectRecord(input: {
       capabilityState: input.available ? 'backend_accessible' : 'unavailable',
       onboardingState: input.available ? 'approved' : 'missing',
       defaultAgentProfile: 'coding',
+      workspaceProfile: 'coding_project',
+      workspaceCapabilities: [...CODING_PROJECT_WORKSPACE_CAPABILITIES],
       instructionFileCount: input.available ? 1 : 0,
     },
     createdAtMs: 1,

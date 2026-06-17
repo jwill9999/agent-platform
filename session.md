@@ -15,28 +15,41 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-16
-- **Session:** Paused after starting Project Experience `.1`.
+- **Date:** 2026-06-17
+- **Session:** Implemented and verified Project Experience `.1`.
 - **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** `staging` at `531ec2b` (`docs: move workflow matrix to pre-production gate (#235)`)
+- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`
 
 ## Current State
 
-- PR #235 has merged to `staging`; local `staging` is clean and aligned with `origin/staging`.
-- Post-merge verification passed locally:
+- `agent-platform-project-experience.1` now defines shared workspace profile/capability metadata
+  for the current product surfaces:
+  - `general_chat`: chat + general tooling/app context.
+  - `coding_project`: chat, project files, coding tools, terminal, Git/GitHub, branch selection,
+    tests/checks, generated previews, activity evidence, and IDE handoff.
+- Deferred workspace profiles exist only as extension points for later epics and are not exposed as
+  current Workspaces UI options.
+- API project open/desktop registration responses now derive/persist Coding Project workspace
+  metadata for legacy and new Project records.
+- The `.1` task spec dependency table was corrected so `.1` feeds `.2`, and its DoD checklist is
+  complete.
+- Local verification passed:
+  - `pnpm --filter @agent-platform/contracts typecheck`
+  - `pnpm --filter @agent-platform/api typecheck`
+  - `pnpm --filter @agent-platform/web typecheck`
+  - `pnpm --filter @agent-platform/contracts test -- test/project.test.ts`
+  - `pnpm --filter @agent-platform/api test -- test/projectsRouter.test.ts`
+  - `pnpm --filter @agent-platform/web test -- test/project-navigation.test.ts test/project-onboarding-assessment-panel.test.ts`
+  - `pnpm build`
   - `pnpm docs:lint`
   - `pnpm format:check`
+  - `pnpm lint`
+  - `pnpm test`
   - `git diff --check`
-- `agent-platform-project-experience.1` is claimed and `in_progress`.
-- No implementation files have been edited for `.1` yet.
-- Current investigation started by reading:
-  - [docs/tasks/agent-platform-project-experience.1.md](docs/tasks/agent-platform-project-experience.1.md)
-  - [packages/contracts/src/project.ts](packages/contracts/src/project.ts)
-  - [packages/db/src/repositories/projects.ts](packages/db/src/repositories/projects.ts)
-  - [apps/api/src/infrastructure/http/v1/projectsRouter.ts](apps/api/src/infrastructure/http/v1/projectsRouter.ts)
-  - [packages/contracts/test/project.test.ts](packages/contracts/test/project.test.ts)
-- The `.1` spec has a stale dependency-table row: it should show `.1` as upstream of `.2`, matching
-  Beads. Fix this during the `.1` implementation/docs update.
+- SonarQube MCP was attempted for touched-file issue discovery, but the server returned
+  `Not authorized`; the repo fallback gate passed.
+- Unrelated local change present and intentionally left untouched:
+  `.github/agents/api-review-specialist.agent.md`.
 
 ## Product Direction
 
@@ -50,10 +63,6 @@ and actionable.
 
 ## Next
 
-1. Continue `agent-platform-project-experience.1` on
-   `jwill9999/project-experience-capability-metadata`.
-2. Add shared Chat/Coding Project workspace/profile/capability contracts and compatibility helpers.
-3. Update API/project mapping so existing coding Projects derive sensible default capabilities.
-4. Add focused contracts/API tests for defaults, deferred profile fallbacks, and backwards
-   compatibility.
-5. Run focused gates first, then broader required gates before closing `.1`.
+1. Close `agent-platform-project-experience.1` in Beads, commit, push, and open the PR to staging.
+2. After CI/review passes and the PR merges, start `agent-platform-project-experience.2`: simplify
+   the Workspaces/sidebar UI using the new capability metadata.
