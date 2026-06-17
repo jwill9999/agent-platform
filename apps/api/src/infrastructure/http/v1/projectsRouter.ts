@@ -67,6 +67,7 @@ import {
   type ProjectGitStashBody,
   type ProjectGitWorkingTreeSummary,
   ProjectUpdateBodySchema,
+  deriveWorkspaceProfileMetadata,
 } from '@agent-platform/contracts';
 import {
   archiveProject,
@@ -150,6 +151,8 @@ type BackendProjectMetadata = {
   capabilityState: 'backend_accessible';
   onboardingState: 'missing' | 'in_progress' | 'needs_review' | 'approved';
   defaultAgentProfile: 'coding';
+  workspaceProfile: ReturnType<typeof deriveWorkspaceProfileMetadata>['workspaceProfile'];
+  workspaceCapabilities: ReturnType<typeof deriveWorkspaceProfileMetadata>['workspaceCapabilities'];
   instructionFiles: ProjectInstructionFileReference[];
   onboardingAssessment?: ReturnType<typeof assessProjectOnboarding>['assessment'];
   onboardingDraft?: ReturnType<typeof parseStoredOnboardingDraft>;
@@ -491,6 +494,7 @@ function discoverBackendProjectMetadata(
     capabilityState: 'backend_accessible',
     onboardingState: instructionDiscovery.onboardingState,
     defaultAgentProfile: 'coding',
+    ...deriveWorkspaceProfileMetadata({ mode: 'project', metadata: existingMetadata }),
     instructionFiles: instructionDiscovery.instructionFiles,
   };
   if (activeBranch) metadata.activeBranch = activeBranch;
@@ -687,6 +691,10 @@ function toDesktopProjectRecord(
     typeof project.metadata['activeBranch'] === 'string'
       ? project.metadata['activeBranch']
       : undefined;
+  const workspaceMetadata = deriveWorkspaceProfileMetadata({
+    mode: 'project',
+    metadata: project.metadata,
+  });
 
   return {
     ...project,
@@ -698,6 +706,7 @@ function toDesktopProjectRecord(
       capabilityState,
       onboardingState,
       defaultAgentProfile: 'coding',
+      ...workspaceMetadata,
       ...(activeBranch ? { activeBranch } : {}),
       instructionFileCount: instructionFiles.length,
     },

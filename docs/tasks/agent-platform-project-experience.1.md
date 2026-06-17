@@ -48,7 +48,7 @@ workspaces, but do not expose those as current Workspaces options.
 | Upstream                               | Downstream                            |
 | -------------------------------------- | ------------------------------------- |
 | `agent-platform-project-experience.14` | `agent-platform-project-experience.1` |
-| `agent-platform-project-onboarding.6`  | `agent-platform-project-experience.2` |
+| `agent-platform-project-experience.1`  | `agent-platform-project-experience.2` |
 
 Keep Beads dependencies aligned with this table.
 
@@ -61,13 +61,13 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] Workspace/profile and capability contracts exist and are exported through the shared
+- [x] Workspace/profile and capability contracts exist and are exported through the shared
       contracts.
-- [ ] Chat and Coding Project are distinct profile/capability sets.
-- [ ] Coding Project is represented as the current folder/repository workspace, not the definition
+- [x] Chat and Coding Project are distinct profile/capability sets.
+- [x] Coding Project is represented as the current folder/repository workspace, not the definition
       of all assistant work.
-- [ ] Existing coding Project metadata remains compatible.
-- [ ] Future automation/task/docs/research profiles are deferred extension points and are not
+- [x] Existing coding Project metadata remains compatible.
+- [x] Future automation/task/docs/research profiles are deferred extension points and are not
       exposed as current Workspaces UI.
-- [ ] Runtime metadata remains separate from user-facing display metadata.
-- [ ] Profile/capability metadata can drive the staged E2E/workspace expectation matrix.
+- [x] Runtime metadata remains separate from user-facing display metadata.
+- [x] Profile/capability metadata can drive the staged E2E/workspace expectation matrix.

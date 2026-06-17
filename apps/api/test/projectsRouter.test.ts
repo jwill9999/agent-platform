@@ -17,6 +17,7 @@ import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { CODING_PROJECT_WORKSPACE_CAPABILITIES } from '@agent-platform/contracts';
 import {
   closeDatabase,
   createSession,
@@ -29,6 +30,9 @@ import { createProjectsRouter } from '../src/infrastructure/http/v1/projectsRout
 import { createSessionsRouter } from '../src/infrastructure/http/v1/sessionsRouter.js';
 
 const GIT_BINARY = '/usr/bin/git';
+const EXPECTED_CODING_WORKSPACE_CAPABILITIES = expect.arrayContaining([
+  ...CODING_PROJECT_WORKSPACE_CAPABILITIES,
+]);
 
 function buildTestApp(db: ReturnType<typeof openDatabase>['db']) {
   const app = express();
@@ -114,6 +118,8 @@ describe('projectsRouter', () => {
         capabilityState: 'backend_accessible',
         onboardingState: 'in_progress',
         defaultAgentProfile: 'coding',
+        workspaceProfile: 'coding_project',
+        workspaceCapabilities: EXPECTED_CODING_WORKSPACE_CAPABILITIES,
         onboardingAssessment: expect.objectContaining({
           status: 'in_progress',
           profile: expect.any(String),
@@ -167,6 +173,8 @@ describe('projectsRouter', () => {
           capabilityState: 'backend_accessible',
           onboardingState: 'in_progress',
           defaultAgentProfile: 'coding',
+          workspaceProfile: 'coding_project',
+          workspaceCapabilities: EXPECTED_CODING_WORKSPACE_CAPABILITIES,
           activeBranch: 'main',
           instructionFileCount: 0,
         },
@@ -184,6 +192,8 @@ describe('projectsRouter', () => {
         backendProjectRoot: repoRealPath,
         repositoryRoot: repoRealPath,
         source: 'desktop',
+        workspaceProfile: 'coding_project',
+        workspaceCapabilities: EXPECTED_CODING_WORKSPACE_CAPABILITIES,
       }),
     });
 

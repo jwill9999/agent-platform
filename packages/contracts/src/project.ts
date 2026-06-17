@@ -6,6 +6,34 @@ export type ProjectMode = z.infer<typeof ProjectModeSchema>;
 export const ProjectDefaultAgentProfileSchema = z.enum(['coding', 'personal_assistant']);
 export type ProjectDefaultAgentProfile = z.infer<typeof ProjectDefaultAgentProfileSchema>;
 
+export const WorkspaceProfileSchema = z.enum([
+  'general_chat',
+  'coding_project',
+  'deferred_docs_content',
+  'deferred_research',
+  'deferred_automation',
+  'deferred_scheduled_task',
+  'deferred_application_workflow',
+  'unknown',
+]);
+export type WorkspaceProfile = z.infer<typeof WorkspaceProfileSchema>;
+
+export const WorkspaceCapabilitySchema = z.enum([
+  'chat',
+  'general_tools',
+  'project_files',
+  'coding_tools',
+  'terminal',
+  'git',
+  'github',
+  'branch_selection',
+  'tests_checks',
+  'generated_previews',
+  'activity_evidence',
+  'ide_handoff',
+]);
+export type WorkspaceCapability = z.infer<typeof WorkspaceCapabilitySchema>;
+
 export const ProjectProfileSchema = z.enum([
   'coding',
   'docs_content',
@@ -52,6 +80,31 @@ export const ProjectAccessPolicyBlockReasonSchema = z.enum([
   'onboarding_not_approved',
 ]);
 export type ProjectAccessPolicyBlockReason = z.infer<typeof ProjectAccessPolicyBlockReasonSchema>;
+
+export const GENERAL_CHAT_WORKSPACE_CAPABILITIES = [
+  'chat',
+  'general_tools',
+] as const satisfies readonly WorkspaceCapability[];
+
+export const CODING_PROJECT_WORKSPACE_CAPABILITIES = [
+  'chat',
+  'project_files',
+  'coding_tools',
+  'terminal',
+  'git',
+  'github',
+  'branch_selection',
+  'tests_checks',
+  'generated_previews',
+  'activity_evidence',
+  'ide_handoff',
+] as const satisfies readonly WorkspaceCapability[];
+
+export const WorkspaceProfileMetadataSchema = z.object({
+  workspaceProfile: WorkspaceProfileSchema,
+  workspaceCapabilities: z.array(WorkspaceCapabilitySchema).default([]),
+});
+export type WorkspaceProfileMetadata = z.infer<typeof WorkspaceProfileMetadataSchema>;
 
 const RelativeProjectPathSchema = z
   .string()
@@ -422,6 +475,10 @@ export const ProjectWorkspaceBindingSchema = z.object({
   capabilityState: ProjectCapabilityStateSchema,
   onboardingState: ProjectOnboardingStateSchema,
   defaultAgentProfile: ProjectDefaultAgentProfileSchema,
+  workspaceProfile: WorkspaceProfileSchema.default('coding_project'),
+  workspaceCapabilities: z
+    .array(WorkspaceCapabilitySchema)
+    .default([...CODING_PROJECT_WORKSPACE_CAPABILITIES]),
   instructionFiles: z.array(ProjectInstructionFileReferenceSchema).default([]),
 });
 export type ProjectWorkspaceBinding = z.infer<typeof ProjectWorkspaceBindingSchema>;
@@ -481,6 +538,10 @@ export const ProjectDesktopMetadataSchema = z.object({
   capabilityState: ProjectCapabilityStateSchema,
   onboardingState: ProjectOnboardingStateSchema,
   defaultAgentProfile: ProjectDefaultAgentProfileSchema,
+  workspaceProfile: WorkspaceProfileSchema.default('coding_project'),
+  workspaceCapabilities: z
+    .array(WorkspaceCapabilitySchema)
+    .default([...CODING_PROJECT_WORKSPACE_CAPABILITIES]),
   activeBranch: z.string().min(1).max(300).optional(),
   instructionFileCount: z.number().int().nonnegative(),
 });
@@ -932,6 +993,56 @@ export type ProjectFileReadResult = z.infer<typeof ProjectFileReadResultSchema>;
 export const ProjectQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(false),
 });
+
+function uniqueWorkspaceCapabilities(
+  capabilities: readonly WorkspaceCapability[],
+): WorkspaceCapability[] {
+  return [...new Set(capabilities)];
+}
+
+export function getDefaultWorkspaceCapabilitiesForProfile(
+  profile: WorkspaceProfile,
+): WorkspaceCapability[] {
+  switch (profile) {
+    case 'general_chat':
+      return [...GENERAL_CHAT_WORKSPACE_CAPABILITIES];
+    case 'coding_project':
+      return [...CODING_PROJECT_WORKSPACE_CAPABILITIES];
+    case 'deferred_docs_content':
+    case 'deferred_research':
+    case 'deferred_automation':
+    case 'deferred_scheduled_task':
+    case 'deferred_application_workflow':
+    case 'unknown':
+      return [...GENERAL_CHAT_WORKSPACE_CAPABILITIES];
+    default:
+      return assertNever(profile);
+  }
+}
+
+export function getDefaultWorkspaceProfileForMode(mode: ProjectMode): WorkspaceProfile {
+  return mode === 'project' ? 'coding_project' : 'general_chat';
+}
+
+export function deriveWorkspaceProfileMetadata(input: {
+  mode: ProjectMode;
+  metadata?: Record<string, unknown> | null;
+}): WorkspaceProfileMetadata {
+  const parsedProfile = WorkspaceProfileSchema.safeParse(input.metadata?.['workspaceProfile']);
+  const workspaceProfile = parsedProfile.success
+    ? parsedProfile.data
+    : getDefaultWorkspaceProfileForMode(input.mode);
+  const parsedCapabilities = z
+    .array(WorkspaceCapabilitySchema)
+    .safeParse(input.metadata?.['workspaceCapabilities']);
+
+  return {
+    workspaceProfile,
+    workspaceCapabilities: parsedCapabilities.success
+      ? uniqueWorkspaceCapabilities(parsedCapabilities.data)
+      : getDefaultWorkspaceCapabilitiesForProfile(workspaceProfile),
+  };
+}
 
 export function getDefaultAgentProfileForMode(mode: ProjectMode): ProjectDefaultAgentProfile {
   return mode === 'project' ? 'coding' : 'personal_assistant';

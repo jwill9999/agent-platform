@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CODING_PROJECT_WORKSPACE_CAPABILITIES,
+  type ProjectDesktopRecord,
+} from '@agent-platform/contracts';
+import {
   buildPersonalChatHref,
   buildProjectChatHref,
   buildProjectIdeHref,
@@ -78,7 +82,7 @@ describe('Project navigation model', () => {
     readonly folderName: string;
     readonly folderPathLabel?: string;
     readonly available: boolean;
-  }) {
+  }): ProjectDesktopRecord {
     return {
       id: input.id,
       slug: input.folderName,
@@ -91,11 +95,13 @@ describe('Project navigation model', () => {
         capabilityState: input.available ? 'backend_accessible' : 'unavailable',
         onboardingState: input.available ? 'approved' : 'missing',
         defaultAgentProfile: 'coding',
+        workspaceProfile: 'coding_project',
+        workspaceCapabilities: [...CODING_PROJECT_WORKSPACE_CAPABILITIES],
         instructionFileCount: input.available ? 1 : 0,
       },
       createdAtMs: 1,
       updatedAtMs: input.available ? 2 : 1,
-    } as const;
+    };
   }
 
   it('tracks surface, Project, and session context explicitly', () => {
