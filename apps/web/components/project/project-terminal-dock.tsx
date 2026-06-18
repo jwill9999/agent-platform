@@ -314,6 +314,47 @@ export function ProjectTerminalDock({
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
   const activeState = activeTab?.state ?? 'closed';
 
+  const terminalContent = (() => {
+    if (activeState === 'unavailable') {
+      return (
+        <div className="flex h-[calc(100%-2.5rem)] items-center justify-center text-sm text-slate-300">
+          Native terminal is available in the desktop app.
+        </div>
+      );
+    }
+
+    if (activeState === 'error') {
+      return (
+        <div className="p-4 text-sm text-red-200">
+          {activeTab?.error ?? 'Terminal failed to start.'}
+        </div>
+      );
+    }
+
+    return (
+      <div className="h-[calc(100%-2.5rem)] min-h-0 min-w-0 overflow-hidden">
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            ref={(node) => {
+              if (node) {
+                containersRef.current.set(tab.id, node);
+                startTabRuntime(tab, node);
+              } else {
+                containersRef.current.delete(tab.id);
+              }
+            }}
+            data-terminal-active={tab.id === activeTabId ? 'true' : 'false'}
+            className={cn(
+              'h-full min-h-0 min-w-0 overflow-hidden p-2',
+              tab.id === activeTabId ? 'block' : 'hidden',
+            )}
+          />
+        ))}
+      </div>
+    );
+  })();
+
   return (
     <section
       ref={sectionRef}
@@ -424,36 +465,7 @@ export function ProjectTerminalDock({
           Close
         </Button>
       </div>
-      {activeState === 'unavailable' ? (
-        <div className="flex h-[calc(100%-2.5rem)] items-center justify-center text-sm text-slate-300">
-          Native terminal is available in the desktop app.
-        </div>
-      ) : activeState === 'error' ? (
-        <div className="p-4 text-sm text-red-200">
-          {activeTab?.error ?? 'Terminal failed to start.'}
-        </div>
-      ) : (
-        <div className="h-[calc(100%-2.5rem)] min-h-0 min-w-0 overflow-hidden">
-          {tabs.map((tab) => (
-            <div
-              key={tab.id}
-              ref={(node) => {
-                if (node) {
-                  containersRef.current.set(tab.id, node);
-                  startTabRuntime(tab, node);
-                } else {
-                  containersRef.current.delete(tab.id);
-                }
-              }}
-              data-terminal-active={tab.id === activeTabId ? 'true' : 'false'}
-              className={cn(
-                'h-full min-h-0 min-w-0 overflow-hidden p-2',
-                tab.id === activeTabId ? 'block' : 'hidden',
-              )}
-            />
-          ))}
-        </div>
-      )}
+      {terminalContent}
     </section>
   );
 }
