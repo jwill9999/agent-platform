@@ -6,10 +6,11 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type {
-  BrowserActionResult,
-  BrowserEvidenceArtifact,
-  Output,
+import {
+  BrowserActionResultSchema,
+  type BrowserActionResult,
+  type BrowserEvidenceArtifact,
+  type Output,
 } from '@agent-platform/contracts';
 import {
   BrowserSessionManager,
@@ -55,7 +56,7 @@ const EXTERNAL_DOMAIN_APPROVAL_RULE = 'external_domain_requires_approval';
 function toolData(output: Output | null): BrowserActionResult {
   expect(output?.type).toBe('tool_result');
   if (output?.type !== 'tool_result') throw new Error('Expected tool_result output');
-  return output.data as unknown as BrowserActionResult;
+  return BrowserActionResultSchema.parse(output.data);
 }
 
 function getManager(manager: BrowserSessionManager | undefined): BrowserSessionManager {
