@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 RUN apk add --no-cache curl python3 make g++ && corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -23,7 +23,7 @@ RUN pnpm -r run build
 # Prune to production deps (keeps native addons like better-sqlite3 intact)
 RUN pnpm prune --prod
 
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 RUN apk add --no-cache curl chromium git ripgrep jq make file diffutils coreutils \
   && corepack enable \
   && corepack prepare pnpm@9.15.4 --activate \

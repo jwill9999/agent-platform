@@ -17,7 +17,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -28,11 +28,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
 
       - name: Format (check)
         run: pnpm run format:check
@@ -45,9 +48,6 @@ jobs:
 
       - name: Build
         run: pnpm run build
-
-      - name: Install Playwright Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Test
         run: pnpm run test
@@ -80,7 +80,7 @@ jobs:
   e2e:
     needs: docker
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -91,14 +91,19 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Install Playwright Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
+
+      - name: Install Playwright browser dependencies
+        run: |
+          google-chrome --version
+          ./node_modules/.bin/playwright install-deps chromium
 
       - name: Prepare workspace storage
         run: make workspace-init
@@ -198,7 +203,7 @@ jobs:
 
   desktop-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -209,19 +214,22 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
+
+      - name: Install Electron binary
+        run: node scripts/install-electron-binary.mjs
+
       - name: Install Electron display dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
-
-      - name: Install Playwright browser dependencies
-        run: ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Electron E2E tests
         run: xvfb-run -a pnpm --filter @agent-platform/desktop test:e2e
@@ -263,11 +271,17 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
+
+      - name: Install Electron binary
+        run: node scripts/install-electron-binary.mjs
 
       - name: Run macOS VM host preflight
         run: pnpm --filter @agent-platform/desktop native:vm:host-check -- --json

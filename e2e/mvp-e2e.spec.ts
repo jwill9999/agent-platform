@@ -38,14 +38,16 @@ test.describe('MVP E2E (compose-backed)', () => {
   test('home page chat smoke', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Open Chat/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Open Project/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Chat\b/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Coding Project' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /New project/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Open folder/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /Open Project/ })).toHaveCount(0);
   });
 
   test('sessions move from sidebar panel to header dropdown', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: /Open Chat/ }).click();
+    await page.getByRole('button', { name: /^Chat\b/ }).click();
 
     await expect(page.getByRole('button', { name: 'Open sessions menu' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Collapse panel' })).toHaveCount(0);
@@ -77,7 +79,7 @@ test.describe('MVP E2E (compose-backed)', () => {
   test('entry paths select mode-specific surfaces and default agents', async ({ page }) => {
     await page.goto('/');
 
-    await page.getByRole('button', { name: /Open Chat/ }).click();
+    await page.getByRole('button', { name: /^Chat\b/ }).click();
     await expect(page).toHaveURL(/\/\?mode=chat$/);
     await expect(page.locator('[aria-label="Active agent"]').first()).toContainText(
       'Personal assistant',
@@ -88,10 +90,9 @@ test.describe('MVP E2E (compose-backed)', () => {
 
     await page.goto('/');
     await expect(page.getByRole('link', { name: /Open Project/ })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Open Project/ })).toBeDisabled();
-    await expect(
-      page.getByText('Open this app on desktop to choose a Project folder.'),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /New project/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Open folder/ })).toBeDisabled();
+    await expect(page.getByText('Open the desktop app to choose a project folder.')).toBeVisible();
     await expect(page).toHaveURL(/\/$/);
   });
 

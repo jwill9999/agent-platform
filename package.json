@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@9.15.4",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "rebuild:native": "node scripts/rebuild-better-sqlite3.mjs",

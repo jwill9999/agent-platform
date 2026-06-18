@@ -32,7 +32,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Run markdownlint-cli2
         run: npx --yes markdownlint-cli2 "**/*.md" "#node_modules" "#**/node_modules" "#dist" "#**/dist" "#.next" "#**/.next" "#coverage" "#**/coverage" "#test-results" "#data" "#packages/db/drizzle"

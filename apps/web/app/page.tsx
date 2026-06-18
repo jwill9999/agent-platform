@@ -74,7 +74,7 @@ import {
   openDesktopProjectIde,
   selectAndRegisterDesktopProject,
 } from '@/lib/desktop-projects';
-import { Terminal as TerminalIcon } from 'lucide-react';
+import { FolderOpen, FolderPlus, MessageSquare, Terminal as TerminalIcon } from 'lucide-react';
 
 type WorkspaceMode = 'chat' | 'project-chat';
 type HomeEntryScreenProps = Readonly<{
@@ -311,14 +311,17 @@ function HomeEntryScreen({
         </div>
       </section>
       <section className="flex flex-1 items-center px-6 py-8">
-        <div className="mx-auto grid w-full max-w-5xl gap-4 lg:grid-cols-3">
+        <div className="mx-auto grid w-full max-w-5xl gap-4 lg:grid-cols-2">
           <button
             type="button"
-            className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary"
+            className="group flex min-h-52 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary"
             onClick={onOpenChat}
           >
             <span>
-              <span className="block text-lg font-semibold text-foreground">
+              <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-secondary text-muted-foreground group-hover:text-primary">
+                <MessageSquare className="h-5 w-5" aria-hidden />
+              </span>
+              <span className="block text-lg font-semibold leading-7 text-foreground">
                 {workspaceEntryCopy.chatTitle}
               </span>
               <span className="mt-2 block text-sm leading-6 text-muted-foreground">
@@ -329,62 +332,48 @@ function HomeEntryScreen({
               {workspaceEntryCopy.chatProfile}
             </span>
           </button>
-          {isDesktopProjectBridgeAvailable ? (
-            <>
-              <button
-                type="button"
-                className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary disabled:opacity-70"
-                onClick={onCreateProject}
-                disabled={isCreatingProject}
-              >
-                <span>
-                  <span className="block text-lg font-semibold text-foreground">New Project</span>
-                  <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                    Create a new folder on your computer and open it in Project Chat.
-                  </span>
-                </span>
-                <span className="text-sm font-medium text-primary">
-                  {isCreatingProject ? 'Creating...' : 'Start from scratch'}
-                </span>
-              </button>
-              <button
-                type="button"
-                className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left transition-colors hover:border-primary disabled:opacity-70"
-                onClick={onOpenProject}
-                disabled={isOpeningProject}
-              >
-                <span>
-                  <span className="block text-lg font-semibold text-foreground">
-                    {workspaceEntryCopy.projectTitle}
-                  </span>
-                  <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                    {workspaceEntryCopy.projectDescription}
-                  </span>
-                </span>
-                <span className="text-sm font-medium text-primary">
-                  {isOpeningProject ? 'Opening...' : 'Use existing folder'}
-                </span>
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="group flex min-h-44 flex-col items-start justify-between rounded-lg border border-border bg-card p-5 text-left opacity-75"
-              disabled
-            >
-              <span>
-                <span className="block text-lg font-semibold text-foreground">
-                  {workspaceEntryCopy.projectTitle}
-                </span>
-                <span className="mt-2 block text-sm leading-6 text-muted-foreground">
-                  {workspaceEntryCopy.projectDescription}
-                </span>
+          <div className="flex min-h-52 flex-col justify-between rounded-lg border border-border bg-card p-5">
+            <div>
+              <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-md bg-secondary text-muted-foreground">
+                <FolderOpen className="h-5 w-5" aria-hidden />
               </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                Open this app on desktop to choose a Project folder.
-              </span>
-            </button>
-          )}
+              <h3 className="text-lg font-semibold leading-7 text-foreground">
+                {workspaceEntryCopy.projectTitle}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {workspaceEntryCopy.projectDescription}
+              </p>
+            </div>
+            <div className="mt-5 space-y-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="justify-start gap-2"
+                  onClick={onCreateProject}
+                  disabled={!isDesktopProjectBridgeAvailable || isCreatingProject}
+                >
+                  <FolderPlus className="h-4 w-4" aria-hidden />
+                  {isCreatingProject ? 'Creating...' : workspaceEntryCopy.projectCreateAction}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="justify-start gap-2"
+                  onClick={onOpenProject}
+                  disabled={!isDesktopProjectBridgeAvailable || isOpeningProject}
+                >
+                  <FolderOpen className="h-4 w-4" aria-hidden />
+                  {isOpeningProject ? 'Opening...' : workspaceEntryCopy.projectOpenAction}
+                </Button>
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground">
+                {isDesktopProjectBridgeAvailable
+                  ? workspaceEntryCopy.projectProfile
+                  : 'Open the desktop app to choose a project folder.'}
+              </p>
+            </div>
+          </div>
         </div>
       </section>
     </main>
