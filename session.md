@@ -59,6 +59,8 @@ and actionable.
   flagged its controlled archive extraction as a security hotspot.
 - Updated desktop/VM E2E project-opening helpers to use the new `Open folder` Workspaces action
   instead of the removed `Open Project` button label.
+- Kept browser E2E selectors aligned with surface-specific labels: Workspaces uses `Chat` /
+  `Open folder`, while the legacy `/ide` Project binding panel still uses `Open Project`.
 - Increased `verify`, browser `e2e`, and `desktop-e2e` CI timeouts because Playwright Chromium
   install can exceed the old 15-minute verify cap after the Node/Playwright baseline update.
 - Removed standalone Chromium installation from `verify` and `desktop-e2e`; browser E2E now installs

@@ -38,7 +38,7 @@ test.describe('MVP E2E (compose-backed)', () => {
   test('home page chat smoke', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Chat/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Chat\b/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Coding Project' })).toBeVisible();
     await expect(page.getByRole('button', { name: /New project/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /Open folder/ })).toBeVisible();
@@ -47,7 +47,7 @@ test.describe('MVP E2E (compose-backed)', () => {
 
   test('sessions move from sidebar panel to header dropdown', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: /Chat/ }).click();
+    await page.getByRole('button', { name: /^Chat\b/ }).click();
 
     await expect(page.getByRole('button', { name: 'Open sessions menu' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Collapse panel' })).toHaveCount(0);
@@ -79,7 +79,7 @@ test.describe('MVP E2E (compose-backed)', () => {
   test('entry paths select mode-specific surfaces and default agents', async ({ page }) => {
     await page.goto('/');
 
-    await page.getByRole('button', { name: /Chat/ }).click();
+    await page.getByRole('button', { name: /^Chat\b/ }).click();
     await expect(page).toHaveURL(/\/\?mode=chat$/);
     await expect(page.locator('[aria-label="Active agent"]').first()).toContainText(
       'Personal assistant',

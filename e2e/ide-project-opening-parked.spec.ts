@@ -126,7 +126,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
       );
 
       await page.goto('/ide', { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: 'Open folder' }).click();
+      await page.getByRole('button', { name: 'Open Project' }).click();
 
       await expect(page.getByLabel('Project binding').getByText(projectName).first()).toBeVisible();
       await expect(page.getByText('Desktop required')).toHaveCount(0);
