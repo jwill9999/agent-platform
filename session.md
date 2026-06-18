@@ -59,6 +59,8 @@ and actionable.
   flagged its controlled archive extraction as a security hotspot.
 - Updated desktop/VM E2E project-opening helpers to use the new `Open folder` Workspaces action
   instead of the removed `Open Project` button label.
+- Increased `verify`, browser `e2e`, and `desktop-e2e` CI timeouts because Playwright Chromium
+  install can exceed the old 15-minute verify cap after the Node/Playwright baseline update.
 - Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
   `multiple target patterns`.
 - Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,
