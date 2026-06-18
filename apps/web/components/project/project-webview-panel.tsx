@@ -29,17 +29,19 @@ type ProjectWebViewPanelProps = Readonly<{
   onViewModeChange?: (mode: ProjectWebViewMode) => void;
 }>;
 
+function runBridgeAction(action: Promise<unknown> | undefined): void {
+  action?.catch(() => {});
+}
+
 function webviewStatusLabel(webview: DesktopWorkspaceWebViewState | null): string {
   if (!webview) return 'No preview open';
   if (webview.status === 'loading') return 'Loading';
   if (webview.status === 'blocked') return 'Blocked';
   if (webview.status === 'error') return 'Error';
   if (webview.status === 'closed') return 'Closed';
-  return webview.policyTier === 'local'
-    ? 'Local preview'
-    : webview.policyTier === 'trusted'
-      ? 'Trusted'
-      : 'External';
+  if (webview.policyTier === 'local') return 'Local preview';
+  if (webview.policyTier === 'trusted') return 'Trusted';
+  return 'External';
 }
 
 function upsertWebView(
@@ -51,13 +53,62 @@ function upsertWebView(
   return webviews.map((webview) => (webview.webviewId === next.webviewId ? next : webview));
 }
 
+function updateWebViewsForEvent(
+  webviews: readonly DesktopWorkspaceWebViewState[],
+  event: DesktopWorkspaceWebViewState,
+): readonly DesktopWorkspaceWebViewState[] {
+  if (event.status === 'closed') {
+    return webviews.filter((webview) => webview.webviewId !== event.webviewId);
+  }
+  return upsertWebView(webviews, event);
+}
+
+function previewModeTitle(viewMode: ProjectWebViewMode, mode: 'wide' | 'overlay'): string {
+  if (mode === 'wide') {
+    if (viewMode === 'wide') return 'Return preview to standard side width';
+    return 'Make the side preview wider';
+  }
+  if (viewMode === 'overlay') return 'Return focused preview to the side panel';
+  return 'Open preview in a focused overlay';
+}
+
+function panelMessageProps(
+  activeWebView: DesktopWorkspaceWebViewState | null,
+  onOpenExternal: () => void,
+): Readonly<{
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}> | null {
+  if (activeWebView == null) {
+    return {
+      title: 'No preview open',
+      description: 'Open a preview or web resource from Project Chat to show it here.',
+    };
+  }
+  if (activeWebView.status === 'blocked' || activeWebView.status === 'error') {
+    const hasExternalFallback = activeWebView.externalFallbackUrl != null;
+    return {
+      title: activeWebView.status === 'blocked' ? 'Navigation blocked' : 'Preview error',
+      description: activeWebView.error ?? activeWebView.blockedUrl ?? activeWebView.url,
+      actionLabel: hasExternalFallback ? 'Open externally' : undefined,
+      onAction: hasExternalFallback ? onOpenExternal : undefined,
+    };
+  }
+  if (activeWebView.status === 'loading') {
+    return { title: 'Loading preview', description: activeWebView.url };
+  }
+  return null;
+}
+
 export function ProjectWebViewPanel({
   projectId,
   viewMode = 'docked',
   onViewModeChange,
 }: ProjectWebViewPanelProps) {
   const [open, setOpen] = useState(true);
-  const [webviews, setWebViews] = useState<readonly DesktopWorkspaceWebViewState[]>([]);
+  const [webviews, setWebviews] = useState<readonly DesktopWorkspaceWebViewState[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [bridgeAvailable, setBridgeAvailable] = useState(false);
   const dockedViewportRef = useRef<HTMLDivElement | null>(null);
@@ -83,18 +134,14 @@ export function ProjectWebViewPanel({
           ? next.filter((webview) => !webview.projectId || webview.projectId === projectId)
           : next;
         const live = filtered.filter((webview) => webview.status !== 'closed');
-        setWebViews(live);
+        setWebviews(live);
         setActiveId((current) => current ?? live[0]?.webviewId ?? null);
       })
       .catch(() => {});
 
     const unsubscribe = bridge.onWebViewUpdated((event) => {
       if (projectId && event.projectId && event.projectId !== projectId) return;
-      setWebViews((current) =>
-        event.status === 'closed'
-          ? current.filter((webview) => webview.webviewId !== event.webviewId)
-          : upsertWebView(current, event),
-      );
+      setWebviews((current) => updateWebViewsForEvent(current, event));
       if (event.status !== 'closed') {
         setOpen(true);
         setActiveId(event.webviewId);
@@ -124,20 +171,24 @@ export function ProjectWebViewPanel({
     const nextBoundsKey = `${activeWebView.webviewId}:${nextBounds.x}:${nextBounds.y}:${nextBounds.width}:${nextBounds.height}`;
     if (lastBoundsKeyRef.current === nextBoundsKey) return;
     lastBoundsKeyRef.current = nextBoundsKey;
-    void bridge.setWebViewBounds({
-      webviewId: activeWebView.webviewId,
-      bounds: nextBounds,
-    });
+    runBridgeAction(
+      bridge.setWebViewBounds({
+        webviewId: activeWebView.webviewId,
+        bounds: nextBounds,
+      }),
+    );
   }, [activeWebView, open, viewMode]);
 
   const resetBounds = useCallback(() => {
     const bridge = getDesktopWorkspaceBridge();
     if (!bridge?.setWebViewBounds || !activeWebView) return;
     lastBoundsKeyRef.current = null;
-    void bridge.setWebViewBounds({
-      webviewId: activeWebView.webviewId,
-      bounds: { x: 0, y: 0, width: 0, height: 0 },
-    });
+    runBridgeAction(
+      bridge.setWebViewBounds({
+        webviewId: activeWebView.webviewId,
+        bounds: { x: 0, y: 0, width: 0, height: 0 },
+      }),
+    );
   }, [activeWebView]);
 
   useEffect(() => {
@@ -153,17 +204,17 @@ export function ProjectWebViewPanel({
     let animationFrame = 0;
     const syncBounds = () => {
       updateBounds();
-      animationFrame = requestAnimationFrame(syncBounds);
+      animationFrame = globalThis.requestAnimationFrame(syncBounds);
     };
 
-    animationFrame = requestAnimationFrame(syncBounds);
+    animationFrame = globalThis.requestAnimationFrame(syncBounds);
     if (element) observer?.observe(element);
-    window.addEventListener('resize', updateBounds);
+    globalThis.addEventListener('resize', updateBounds);
 
     return () => {
-      cancelAnimationFrame(animationFrame);
+      globalThis.cancelAnimationFrame(animationFrame);
       observer?.disconnect();
-      window.removeEventListener('resize', updateBounds);
+      globalThis.removeEventListener('resize', updateBounds);
       resetBounds();
     };
   }, [activeWebView, resetBounds, updateBounds, viewMode]);
@@ -175,8 +226,8 @@ export function ProjectWebViewPanel({
         onViewModeChange?.('docked');
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    globalThis.addEventListener('keydown', onKeyDown);
+    return () => globalThis.removeEventListener('keydown', onKeyDown);
   }, [onViewModeChange, viewMode]);
 
   useEffect(() => {
@@ -190,23 +241,24 @@ export function ProjectWebViewPanel({
       const bridge = getDesktopWorkspaceBridge();
       if (!bridge || !activeWebView) return;
       const request = { webviewId: activeWebView.webviewId };
-      if (action === 'back') void bridge.goBackWebView?.(request);
-      if (action === 'forward') void bridge.goForwardWebView?.(request);
-      if (action === 'reload') void bridge.reloadWebView?.(request);
-      if (action === 'close') void bridge.closeWebView?.(request);
+      if (action === 'back') runBridgeAction(bridge.goBackWebView?.(request));
+      if (action === 'forward') runBridgeAction(bridge.goForwardWebView?.(request));
+      if (action === 'reload') runBridgeAction(bridge.reloadWebView?.(request));
+      if (action === 'close') runBridgeAction(bridge.closeWebView?.(request));
     },
     [activeWebView],
   );
 
   const openExternal = useCallback(() => {
-    if (!activeWebView) return;
-    const url = activeWebView.externalFallbackUrl ?? activeWebView.url;
-    const bridge = getDesktopWorkspaceBridge();
-    if (bridge?.openExternalFallback) {
-      void bridge.openExternalFallback({ url });
-      return;
+    if (activeWebView != null) {
+      const url = activeWebView.externalFallbackUrl ?? activeWebView.url;
+      const bridge = getDesktopWorkspaceBridge();
+      if (bridge?.openExternalFallback) {
+        runBridgeAction(bridge.openExternalFallback({ url }));
+        return;
+      }
+      globalThis.open(url, '_blank', 'noopener,noreferrer');
     }
-    window.open(url, '_blank', 'noopener,noreferrer');
   }, [activeWebView]);
 
   if (!bridgeAvailable || (!activeWebView && webviews.length === 0)) {
@@ -259,9 +311,9 @@ export function ProjectWebViewPanel({
       </aside>
 
       {viewMode === 'overlay' && (
-        <div
-          className="fixed inset-0 z-50 hidden bg-background/80 p-6 backdrop-blur-sm lg:block"
-          role="dialog"
+        <dialog
+          open
+          className="fixed inset-0 z-50 hidden h-auto w-auto max-h-none max-w-none border-0 bg-background/80 p-6 backdrop-blur-sm lg:block"
           aria-modal="true"
           aria-label="Focused workspace preview"
         >
@@ -283,7 +335,7 @@ export function ProjectWebViewPanel({
               setActiveId={setActiveId}
             />
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );
@@ -320,6 +372,8 @@ function PreviewChrome({
   viewportRef: React.RefObject<HTMLDivElement | null>;
   webviews: readonly DesktopWorkspaceWebViewState[];
 }>) {
+  const activeWebViewMissing = activeWebView == null;
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
@@ -330,46 +384,12 @@ function PreviewChrome({
             {activeWebView?.title ?? activeWebView?.url ?? webviewStatusLabel(activeWebView)}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-muted/30 p-1">
-          <Button
-            type="button"
-            size="sm"
-            variant={viewMode === 'wide' ? 'secondary' : 'ghost'}
-            className="h-7 gap-1.5 px-2 text-xs"
-            onClick={onWide}
-            title={
-              viewMode === 'wide'
-                ? 'Return preview to standard side width'
-                : 'Make the side preview wider'
-            }
-          >
-            {viewMode === 'wide' ? (
-              <Minimize2 className="h-3.5 w-3.5" />
-            ) : (
-              <Maximize2 className="h-3.5 w-3.5" />
-            )}
-            Wide
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={viewMode === 'overlay' ? 'secondary' : 'ghost'}
-            className="h-7 gap-1.5 px-2 text-xs"
-            onClick={viewMode === 'overlay' ? onDock : onOverlay}
-            title={
-              viewMode === 'overlay'
-                ? 'Return focused preview to the side panel'
-                : 'Open preview in a focused overlay'
-            }
-          >
-            {viewMode === 'overlay' ? (
-              <Minimize2 className="h-3.5 w-3.5" />
-            ) : (
-              <Maximize2 className="h-3.5 w-3.5" />
-            )}
-            Focus
-          </Button>
-        </div>
+        <PreviewModeControls
+          onDock={onDock}
+          onOverlay={onOverlay}
+          onWide={onWide}
+          viewMode={viewMode}
+        />
         <Button
           type="button"
           size="icon"
@@ -388,7 +408,7 @@ function PreviewChrome({
           size="icon"
           variant="ghost"
           className="h-8 w-8"
-          disabled={!activeWebView?.canGoBack}
+          disabled={activeWebView?.canGoBack !== true}
           onClick={() => onNavigate('back')}
           title="Back"
         >
@@ -399,7 +419,7 @@ function PreviewChrome({
           size="icon"
           variant="ghost"
           className="h-8 w-8"
-          disabled={!activeWebView?.canGoForward}
+          disabled={activeWebView?.canGoForward !== true}
           onClick={() => onNavigate('forward')}
           title="Forward"
         >
@@ -410,7 +430,7 @@ function PreviewChrome({
           size="icon"
           variant="ghost"
           className="h-8 w-8"
-          disabled={!activeWebView}
+          disabled={activeWebViewMissing}
           onClick={() => onNavigate('reload')}
           title="Reload"
         >
@@ -424,7 +444,7 @@ function PreviewChrome({
           size="icon"
           variant="ghost"
           className="h-8 w-8"
-          disabled={!activeWebView}
+          disabled={activeWebViewMissing}
           onClick={onOpenExternal}
           title="Open externally"
         >
@@ -435,7 +455,7 @@ function PreviewChrome({
           size="icon"
           variant="ghost"
           className="h-8 w-8"
-          disabled={!activeWebView}
+          disabled={activeWebViewMissing}
           onClick={onClosePreview}
           title="Close preview"
         >
@@ -443,56 +463,144 @@ function PreviewChrome({
         </Button>
       </div>
 
-      {webviews.length > 1 && (
-        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 py-2">
-          {webviews.map((webview) => (
-            <button
-              key={webview.webviewId}
-              type="button"
-              className={cn(
-                'max-w-40 truncate rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground',
-                webview.webviewId === activeWebView?.webviewId && 'bg-secondary text-foreground',
-              )}
-              onClick={() => {
-                setActiveId(webview.webviewId);
-                void getDesktopWorkspaceBridge()?.focusWebView?.({
-                  webviewId: webview.webviewId,
-                });
-              }}
-            >
-              {webview.title ?? new URL(webview.url).hostname}
-            </button>
-          ))}
-        </div>
-      )}
+      <WebViewTabs activeWebView={activeWebView} setActiveId={setActiveId} webviews={webviews} />
 
       <div
         ref={viewportRef}
         className="relative min-h-0 flex-1 bg-zinc-950"
         data-testid="project-webview-viewport"
       >
-        {!bridgeAvailable ? (
-          <PanelMessage
-            title="Desktop preview unavailable"
-            description="Embedded previews are available in the desktop shell. Browser mode opens preview resources externally."
-          />
-        ) : !activeWebView ? (
-          <PanelMessage
-            title="No preview open"
-            description="Open a preview or web resource from Project Chat to show it here."
-          />
-        ) : activeWebView.status === 'blocked' || activeWebView.status === 'error' ? (
-          <PanelMessage
-            title={activeWebView.status === 'blocked' ? 'Navigation blocked' : 'Preview error'}
-            description={activeWebView.error ?? activeWebView.blockedUrl ?? activeWebView.url}
-            actionLabel={activeWebView.externalFallbackUrl ? 'Open externally' : undefined}
-            onAction={activeWebView.externalFallbackUrl ? onOpenExternal : undefined}
-          />
-        ) : activeWebView.status === 'loading' ? (
-          <PanelMessage title="Loading preview" description={activeWebView.url} />
-        ) : null}
+        <PreviewViewportMessage
+          activeWebView={activeWebView}
+          bridgeAvailable={bridgeAvailable}
+          onOpenExternal={onOpenExternal}
+        />
       </div>
     </div>
+  );
+}
+
+function PreviewModeControls({
+  onDock,
+  onOverlay,
+  onWide,
+  viewMode,
+}: Readonly<{
+  onDock: () => void;
+  onOverlay: () => void;
+  onWide: () => void;
+  viewMode: ProjectWebViewMode;
+}>) {
+  const isWide = viewMode === 'wide';
+  const isOverlay = viewMode === 'overlay';
+  const WideIcon = isWide ? Minimize2 : Maximize2;
+  const FocusIcon = isOverlay ? Minimize2 : Maximize2;
+
+  return (
+    <div className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-muted/30 p-1">
+      <Button
+        type="button"
+        size="sm"
+        variant={isWide ? 'secondary' : 'ghost'}
+        className="h-7 gap-1.5 px-2 text-xs"
+        onClick={onWide}
+        title={previewModeTitle(viewMode, 'wide')}
+      >
+        <WideIcon className="h-3.5 w-3.5" />
+        Wide
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant={isOverlay ? 'secondary' : 'ghost'}
+        className="h-7 gap-1.5 px-2 text-xs"
+        onClick={isOverlay ? onDock : onOverlay}
+        title={previewModeTitle(viewMode, 'overlay')}
+      >
+        <FocusIcon className="h-3.5 w-3.5" />
+        Focus
+      </Button>
+    </div>
+  );
+}
+
+function WebViewTabs({
+  activeWebView,
+  setActiveId,
+  webviews,
+}: Readonly<{
+  activeWebView: DesktopWorkspaceWebViewState | null;
+  setActiveId: (id: string) => void;
+  webviews: readonly DesktopWorkspaceWebViewState[];
+}>) {
+  if (webviews.length <= 1) return null;
+
+  return (
+    <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 py-2">
+      {webviews.map((webview) => (
+        <WebViewTab
+          activeWebViewId={activeWebView?.webviewId ?? null}
+          key={webview.webviewId}
+          setActiveId={setActiveId}
+          webview={webview}
+        />
+      ))}
+    </div>
+  );
+}
+
+function WebViewTab({
+  activeWebViewId,
+  setActiveId,
+  webview,
+}: Readonly<{
+  activeWebViewId: string | null;
+  setActiveId: (id: string) => void;
+  webview: DesktopWorkspaceWebViewState;
+}>) {
+  const focusWebView = () => {
+    setActiveId(webview.webviewId);
+    runBridgeAction(
+      getDesktopWorkspaceBridge()?.focusWebView?.({
+        webviewId: webview.webviewId,
+      }),
+    );
+  };
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        'max-w-40 truncate rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground',
+        webview.webviewId === activeWebViewId && 'bg-secondary text-foreground',
+      )}
+      onClick={focusWebView}
+    >
+      {webview.title ?? new URL(webview.url).hostname}
+    </button>
+  );
+}
+
+function PreviewViewportMessage({
+  activeWebView,
+  bridgeAvailable,
+  onOpenExternal,
+}: Readonly<{
+  activeWebView: DesktopWorkspaceWebViewState | null;
+  bridgeAvailable: boolean;
+  onOpenExternal: () => void;
+}>) {
+  if (bridgeAvailable) {
+    const messageProps = panelMessageProps(activeWebView, onOpenExternal);
+    if (messageProps == null) return null;
+    return <PanelMessage {...messageProps} />;
+  }
+
+  return (
+    <PanelMessage
+      title="Desktop preview unavailable"
+      description="Embedded previews are available in the desktop shell. Browser mode opens preview resources externally."
+    />
   );
 }
 

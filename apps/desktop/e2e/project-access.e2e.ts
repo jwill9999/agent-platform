@@ -39,6 +39,7 @@ const GIT_BINARY = '/usr/bin/git';
 const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
 const E2E_MODEL_RESPONSE = 'E2E model response received';
 const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+const IDE_URL_PATTERN = new RegExp(String.raw`/ide`);
 
 test.describe('Electron Project access', () => {
   test('opens a local Project and binds chat/slash commands to the same Project session', async () => {
@@ -189,7 +190,7 @@ test.describe('Electron Project access', () => {
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
-      await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
       await expect(page.getByText('Restore folder')).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
@@ -327,7 +328,7 @@ test.describe('Electron Project access', () => {
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
-      await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       const secondProject = await findRecentProjectExcluding(
         backendPort,
         secondProjectName,
@@ -356,11 +357,11 @@ test.describe('Electron Project access', () => {
         timeout: 15_000,
       });
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
-      await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
       await expect(page.getByText(secondProjectDir)).toHaveCount(0);
       await page.getByRole('button', { name: 'Open in IDE' }).click();
-      await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       await expect(page.getByText(/Open in IDE is available/)).toHaveCount(0);
       await expect(page.getByText(/Project folder is unavailable/)).toHaveCount(0);
       await expect(page.getByText(/Failed to open the Project folder/)).toHaveCount(0);
@@ -374,7 +375,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
 
       await page.getByRole('button', { name: 'Open in IDE' }).click();
-      await expect(page).not.toHaveURL(/\/ide/);
+      await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       await expect(page.getByText(/Open in IDE is available/)).toHaveCount(0);
       await expect(page.getByText(/Project folder is unavailable/)).toHaveCount(0);
       await expect(page.getByText(/Failed to open the Project folder/)).toHaveCount(0);

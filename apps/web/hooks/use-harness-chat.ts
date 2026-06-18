@@ -259,6 +259,16 @@ type StreamAssistantResult = {
   errorMessage: string | null;
 };
 
+type NdjsonStreamHandlers = {
+  onText: (chunk: string) => void;
+  onError: (msg: string) => void;
+  onCritic: (event: CriticEvent) => void;
+  onThinking: (chunk: string) => void;
+  onToolTrace: (event: ToolTraceEvent) => void;
+  onWorkspaceEvent: (event: WorkspaceEvent) => void;
+  onApprovalRequired: (event: ApprovalRequiredStreamEvent) => void;
+};
+
 function renderThinkingEvent(o: StreamEvent): StreamRenderResult {
   if (typeof o.content !== 'string') return null;
   const critic = parseCriticContent(o.content.trimStart());
@@ -277,51 +287,67 @@ function renderTextEvent(o: StreamEvent): StreamRenderResult {
   return { text };
 }
 
+function renderCodeEvent(o: StreamEvent): StreamRenderResult {
+  if (typeof o.content !== 'string') return null;
+  const lang = typeof o.language === 'string' ? o.language : '';
+  return { text: `\n\`\`\`${lang}\n${o.content}\n\`\`\`\n` };
+}
+
+function renderImageEvent(o: StreamEvent): StreamRenderResult {
+  return typeof o.data === 'string' && typeof o.mimeType === 'string'
+    ? { text: `\n\n![screenshot](data:${o.mimeType};base64,${o.data})\n\n` }
+    : null;
+}
+
+function renderToolResultEvent(o: StreamEvent): StreamRenderResult {
+  if (typeof o.toolId !== 'string') return null;
+  return {
+    toolTrace: {
+      type: 'result',
+      toolId: o.toolId,
+      data: o.data,
+      status: toolResultStatus(o.data),
+    },
+  };
+}
+
+function renderApprovalRequiredEvent(o: StreamEvent): StreamRenderResult {
+  if (typeof o.approvalRequestId !== 'string' || typeof o.toolName !== 'string') return null;
+  return {
+    approvalRequired: {
+      type: 'approval_required',
+      approvalRequestId: o.approvalRequestId,
+      toolName: o.toolName,
+      argsPreview: o.argsPreview,
+      ...(typeof o.riskTier === 'string' ? { riskTier: o.riskTier } : {}),
+      ...(typeof o.message === 'string' ? { message: o.message } : {}),
+    },
+  };
+}
+
+function renderWorkspaceEvent(o: StreamEvent): StreamRenderResult {
+  const parsed = WorkspaceEventSchema.safeParse(o.event);
+  return parsed.success ? { workspaceEvent: parsed.data } : null;
+}
+
 export function renderStreamEvent(o: StreamEvent): StreamRenderResult {
   switch (o.type) {
     case 'text':
       return renderTextEvent(o);
     case 'thinking':
       return renderThinkingEvent(o);
-    case 'code': {
-      if (typeof o.content !== 'string') return null;
-      const lang = typeof o.language === 'string' ? o.language : '';
-      return { text: `\n\`\`\`${lang}\n${o.content}\n\`\`\`\n` };
-    }
+    case 'code':
+      return renderCodeEvent(o);
     case 'image':
-      return typeof o.data === 'string' && typeof o.mimeType === 'string'
-        ? { text: `\n\n![screenshot](data:${o.mimeType};base64,${o.data})\n\n` }
-        : null;
-    case 'tool_result': {
-      if (typeof o.toolId !== 'string') return null;
-      return {
-        toolTrace: {
-          type: 'result',
-          toolId: o.toolId,
-          data: o.data,
-          status: toolResultStatus(o.data),
-        },
-      };
-    }
+      return renderImageEvent(o);
+    case 'tool_result':
+      return renderToolResultEvent(o);
     case 'error':
       return renderErrorEvent(o);
     case 'approval_required':
-      return typeof o.approvalRequestId === 'string' && typeof o.toolName === 'string'
-        ? {
-            approvalRequired: {
-              type: 'approval_required',
-              approvalRequestId: o.approvalRequestId,
-              toolName: o.toolName,
-              argsPreview: o.argsPreview,
-              ...(typeof o.riskTier === 'string' ? { riskTier: o.riskTier } : {}),
-              ...(typeof o.message === 'string' ? { message: o.message } : {}),
-            },
-          }
-        : null;
-    case 'workspace_event': {
-      const parsed = WorkspaceEventSchema.safeParse(o.event);
-      return parsed.success ? { workspaceEvent: parsed.data } : null;
-    }
+      return renderApprovalRequiredEvent(o);
+    case 'workspace_event':
+      return renderWorkspaceEvent(o);
     default:
       return null;
   }
@@ -341,13 +367,7 @@ async function parseErrorResponse(res: Response): Promise<string> {
 
 async function readNdjsonStream(
   body: ReadableStream<Uint8Array>,
-  onText: (chunk: string) => void,
-  onError: (msg: string) => void,
-  onCritic: (event: CriticEvent) => void,
-  onThinking: (chunk: string) => void,
-  onToolTrace: (event: ToolTraceEvent) => void,
-  onWorkspaceEvent: (event: WorkspaceEvent) => void,
-  onApprovalRequired: (event: ApprovalRequiredStreamEvent) => void,
+  handlers: NdjsonStreamHandlers,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -358,13 +378,13 @@ async function readNdjsonStream(
     if (!ev) return;
     const result = renderStreamEvent(ev);
     if (!result) return;
-    if ('text' in result) onText(result.text);
-    else if ('thinking' in result) onThinking(result.thinking);
-    else if ('toolTrace' in result) onToolTrace(result.toolTrace);
-    else if ('workspaceEvent' in result) onWorkspaceEvent(result.workspaceEvent);
-    else if ('critic' in result) onCritic(result.critic);
-    else if ('approvalRequired' in result) onApprovalRequired(result.approvalRequired);
-    else onError(result.error);
+    if ('text' in result) handlers.onText(result.text);
+    else if ('thinking' in result) handlers.onThinking(result.thinking);
+    else if ('toolTrace' in result) handlers.onToolTrace(result.toolTrace);
+    else if ('workspaceEvent' in result) handlers.onWorkspaceEvent(result.workspaceEvent);
+    else if ('critic' in result) handlers.onCritic(result.critic);
+    else if ('approvalRequired' in result) handlers.onApprovalRequired(result.approvalRequired);
+    else handlers.onError(result.error);
   };
 
   while (true) {
@@ -609,9 +629,8 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
       let accumulated = '';
       let streamErrorMessage: string | null = null;
       let pendingRevisionReset = false;
-      await readNdjsonStream(
-        body,
-        (chunk) => {
+      await readNdjsonStream(body, {
+        onText: (chunk) => {
           if (!chunk) return;
           if (pendingRevisionReset) {
             accumulated = chunk;
@@ -620,11 +639,11 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
             accumulated += chunk;
           }
         },
-        (msg) => {
+        onError: (msg) => {
           streamErrorMessage = msg;
           setError(msg);
         },
-        (event) => {
+        onCritic: (event) => {
           appendCriticEvent(assistantId, event);
           if (event.kind === 'revise') {
             pendingRevisionReset = true;
@@ -634,11 +653,11 @@ export function useHarnessChat(sessionId: string | null, resume = false) {
             }));
           }
         },
-        (chunk) => appendThinking(assistantId, chunk),
-        (event) => appendToolTrace(assistantId, event),
-        (event) => appendWorkspaceEvent(assistantId, event),
-        (event) => appendApprovalRequired(assistantId, event),
-      );
+        onThinking: (chunk) => appendThinking(assistantId, chunk),
+        onToolTrace: (event) => appendToolTrace(assistantId, event),
+        onWorkspaceEvent: (event) => appendWorkspaceEvent(assistantId, event),
+        onApprovalRequired: (event) => appendApprovalRequired(assistantId, event),
+      });
       return { text: accumulated, errorMessage: streamErrorMessage };
     },
     [

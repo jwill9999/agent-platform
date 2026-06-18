@@ -514,6 +514,27 @@ function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
   );
 }
 
+function ProjectCommandRunnerStatus({
+  commandRunner,
+}: Readonly<{ commandRunner: CommandRunnerDisplay | null }>) {
+  if (!commandRunner) {
+    return null;
+  }
+
+  return (
+    <div
+      aria-label="Command runner status"
+      className="hidden min-w-0 max-w-44 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground md:flex"
+      title={commandRunner.message}
+    >
+      <span
+        className={`h-2 w-2 shrink-0 rounded-full ${commandRunnerStatusColor(commandRunner)}`}
+      />
+      <span className="truncate">{commandRunnerStatusLabel(commandRunner)}</span>
+    </div>
+  );
+}
+
 function ProjectChatHeader({
   commandRunner,
   project,
@@ -545,18 +566,7 @@ function ProjectChatHeader({
           <div className="truncate text-[11px] text-muted-foreground">{folderPathLabel}</div>
         )}
       </div>
-      {commandRunner && (
-        <div
-          aria-label="Command runner status"
-          className="hidden min-w-0 max-w-44 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground md:flex"
-          title={commandRunner.message}
-        >
-          <span
-            className={`h-2 w-2 shrink-0 rounded-full ${commandRunnerStatusColor(commandRunner)}`}
-          />
-          <span className="truncate">{commandRunnerStatusLabel(commandRunner)}</span>
-        </div>
-      )}
+      <ProjectCommandRunnerStatus commandRunner={commandRunner} />
       <Button
         type="button"
         size="sm"
@@ -752,7 +762,10 @@ export default function HomePage() {
         projectId: null,
         updatedAtMs: Date.now(),
       };
-      return (await apiPut<SessionRecord>(apiPath('sessions', session.id), updatedSession)) ?? updatedSession;
+      return (
+        (await apiPut<SessionRecord>(apiPath('sessions', session.id), updatedSession)) ??
+        updatedSession
+      );
     },
     [agents],
   );
@@ -1252,7 +1265,7 @@ export default function HomePage() {
     if (attemptedProjectReopenIdRef.current === projectId) return;
     attemptedProjectReopenIdRef.current = projectId;
 
-    void reopenRecentProject(projectId, requestedSessionId);
+    reopenRecentProject(projectId, requestedSessionId).catch(() => {});
   }, [activeProject, reopenRecentProject, selectedMode]);
 
   useEffect(() => {
@@ -1271,7 +1284,7 @@ export default function HomePage() {
     const handleProjectReopenRequest = (event: Event) => {
       const detail = (event as CustomEvent<{ projectId?: unknown }>).detail;
       if (typeof detail?.projectId !== 'string') return;
-      void reopenRecentProject(detail.projectId, null);
+      reopenRecentProject(detail.projectId, null).catch(() => {});
     };
 
     globalThis.window.addEventListener(projectReopenRequestedEvent, handleProjectReopenRequest);
@@ -1285,7 +1298,7 @@ export default function HomePage() {
 
   const handleSelectSession = useCallback(
     (session: SessionRecord) => {
-      void (async () => {
+      const selectSession = async () => {
         agentSelectionSourceRef.current = 'system';
         setIsResuming(true);
         const normalizedSession = await normalizePersonalChatSession(session);
@@ -1308,19 +1321,15 @@ export default function HomePage() {
         if (repairedPersonalSession) {
           refreshSessions().catch(() => {});
         }
-      })().catch((error) => {
+      };
+
+      selectSession().catch((error) => {
         setSessionError(
           error instanceof ApiRequestError ? error.message : 'Failed to open chat session',
         );
       });
     },
-    [
-      clearAttachments,
-      modelConfigs,
-      normalizePersonalChatSession,
-      refreshSensors,
-      refreshSessions,
-    ],
+    [clearAttachments, modelConfigs, normalizePersonalChatSession, refreshSensors, refreshSessions],
   );
 
   const handleNewChatForAgent = useCallback(
@@ -1377,7 +1386,17 @@ export default function HomePage() {
   const inputStatusText = hasUsableModelConfig
     ? getInputStatusText(hasPendingApproval, selectedMode, sessionId)
     : 'Create a model in Settings > Models before sending.';
+  let workspaceWebViewProjectId: string | null = null;
+  if (selectedMode === 'project-chat') {
+    workspaceWebViewProjectId = activeProject?.id ?? null;
+  }
   const onboardingDraft = projectOnboardingDraft(activeProject);
+  let projectInstructionsStatus: 'approved' | 'draft_ready' | 'missing' = 'missing';
+  if (projectOnboardingIsApproved(activeProject)) {
+    projectInstructionsStatus = 'approved';
+  } else if (onboardingDraft) {
+    projectInstructionsStatus = 'draft_ready';
+  }
   const navigationState = createWorkspaceNavigationState({
     surface: getWorkspaceSurface(selectedMode),
     projectId: activeProject?.id,
@@ -1573,9 +1592,7 @@ export default function HomePage() {
               thinkingByMessage={thinkingByMessage}
               toolEventsByMessage={toolEventsByMessage}
               workspaceEventsByMessage={workspaceEventsByMessage}
-              workspaceWebViewProjectId={
-                selectedMode === 'project-chat' ? (activeProject?.id ?? null) : null
-              }
+              workspaceWebViewProjectId={workspaceWebViewProjectId}
               approvalEventsByMessage={approvalEventsByMessage}
               onApprovalDecision={handleApprovalDecision}
               showSensors={false}
@@ -1641,13 +1658,7 @@ export default function HomePage() {
                       <ProjectGitHubPanel
                         projectId={activeProject?.id ?? null}
                         refreshKey={projectGitRefreshKey}
-                        projectInstructionsStatus={
-                          projectOnboardingIsApproved(activeProject)
-                            ? 'approved'
-                            : onboardingDraft
-                              ? 'draft_ready'
-                              : 'missing'
-                        }
+                        projectInstructionsStatus={projectInstructionsStatus}
                         isStartingProjectInstructions={isStartingProjectInstructions}
                         onStartProjectInstructions={handleStartProjectInstructions}
                       />

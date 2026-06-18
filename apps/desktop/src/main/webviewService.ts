@@ -313,7 +313,7 @@ export class DesktopWebViewService {
 
   goBack(webviewId: string): DesktopWebViewState | null {
     const session = this.#sessions.get(webviewId);
-    if (!session?.view.webContents.navigationHistory.canGoBack()) {
+    if (!session?.view?.webContents?.navigationHistory?.canGoBack()) {
       return session ? this.#state(session) : null;
     }
     session.view.webContents.goBack();
@@ -322,7 +322,7 @@ export class DesktopWebViewService {
 
   goForward(webviewId: string): DesktopWebViewState | null {
     const session = this.#sessions.get(webviewId);
-    if (!session?.view.webContents.navigationHistory.canGoForward()) {
+    if (!session?.view?.webContents?.navigationHistory?.canGoForward()) {
       return session ? this.#state(session) : null;
     }
     session.view.webContents.goForward();
@@ -340,7 +340,7 @@ export class DesktopWebViewService {
   }
 
   disposeAll(): void {
-    for (const webviewId of [...this.#sessions.keys()]) {
+    for (const webviewId of this.#sessions.keys()) {
       this.close(webviewId);
     }
     this.#sessions.clear();
