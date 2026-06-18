@@ -134,9 +134,9 @@ test.describe('Electron Project access', () => {
       await selectActiveAgent(page, 'Personal assistant');
       await selectActiveAgent(page, 'Coding');
       await page.getByRole('button', { name: 'Workspaces' }).click();
-      await expect(page.getByRole('button', { name: 'Open Chat' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^Chat\b/ })).toBeVisible();
 
-      await page.getByRole('button', { name: 'Open Chat' }).click();
+      await page.getByRole('button', { name: /^Chat\b/ }).click();
       await expect(page.getByPlaceholder('Send a message... (drop files to attach)')).toBeVisible();
       await expect(page.locator('nav a[href="/?mode=chat"]')).toHaveAttribute(
         'aria-current',
@@ -347,7 +347,7 @@ test.describe('Electron Project access', () => {
         `${rendererOrigin}/?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(session.id)}`,
       );
       await expect(page.getByText('Opening Project chat...')).toHaveCount(0, { timeout: 15_000 });
-      await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: firstProjectName })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
       await expect(page.getByText('/help init', { exact: true }).last()).toBeVisible({
@@ -434,7 +434,10 @@ async function sendChatMessage(page: Page, message: string, placeholder: string)
 }
 
 async function attachFilesToComposer(page: Page, files: FilePayload[]): Promise<void> {
-  await page.locator('input[type="file"]').setInputFiles(files);
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Attach files' }).click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(files);
 }
 
 async function findRecentProject(port: number, name: string): Promise<ProjectRecord> {

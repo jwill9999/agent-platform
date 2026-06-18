@@ -58,10 +58,12 @@ and actionable.
 - Added explicit Electron binary setup for Electron E2E jobs, because hardened installs also skip
   Electron's binary download/path setup. The setup now uses `scripts/install-electron-binary.mjs`
   and fails early if `path.txt` or the executable is still missing.
-- Excluded that CI-only Electron installer helper from Sonar application analysis after SonarCloud
-  flagged its controlled archive extraction as a security hotspot.
+- Excluded CI-only native setup helpers from Sonar application analysis after SonarCloud flagged
+  helper implementation details that are not product runtime code.
 - Updated desktop/VM E2E project-opening helpers to use the new `Open folder` Workspaces action
   instead of the removed `Open Project` button label.
+- Updated desktop E2E to use the visible `Attach files` file chooser path and the current `Chat`
+  workspace label, matching the simplified Workspaces UX.
 - Kept browser E2E selectors aligned with surface-specific labels: Workspaces uses `Chat` /
   `Open folder`, while the legacy `/ide` Project binding panel still uses `Open Project`.
 - Increased `verify`, browser `e2e`, and `desktop-e2e` CI timeouts because Playwright Chromium
@@ -77,6 +79,8 @@ and actionable.
   `pnpm --filter @agent-platform/api test -- test/settingsRouter.test.ts test/projectsRouter.test.ts`,
   full `pnpm build`, full `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, and
   `git diff --check`.
+- Verified locally after the latest desktop E2E alignment:
+  `SECRETS_MASTER_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= pnpm --filter @agent-platform/desktop run test:e2e -- e2e/project-access.e2e.ts`.
 
 ## Product Direction
 
