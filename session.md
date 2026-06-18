@@ -64,6 +64,8 @@ and actionable.
 - Removed standalone Chromium installation from `verify` and `desktop-e2e`; browser E2E now installs
   only Playwright browser OS dependencies and uses the GitHub runner's system Chrome channel instead
   of downloading a standalone Chromium archive.
+- Disabled browser E2E video capture in CI because system Chrome runs do not install Playwright's
+  bundled `ffmpeg`; traces, screenshots, HTML reports, and Docker logs remain available on failure.
 - Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
   `multiple target patterns`.
 - Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,
