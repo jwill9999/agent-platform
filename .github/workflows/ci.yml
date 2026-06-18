@@ -100,8 +100,10 @@ jobs:
       - name: Rebuild native dependencies
         run: pnpm run rebuild:native
 
-      - name: Install Playwright Chromium
-        run: ./node_modules/.bin/playwright install --with-deps --only-shell chromium
+      - name: Install Playwright browser dependencies
+        run: |
+          google-chrome --version
+          ./node_modules/.bin/playwright install-deps chromium
 
       - name: Prepare workspace storage
         run: make workspace-init

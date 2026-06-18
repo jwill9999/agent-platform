@@ -62,7 +62,8 @@ and actionable.
 - Increased `verify`, browser `e2e`, and `desktop-e2e` CI timeouts because Playwright Chromium
   install can exceed the old 15-minute verify cap after the Node/Playwright baseline update.
 - Removed standalone Chromium installation from `verify` and `desktop-e2e`; browser E2E now installs
-  Playwright's smaller Chromium headless shell.
+  only Playwright browser OS dependencies and uses the GitHub runner's system Chrome channel instead
+  of downloading a standalone Chromium archive.
 - Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
   `multiple target patterns`.
 - Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,
@@ -82,10 +83,9 @@ and actionable.
 
 ## Next
 
-1. Push the task 2 and CI repair commits if not already done in this session.
-2. Monitor GitHub Actions for the branch/PR and confirm CI, E2E, desktop E2E, VM E2E, and circular
+1. Monitor GitHub Actions for the branch/PR and confirm CI, E2E, desktop E2E, VM E2E, and circular
    dependency checks are green.
-3. Ask the user to manually test Workspaces, Chat, Coding Project creation/opening, recent Projects,
+2. Ask the user to manually test Workspaces, Chat, Coding Project creation/opening, recent Projects,
    and refresh feedback.
-4. Close `agent-platform-project-experience.2` only after manual UX feedback is accepted or filed as
+3. Close `agent-platform-project-experience.2` only after manual UX feedback is accepted or filed as
    follow-up Beads work.
