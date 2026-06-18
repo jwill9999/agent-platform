@@ -27,6 +27,11 @@ const DEFAULT_UBUNTU_KERNEL_PACKAGE_BASE =
 const CURL_BINARY = '/usr/bin/curl';
 const FILE_BINARY = '/usr/bin/file';
 const STRINGS_BINARY = '/usr/bin/strings';
+const DOCKER_BINARY_CANDIDATES = [
+  '/usr/bin/docker',
+  '/usr/local/bin/docker',
+  '/opt/homebrew/bin/docker',
+];
 const FAILURE_EXIT_CODE = 1;
 
 const scriptArgs = process.argv.slice(2);
@@ -95,10 +100,11 @@ downloadFile(
 
 const buildScriptPath = join(resolvedOutDir, 'build-inside-container.sh');
 writeFileSync(buildScriptPath, buildScript(), { mode: 0o755 });
+const dockerBinary = resolveDockerBinary();
 
 try {
   execFileSync(
-    'docker',
+    dockerBinary,
     [
       'run',
       '--rm',
@@ -142,6 +148,20 @@ function downloadFile(url, path) {
   } catch (error) {
     exitWithChildProcessFailure(error, `Failed to download VM boot asset from ${url}`);
   }
+}
+
+function resolveDockerBinary() {
+  for (const candidate of DOCKER_BINARY_CANDIDATES) {
+    if (existsSync(candidate)) return candidate;
+  }
+
+  console.error(
+    [
+      'Docker CLI was not found in a supported fixed system location.',
+      `Checked: ${DOCKER_BINARY_CANDIDATES.join(', ')}`,
+    ].join('\n'),
+  );
+  process.exit(1);
 }
 
 function exitWithChildProcessFailure(error, message) {
