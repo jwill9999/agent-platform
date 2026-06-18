@@ -226,8 +226,7 @@ jobs:
 
       - name: Install Electron binary
         run: |
-          ELECTRON_INSTALL_SCRIPT="$(node -p "require('node:module').createRequire(process.cwd() + '/apps/desktop/package.json').resolve('electron/install.js')")"
-          node "$ELECTRON_INSTALL_SCRIPT"
+          pnpm --filter @agent-platform/desktop rebuild electron
           node - <<'NODE'
           const { createRequire } = require('node:module');
           const fs = require('node:fs');
@@ -301,8 +300,7 @@ jobs:
 
       - name: Install Electron binary
         run: |
-          ELECTRON_INSTALL_SCRIPT="$(node -p "require('node:module').createRequire(process.cwd() + '/apps/desktop/package.json').resolve('electron/install.js')")"
-          node "$ELECTRON_INSTALL_SCRIPT"
+          pnpm --filter @agent-platform/desktop rebuild electron
           node - <<'NODE'
           const { createRequire } = require('node:module');
           const fs = require('node:fs');
