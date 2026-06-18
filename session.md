@@ -52,8 +52,8 @@ and actionable.
 - Kept hardened `pnpm install --frozen-lockfile --ignore-scripts` in CI and added explicit
   `pnpm run rebuild:native` steps before DB-backed tests and Electron/VM E2E jobs.
 - Added explicit Electron binary setup for Electron E2E jobs, because hardened installs also skip
-  Electron's binary download/path setup. The setup now rebuilds Electron through pnpm's package
-  lifecycle and fails early if `path.txt` is still missing.
+  Electron's binary download/path setup. The setup now uses `scripts/install-electron-binary.mjs`
+  and fails early if `path.txt` or the executable is still missing.
 - Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
   `multiple target patterns`.
 - Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,

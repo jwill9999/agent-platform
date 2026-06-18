@@ -225,21 +225,7 @@ jobs:
         run: pnpm run rebuild:native
 
       - name: Install Electron binary
-        run: |
-          pnpm --filter @agent-platform/desktop rebuild electron
-          node - <<'NODE'
-          const { createRequire } = require('node:module');
-          const fs = require('node:fs');
-          const path = require('node:path');
-          const requireFromDesktop = createRequire(process.cwd() + '/apps/desktop/package.json');
-          const electronPackage = requireFromDesktop.resolve('electron/package.json');
-          const electronRoot = path.dirname(electronPackage);
-          const marker = path.join(electronRoot, 'path.txt');
-          if (!fs.existsSync(marker)) {
-            throw new Error(`Electron marker missing after install: ${marker}`);
-          }
-          console.log(`Electron binary ready: ${fs.readFileSync(marker, 'utf8').trim()}`);
-          NODE
+        run: node scripts/install-electron-binary.mjs
 
       - name: Install Electron display dependencies
         run: |
@@ -299,21 +285,7 @@ jobs:
         run: pnpm run rebuild:native
 
       - name: Install Electron binary
-        run: |
-          pnpm --filter @agent-platform/desktop rebuild electron
-          node - <<'NODE'
-          const { createRequire } = require('node:module');
-          const fs = require('node:fs');
-          const path = require('node:path');
-          const requireFromDesktop = createRequire(process.cwd() + '/apps/desktop/package.json');
-          const electronPackage = requireFromDesktop.resolve('electron/package.json');
-          const electronRoot = path.dirname(electronPackage);
-          const marker = path.join(electronRoot, 'path.txt');
-          if (!fs.existsSync(marker)) {
-            throw new Error(`Electron marker missing after install: ${marker}`);
-          }
-          console.log(`Electron binary ready: ${fs.readFileSync(marker, 'utf8').trim()}`);
-          NODE
+        run: node scripts/install-electron-binary.mjs
 
       - name: Run macOS VM host preflight
         run: pnpm --filter @agent-platform/desktop native:vm:host-check -- --json
