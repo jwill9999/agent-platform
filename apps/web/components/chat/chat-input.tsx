@@ -4,9 +4,9 @@ import {
   useState,
   useRef,
   useCallback,
+  type ComponentProps,
   type KeyboardEvent,
   type DragEvent,
-  type FormEvent,
   type ReactNode,
 } from 'react';
 import {
@@ -90,8 +90,8 @@ export function ChatInput({
     }
   }, [input, isLoading, onSend, canSend]);
 
-  const handleSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = useCallback<NonNullable<ComponentProps<'form'>['onSubmit']>>(
+    (e) => {
       e.preventDefault();
       doSend();
     },
