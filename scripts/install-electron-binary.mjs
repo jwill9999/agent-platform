@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import childProcess from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-import os from 'node:os';
 import path from 'node:path';
 
 const requireFromDesktop = createRequire(path.join(process.cwd(), 'apps/desktop/package.json'));
@@ -49,7 +47,7 @@ const zipPath = await downloadArtifact({
 });
 
 await fs.promises.rm(distPath, { force: true, recursive: true });
-await extract(zipPath, { dir: path.join(electronRoot, 'dist') });
+await extractWithKeepAlive(zipPath, distPath);
 
 const extractedTypes = path.join(distPath, 'electron.d.ts');
 if (fs.existsSync(extractedTypes)) {
@@ -99,23 +97,16 @@ function hasMatchingDist() {
 function resolveArch(targetPlatform) {
   let targetArch = process.env.ELECTRON_INSTALL_ARCH ?? process.env.npm_config_arch ?? process.arch;
 
-  if (
-    targetPlatform === 'darwin' &&
-    process.platform === 'darwin' &&
-    targetArch === 'x64' &&
-    process.env.npm_config_arch === undefined
-  ) {
-    try {
-      const output = childProcess.execSync('sysctl -in sysctl.proc_translated');
-      if (output.toString().trim() === '1') {
-        targetArch = 'arm64';
-      }
-    } catch {
-      // Not running under Rosetta, or sysctl is unavailable.
-    }
-  }
-
   return targetArch;
+}
+
+async function extractWithKeepAlive(zipPath, targetDirectory) {
+  const keepAlive = setInterval(() => {}, 1000);
+  try {
+    await extract(zipPath, { dir: targetDirectory });
+  } finally {
+    clearInterval(keepAlive);
+  }
 }
 
 function getPlatformPath(targetPlatform) {
