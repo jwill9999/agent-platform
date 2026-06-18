@@ -144,6 +144,7 @@ export function recommendPullRequestBaseBranch({
 }
 
 type RepositoryConnectionMode = 'create' | 'connect';
+type ConflictResolutionStrategy = 'current' | 'incoming' | 'both';
 
 const ZERO_WORKING_TREE = {
   total: 0,
@@ -1886,7 +1887,7 @@ type ConflictResolverDialogProps = {
   setSelectedConflictPath: React.Dispatch<React.SetStateAction<string | null>>;
   setConflictFile: React.Dispatch<React.SetStateAction<ProjectGitConflictFileResult | null>>;
   setMergeCommitMessage: React.Dispatch<React.SetStateAction<string>>;
-  applyConflictChoice: (strategy: 'current' | 'incoming' | 'both') => Promise<void>;
+  applyConflictChoice: (strategy: ConflictResolutionStrategy) => Promise<void>;
   commitMergeResolution: (push: boolean) => Promise<void>;
 };
 
@@ -2142,7 +2143,7 @@ function ConflictResolverMain({
   setConflictFile: React.Dispatch<React.SetStateAction<ProjectGitConflictFileResult | null>>;
   setSelectedConflictPath: React.Dispatch<React.SetStateAction<string | null>>;
   setMergeCommitMessage: React.Dispatch<React.SetStateAction<string>>;
-  applyConflictChoice: (strategy: 'current' | 'incoming' | 'both') => Promise<void>;
+  applyConflictChoice: (strategy: ConflictResolutionStrategy) => Promise<void>;
   commitMergeResolution: (push: boolean) => Promise<void>;
 }>) {
   return (
@@ -2287,7 +2288,7 @@ function UnresolvedConflictPanel({
   actionPending: string | null;
   setConflictFile: React.Dispatch<React.SetStateAction<ProjectGitConflictFileResult | null>>;
   setSelectedConflictPath: React.Dispatch<React.SetStateAction<string | null>>;
-  applyConflictChoice: (strategy: 'current' | 'incoming' | 'both') => Promise<void>;
+  applyConflictChoice: (strategy: ConflictResolutionStrategy) => Promise<void>;
 }>) {
   return (
     <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-4">
@@ -3097,7 +3098,7 @@ export function ProjectGitHubPanel({
   }, [loadChanges, loadChecks, loadPullRequests, projectId]);
 
   const applyConflictChoice = useCallback(
-    async (strategy: 'current' | 'incoming' | 'both') => {
+    async (strategy: ConflictResolutionStrategy) => {
       if (!projectId || !selectedConflictPath) return;
       setActionPending(`resolve:${selectedConflictPath}:${strategy}`);
       try {
