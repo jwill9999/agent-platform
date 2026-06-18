@@ -16,8 +16,8 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-18
-- **Session:** Implemented `agent-platform-project-experience.2` Workspaces/sidebar simplification and
-  prepared it for manual UX review.
+- **Session:** Implemented `agent-platform-project-experience.2` Workspaces/sidebar simplification,
+  then repaired failing GitHub Actions setup for Node/native dependency handling.
 - **Branch:** `jwill9999/project-experience-workspace-navigation`
 - **Base:** branched from `jwill9999/project-experience-capability-metadata`; task 2 is not closed
   until manual testing is reviewed.
@@ -44,6 +44,20 @@ and actionable.
 - Docker rebuild for a later Playwright rerun hit local disk pressure (`ENOSPC`) while writing the
   Next.js build cache; no source failure was identified.
 
+**CI Pipeline Repair:**
+
+- Moved the repo baseline to Node 24 in `.nvmrc`, package engines, GitHub Actions, Dockerfiles, and
+  user/developer docs.
+- Added `pnpm/action-setup` before setup-node pnpm caching in `check-cycles.yml`.
+- Kept hardened `pnpm install --frozen-lockfile --ignore-scripts` in CI and added explicit
+  `pnpm run rebuild:native` steps before DB-backed tests and Electron/VM E2E jobs.
+- Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
+  `multiple target patterns`.
+- Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,
+  `pnpm --filter @agent-platform/api test -- test/settingsRouter.test.ts test/projectsRouter.test.ts`,
+  full `pnpm build`, full `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, and
+  `git diff --check`.
+
 ## Product Direction
 
 - Current visible workspace surfaces are:
@@ -56,8 +70,10 @@ and actionable.
 
 ## Next
 
-1. Commit and push task 2 changes if not already done in this session.
-2. Ask the user to manually test Workspaces, Chat, Coding Project creation/opening, recent Projects,
+1. Push the task 2 and CI repair commits if not already done in this session.
+2. Monitor GitHub Actions for the branch/PR and confirm CI, E2E, desktop E2E, VM E2E, and circular
+   dependency checks are green.
+3. Ask the user to manually test Workspaces, Chat, Coding Project creation/opening, recent Projects,
    and refresh feedback.
-3. Close `agent-platform-project-experience.2` only after manual UX feedback is accepted or filed as
+4. Close `agent-platform-project-experience.2` only after manual UX feedback is accepted or filed as
    follow-up Beads work.

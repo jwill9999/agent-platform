@@ -53,7 +53,7 @@ pnpm --filter <package-name> run test -- <path/to/test.ts>
 SQLITE_PATH=<path> pnpm seed   # idempotent
 ```
 
-**Node version:** managed by `.nvmrc` (v20). The Makefile auto-runs `nvm install` when nvm is present.
+**Node version:** managed by `.nvmrc` (v24). The Makefile auto-runs `nvm install` when nvm is present.
 
 ---
 

@@ -28,11 +28,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
 
       - name: Format (check)
         run: pnpm run format:check
@@ -91,11 +94,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
 
       - name: Install Playwright Chromium
         run: ./node_modules/.bin/playwright install --with-deps chromium
@@ -209,11 +215,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
 
       - name: Install Electron display dependencies
         run: |
@@ -263,11 +272,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: pnpm
 
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Rebuild native dependencies
+        run: pnpm run rebuild:native
 
       - name: Run macOS VM host preflight
         run: pnpm --filter @agent-platform/desktop native:vm:host-check -- --json
