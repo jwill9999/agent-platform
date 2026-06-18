@@ -16,12 +16,12 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-18
-- **Session:** Implemented `agent-platform-project-experience.2` Workspaces/sidebar simplification,
-  then repaired failing GitHub Actions setup for Node/native dependency handling and aligned E2E
-  expectations with the new Workspaces copy.
-- **Branch:** `jwill9999/project-experience-workspace-navigation`
-- **Base:** branched from `jwill9999/project-experience-capability-metadata`; task 2 is not closed
-  until manual testing is reviewed.
+- **Session:** Reviewed manual Project Experience feedback, identified long-session context replay as
+  the current LLM failure mode, raised context optimisation to P1, and added E2E coverage for the
+  simplified Workspaces entry screen.
+- **Branch:** `jwill9999/project-experience-capability-metadata`
+- **Base:** current Project Experience task branch; task 2 remains in progress until final manual
+  feedback is accepted or filed as follow-up work.
 
 ## Current State
 
@@ -35,52 +35,31 @@ and actionable.
   and refresh-error states.
 - User-facing copy avoids `/workspace` or backend terminology and keeps deferred surfaces out of the
   current navigation.
-- Manual testing is still pending; do not close the Beads task until feedback is reviewed.
+- User manual testing is broadly positive. The remaining LLM failure appears to be session context
+  replay/token pressure, not the Workspaces navigation UI.
 
 **Verification:**
 
-- Passed: `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, and
-  `git diff --check`.
-- Passed before the final docs update: focused Playwright `e2e/mvp-e2e.spec.ts` against local API/web.
-- Docker rebuild for a later Playwright rerun hit local disk pressure (`ENOSPC`) while writing the
-  Next.js build cache; no source failure was identified.
+- Added `apps/desktop/e2e/project-access.e2e.ts` assertions for the simplified Workspaces landing
+  screen: Chat, Coding Project, New project, Open folder, and no deferred workspace cards.
+- Passed: `pnpm --filter @agent-platform/web run test -- project-navigation.test.ts` (Vitest runs
+  the web test suite; 30 files / 158 tests passed).
+- Passed: `pnpm exec prettier --check apps/desktop/e2e/project-access.e2e.ts`.
+- Passed: `pnpm --filter @agent-platform/desktop run lint -- e2e/project-access.e2e.ts`.
+- Passed under Node 24:
+  `PATH="$HOME/.nvm/versions/node/v24.14.0/bin:$PATH" pnpm --filter @agent-platform/desktop run test:e2e -- project-access.e2e.ts`.
+- Note: running the Electron E2E under Node 25 fails before UI launch because native
+  `better-sqlite3` bindings are built for Node 24. Use the repo Node 24 baseline.
 
-**CI Pipeline Repair:**
+**Context Optimisation:**
 
-- Moved the repo baseline to Node 24 in `.nvmrc`, package engines, GitHub Actions, Dockerfiles, and
-  user/developer docs.
-- Added `pnpm/action-setup` before setup-node pnpm caching in `check-cycles.yml`.
-- Kept hardened `pnpm install --frozen-lockfile --ignore-scripts` in CI and added explicit
-  `pnpm run rebuild:native` steps before DB-backed tests and Electron/VM E2E jobs.
-- Extended `pnpm run rebuild:native` to force-run `node-pty`'s native install build as well as
-  `better-sqlite3`; desktop Electron imports `node-pty` in the main process, so Linux desktop E2E
-  needs this after install scripts are skipped.
-- Added explicit Electron binary setup for Electron E2E jobs, because hardened installs also skip
-  Electron's binary download/path setup. The setup now uses `scripts/install-electron-binary.mjs`
-  and fails early if `path.txt` or the executable is still missing.
-- Excluded CI-only native setup helpers from Sonar application analysis after SonarCloud flagged
-  helper implementation details that are not product runtime code.
-- Updated desktop/VM E2E project-opening helpers to use the new `Open folder` Workspaces action
-  instead of the removed `Open Project` button label.
-- Updated desktop E2E to use the visible `Attach files` file chooser path and the current `Chat`
-  workspace label, matching the simplified Workspaces UX.
-- Kept browser E2E selectors aligned with surface-specific labels: Workspaces uses `Chat` /
-  `Open folder`, while the legacy `/ide` Project binding panel still uses `Open Project`.
-- Increased `verify`, browser `e2e`, and `desktop-e2e` CI timeouts because Playwright Chromium
-  install can exceed the old 15-minute verify cap after the Node/Playwright baseline update.
-- Removed standalone Chromium installation from `verify` and `desktop-e2e`; browser E2E now installs
-  only Playwright browser OS dependencies and uses the GitHub runner's system Chrome channel instead
-  of downloading a standalone Chromium archive.
-- Disabled browser E2E video capture in CI because system Chrome runs do not install Playwright's
-  bundled `ffmpeg`; traces, screenshots, HTML reports, and Docker logs remain available on failure.
-- Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
-  `multiple target patterns`.
-- Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,
-  `pnpm --filter @agent-platform/api test -- test/settingsRouter.test.ts test/projectsRouter.test.ts`,
-  full `pnpm build`, full `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, and
-  `git diff --check`.
-- Verified locally after the latest desktop E2E alignment:
-  `SECRETS_MASTER_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= pnpm --filter @agent-platform/desktop run test:e2e -- e2e/project-access.e2e.ts`.
+- Beads issue `agent-platform-context-optimisation` is now P1.
+- Evidence added: a simple Beads question reused stale Coding session
+  `bad6e0a5-d8e0-4eee-b94d-a2dc4c8f65da` with 87 messages and about 526k stored characters,
+  including multiple very large tool outputs, causing OpenAI API TPM pressure.
+- Current implementation has an 8k approximate context window, but still needs durable compaction,
+  bounded tool-output replay, stale-session handling, explicit output-token caps, and clearer
+  rate-limit/context diagnostics.
 
 ## Product Direction
 
@@ -94,9 +73,8 @@ and actionable.
 
 ## Next
 
-1. Monitor GitHub Actions for the branch/PR and confirm CI, E2E, desktop E2E, VM E2E, and circular
-   dependency checks are green.
-2. Ask the user to manually test Workspaces, Chat, Coding Project creation/opening, recent Projects,
-   and refresh feedback.
-3. Close `agent-platform-project-experience.2` only after manual UX feedback is accepted or filed as
-   follow-up Beads work.
+1. Finish reviewing any remaining manual feedback for `agent-platform-project-experience.2`.
+2. If no more UI issues are found, close `agent-platform-project-experience.2`.
+3. Pick up `agent-platform-context-optimisation` before expanding deeper Project Chat surfaces.
+4. Continue Project Experience with `.4` only after the context failure mode is handled or explicitly
+   deferred again.
