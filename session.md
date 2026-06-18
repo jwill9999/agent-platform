@@ -61,6 +61,8 @@ and actionable.
   instead of the removed `Open Project` button label.
 - Increased `verify`, browser `e2e`, and `desktop-e2e` CI timeouts because Playwright Chromium
   install can exceed the old 15-minute verify cap after the Node/Playwright baseline update.
+- Removed standalone Chromium installation from `verify` and `desktop-e2e`; browser E2E now installs
+  Playwright's smaller Chromium headless shell.
 - Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
   `multiple target patterns`.
 - Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,

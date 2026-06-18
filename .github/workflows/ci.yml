@@ -49,9 +49,6 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Install Playwright Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
-
       - name: Test
         run: pnpm run test
 
@@ -104,7 +101,7 @@ jobs:
         run: pnpm run rebuild:native
 
       - name: Install Playwright Chromium
-        run: ./node_modules/.bin/playwright install --with-deps chromium
+        run: ./node_modules/.bin/playwright install --with-deps --only-shell chromium
 
       - name: Prepare workspace storage
         run: make workspace-init
@@ -231,9 +228,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
-
-      - name: Install Playwright browser dependencies
-        run: ./node_modules/.bin/playwright install --with-deps chromium
 
       - name: Electron E2E tests
         run: xvfb-run -a pnpm --filter @agent-platform/desktop test:e2e
