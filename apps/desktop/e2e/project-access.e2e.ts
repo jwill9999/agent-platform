@@ -119,8 +119,9 @@ test.describe('Electron Project access', () => {
 
       const page = await app.firstWindow();
       await openProjectChat(page);
+      await expectSimplifiedWorkspaceEntry(page);
 
-      await page.getByRole('button', { name: 'New Project' }).click();
+      await page.getByRole('button', { name: 'New project' }).click();
       await expect(page.getByRole('dialog', { name: 'New Project' })).toBeVisible();
       await expect(page.getByRole('button', { name: /Import from Chat/ })).toBeDisabled();
       await page.getByRole('button', { name: /Start from scratch/ }).click();
@@ -407,6 +408,36 @@ test.describe('Electron Project access', () => {
 async function openProjectChat(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForLoadState('networkidle');
+}
+
+async function expectSimplifiedWorkspaceEntry(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
+  await expect(page.getByText('Start a general chat or open a coding project.')).toBeVisible();
+
+  await expect(page.getByRole('button', { name: /^Chat\b/ })).toBeVisible();
+  await expect(page.getByText('General assistant')).toBeVisible();
+  await expect(
+    page.getByText('Talk with the assistant and use general tools without opening a project.'),
+  ).toBeVisible();
+
+  await expect(page.getByRole('heading', { name: 'Coding Project' })).toBeVisible();
+  await expect(
+    page.getByText(
+      'Work with a folder or repository, including Git, branches, terminal, and IDE handoff.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New project' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
+  await expect(page.getByText('Folder or repository', { exact: true })).toBeVisible();
+
+  for (const deferredWorkspace of [
+    'Automation',
+    'Scheduled tasks',
+    'Email workflows',
+    'Research',
+  ]) {
+    await expect(page.getByRole('heading', { name: deferredWorkspace })).toHaveCount(0);
+  }
 }
 
 async function selectActiveAgent(page: Page, name: string): Promise<void> {
