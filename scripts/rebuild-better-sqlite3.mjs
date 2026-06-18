@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Force-compile better-sqlite3 for the current Node (node-gyp --release).
- * `pnpm rebuild better-sqlite3` can no-op when install scripts were skipped; this runs
- * the package's build-release in its real directory under node_modules/.pnpm.
+ * Force-compile native packages after hardened `pnpm install --ignore-scripts`.
+ * `pnpm rebuild` can no-op when install scripts were skipped; this runs the
+ * package scripts in their real directories under node_modules/.pnpm.
  */
 import { execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -10,12 +10,24 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const require = createRequire(join(root, 'packages/db/package.json'));
-const pkgJson = require.resolve('better-sqlite3/package.json');
-const pkgDir = dirname(pkgJson);
+const dbRequire = createRequire(join(root, 'packages/db/package.json'));
+const desktopRequire = createRequire(join(root, 'apps/desktop/package.json'));
 
-execSync('npm run build-release', {
-  cwd: pkgDir,
+runPackageScript(dbRequire, 'better-sqlite3/package.json', 'npm run build-release');
+runPackageScript(desktopRequire, 'node-pty/package.json', 'npm run install');
+
+execSync('node scripts/fix-node-pty-helpers.mjs', {
+  cwd: root,
   stdio: 'inherit',
   env: process.env,
 });
+
+function runPackageScript(requireFromPackage, packageJsonSpecifier, command) {
+  const pkgJson = requireFromPackage.resolve(packageJsonSpecifier);
+  const pkgDir = dirname(pkgJson);
+  execSync(command, {
+    cwd: pkgDir,
+    stdio: 'inherit',
+    env: process.env,
+  });
+}

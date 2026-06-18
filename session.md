@@ -52,6 +52,9 @@ and actionable.
 - Added `pnpm/action-setup` before setup-node pnpm caching in `check-cycles.yml`.
 - Kept hardened `pnpm install --frozen-lockfile --ignore-scripts` in CI and added explicit
   `pnpm run rebuild:native` steps before DB-backed tests and Electron/VM E2E jobs.
+- Extended `pnpm run rebuild:native` to force-run `node-pty`'s native install build as well as
+  `better-sqlite3`; desktop Electron imports `node-pty` in the main process, so Linux desktop E2E
+  needs this after install scripts are skipped.
 - Added explicit Electron binary setup for Electron E2E jobs, because hardened installs also skip
   Electron's binary download/path setup. The setup now uses `scripts/install-electron-binary.mjs`
   and fails early if `path.txt` or the executable is still missing.
