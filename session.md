@@ -18,7 +18,7 @@ and actionable.
 - **Date:** 2026-06-18
 - **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, Playwright install steps, Project Git/WebView panels, chat router, chat input, browser tools tests, and macOS VM asset script.
 - **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `5982ca5`.
+- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `9518ae5`.
 
 ## Current State
 
@@ -29,8 +29,10 @@ and actionable.
 - Fixed `.github/workflows/ci.yml` Sonar rule `githubactions:S6505` by adding `--ignore-scripts` to all four `pnpm install --frozen-lockfile` steps.
 - Fixed `.github/workflows/ci.yml` Sonar rule `githubactions:S6505` on Playwright install steps by calling `./node_modules/.bin/playwright install --with-deps chromium` directly instead of `pnpm exec`.
 - Reduced `apps/web/components/project/project-git-github-panel.tsx` component complexity by moving effect branches into focused hooks and replaced the adjacent live-status spans with a badge.
+- Reduced the remaining `apps/web/components/project/project-git-github-panel.tsx` panel complexity by extracting repository connection and merge-conflict resolver UI into focused child components.
 - Fixed `apps/web/components/project/project-webview-panel.tsx` negated open-state branch by rendering the open panel path first.
 - Fixed `apps/api/src/infrastructure/http/v1/chatRouter.ts` Sonar issues by splitting model resolution helpers, removing an unnecessary tool-call assertion, using `includes`, and switching active-task extraction to `RegExp.exec`.
+- Reduced `apps/api/src/infrastructure/http/v1/chatRouter.ts` `buildRuntimeGraph` parameter count by replacing the long positional parameter list with a typed input object.
 - Fixed `apps/web/components/chat/chat-input.tsx` deprecated form event typing by deriving the submit handler type from `ComponentProps<'form'>['onSubmit']` instead of referencing `FormEvent`.
 - Fixed `packages/harness/test/browserTools.integration.test.ts` unnecessary assertion by parsing tool result data with `BrowserActionResultSchema`.
 - Fixed `apps/desktop/scripts/build-macos-vm-linux-assets.mjs` Docker execution path warning by resolving Docker from fixed absolute system locations before `execFileSync`.
@@ -50,6 +52,8 @@ and actionable.
 - Commit `bc1d261` (`fix chat router sonar warnings`) contains the chat router Sonar cleanup.
 - Commit `ce02c4a` (`fix chat input form event type`) contains the chat input deprecated form event typing cleanup.
 - Commit `5982ca5` (`remove deprecated chat input form event type`) removes the remaining direct `FormEvent` usage in chat input.
+- Commit `b60c86e` (`reduce chat runtime graph parameters`) contains the `buildRuntimeGraph` parameter object refactor.
+- Commit `9518ae5` (`reduce git github panel complexity`) contains the Git/GitHub panel UI extraction refactor.
 - Commit `bb7ee02` (`fix browser tools test assertion`) contains the browser tools integration test assertion cleanup.
 - Commit `774f9d7` (`fix vm asset docker path lookup`) contains the macOS VM asset script Docker path hardening.
 - Unrelated local changes intentionally left untouched: `apps/web/components/project/project-terminal-dock.tsx` and untracked `deps-graph.svg`.
