@@ -32,6 +32,7 @@ import type {
   ApprovalRequest,
   ContextWindow,
   MessageRecord,
+  ModelConfig,
   Output,
   PromptMemoryBundle,
   ProjectRecord,
@@ -193,6 +194,59 @@ async function loadAgentContext(
   }
 }
 
+type ResolvedChatModel = { provider: string; model: string; apiKey?: string };
+
+function requiredSecretsMasterKey(): Buffer {
+  const masterKeyB64 = process.env['SECRETS_MASTER_KEY'];
+  if (!masterKeyB64) {
+    throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
+  }
+  return parseMasterKeyFromBase64(masterKeyB64);
+}
+
+function apiKeyForModelConfig(db: DrizzleDb, config: ModelConfig): string | undefined {
+  if (!config.hasApiKey) return undefined;
+  return resolveStoredModelConfigKeyOrThrow(db, config.id, requiredSecretsMasterKey());
+}
+
+function resolvedConfiguredModel(db: DrizzleDb, config: ModelConfig): ResolvedChatModel {
+  return {
+    provider: config.provider,
+    model: config.model,
+    apiKey: apiKeyForModelConfig(db, config),
+  };
+}
+
+function resolveExplicitModelConfig(
+  db: DrizzleDb,
+  effectiveModelConfigId: string | undefined,
+  requestModelConfigId?: string,
+): ResolvedChatModel | undefined {
+  if (!effectiveModelConfigId) return undefined;
+
+  const cfg = getModelConfig(db, effectiveModelConfigId);
+  if (!cfg) {
+    throw new HttpError(404, 'NOT_FOUND', `Model config '${effectiveModelConfigId}' not found`);
+  }
+  // A per-request UI override must reference a config that has a stored API key.
+  // Configs without a key cannot be meaningfully used as an explicit override.
+  if (requestModelConfigId && !cfg.hasApiKey) {
+    throw new HttpError(
+      400,
+      'VALIDATION_ERROR',
+      `Model config '${effectiveModelConfigId}' has no API key stored`,
+    );
+  }
+  return resolvedConfiguredModel(db, cfg);
+}
+
+function resolveDefaultModelConfig(db: DrizzleDb): ResolvedChatModel | undefined {
+  const defaultModelConfig = listModelConfigs(db).find(
+    (config) => config.hasApiKey || config.provider === 'ollama',
+  );
+  return defaultModelConfig ? resolvedConfiguredModel(db, defaultModelConfig) : undefined;
+}
+
 /** Resolve model config or throw an HttpError on failure.
  *
  * Precedence (highest → lowest):
@@ -210,56 +264,19 @@ function resolveModelOrThrow(
   agentCtx: AgentContext,
   headerKey: string | undefined,
   requestModelConfigId?: string,
-): { provider: string; model: string; apiKey?: string } {
+): ResolvedChatModel {
   // Effective model config ID: per-request override wins over agent's stored config.
   const effectiveModelConfigId = requestModelConfigId ?? agentCtx.agent.modelConfigId;
 
-  // If the agent has a stored model config, use its encrypted key (highest precedence).
-  if (effectiveModelConfigId) {
-    const cfg = getModelConfig(db, effectiveModelConfigId);
-    if (!cfg) {
-      throw new HttpError(404, 'NOT_FOUND', `Model config '${effectiveModelConfigId}' not found`);
-    }
-    // A per-request UI override must reference a config that has a stored API key.
-    // Configs without a key cannot be meaningfully used as an explicit override.
-    if (requestModelConfigId && !cfg.hasApiKey) {
-      throw new HttpError(
-        400,
-        'VALIDATION_ERROR',
-        `Model config '${effectiveModelConfigId}' has no API key stored`,
-      );
-    }
-    let apiKey: string | undefined;
-    if (cfg.hasApiKey) {
-      const masterKeyB64 = process.env['SECRETS_MASTER_KEY'];
-      if (!masterKeyB64) {
-        throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
-      }
-      const masterKey = parseMasterKeyFromBase64(masterKeyB64);
-      apiKey = resolveStoredModelConfigKeyOrThrow(db, effectiveModelConfigId, masterKey);
-    }
-    return { provider: cfg.provider, model: cfg.model, apiKey };
-  }
-
-  const defaultModelConfig = listModelConfigs(db).find(
-    (config) => config.hasApiKey || config.provider === 'ollama',
+  const explicitModel = resolveExplicitModelConfig(
+    db,
+    effectiveModelConfigId,
+    requestModelConfigId,
   );
-  if (defaultModelConfig) {
-    let apiKey: string | undefined;
-    if (defaultModelConfig.hasApiKey) {
-      const masterKeyB64 = process.env['SECRETS_MASTER_KEY'];
-      if (!masterKeyB64) {
-        throw new HttpError(500, 'CONFIGURATION_ERROR', 'SECRETS_MASTER_KEY is not configured');
-      }
-      const masterKey = parseMasterKeyFromBase64(masterKeyB64);
-      apiKey = resolveStoredModelConfigKeyOrThrow(db, defaultModelConfig.id, masterKey);
-    }
-    return {
-      provider: defaultModelConfig.provider,
-      model: defaultModelConfig.model,
-      apiKey,
-    };
-  }
+  if (explicitModel) return explicitModel;
+
+  const defaultModel = resolveDefaultModelConfig(db);
+  if (defaultModel) return defaultModel;
 
   // Fall back to free-form modelOverride + env-var chain.
   const resolution = resolveModelConfig({
@@ -300,7 +317,7 @@ export function dbRecordToChatMessage(m: MessageRecord): ChatMessage {
     return {
       role: 'assistant',
       content: m.content,
-      toolCalls: m.toolCalls as ToolCallIntent[] | undefined,
+      toolCalls: m.toolCalls,
     };
   }
   return { role: m.role as 'user' | 'assistant' | 'system', content: m.content };
@@ -362,9 +379,12 @@ function pairedAssistantToolMessages(
     return { ...candidate, toolName: candidate.toolName || toolCall.name };
   });
 
-  if (toolResults.some((result) => result === undefined)) return undefined;
+  if (toolResults.includes(undefined)) return undefined;
+  const pairedToolResults = toolResults.filter(
+    (result): result is ChatMessage => result !== undefined,
+  );
   return {
-    messages: [assistant, ...(toolResults as ChatMessage[])],
+    messages: [assistant, ...pairedToolResults],
     nextIndex: assistantIndex + toolResults.length + 1,
   };
 }
@@ -602,7 +622,7 @@ function extractImportantFiles(text: string): string[] {
 }
 
 function extractActiveTask(text: string): string | undefined {
-  return text.match(/\bagent-platform-[\w.-]+\b/)?.[0];
+  return /\bagent-platform-[\w.-]+\b/.exec(text)?.[0];
 }
 
 function extractDecisions(text: string): string[] {
