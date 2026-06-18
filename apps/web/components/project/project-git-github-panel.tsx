@@ -1543,6 +1543,840 @@ function ChangeFileRow({
   );
 }
 
+type RepositoryConnectionDialogProps = {
+  open: boolean;
+  mode: RepositoryConnectionMode;
+  actionPending: string | null;
+  owner: string;
+  name: string;
+  description: string;
+  visibility: 'private' | 'public';
+  connectRepository: string;
+  error: string | null;
+  setMode: React.Dispatch<React.SetStateAction<RepositoryConnectionMode>>;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setOwner: React.Dispatch<React.SetStateAction<string>>;
+  setName: React.Dispatch<React.SetStateAction<string>>;
+  setDescription: React.Dispatch<React.SetStateAction<string>>;
+  setVisibility: React.Dispatch<React.SetStateAction<'private' | 'public'>>;
+  setConnectRepository: React.Dispatch<React.SetStateAction<string>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  createRepository: () => Promise<void>;
+  connectExistingRepository: () => Promise<void>;
+};
+
+function RepositoryConnectionDialog({
+  open,
+  mode,
+  actionPending,
+  owner,
+  name,
+  description,
+  visibility,
+  connectRepository,
+  error,
+  setMode,
+  setOpen,
+  setOwner,
+  setName,
+  setDescription,
+  setVisibility,
+  setConnectRepository,
+  setError,
+  createRepository,
+  connectExistingRepository,
+}: Readonly<RepositoryConnectionDialogProps>) {
+  if (!open) return null;
+
+  const createPending = actionPending === 'github-create-repository';
+  const connectPending = actionPending === 'github-connect-repository';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-2xl rounded-lg border border-border bg-background shadow-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold">{getRepositoryDialogTitle(mode)}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {getRepositoryDialogDescription(mode)}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setOpen(false)}
+            aria-label="Close repository connection dialog"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="grid gap-4 px-5 py-5 md:grid-cols-[180px_1fr]">
+          <div className="space-y-2">
+            <RepositoryDialogModeButton
+              active={mode === 'create'}
+              icon={<Plus className="h-4 w-4" />}
+              label="Create repository"
+              onClick={() => {
+                setMode('create');
+                setError(null);
+              }}
+            />
+            <RepositoryDialogModeButton
+              active={mode === 'connect'}
+              icon={<Link className="h-4 w-4" />}
+              label="Connect existing"
+              onClick={() => {
+                setMode('connect');
+                setError(null);
+              }}
+            />
+          </div>
+
+          <div className="space-y-4">
+            {error && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {error}
+              </div>
+            )}
+
+            {mode === 'create' ? (
+              <RepositoryCreateForm
+                actionPending={actionPending}
+                owner={owner}
+                name={name}
+                description={description}
+                visibility={visibility}
+                setOwner={setOwner}
+                setName={setName}
+                setDescription={setDescription}
+                setVisibility={setVisibility}
+                onCancel={() => setOpen(false)}
+                onSubmit={() => runAsyncAction(createRepository)}
+                createPending={createPending}
+              />
+            ) : (
+              <RepositoryConnectForm
+                actionPending={actionPending}
+                connectRepository={connectRepository}
+                setConnectRepository={setConnectRepository}
+                onCancel={() => setOpen(false)}
+                onSubmit={() => runAsyncAction(connectExistingRepository)}
+                connectPending={connectPending}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RepositoryDialogModeButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: Readonly<{
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}>) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'flex w-full items-center gap-2 rounded border px-3 py-2 text-left text-sm',
+        active ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:bg-secondary/50',
+      )}
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function RepositoryCreateForm({
+  actionPending,
+  owner,
+  name,
+  description,
+  visibility,
+  setOwner,
+  setName,
+  setDescription,
+  setVisibility,
+  onCancel,
+  onSubmit,
+  createPending,
+}: Readonly<{
+  actionPending: string | null;
+  owner: string;
+  name: string;
+  description: string;
+  visibility: 'private' | 'public';
+  setOwner: React.Dispatch<React.SetStateAction<string>>;
+  setName: React.Dispatch<React.SetStateAction<string>>;
+  setDescription: React.Dispatch<React.SetStateAction<string>>;
+  setVisibility: React.Dispatch<React.SetStateAction<'private' | 'public'>>;
+  onCancel: () => void;
+  onSubmit: () => void;
+  createPending: boolean;
+}>) {
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Owner</span>
+          <Input
+            value={owner}
+            onChange={(event) => setOwner(event.target.value)}
+            placeholder="GitHub user or organization"
+            disabled={createPending}
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="font-medium">Repository name</span>
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="repository-name"
+            disabled={createPending}
+          />
+        </label>
+      </div>
+      <label className="space-y-1 text-sm">
+        <span className="font-medium">Description</span>
+        <Input
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="Optional repository description"
+          disabled={createPending}
+        />
+      </label>
+      <div className="space-y-2 text-sm">
+        <div className="font-medium">Visibility</div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={visibility === 'private' ? 'default' : 'outline'}
+            onClick={() => setVisibility('private')}
+            disabled={createPending}
+          >
+            Private
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={visibility === 'public' ? 'default' : 'outline'}
+            onClick={() => setVisibility('public')}
+            disabled={createPending}
+          >
+            Public
+          </Button>
+        </div>
+      </div>
+      <div className="rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+        This will create the repository on GitHub, add it as origin, and push the current branch.
+      </div>
+      <RepositoryDialogActions
+        pendingLabel="Creating..."
+        submitLabel="Create repository & push"
+        pending={createPending}
+        actionPending={actionPending}
+        onCancel={onCancel}
+        onSubmit={onSubmit}
+      />
+    </>
+  );
+}
+
+function RepositoryConnectForm({
+  actionPending,
+  connectRepository,
+  setConnectRepository,
+  onCancel,
+  onSubmit,
+  connectPending,
+}: Readonly<{
+  actionPending: string | null;
+  connectRepository: string;
+  setConnectRepository: React.Dispatch<React.SetStateAction<string>>;
+  onCancel: () => void;
+  onSubmit: () => void;
+  connectPending: boolean;
+}>) {
+  return (
+    <>
+      <label className="space-y-1 text-sm">
+        <span className="font-medium">GitHub repository</span>
+        <Input
+          value={connectRepository}
+          onChange={(event) => setConnectRepository(event.target.value)}
+          placeholder="owner/repository or https://github.com/owner/repository"
+          disabled={connectPending}
+        />
+      </label>
+      <div className="rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+        AI Studio will validate the repository with GitHub CLI, add it as origin, and fetch it. If
+        the remote already has commits, you will be guided through pull or conflict resolution
+        before pushing.
+      </div>
+      <RepositoryDialogActions
+        pendingLabel="Connecting..."
+        submitLabel="Connect repository"
+        pending={connectPending}
+        actionPending={actionPending}
+        onCancel={onCancel}
+        onSubmit={onSubmit}
+      />
+    </>
+  );
+}
+
+function RepositoryDialogActions({
+  pendingLabel,
+  submitLabel,
+  pending,
+  actionPending,
+  onCancel,
+  onSubmit,
+}: Readonly<{
+  pendingLabel: string;
+  submitLabel: string;
+  pending: boolean;
+  actionPending: string | null;
+  onCancel: () => void;
+  onSubmit: () => void;
+}>) {
+  return (
+    <div className="flex justify-end gap-2">
+      <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+        Cancel
+      </Button>
+      <Button type="button" onClick={onSubmit} disabled={actionPending !== null}>
+        {pending ? pendingLabel : submitLabel}
+      </Button>
+    </div>
+  );
+}
+
+type ConflictResolverDialogProps = {
+  open: boolean;
+  projectId: string;
+  status: ProjectGitStatusResult;
+  conflictResolved: boolean;
+  conflictCountText: string;
+  conflictsLoading: boolean;
+  conflictFiles: ProjectGitConflictSummary['files'];
+  unresolvedConflictText: string;
+  selectedConflictPath: string | null;
+  conflictError: string | null;
+  conflictFileLoading: boolean;
+  conflictFile: ProjectGitConflictFileResult | null;
+  mergeCommitMessage: string;
+  actionPending: string | null;
+  loadConflicts: () => Promise<void>;
+  openProjectInSystemIde: () => Promise<void>;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedConflictPath: React.Dispatch<React.SetStateAction<string | null>>;
+  setConflictFile: React.Dispatch<React.SetStateAction<ProjectGitConflictFileResult | null>>;
+  setMergeCommitMessage: React.Dispatch<React.SetStateAction<string>>;
+  applyConflictChoice: (strategy: 'current' | 'incoming' | 'both') => Promise<void>;
+  commitMergeResolution: (push: boolean) => Promise<void>;
+};
+
+function ConflictResolverDialog({
+  open,
+  projectId,
+  status,
+  conflictResolved,
+  conflictCountText,
+  conflictsLoading,
+  conflictFiles,
+  unresolvedConflictText,
+  selectedConflictPath,
+  conflictError,
+  conflictFileLoading,
+  conflictFile,
+  mergeCommitMessage,
+  actionPending,
+  loadConflicts,
+  openProjectInSystemIde,
+  setOpen,
+  setSelectedConflictPath,
+  setConflictFile,
+  setMergeCommitMessage,
+  applyConflictChoice,
+  commitMergeResolution,
+}: Readonly<ConflictResolverDialogProps>) {
+  if (!open) return null;
+
+  return (
+    <dialog
+      open
+      className="fixed inset-0 z-50 flex bg-background text-foreground"
+      aria-label="Merge conflict resolver"
+    >
+      <ConflictResolverSidebar
+        projectId={projectId}
+        status={status}
+        conflictResolved={conflictResolved}
+        conflictCountText={conflictCountText}
+        conflictsLoading={conflictsLoading}
+        loadConflicts={loadConflicts}
+        openProjectInSystemIde={openProjectInSystemIde}
+        setOpen={setOpen}
+      />
+      <ConflictFileList
+        files={conflictFiles}
+        conflictsLoading={conflictsLoading}
+        unresolvedConflictText={unresolvedConflictText}
+        selectedConflictPath={selectedConflictPath}
+        setSelectedConflictPath={setSelectedConflictPath}
+      />
+      <ConflictResolverMain
+        status={status}
+        conflictResolved={conflictResolved}
+        conflictFiles={conflictFiles}
+        conflictError={conflictError}
+        conflictFileLoading={conflictFileLoading}
+        conflictFile={conflictFile}
+        selectedConflictPath={selectedConflictPath}
+        mergeCommitMessage={mergeCommitMessage}
+        actionPending={actionPending}
+        setOpen={setOpen}
+        setConflictFile={setConflictFile}
+        setSelectedConflictPath={setSelectedConflictPath}
+        setMergeCommitMessage={setMergeCommitMessage}
+        applyConflictChoice={applyConflictChoice}
+        commitMergeResolution={commitMergeResolution}
+      />
+    </dialog>
+  );
+}
+
+function ConflictResolverSidebar({
+  projectId,
+  status,
+  conflictResolved,
+  conflictCountText,
+  conflictsLoading,
+  loadConflicts,
+  openProjectInSystemIde,
+  setOpen,
+}: Readonly<{
+  projectId: string;
+  status: ProjectGitStatusResult;
+  conflictResolved: boolean;
+  conflictCountText: string;
+  conflictsLoading: boolean;
+  loadConflicts: () => Promise<void>;
+  openProjectInSystemIde: () => Promise<void>;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}>) {
+  return (
+    <div className="flex w-72 shrink-0 flex-col border-r border-border bg-muted/20 p-4">
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <div className="text-lg font-semibold">Git & GitHub</div>
+          <div className="text-xs text-muted-foreground">Merge conflict workflow</div>
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          onClick={() => setOpen(false)}
+          aria-label="Close merge conflict resolver"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="space-y-3">
+        <GitCard title="Repository">
+          <div className="space-y-2 text-sm">
+            <div className="font-medium">{status.repositoryName}</div>
+            <div className="flex items-center gap-2 font-mono text-xs">
+              <GitBranch className="h-3.5 w-3.5" />
+              <span className="truncate">{status.currentBranch}</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              ↑ {status.ahead} ↓ {status.behind}
+            </div>
+          </div>
+        </GitCard>
+
+        <section className="rounded border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+          <div className="font-medium">
+            {conflictResolved ? 'All conflicts resolved' : 'Merge conflicts detected'}
+          </div>
+          <div className="mt-1 text-xs">{conflictCountText}</div>
+        </section>
+
+        <Button
+          type="button"
+          className="w-full"
+          variant={conflictResolved ? 'outline' : 'default'}
+          onClick={() => runAsyncAction(loadConflicts)}
+          disabled={conflictsLoading}
+        >
+          {conflictsLoading ? 'Refreshing...' : 'Refresh conflicts'}
+        </Button>
+        <Button type="button" className="w-full" variant="outline" onClick={() => setOpen(false)}>
+          Exit resolver
+        </Button>
+
+        <GitCard title="Working Tree">
+          <div className="space-y-1">
+            <StatRow label="Staged" value={status.workingTree.staged} />
+            <StatRow label="Conflicts" value={status.workingTree.conflicts} tone="text-red-700" />
+            <StatRow label="Modified" value={status.workingTree.modified} />
+            <StatRow label="Untracked" value={status.workingTree.untracked} />
+          </div>
+        </GitCard>
+
+        <div className="rounded border border-border bg-background px-3 py-3 text-xs text-muted-foreground">
+          <div className="mb-2">
+            You can also open the project in your IDE if a file needs deeper edits.
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full"
+            disabled={!projectId}
+            onClick={() => {
+              runAsyncAction(openProjectInSystemIde);
+            }}
+          >
+            Open in IDE
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConflictFileList({
+  files,
+  conflictsLoading,
+  unresolvedConflictText,
+  selectedConflictPath,
+  setSelectedConflictPath,
+}: Readonly<{
+  files: ProjectGitConflictSummary['files'];
+  conflictsLoading: boolean;
+  unresolvedConflictText: string;
+  selectedConflictPath: string | null;
+  setSelectedConflictPath: React.Dispatch<React.SetStateAction<string | null>>;
+}>) {
+  return (
+    <div className="flex w-72 shrink-0 flex-col border-r border-border p-4">
+      <div className="mb-3">
+        <h2 className="text-sm font-semibold">Files with conflicts</h2>
+        <p className="text-xs text-muted-foreground">
+          {conflictsLoading ? 'Loading conflicts...' : unresolvedConflictText}
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        {files.length === 0 && (
+          <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+            No conflicted files are currently reported.
+          </div>
+        )}
+        {files.map((file) => (
+          <button
+            type="button"
+            key={file.path}
+            className={cn(
+              'flex w-full items-center justify-between gap-2 rounded border px-3 py-2 text-left text-xs',
+              selectedConflictPath === file.path
+                ? 'border-primary bg-primary/5'
+                : 'border-border bg-background hover:bg-secondary/50',
+            )}
+            onClick={() => setSelectedConflictPath(file.path)}
+          >
+            <span className="min-w-0 flex-1 truncate font-mono">{file.path}</span>
+            <Badge variant={file.resolved ? 'outline' : 'destructive'}>
+              {file.resolved ? 'resolved' : file.conflictCount}
+            </Badge>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConflictResolverMain({
+  status,
+  conflictResolved,
+  conflictFiles,
+  conflictError,
+  conflictFileLoading,
+  conflictFile,
+  selectedConflictPath,
+  mergeCommitMessage,
+  actionPending,
+  setOpen,
+  setConflictFile,
+  setSelectedConflictPath,
+  setMergeCommitMessage,
+  applyConflictChoice,
+  commitMergeResolution,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  conflictResolved: boolean;
+  conflictFiles: ProjectGitConflictSummary['files'];
+  conflictError: string | null;
+  conflictFileLoading: boolean;
+  conflictFile: ProjectGitConflictFileResult | null;
+  selectedConflictPath: string | null;
+  mergeCommitMessage: string;
+  actionPending: string | null;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setConflictFile: React.Dispatch<React.SetStateAction<ProjectGitConflictFileResult | null>>;
+  setSelectedConflictPath: React.Dispatch<React.SetStateAction<string | null>>;
+  setMergeCommitMessage: React.Dispatch<React.SetStateAction<string>>;
+  applyConflictChoice: (strategy: 'current' | 'incoming' | 'both') => Promise<void>;
+  commitMergeResolution: (push: boolean) => Promise<void>;
+}>) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col p-5">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">
+            {conflictResolved ? 'Merge Conflicts Resolved' : 'Resolve Merge Conflicts'}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Choose the code to keep for each conflicted file, then commit the merge resolution.
+          </p>
+        </div>
+        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+          Close
+        </Button>
+      </div>
+
+      {conflictError && (
+        <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {conflictError}
+        </div>
+      )}
+
+      {conflictResolved ? (
+        <ResolvedConflictPanel
+          status={status}
+          conflictFiles={conflictFiles}
+          mergeCommitMessage={mergeCommitMessage}
+          actionPending={actionPending}
+          setMergeCommitMessage={setMergeCommitMessage}
+          commitMergeResolution={commitMergeResolution}
+        />
+      ) : (
+        <UnresolvedConflictPanel
+          selectedConflictPath={selectedConflictPath}
+          conflictFileLoading={conflictFileLoading}
+          conflictFile={conflictFile}
+          actionPending={actionPending}
+          setConflictFile={setConflictFile}
+          setSelectedConflictPath={setSelectedConflictPath}
+          applyConflictChoice={applyConflictChoice}
+        />
+      )}
+    </div>
+  );
+}
+
+function ResolvedConflictPanel({
+  status,
+  conflictFiles,
+  mergeCommitMessage,
+  actionPending,
+  setMergeCommitMessage,
+  commitMergeResolution,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  conflictFiles: ProjectGitConflictSummary['files'];
+  mergeCommitMessage: string;
+  actionPending: string | null;
+  setMergeCommitMessage: React.Dispatch<React.SetStateAction<string>>;
+  commitMergeResolution: (push: boolean) => Promise<void>;
+}>) {
+  return (
+    <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-4">
+      <div className="grid grid-cols-4 gap-3">
+        <ConflictMetric label="Files reviewed" value={conflictFiles.length} />
+        <ConflictMetric label="Conflicts remaining" value={0} className="text-emerald-700" />
+        <ConflictMetric label="Commits ahead" value={status.ahead} />
+        <ConflictMetric label="Commits behind" value={status.behind} />
+      </div>
+      <div className="min-h-0 overflow-y-auto rounded border border-border bg-background p-4">
+        <h2 className="mb-3 text-sm font-semibold">Resolved files</h2>
+        <div className="space-y-2">
+          {conflictFiles.map((file) => (
+            <div
+              key={file.path}
+              className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm"
+            >
+              <span className="font-mono">{file.path}</span>
+              <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                Resolved
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded border border-border bg-background p-4">
+        <div className="mb-3 font-medium">Commit merge resolution</div>
+        <div className="flex gap-2">
+          <Input
+            value={mergeCommitMessage}
+            onChange={(event) => setMergeCommitMessage(event.target.value)}
+            placeholder="Merge commit message"
+            disabled={actionPending !== null}
+          />
+          <Button
+            type="button"
+            onClick={() => runAsyncAction(() => commitMergeResolution(false))}
+            disabled={actionPending !== null || !mergeCommitMessage.trim()}
+          >
+            {actionPending === 'merge-commit' ? 'Committing...' : 'Commit merge'}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => runAsyncAction(() => commitMergeResolution(true))}
+            disabled={actionPending !== null || !mergeCommitMessage.trim()}
+          >
+            {actionPending === 'merge-commit-push' ? 'Pushing...' : 'Commit & push'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConflictMetric({
+  label,
+  value,
+  className,
+}: Readonly<{ label: string; value: number; className?: string }>) {
+  return (
+    <div className="rounded border border-border px-4 py-3">
+      <div className={cn('text-2xl font-semibold', className)}>{value}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function UnresolvedConflictPanel({
+  selectedConflictPath,
+  conflictFileLoading,
+  conflictFile,
+  actionPending,
+  setConflictFile,
+  setSelectedConflictPath,
+  applyConflictChoice,
+}: Readonly<{
+  selectedConflictPath: string | null;
+  conflictFileLoading: boolean;
+  conflictFile: ProjectGitConflictFileResult | null;
+  actionPending: string | null;
+  setConflictFile: React.Dispatch<React.SetStateAction<ProjectGitConflictFileResult | null>>;
+  setSelectedConflictPath: React.Dispatch<React.SetStateAction<string | null>>;
+  applyConflictChoice: (strategy: 'current' | 'incoming' | 'both') => Promise<void>;
+}>) {
+  return (
+    <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-4">
+      <div className="grid min-h-0 grid-cols-3 overflow-hidden rounded border border-border">
+        <ConflictPreviewColumn
+          title="Current"
+          titleClassName="bg-emerald-50"
+          text={getConflictPreviewText(
+            conflictFileLoading,
+            conflictFile?.hunks.map((hunk) => hunk.current).join('\n'),
+          )}
+        />
+        <ConflictPreviewColumn
+          title="Incoming"
+          titleClassName="bg-red-50"
+          text={getConflictPreviewText(
+            conflictFileLoading,
+            conflictFile?.hunks.map((hunk) => hunk.incoming).join('\n'),
+          )}
+        />
+        <ConflictPreviewColumn
+          title="Result"
+          titleClassName="bg-primary/5"
+          text={getConflictPreviewText(conflictFileLoading, conflictFile?.content)}
+          last
+        />
+      </div>
+      <div className="flex flex-wrap gap-2 rounded border border-border bg-background p-3">
+        <ConflictChoiceButton
+          label="Accept current"
+          disabled={!selectedConflictPath || actionPending !== null}
+          onClick={() => runAsyncAction(() => applyConflictChoice('current'))}
+        />
+        <ConflictChoiceButton
+          label="Accept incoming"
+          disabled={!selectedConflictPath || actionPending !== null}
+          onClick={() => runAsyncAction(() => applyConflictChoice('incoming'))}
+        />
+        <ConflictChoiceButton
+          label="Accept both"
+          disabled={!selectedConflictPath || actionPending !== null}
+          onClick={() => runAsyncAction(() => applyConflictChoice('both'))}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={!selectedConflictPath || conflictFileLoading}
+          onClick={() => {
+            setConflictFile(null);
+            const currentPath = selectedConflictPath;
+            setSelectedConflictPath(null);
+            globalThis.setTimeout(() => setSelectedConflictPath(currentPath), 0);
+          }}
+        >
+          Reset view
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ConflictPreviewColumn({
+  title,
+  titleClassName,
+  text,
+  last = false,
+}: Readonly<{ title: string; titleClassName: string; text: string; last?: boolean }>) {
+  return (
+    <div className={cn('min-h-0 overflow-y-auto', !last && 'border-r border-border')}>
+      <div className={cn('border-b border-border px-3 py-2 text-sm font-medium', titleClassName)}>
+        {title}
+      </div>
+      <pre className="whitespace-pre-wrap p-3 font-mono text-xs">{text}</pre>
+    </div>
+  );
+}
+
+function ConflictChoiceButton({
+  label,
+  disabled,
+  onClick,
+}: Readonly<{ label: string; disabled: boolean; onClick: () => void }>) {
+  return (
+    <Button type="button" variant="outline" disabled={disabled} onClick={onClick}>
+      {label}
+    </Button>
+  );
+}
+
 export function ProjectGitHubPanel({
   projectId,
   refreshKey,
@@ -2498,490 +3332,52 @@ export function ProjectGitHubPanel({
 
   return (
     <>
-      {repositoryDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-2xl rounded-lg border border-border bg-background shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  {getRepositoryDialogTitle(repositoryDialogMode)}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {getRepositoryDialogDescription(repositoryDialogMode)}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setRepositoryDialogOpen(false)}
-                aria-label="Close repository connection dialog"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+      <RepositoryConnectionDialog
+        open={repositoryDialogOpen}
+        mode={repositoryDialogMode}
+        actionPending={actionPending}
+        owner={repositoryOwner}
+        name={repositoryName}
+        description={repositoryDescription}
+        visibility={repositoryVisibility}
+        connectRepository={connectRepository}
+        error={repositoryActionError}
+        setMode={setRepositoryDialogMode}
+        setOpen={setRepositoryDialogOpen}
+        setOwner={setRepositoryOwner}
+        setName={setRepositoryName}
+        setDescription={setRepositoryDescription}
+        setVisibility={setRepositoryVisibility}
+        setConnectRepository={setConnectRepository}
+        setError={setRepositoryActionError}
+        createRepository={createGitHubRepository}
+        connectExistingRepository={connectGitHubRepository}
+      />
 
-            <div className="grid gap-4 px-5 py-5 md:grid-cols-[180px_1fr]">
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded border px-3 py-2 text-left text-sm',
-                    repositoryDialogMode === 'create'
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-border hover:bg-secondary/50',
-                  )}
-                  onClick={() => {
-                    setRepositoryDialogMode('create');
-                    setRepositoryActionError(null);
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Create repository
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded border px-3 py-2 text-left text-sm',
-                    repositoryDialogMode === 'connect'
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-border hover:bg-secondary/50',
-                  )}
-                  onClick={() => {
-                    setRepositoryDialogMode('connect');
-                    setRepositoryActionError(null);
-                  }}
-                >
-                  <Link className="h-4 w-4" />
-                  Connect existing
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {repositoryActionError && (
-                  <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    {repositoryActionError}
-                  </div>
-                )}
-
-                {repositoryDialogMode === 'create' && (
-                  <>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="space-y-1 text-sm">
-                        <span className="font-medium">Owner</span>
-                        <Input
-                          value={repositoryOwner}
-                          onChange={(event) => setRepositoryOwner(event.target.value)}
-                          placeholder="GitHub user or organization"
-                          disabled={actionPending === 'github-create-repository'}
-                        />
-                      </label>
-                      <label className="space-y-1 text-sm">
-                        <span className="font-medium">Repository name</span>
-                        <Input
-                          value={repositoryName}
-                          onChange={(event) => setRepositoryName(event.target.value)}
-                          placeholder="repository-name"
-                          disabled={actionPending === 'github-create-repository'}
-                        />
-                      </label>
-                    </div>
-                    <label className="space-y-1 text-sm">
-                      <span className="font-medium">Description</span>
-                      <Input
-                        value={repositoryDescription}
-                        onChange={(event) => setRepositoryDescription(event.target.value)}
-                        placeholder="Optional repository description"
-                        disabled={actionPending === 'github-create-repository'}
-                      />
-                    </label>
-                    <div className="space-y-2 text-sm">
-                      <div className="font-medium">Visibility</div>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={repositoryVisibility === 'private' ? 'default' : 'outline'}
-                          onClick={() => setRepositoryVisibility('private')}
-                          disabled={actionPending === 'github-create-repository'}
-                        >
-                          Private
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={repositoryVisibility === 'public' ? 'default' : 'outline'}
-                          onClick={() => setRepositoryVisibility('public')}
-                          disabled={actionPending === 'github-create-repository'}
-                        >
-                          Public
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
-                      This will create the repository on GitHub, add it as origin, and push the
-                      current branch.
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setRepositoryDialogOpen(false)}
-                        disabled={actionPending === 'github-create-repository'}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => runAsyncAction(createGitHubRepository)}
-                        disabled={actionPending !== null}
-                      >
-                        {actionPending === 'github-create-repository'
-                          ? 'Creating...'
-                          : 'Create repository & push'}
-                      </Button>
-                    </div>
-                  </>
-                )}
-                {repositoryDialogMode === 'connect' && (
-                  <>
-                    <label className="space-y-1 text-sm">
-                      <span className="font-medium">GitHub repository</span>
-                      <Input
-                        value={connectRepository}
-                        onChange={(event) => setConnectRepository(event.target.value)}
-                        placeholder="owner/repository or https://github.com/owner/repository"
-                        disabled={actionPending === 'github-connect-repository'}
-                      />
-                    </label>
-                    <div className="rounded border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
-                      AI Studio will validate the repository with GitHub CLI, add it as origin, and
-                      fetch it. If the remote already has commits, you will be guided through pull
-                      or conflict resolution before pushing.
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setRepositoryDialogOpen(false)}
-                        disabled={actionPending === 'github-connect-repository'}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => runAsyncAction(connectGitHubRepository)}
-                        disabled={actionPending !== null}
-                      >
-                        {actionPending === 'github-connect-repository'
-                          ? 'Connecting...'
-                          : 'Connect repository'}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {conflictResolverOpen && (
-        <dialog
-          open
-          className="fixed inset-0 z-50 flex bg-background text-foreground"
-          aria-label="Merge conflict resolver"
-        >
-          <div className="flex w-72 shrink-0 flex-col border-r border-border bg-muted/20 p-4">
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div>
-                <div className="text-lg font-semibold">Git & GitHub</div>
-                <div className="text-xs text-muted-foreground">Merge conflict workflow</div>
-              </div>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => setConflictResolverOpen(false)}
-                aria-label="Close merge conflict resolver"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              <GitCard title="Repository">
-                <div className="space-y-2 text-sm">
-                  <div className="font-medium">{currentStatus.repositoryName}</div>
-                  <div className="flex items-center gap-2 font-mono text-xs">
-                    <GitBranch className="h-3.5 w-3.5" />
-                    <span className="truncate">{currentStatus.currentBranch}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    ↑ {currentStatus.ahead} ↓ {currentStatus.behind}
-                  </div>
-                </div>
-              </GitCard>
-
-              <section className="rounded border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
-                <div className="font-medium">
-                  {conflictResolved ? 'All conflicts resolved' : 'Merge conflicts detected'}
-                </div>
-                <div className="mt-1 text-xs">{conflictCountText}</div>
-              </section>
-
-              <Button
-                type="button"
-                className="w-full"
-                variant={conflictResolved ? 'outline' : 'default'}
-                onClick={() => runAsyncAction(loadConflicts)}
-                disabled={conflictsLoading}
-              >
-                {conflictsLoading ? 'Refreshing...' : 'Refresh conflicts'}
-              </Button>
-              <Button
-                type="button"
-                className="w-full"
-                variant="outline"
-                onClick={() => setConflictResolverOpen(false)}
-              >
-                Exit resolver
-              </Button>
-
-              <GitCard title="Working Tree">
-                <div className="space-y-1">
-                  <StatRow label="Staged" value={currentStatus.workingTree.staged} />
-                  <StatRow
-                    label="Conflicts"
-                    value={currentStatus.workingTree.conflicts}
-                    tone="text-red-700"
-                  />
-                  <StatRow label="Modified" value={currentStatus.workingTree.modified} />
-                  <StatRow label="Untracked" value={currentStatus.workingTree.untracked} />
-                </div>
-              </GitCard>
-
-              <div className="rounded border border-border bg-background px-3 py-3 text-xs text-muted-foreground">
-                <div className="mb-2">
-                  You can also open the project in your IDE if a file needs deeper edits.
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  disabled={!projectId}
-                  onClick={() => {
-                    runAsyncAction(openProjectInSystemIde);
-                  }}
-                >
-                  Open in IDE
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex w-72 shrink-0 flex-col border-r border-border p-4">
-            <div className="mb-3">
-              <h2 className="text-sm font-semibold">Files with conflicts</h2>
-              <p className="text-xs text-muted-foreground">
-                {conflictsLoading ? 'Loading conflicts...' : unresolvedConflictText}
-              </p>
-            </div>
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-              {conflictFiles.length === 0 && (
-                <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
-                  No conflicted files are currently reported.
-                </div>
-              )}
-              {conflictFiles.map((file) => (
-                <button
-                  type="button"
-                  key={file.path}
-                  className={cn(
-                    'flex w-full items-center justify-between gap-2 rounded border px-3 py-2 text-left text-xs',
-                    selectedConflictPath === file.path
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-background hover:bg-secondary/50',
-                  )}
-                  onClick={() => setSelectedConflictPath(file.path)}
-                >
-                  <span className="min-w-0 flex-1 truncate font-mono">{file.path}</span>
-                  <Badge variant={file.resolved ? 'outline' : 'destructive'}>
-                    {file.resolved ? 'resolved' : file.conflictCount}
-                  </Badge>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex min-w-0 flex-1 flex-col p-5">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-semibold">
-                  {conflictResolved ? 'Merge Conflicts Resolved' : 'Resolve Merge Conflicts'}
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Choose the code to keep for each conflicted file, then commit the merge
-                  resolution.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setConflictResolverOpen(false)}
-              >
-                Close
-              </Button>
-            </div>
-
-            {conflictError && (
-              <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                {conflictError}
-              </div>
-            )}
-
-            {conflictResolved && (
-              <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-4">
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="rounded border border-border px-4 py-3">
-                    <div className="text-2xl font-semibold">{conflictFiles.length}</div>
-                    <div className="text-xs text-muted-foreground">Files reviewed</div>
-                  </div>
-                  <div className="rounded border border-border px-4 py-3">
-                    <div className="text-2xl font-semibold text-emerald-700">0</div>
-                    <div className="text-xs text-muted-foreground">Conflicts remaining</div>
-                  </div>
-                  <div className="rounded border border-border px-4 py-3">
-                    <div className="text-2xl font-semibold">{currentStatus.ahead}</div>
-                    <div className="text-xs text-muted-foreground">Commits ahead</div>
-                  </div>
-                  <div className="rounded border border-border px-4 py-3">
-                    <div className="text-2xl font-semibold">{currentStatus.behind}</div>
-                    <div className="text-xs text-muted-foreground">Commits behind</div>
-                  </div>
-                </div>
-                <div className="min-h-0 overflow-y-auto rounded border border-border bg-background p-4">
-                  <h2 className="mb-3 text-sm font-semibold">Resolved files</h2>
-                  <div className="space-y-2">
-                    {conflictFiles.map((file) => (
-                      <div
-                        key={file.path}
-                        className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm"
-                      >
-                        <span className="font-mono">{file.path}</span>
-                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                          Resolved
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="rounded border border-border bg-background p-4">
-                  <div className="mb-3 font-medium">Commit merge resolution</div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={mergeCommitMessage}
-                      onChange={(event) => setMergeCommitMessage(event.target.value)}
-                      placeholder="Merge commit message"
-                      disabled={actionPending !== null}
-                    />
-                    <Button
-                      type="button"
-                      onClick={() => runAsyncAction(() => commitMergeResolution(false))}
-                      disabled={actionPending !== null || !mergeCommitMessage.trim()}
-                    >
-                      {actionPending === 'merge-commit' ? 'Committing...' : 'Commit merge'}
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => runAsyncAction(() => commitMergeResolution(true))}
-                      disabled={actionPending !== null || !mergeCommitMessage.trim()}
-                    >
-                      {actionPending === 'merge-commit-push' ? 'Pushing...' : 'Commit & push'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {!conflictResolved && (
-              <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-4">
-                <div className="grid min-h-0 grid-cols-3 overflow-hidden rounded border border-border">
-                  <div className="min-h-0 overflow-y-auto border-r border-border">
-                    <div className="border-b border-border bg-emerald-50 px-3 py-2 text-sm font-medium">
-                      Current
-                    </div>
-                    <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
-                      {getConflictPreviewText(
-                        conflictFileLoading,
-                        conflictFile?.hunks.map((hunk) => hunk.current).join('\n'),
-                      )}
-                    </pre>
-                  </div>
-                  <div className="min-h-0 overflow-y-auto border-r border-border">
-                    <div className="border-b border-border bg-red-50 px-3 py-2 text-sm font-medium">
-                      Incoming
-                    </div>
-                    <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
-                      {getConflictPreviewText(
-                        conflictFileLoading,
-                        conflictFile?.hunks.map((hunk) => hunk.incoming).join('\n'),
-                      )}
-                    </pre>
-                  </div>
-                  <div className="min-h-0 overflow-y-auto">
-                    <div className="border-b border-border bg-primary/5 px-3 py-2 text-sm font-medium">
-                      Result
-                    </div>
-                    <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
-                      {getConflictPreviewText(conflictFileLoading, conflictFile?.content)}
-                    </pre>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 rounded border border-border bg-background p-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!selectedConflictPath || actionPending !== null}
-                    onClick={() => runAsyncAction(() => applyConflictChoice('current'))}
-                  >
-                    Accept current
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!selectedConflictPath || actionPending !== null}
-                    onClick={() => runAsyncAction(() => applyConflictChoice('incoming'))}
-                  >
-                    Accept incoming
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={!selectedConflictPath || actionPending !== null}
-                    onClick={() => runAsyncAction(() => applyConflictChoice('both'))}
-                  >
-                    Accept both
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={!selectedConflictPath || conflictFileLoading}
-                    onClick={() => {
-                      setConflictFile(null);
-                      const currentPath = selectedConflictPath;
-                      setSelectedConflictPath(null);
-                      globalThis.setTimeout(() => setSelectedConflictPath(currentPath), 0);
-                    }}
-                  >
-                    Reset view
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </dialog>
-      )}
+      <ConflictResolverDialog
+        open={conflictResolverOpen}
+        projectId={projectId}
+        status={currentStatus}
+        conflictResolved={conflictResolved}
+        conflictCountText={conflictCountText}
+        conflictsLoading={conflictsLoading}
+        conflictFiles={conflictFiles}
+        unresolvedConflictText={unresolvedConflictText}
+        selectedConflictPath={selectedConflictPath}
+        conflictError={conflictError}
+        conflictFileLoading={conflictFileLoading}
+        conflictFile={conflictFile}
+        mergeCommitMessage={mergeCommitMessage}
+        actionPending={actionPending}
+        loadConflicts={loadConflicts}
+        openProjectInSystemIde={openProjectInSystemIde}
+        setOpen={setConflictResolverOpen}
+        setSelectedConflictPath={setSelectedConflictPath}
+        setConflictFile={setConflictFile}
+        setMergeCommitMessage={setMergeCommitMessage}
+        applyConflictChoice={applyConflictChoice}
+        commitMergeResolution={commitMergeResolution}
+      />
 
       <aside
         className={cn(
