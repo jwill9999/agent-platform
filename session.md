@@ -16,36 +16,23 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-18
-- **Session:** Integrated Madge circular dependency detection (pnpm script, Husky pre-push, GitHub Actions CI); enhanced API review specialist agent.
+- **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, and web files using parallel subagents.
 - **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata` (3 commits, all pushed)
+- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest local commit `5eeb001` pending push with this handoff update.
 
 ## Current State
 
-**Madge Circular Dependency Integration:**
+**SonarQube Cleanup:**
 
-- ✅ Madge v8.0.0 installed as devDependency (resolved v7.3.1 unavailability)
-- ✅ pnpm scripts: `deps:check-cycles`, `deps:visualize` with tsconfig path alias resolution
-- ✅ Makefile target: `make deps:check-cycles`
-- ✅ Husky pre-push hook: runs madge check early with fail-fast behavior
-- ✅ GitHub Actions workflow: `.github/workflows/check-cycles.yml` (PR trigger)
-- ✅ Verification: **0 circular dependencies found** (1140 files scanned, 72 skipped warnings = acceptable unresolved imports)
-
-**Agent Review Specialist Enhancement:**
-
-- ✅ 15 scope areas with locked decision references (API surface, execution modes, security guards, harness runtime, data layer, plugin system, observability, streaming, MCP adapter, model router, contracts, planner, agent validation, skill loading, frontend integration)
-- ✅ Non-scope clarity (frontend, native Electron, CI/CD unless test-related, docs-only)
-- ✅ DoD checklist now requires: `pnpm deps:check-cycles` passing
+- Fixed requested SonarQube warnings in API/router tests, desktop E2E/runtime code, web chat/webview/Git panels, workflow CI, harness browser tools, and macOS VM asset script.
+- Used subagents for the requested file groups; `apps/api/test/readinessCheck.test.ts` had no open Sonar issues and was left unchanged.
+- Local completion gate passed: Prettier check, `pnpm lint`, `pnpm typecheck`, focused API tests (`projectsRouter`, `readinessCheck`), and focused web Vitest run.
+- Sonar Agentic Analysis is unavailable for this org: `403 Forbidden - Agentic Analysis is not activated`; remote issue list remains stale until the next Sonar project analysis.
 
 **Changes Committed & Pushed:**
 
-- `.github/agents/api-review-specialist.agent.md`: Enhanced scope table, locked decisions, execution modes, security guards, Beads integration
-- `.github/workflows/check-cycles.yml`: New GitHub Actions PR workflow
-- `.husky/pre-push`: Integrated madge circular dependency check
-- `Makefile`: Added deps:check-cycles target
-- `package.json`: Added madge devDependency, pnpm scripts
-- Unrelated local change present and intentionally left untouched:
-  `.github/agents/api-review-specialist.agent.md`.
+- Commit `5eeb001` (`fix sonarqube warnings`) contains the scoped Sonar fixes and validation-hook formatting.
+- Unrelated local changes intentionally left untouched: `apps/web/components/project/project-terminal-dock.tsx` and untracked `deps-graph.svg`.
 
 ## Product Direction
 
@@ -59,7 +46,6 @@ and actionable.
 
 ## Next
 
-1. **Monitor PR #236** (`Define workspace capability metadata`): Verify circular dep checks pass in CI.
-2. **Optional:** Install Graphviz locally if dependency graph visualization is useful (`brew install graphviz`, then `pnpm deps:visualize` to generate `deps-graph.svg`).
-3. **Optional:** Add `--exclude` rules to madge to suppress known unresolved import warnings (non-blocking, nice-to-have).
-4. **Follow-up Epic:** Consider expanding API review agent integration into pre-commit lint checks or IDE extensions.
+1. Push the Sonar cleanup commit plus this `session.md` handoff update.
+2. After CI/Sonar reruns, confirm the stale remote Sonar issues are closed or only unrelated files remain.
+3. Decide separately whether to keep, commit, or discard the unrelated `project-terminal-dock.tsx` and `deps-graph.svg` local changes.
