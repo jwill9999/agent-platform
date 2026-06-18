@@ -16,9 +16,9 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-18
-- **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, Playwright install steps, Project Git/WebView panels, and chat router.
+- **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, Playwright install steps, Project Git/WebView panels, chat router, and chat input.
 - **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `bc1d261`.
+- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `ce02c4a`.
 
 ## Current State
 
@@ -31,8 +31,9 @@ and actionable.
 - Reduced `apps/web/components/project/project-git-github-panel.tsx` component complexity by moving effect branches into focused hooks and replaced the adjacent live-status spans with a badge.
 - Fixed `apps/web/components/project/project-webview-panel.tsx` negated open-state branch by rendering the open panel path first.
 - Fixed `apps/api/src/infrastructure/http/v1/chatRouter.ts` Sonar issues by splitting model resolution helpers, removing an unnecessary tool-call assertion, using `includes`, and switching active-task extraction to `RegExp.exec`.
+- Fixed `apps/web/components/chat/chat-input.tsx` deprecated form event typing by importing React's `FormEvent` type directly.
 - Used subagents for the requested file groups; `apps/api/test/readinessCheck.test.ts` had no open Sonar issues and was left unchanged.
-- Local completion gate passed: Prettier check, `pnpm lint`, `pnpm typecheck`, focused API tests (`projectsRouter`, `readinessCheck`, `chat`, `sessionChat`), focused web Vitest run, and pre-push API build/typecheck/full test run.
+- Local completion gate passed: Prettier check, `pnpm lint`, `pnpm typecheck`, focused API tests (`projectsRouter`, `readinessCheck`, `chat`, `sessionChat`), focused web Vitest run, pre-push API build/typecheck/full test run, and pre-push web build/typecheck/full test run.
 - Sonar Agentic Analysis is unavailable for this org: `403 Forbidden - Agentic Analysis is not activated`; remote issue list remains stale until the next Sonar project analysis.
 
 **Changes Committed & Pushed:**
@@ -45,6 +46,7 @@ and actionable.
 - Commit `fe23310` (`reduce git github panel sonar complexity`) contains the Project Git/GitHub panel complexity and spacing cleanup.
 - Commit `051bc7d` (`fix webview panel negated condition`) contains the Project WebView panel negated-condition cleanup.
 - Commit `bc1d261` (`fix chat router sonar warnings`) contains the chat router Sonar cleanup.
+- Commit `ce02c4a` (`fix chat input form event type`) contains the chat input deprecated form event typing cleanup.
 - Unrelated local changes intentionally left untouched: `apps/web/components/project/project-terminal-dock.tsx` and untracked `deps-graph.svg`.
 
 ## Product Direction
