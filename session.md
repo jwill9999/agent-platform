@@ -16,51 +16,33 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-18
-- **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, Playwright install steps, Project Git/WebView panels, chat router, chat input, browser tools tests, and macOS VM asset script.
-- **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `6f669f0`.
+- **Session:** Implemented `agent-platform-project-experience.2` Workspaces/sidebar simplification and
+  prepared it for manual UX review.
+- **Branch:** `jwill9999/project-experience-workspace-navigation`
+- **Base:** branched from `jwill9999/project-experience-capability-metadata`; task 2 is not closed
+  until manual testing is reviewed.
 
 ## Current State
 
-**SonarQube Cleanup:**
+**Project Experience Task 2:**
 
-- Fixed requested SonarQube warnings in API/router tests, desktop E2E/runtime code, web chat/webview/Git panels, workflow CI, harness browser tools, and macOS VM asset script.
-- Fixed `.github/workflows/check-cycles.yml` Sonar rule `githubactions:S6505` by adding `--ignore-scripts` to `pnpm install --frozen-lockfile`.
-- Fixed `.github/workflows/ci.yml` Sonar rule `githubactions:S6505` by adding `--ignore-scripts` to all four `pnpm install --frozen-lockfile` steps.
-- Fixed `.github/workflows/ci.yml` Sonar rule `githubactions:S6505` on Playwright install steps by calling `./node_modules/.bin/playwright install --with-deps chromium` directly instead of `pnpm exec`.
-- Reduced `apps/web/components/project/project-git-github-panel.tsx` component complexity by moving effect branches into focused hooks and replaced the adjacent live-status spans with a badge.
-- Reduced the remaining `apps/web/components/project/project-git-github-panel.tsx` panel complexity by extracting repository connection and merge-conflict resolver UI into focused child components.
-- Fixed `apps/web/components/project/project-git-github-panel.tsx` live badge spacing by wrapping the text label in its own `span`.
-- Replaced repeated inline conflict-resolution strategy unions in `apps/web/components/project/project-git-github-panel.tsx` with a `ConflictResolutionStrategy` type alias.
-- Fixed `apps/web/components/project/project-webview-panel.tsx` negated open-state branch by rendering the open panel path first.
-- Fixed `apps/api/src/infrastructure/http/v1/chatRouter.ts` Sonar issues by splitting model resolution helpers, removing an unnecessary tool-call assertion, using `includes`, and switching active-task extraction to `RegExp.exec`.
-- Reduced `apps/api/src/infrastructure/http/v1/chatRouter.ts` `buildRuntimeGraph` parameter count by replacing the long positional parameter list with a typed input object.
-- Fixed `apps/web/components/chat/chat-input.tsx` deprecated form event typing by deriving the submit handler type from `ComponentProps<'form'>['onSubmit']` instead of referencing `FormEvent`.
-- Fixed `packages/harness/test/browserTools.integration.test.ts` unnecessary assertion by parsing tool result data with `BrowserActionResultSchema`.
-- Fixed `apps/desktop/scripts/build-macos-vm-linux-assets.mjs` Docker execution path warning by resolving Docker from fixed absolute system locations before `execFileSync`.
-- Used subagents for the requested file groups; `apps/api/test/readinessCheck.test.ts` had no open Sonar issues and was left unchanged.
-- Local completion gate passed: Prettier check, `pnpm lint`, `pnpm typecheck`, focused API tests (`projectsRouter`, `readinessCheck`, `chat`, `sessionChat`), focused web Vitest run, focused harness browser tools test run, focused desktop script tests, pre-push API build/typecheck/full test run, pre-push web build/typecheck/full test run, pre-push harness build/typecheck/full test run, and pre-push desktop build/typecheck/full test run.
-- Sonar Agentic Analysis is unavailable for this org: `403 Forbidden - Agentic Analysis is not activated`; remote issue list remains stale until the next Sonar project analysis.
+- Beads issue `agent-platform-project-experience.2` is claimed/in progress.
+- Workspaces now presents two main choices: `Chat` and `Coding Project`.
+- The previous separate `New Project` and `Open Project` cards are collapsed into the single
+  `Coding Project` entry with `New project` and `Open folder` actions.
+- Sidebar Recent Projects remain available on the Workspaces surface and now show loading, empty,
+  and refresh-error states.
+- User-facing copy avoids `/workspace` or backend terminology and keeps deferred surfaces out of the
+  current navigation.
+- Manual testing is still pending; do not close the Beads task until feedback is reviewed.
 
-**Changes Committed & Pushed:**
+**Verification:**
 
-- Commit `5eeb001` (`fix sonarqube warnings`) contains the scoped Sonar fixes and validation-hook formatting.
-- Commit `bd8953e` (`fix check cycles workflow install warning`) contains the workflow install-script hardening.
-- Commit `8db558e` (`harden ci dependency installs`) contains the CI install-script hardening.
-- Commit `587b720` (`harden playwright install commands`) tried the pnpm config form for Playwright install hardening.
-- Commit `da60402` (`avoid pnpm for playwright installs`) contains the direct Playwright binary fix for the remaining line warnings.
-- Commit `fe23310` (`reduce git github panel sonar complexity`) contains the Project Git/GitHub panel complexity and spacing cleanup.
-- Commit `051bc7d` (`fix webview panel negated condition`) contains the Project WebView panel negated-condition cleanup.
-- Commit `bc1d261` (`fix chat router sonar warnings`) contains the chat router Sonar cleanup.
-- Commit `ce02c4a` (`fix chat input form event type`) contains the chat input deprecated form event typing cleanup.
-- Commit `5982ca5` (`remove deprecated chat input form event type`) removes the remaining direct `FormEvent` usage in chat input.
-- Commit `b60c86e` (`reduce chat runtime graph parameters`) contains the `buildRuntimeGraph` parameter object refactor.
-- Commit `9518ae5` (`reduce git github panel complexity`) contains the Git/GitHub panel UI extraction refactor.
-- Commit `9a425a5` (`fix git panel live badge spacing`) contains the live badge spacing cleanup.
-- Commit `6f669f0` (`alias conflict resolution strategy type`) contains the conflict-resolution strategy type alias cleanup.
-- Commit `bb7ee02` (`fix browser tools test assertion`) contains the browser tools integration test assertion cleanup.
-- Commit `774f9d7` (`fix vm asset docker path lookup`) contains the macOS VM asset script Docker path hardening.
-- Unrelated local changes intentionally left untouched: `apps/web/components/project/project-terminal-dock.tsx` and untracked `deps-graph.svg`.
+- Passed: `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm format:check`, and
+  `git diff --check`.
+- Passed before the final docs update: focused Playwright `e2e/mvp-e2e.spec.ts` against local API/web.
+- Docker rebuild for a later Playwright rerun hit local disk pressure (`ENOSPC`) while writing the
+  Next.js build cache; no source failure was identified.
 
 ## Product Direction
 
@@ -74,5 +56,8 @@ and actionable.
 
 ## Next
 
-1. After CI/Sonar reruns, confirm the stale remote Sonar issues are closed or only unrelated files remain.
-2. Decide separately whether to keep, commit, or discard the unrelated `project-terminal-dock.tsx` and `deps-graph.svg` local changes.
+1. Commit and push task 2 changes if not already done in this session.
+2. Ask the user to manually test Workspaces, Chat, Coding Project creation/opening, recent Projects,
+   and refresh feedback.
+3. Close `agent-platform-project-experience.2` only after manual UX feedback is accepted or filed as
+   follow-up Beads work.

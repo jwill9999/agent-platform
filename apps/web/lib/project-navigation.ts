@@ -58,13 +58,16 @@ export const workspaceNavigationItems: readonly WorkspaceNavigationItem[] = [
 
 export const workspaceEntryCopy = {
   title: 'Choose a workspace',
-  description: 'Open a general chat or choose a Project.',
-  chatTitle: 'Open Chat',
-  chatDescription: 'Talk with the personal assistant without loading a Project.',
-  chatProfile: 'Personal assistant',
-  projectTitle: 'Open Project',
-  projectDescription: 'Choose a Project folder for chat, file review, and optional IDE work.',
-  projectProfile: 'Project workspace',
+  description: 'Start a general chat or open a coding project.',
+  chatTitle: 'Chat',
+  chatDescription: 'Talk with the assistant and use general tools without opening a project.',
+  chatProfile: 'General assistant',
+  projectTitle: 'Coding Project',
+  projectDescription:
+    'Work with a folder or repository, including Git, branches, terminal, and IDE handoff.',
+  projectProfile: 'Folder or repository',
+  projectCreateAction: 'New project',
+  projectOpenAction: 'Open folder',
 } as const;
 
 export const projectReopenSearchParam = 'projectId';

@@ -122,11 +122,13 @@ const settingsNavigation = [
 export function RecentProjectsNavSection({
   projects,
   isLoading,
+  error,
   onRefresh,
   onForgetProject,
 }: Readonly<{
   projects: readonly ProjectDesktopRecord[];
   isLoading: boolean;
+  error?: string | null;
   onRefresh: () => void | Promise<void>;
   onForgetProject?: (project: ProjectDesktopRecord) => void;
 }>) {
@@ -163,32 +165,39 @@ export function RecentProjectsNavSection({
 
   return (
     <section className="mt-5 border-t border-border pt-4" aria-label="Recent Projects">
-      <div className="mb-2 flex items-center justify-between gap-2 px-3">
-        <div className="truncate text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Recent Projects
+      <div className="mb-2 px-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Recent Projects
+          </div>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className={cn(
+              'h-7 w-7 shrink-0',
+              isRefreshing && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
+            )}
+            aria-label={isRefreshing ? 'Refreshing recent Projects' : 'Refresh recent Projects'}
+            title={isRefreshing ? 'Refreshing recent Projects' : 'Refresh recent Projects'}
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden />
+          </Button>
         </div>
         {isRefreshing && (
-          <span className="shrink-0 text-[11px] font-medium text-primary">Refreshing</span>
+          <div className="mt-1 text-[11px] font-medium text-primary">Refreshing</div>
         )}
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className={cn(
-            'h-7 w-7 shrink-0',
-            isRefreshing && 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
-          )}
-          aria-label={isRefreshing ? 'Refreshing recent Projects' : 'Refresh recent Projects'}
-          title={isRefreshing ? 'Refreshing recent Projects' : 'Refresh recent Projects'}
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} aria-hidden />
-        </Button>
       </div>
       {visibleProjects.length === 0 ? (
-        <p className="px-3 text-xs leading-snug text-muted-foreground">
-          {isLoading ? 'Loading Projects...' : 'No recent Projects'}
+        <p
+          className={cn(
+            'px-3 text-xs leading-snug',
+            error ? 'text-destructive' : 'text-muted-foreground',
+          )}
+        >
+          {error ?? (isLoading ? 'Loading Projects...' : 'No recent Projects')}
         </p>
       ) : (
         <div className="space-y-1">
@@ -304,6 +313,7 @@ export function Sidebar() {
   const { collapsed, toggle } = useSidebar();
   const [recentProjects, setRecentProjects] = useState<ProjectDesktopRecord[]>([]);
   const [isLoadingRecentProjects, setIsLoadingRecentProjects] = useState(false);
+  const [recentProjectsError, setRecentProjectsError] = useState<string | null>(null);
   const [searchString, setSearchString] = useState('');
 
   const loadRecentProjects = useCallback(async () => {
@@ -313,27 +323,33 @@ export function Sidebar() {
         apiPath('projects', 'desktop', 'recent'),
       );
       setRecentProjects(result?.projects ?? []);
+      setRecentProjectsError(null);
     } catch (error) {
       if (error instanceof ApiRequestError && error.status === 404) {
         setRecentProjects([]);
+        setRecentProjectsError(null);
         return;
       }
       setRecentProjects([]);
+      setRecentProjectsError('Could not refresh recent Projects');
     } finally {
       setIsLoadingRecentProjects(false);
     }
   }, []);
 
-  const forgetRecentProject = useCallback(async (project: ProjectDesktopRecord) => {
-    try {
-      await apiDelete(apiPath('projects', project.id));
-      setRecentProjects((current) => current.filter((candidate) => candidate.id !== project.id));
-      forgetProjectInLocation(project.id);
-      globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
-    } catch {
-      loadRecentProjects().catch(() => {});
-    }
-  }, [loadRecentProjects]);
+  const forgetRecentProject = useCallback(
+    async (project: ProjectDesktopRecord) => {
+      try {
+        await apiDelete(apiPath('projects', project.id));
+        setRecentProjects((current) => current.filter((candidate) => candidate.id !== project.id));
+        forgetProjectInLocation(project.id);
+        globalThis.window.dispatchEvent(new Event(recentProjectsUpdatedEvent));
+      } catch {
+        loadRecentProjects().catch(() => {});
+      }
+    },
+    [loadRecentProjects],
+  );
 
   useEffect(() => {
     if (collapsed) return;
@@ -371,8 +387,7 @@ export function Sidebar() {
   const isRoot = pathname === '/';
   const isPersonalChatSurface =
     isRoot && currentMode === personalChatModeSearchValue && !currentProjectId;
-  const shouldShowRecentProjects =
-    !collapsed && !isPersonalChatSurface && recentProjects.length > 0;
+  const shouldShowRecentProjects = !collapsed && !isPersonalChatSurface;
 
   return (
     <aside
@@ -456,6 +471,7 @@ export function Sidebar() {
           <RecentProjectsNavSection
             projects={recentProjects}
             isLoading={isLoadingRecentProjects}
+            error={recentProjectsError}
             onRefresh={loadRecentProjects}
             onForgetProject={forgetRecentProject}
           />
