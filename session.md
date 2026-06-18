@@ -18,7 +18,7 @@ and actionable.
 - **Date:** 2026-06-18
 - **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, Playwright install steps, Project Git/WebView panels, chat router, chat input, browser tools tests, and macOS VM asset script.
 - **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `9a425a5`.
+- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `6f669f0`.
 
 ## Current State
 
@@ -31,6 +31,7 @@ and actionable.
 - Reduced `apps/web/components/project/project-git-github-panel.tsx` component complexity by moving effect branches into focused hooks and replaced the adjacent live-status spans with a badge.
 - Reduced the remaining `apps/web/components/project/project-git-github-panel.tsx` panel complexity by extracting repository connection and merge-conflict resolver UI into focused child components.
 - Fixed `apps/web/components/project/project-git-github-panel.tsx` live badge spacing by wrapping the text label in its own `span`.
+- Replaced repeated inline conflict-resolution strategy unions in `apps/web/components/project/project-git-github-panel.tsx` with a `ConflictResolutionStrategy` type alias.
 - Fixed `apps/web/components/project/project-webview-panel.tsx` negated open-state branch by rendering the open panel path first.
 - Fixed `apps/api/src/infrastructure/http/v1/chatRouter.ts` Sonar issues by splitting model resolution helpers, removing an unnecessary tool-call assertion, using `includes`, and switching active-task extraction to `RegExp.exec`.
 - Reduced `apps/api/src/infrastructure/http/v1/chatRouter.ts` `buildRuntimeGraph` parameter count by replacing the long positional parameter list with a typed input object.
@@ -56,6 +57,7 @@ and actionable.
 - Commit `b60c86e` (`reduce chat runtime graph parameters`) contains the `buildRuntimeGraph` parameter object refactor.
 - Commit `9518ae5` (`reduce git github panel complexity`) contains the Git/GitHub panel UI extraction refactor.
 - Commit `9a425a5` (`fix git panel live badge spacing`) contains the live badge spacing cleanup.
+- Commit `6f669f0` (`alias conflict resolution strategy type`) contains the conflict-resolution strategy type alias cleanup.
 - Commit `bb7ee02` (`fix browser tools test assertion`) contains the browser tools integration test assertion cleanup.
 - Commit `774f9d7` (`fix vm asset docker path lookup`) contains the macOS VM asset script Docker path hardening.
 - Unrelated local changes intentionally left untouched: `apps/web/components/project/project-terminal-dock.tsx` and untracked `deps-graph.svg`.
