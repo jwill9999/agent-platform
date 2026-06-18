@@ -270,27 +270,14 @@ export function ProjectWebViewPanel({
       <aside
         className={cn(
           'hidden h-full max-h-full min-h-0 min-w-0 shrink-0 overflow-hidden border-l border-border bg-background/95 lg:flex',
-          !open && 'w-12',
+          open ? null : 'w-12',
           open && viewMode === 'wide' && 'w-[clamp(520px,62vw,980px)]',
           open && viewMode !== 'wide' && 'w-[clamp(360px,38vw,640px)] max-w-[900px]',
         )}
         aria-label="Workspace preview"
         data-testid="project-webview-panel"
       >
-        {!open ? (
-          <button
-            type="button"
-            className="flex h-full w-full flex-col items-center gap-3 px-2 py-4 text-xs text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-            onClick={() => setOpen(true)}
-            aria-label="Open workspace preview panel"
-            title="Open workspace preview panel"
-          >
-            <Globe className="h-5 w-5" />
-            <span className="[writing-mode:vertical-rl] rotate-180 font-medium tracking-wide">
-              Preview
-            </span>
-          </button>
-        ) : (
+        {open ? (
           <PreviewChrome
             activeWebView={activeWebView}
             bridgeAvailable={bridgeAvailable}
@@ -307,6 +294,19 @@ export function ProjectWebViewPanel({
             webviews={webviews}
             setActiveId={setActiveId}
           />
+        ) : (
+          <button
+            type="button"
+            className="flex h-full w-full flex-col items-center gap-3 px-2 py-4 text-xs text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+            onClick={() => setOpen(true)}
+            aria-label="Open workspace preview panel"
+            title="Open workspace preview panel"
+          >
+            <Globe className="h-5 w-5" />
+            <span className="[writing-mode:vertical-rl] rotate-180 font-medium tracking-wide">
+              Preview
+            </span>
+          </button>
         )}
       </aside>
 
