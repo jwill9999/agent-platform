@@ -1,4 +1,4 @@
-.PHONY: build rebuild up down restart reset new workspace-init workspace-clean-dry-run workspace-clean workspace-clean-force runtime-config-backup runtime-config-restore coding-runtime-verify seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format deps:check-cycles help
+.PHONY: build rebuild up down restart reset new workspace-init workspace-clean-dry-run workspace-clean workspace-clean-force runtime-config-backup runtime-config-restore coding-runtime-verify seed logs logs-api logs-web status shell-api shell-web clean test lint typecheck format deps\:check-cycles help
 
 # ---------------------------------------------------------------------------
 # Docker-only Makefile — all runtime commands run inside containers.
@@ -159,7 +159,7 @@ format:
 	pnpm format:check
 
 ## Check for circular dependencies between packages
-deps:check-cycles:
+deps\:check-cycles:
 	pnpm deps:check-cycles
 
 electron-local:

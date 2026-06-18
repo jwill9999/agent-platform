@@ -52,11 +52,33 @@ Keep Beads dependencies aligned with this table.
   Project, and exposes both New project and Open folder actions from the Coding Project entry.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
+## Implementation Notes
+
+- The Workspaces entry screen now shows two primary choices: `Chat` and `Coding Project`.
+- `Coding Project` contains the `New project` and `Open folder` actions, removing the previous
+  separate project cards.
+- Recent Projects remain visible on the Workspaces surface and now expose loading, empty, and refresh
+  error states without changing the main navigation model.
+- Automation, scheduled tasks, email workflows, docs/research, and generated-app surfaces remain
+  deferred to future product definitions.
+
+## Verification Run
+
+- `pnpm build`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm format:check`
+- `git diff --check`
+- Focused Playwright smoke for `e2e/mvp-e2e.spec.ts` passed against the local web/API stack before
+  the final documentation update; a later Docker rebuild was blocked by local Docker disk pressure
+  (`ENOSPC`) while writing the Next.js build cache.
+
 ## Definition Of Done
 
-- [ ] Workspaces/sidebar clearly separates general Chat and Coding Projects.
-- [ ] Workspaces shows one Coding Project entry with New project and Open folder actions.
-- [ ] Users can reopen stored Projects from the explorer.
-- [ ] Users can start/open/create Coding Project flows without duplicate or conflicting CTAs.
-- [ ] Deferred automation/task/docs/research surfaces are not exposed as current workspace cards.
-- [ ] Labels remain user-facing and avoid `/workspace`/backend wording.
+- [x] Workspaces/sidebar clearly separates general Chat and Coding Projects.
+- [x] Workspaces shows one Coding Project entry with New project and Open folder actions.
+- [x] Users can reopen stored Projects from the explorer.
+- [x] Users can start/open/create Coding Project flows without duplicate or conflicting CTAs.
+- [x] Deferred automation/task/docs/research surfaces are not exposed as current workspace cards.
+- [x] Labels remain user-facing and avoid `/workspace`/backend wording.

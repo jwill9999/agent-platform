@@ -196,7 +196,7 @@ async function launchVmFixture(
 async function openProject(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: 'Open Project' }).click();
+  await page.getByRole('button', { name: 'Open folder' }).click();
   await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
 }
 

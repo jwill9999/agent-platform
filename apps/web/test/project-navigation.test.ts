@@ -182,6 +182,10 @@ describe('Project navigation model', () => {
     expect(visibleCopy).toContain('Project');
     expect(visibleCopy).not.toMatch(/backend|\/workspace|container|coding agent/i);
     expect(workspaceNavigationItems.map((item) => item.name)).toEqual(['Workspaces', 'Chat']);
+    expect(workspaceEntryCopy.chatTitle).toBe('Chat');
+    expect(workspaceEntryCopy.projectTitle).toBe('Coding Project');
+    expect(workspaceEntryCopy.projectCreateAction).toBe('New project');
+    expect(workspaceEntryCopy.projectOpenAction).toBe('Open folder');
   });
 
   it('builds safe Project reopen metadata for desktop Projects', () => {

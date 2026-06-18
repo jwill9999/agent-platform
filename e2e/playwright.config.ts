@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.BASE_URL ?? 'http://127.0.0.1:3001';
 const apiURL = process.env.API_URL ?? 'http://127.0.0.1:3000';
+const ciBrowserChannel = process.env.CI ? { channel: 'chrome' as const } : {};
 
 export default defineConfig({
   testDir: '.',
@@ -14,8 +15,8 @@ export default defineConfig({
     baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: process.env.CI ? 'off' : 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], ...ciBrowserChannel } }],
   metadata: { apiURL },
 });

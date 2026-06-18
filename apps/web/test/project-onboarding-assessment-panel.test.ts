@@ -264,6 +264,39 @@ describe('Project onboarding assessment panel', () => {
     expect(html).not.toContain('backend');
   });
 
+  it('renders recent Project empty, loading, and error states', () => {
+    const emptyHtml = renderToStaticMarkup(
+      createElement(RecentProjectsNavSection, {
+        projects: [],
+        isLoading: false,
+        onRefresh: () => {},
+      }),
+    );
+    expect(emptyHtml).toContain('Recent Projects');
+    expect(emptyHtml).toContain('No recent Projects');
+    expect(emptyHtml).toContain('Refresh recent Projects');
+
+    const loadingHtml = renderToStaticMarkup(
+      createElement(RecentProjectsNavSection, {
+        projects: [],
+        isLoading: true,
+        onRefresh: () => {},
+      }),
+    );
+    expect(loadingHtml).toContain('Loading Projects...');
+    expect(loadingHtml).toContain('Refreshing');
+
+    const errorHtml = renderToStaticMarkup(
+      createElement(RecentProjectsNavSection, {
+        projects: [],
+        isLoading: false,
+        error: 'Could not refresh recent Projects',
+        onRefresh: () => {},
+      }),
+    );
+    expect(errorHtml).toContain('Could not refresh recent Projects');
+  });
+
   it('renders forget actions and collapses long recent Project lists', () => {
     const projects = [
       ...recentDesktopProjectFixtures,

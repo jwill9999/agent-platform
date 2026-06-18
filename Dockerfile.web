@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 RUN apk add --no-cache libc6-compat && corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -15,7 +15,7 @@ RUN pnpm --filter @agent-platform/contracts build \
   && pnpm --filter @agent-platform/model-router build \
   && pnpm --filter @agent-platform/web build
 
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 RUN apk add --no-cache curl
 WORKDIR /app
 ENV NODE_ENV=production
