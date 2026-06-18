@@ -51,8 +51,9 @@ and actionable.
 - Added `pnpm/action-setup` before setup-node pnpm caching in `check-cycles.yml`.
 - Kept hardened `pnpm install --frozen-lockfile --ignore-scripts` in CI and added explicit
   `pnpm run rebuild:native` steps before DB-backed tests and Electron/VM E2E jobs.
-- Added explicit `pnpm --filter @agent-platform/desktop exec install-electron` steps for Electron
-  E2E jobs, because hardened installs also skip Electron's binary download/path setup.
+- Added explicit Electron binary setup for Electron E2E jobs, because hardened installs also skip
+  Electron's binary download/path setup. The setup now runs Electron's resolved `install.js`
+  directly and fails early if `path.txt` is still missing.
 - Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
   `multiple target patterns`.
 - Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,
