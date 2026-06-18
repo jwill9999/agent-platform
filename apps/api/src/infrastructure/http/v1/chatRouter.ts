@@ -163,6 +163,17 @@ export type ChatRouterOptions = {
   }) => NativeToolExecutor;
 };
 
+type RuntimeGraphInput = {
+  db: DrizzleDb;
+  agentCtx: AgentContext;
+  runId: string;
+  sessionId: string;
+  emitter: OutputEmitter;
+  options: ChatRouterOptions;
+  approvedToolCallIds?: ReadonlySet<string>;
+  nativeToolExecutor?: NativeToolExecutor;
+};
+
 function resolveSlashCommandOptions(options?: RunSlashCommandOptions): RunSlashCommandOptions {
   return options ?? { registry: defaultSlashCommandRegistry };
 }
@@ -1016,16 +1027,16 @@ function createProjectWriteBlockHandler(
   };
 }
 
-function buildRuntimeGraph(
-  db: DrizzleDb,
-  agentCtx: AgentContext,
-  runId: string,
-  sessionId: string,
-  emitter: OutputEmitter,
-  options: ChatRouterOptions,
-  approvedToolCallIds?: ReadonlySet<string>,
-  nativeToolExecutor?: NativeToolExecutor,
-) {
+function buildRuntimeGraph({
+  db,
+  agentCtx,
+  runId,
+  sessionId,
+  emitter,
+  options,
+  approvedToolCallIds,
+  nativeToolExecutor,
+}: RuntimeGraphInput) {
   const dispatcher = agentCtx.pluginDispatcher;
   return buildHarnessGraph({
     executeTool: async () => ({ ok: true }),
@@ -1263,16 +1274,16 @@ export async function handleSessionResume(
       resumeMessages = dispatchResult.messages ?? [];
     }
 
-    const graph = buildRuntimeGraph(
+    const graph = buildRuntimeGraph({
       db,
       agentCtx,
       runId,
       sessionId,
       emitter,
       options,
-      new Set([toolCall.id]),
+      approvedToolCallIds: new Set([toolCall.id]),
       nativeToolExecutor,
-    );
+    });
     const resumeState = buildInitialState(
       runId,
       sessionId,
@@ -1375,7 +1386,7 @@ export function createChatRouter(db: DrizzleDb, options: ChatRouterOptions = {})
 
         await emitTaskStart(agentCtx, sessionId, runId);
 
-        const graph = buildRuntimeGraph(db, agentCtx, runId, sessionId, emitter, options);
+        const graph = buildRuntimeGraph({ db, agentCtx, runId, sessionId, emitter, options });
 
         const { messages, dropped, contextTokens, memoryBundle } = buildConversationMessages(
           db,
