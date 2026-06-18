@@ -1070,6 +1070,18 @@ function ClosedGitHubPanelButton({ onOpen }: Readonly<{ onOpen: () => void }>) {
   );
 }
 
+function LiveStatusBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className="inline-flex items-center gap-1 border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+      Live
+    </Badge>
+  );
+}
+
 function shortPath(path: string): string {
   const parts = path.split('/');
   if (parts.length <= 2) return path;
@@ -1268,6 +1280,224 @@ function checksScopeLabel(checks: ProjectGitChecksResult): string {
   }
   if (checks.scope === 'head_commit') return 'Current branch HEAD';
   return 'Current branch';
+}
+
+function runWhenTabActive(
+  activeTab: PanelTab,
+  matchingTabs: readonly PanelTab[],
+  action: () => Promise<unknown>,
+): void {
+  if (matchingTabs.includes(activeTab)) runAsyncAction(action);
+}
+
+function useConflictFileLoader({
+  conflictResolverOpen,
+  projectId,
+  selectedConflictPath,
+  setConflictError,
+  setConflictFile,
+  setConflictFileLoading,
+}: Readonly<{
+  conflictResolverOpen: boolean;
+  projectId: string | null;
+  selectedConflictPath: string | null;
+  setConflictError: React.Dispatch<React.SetStateAction<string | null>>;
+  setConflictFile: React.Dispatch<React.SetStateAction<ProjectGitConflictFileResult | null>>;
+  setConflictFileLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}>) {
+  useEffect(() => {
+    if (!projectId || !selectedConflictPath || !conflictResolverOpen) {
+      setConflictFile(null);
+      return;
+    }
+    let cancelled = false;
+    setConflictFileLoading(true);
+    const params = new URLSearchParams({ path: selectedConflictPath });
+    apiGet<ProjectGitConflictFileResult>(
+      `${apiPath('projects', projectId, 'git', 'conflicts', 'file')}?${params.toString()}`,
+    )
+      .then((next) => {
+        if (!cancelled) setConflictFile(next ?? null);
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          setConflictFile(null);
+          setConflictError(
+            cause instanceof ApiRequestError ? cause.message : 'Failed to load conflict file.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setConflictFileLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    conflictResolverOpen,
+    projectId,
+    selectedConflictPath,
+    setConflictError,
+    setConflictFile,
+    setConflictFileLoading,
+  ]);
+}
+
+function useSelectedDiffLoader({
+  activeTab,
+  changes,
+  changesProjectId,
+  projectId,
+  selectedChange,
+  selectedDiffMode,
+  setChangesError,
+  setDiff,
+  setDiffLoading,
+}: Readonly<{
+  activeTab: PanelTab;
+  changes: ProjectGitChangesResult | null;
+  changesProjectId: string | null;
+  projectId: string | null;
+  selectedChange: ProjectGitChangedFile | null;
+  selectedDiffMode: ProjectGitDiffMode;
+  setChangesError: React.Dispatch<React.SetStateAction<string | null>>;
+  setDiff: React.Dispatch<React.SetStateAction<ProjectGitFileDiffResult | null>>;
+  setDiffLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}>) {
+  useEffect(() => {
+    const selectedPath = selectedChange?.path;
+    if (
+      !projectId ||
+      !selectedPath ||
+      !shouldRequestProjectGitDiff({
+        projectId,
+        activeTab,
+        selectedChange,
+        changesProjectId,
+        changes,
+      })
+    ) {
+      setDiff(null);
+      return;
+    }
+    const params = new URLSearchParams({
+      path: selectedPath,
+      mode: selectedDiffMode,
+    });
+    let cancelled = false;
+    setDiffLoading(true);
+    apiGet<ProjectGitFileDiffResult>(
+      `${apiPath('projects', projectId, 'git', 'diff')}?${params.toString()}`,
+    )
+      .then((next) => {
+        if (!cancelled) setDiff(next ?? null);
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          setDiff(null);
+          setChangesError(
+            cause instanceof ApiRequestError ? cause.message : 'Failed to load file diff.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDiffLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeTab,
+    changes,
+    changesProjectId,
+    projectId,
+    selectedChange,
+    selectedDiffMode,
+    setChangesError,
+    setDiff,
+    setDiffLoading,
+  ]);
+}
+
+function useConflictSummaryLoader({
+  conflictResolverOpen,
+  loadConflicts,
+  refreshKey,
+  status,
+}: Readonly<{
+  conflictResolverOpen: boolean;
+  loadConflicts: () => Promise<unknown>;
+  refreshKey: number | undefined;
+  status: ProjectGitStatusResult | null;
+}>) {
+  useEffect(() => {
+    if (conflictResolverOpen || currentStatusHasConflicts(status)) runAsyncAction(loadConflicts);
+  }, [conflictResolverOpen, loadConflicts, refreshKey, status]);
+}
+
+function usePullRequestDraftDefaults({
+  activeTab,
+  pullRequestBaseBranch,
+  pullRequestCreateState,
+  pullRequestTitle,
+  recommendedPullRequestBaseBranch,
+  setPullRequestBaseBranch,
+  setPullRequestTitle,
+}: Readonly<{
+  activeTab: PanelTab;
+  pullRequestBaseBranch: string;
+  pullRequestCreateState: GitPullRequestCreateState;
+  pullRequestTitle: string;
+  recommendedPullRequestBaseBranch: string;
+  setPullRequestBaseBranch: React.Dispatch<React.SetStateAction<string>>;
+  setPullRequestTitle: React.Dispatch<React.SetStateAction<string>>;
+}>) {
+  useEffect(() => {
+    if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestTitle) {
+      setPullRequestTitle(pullRequestCreateState.defaultTitle);
+    }
+    if (
+      activeTab === 'prs' &&
+      pullRequestCreateState.canCreate &&
+      (!pullRequestBaseBranch || pullRequestBaseBranch === pullRequestCreateState.baseBranch)
+    ) {
+      setPullRequestBaseBranch(recommendedPullRequestBaseBranch);
+    }
+  }, [
+    activeTab,
+    pullRequestBaseBranch,
+    pullRequestCreateState.baseBranch,
+    pullRequestCreateState.canCreate,
+    pullRequestCreateState.defaultTitle,
+    pullRequestTitle,
+    recommendedPullRequestBaseBranch,
+    setPullRequestBaseBranch,
+    setPullRequestTitle,
+  ]);
+}
+
+function useResolvedGitWorkflowTab({
+  activeTab,
+  preferredTab,
+  setActiveTab,
+  setPreferredTab,
+  tabs,
+}: Readonly<{
+  activeTab: PanelTab;
+  preferredTab: PanelTab | null;
+  setActiveTab: React.Dispatch<React.SetStateAction<PanelTab>>;
+  setPreferredTab: React.Dispatch<React.SetStateAction<PanelTab | null>>;
+  tabs: readonly GitWorkflowTab[];
+}>) {
+  useEffect(() => {
+    const nextTab = resolveGitWorkflowActiveTab({ activeTab, tabs, preferredTab });
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+    if (preferredTab && tabs.some((tab) => tab.id === preferredTab)) {
+      setPreferredTab(null);
+    }
+  }, [activeTab, preferredTab, setActiveTab, setPreferredTab, tabs]);
 }
 
 function ChangeFileRow({
@@ -1582,100 +1812,48 @@ export function ProjectGitHubPanel({
   }, [loadStatus, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'changes' || activeTab === 'commit') runAsyncAction(loadChanges);
+    runWhenTabActive(activeTab, ['changes', 'commit'], loadChanges);
   }, [activeTab, loadChanges, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'checks' || activeTab === 'overview') runAsyncAction(loadChecks);
+    runWhenTabActive(activeTab, ['checks', 'overview'], loadChecks);
   }, [activeTab, loadChecks, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'prs' || activeTab === 'overview') runAsyncAction(loadPullRequests);
+    runWhenTabActive(activeTab, ['prs', 'overview'], loadPullRequests);
   }, [activeTab, loadPullRequests, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'prs') {
-      loadBranches().catch(() => undefined);
-    }
+    runWhenTabActive(activeTab, ['prs'], loadBranches);
   }, [activeTab, loadBranches, refreshKey]);
 
-  useEffect(() => {
-    if (conflictResolverOpen || currentStatusHasConflicts(status)) runAsyncAction(loadConflicts);
-  }, [conflictResolverOpen, loadConflicts, refreshKey, status]);
+  useConflictSummaryLoader({
+    conflictResolverOpen,
+    loadConflicts,
+    refreshKey,
+    status,
+  });
 
-  useEffect(() => {
-    if (!projectId || !selectedConflictPath || !conflictResolverOpen) {
-      setConflictFile(null);
-      return;
-    }
-    let cancelled = false;
-    setConflictFileLoading(true);
-    const params = new URLSearchParams({ path: selectedConflictPath });
-    apiGet<ProjectGitConflictFileResult>(
-      `${apiPath('projects', projectId, 'git', 'conflicts', 'file')}?${params.toString()}`,
-    )
-      .then((next) => {
-        if (!cancelled) setConflictFile(next ?? null);
-      })
-      .catch((cause) => {
-        if (!cancelled) {
-          setConflictFile(null);
-          setConflictError(
-            cause instanceof ApiRequestError ? cause.message : 'Failed to load conflict file.',
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setConflictFileLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [conflictResolverOpen, projectId, selectedConflictPath]);
+  useConflictFileLoader({
+    conflictResolverOpen,
+    projectId,
+    selectedConflictPath,
+    setConflictError,
+    setConflictFile,
+    setConflictFileLoading,
+  });
 
-  useEffect(() => {
-    const selectedPath = selectedChange?.path;
-    if (
-      !projectId ||
-      !selectedPath ||
-      !shouldRequestProjectGitDiff({
-        projectId,
-        activeTab,
-        selectedChange,
-        changesProjectId,
-        changes,
-      })
-    ) {
-      setDiff(null);
-      return;
-    }
-    const params = new URLSearchParams({
-      path: selectedPath,
-      mode: selectedDiffMode,
-    });
-    let cancelled = false;
-    setDiffLoading(true);
-    apiGet<ProjectGitFileDiffResult>(
-      `${apiPath('projects', projectId, 'git', 'diff')}?${params.toString()}`,
-    )
-      .then((next) => {
-        if (!cancelled) setDiff(next ?? null);
-      })
-      .catch((cause) => {
-        if (!cancelled) {
-          setDiff(null);
-          setChangesError(
-            cause instanceof ApiRequestError ? cause.message : 'Failed to load file diff.',
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setDiffLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, changes, changesProjectId, projectId, selectedChange, selectedDiffMode]);
+  useSelectedDiffLoader({
+    activeTab,
+    changes,
+    changesProjectId,
+    projectId,
+    selectedChange,
+    selectedDiffMode,
+    setChangesError,
+    setDiff,
+    setDiffLoading,
+  });
 
   const refreshGitViews = useCallback(async () => {
     await Promise.all([
@@ -2298,36 +2476,23 @@ export function ProjectGitHubPanel({
     pullRequestTitle,
   ]);
 
-  useEffect(() => {
-    if (activeTab === 'prs' && pullRequestCreateState.canCreate && !pullRequestTitle) {
-      setPullRequestTitle(pullRequestCreateState.defaultTitle);
-    }
-    if (
-      activeTab === 'prs' &&
-      pullRequestCreateState.canCreate &&
-      (!pullRequestBaseBranch || pullRequestBaseBranch === pullRequestCreateState.baseBranch)
-    ) {
-      setPullRequestBaseBranch(recommendedPullRequestBaseBranch);
-    }
-  }, [
+  usePullRequestDraftDefaults({
     activeTab,
     pullRequestBaseBranch,
-    pullRequestCreateState.baseBranch,
-    pullRequestCreateState.canCreate,
-    pullRequestCreateState.defaultTitle,
+    pullRequestCreateState,
     pullRequestTitle,
     recommendedPullRequestBaseBranch,
-  ]);
+    setPullRequestBaseBranch,
+    setPullRequestTitle,
+  });
 
-  useEffect(() => {
-    const nextTab = resolveGitWorkflowActiveTab({ activeTab, tabs, preferredTab });
-    if (nextTab !== activeTab) {
-      setActiveTab(nextTab);
-    }
-    if (preferredTab && tabs.some((tab) => tab.id === preferredTab)) {
-      setPreferredTab(null);
-    }
-  }, [activeTab, preferredTab, tabs]);
+  useResolvedGitWorkflowTab({
+    activeTab,
+    preferredTab,
+    setActiveTab,
+    setPreferredTab,
+    tabs,
+  });
 
   if (!projectId) return null;
 
@@ -2832,10 +2997,7 @@ export function ProjectGitHubPanel({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Git & GitHub</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    Live
-                  </span>
+                  <LiveStatusBadge />
                 </div>
                 <div className="truncate text-xs text-muted-foreground">{gitStateSummary}</div>
               </div>
