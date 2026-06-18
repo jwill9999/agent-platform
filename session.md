@@ -17,7 +17,8 @@ and actionable.
 
 - **Date:** 2026-06-18
 - **Session:** Implemented `agent-platform-project-experience.2` Workspaces/sidebar simplification,
-  then repaired failing GitHub Actions setup for Node/native dependency handling.
+  then repaired failing GitHub Actions setup for Node/native dependency handling and aligned E2E
+  expectations with the new Workspaces copy.
 - **Branch:** `jwill9999/project-experience-workspace-navigation`
 - **Base:** branched from `jwill9999/project-experience-capability-metadata`; task 2 is not closed
   until manual testing is reviewed.
@@ -56,6 +57,8 @@ and actionable.
   and fails early if `path.txt` or the executable is still missing.
 - Excluded that CI-only Electron installer helper from Sonar application analysis after SonarCloud
   flagged its controlled archive extraction as a security hotspot.
+- Updated desktop/VM E2E project-opening helpers to use the new `Open folder` Workspaces action
+  instead of the removed `Open Project` button label.
 - Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
   `multiple target patterns`.
 - Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,
