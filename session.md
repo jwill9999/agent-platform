@@ -16,9 +16,9 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-18
-- **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, and Playwright install steps.
+- **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, Playwright install steps, and Project Git/WebView panels.
 - **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `da60402`.
+- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `051bc7d`.
 
 ## Current State
 
@@ -28,6 +28,8 @@ and actionable.
 - Fixed `.github/workflows/check-cycles.yml` Sonar rule `githubactions:S6505` by adding `--ignore-scripts` to `pnpm install --frozen-lockfile`.
 - Fixed `.github/workflows/ci.yml` Sonar rule `githubactions:S6505` by adding `--ignore-scripts` to all four `pnpm install --frozen-lockfile` steps.
 - Fixed `.github/workflows/ci.yml` Sonar rule `githubactions:S6505` on Playwright install steps by calling `./node_modules/.bin/playwright install --with-deps chromium` directly instead of `pnpm exec`.
+- Reduced `apps/web/components/project/project-git-github-panel.tsx` component complexity by moving effect branches into focused hooks and replaced the adjacent live-status spans with a badge.
+- Fixed `apps/web/components/project/project-webview-panel.tsx` negated open-state branch by rendering the open panel path first.
 - Used subagents for the requested file groups; `apps/api/test/readinessCheck.test.ts` had no open Sonar issues and was left unchanged.
 - Local completion gate passed: Prettier check, `pnpm lint`, `pnpm typecheck`, focused API tests (`projectsRouter`, `readinessCheck`), and focused web Vitest run.
 - Sonar Agentic Analysis is unavailable for this org: `403 Forbidden - Agentic Analysis is not activated`; remote issue list remains stale until the next Sonar project analysis.
@@ -39,6 +41,8 @@ and actionable.
 - Commit `8db558e` (`harden ci dependency installs`) contains the CI install-script hardening.
 - Commit `587b720` (`harden playwright install commands`) tried the pnpm config form for Playwright install hardening.
 - Commit `da60402` (`avoid pnpm for playwright installs`) contains the direct Playwright binary fix for the remaining line warnings.
+- Commit `fe23310` (`reduce git github panel sonar complexity`) contains the Project Git/GitHub panel complexity and spacing cleanup.
+- Commit `051bc7d` (`fix webview panel negated condition`) contains the Project WebView panel negated-condition cleanup.
 - Unrelated local changes intentionally left untouched: `apps/web/components/project/project-terminal-dock.tsx` and untracked `deps-graph.svg`.
 
 ## Product Direction
