@@ -224,6 +224,9 @@ jobs:
       - name: Rebuild native dependencies
         run: pnpm run rebuild:native
 
+      - name: Install Electron binary
+        run: pnpm --filter @agent-platform/desktop exec install-electron
+
       - name: Install Electron display dependencies
         run: |
           sudo apt-get update
@@ -280,6 +283,9 @@ jobs:
 
       - name: Rebuild native dependencies
         run: pnpm run rebuild:native
+
+      - name: Install Electron binary
+        run: pnpm --filter @agent-platform/desktop exec install-electron
 
       - name: Run macOS VM host preflight
         run: pnpm --filter @agent-platform/desktop native:vm:host-check -- --json
