@@ -16,9 +16,9 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-18
-- **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, Playwright install steps, and Project Git/WebView panels.
+- **Session:** Fixed SonarQube warnings across API, desktop, harness, workflow, web files, CI dependency installs, Playwright install steps, Project Git/WebView panels, and chat router.
 - **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `051bc7d`.
+- **Base:** current branch tracks `origin/jwill9999/project-experience-capability-metadata`; latest pushed commit `bc1d261`.
 
 ## Current State
 
@@ -30,8 +30,9 @@ and actionable.
 - Fixed `.github/workflows/ci.yml` Sonar rule `githubactions:S6505` on Playwright install steps by calling `./node_modules/.bin/playwright install --with-deps chromium` directly instead of `pnpm exec`.
 - Reduced `apps/web/components/project/project-git-github-panel.tsx` component complexity by moving effect branches into focused hooks and replaced the adjacent live-status spans with a badge.
 - Fixed `apps/web/components/project/project-webview-panel.tsx` negated open-state branch by rendering the open panel path first.
+- Fixed `apps/api/src/infrastructure/http/v1/chatRouter.ts` Sonar issues by splitting model resolution helpers, removing an unnecessary tool-call assertion, using `includes`, and switching active-task extraction to `RegExp.exec`.
 - Used subagents for the requested file groups; `apps/api/test/readinessCheck.test.ts` had no open Sonar issues and was left unchanged.
-- Local completion gate passed: Prettier check, `pnpm lint`, `pnpm typecheck`, focused API tests (`projectsRouter`, `readinessCheck`), and focused web Vitest run.
+- Local completion gate passed: Prettier check, `pnpm lint`, `pnpm typecheck`, focused API tests (`projectsRouter`, `readinessCheck`, `chat`, `sessionChat`), focused web Vitest run, and pre-push API build/typecheck/full test run.
 - Sonar Agentic Analysis is unavailable for this org: `403 Forbidden - Agentic Analysis is not activated`; remote issue list remains stale until the next Sonar project analysis.
 
 **Changes Committed & Pushed:**
@@ -43,6 +44,7 @@ and actionable.
 - Commit `da60402` (`avoid pnpm for playwright installs`) contains the direct Playwright binary fix for the remaining line warnings.
 - Commit `fe23310` (`reduce git github panel sonar complexity`) contains the Project Git/GitHub panel complexity and spacing cleanup.
 - Commit `051bc7d` (`fix webview panel negated condition`) contains the Project WebView panel negated-condition cleanup.
+- Commit `bc1d261` (`fix chat router sonar warnings`) contains the chat router Sonar cleanup.
 - Unrelated local changes intentionally left untouched: `apps/web/components/project/project-terminal-dock.tsx` and untracked `deps-graph.svg`.
 
 ## Product Direction
