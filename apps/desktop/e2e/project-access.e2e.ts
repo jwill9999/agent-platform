@@ -179,11 +179,11 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText(E2E_MODEL_RESPONSE).last()).toBeVisible({ timeout: 15_000 });
 
       await page.getByRole('link', { name: /Workspaces/ }).click();
-      await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
       await expect(page.getByText('personal-chat-screenshot.png')).toHaveCount(0);
       await expect(page.getByText('personal-chat-notes.md')).toHaveCount(0);
 
-      await page.getByRole('button', { name: 'Open Project' }).click();
+      await page.getByRole('button', { name: 'Open folder' }).click();
       const projectChatHeader = page.locator('[data-workspace-surface="project-chat"]');
 
       await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
@@ -322,8 +322,8 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('project-chat-notes.md')).toHaveCount(0);
 
       await page.getByRole('link', { name: /Workspaces/ }).click();
-      await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
-      await page.getByRole('button', { name: 'Open Project' }).click();
+      await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
+      await page.getByRole('button', { name: 'Open folder' }).click();
       await expect(projectChatHeader.getByText(secondProjectName, { exact: true })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();

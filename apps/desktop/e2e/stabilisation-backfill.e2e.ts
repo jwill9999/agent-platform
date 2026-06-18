@@ -119,7 +119,7 @@ test.describe('Electron stabilisation automation backfill', () => {
       });
       await expect(recentProjects.getByText('Open again to reconnect')).toBeVisible();
       await expect(recentProjects.getByText(fixture.projectDir)).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
     } finally {
       await app?.close();
       rmSync(fixture.tempRoot, { recursive: true, force: true });
@@ -220,7 +220,7 @@ async function createModelConfig(page: Page): Promise<void> {
 }
 
 async function openProject(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Open Project' }).click();
+  await page.getByRole('button', { name: 'Open folder' }).click();
   await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
 }
 
@@ -269,7 +269,7 @@ async function expectUsableSurface(page: Page, label: string): Promise<void> {
 async function expectResponsiveFirstLoad(page: Page, label: string): Promise<void> {
   await expect(page.getByRole('link', { name: /Workspaces/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Chat/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open Project' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
   await expect(page.getByLabel('Open settings menu')).toBeVisible();
   await expectUsableSurface(page, label);
 

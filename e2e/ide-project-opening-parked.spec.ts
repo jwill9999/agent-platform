@@ -32,7 +32,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
       );
 
       await page.goto('/', { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: /Open Project/ }).click();
+      await page.getByRole('button', { name: /Open folder/ }).click();
 
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(projectName).first()).toBeVisible();
@@ -62,7 +62,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
     await expect(page.getByRole('button', { name: /Open Folder/i })).toHaveCount(0);
     await expect(page.getByLabel('Project folder path')).toHaveCount(0);
     await expect(page.getByLabel('Project binding')).toContainText('Desktop app required');
-    await expect(page.getByRole('button', { name: 'Open Project' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Open folder' })).toHaveCount(0);
     await expect(
       page.getByText('Open this app on desktop to choose a Project folder'),
     ).toBeVisible();
@@ -126,7 +126,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
       );
 
       await page.goto('/ide', { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: 'Open Project' }).click();
+      await page.getByRole('button', { name: 'Open folder' }).click();
 
       await expect(page.getByLabel('Project binding').getByText(projectName).first()).toBeVisible();
       await expect(page.getByText('Desktop required')).toHaveCount(0);
@@ -173,7 +173,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
       );
 
       await page.goto('/', { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: /Open Project/ }).click();
+      await page.getByRole('button', { name: /Open folder/ }).click();
 
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(projectName).first()).toBeVisible();
