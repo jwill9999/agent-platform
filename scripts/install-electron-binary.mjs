@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import childProcess from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -10,13 +11,12 @@ const electronRoot = path.dirname(electronPackagePath);
 const requireFromElectron = createRequire(electronPackagePath);
 
 const { downloadArtifact } = requireFromElectron('@electron/get');
-const extract = requireFromElectron('extract-zip');
 const { version } = requireFromElectron('./package.json');
 const checksums = requireFromElectron('./checksums.json');
 
 const platform =
   process.env.ELECTRON_INSTALL_PLATFORM ?? process.env.npm_config_platform ?? process.platform;
-const arch = resolveArch(platform);
+const arch = resolveArch();
 const platformPath = getPlatformPath(platform);
 const markerPath = path.join(electronRoot, 'path.txt');
 const distPath = process.env.ELECTRON_OVERRIDE_DIST_PATH ?? path.join(electronRoot, 'dist');
@@ -47,7 +47,14 @@ const zipPath = await downloadArtifact({
 });
 
 await fs.promises.rm(distPath, { force: true, recursive: true });
-await extractWithKeepAlive(zipPath, distPath);
+fs.mkdirSync(distPath, { recursive: true });
+const unzip = childProcess.spawnSync('unzip', ['-q', zipPath, '-d', distPath], {
+  encoding: 'utf8',
+  stdio: 'pipe',
+});
+if (unzip.status !== 0) {
+  throw new Error(`Failed to extract Electron archive: ${unzip.stderr || unzip.stdout}`);
+}
 
 const extractedTypes = path.join(distPath, 'electron.d.ts');
 if (fs.existsSync(extractedTypes)) {
@@ -94,19 +101,10 @@ function hasMatchingDist() {
   );
 }
 
-function resolveArch(targetPlatform) {
+function resolveArch() {
   let targetArch = process.env.ELECTRON_INSTALL_ARCH ?? process.env.npm_config_arch ?? process.arch;
 
   return targetArch;
-}
-
-async function extractWithKeepAlive(zipPath, targetDirectory) {
-  const keepAlive = setInterval(() => {}, 1000);
-  try {
-    await extract(zipPath, { dir: targetDirectory });
-  } finally {
-    clearInterval(keepAlive);
-  }
 }
 
 function getPlatformPath(targetPlatform) {

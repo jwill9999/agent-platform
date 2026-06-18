@@ -54,6 +54,8 @@ and actionable.
 - Added explicit Electron binary setup for Electron E2E jobs, because hardened installs also skip
   Electron's binary download/path setup. The setup now uses `scripts/install-electron-binary.mjs`
   and fails early if `path.txt` or the executable is still missing.
+- Excluded that CI-only Electron installer helper from Sonar application analysis after SonarCloud
+  flagged its controlled archive extraction as a security hotspot.
 - Escaped the `deps:check-cycles` Makefile target so GNU make no longer fails with
   `multiple target patterns`.
 - Verified locally: `pnpm run rebuild:native`, `make workspace-init`, `make deps:check-cycles`,
