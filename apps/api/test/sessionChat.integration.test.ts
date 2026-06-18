@@ -27,6 +27,19 @@ import type { SessionLock } from '../src/infrastructure/http/sessionLock.js';
 const mockStreamText = vi.hoisted(() => vi.fn());
 const mockGenerateText = vi.hoisted(() => vi.fn());
 const mockToolCalls = vi.hoisted(() => vi.fn());
+const CHAT_ENDPOINT = '/v1/chat';
+const TEST_OPENAI_API_KEY = 'sk-test-key';
+const READ_TOOL_NAME = 'sys_read_file';
+const PROJECT_INSTRUCTION_DRAFT_PREFIX = 'I prepared a Project instructions draft';
+const PROJECT_INSTRUCTION_DRAFT_MESSAGE = `${PROJECT_INSTRUCTION_DRAFT_PREFIX} for AGENTS.md.\n\nI have not created the requested Project files yet.\nReview the draft shown in Project Chat, approve it to enable file edits, then send your request again.`;
+const HIDDEN_WRITE_TOOL_NAMES = [
+  'sys_write_file',
+  'sys_append_file',
+  'sys_copy_file',
+  'sys_create_directory',
+  'sys_download_file',
+  'coding_apply_patch',
+] as const;
 
 vi.mock('ai', () => ({
   streamText: (...args: unknown[]) => mockStreamText(...args),
@@ -149,6 +162,7 @@ type TestDb = ReturnType<typeof openDatabase>['db'];
 type MockChatApp = Awaited<ReturnType<typeof createSeededApp>>;
 type ChatEvent = {
   type: string;
+  content?: string;
   approvalRequestId?: string;
   toolName?: string;
   riskTier?: string;
@@ -156,6 +170,17 @@ type ChatEvent = {
   code?: string;
   message?: string;
 };
+type ChatPromptState = {
+  messages?: Array<{ role?: string; content?: string; toolCalls?: unknown[] }>;
+  trace?: Array<{ type: string; included?: number }>;
+  modelConfig?: { provider: string; model: string; apiKey?: string };
+};
+
+function expectPresent<T>(value: T | null | undefined, message: string): T {
+  expect(value).toBeDefined();
+  if (value === null || value === undefined) throw new Error(message);
+  return value;
+}
 
 function createChatProject(
   db: TestDb,
@@ -225,7 +250,7 @@ async function withMockChatApp(
   const envSnap = snapshotChatEnv();
   const ctx = await createSeededApp(dirs, { mockLlm: true });
   try {
-    process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+    process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
     process.env.AGENT_PLATFORM_COMMAND_RUNNER = 'host';
     await callback(ctx);
   } finally {
@@ -259,12 +284,13 @@ async function expectHandledSlashMessage(
   message: string,
   expectedContent: string | RegExp,
 ) {
-  const res = await request(app).post('/v1/chat').send({ sessionId, message }).expect(200);
+  const res = await request(app).post(CHAT_ENDPOINT).send({ sessionId, message }).expect(200);
   expect(mockToolCalls).not.toHaveBeenCalled();
   const events = parseNdjsonEvents(res.text);
   expect(events).toHaveLength(1);
-  expect(events[0]).toMatchObject({ type: 'text' });
-  const content = events[0]!.content ?? '';
+  const event = expectPresent(events[0], 'Expected slash command response event');
+  expect(event).toMatchObject({ type: 'text' });
+  const content = event.content ?? '';
   if (typeof expectedContent === 'string') {
     expect(content).toBe(expectedContent);
   } else {
@@ -297,13 +323,17 @@ async function createPendingToolApproval(
   mockToolCalls.mockReset();
   mockToolCallStream(toolName, args ?? { command: 'date' });
   const chatRes = await request(app)
-    .post('/v1/chat')
+    .post(CHAT_ENDPOINT)
     .send({ sessionId, message: 'Run date' })
     .expect(200);
   const events = parseNdjsonEvents(chatRes.text);
   const approvalEvent = events.find((event) => event.type === 'approval_required');
-  expect(approvalEvent?.approvalRequestId).toEqual(expect.any(String));
-  return { approvalEvent, approvalRequestId: approvalEvent!.approvalRequestId!, events };
+  const approvalRequestId = expectPresent(
+    approvalEvent?.approvalRequestId,
+    'Expected approval_required event with approvalRequestId',
+  );
+  expect(approvalRequestId).toEqual(expect.any(String));
+  return { approvalEvent, approvalRequestId, events };
 }
 
 async function expectToolExecutionCount(
@@ -322,6 +352,20 @@ async function expectToolExecutionCount(
       offset: 0,
     }),
   ).toBe(expected);
+}
+
+function expectWriteToolsHidden(visibleToolNames: string[]) {
+  expect(visibleToolNames).toContain(READ_TOOL_NAME);
+  for (const toolName of HIDDEN_WRITE_TOOL_NAMES) {
+    expect(visibleToolNames).not.toContain(toolName);
+  }
+}
+
+function getLastChatPromptState(): ChatPromptState {
+  return expectPresent(
+    mockToolCalls.mock.calls.at(-1)?.[0] as ChatPromptState | undefined,
+    'Expected mock tool calls to include a prompt state',
+  );
 }
 
 describe('POST /v1/chat (session-aware)', () => {
@@ -344,7 +388,7 @@ describe('POST /v1/chat (session-aware)', () => {
   it('returns 400 for invalid request body', async () => {
     const { app, sqlite } = await createSeededApp(dirs);
     try {
-      const res = await request(app).post('/v1/chat').send({ bad: 'body' }).expect(400);
+      const res = await request(app).post(CHAT_ENDPOINT).send({ bad: 'body' }).expect(400);
       expect(res.body.error?.code).toBe('VALIDATION_ERROR');
     } finally {
       closeDatabase(sqlite);
@@ -355,9 +399,9 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs);
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId: 'nonexistent', message: 'hello' })
         .expect(404);
       expect(res.body.error?.code).toBe('NOT_FOUND');
@@ -379,7 +423,7 @@ describe('POST /v1/chat (session-aware)', () => {
       const sessionId = await createDefaultSession(app);
 
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'hello' })
         .expect(400);
       expect(res.body.error?.code).toBe('MISSING_KEY');
@@ -420,10 +464,10 @@ describe('POST /v1/chat (session-aware)', () => {
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true, sessionLock: lock });
 
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
       const sessionId = await createDefaultSession(app);
       const response = request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: '/help' })
         .then((res) => {
           completed = true;
@@ -470,7 +514,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.id,
         '/init',
-        'I prepared a Project instructions draft for AGENTS.md.\n\nI have not created the requested Project files yet.\nReview the draft shown in Project Chat, approve it to enable file edits, then send your request again.',
+        PROJECT_INSTRUCTION_DRAFT_MESSAGE,
       );
       expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
 
@@ -510,7 +554,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionRes.body.data.session.id,
         '/init',
-        'I prepared a Project instructions draft for AGENTS.md.\n\nI have not created the requested Project files yet.\nReview the draft shown in Project Chat, approve it to enable file edits, then send your request again.',
+        PROJECT_INSTRUCTION_DRAFT_MESSAGE,
       );
       expect(existsSync(path.join(projectRoot, 'AGENTS.md'))).toBe(false);
 
@@ -555,7 +599,7 @@ describe('POST /v1/chat (session-aware)', () => {
         db,
         sessionId,
         '/init',
-        'I prepared a Project instructions draft for AGENTS.md.\n\nI have not created the requested Project files yet.\nReview the draft shown in Project Chat, approve it to enable file edits, then send your request again.',
+        PROJECT_INSTRUCTION_DRAFT_MESSAGE,
       );
 
       const boundProject = await request(app).get(`/v1/projects/${bound.body.data.project.id}`);
@@ -616,13 +660,11 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockToolCalls.mockReturnValueOnce('Read the desktop Project instructions');
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId: sessionRes.body.data.session.id, message: 'Inspect README.md' })
         .expect(200);
 
-      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
-        messages?: Array<{ role: string; content: string }>;
-      };
+      const state = getLastChatPromptState();
       const systemPrompt = state.messages?.[0]?.content ?? '';
       expect(systemPrompt).toContain('--- AGENTS.md ---');
       expect(systemPrompt).toContain('desktop root rule');
@@ -669,16 +711,11 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockToolCalls.mockReturnValueOnce('Using the bound Project');
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Inspect README.md' })
         .expect(200);
 
-      const state = mockToolCalls.mock.calls.at(-1)?.[0] as
-        | {
-            messages?: Array<{ role: string; content: string }>;
-          }
-        | undefined;
-      expect(state).toBeDefined();
+      const state = getLastChatPromptState();
       const systemPrompt = state?.messages?.[0]?.content ?? '';
       expect(systemPrompt).toContain('bound project rule');
       expect(systemPrompt).not.toContain('remembered project rule');
@@ -703,7 +740,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockToolCalls.mockReturnValueOnce('Yes, /workspace/AGENTS.md exists in /workspace.');
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'did you create the AGENTS.md file?' })
         .expect(200);
 
@@ -717,11 +754,7 @@ describe('POST /v1/chat (session-aware)', () => {
         ]),
       );
 
-      const state = mockToolCalls.mock.calls.at(-1)?.[0] as
-        | {
-            messages?: Array<{ role: string; content: string }>;
-          }
-        | undefined;
+      const state = getLastChatPromptState();
       const systemPrompt = state?.messages?.[0]?.content ?? '';
       expect(systemPrompt).toContain('use Project-relative paths');
       expect(systemPrompt).toContain('do not mention the internal /workspace mount');
@@ -732,7 +765,7 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs);
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
 
@@ -741,7 +774,7 @@ describe('POST /v1/chat (session-aware)', () => {
       sqlite.exec(`DELETE FROM agents WHERE id = '${DEFAULT_AGENT_ID}'`);
 
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'hello' })
         .expect(404);
       expect(res.body.error?.code).toBe('NOT_FOUND');
@@ -759,7 +792,7 @@ describe('POST /v1/chat (session-aware)', () => {
       disableEvaluatorNodes: false,
     });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
       mockToolCalls.mockReturnValueOnce('Hello from chat');
       mockGenerateText.mockResolvedValue({
         text: JSON.stringify({ verdict: 'accept', reasons: [] }),
@@ -767,7 +800,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
       const sessionId = await createDefaultSession(app);
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'test' })
         .expect(200);
 
@@ -797,7 +830,7 @@ describe('POST /v1/chat (session-aware)', () => {
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     let sessionId = '';
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       sessionId = await createDefaultSession(app);
 
@@ -806,7 +839,7 @@ describe('POST /v1/chat (session-aware)', () => {
       // Use a short response timeout so the test doesn't hang.
       try {
         await request(app)
-          .post('/v1/chat')
+          .post(CHAT_ENDPOINT)
           .send({ sessionId, message: 'Hello agent' })
           .timeout({ response: 2000 });
       } catch {
@@ -816,10 +849,12 @@ describe('POST /v1/chat (session-aware)', () => {
       // Verify user message was persisted
       const { listMessagesBySession } = await import('@agent-platform/db');
       const msgs = listMessagesBySession(db, sessionId);
-      const userMsg = msgs.find((m) => m.role === 'user');
-      expect(userMsg).toBeDefined();
-      expect(userMsg!.content).toBe('Hello agent');
-      expect(userMsg!.sessionId).toBe(sessionId);
+      const userMsg = expectPresent(
+        msgs.find((m) => m.role === 'user'),
+        'Expected persisted user message',
+      );
+      expect(userMsg.content).toBe('Hello agent');
+      expect(userMsg.sessionId).toBe(sessionId);
     } finally {
       restoreChatEnv(envSnap);
       closeDatabase(sqlite);
@@ -831,14 +866,14 @@ describe('POST /v1/chat (session-aware)', () => {
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     const openAiKey = ['sk-proj-', 'abcdefghijklmnopqrstuvwxyz1234567890'].join('');
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
       const sessionId = await createDefaultSession(app);
       mockToolCalls.mockImplementationOnce(() => {
         throw new Error(`Incorrect API key provided: ${openAiKey}`);
       });
 
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'hello' })
         .expect(200);
       const events = parseNdjsonEvents(res.text);
@@ -861,7 +896,7 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
       const { approvalEvent, events } = await createPendingToolApproval(app, sessionId);
@@ -882,7 +917,11 @@ describe('POST /v1/chat (session-aware)', () => {
       const messages = await import('@agent-platform/db').then((mod) =>
         mod.listMessagesBySession(db, sessionId),
       );
-      expect(messages.find((message) => message.role === 'assistant')?.toolCalls).toEqual([
+      const assistantMessage = expectPresent(
+        messages.find((message) => message.role === 'assistant'),
+        'Expected assistant message with tool call',
+      );
+      expect(assistantMessage.toolCalls).toEqual([
         { id: 'tc-approval', name: 'sys_bash', args: { command: 'date' } },
       ]);
       await expectToolExecutionCount(db, sessionId, 'pending', 1);
@@ -897,12 +936,12 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
       mockToolCallStream('sys_bash', { command: 'gh repo create test --private' });
       const chatRes = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Create a GitHub repository' })
         .expect(200);
 
@@ -929,12 +968,12 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
       mockToolCallStream('sys_browser_start', { url: 'https://example.com' });
       const chatRes = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Open example.com' })
         .expect(200);
 
@@ -961,7 +1000,7 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
       const { approvalEvent, approvalRequestId } = await createPendingToolApproval(app, sessionId);
@@ -1008,7 +1047,7 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
       const { approvalRequestId } = await createPendingToolApproval(app, sessionId);
@@ -1016,11 +1055,15 @@ describe('POST /v1/chat (session-aware)', () => {
       const assistantToolCallMessage = listMessagesBySession(db, sessionId).find(
         (message) => message.role === 'assistant' && message.toolCalls?.length,
       );
-      expect(assistantToolCallMessage?.id).toEqual(expect.any(String));
+      const assistantMessage = expectPresent(
+        assistantToolCallMessage,
+        'Expected assistant tool-call message',
+      );
+      expect(assistantMessage.id).toEqual(expect.any(String));
 
       sqlite
         .prepare('UPDATE messages SET tool_calls_json = NULL WHERE id = ?')
-        .run(assistantToolCallMessage!.id);
+        .run(assistantMessage.id);
 
       await request(app)
         .post(`/v1/approval-requests/${approvalRequestId}/approve`)
@@ -1095,7 +1138,7 @@ describe('POST /v1/chat (session-aware)', () => {
       systemToolExecutorFactory,
     });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
       mockToolCallStream('sys_browser_start', {
@@ -1103,12 +1146,14 @@ describe('POST /v1/chat (session-aware)', () => {
         url: 'https://example.com',
       });
       const chatRes = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Open example.com and capture a snapshot' })
         .expect(200);
-      const approvalRequestId = parseNdjsonEvents(chatRes.text).find(
-        (event) => event.type === 'approval_required',
-      )?.approvalRequestId;
+      const approvalRequestId = expectPresent(
+        parseNdjsonEvents(chatRes.text).find((event) => event.type === 'approval_required')
+          ?.approvalRequestId,
+        'Expected browser URL approval request id',
+      );
       expect(approvalRequestId).toEqual(expect.any(String));
 
       await request(app)
@@ -1199,7 +1244,7 @@ describe('POST /v1/chat (session-aware)', () => {
       });
       mockProjectWrite('tc-project-write', 'written in project root');
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Write the project note' })
         .expect(200);
       expect(res.text).toContain('tool_result');
@@ -1236,7 +1281,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockToolCallStream('sys_bash', { command: 'touch /workspace/command-note.txt' });
       const chatRes = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Create the command note' })
         .expect(200);
       const approvalEvent = parseNdjsonEvents(chatRes.text).find(
@@ -1250,7 +1295,10 @@ describe('POST /v1/chat (session-aware)', () => {
       expect(chatRes.text).toContain('/workspace/command-note.txt');
       expect(chatRes.text).not.toContain(projectRoot);
 
-      const approvalRequestId = approvalEvent!.approvalRequestId!;
+      const approvalRequestId = expectPresent(
+        approvalEvent?.approvalRequestId,
+        'Expected project command approval request id',
+      );
       await request(app)
         .post(`/v1/approval-requests/${approvalRequestId}/approve`)
         .send({ reason: 'ok' })
@@ -1289,7 +1337,7 @@ describe('POST /v1/chat (session-aware)', () => {
       mockProjectWrite('tc-project-write-allowed', 'written before onboarding');
 
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Write the project note' })
         .expect(200);
 
@@ -1316,7 +1364,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockProjectWrite('tc-project-first-write', 'written on first request');
       const firstWrite = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Create a simple Node project' })
         .expect(200);
 
@@ -1350,17 +1398,11 @@ describe('POST /v1/chat (session-aware)', () => {
       });
 
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Create a simple Node project' })
         .expect(200);
 
-      expect(visibleToolNames).toContain('sys_read_file');
-      expect(visibleToolNames).not.toContain('sys_write_file');
-      expect(visibleToolNames).not.toContain('sys_append_file');
-      expect(visibleToolNames).not.toContain('sys_copy_file');
-      expect(visibleToolNames).not.toContain('sys_create_directory');
-      expect(visibleToolNames).not.toContain('sys_download_file');
-      expect(visibleToolNames).not.toContain('coding_apply_patch');
+      expectWriteToolsHidden(visibleToolNames);
     });
   });
 
@@ -1383,17 +1425,11 @@ describe('POST /v1/chat (session-aware)', () => {
       });
 
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Inspect this project' })
         .expect(200);
 
-      expect(visibleToolNames).toContain('sys_read_file');
-      expect(visibleToolNames).not.toContain('sys_write_file');
-      expect(visibleToolNames).not.toContain('sys_append_file');
-      expect(visibleToolNames).not.toContain('sys_copy_file');
-      expect(visibleToolNames).not.toContain('sys_create_directory');
-      expect(visibleToolNames).not.toContain('sys_download_file');
-      expect(visibleToolNames).not.toContain('coding_apply_patch');
+      expectWriteToolsHidden(visibleToolNames);
     });
   });
 
@@ -1423,13 +1459,11 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockToolCalls.mockReturnValueOnce('Read the instructions');
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Inspect apps/web/page.tsx' })
         .expect(200);
 
-      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
-        messages?: Array<{ role: string; content: string }>;
-      };
+      const state = getLastChatPromptState();
       const systemPrompt = state.messages?.[0]?.content ?? '';
       expect(systemPrompt).toContain('--- AGENTS.md ---');
       expect(systemPrompt).toContain('root rule');
@@ -1449,7 +1483,7 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockProjectWrite('tc-project-write-unavailable', 'should not write');
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Write the project note' })
         .expect(200);
 
@@ -1483,11 +1517,9 @@ describe('POST /v1/chat (session-aware)', () => {
       const sessionId = await createDefaultSession(app);
       mockToolCalls.mockReturnValueOnce('Used saved default config');
 
-      await request(app).post('/v1/chat').send({ sessionId, message: 'hello' }).expect(200);
+      await request(app).post(CHAT_ENDPOINT).send({ sessionId, message: 'hello' }).expect(200);
 
-      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
-        modelConfig?: { provider: string; model: string; apiKey?: string };
-      };
+      const state = getLastChatPromptState();
       expect(state.modelConfig).toEqual({
         provider: 'openai',
         model: 'gpt-4.1-mini',
@@ -1528,7 +1560,7 @@ describe('POST /v1/chat (session-aware)', () => {
       const sessionId = await createDefaultSession(app);
 
       const res = await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'hello' })
         .expect(409);
 
@@ -1548,14 +1580,14 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
       const sessionId = await createDefaultSession(app);
 
       mockToolCalls.mockReturnValueOnce(
         'Decision: keep the working memory session scoped. Next update packages/db/src/repositories/workingMemory.ts.',
       );
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Implement agent-platform-memory.2 for agent-platform' })
         .expect(200);
 
@@ -1577,11 +1609,9 @@ describe('POST /v1/chat (session-aware)', () => {
       );
 
       mockToolCalls.mockReturnValueOnce('Continuing with the remembered task');
-      await request(app).post('/v1/chat').send({ sessionId, message: 'Continue' }).expect(200);
+      await request(app).post(CHAT_ENDPOINT).send({ sessionId, message: 'Continue' }).expect(200);
 
-      const followUpState = mockToolCalls.mock.calls.at(-1)?.[0] as {
-        messages?: Array<{ role: string; content: string }>;
-      };
+      const followUpState = getLastChatPromptState();
       expect(followUpState.messages?.[0]?.content).toContain('Short-term working memory');
       expect(followUpState.messages?.[0]?.content).toContain(
         'Goal: Implement agent-platform-memory.2 for agent-platform',
@@ -1596,7 +1626,7 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
       const sessionId = await createDefaultSession(app);
       createMemory(
         db,
@@ -1632,14 +1662,11 @@ describe('POST /v1/chat (session-aware)', () => {
 
       mockToolCalls.mockReturnValueOnce('Using approved memory.');
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'How should memory retrieval prompt bundles work?' })
         .expect(200);
 
-      const state = mockToolCalls.mock.calls.at(-1)?.[0] as {
-        messages?: Array<{ role: string; content: string }>;
-        trace?: Array<{ type: string; included?: number }>;
-      };
+      const state = getLastChatPromptState();
       const systemPrompt = state.messages?.[0]?.content ?? '';
       expect(systemPrompt).toContain('Long-term approved memories');
       expect(systemPrompt).toContain('Memory retrieval must include source metadata');
@@ -1658,7 +1685,7 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
       const sessionId = await createDefaultSession(app);
       const rawPayload = 'x'.repeat(2_000);
 
@@ -1673,7 +1700,7 @@ describe('POST /v1/chat (session-aware)', () => {
         .mockReturnValueOnce('Tool run complete');
 
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Run a tool and summarize it' })
         .expect(200);
 
@@ -1698,12 +1725,12 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
       const sessionId = await createDefaultSession(app);
       mockToolCalls.mockReturnValueOnce('Noted for review.');
 
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({
           sessionId,
           message: 'Remember that agent-platform should keep memory retrieval auditable.',
@@ -1733,20 +1760,18 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
       await createPendingToolApproval(app, sessionId);
 
       mockToolCalls.mockReturnValueOnce('I can continue without replaying pending tool calls');
       await request(app)
-        .post('/v1/chat')
+        .post(CHAT_ENDPOINT)
         .send({ sessionId, message: 'Continue without approving yet' })
         .expect(200);
 
-      const followUpState = mockToolCalls.mock.calls.at(-1)?.[0] as {
-        messages?: Array<{ role: string; toolCalls?: unknown[] }>;
-      };
+      const followUpState = getLastChatPromptState();
       expect(followUpState.messages?.some((message) => message.toolCalls?.length)).toBe(false);
     } finally {
       restoreChatEnv(envSnap);
@@ -1758,7 +1783,7 @@ describe('POST /v1/chat (session-aware)', () => {
     const envSnap = snapshotChatEnv();
     const { app, db, sqlite } = await createSeededApp(dirs, { mockLlm: true });
     try {
-      process.env.AGENT_OPENAI_API_KEY = 'sk-test-key';
+      process.env.AGENT_OPENAI_API_KEY = TEST_OPENAI_API_KEY;
 
       const sessionId = await createDefaultSession(app);
       const { approvalRequestId } = await createPendingToolApproval(app, sessionId);

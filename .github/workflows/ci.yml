@@ -296,7 +296,8 @@ jobs:
 
           if [ ! -f "$CACHE_ARCHIVE" ]; then
             echo "Downloading macOS VM asset archive into SHA cache: $CACHE_ARCHIVE"
-            curl -fsSL "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL" \
+            curl -fsSL --connect-timeout 10 --max-time 300 --retry 3 --retry-delay 5 \
+              "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_URL" \
               -o "$CACHE_ARCHIVE_TMP"
             printf '%s  %s\n' \
               "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256" \
@@ -304,7 +305,7 @@ jobs:
             mv -f "$CACHE_ARCHIVE_TMP" "$CACHE_ARCHIVE"
           fi
 
-          cp "$CACHE_ARCHIVE" "$RUNNER_TEMP/macos-vm-assets.tgz"
+          cp -f "$CACHE_ARCHIVE" "$RUNNER_TEMP/macos-vm-assets.tgz"
           printf '%s  %s\n' \
             "$AGENT_PLATFORM_MACOS_VM_ASSET_ARCHIVE_SHA256" \
             "$RUNNER_TEMP/macos-vm-assets.tgz" | shasum -a 256 -c -
@@ -335,9 +336,9 @@ jobs:
             --helper "$GITHUB_WORKSPACE/apps/desktop/native/macos-vm-runner/.build/arm64-apple-macosx/debug/macos-vm-runner" \
             --skip-build
           mkdir -p "$RUNNER_TEMP/agent-platform-vm-evidence"
-          cp "$RUNNER_TEMP/agent-platform-resources/macos-vm/package-manifest.json" \
+          cp -f "$RUNNER_TEMP/agent-platform-resources/macos-vm/package-manifest.json" \
             "$RUNNER_TEMP/agent-platform-vm-evidence/package-manifest.json"
-          cp "$RUNNER_TEMP/agent-platform-resources/macos-vm/images/manifest.json" \
+          cp -f "$RUNNER_TEMP/agent-platform-resources/macos-vm/images/manifest.json" \
             "$RUNNER_TEMP/agent-platform-vm-evidence/asset-manifest.json"
           rm -rf "$RUNNER_TEMP/macos-vm-assets" "$RUNNER_TEMP/macos-vm-assets.tgz"
 

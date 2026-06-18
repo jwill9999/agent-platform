@@ -108,7 +108,7 @@ test.describe('Electron workspace WebView runtime', () => {
       await expectUsableViewport(page, 640);
 
       const localOpened = await page.evaluate(async (url) => {
-        const workspace = window.agentPlatformDesktop?.workspace;
+        const workspace = globalThis.agentPlatformDesktop?.workspace;
         const uri = `workspace://project/project-1/webview/${encodeURIComponent(url)}`;
         return workspace?.openResource({ uri });
       }, previewUrl);
@@ -116,7 +116,7 @@ test.describe('Electron workspace WebView runtime', () => {
       await expectAnyWebViewUrl(page, previewUrl);
 
       const httpFallback = await page.evaluate(async () =>
-        window.agentPlatformDesktop?.workspace.openWebView({ url: 'http://example.com/' }),
+        globalThis.agentPlatformDesktop?.workspace.openWebView({ url: 'http://example.com/' }),
       );
       expect(httpFallback).toMatchObject({
         handled: false,
@@ -136,7 +136,7 @@ test.describe('Electron workspace WebView runtime', () => {
         .toBe(Math.max(0, countBeforeClose - 1));
 
       await page.evaluate(async () => {
-        const workspace = window.agentPlatformDesktop?.workspace;
+        const workspace = globalThis.agentPlatformDesktop?.workspace;
         const webviews = (await workspace?.listWebViews()) ?? [];
         await Promise.all(
           webviews.map((webview) => workspace?.closeWebView({ webviewId: webview.webviewId })),
@@ -154,7 +154,7 @@ test.describe('Electron workspace WebView runtime', () => {
 async function expectDesktopWorkspaceBridge(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
-      const workspace = window.agentPlatformDesktop?.workspace;
+      const workspace = globalThis.agentPlatformDesktop?.workspace;
       return Boolean(
         workspace &&
         typeof workspace.openWebView === 'function' &&
@@ -214,7 +214,7 @@ async function expectAnyWebViewUrl(page: Page, expectedUrlPrefix: string): Promi
     .poll(
       async () => {
         const webviews = await page.evaluate(() =>
-          window.agentPlatformDesktop?.workspace.listWebViews(),
+          globalThis.agentPlatformDesktop?.workspace.listWebViews(),
         );
         return webviews?.some((webview) => webview.url.startsWith(expectedUrlPrefix)) ?? false;
       },
@@ -225,7 +225,7 @@ async function expectAnyWebViewUrl(page: Page, expectedUrlPrefix: string): Promi
 
 async function webViewCount(page: Page): Promise<number> {
   return page.evaluate(async () => {
-    const webviews = await window.agentPlatformDesktop?.workspace.listWebViews();
+    const webviews = await globalThis.agentPlatformDesktop?.workspace.listWebViews();
     return webviews?.length ?? 0;
   });
 }

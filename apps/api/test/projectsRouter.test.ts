@@ -635,8 +635,8 @@ describe('projectsRouter', () => {
     const ghBinary = path.join(tmpDir, 'fake-gh-create');
     writeFileSync(
       ghBinary,
-      `#!/bin/sh
-printf '%s\\n' "$*" >> "${ghLog}"
+      String.raw`#!/bin/sh
+printf '%s\n' "$*" >> "${ghLog}"
 if [ "$1" = "--version" ]; then
   echo "gh version 2.0.0"
   exit 0
@@ -712,8 +712,8 @@ exit 1
     const ghBinary = path.join(tmpDir, 'fake-gh-connect');
     writeFileSync(
       ghBinary,
-      `#!/bin/sh
-printf '%s\\n' "$*" >> "${ghLog}"
+      String.raw`#!/bin/sh
+printf '%s\n' "$*" >> "${ghLog}"
 if [ "$1" = "--version" ]; then
   echo "gh version 2.0.0"
   exit 0
@@ -840,7 +840,7 @@ exit 1
     const ghBinary = path.join(tmpDir, 'fake-gh');
     writeFileSync(
       ghBinary,
-      `#!/bin/sh
+      String.raw`#!/bin/sh
 if [ "$1" = "--version" ]; then
   echo "gh version 2.0.0"
   exit 0
@@ -850,7 +850,7 @@ if [ "$1" = "auth" ]; then
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
-  printf '%s\\n' '{"number":42,"url":"https://github.com/user/repo/pull/42","statusCheckRollup":[{"databaseId":101,"name":"CI","displayTitle":"Build and test","workflowName":"CI","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2026-05-16T15:55:00Z","completedAt":"2026-05-16T15:58:00Z","detailsUrl":"https://github.com/user/repo/actions/runs/101"},{"databaseId":102,"name":"Lint","workflowName":"Lint","status":"COMPLETED","conclusion":"FAILURE","startedAt":"2026-05-16T15:56:00Z","completedAt":"2026-05-16T15:59:00Z","detailsUrl":"https://github.com/user/repo/actions/runs/102"}]}'
+  printf '%s\n' '{"number":42,"url":"https://github.com/user/repo/pull/42","statusCheckRollup":[{"databaseId":101,"name":"CI","displayTitle":"Build and test","workflowName":"CI","status":"COMPLETED","conclusion":"SUCCESS","startedAt":"2026-05-16T15:55:00Z","completedAt":"2026-05-16T15:58:00Z","detailsUrl":"https://github.com/user/repo/actions/runs/101"},{"databaseId":102,"name":"Lint","workflowName":"Lint","status":"COMPLETED","conclusion":"FAILURE","startedAt":"2026-05-16T15:56:00Z","completedAt":"2026-05-16T15:59:00Z","detailsUrl":"https://github.com/user/repo/actions/runs/102"}]}'
   exit 0
 fi
 if [ "$1" = "run" ]; then
@@ -933,7 +933,7 @@ exit 1
     const ghBinary = path.join(tmpDir, 'fake-gh-head-checks');
     writeFileSync(
       ghBinary,
-      `#!/bin/sh
+      String.raw`#!/bin/sh
 if [ "$1" = "--version" ]; then
   echo "gh version 2.0.0"
   exit 0
@@ -947,7 +947,7 @@ if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
   exit 1
 fi
 if [ "$1" = "api" ]; then
-  printf '%s\\n' '[{"id":201,"name":"CI / build","status":"completed","conclusion":"success","html_url":"https://github.com/user/repo/runs/201","started_at":"2026-05-16T15:55:00Z","completed_at":"2026-05-16T15:58:00Z","check_suite":{"workflow_name":"CI"}},{"id":202,"name":"Tests","status":"in_progress","conclusion":null,"html_url":"https://github.com/user/repo/runs/202","check_suite":{"workflow_name":"CI"}}]'
+  printf '%s\n' '[{"id":201,"name":"CI / build","status":"completed","conclusion":"success","html_url":"https://github.com/user/repo/runs/201","started_at":"2026-05-16T15:55:00Z","completed_at":"2026-05-16T15:58:00Z","check_suite":{"workflow_name":"CI"}},{"id":202,"name":"Tests","status":"in_progress","conclusion":null,"html_url":"https://github.com/user/repo/runs/202","check_suite":{"workflow_name":"CI"}}]'
   exit 0
 fi
 if [ "$1" = "run" ]; then
@@ -1058,7 +1058,7 @@ exit 1
     const ghBinary = path.join(tmpDir, 'fake-gh-prs');
     writeFileSync(
       ghBinary,
-      `#!/bin/sh
+      String.raw`#!/bin/sh
 if [ "$1" = "--version" ]; then
   echo "gh version 2.0.0"
   exit 0
@@ -1068,7 +1068,7 @@ if [ "$1" = "auth" ]; then
   exit 0
 fi
 if [ "$1" = "pr" ]; then
-  printf '%s\\n' '[{"number":42,"title":"Add PRs view","state":"OPEN","url":"https://github.com/user/repo/pull/42","headRefName":"task/prs","baseRefName":"main","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"MERGEABLE","createdAt":"2026-05-16T15:00:00Z","updatedAt":"2026-05-16T15:30:00Z","statusCheckRollup":[{"status":"COMPLETED","conclusion":"SUCCESS"},{"status":"COMPLETED","conclusion":"FAILURE"},{"status":"IN_PROGRESS","conclusion":null}]},{"number":41,"title":"Other branch","state":"OPEN","url":"https://github.com/user/repo/pull/41","headRefName":"task/other","baseRefName":"main","author":{"login":"agent-bot"},"isDraft":true,"reviewDecision":"APPROVED","mergeable":"UNKNOWN","createdAt":"2026-05-15T15:00:00Z","updatedAt":"2026-05-15T15:30:00Z","statusCheckRollup":[]}]'
+  printf '%s\n' '[{"number":42,"title":"Add PRs view","state":"OPEN","url":"https://github.com/user/repo/pull/42","headRefName":"task/prs","baseRefName":"main","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"MERGEABLE","createdAt":"2026-05-16T15:00:00Z","updatedAt":"2026-05-16T15:30:00Z","statusCheckRollup":[{"status":"COMPLETED","conclusion":"SUCCESS"},{"status":"COMPLETED","conclusion":"FAILURE"},{"status":"IN_PROGRESS","conclusion":null}]},{"number":41,"title":"Other branch","state":"OPEN","url":"https://github.com/user/repo/pull/41","headRefName":"task/other","baseRefName":"main","author":{"login":"agent-bot"},"isDraft":true,"reviewDecision":"APPROVED","mergeable":"UNKNOWN","createdAt":"2026-05-15T15:00:00Z","updatedAt":"2026-05-15T15:30:00Z","statusCheckRollup":[]}]'
   exit 0
 fi
 exit 1
@@ -1147,7 +1147,7 @@ exit 1
     const ghBinary = path.join(tmpDir, 'fake-gh-create-pr');
     writeFileSync(
       ghBinary,
-      `#!/bin/sh
+      String.raw`#!/bin/sh
 if [ "$1" = "--version" ]; then
   echo "gh version 2.0.0"
   exit 0
@@ -1168,15 +1168,15 @@ if [ "$1" = "pr" ] && [ "$2" = "create" ]; then
     echo "expected --base staging" >&2
     exit 1
   fi
-  printf '%s\\n' '{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"staging","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}'
+  printf '%s\n' '{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"staging","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}'
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
-  printf '%s\\n' '[{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"staging","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}]'
+  printf '%s\n' '[{"number":43,"title":"Add PR creation flow","state":"OPEN","url":"https://github.com/user/repo/pull/43","headRefName":"task/pr-flow","baseRefName":"staging","author":{"login":"jwill9999"},"isDraft":false,"reviewDecision":"REVIEW_REQUIRED","mergeable":"UNKNOWN","createdAt":"2026-05-22T12:00:00Z","updatedAt":"2026-05-22T12:00:00Z","statusCheckRollup":[{"status":"IN_PROGRESS","conclusion":null}]}]'
   exit 0
 fi
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
-  printf '%s\\n' '{"number":43,"url":"https://github.com/user/repo/pull/43","statusCheckRollup":[{"__typename":"CheckRun","name":"CI","workflowName":"CI","status":"IN_PROGRESS","conclusion":null,"detailsUrl":"https://github.com/user/repo/actions/runs/1"}]}'
+  printf '%s\n' '{"number":43,"url":"https://github.com/user/repo/pull/43","statusCheckRollup":[{"__typename":"CheckRun","name":"CI","workflowName":"CI","status":"IN_PROGRESS","conclusion":null,"detailsUrl":"https://github.com/user/repo/actions/runs/1"}]}'
   exit 0
 fi
 exit 1

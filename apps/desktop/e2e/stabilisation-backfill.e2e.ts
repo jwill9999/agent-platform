@@ -259,8 +259,11 @@ async function expectUsableSurface(page: Page, label: string): Promise<void> {
   const main = page.locator('main, [data-workspace-surface]').first();
   await expect(main, `${label} is visible`).toBeVisible();
   const box = await main.boundingBox();
-  expect(box?.width, `${label} has usable width`).toBeGreaterThan(500);
-  expect(box?.height, `${label} has usable height`).toBeGreaterThan(400);
+  if (!box) {
+    throw new Error(`${label} has no measurable bounding box.`);
+  }
+  expect(box.width, `${label} has usable width`).toBeGreaterThan(500);
+  expect(box.height, `${label} has usable height`).toBeGreaterThan(400);
 }
 
 async function expectResponsiveFirstLoad(page: Page, label: string): Promise<void> {
@@ -326,8 +329,10 @@ async function findRecentProject(port: number, name: string): Promise<ProjectRec
     `http://127.0.0.1:${port}/v1/projects/desktop/recent`,
   );
   const project = response.data.projects.find((candidate) => candidate.name === name);
-  expect(project).toBeDefined();
-  return project as ProjectRecord;
+  if (!project) {
+    throw new Error(`Recent Project ${name} was not returned by the desktop API.`);
+  }
+  return project;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

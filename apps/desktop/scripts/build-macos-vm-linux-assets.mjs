@@ -27,6 +27,7 @@ const DEFAULT_UBUNTU_KERNEL_PACKAGE_BASE =
 const CURL_BINARY = '/usr/bin/curl';
 const FILE_BINARY = '/usr/bin/file';
 const STRINGS_BINARY = '/usr/bin/strings';
+const FAILURE_EXIT_CODE = 1;
 
 const scriptArgs = process.argv.slice(2);
 if (scriptArgs[0] === '--') scriptArgs.shift();
@@ -116,14 +117,11 @@ try {
     { stdio: 'inherit' },
   );
 } catch (error) {
-  console.error(
-    [
-      'Failed to build macOS VM Linux assets with Docker.',
-      'Start Docker Desktop or run this script in the staging/release builder where Docker is available.',
-      `Output directory retained for diagnostics: ${resolvedOutDir}`,
-    ].join('\n'),
-  );
-  process.exit(typeof error?.status === 'number' ? error.status : 1);
+  exitWithChildProcessFailure(error, [
+    'Failed to build macOS VM Linux assets with Docker.',
+    'Start Docker Desktop or run this script in the staging/release builder where Docker is available.',
+    `Output directory retained for diagnostics: ${resolvedOutDir}`,
+  ]);
 }
 
 const required = ['source.raw', 'vmlinuz', 'initrd.img', 'guest-bootstrap.sh'];
@@ -142,9 +140,22 @@ function downloadFile(url, path) {
   try {
     execFileSync(CURL_BINARY, ['-L', '--fail', '--output', path, url], { stdio: 'inherit' });
   } catch (error) {
-    console.error(`Failed to download VM boot asset from ${url}`);
-    process.exit(typeof error?.status === 'number' ? error.status : 1);
+    exitWithChildProcessFailure(error, `Failed to download VM boot asset from ${url}`);
   }
+}
+
+function exitWithChildProcessFailure(error, message) {
+  console.error(Array.isArray(message) ? message.join('\n') : message);
+  process.exit(childProcessExitCode(error));
+}
+
+function childProcessExitCode(error) {
+  if (typeof error !== 'object' || error === null || !('status' in error)) {
+    return FAILURE_EXIT_CODE;
+  }
+
+  const { status } = error;
+  return typeof status === 'number' ? status : FAILURE_EXIT_CODE;
 }
 
 function assertRawArm64Kernel(path) {

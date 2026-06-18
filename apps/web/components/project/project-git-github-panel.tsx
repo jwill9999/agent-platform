@@ -174,7 +174,47 @@ function openWorkspaceWebLink(
   const bridge = getDesktopWorkspaceBridge();
   if (!bridge) return;
   event.preventDefault();
-  void openWorkspaceWebUrl({ url, projectId });
+  openWorkspaceWebUrl({ url, projectId }).catch(() => undefined);
+}
+
+function runAsyncAction(action: () => Promise<unknown>): void {
+  action().catch(() => undefined);
+}
+
+function getGitStateSummary(statusLoading: boolean, currentStatus: ProjectGitStatusResult): string {
+  if (statusLoading) return 'Loading Git state';
+  if (currentStatus.available) return 'Local Git state';
+  return 'No local Git repository';
+}
+
+function getPublishActionLabel(
+  actionPending: string | null,
+  publishState: GitPublishState,
+): string | undefined {
+  if (actionPending === 'pull') return 'Pulling...';
+  if (actionPending === 'push' || actionPending === 'publish') return 'Publishing...';
+  return publishState.actionLabel;
+}
+
+function getRepositoryDialogTitle(mode: RepositoryConnectionMode): string {
+  if (mode === 'create') return 'Create GitHub Repository';
+  return 'Connect Existing Repository';
+}
+
+function getRepositoryDialogDescription(mode: RepositoryConnectionMode): string {
+  if (mode === 'create') {
+    return 'Create a GitHub repository, set it as origin, and push this project.';
+  }
+  return 'Connect this local project to a GitHub repository you already have.';
+}
+
+function getConflictPreviewText(
+  loading: boolean,
+  content: string | undefined,
+  fallback = 'Select a conflicted file.',
+): string {
+  if (loading) return 'Loading...';
+  return content || fallback;
 }
 
 export function deriveGitPullRequestCreateState({
@@ -292,7 +332,7 @@ export function defaultRepositoryName(repositoryName: string | undefined): strin
       parts.push(char);
       continue;
     }
-    if (parts.length > 0 && parts[parts.length - 1] !== '-') {
+    if (parts.length > 0 && parts.at(-1) !== '-') {
       parts.push('-');
     }
   }
@@ -306,7 +346,10 @@ export function defaultRepositoryName(repositoryName: string | undefined): strin
 }
 
 function isRepositoryNameCharacter(char: string): boolean {
-  const code = char.charCodeAt(0);
+  const code = char.codePointAt(0);
+  if (code === undefined) {
+    return false;
+  }
   return (
     (code >= 97 && code <= 122) ||
     (code >= 48 && code <= 57) ||
@@ -359,62 +402,66 @@ function isLikelyPrimaryBranch(branch: string | undefined): boolean {
   return Boolean(branch && ['main', 'master', 'trunk', 'develop', 'development'].includes(branch));
 }
 
-export function deriveGitWorkflowOverview({
-  status,
-  pullRequests,
-  checks,
-}: Readonly<{
-  status: ProjectGitStatusResult;
-  pullRequests?: ProjectGitPullRequestsResult | null;
-  checks?: ProjectGitChecksResult | null;
-}>): GitWorkflowOverview {
-  if (!status.available) {
-    return {
-      title: 'Git is unavailable',
-      description: status.reason ?? 'This Project is not currently backed by a Git repository.',
-      tone: 'warning',
-    };
-  }
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return count === 1 ? singular : plural;
+}
 
+function getUpstreamMissingOverview(status: ProjectGitStatusResult): GitWorkflowOverview | null {
+  if (status.upstreamState !== 'missing') return null;
+
+  return {
+    title: 'Publish this branch',
+    description:
+      'This local branch tracks a remote branch that no longer exists. Publish it again or clear the stale upstream before pushing.',
+    tone: 'warning',
+    primaryAction: { label: 'Review publish options', tab: 'push' },
+    detail: status.upstreamBranch ? `Missing upstream: ${status.upstreamBranch}` : undefined,
+  };
+}
+
+function getWorkingTreeOverview(status: ProjectGitStatusResult): GitWorkflowOverview | null {
   if (status.workingTree.conflicts > 0) {
-    return {
-      title: 'Resolve merge conflicts',
-      description: `${status.workingTree.conflicts} conflicted file${
-        status.workingTree.conflicts === 1 ? '' : 's'
-      } need attention before this branch can continue.`,
-      tone: 'danger',
-      primaryAction: { label: 'Resolve conflicts', tab: 'push' },
-    };
+    return getWorkingTreeConflictOverview(status.workingTree.conflicts);
   }
 
-  if (status.upstreamState === 'missing') {
-    return {
-      title: 'Publish this branch',
-      description:
-        'This local branch tracks a remote branch that no longer exists. Publish it again or clear the stale upstream before pushing.',
-      tone: 'warning',
-      primaryAction: { label: 'Review publish options', tab: 'push' },
-      detail: status.upstreamBranch ? `Missing upstream: ${status.upstreamBranch}` : undefined,
-    };
-  }
+  if (status.clean) return null;
 
-  if (!status.clean) {
-    const staged = status.workingTree.staged;
-    const total = status.workingTree.total;
-    return {
-      title: staged > 0 ? 'Commit staged changes' : 'Review local changes',
-      description:
-        staged > 0
-          ? `${staged} staged file${staged === 1 ? '' : 's'} ready to commit.`
-          : `${total} changed file${total === 1 ? '' : 's'} need review before committing.`,
-      tone: 'warning',
-      primaryAction: {
-        label: staged > 0 ? 'Commit changes' : 'Review changes',
-        tab: staged > 0 ? 'commit' : 'changes',
-      },
-    };
-  }
+  return getWorkingTreeChangeOverview(status.workingTree);
+}
 
+function getWorkingTreeConflictOverview(conflicts: number): GitWorkflowOverview {
+  return {
+    title: 'Resolve merge conflicts',
+    description: `${conflicts} conflicted ${pluralize(
+      conflicts,
+      'file',
+    )} need attention before this branch can continue.`,
+    tone: 'danger',
+    primaryAction: { label: 'Resolve conflicts', tab: 'push' },
+  };
+}
+
+function getWorkingTreeChangeOverview(
+  workingTree: ProjectGitStatusResult['workingTree'],
+): GitWorkflowOverview {
+  const { staged, total } = workingTree;
+  const hasStaged = staged > 0;
+  const description = hasStaged
+    ? `${staged} staged ${pluralize(staged, 'file')} ready to commit.`
+    : `${total} changed ${pluralize(total, 'file')} need review before committing.`;
+
+  return {
+    title: hasStaged ? 'Commit staged changes' : 'Review local changes',
+    description,
+    tone: 'warning',
+    primaryAction: {
+      label: hasStaged ? 'Commit changes' : 'Review changes',
+      tab: hasStaged ? 'commit' : 'changes',
+    },
+  };
+}
+
+function getSyncOverview(status: ProjectGitStatusResult): GitWorkflowOverview | null {
   if (status.behind > 0) {
     return {
       title: 'Pull remote changes',
@@ -437,9 +484,15 @@ export function deriveGitWorkflowOverview({
     };
   }
 
-  const currentPullRequest = pullRequests?.pullRequests.find(
-    (pullRequest) => pullRequest.currentBranch,
-  );
+  return null;
+}
+
+function getCurrentPullRequestOverview(
+  currentPullRequest: ProjectGitPullRequestSummary | undefined,
+  checks?: ProjectGitChecksResult | null,
+): GitWorkflowOverview | null {
+  if (!currentPullRequest) return null;
+
   const failingChecks =
     checks?.available && checks.summary.failure + checks.summary.cancelled > 0
       ? checks.summary.failure + checks.summary.cancelled
@@ -449,35 +502,41 @@ export function deriveGitWorkflowOverview({
       ? checks.summary.inProgress + checks.summary.queued
       : 0;
 
-  if (currentPullRequest) {
-    if (failingChecks > 0 || currentPullRequest.checks.failure > 0) {
-      return {
-        title: 'Pull request checks need attention',
-        description: `${failingChecks || currentPullRequest.checks.failure} check${
-          (failingChecks || currentPullRequest.checks.failure) === 1 ? '' : 's'
-        } failing on PR #${currentPullRequest.number}.`,
-        tone: 'danger',
-        primaryAction: { label: 'Review checks', tab: 'checks' },
-      };
-    }
-    if (runningChecks > 0 || currentPullRequest.checks.pending > 0) {
-      return {
-        title: 'Pull request checks are running',
-        description: `${runningChecks || currentPullRequest.checks.pending} check${
-          (runningChecks || currentPullRequest.checks.pending) === 1 ? '' : 's'
-        } still running on PR #${currentPullRequest.number}.`,
-        tone: 'neutral',
-        primaryAction: { label: 'View checks', tab: 'checks' },
-      };
-    }
+  if (failingChecks > 0 || currentPullRequest.checks.failure > 0) {
+    const totalFailing = failingChecks || currentPullRequest.checks.failure;
+    const checkLabel = totalFailing === 1 ? 'check' : 'checks';
+
     return {
-      title: 'Pull request is open',
-      description: `PR #${currentPullRequest.number} is open for ${currentPullRequest.headRefName}.`,
-      tone: 'success',
-      primaryAction: { label: 'View pull request', tab: 'prs' },
+      title: 'Pull request checks need attention',
+      description: `${totalFailing} ${checkLabel} failing on PR #${currentPullRequest.number}.`,
+      tone: 'danger',
+      primaryAction: { label: 'Review checks', tab: 'checks' },
     };
   }
 
+  if (runningChecks > 0 || currentPullRequest.checks.pending > 0) {
+    return {
+      title: 'Pull request checks are running',
+      description: `${runningChecks || currentPullRequest.checks.pending} check${
+        (runningChecks || currentPullRequest.checks.pending) === 1 ? '' : 's'
+      } still running on PR #${currentPullRequest.number}.`,
+      tone: 'neutral',
+      primaryAction: { label: 'View checks', tab: 'checks' },
+    };
+  }
+
+  return {
+    title: 'Pull request is open',
+    description: `PR #${currentPullRequest.number} is open for ${currentPullRequest.headRefName}.`,
+    tone: 'success',
+    primaryAction: { label: 'View pull request', tab: 'prs' },
+  };
+}
+
+function getCreatePullRequestOverview(
+  status: ProjectGitStatusResult,
+  pullRequests?: ProjectGitPullRequestsResult | null,
+): GitWorkflowOverview | null {
   if (
     status.githubRemoteDetected &&
     pullRequests?.available &&
@@ -491,23 +550,69 @@ export function deriveGitWorkflowOverview({
       primaryAction: { label: 'Review pull request options', tab: 'prs' },
     };
   }
+  return null;
+}
+
+function getNoGithubRemoteOverview(status: ProjectGitStatusResult): GitWorkflowOverview {
+  if (
+    !status.githubRemoteDetected &&
+    status.available &&
+    !status.remoteUrl &&
+    status.recentCommit
+  ) {
+    return {
+      title: 'Connect this project to GitHub',
+      description: 'This local repository has commits, but no GitHub repository is connected yet.',
+      tone: 'warning',
+      primaryAction: { label: 'Create or connect repository', tab: 'push' },
+    };
+  }
+
+  return {
+    title: 'Local repository only',
+    description:
+      'This repository has no GitHub remote configured, so pull requests and GitHub checks are unavailable.',
+    tone: 'neutral',
+  };
+}
+
+export function deriveGitWorkflowOverview({
+  status,
+  pullRequests,
+  checks,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  pullRequests?: ProjectGitPullRequestsResult | null;
+  checks?: ProjectGitChecksResult | null;
+}>): GitWorkflowOverview {
+  if (!status.available) {
+    return {
+      title: 'Git is unavailable',
+      description: status.reason ?? 'This Project is not currently backed by a Git repository.',
+      tone: 'warning',
+    };
+  }
+
+  const upstreamOverview = getUpstreamMissingOverview(status);
+  if (upstreamOverview) return upstreamOverview;
+
+  const workingTreeOverview = getWorkingTreeOverview(status);
+  if (workingTreeOverview) return workingTreeOverview;
+
+  const syncOverview = getSyncOverview(status);
+  if (syncOverview) return syncOverview;
+
+  const currentPullRequest = pullRequests?.pullRequests.find(
+    (pullRequest) => pullRequest.currentBranch,
+  );
+  const currentPullRequestOverview = getCurrentPullRequestOverview(currentPullRequest, checks);
+  if (currentPullRequestOverview) return currentPullRequestOverview;
+
+  const createPullRequestOverview = getCreatePullRequestOverview(status, pullRequests);
+  if (createPullRequestOverview) return createPullRequestOverview;
 
   if (!status.githubRemoteDetected) {
-    if (status.available && !status.remoteUrl && status.recentCommit) {
-      return {
-        title: 'Connect this project to GitHub',
-        description:
-          'This local repository has commits, but no GitHub repository is connected yet.',
-        tone: 'warning',
-        primaryAction: { label: 'Create or connect repository', tab: 'push' },
-      };
-    }
-    return {
-      title: 'Local repository only',
-      description:
-        'This repository has no GitHub remote configured, so pull requests and GitHub checks are unavailable.',
-      tone: 'neutral',
-    };
+    return getNoGithubRemoteOverview(status);
   }
 
   return {
@@ -517,37 +622,50 @@ export function deriveGitWorkflowOverview({
   };
 }
 
-export function deriveGitWorkflowTabs({
-  status,
-  pullRequests,
-  checks,
-  commitSuccess,
-  pushSuccess,
-}: Readonly<{
-  status: ProjectGitStatusResult;
-  pullRequests?: ProjectGitPullRequestsResult | null;
-  checks?: ProjectGitChecksResult | null;
-  commitSuccess?: string | null;
-  pushSuccess?: string | null;
-}>): GitWorkflowTab[] {
-  void commitSuccess;
-  const tabs: GitWorkflowTab[] = [{ id: 'overview', label: 'Overview' }];
-  if (!status.available) return tabs;
+function shouldShowChangesTab(workingTree: ProjectGitStatusResult['workingTree']): boolean {
+  return workingTree.total > 0 || workingTree.conflicts > 0;
+}
 
-  const workingTree = status.workingTree;
-  const hasChanges = workingTree.total > 0 || workingTree.conflicts > 0;
-  const hasStagedChanges = workingTree.staged > 0;
-  const hasPublishWork =
-    workingTree.conflicts > 0 ||
-    (status.clean &&
-      (status.ahead > 0 ||
-        status.behind > 0 ||
-        status.upstreamState === 'missing' ||
-        status.upstreamState === 'none'));
-  const currentPullRequest = pullRequests?.pullRequests.find(
-    (pullRequest) => pullRequest.currentBranch,
-  );
-  const hasPullRequestStep =
+function shouldShowCommitTab(workingTree: ProjectGitStatusResult['workingTree']): boolean {
+  return workingTree.staged > 0;
+}
+
+function shouldShowPushTab(
+  status: ProjectGitStatusResult,
+  workingTree: ProjectGitStatusResult['workingTree'],
+  pushSuccess?: string | null,
+): boolean {
+  const hasSyncWork =
+    status.ahead > 0 ||
+    status.behind > 0 ||
+    status.upstreamState === 'missing' ||
+    status.upstreamState === 'none';
+
+  return Boolean(pushSuccess) || workingTree.conflicts > 0 || (status.clean && hasSyncWork);
+}
+
+function getPushTabLabel(
+  status: ProjectGitStatusResult,
+  workingTree: ProjectGitStatusResult['workingTree'],
+): string {
+  if (workingTree.conflicts > 0) return 'Resolve';
+  if (status.behind > 0) return 'Pull';
+  if (status.upstreamState === 'none') return 'Publish';
+  return 'Push';
+}
+
+function getPushTabBadge(status: ProjectGitStatusResult): number | undefined {
+  if (status.behind > 0) return status.behind;
+  if (status.ahead > 0) return status.ahead;
+  return undefined;
+}
+
+function shouldShowPullRequestTab(
+  status: ProjectGitStatusResult,
+  currentPullRequest: ProjectGitPullRequestsResult['pullRequests'][number] | undefined,
+  pushSuccess?: string | null,
+): boolean {
+  return (
     Boolean(currentPullRequest) ||
     Boolean(
       status.githubRemoteDetected &&
@@ -556,50 +674,79 @@ export function deriveGitWorkflowTabs({
       !isLikelyPrimaryBranch(status.currentBranch) &&
       status.upstreamState === 'active',
     ) ||
-    Boolean(pushSuccess);
-  const hasChecksStep =
-    Boolean(
-      checks?.available &&
-      (checks.scope === 'pull_request' || checks.summary.total > 0 || currentPullRequest),
-    ) || Boolean(currentPullRequest?.checks.total);
+    Boolean(pushSuccess)
+  );
+}
 
-  if (hasChanges) {
+function getPullRequestTabBadge(
+  pullRequests?: ProjectGitPullRequestsResult | null,
+): number | undefined {
+  return pullRequests?.pullRequests.length ? pullRequests.pullRequests.length : undefined;
+}
+
+function shouldShowChecksTab(
+  checks: ProjectGitChecksResult | null | undefined,
+  currentPullRequest: ProjectGitPullRequestsResult['pullRequests'][number] | undefined,
+): boolean {
+  const hasChecks =
+    checks?.available &&
+    (checks.scope === 'pull_request' || checks.summary.total > 0 || currentPullRequest);
+
+  return Boolean(hasChecks) || Boolean(currentPullRequest?.checks.total);
+}
+
+function getChecksTabBadge(checks?: ProjectGitChecksResult | null): number | undefined {
+  return checks?.summary.total && checks.summary.total > 0 ? checks.summary.total : undefined;
+}
+
+export function deriveGitWorkflowTabs({
+  status,
+  pullRequests,
+  checks,
+  pushSuccess,
+}: Readonly<{
+  status: ProjectGitStatusResult;
+  pullRequests?: ProjectGitPullRequestsResult | null;
+  checks?: ProjectGitChecksResult | null;
+  commitSuccess?: string | null;
+  pushSuccess?: string | null;
+}>): GitWorkflowTab[] {
+  const tabs: GitWorkflowTab[] = [{ id: 'overview', label: 'Overview' }];
+  if (!status.available) return tabs;
+
+  const { workingTree } = status;
+  const currentPullRequest = pullRequests?.pullRequests.find((pr) => pr.currentBranch);
+
+  if (shouldShowChangesTab(workingTree)) {
     tabs.push({ id: 'changes', label: 'Changes', badge: workingTree.total });
   }
 
-  if (hasStagedChanges) {
+  if (shouldShowCommitTab(workingTree)) {
+    tabs.push({ id: 'commit', label: 'Commit', badge: workingTree.staged });
+  }
+
+  if (shouldShowPushTab(status, workingTree, pushSuccess)) {
     tabs.push({
-      id: 'commit',
-      label: 'Commit',
-      badge: workingTree.staged,
+      id: 'push',
+      label: getPushTabLabel(status, workingTree),
+      badge: getPushTabBadge(status),
     });
   }
 
-  if (hasPublishWork || pushSuccess) {
-    const badge = status.behind > 0 ? status.behind : status.ahead > 0 ? status.ahead : undefined;
-    const label =
-      workingTree.conflicts > 0
-        ? 'Resolve'
-        : status.behind > 0
-          ? 'Pull'
-          : status.upstreamState === 'none'
-            ? 'Publish'
-            : 'Push';
-    tabs.push({ id: 'push', label, badge });
+  if (shouldShowPullRequestTab(status, currentPullRequest, pushSuccess)) {
+    tabs.push({
+      id: 'prs',
+      label: 'PRs',
+      badge: getPullRequestTabBadge(pullRequests),
+    });
   }
 
-  if (hasPullRequestStep) {
-    const badge =
-      pullRequests?.pullRequests.length && pullRequests.pullRequests.length > 0
-        ? pullRequests.pullRequests.length
-        : undefined;
-    tabs.push({ id: 'prs', label: 'PRs', badge });
-  }
-
-  if (hasChecksStep) {
-    const badge =
-      checks?.summary.total && checks.summary.total > 0 ? checks.summary.total : undefined;
-    tabs.push({ id: 'checks', label: 'Checks', badge });
+  if (shouldShowChecksTab(checks, currentPullRequest)) {
+    tabs.push({
+      id: 'checks',
+      label: 'Checks',
+      badge: getChecksTabBadge(checks),
+    });
   }
 
   return tabs;
@@ -628,111 +775,124 @@ export function deriveGitPublishState({
   commitSuccess?: string | null;
   pushSuccess?: string | null;
 }>): GitPublishState {
-  if (status.workingTree.conflicts > 0) {
-    return {
-      title: 'Resolve merge conflicts',
-      description:
-        'This branch has unresolved merge conflicts. Resolve them before committing or pushing.',
-      statusLabel: 'Conflicts',
-      actionLabel: 'Resolve conflicts',
-      canPublish: false,
-      canPull: false,
-      canClearStaleUpstream: false,
-      pushed: false,
-    };
-  }
+  if (status.workingTree.conflicts > 0) return getMergeConflictState();
+  if (status.clean && status.behind > 0) return getPullRemoteChangesState(status);
+  if (pushSuccess || (status.clean && status.upstreamState === 'active' && status.ahead === 0))
+    return getPublishedState(pushSuccess);
+  if (!status.remoteUrl) return getNotConnectedState(commitSuccess);
+  if (status.upstreamState === 'missing') return getStaleUpstreamState(status);
+  if (status.upstreamState === 'none') return getPublishBranchState(commitSuccess);
+  if (status.ahead > 0) return getPushLocalCommitsState(status);
 
-  if (status.clean && status.behind > 0) {
-    return {
-      title: 'Pull remote changes',
-      description:
-        status.ahead > 0
-          ? 'This branch has local commits and remote commits. Pull remote changes before pushing.'
-          : 'Remote commits are waiting on this branch. Pull them before continuing.',
-      statusLabel: 'Pull required',
-      actionLabel: 'Pull remote changes',
-      canPublish: false,
-      canPull: true,
-      canClearStaleUpstream: false,
-      pushed: false,
-      detail: status.upstreamBranch ? `Upstream: ${status.upstreamBranch}` : undefined,
-    };
-  }
+  return getNothingToPublishState();
+}
 
-  if (pushSuccess || (status.clean && status.upstreamState === 'active' && status.ahead === 0)) {
-    return {
-      title: 'Published',
-      description: 'This branch is published and up to date with its upstream.',
-      statusLabel: 'Published',
-      canPublish: false,
-      canPull: false,
-      canClearStaleUpstream: false,
-      pushed: true,
-      detail: pushSuccess ?? undefined,
-    };
-  }
+function getMergeConflictState(): GitPublishState {
+  return {
+    title: 'Resolve merge conflicts',
+    description:
+      'This branch has unresolved merge conflicts. Resolve them before committing or pushing.',
+    statusLabel: 'Conflicts',
+    actionLabel: 'Resolve conflicts',
+    canPublish: false,
+    canPull: false,
+    canClearStaleUpstream: false,
+    pushed: false,
+  };
+}
 
-  if (!status.remoteUrl) {
-    return {
-      title: 'Connect this project to GitHub',
-      description:
-        'This local repository has no origin remote. You can keep working locally, or connect it to GitHub before publishing.',
-      statusLabel: 'Not connected',
-      actionLabel: undefined,
-      canPublish: false,
-      canPull: false,
-      canClearStaleUpstream: false,
-      pushed: false,
-      detail: commitSuccess ?? undefined,
-    };
-  }
+function getPullRemoteChangesState(status: ProjectGitStatusResult): GitPublishState {
+  return {
+    title: 'Pull remote changes',
+    description:
+      status.ahead > 0
+        ? 'This branch has local commits and remote commits. Pull remote changes before pushing.'
+        : 'Remote commits are waiting on this branch. Pull them before continuing.',
+    statusLabel: 'Pull required',
+    actionLabel: 'Pull remote changes',
+    canPublish: false,
+    canPull: true,
+    canClearStaleUpstream: false,
+    pushed: false,
+    detail: status.upstreamBranch ? `Upstream: ${status.upstreamBranch}` : undefined,
+  };
+}
 
-  if (status.upstreamState === 'missing') {
-    return {
-      title: 'Publish this branch again',
-      description:
-        'This branch tracks a remote branch that no longer exists. Publish it again, or clear the stale upstream and choose another route.',
-      statusLabel: 'Stale upstream',
-      actionLabel: 'Publish branch',
-      canPublish: true,
-      canPull: false,
-      canClearStaleUpstream: true,
-      pushed: false,
-      detail: status.upstreamBranch ? `Missing upstream: ${status.upstreamBranch}` : undefined,
-    };
-  }
+function getPublishedState(pushSuccess?: string | null): GitPublishState {
+  return {
+    title: 'Published',
+    description: 'This branch is published and up to date with its upstream.',
+    statusLabel: 'Published',
+    canPublish: false,
+    canPull: false,
+    canClearStaleUpstream: false,
+    pushed: true,
+    detail: pushSuccess ?? undefined,
+  };
+}
 
-  if (status.upstreamState === 'none') {
-    return {
-      title: 'Publish this branch',
-      description:
-        'This branch has not been published yet. Publishing creates the remote branch and links future pushes to it.',
-      statusLabel: 'Ready to publish',
-      actionLabel: 'Publish branch',
-      canPublish: true,
-      canPull: false,
-      canClearStaleUpstream: false,
-      pushed: false,
-      detail: commitSuccess ?? undefined,
-    };
-  }
+function getNotConnectedState(commitSuccess?: string | null): GitPublishState {
+  return {
+    title: 'Connect this project to GitHub',
+    description:
+      'This local repository has no origin remote. You can keep working locally, or connect it to GitHub before publishing.',
+    statusLabel: 'Not connected',
+    actionLabel: undefined,
+    canPublish: false,
+    canPull: false,
+    canClearStaleUpstream: false,
+    pushed: false,
+    detail: commitSuccess ?? undefined,
+  };
+}
 
-  if (status.ahead > 0) {
-    return {
-      title: 'Push local commits',
-      description: `${status.ahead} local commit${status.ahead === 1 ? '' : 's'} ${
-        status.ahead === 1 ? 'is' : 'are'
-      } ready to push.`,
-      statusLabel: 'Ready to push',
-      actionLabel: 'Push',
-      canPublish: true,
-      canPull: false,
-      canClearStaleUpstream: false,
-      pushed: false,
-      detail: status.upstreamBranch ? `Upstream: ${status.upstreamBranch}` : undefined,
-    };
-  }
+function getStaleUpstreamState(status: ProjectGitStatusResult): GitPublishState {
+  return {
+    title: 'Publish this branch again',
+    description:
+      'This branch tracks a remote branch that no longer exists. Publish it again, or clear the stale upstream and choose another route.',
+    statusLabel: 'Stale upstream',
+    actionLabel: 'Publish branch',
+    canPublish: true,
+    canPull: false,
+    canClearStaleUpstream: true,
+    pushed: false,
+    detail: status.upstreamBranch ? `Missing upstream: ${status.upstreamBranch}` : undefined,
+  };
+}
 
+function getPublishBranchState(commitSuccess?: string | null): GitPublishState {
+  return {
+    title: 'Publish this branch',
+    description:
+      'This branch has not been published yet. Publishing creates the remote branch and links future pushes to it.',
+    statusLabel: 'Ready to publish',
+    actionLabel: 'Publish branch',
+    canPublish: true,
+    canPull: false,
+    canClearStaleUpstream: false,
+    pushed: false,
+    detail: commitSuccess ?? undefined,
+  };
+}
+
+function getPushLocalCommitsState(status: ProjectGitStatusResult): GitPublishState {
+  return {
+    title: 'Push local commits',
+    description: `${status.ahead} local commit${status.ahead === 1 ? '' : 's'} ${
+      status.ahead === 1 ? 'is' : 'are'
+    } ready to push.`,
+    statusLabel: 'Ready to push',
+    actionLabel: 'Push',
+    canPublish: true,
+    canPull: false,
+    canClearStaleUpstream: false,
+    pushed: false,
+    detail: status.upstreamBranch ? `Upstream: ${status.upstreamBranch}` : undefined,
+  };
+}
+
+function getNothingToPublishState(): GitPublishState {
   return {
     title: 'Nothing to publish',
     description: 'There are no unpublished commits on this branch.',
@@ -892,6 +1052,21 @@ function ProjectInstructionsCard({
         )}
       </div>
     </GitCard>
+  );
+}
+
+function ClosedGitHubPanelButton({ onOpen }: Readonly<{ onOpen: () => void }>) {
+  return (
+    <button
+      type="button"
+      className="flex h-full w-full flex-col items-center gap-3 px-2 py-4 text-xs text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+      onClick={onOpen}
+      aria-label="Open Git and GitHub panel"
+      title="Open Git and GitHub panel"
+    >
+      <GitBranch className="h-5 w-5" />
+      <span className="[writing-mode:vertical-rl] rotate-180 font-medium tracking-wide">Git</span>
+    </button>
   );
 }
 
@@ -1129,8 +1304,8 @@ function ChangeFileRow({
         {shortPath(file.path)}
       </span>
       {(file.additions !== undefined || file.deletions !== undefined) && (
-        <span className="shrink-0 text-[10px] text-muted-foreground">
-          <span className="text-emerald-700">+{file.additions ?? 0}</span>{' '}
+        <span className="flex shrink-0 gap-1 text-[10px] text-muted-foreground">
+          <span className="text-emerald-700">+{file.additions ?? 0}</span>
           <span className="text-red-700">-{file.deletions ?? 0}</span>
         </span>
       )}
@@ -1316,7 +1491,9 @@ export function ProjectGitHubPanel({
     }
     setBranchesLoading(true);
     try {
-      const next = await apiGet<ProjectBranchListResult>(apiPath('projects', projectId, 'branches'));
+      const next = await apiGet<ProjectBranchListResult>(
+        apiPath('projects', projectId, 'branches'),
+      );
       setBranches(next ?? null);
       setBranchesProjectId(projectId);
       setBranchesError(null);
@@ -1401,19 +1578,19 @@ export function ProjectGitHubPanel({
   }, [projectId]);
 
   useEffect(() => {
-    void loadStatus();
+    runAsyncAction(loadStatus);
   }, [loadStatus, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'changes' || activeTab === 'commit') void loadChanges();
+    if (activeTab === 'changes' || activeTab === 'commit') runAsyncAction(loadChanges);
   }, [activeTab, loadChanges, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'checks' || activeTab === 'overview') void loadChecks();
+    if (activeTab === 'checks' || activeTab === 'overview') runAsyncAction(loadChecks);
   }, [activeTab, loadChecks, refreshKey]);
 
   useEffect(() => {
-    if (activeTab === 'prs' || activeTab === 'overview') void loadPullRequests();
+    if (activeTab === 'prs' || activeTab === 'overview') runAsyncAction(loadPullRequests);
   }, [activeTab, loadPullRequests, refreshKey]);
 
   useEffect(() => {
@@ -1423,7 +1600,7 @@ export function ProjectGitHubPanel({
   }, [activeTab, loadBranches, refreshKey]);
 
   useEffect(() => {
-    if (conflictResolverOpen || currentStatusHasConflicts(status)) void loadConflicts();
+    if (conflictResolverOpen || currentStatusHasConflicts(status)) runAsyncAction(loadConflicts);
   }, [conflictResolverOpen, loadConflicts, refreshKey, status]);
 
   useEffect(() => {
@@ -2036,14 +2213,33 @@ export function ProjectGitHubPanel({
         status: currentStatus,
         pullRequests: currentPullRequests,
         checks: currentChecks,
-        commitSuccess,
         pushSuccess,
       }),
-    [commitSuccess, currentChecks, currentPullRequests, currentStatus, pushSuccess],
+    [currentChecks, currentPullRequests, currentStatus, pushSuccess],
   );
   const conflictFiles = conflicts?.files ?? [];
   const unresolvedConflictFiles = conflictFiles.filter((file) => !file.resolved);
   const conflictResolved = currentStatus.available && currentStatus.workingTree.conflicts === 0;
+  const conflictFileCount = conflicts?.totalFiles ?? currentStatus.workingTree.conflicts;
+  const changedFileCount = currentStatus.workingTree.total;
+  const conflictCountText = conflictResolved
+    ? 'Review the resolved files and commit the merge resolution.'
+    : `${conflictFileCount} ${pluralize(
+        conflictFileCount,
+        'file',
+      )} need resolution before pushing.`;
+  const unresolvedConflictText = `${unresolvedConflictFiles.length} unresolved ${pluralize(
+    unresolvedConflictFiles.length,
+    'file',
+  )}`;
+  const gitStateSummary = getGitStateSummary(statusLoading, currentStatus);
+  const changeCountLabel = currentStatus.clean
+    ? 'Clean'
+    : `${changedFileCount} ${pluralize(changedFileCount, 'change')}`;
+  const changedFilesLabel = currentStatus.clean
+    ? 'Working tree clean'
+    : `${changedFileCount} changed ${pluralize(changedFileCount, 'file')}`;
+  const publishActionLabel = getPublishActionLabel(actionPending, publishState);
 
   const createPullRequest = useCallback(async () => {
     if (!projectId) return;
@@ -2143,14 +2339,10 @@ export function ProjectGitHubPanel({
             <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold">
-                  {repositoryDialogMode === 'create'
-                    ? 'Create GitHub Repository'
-                    : 'Connect Existing Repository'}
+                  {getRepositoryDialogTitle(repositoryDialogMode)}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {repositoryDialogMode === 'create'
-                    ? 'Create a GitHub repository, set it as origin, and push this project.'
-                    : 'Connect this local project to a GitHub repository you already have.'}
+                  {getRepositoryDialogDescription(repositoryDialogMode)}
                 </p>
               </div>
               <Button
@@ -2207,7 +2399,7 @@ export function ProjectGitHubPanel({
                   </div>
                 )}
 
-                {repositoryDialogMode === 'create' ? (
+                {repositoryDialogMode === 'create' && (
                   <>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="space-y-1 text-sm">
@@ -2276,7 +2468,7 @@ export function ProjectGitHubPanel({
                       </Button>
                       <Button
                         type="button"
-                        onClick={() => void createGitHubRepository()}
+                        onClick={() => runAsyncAction(createGitHubRepository)}
                         disabled={actionPending !== null}
                       >
                         {actionPending === 'github-create-repository'
@@ -2285,7 +2477,8 @@ export function ProjectGitHubPanel({
                       </Button>
                     </div>
                   </>
-                ) : (
+                )}
+                {repositoryDialogMode === 'connect' && (
                   <>
                     <label className="space-y-1 text-sm">
                       <span className="font-medium">GitHub repository</span>
@@ -2312,7 +2505,7 @@ export function ProjectGitHubPanel({
                       </Button>
                       <Button
                         type="button"
-                        onClick={() => void connectGitHubRepository()}
+                        onClick={() => runAsyncAction(connectGitHubRepository)}
                         disabled={actionPending !== null}
                       >
                         {actionPending === 'github-connect-repository'
@@ -2329,10 +2522,9 @@ export function ProjectGitHubPanel({
       )}
 
       {conflictResolverOpen && (
-        <div
+        <dialog
+          open
           className="fixed inset-0 z-50 flex bg-background text-foreground"
-          role="dialog"
-          aria-modal="true"
           aria-label="Merge conflict resolver"
         >
           <div className="flex w-72 shrink-0 flex-col border-r border-border bg-muted/20 p-4">
@@ -2370,22 +2562,14 @@ export function ProjectGitHubPanel({
                 <div className="font-medium">
                   {conflictResolved ? 'All conflicts resolved' : 'Merge conflicts detected'}
                 </div>
-                <div className="mt-1 text-xs">
-                  {conflictResolved
-                    ? 'Review the resolved files and commit the merge resolution.'
-                    : `${conflicts?.totalFiles ?? currentStatus.workingTree.conflicts} file${
-                        (conflicts?.totalFiles ?? currentStatus.workingTree.conflicts) === 1
-                          ? ''
-                          : 's'
-                      } need resolution before pushing.`}
-                </div>
+                <div className="mt-1 text-xs">{conflictCountText}</div>
               </section>
 
               <Button
                 type="button"
                 className="w-full"
                 variant={conflictResolved ? 'outline' : 'default'}
-                onClick={() => void loadConflicts()}
+                onClick={() => runAsyncAction(loadConflicts)}
                 disabled={conflictsLoading}
               >
                 {conflictsLoading ? 'Refreshing...' : 'Refresh conflicts'}
@@ -2423,7 +2607,7 @@ export function ProjectGitHubPanel({
                   className="w-full"
                   disabled={!projectId}
                   onClick={() => {
-                    openProjectInSystemIde().catch(() => undefined);
+                    runAsyncAction(openProjectInSystemIde);
                   }}
                 >
                   Open in IDE
@@ -2436,11 +2620,7 @@ export function ProjectGitHubPanel({
             <div className="mb-3">
               <h2 className="text-sm font-semibold">Files with conflicts</h2>
               <p className="text-xs text-muted-foreground">
-                {conflictsLoading
-                  ? 'Loading conflicts...'
-                  : `${unresolvedConflictFiles.length} unresolved file${
-                      unresolvedConflictFiles.length === 1 ? '' : 's'
-                    }`}
+                {conflictsLoading ? 'Loading conflicts...' : unresolvedConflictText}
               </p>
             </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
@@ -2496,7 +2676,7 @@ export function ProjectGitHubPanel({
               </div>
             )}
 
-            {conflictResolved ? (
+            {conflictResolved && (
               <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] gap-4">
                 <div className="grid grid-cols-4 gap-3">
                   <div className="rounded border border-border px-4 py-3">
@@ -2543,14 +2723,14 @@ export function ProjectGitHubPanel({
                     />
                     <Button
                       type="button"
-                      onClick={() => void commitMergeResolution(false)}
+                      onClick={() => runAsyncAction(() => commitMergeResolution(false))}
                       disabled={actionPending !== null || !mergeCommitMessage.trim()}
                     >
                       {actionPending === 'merge-commit' ? 'Committing...' : 'Commit merge'}
                     </Button>
                     <Button
                       type="button"
-                      onClick={() => void commitMergeResolution(true)}
+                      onClick={() => runAsyncAction(() => commitMergeResolution(true))}
                       disabled={actionPending !== null || !mergeCommitMessage.trim()}
                     >
                       {actionPending === 'merge-commit-push' ? 'Pushing...' : 'Commit & push'}
@@ -2558,7 +2738,8 @@ export function ProjectGitHubPanel({
                   </div>
                 </div>
               </div>
-            ) : (
+            )}
+            {!conflictResolved && (
               <div className="grid min-h-0 flex-1 grid-rows-[1fr_auto] gap-4">
                 <div className="grid min-h-0 grid-cols-3 overflow-hidden rounded border border-border">
                   <div className="min-h-0 overflow-y-auto border-r border-border">
@@ -2566,10 +2747,10 @@ export function ProjectGitHubPanel({
                       Current
                     </div>
                     <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
-                      {conflictFileLoading
-                        ? 'Loading...'
-                        : conflictFile?.hunks.map((hunk) => hunk.current).join('\n') ||
-                          'Select a conflicted file.'}
+                      {getConflictPreviewText(
+                        conflictFileLoading,
+                        conflictFile?.hunks.map((hunk) => hunk.current).join('\n'),
+                      )}
                     </pre>
                   </div>
                   <div className="min-h-0 overflow-y-auto border-r border-border">
@@ -2577,10 +2758,10 @@ export function ProjectGitHubPanel({
                       Incoming
                     </div>
                     <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
-                      {conflictFileLoading
-                        ? 'Loading...'
-                        : conflictFile?.hunks.map((hunk) => hunk.incoming).join('\n') ||
-                          'Select a conflicted file.'}
+                      {getConflictPreviewText(
+                        conflictFileLoading,
+                        conflictFile?.hunks.map((hunk) => hunk.incoming).join('\n'),
+                      )}
                     </pre>
                   </div>
                   <div className="min-h-0 overflow-y-auto">
@@ -2588,9 +2769,7 @@ export function ProjectGitHubPanel({
                       Result
                     </div>
                     <pre className="whitespace-pre-wrap p-3 font-mono text-xs">
-                      {conflictFileLoading
-                        ? 'Loading...'
-                        : (conflictFile?.content ?? 'Select a conflicted file.')}
+                      {getConflictPreviewText(conflictFileLoading, conflictFile?.content)}
                     </pre>
                   </div>
                 </div>
@@ -2599,7 +2778,7 @@ export function ProjectGitHubPanel({
                     type="button"
                     variant="outline"
                     disabled={!selectedConflictPath || actionPending !== null}
-                    onClick={() => void applyConflictChoice('current')}
+                    onClick={() => runAsyncAction(() => applyConflictChoice('current'))}
                   >
                     Accept current
                   </Button>
@@ -2607,7 +2786,7 @@ export function ProjectGitHubPanel({
                     type="button"
                     variant="outline"
                     disabled={!selectedConflictPath || actionPending !== null}
-                    onClick={() => void applyConflictChoice('incoming')}
+                    onClick={() => runAsyncAction(() => applyConflictChoice('incoming'))}
                   >
                     Accept incoming
                   </Button>
@@ -2615,7 +2794,7 @@ export function ProjectGitHubPanel({
                     type="button"
                     variant="outline"
                     disabled={!selectedConflictPath || actionPending !== null}
-                    onClick={() => void applyConflictChoice('both')}
+                    onClick={() => runAsyncAction(() => applyConflictChoice('both'))}
                   >
                     Accept both
                   </Button>
@@ -2627,7 +2806,7 @@ export function ProjectGitHubPanel({
                       setConflictFile(null);
                       const currentPath = selectedConflictPath;
                       setSelectedConflictPath(null);
-                      window.setTimeout(() => setSelectedConflictPath(currentPath), 0);
+                      globalThis.setTimeout(() => setSelectedConflictPath(currentPath), 0);
                     }}
                   >
                     Reset view
@@ -2636,7 +2815,7 @@ export function ProjectGitHubPanel({
               </div>
             )}
           </div>
-        </div>
+        </dialog>
       )}
 
       <aside
@@ -2646,20 +2825,7 @@ export function ProjectGitHubPanel({
         )}
         aria-label="Git and GitHub"
       >
-        {!open ? (
-          <button
-            type="button"
-            className="flex h-full w-full flex-col items-center gap-3 px-2 py-4 text-xs text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-            onClick={() => setOpen(true)}
-            aria-label="Open Git and GitHub panel"
-            title="Open Git and GitHub panel"
-          >
-            <GitBranch className="h-5 w-5" />
-            <span className="[writing-mode:vertical-rl] rotate-180 font-medium tracking-wide">
-              Git
-            </span>
-          </button>
-        ) : (
+        {open && (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
               <GitBranch className="h-4 w-4 shrink-0" />
@@ -2671,20 +2837,14 @@ export function ProjectGitHubPanel({
                     Live
                   </span>
                 </div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {statusLoading
-                    ? 'Loading Git state'
-                    : currentStatus.available
-                      ? 'Local Git state'
-                      : 'No local Git repository'}
-                </div>
+                <div className="truncate text-xs text-muted-foreground">{gitStateSummary}</div>
               </div>
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7"
-                onClick={() => void refreshGitViews()}
+                onClick={() => runAsyncAction(refreshGitViews)}
                 disabled={loading || changesLoading || pullRequestsLoading || checksLoading}
                 title="Refresh Git state"
                 aria-label="Refresh Git state"
@@ -2760,7 +2920,7 @@ export function ProjectGitHubPanel({
                 </div>
               )}
 
-              {statusLoading ? (
+              {statusLoading && (
                 <>
                   <ProjectInstructionsCard
                     status={projectInstructionsStatus}
@@ -2769,7 +2929,8 @@ export function ProjectGitHubPanel({
                   />
                   <GitStatusLoadingCard />
                 </>
-              ) : !currentStatus.available ? (
+              )}
+              {!statusLoading && !currentStatus.available && (
                 <>
                   <ProjectInstructionsCard
                     status={projectInstructionsStatus}
@@ -2783,7 +2944,8 @@ export function ProjectGitHubPanel({
                     </div>
                   </GitCard>
                 </>
-              ) : activeTab === 'overview' ? (
+              )}
+              {!statusLoading && currentStatus.available && activeTab === 'overview' && (
                 <>
                   <ProjectInstructionsCard
                     status={projectInstructionsStatus}
@@ -2855,13 +3017,7 @@ export function ProjectGitHubPanel({
 
                   <GitCard title="Working Tree">
                     <div className="space-y-1">
-                      <div className="mb-2 font-medium">
-                        {currentStatus.clean
-                          ? 'Clean'
-                          : `${currentStatus.workingTree.total} change${
-                              currentStatus.workingTree.total === 1 ? '' : 's'
-                            }`}
-                      </div>
+                      <div className="mb-2 font-medium">{changeCountLabel}</div>
                       <StatRow
                         label="Added"
                         value={currentStatus.workingTree.added}
@@ -2905,18 +3061,13 @@ export function ProjectGitHubPanel({
                     )}
                   </GitCard>
                 </>
-              ) : activeTab === 'changes' ? (
+              )}
+              {!statusLoading && currentStatus.available && activeTab === 'changes' && (
                 <>
                   <GitCard title="Changes">
                     <div className="flex min-h-0 flex-col gap-3">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-medium">
-                          {currentStatus.clean
-                            ? 'Working tree clean'
-                            : `${currentStatus.workingTree.total} changed file${
-                                currentStatus.workingTree.total === 1 ? '' : 's'
-                              }`}
-                        </div>
+                        <div className="text-sm font-medium">{changedFilesLabel}</div>
                         <Button
                           type="button"
                           size="sm"
@@ -2926,7 +3077,7 @@ export function ProjectGitHubPanel({
                             actionPending !== null ||
                             currentStatus.workingTree.total === 0
                           }
-                          onClick={() => void stagePaths('all')}
+                          onClick={() => runAsyncAction(() => stagePaths('all'))}
                         >
                           {actionPending === 'stage-all' ? 'Staging...' : 'Stage all'}
                         </Button>
@@ -3033,7 +3184,7 @@ export function ProjectGitHubPanel({
                   </GitCard>
 
                   <GitCard title="Diff">
-                    {selectedChange ? (
+                    {selectedChange && (
                       <div className="space-y-3">
                         <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
                           <div className="flex min-w-0 items-start gap-2">
@@ -3051,10 +3202,10 @@ export function ProjectGitHubPanel({
                                 </Badge>
                                 {(selectedChange.additions !== undefined ||
                                   selectedChange.deletions !== undefined) && (
-                                  <span className="text-[10px] text-muted-foreground">
+                                  <span className="flex gap-1 text-[10px] text-muted-foreground">
                                     <span className="font-medium text-emerald-700">
                                       +{selectedChange.additions ?? 0}
-                                    </span>{' '}
+                                    </span>
                                     <span className="font-medium text-red-700">
                                       -{selectedChange.deletions ?? 0}
                                     </span>
@@ -3069,7 +3220,9 @@ export function ProjectGitHubPanel({
                             <Button
                               type="button"
                               size="sm"
-                              onClick={() => void stagePaths([selectedChange.path])}
+                              onClick={() =>
+                                runAsyncAction(() => stagePaths([selectedChange.path]))
+                              }
                               disabled={actionPending !== null}
                             >
                               {actionPending === `stage:${selectedChange.path}`
@@ -3082,7 +3235,9 @@ export function ProjectGitHubPanel({
                               type="button"
                               size="sm"
                               variant="outline"
-                              onClick={() => void stashPaths([selectedChange.path])}
+                              onClick={() =>
+                                runAsyncAction(() => stashPaths([selectedChange.path]))
+                              }
                               disabled={actionPending !== null}
                             >
                               {actionPending === `stash:${selectedChange.path}`
@@ -3095,7 +3250,9 @@ export function ProjectGitHubPanel({
                               type="button"
                               size="sm"
                               variant="outline"
-                              onClick={() => void unstagePaths([selectedChange.path])}
+                              onClick={() =>
+                                runAsyncAction(() => unstagePaths([selectedChange.path]))
+                              }
                               disabled={actionPending !== null}
                             >
                               {actionPending === `unstage:${selectedChange.path}`
@@ -3115,24 +3272,27 @@ export function ProjectGitHubPanel({
                           </div>
                         )}
                       </div>
-                    ) : (
+                    )}
+                    {!selectedChange && (
                       <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
                         Select a changed file to review its diff.
                       </div>
                     )}
                   </GitCard>
                 </>
-              ) : activeTab === 'commit' ? (
+              )}
+              {!statusLoading && currentStatus.available && activeTab === 'commit' && (
                 <GitCard title="Commit">
                   <div className="space-y-3">
                     {changesLoading && (
                       <div className="text-xs text-muted-foreground">Loading staged files...</div>
                     )}
-                    {stagedFiles.length === 0 ? (
+                    {stagedFiles.length === 0 && (
                       <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
                         No staged files are ready to commit. Go back to Changes to choose files.
                       </div>
-                    ) : (
+                    )}
+                    {stagedFiles.length > 0 && (
                       <>
                         <div>
                           <div className="font-medium">Commit staged changes</div>
@@ -3169,7 +3329,7 @@ export function ProjectGitHubPanel({
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' && !event.shiftKey) {
                             event.preventDefault();
-                            void commitStagedChanges();
+                            runAsyncAction(commitStagedChanges);
                           }
                         }}
                       />
@@ -3181,7 +3341,7 @@ export function ProjectGitHubPanel({
                           actionPending !== null ||
                           commitMessage.trim().length === 0
                         }
-                        onClick={() => void commitStagedChanges()}
+                        onClick={() => runAsyncAction(commitStagedChanges)}
                       >
                         {actionPending === 'commit' ? 'Committing...' : 'Commit'}
                       </Button>
@@ -3201,9 +3361,10 @@ export function ProjectGitHubPanel({
                     )}
                   </div>
                 </GitCard>
-              ) : activeTab === 'push' ? (
+              )}
+              {!statusLoading && currentStatus.available && activeTab === 'push' && (
                 <GitCard title="Publish">
-                  {currentStatus.recentCommit ? (
+                  {currentStatus.recentCommit && (
                     <div className="space-y-3">
                       {commitSuccess && (
                         <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
@@ -3233,7 +3394,7 @@ export function ProjectGitHubPanel({
                         {shortSha(currentStatus.recentCommit.sha)}
                       </div>
                       <div className="font-medium">{currentStatus.recentCommit.subject}</div>
-                      {!currentStatus.remoteUrl ? (
+                      {!currentStatus.remoteUrl && (
                         <div className="rounded border border-border bg-background px-3 py-4">
                           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                             <GitBranch className="h-5 w-5 text-muted-foreground" />
@@ -3276,7 +3437,8 @@ export function ProjectGitHubPanel({
                             this panel to continue the publish workflow here.
                           </div>
                         </div>
-                      ) : (
+                      )}
+                      {currentStatus.remoteUrl && (
                         <>
                           <div className="rounded border border-border bg-muted/20 px-3 py-3">
                             <div className="flex items-center justify-between gap-3">
@@ -3297,7 +3459,7 @@ export function ProjectGitHubPanel({
                             </div>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {publishState.actionLabel && (
+                            {publishActionLabel && (
                               <Button
                                 type="button"
                                 size="sm"
@@ -3309,25 +3471,21 @@ export function ProjectGitHubPanel({
                                 }
                                 onClick={() => {
                                   if (currentStatus.workingTree.conflicts > 0) {
-                                    void openConflictResolver();
+                                    runAsyncAction(openConflictResolver);
                                     return;
                                   }
                                   if (publishState.canPull) {
-                                    void pullRemoteChanges();
+                                    runAsyncAction(pullRemoteChanges);
                                     return;
                                   }
                                   if (currentStatus.upstreamState === 'active') {
-                                    void pushCurrentBranch();
+                                    runAsyncAction(pushCurrentBranch);
                                     return;
                                   }
-                                  void publishCurrentBranch();
+                                  runAsyncAction(publishCurrentBranch);
                                 }}
                               >
-                                {actionPending === 'pull'
-                                  ? 'Pulling...'
-                                  : actionPending === 'push' || actionPending === 'publish'
-                                    ? 'Publishing...'
-                                    : publishState.actionLabel}
+                                {publishActionLabel}
                               </Button>
                             )}
                             {publishState.canClearStaleUpstream && (
@@ -3336,7 +3494,7 @@ export function ProjectGitHubPanel({
                                 size="sm"
                                 variant="outline"
                                 disabled={actionPending !== null}
-                                onClick={() => void clearStaleUpstream()}
+                                onClick={() => runAsyncAction(clearStaleUpstream)}
                               >
                                 {actionPending === 'clear-upstream'
                                   ? 'Clearing...'
@@ -3384,11 +3542,13 @@ export function ProjectGitHubPanel({
                         )}
                       </div>
                     </div>
-                  ) : (
+                  )}
+                  {!currentStatus.recentCommit && (
                     <div className="text-sm text-muted-foreground">No commits found.</div>
                   )}
                 </GitCard>
-              ) : activeTab === 'prs' ? (
+              )}
+              {!statusLoading && currentStatus.available && activeTab === 'prs' && (
                 <>
                   <GitCard title="Pull Requests">
                     <div className="space-y-3">
@@ -3476,10 +3636,14 @@ export function ProjectGitHubPanel({
                                 </p>
                               </div>
                               <div className="space-y-2">
-                                <label className="block text-xs font-medium text-muted-foreground">
+                                <label
+                                  htmlFor="project-pull-request-title"
+                                  className="block text-xs font-medium text-muted-foreground"
+                                >
                                   Title
                                 </label>
                                 <Input
+                                  id="project-pull-request-title"
                                   value={pullRequestTitle}
                                   onChange={(event) => setPullRequestTitle(event.target.value)}
                                   placeholder={pullRequestCreateState.defaultTitle}
@@ -3487,7 +3651,10 @@ export function ProjectGitHubPanel({
                                 />
                               </div>
                               <div className="space-y-2">
-                                <label className="block text-xs font-medium text-muted-foreground">
+                                <label
+                                  htmlFor="project-pull-request-target-branch"
+                                  className="block text-xs font-medium text-muted-foreground"
+                                >
                                   Target branch
                                 </label>
                                 <Select
@@ -3496,6 +3663,7 @@ export function ProjectGitHubPanel({
                                   disabled={actionPending !== null}
                                 >
                                   <SelectTrigger
+                                    id="project-pull-request-target-branch"
                                     aria-label="Pull request target branch"
                                     className="h-9"
                                   >
@@ -3563,7 +3731,7 @@ export function ProjectGitHubPanel({
                                   type="button"
                                   size="sm"
                                   disabled={actionPending !== null}
-                                  onClick={() => void createPullRequest()}
+                                  onClick={() => runAsyncAction(createPullRequest)}
                                 >
                                   {actionPending === 'create-pull-request'
                                     ? 'Creating...'
@@ -3743,7 +3911,8 @@ export function ProjectGitHubPanel({
                     </div>
                   </GitCard>
                 </>
-              ) : (
+              )}
+              {!statusLoading && currentStatus.available && activeTab === 'checks' && (
                 <>
                   <GitCard title="Checks">
                     <div className="space-y-3">
@@ -3807,11 +3976,12 @@ export function ProjectGitHubPanel({
                             </div>
                           </div>
 
-                          {currentChecks.checks.length === 0 ? (
+                          {currentChecks.checks.length === 0 && (
                             <div className="rounded border border-border bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
                               No GitHub checks were found for {checksScopeLabel(currentChecks)}.
                             </div>
-                          ) : (
+                          )}
+                          {currentChecks.checks.length > 0 && (
                             <div className="space-y-2">
                               {currentChecks.checks.map((check) => (
                                 <div
@@ -3890,6 +4060,7 @@ export function ProjectGitHubPanel({
             </div>
           </div>
         )}
+        {!open && <ClosedGitHubPanelButton onOpen={() => setOpen(true)} />}
       </aside>
     </>
   );
