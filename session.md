@@ -16,8 +16,8 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-20
-- **Session:** Implemented the first Project Experience `.4` pass for local IDE handoff copy,
-  fallback behavior, bridge detection, documentation, and regression coverage.
+- **Session:** Finished manual-test follow-up for Project Experience `.4`, including devtools
+  development workflow, stale error-banner fix, and diagnostics/observability backlog refinement.
 - **Branch:** `jwill9999/project-experience-ide-handoff`
 - **Base:** branched from `jwill9999/project-experience-capability-metadata`, which contains
   completed Project Experience `.1` and `.2` work.
@@ -62,6 +62,13 @@ and actionable.
 - Added web unit coverage proving folder selection and local IDE handoff are detected separately.
 - Documented `AGENT_PLATFORM_DESKTOP_IDE_COMMAND` and
   `AGENT_PLATFORM_DESKTOP_TEST_OPEN_IDE` in `docs/configuration.md`.
+- User manually confirmed `Open local IDE` works as expected.
+- `make electron:local` now enables development-only Electron DevTools through
+  `AGENT_PLATFORM_DESKTOP_DEVTOOLS=1`; user manually confirmed DevTools works.
+- User retested opening an existing Project and currently sees no UI error and no obvious log error.
+  The earlier `Request failed (500)` banner is most likely a stale UI banner: the global banner
+  combined load/session/chat errors, but dismiss only cleared chat error. `apps/web/app/page.tsx` now
+  clears load, session, and chat errors together.
 
 **Project Experience Task 4 Verification:**
 
@@ -88,6 +95,19 @@ and actionable.
   rate-limit/context diagnostics.
 - Parked for now because self-hosted runner validation is unavailable; keep it as a P1 follow-up.
 
+**Developer Diagnostics And Observability:**
+
+- Beads issue `agent-platform-llm-observability-export` is now P1 and retitled
+  `Add developer diagnostics and LLM observability export`.
+- Spec now separates general app observability from agent/LLM observability:
+  Electron/Next/API logs, request failures, metrics, traces, crashes, and desktop diagnostics vs.
+  prompt assembly, context windows, memory retrieval, model calls, token usage, tool calls, and agent
+  run timelines.
+- Refinement gate added before implementation: choose concrete tooling, define data/redaction policy,
+  environment controls, implementation increment, and Definition of Done.
+- Candidate general observability stack: OpenTelemetry Collector, SigNoz, Grafana Loki/Grafana, and
+  Sentry-compatible error tooling. Candidate AI observability stack: Phoenix, Langfuse, Helicone.
+
 ## Product Direction
 
 - Current visible workspace surfaces are:
@@ -100,10 +120,10 @@ and actionable.
 
 ## Next
 
-1. Manual test `.4`: open an existing Coding Project, click `Open local IDE`, confirm the local IDE
-   or system folder opener launches, then return to Agent Platform and confirm Project Chat/session
-   context remains intact.
+1. Run final `.4` checks for the user/devtools/stale-banner changes, then commit and push the branch.
 2. Review whether `.4` needs a future preferred-IDE settings picker task; current implementation
    uses configured command, detected common IDEs, then system folder fallback.
 3. Keep `agent-platform-context-optimisation` queued as P1 once runner validation is available or
    the issue starts blocking Project Chat again.
+4. Before implementing observability export, refine
+   `agent-platform-llm-observability-export` into a concrete implementation plan and DoD.

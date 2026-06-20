@@ -218,14 +218,18 @@ test.describe('Electron Project access', () => {
       const composerBox = await composer.boundingBox();
       expect(terminalBox?.y).toBeGreaterThan((composerBox?.y ?? 0) + (composerBox?.height ?? 0));
       await expect(projectTerminal).toContainText(firstProjectDir, { timeout: 10_000 });
+      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
+      await expect(gitPanel).toBeVisible();
       writeFileSync(join(firstProjectDir, 'scratch.txt'), 'scratch\n');
+      await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
+      await expect(gitPanel.getByText('1 change', { exact: true })).toBeVisible({
+        timeout: 10_000,
+      });
       await expect(
         page.getByRole('combobox', {
           name: /Branch switching is disabled because this Project has uncommitted changes/,
         }),
       ).toBeDisabled({ timeout: 10_000 });
-      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
-      await expect(gitPanel).toBeVisible();
       await expect(gitPanel.getByText('Git & GitHub')).toBeVisible();
       await expect(gitPanel.getByText('agent-platform')).toBeVisible();
       await expect(gitPanel.getByText('feature/e2e-branch')).toBeVisible();

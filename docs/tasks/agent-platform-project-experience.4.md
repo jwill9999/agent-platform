@@ -61,10 +61,10 @@ Keep Beads dependencies aligned with this table.
 
 ## Definition Of Done
 
-- [ ] External/default IDE handoff is polished and opens only after explicit user action from
+- [x] External/default IDE handoff is polished and opens only after explicit user action from
       Project context.
-- [ ] Handoff uses the Electron-selected Project without asking the user to type a path.
-- [ ] Agent Platform preserves Project/session/conversation context after handoff.
-- [ ] Any remaining built-in file view is secondary and uses the same backend Project id/root as
+- [x] Handoff uses the Electron-selected Project without asking the user to type a path.
+- [x] Agent Platform preserves Project/session/conversation context after handoff.
+- [x] Any remaining built-in file view is secondary and uses the same backend Project id/root as
       Project Chat.
-- [ ] Handoff and file-view labels use Project/folder terminology.
+- [x] Handoff and file-view labels use Project/folder terminology.

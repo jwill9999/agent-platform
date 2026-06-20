@@ -165,7 +165,7 @@ deps\:check-cycles:
 electron-local:
 	@mkdir -p "$(dir $(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH))"
 	@[ -s "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)" ] || openssl rand -base64 32 > "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)"
-	SECRETS_MASTER_KEY="$$(cat "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)")" pnpm --filter @agent-platform/desktop run start:renderer
+	AGENT_PLATFORM_DESKTOP_DEVTOOLS=1 SECRETS_MASTER_KEY="$$(cat "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)")" pnpm --filter @agent-platform/desktop run start:renderer
 
 # ---------------------------------------------------------------------------
 # Help

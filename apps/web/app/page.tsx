@@ -1530,6 +1530,8 @@ export default function HomePage() {
         <ErrorBanner
           message={alertMessage}
           onDismiss={() => {
+            setLoadError(null);
+            setSessionError(null);
             setError(null);
           }}
         />
