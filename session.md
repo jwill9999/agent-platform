@@ -16,11 +16,12 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-20
-- **Session:** Closed `agent-platform-project-experience.2` after manual testing and kept the
-  long-session LLM failure tracked separately as P1 context optimisation.
-- **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch contains completed Project Experience `.1` and `.2` work. Next
-  implementation should branch from here for context optimisation before `.4`.
+- **Session:** Closed `agent-platform-project-experience.2`, parked context optimisation as a P1
+  follow-up while self-hosted runner validation is unavailable, and branched/claimed Project
+  Experience `.4`.
+- **Branch:** `jwill9999/project-experience-ide-handoff`
+- **Base:** branched from `jwill9999/project-experience-capability-metadata`, which contains
+  completed Project Experience `.1` and `.2` work.
 
 ## Current State
 
@@ -50,6 +51,14 @@ and actionable.
 - Note: running the Electron E2E under Node 25 fails before UI launch because native
   `better-sqlite3` bindings are built for Node 24. Use the repo Node 24 baseline.
 
+**Project Experience Task 4:**
+
+- Beads issue `agent-platform-project-experience.4` is claimed/in progress.
+- Scope: polish and verify external/default IDE handoff from Project Chat.
+- Acceptance focus: explicit IDE handoff, Electron-selected Project folder only, session/context
+  continuity, clear unavailable/fallback states, and any remaining built-in file view stays
+  secondary and Project-bound.
+
 **Context Optimisation:**
 
 - Beads issue `agent-platform-context-optimisation` is now P1.
@@ -59,6 +68,7 @@ and actionable.
 - Current implementation has an 8k approximate context window, but still needs durable compaction,
   bounded tool-output replay, stale-session handling, explicit output-token caps, and clearer
   rate-limit/context diagnostics.
+- Parked for now because self-hosted runner validation is unavailable; keep it as a P1 follow-up.
 
 ## Product Direction
 
@@ -72,9 +82,8 @@ and actionable.
 
 ## Next
 
-1. Branch from `jwill9999/project-experience-capability-metadata` for
-   `agent-platform-context-optimisation`.
-2. Claim and implement `agent-platform-context-optimisation` before expanding deeper Project Chat
-   surfaces.
-3. Continue Project Experience with `.4` only after the context failure mode is handled or explicitly
-   deferred again.
+1. Review `.4` code paths for external IDE detection/opening, fallback messages, and session
+   continuity.
+2. Implement focused `.4` fixes and tests.
+3. Keep `agent-platform-context-optimisation` queued as P1 once runner validation is available or
+   the issue starts blocking Project Chat again.
