@@ -15,19 +15,18 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-18
-- **Session:** Reviewed manual Project Experience feedback, identified long-session context replay as
-  the current LLM failure mode, raised context optimisation to P1, and added E2E coverage for the
-  simplified Workspaces entry screen.
+- **Date:** 2026-06-20
+- **Session:** Closed `agent-platform-project-experience.2` after manual testing and kept the
+  long-session LLM failure tracked separately as P1 context optimisation.
 - **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current Project Experience task branch; task 2 remains in progress until final manual
-  feedback is accepted or filed as follow-up work.
+- **Base:** current branch contains completed Project Experience `.1` and `.2` work. Next
+  implementation should branch from here for context optimisation before `.4`.
 
 ## Current State
 
 **Project Experience Task 2:**
 
-- Beads issue `agent-platform-project-experience.2` is claimed/in progress.
+- Beads issue `agent-platform-project-experience.2` is closed.
 - Workspaces now presents two main choices: `Chat` and `Coding Project`.
 - The previous separate `New Project` and `Open Project` cards are collapsed into the single
   `Coding Project` entry with `New project` and `Open folder` actions.
@@ -73,8 +72,9 @@ and actionable.
 
 ## Next
 
-1. Finish reviewing any remaining manual feedback for `agent-platform-project-experience.2`.
-2. If no more UI issues are found, close `agent-platform-project-experience.2`.
-3. Pick up `agent-platform-context-optimisation` before expanding deeper Project Chat surfaces.
-4. Continue Project Experience with `.4` only after the context failure mode is handled or explicitly
+1. Branch from `jwill9999/project-experience-capability-metadata` for
+   `agent-platform-context-optimisation`.
+2. Claim and implement `agent-platform-context-optimisation` before expanding deeper Project Chat
+   surfaces.
+3. Continue Project Experience with `.4` only after the context failure mode is handled or explicitly
    deferred again.
