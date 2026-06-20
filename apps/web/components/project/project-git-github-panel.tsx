@@ -2043,7 +2043,7 @@ function ConflictResolverSidebar({
 
         <div className="rounded border border-border bg-background px-3 py-3 text-xs text-muted-foreground">
           <div className="mb-2">
-            You can also open the project in your IDE if a file needs deeper edits.
+            You can also open this Project folder in your local IDE if a file needs deeper edits.
           </div>
           <Button
             type="button"
@@ -2055,7 +2055,7 @@ function ConflictResolverSidebar({
               runAsyncAction(openProjectInSystemIde);
             }}
           >
-            Open in IDE
+            Open local IDE
           </Button>
         </div>
       </div>
@@ -3057,7 +3057,9 @@ export function ProjectGitHubPanel({
     if (!projectId) return;
     const result = await openDesktopProjectIde(projectId);
     if (!result) {
-      setError('Open in IDE is available in the desktop app when a Project folder is connected.');
+      setError(
+        'Open local IDE is available in the desktop app when a Project folder is connected.',
+      );
       return;
     }
     if (!result.handled) {

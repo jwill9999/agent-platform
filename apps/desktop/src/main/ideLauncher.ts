@@ -20,11 +20,14 @@ type LaunchAttempt = Readonly<{
   opener: string;
 }>;
 
+export type DesktopIdeLaunchAttempt = LaunchAttempt;
+
 export async function openProjectRootInIde(input: {
   readonly projectRoot: string | undefined;
   readonly env: NodeJS.ProcessEnv;
   readonly platform: NodeJS.Platform;
   readonly shell: Pick<Shell, 'openPath'>;
+  readonly launchAttempt?: (attempt: DesktopIdeLaunchAttempt) => Promise<boolean>;
 }): Promise<DesktopIdeLaunchResult> {
   const projectRoot = input.projectRoot?.trim();
   if (!projectRoot) {
@@ -43,8 +46,9 @@ export async function openProjectRootInIde(input: {
     ...defaultIdeLaunchAttempts(projectRoot, input.platform),
   ];
 
+  const launchAttempt = input.launchAttempt ?? tryLaunch;
   for (const attempt of attempts) {
-    if (await tryLaunch(attempt)) {
+    if (await launchAttempt(attempt)) {
       return { ok: true, handled: true, projectRoot, opener: attempt.opener };
     }
   }
@@ -57,7 +61,7 @@ export async function openProjectRootInIde(input: {
   return {
     ok: true,
     handled: false,
-    reason: `No IDE launcher succeeded. System fallback failed: ${openPathError}`,
+    reason: `No local IDE or system folder opener succeeded. System fallback failed: ${openPathError}`,
   };
 }
 

@@ -70,6 +70,7 @@ import {
   bindProjectSession,
   createAndRegisterDesktopProject,
   hasDesktopProjectBridge,
+  hasDesktopProjectIdeBridge,
   loadRecentDesktopProjects,
   openDesktopProjectIde,
   selectAndRegisterDesktopProject,
@@ -106,6 +107,7 @@ type ProjectChatHeaderProps = Readonly<{
   onReturnHome: () => void;
   terminalOpen: boolean;
   onToggleTerminal: () => void;
+  canOpenIde: boolean;
   isOpeningIde: boolean;
   onOpenIde: () => void;
 }>;
@@ -530,6 +532,7 @@ function ProjectChatHeader({
   onReturnHome,
   terminalOpen,
   onToggleTerminal,
+  canOpenIde,
   isOpeningIde,
   onOpenIde,
 }: ProjectChatHeaderProps) {
@@ -576,10 +579,14 @@ function ProjectChatHeader({
         variant="outline"
         className="shrink-0"
         onClick={onOpenIde}
-        disabled={isOpeningIde}
-        title="Open this Project folder in your system IDE"
+        disabled={!canOpenIde || isOpeningIde}
+        title={
+          canOpenIde
+            ? 'Open this Project folder in your local IDE'
+            : 'Open local IDE is available in the desktop app when a Project folder is connected'
+        }
       >
-        {isOpeningIde ? 'Opening...' : 'Open in IDE'}
+        {isOpeningIde ? 'Opening...' : 'Open local IDE'}
       </Button>
     </div>
   );
@@ -604,6 +611,8 @@ export default function HomePage() {
   const [sensorError, setSensorError] = useState<string | null>(null);
   const [commandRunnerHealth, setCommandRunnerHealth] = useState<CommandRunnerDisplay | null>(null);
   const [isDesktopProjectBridgeAvailable, setIsDesktopProjectBridgeAvailable] = useState(false);
+  const [isDesktopProjectIdeBridgeAvailable, setIsDesktopProjectIdeBridgeAvailable] =
+    useState(false);
   const [isOpeningProject, setIsOpeningProject] = useState(false);
   const [isOpeningProjectIde, setIsOpeningProjectIde] = useState(false);
   const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
@@ -688,6 +697,7 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsDesktopProjectBridgeAvailable(hasDesktopProjectBridge());
+    setIsDesktopProjectIdeBridgeAvailable(hasDesktopProjectIdeBridge());
   }, []);
 
   const refreshSensors = useCallback(async (id: string, retry = false) => {
@@ -1440,12 +1450,18 @@ export default function HomePage() {
 
   const handleOpenProjectIde = useCallback(() => {
     if (!activeProject?.id) return;
+    if (!hasDesktopProjectIdeBridge()) {
+      setError(
+        'Open local IDE is available in the desktop app when a Project folder is connected.',
+      );
+      return;
+    }
     setIsOpeningProjectIde(true);
     openDesktopProjectIde(activeProject.id)
       .then((result) => {
         if (!result) {
           setError(
-            'Open in IDE is available in the desktop app when a Project folder is connected.',
+            'Open local IDE is available in the desktop app when a Project folder is connected.',
           );
           return;
         }
@@ -1454,7 +1470,7 @@ export default function HomePage() {
         }
       })
       .catch(() => {
-        setError('Failed to open the Project folder in your system IDE.');
+        setError('Failed to open the Project folder in your local IDE.');
       })
       .finally(() => {
         setIsOpeningProjectIde(false);
@@ -1547,6 +1563,7 @@ export default function HomePage() {
               onReturnHome={handleReturnHome}
               terminalOpen={projectTerminalOpen}
               onToggleTerminal={() => setProjectTerminalOpen((open) => !open)}
+              canOpenIde={isDesktopProjectIdeBridgeAvailable}
               isOpeningIde={isOpeningProjectIde}
               onOpenIde={handleOpenProjectIde}
             />

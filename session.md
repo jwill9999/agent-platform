@@ -16,9 +16,8 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-06-20
-- **Session:** Closed `agent-platform-project-experience.2`, parked context optimisation as a P1
-  follow-up while self-hosted runner validation is unavailable, and branched/claimed Project
-  Experience `.4`.
+- **Session:** Implemented the first Project Experience `.4` pass for local IDE handoff copy,
+  fallback behavior, bridge detection, documentation, and regression coverage.
 - **Branch:** `jwill9999/project-experience-ide-handoff`
 - **Base:** branched from `jwill9999/project-experience-capability-metadata`, which contains
   completed Project Experience `.1` and `.2` work.
@@ -54,10 +53,29 @@ and actionable.
 **Project Experience Task 4:**
 
 - Beads issue `agent-platform-project-experience.4` is claimed/in progress.
-- Scope: polish and verify external/default IDE handoff from Project Chat.
-- Acceptance focus: explicit IDE handoff, Electron-selected Project folder only, session/context
-  continuity, clear unavailable/fallback states, and any remaining built-in file view stays
-  secondary and Project-bound.
+- Implemented `Open local IDE` copy in Project Chat and the Git conflict resolver so the handoff is
+  clearly a local editor/folder handoff, not the internal `/ide` workbench.
+- Split desktop Project folder bridge detection from IDE handoff bridge detection, so stale or
+  partial preload bridges show the right unavailable state.
+- Added launcher unit coverage for unavailable Project folders, E2E test override, configured IDE
+  command precedence, system folder fallback, and no-opener fallback copy.
+- Added web unit coverage proving folder selection and local IDE handoff are detected separately.
+- Documented `AGENT_PLATFORM_DESKTOP_IDE_COMMAND` and
+  `AGENT_PLATFORM_DESKTOP_TEST_OPEN_IDE` in `docs/configuration.md`.
+
+**Project Experience Task 4 Verification:**
+
+- Passed: `pnpm --filter @agent-platform/desktop run test -- test/ideLauncher.test.ts`.
+- Passed: `pnpm --filter @agent-platform/web run test -- test/desktop-projects.test.ts`.
+- Passed: `pnpm --filter @agent-platform/desktop run typecheck`.
+- Passed: `pnpm --filter @agent-platform/web run typecheck`.
+- Passed: `pnpm --filter @agent-platform/desktop run lint`.
+- Passed: `pnpm --filter @agent-platform/web run lint`.
+- Passed: `pnpm format:check`.
+- Passed: `pnpm docs:lint:md`.
+- Passed: `git diff --check`.
+- Passed: `pnpm --filter @agent-platform/desktop run test:e2e -- project-access.e2e.ts project-git-workflow.e2e.ts`
+  (4/4 Electron tests).
 
 **Context Optimisation:**
 
@@ -82,8 +100,10 @@ and actionable.
 
 ## Next
 
-1. Review `.4` code paths for external IDE detection/opening, fallback messages, and session
-   continuity.
-2. Implement focused `.4` fixes and tests.
+1. Manual test `.4`: open an existing Coding Project, click `Open local IDE`, confirm the local IDE
+   or system folder opener launches, then return to Agent Platform and confirm Project Chat/session
+   context remains intact.
+2. Review whether `.4` needs a future preferred-IDE settings picker task; current implementation
+   uses configured command, detected common IDEs, then system folder fallback.
 3. Keep `agent-platform-context-optimisation` queued as P1 once runner validation is available or
    the issue starts blocking Project Chat again.

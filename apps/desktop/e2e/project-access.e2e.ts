@@ -284,7 +284,7 @@ test.describe('Electron Project access', () => {
       expect(project.metadata.activeBranch).toBe('feature/e2e-branch');
       const session = await findProjectSession(backendPort, project.id);
       expect(session.mode).toBe('project');
-      await expect(page.getByRole('button', { name: 'Open in IDE' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open local IDE' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Open IDE' })).toHaveCount(0);
 
       await sendChatMessage(page, '/help', 'Ask about this Project...');
@@ -361,9 +361,9 @@ test.describe('Electron Project access', () => {
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
       await expect(page.getByText(secondProjectDir)).toHaveCount(0);
-      await page.getByRole('button', { name: 'Open in IDE' }).click();
+      await page.getByRole('button', { name: 'Open local IDE' }).click();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
-      await expect(page.getByText(/Open in IDE is available/)).toHaveCount(0);
+      await expect(page.getByText(/Open local IDE is available/)).toHaveCount(0);
       await expect(page.getByText(/Project folder is unavailable/)).toHaveCount(0);
       await expect(page.getByText(/Failed to open the Project folder/)).toHaveCount(0);
 
@@ -375,9 +375,9 @@ test.describe('Electron Project access', () => {
       await expect(page.getByRole('button', { name: 'Reject draft' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
 
-      await page.getByRole('button', { name: 'Open in IDE' }).click();
+      await page.getByRole('button', { name: 'Open local IDE' }).click();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
-      await expect(page.getByText(/Open in IDE is available/)).toHaveCount(0);
+      await expect(page.getByText(/Open local IDE is available/)).toHaveCount(0);
       await expect(page.getByText(/Project folder is unavailable/)).toHaveCount(0);
       await expect(page.getByText(/Failed to open the Project folder/)).toHaveCount(0);
 
