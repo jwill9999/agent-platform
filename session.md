@@ -15,9 +15,9 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-20
-- **Session:** Finished manual-test follow-up for Project Experience `.4`, including devtools
-  development workflow, stale error-banner fix, and diagnostics/observability backlog refinement.
+- **Date:** 2026-07-15
+- **Session:** Fixed PR #238 browser E2E for the current desktop-only local IDE handoff state and
+  verified the CI-matched Playwright suite passes 21/21.
 - **Branch:** `jwill9999/project-experience-ide-handoff`
 - **Base:** branched from `jwill9999/project-experience-capability-metadata`, which contains
   completed Project Experience `.1` and `.2` work.
@@ -72,6 +72,14 @@ and actionable.
 
 **Project Experience Task 4 Verification:**
 
+- Updated `e2e/ide-project-opening-parked.spec.ts` to assert that `Open local IDE` is visible and
+  disabled when the browser has folder selection but no desktop IDE bridge.
+- Added the required Gherkin E2E strategy to the task spec.
+- Passed: full browser Playwright E2E with CI's two-worker setting (21/21).
+- Passed: focused parked IDE Playwright E2E (6/6).
+- Passed: `pnpm typecheck`, `pnpm lint`, Prettier, markdownlint, and `git diff --check`.
+- Sonar MCP analysis was attempted twice but timed out during server initialization; fallback gates
+  passed with no errors.
 - Passed: `pnpm --filter @agent-platform/desktop run test -- test/ideLauncher.test.ts`.
 - Passed: `pnpm --filter @agent-platform/web run test -- test/desktop-projects.test.ts`.
 - Passed: `pnpm --filter @agent-platform/desktop run typecheck`.
@@ -120,7 +128,8 @@ and actionable.
 
 ## Next
 
-1. Run final `.4` checks for the user/devtools/stale-banner changes, then commit and push the branch.
+1. Monitor PR #238 checks after commit `d1376be`; close `.4` when required CI is green or the
+   packaged macOS VM infrastructure failure is explicitly dispositioned.
 2. Review whether `.4` needs a future preferred-IDE settings picker task; current implementation
    uses configured command, detected common IDEs, then system folder fallback.
 3. Keep `agent-platform-context-optimisation` queued as P1 once runner validation is available or
