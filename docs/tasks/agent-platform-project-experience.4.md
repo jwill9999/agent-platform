@@ -59,6 +59,25 @@ Keep Beads dependencies aligned with this table.
   manual absolute path entry.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Local IDE handoff from Project Chat
+
+  Scenario: Browser mode exposes the unavailable local IDE handoff state
+    Given a Project is opened through a desktop folder-selection bridge without an IDE bridge
+    When Project Chat is displayed
+    Then the Open local IDE action is visible and disabled
+    And the active Project and Project Chat context remain visible
+    And the app does not navigate to the built-in IDE route
+
+  Scenario: Desktop mode opens the active Project in a local IDE
+    Given a desktop Project and IDE handoff bridge are available
+    When the user activates Open local IDE
+    Then the active Project folder is passed to the desktop launcher
+    And the active Project, session, and conversation remain unchanged
+```
+
 ## Definition Of Done
 
 - [x] External/default IDE handoff is polished and opens only after explicit user action from

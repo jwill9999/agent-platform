@@ -40,14 +40,9 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page.getByText(backendProjectRoot)).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Open in IDE' })).toBeVisible();
-
-      await page.getByRole('button', { name: 'Open in IDE' }).click();
-      await expect(
-        page.getByText(
-          'Open in IDE is available in the desktop app when a Project folder is connected.',
-        ),
-      ).toBeVisible();
+      const openLocalIdeButton = page.getByRole('button', { name: 'Open local IDE' });
+      await expect(openLocalIdeButton).toBeVisible();
+      await expect(openLocalIdeButton).toBeDisabled();
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(projectName).first()).toBeVisible();
       await expect(page.getByText('Project / Chat', { exact: true })).toBeVisible();
