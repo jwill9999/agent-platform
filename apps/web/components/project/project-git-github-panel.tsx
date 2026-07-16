@@ -4191,7 +4191,7 @@ export function ProjectGitHubPanel({
                             <div className="space-y-3 rounded border border-border bg-background px-3 py-3">
                               <div>
                                 <div className="font-medium">Create a pull request</div>
-                                <p className="mt-1 text-xs text-muted-foreground">
+                              <p className="mt-1 text-xs text-muted-foreground">
                                   Choose the target branch before creating a pull request for{' '}
                                   {currentStatus.currentBranch}.
                                 </p>
