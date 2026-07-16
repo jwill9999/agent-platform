@@ -16,6 +16,7 @@ dist/
 playwright-report/
 test-results/
 .playwright-mcp/
+output/
 .agent-platform/
 apps/desktop/native/macos-vm-runner/.build/
 apps/desktop/resources/macos-vm/

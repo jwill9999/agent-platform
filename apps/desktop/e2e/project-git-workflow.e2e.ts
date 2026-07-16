@@ -223,7 +223,7 @@ test.describe('Electron Project Git workflow panel', () => {
       });
       const conflictResolver = page.getByRole('dialog', { name: 'Merge conflict resolver' });
       await expect(page.getByRole('button', { name: /README\.md/ })).toBeVisible();
-      await expect(conflictResolver.getByRole('button', { name: 'Open in IDE' })).toBeVisible();
+      await expect(conflictResolver.getByRole('button', { name: 'Open local IDE' })).toBeVisible();
       await expect(page.getByText('Current local line', { exact: true })).toBeVisible();
       await expect(page.getByText('Incoming remote line', { exact: true })).toBeVisible();
 

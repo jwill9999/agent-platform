@@ -51,6 +51,10 @@ export function hasDesktopProjectCreationBridge(): boolean {
   return Boolean(getDesktopProjectBridge()?.projects?.createFolder);
 }
 
+export function hasDesktopProjectIdeBridge(): boolean {
+  return Boolean(getDesktopProjectBridge()?.projects?.openInIde);
+}
+
 export function hasDesktopTerminalBridge(): boolean {
   const terminal = getDesktopProjectBridge()?.terminal;
   return Boolean(

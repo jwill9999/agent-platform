@@ -218,14 +218,18 @@ test.describe('Electron Project access', () => {
       const composerBox = await composer.boundingBox();
       expect(terminalBox?.y).toBeGreaterThan((composerBox?.y ?? 0) + (composerBox?.height ?? 0));
       await expect(projectTerminal).toContainText(firstProjectDir, { timeout: 10_000 });
+      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
+      await expect(gitPanel).toBeVisible();
       writeFileSync(join(firstProjectDir, 'scratch.txt'), 'scratch\n');
+      await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
+      await expect(gitPanel.getByText('1 change', { exact: true })).toBeVisible({
+        timeout: 10_000,
+      });
       await expect(
         page.getByRole('combobox', {
           name: /Branch switching is disabled because this Project has uncommitted changes/,
         }),
       ).toBeDisabled({ timeout: 10_000 });
-      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
-      await expect(gitPanel).toBeVisible();
       await expect(gitPanel.getByText('Git & GitHub')).toBeVisible();
       await expect(gitPanel.getByText('agent-platform')).toBeVisible();
       await expect(gitPanel.getByText('feature/e2e-branch')).toBeVisible();
@@ -284,7 +288,7 @@ test.describe('Electron Project access', () => {
       expect(project.metadata.activeBranch).toBe('feature/e2e-branch');
       const session = await findProjectSession(backendPort, project.id);
       expect(session.mode).toBe('project');
-      await expect(page.getByRole('button', { name: 'Open in IDE' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open local IDE' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Open IDE' })).toHaveCount(0);
 
       await sendChatMessage(page, '/help', 'Ask about this Project...');
@@ -361,9 +365,9 @@ test.describe('Electron Project access', () => {
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
       await expect(page.getByText(secondProjectDir)).toHaveCount(0);
-      await page.getByRole('button', { name: 'Open in IDE' }).click();
+      await page.getByRole('button', { name: 'Open local IDE' }).click();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
-      await expect(page.getByText(/Open in IDE is available/)).toHaveCount(0);
+      await expect(page.getByText(/Open local IDE is available/)).toHaveCount(0);
       await expect(page.getByText(/Project folder is unavailable/)).toHaveCount(0);
       await expect(page.getByText(/Failed to open the Project folder/)).toHaveCount(0);
 
@@ -375,9 +379,9 @@ test.describe('Electron Project access', () => {
       await expect(page.getByRole('button', { name: 'Reject draft' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
 
-      await page.getByRole('button', { name: 'Open in IDE' }).click();
+      await page.getByRole('button', { name: 'Open local IDE' }).click();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
-      await expect(page.getByText(/Open in IDE is available/)).toHaveCount(0);
+      await expect(page.getByText(/Open local IDE is available/)).toHaveCount(0);
       await expect(page.getByText(/Project folder is unavailable/)).toHaveCount(0);
       await expect(page.getByText(/Failed to open the Project folder/)).toHaveCount(0);
 

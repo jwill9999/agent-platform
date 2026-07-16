@@ -15,12 +15,12 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-06-20
-- **Session:** Closed `agent-platform-project-experience.2` after manual testing and kept the
-  long-session LLM failure tracked separately as P1 context optimisation.
-- **Branch:** `jwill9999/project-experience-capability-metadata`
-- **Base:** current branch contains completed Project Experience `.1` and `.2` work. Next
-  implementation should branch from here for context optimisation before `.4`.
+- **Date:** 2026-07-15
+- **Session:** Fixed PR #238 browser E2E for the current desktop-only local IDE handoff state and
+  verified the CI-matched Playwright suite passes 21/21.
+- **Branch:** `jwill9999/project-experience-ide-handoff`
+- **Base:** branched from `jwill9999/project-experience-capability-metadata`, which contains
+  completed Project Experience `.1` and `.2` work.
 
 ## Current State
 
@@ -50,6 +50,48 @@ and actionable.
 - Note: running the Electron E2E under Node 25 fails before UI launch because native
   `better-sqlite3` bindings are built for Node 24. Use the repo Node 24 baseline.
 
+**Project Experience Task 4:**
+
+- Beads issue `agent-platform-project-experience.4` is claimed/in progress.
+- Implemented `Open local IDE` copy in Project Chat and the Git conflict resolver so the handoff is
+  clearly a local editor/folder handoff, not the internal `/ide` workbench.
+- Split desktop Project folder bridge detection from IDE handoff bridge detection, so stale or
+  partial preload bridges show the right unavailable state.
+- Added launcher unit coverage for unavailable Project folders, E2E test override, configured IDE
+  command precedence, system folder fallback, and no-opener fallback copy.
+- Added web unit coverage proving folder selection and local IDE handoff are detected separately.
+- Documented `AGENT_PLATFORM_DESKTOP_IDE_COMMAND` and
+  `AGENT_PLATFORM_DESKTOP_TEST_OPEN_IDE` in `docs/configuration.md`.
+- User manually confirmed `Open local IDE` works as expected.
+- `make electron:local` now enables development-only Electron DevTools through
+  `AGENT_PLATFORM_DESKTOP_DEVTOOLS=1`; user manually confirmed DevTools works.
+- User retested opening an existing Project and currently sees no UI error and no obvious log error.
+  The earlier `Request failed (500)` banner is most likely a stale UI banner: the global banner
+  combined load/session/chat errors, but dismiss only cleared chat error. `apps/web/app/page.tsx` now
+  clears load, session, and chat errors together.
+
+**Project Experience Task 4 Verification:**
+
+- Updated `e2e/ide-project-opening-parked.spec.ts` to assert that `Open local IDE` is visible and
+  disabled when the browser has folder selection but no desktop IDE bridge.
+- Added the required Gherkin E2E strategy to the task spec.
+- Passed: full browser Playwright E2E with CI's two-worker setting (21/21).
+- Passed: focused parked IDE Playwright E2E (6/6).
+- Passed: `pnpm typecheck`, `pnpm lint`, Prettier, markdownlint, and `git diff --check`.
+- Sonar MCP analysis was attempted twice but timed out during server initialization; fallback gates
+  passed with no errors.
+- Passed: `pnpm --filter @agent-platform/desktop run test -- test/ideLauncher.test.ts`.
+- Passed: `pnpm --filter @agent-platform/web run test -- test/desktop-projects.test.ts`.
+- Passed: `pnpm --filter @agent-platform/desktop run typecheck`.
+- Passed: `pnpm --filter @agent-platform/web run typecheck`.
+- Passed: `pnpm --filter @agent-platform/desktop run lint`.
+- Passed: `pnpm --filter @agent-platform/web run lint`.
+- Passed: `pnpm format:check`.
+- Passed: `pnpm docs:lint:md`.
+- Passed: `git diff --check`.
+- Passed: `pnpm --filter @agent-platform/desktop run test:e2e -- project-access.e2e.ts project-git-workflow.e2e.ts`
+  (4/4 Electron tests).
+
 **Context Optimisation:**
 
 - Beads issue `agent-platform-context-optimisation` is now P1.
@@ -59,6 +101,20 @@ and actionable.
 - Current implementation has an 8k approximate context window, but still needs durable compaction,
   bounded tool-output replay, stale-session handling, explicit output-token caps, and clearer
   rate-limit/context diagnostics.
+- Parked for now because self-hosted runner validation is unavailable; keep it as a P1 follow-up.
+
+**Developer Diagnostics And Observability:**
+
+- Beads issue `agent-platform-llm-observability-export` is now P1 and retitled
+  `Add developer diagnostics and LLM observability export`.
+- Spec now separates general app observability from agent/LLM observability:
+  Electron/Next/API logs, request failures, metrics, traces, crashes, and desktop diagnostics vs.
+  prompt assembly, context windows, memory retrieval, model calls, token usage, tool calls, and agent
+  run timelines.
+- Refinement gate added before implementation: choose concrete tooling, define data/redaction policy,
+  environment controls, implementation increment, and Definition of Done.
+- Candidate general observability stack: OpenTelemetry Collector, SigNoz, Grafana Loki/Grafana, and
+  Sentry-compatible error tooling. Candidate AI observability stack: Phoenix, Langfuse, Helicone.
 
 ## Product Direction
 
@@ -72,9 +128,11 @@ and actionable.
 
 ## Next
 
-1. Branch from `jwill9999/project-experience-capability-metadata` for
-   `agent-platform-context-optimisation`.
-2. Claim and implement `agent-platform-context-optimisation` before expanding deeper Project Chat
-   surfaces.
-3. Continue Project Experience with `.4` only after the context failure mode is handled or explicitly
-   deferred again.
+1. Monitor PR #238 checks after commit `d1376be`; close `.4` when required CI is green or the
+   packaged macOS VM infrastructure failure is explicitly dispositioned.
+2. Review whether `.4` needs a future preferred-IDE settings picker task; current implementation
+   uses configured command, detected common IDEs, then system folder fallback.
+3. Keep `agent-platform-context-optimisation` queued as P1 once runner validation is available or
+   the issue starts blocking Project Chat again.
+4. Before implementing observability export, refine
+   `agent-platform-llm-observability-export` into a concrete implementation plan and DoD.

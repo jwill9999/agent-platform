@@ -109,6 +109,18 @@ Keys are resolved in order of precedence:
 | `NEXT_OPENAI_API_KEY`          | No       | —                       | OpenAI key injected by the BFF chat route     |
 | `AGENT_OPENAI_API_KEY`         | No       | —                       | Fallback checked before `NEXT_OPENAI_API_KEY` |
 
+### Desktop App (`apps/desktop`)
+
+| Variable                               | Required | Default     | Description                                                                                   |
+| -------------------------------------- | -------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `AGENT_PLATFORM_DESKTOP_IDE_COMMAND`   | No       | auto-detect | Command used by **Open local IDE**. Receives the active Project folder path as its first arg. |
+| `AGENT_PLATFORM_DESKTOP_TEST_OPEN_IDE` | No       | —           | Set to `1` in Electron E2E to acknowledge the IDE handoff without launching host apps.        |
+
+When no explicit IDE command is configured, macOS desktop builds try common local editors first
+(`Visual Studio Code`, `Cursor`, `Windsurf`, `Zed`, then matching CLI commands) and fall back to
+the operating system folder opener if no editor launch succeeds. The handoff always uses the active
+Electron-selected Project folder; users should not type absolute Project paths for this flow.
+
 ---
 
 ## Model Routing

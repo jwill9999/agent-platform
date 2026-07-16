@@ -28,7 +28,7 @@ describe('desktop package scripts', () => {
     expect(startRenderer).toContain('AGENT_PLATFORM_DESKTOP_RENDERER=standalone');
   });
 
-  it('keeps make electron-local on a stable local secrets master key', () => {
+  it('keeps make electron-local on development-only devtools and a stable local secrets master key', () => {
     expect(makefile).toContain(
       'ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH ?= $(AGENT_PLATFORM_HOME)/desktop-runtime/config/secrets-master-key.b64',
     );
@@ -36,9 +36,10 @@ describe('desktop package scripts', () => {
       '[ -s "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)" ] || openssl rand -base64 32 > "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)"',
     );
     expect(makefile).toContain(
-      'SECRETS_MASTER_KEY="$$(cat "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)")" pnpm --filter @agent-platform/desktop run start:renderer',
+      'AGENT_PLATFORM_DESKTOP_DEVTOOLS=1 SECRETS_MASTER_KEY="$$(cat "$(ELECTRON_LOCAL_SECRETS_MASTER_KEY_PATH)")" pnpm --filter @agent-platform/desktop run start:renderer',
     );
     expect(makefile).not.toContain('export SECRETS_MASTER_KEY="$(openssl rand -base64 32)"');
+    expect(packageJson.scripts['start:renderer']).not.toContain('AGENT_PLATFORM_DESKTOP_DEVTOOLS');
   });
 
   it('keeps the generated CommonJS preload bridge aligned with desktop APIs', () => {
