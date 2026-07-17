@@ -48,6 +48,12 @@ and actionable.
   Project and terminal control visual baselines now pass locally; their first capture exposed and
   fixed a visually truncated `Project root` label. Keep the Bead open until CI verifies the shared
   baselines and all required checks pass.
+- PR #240's first visual-baseline CI run passed browser E2E and application verification but exposed
+  two stale Electron test definitions: Playwright rejected a non-destructured fixture argument, and
+  the packaged VM scenarios still targeted the removed runtime-oriented status label. Both tests now
+  use the current Playwright API and user-facing command status labels. The focused Electron run
+  passes 3/3 locally under Node 24, including both visual baselines and the packaged VM ready/failure
+  paths; keep the Bead open for the replacement GitHub Actions result.
 
 **Merged Verification:**
 
@@ -106,8 +112,8 @@ and actionable.
 
 ## Next
 
-1. Monitor Project Experience `.5` draft PR #240 and close the Bead only after required checks and
-   review feedback are complete.
+1. Monitor the replacement Project Experience `.5` PR #240 checks after the Electron test fix, and
+   close the Bead only after required checks and review feedback are complete.
 2. Continue the Project Experience chain with `.7` generated previews and `.8` activity/evidence;
    both are ready, while `.6` remains blocked on the remaining experience tasks.
 3. Decide whether `agent-platform-context-optimisation` should interrupt the UI chain. It remains a

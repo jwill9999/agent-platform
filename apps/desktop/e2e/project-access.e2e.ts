@@ -50,8 +50,8 @@ const VISUAL_REGRESSION_OPTIONS = {
 } as const;
 
 test.describe('Electron Project access', () => {
-  test('opens a local Project and binds chat/slash commands to the same Project session', async (_fixtures, testInfo) => {
-    testInfo.snapshotSuffix = '';
+  test('opens a local Project and binds chat/slash commands to the same Project session', async () => {
+    test.info().snapshotSuffix = '';
     const tempRoot = join(repoRoot, '.agent-platform', 'electron-e2e', String(Date.now()));
     const runtimeDir = join(tempRoot, 'runtime');
     const newProjectParentDir = join(tempRoot, 'new-projects');
