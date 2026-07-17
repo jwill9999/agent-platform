@@ -19,13 +19,14 @@ and actionable.
 - **Session:** Re-baselined Project Experience `.5` against the merged `.2` through `.4` work and
   implemented the remaining user-facing label and location-context cleanup.
 - **Branch:** `jwill9999/project-experience-label-context`
-- **Base:** `jwill9999/session-handoff-beads-closeout` (draft PR #239 against `staging`)
+- **Base:** `staging` at `e788063` after PR #239 merged
 
 ## Current State
 
 **Merged Project Experience Foundation:**
 
-- PR #236 and PR #238 are merged into `staging`; their remote topic branches were deleted.
+- PR #236, PR #238, and documentation closeout PR #239 are merged into `staging`; their remote topic
+  branches were deleted.
 - Project Experience `.1`, `.2`, `.3`, and `.4` are closed in Beads.
 - Workspaces exposes general Chat and one Coding Project entry with New project, Open folder, recent
   Project reopen, and explicit loading/error states.
@@ -43,8 +44,8 @@ and actionable.
   shows an always-visible host folder path.
 - Command readiness uses user-facing labels instead of runtime modes/messages, and the terminal
   header shows `Project root` instead of its absolute initial working directory.
-- Focused web unit, browser Playwright, and Electron Project access tests pass locally. Keep the Bead
-  open until the task branch is pushed and remote PR checks pass.
+- Focused web unit, browser Playwright, and Electron Project access tests pass locally. PR #239 has
+  merged, and draft PR #240 now targets `staging`; keep the Bead open until checks and review pass.
 
 **Merged Verification:**
 
@@ -59,8 +60,9 @@ and actionable.
 
 **Repository State:**
 
-- Remote branches are now only `main` and `staging`.
-- `staging` is 47 commits ahead of `main`.
+- Remote branches are `main`, `staging`, and the active PR #240 topic branch.
+- `staging` is 48 commits ahead of `main`.
+- Draft PR #240 is mergeable against `staging`, with required checks running.
 - No open `staging` to `main` pull request was visible at this handoff.
 
 **Context Optimisation:**
@@ -102,8 +104,8 @@ and actionable.
 
 ## Next
 
-1. Finish `agent-platform-project-experience.5`: push its task branch, open/monitor the PR, and close
-   the Bead only after required checks and review feedback are complete.
+1. Monitor Project Experience `.5` draft PR #240 and close the Bead only after required checks and
+   review feedback are complete.
 2. Continue the Project Experience chain with `.7` generated previews and `.8` activity/evidence;
    both are ready, while `.6` remains blocked on the remaining experience tasks.
 3. Decide whether `agent-platform-context-optimisation` should interrupt the UI chain. It remains a
