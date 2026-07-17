@@ -15,82 +15,42 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-07-15
-- **Session:** Fixed PR #238 browser E2E for the current desktop-only local IDE handoff state and
-  verified the CI-matched Playwright suite passes 21/21.
-- **Branch:** `jwill9999/project-experience-ide-handoff`
-- **Base:** branched from `jwill9999/project-experience-capability-metadata`, which contains
-  completed Project Experience `.1` and `.2` work.
+- **Date:** 2026-07-17
+- **Session:** Merged the capability/navigation and local IDE handoff work into `staging`, confirmed
+  CI, synchronized the local checkout, and reviewed the Project Experience Beads chain.
+- **Branch:** `staging`
+- **Commit:** `f1debb7` (`origin/staging` matches local)
 
 ## Current State
 
-**Project Experience Task 2:**
+**Merged Project Experience Foundation:**
 
-- Beads issue `agent-platform-project-experience.2` is closed.
-- Workspaces now presents two main choices: `Chat` and `Coding Project`.
-- The previous separate `New Project` and `Open Project` cards are collapsed into the single
-  `Coding Project` entry with `New project` and `Open folder` actions.
-- Sidebar Recent Projects remain available on the Workspaces surface and now show loading, empty,
-  and refresh-error states.
-- User-facing copy avoids `/workspace` or backend terminology and keeps deferred surfaces out of the
-  current navigation.
-- User manual testing is broadly positive. The remaining LLM failure appears to be session context
-  replay/token pressure, not the Workspaces navigation UI.
+- PR #236 and PR #238 are merged into `staging`; their remote topic branches were deleted.
+- Project Experience `.1`, `.2`, `.3`, and `.4` are closed in Beads.
+- Workspaces exposes general Chat and one Coding Project entry with New project, Open folder, recent
+  Project reopen, and explicit loading/error states.
+- Opening a Coding Project lands in Project Chat with Project-bound session context.
+- `Open local IDE` uses the selected Electron Project, supports configured/common IDE launchers and
+  system folder fallback, and presents explicit unavailable states in browser-only contexts.
+- User-facing Project navigation avoids `/workspace` and backend implementation terminology in the
+  surfaces covered so far.
 
-**Verification:**
+**Merged Verification:**
 
-- Added `apps/desktop/e2e/project-access.e2e.ts` assertions for the simplified Workspaces landing
-  screen: Chat, Coding Project, New project, Open folder, and no deferred workspace cards.
-- Passed: `pnpm --filter @agent-platform/web run test -- project-navigation.test.ts` (Vitest runs
-  the web test suite; 30 files / 158 tests passed).
-- Passed: `pnpm exec prettier --check apps/desktop/e2e/project-access.e2e.ts`.
-- Passed: `pnpm --filter @agent-platform/desktop run lint -- e2e/project-access.e2e.ts`.
-- Passed under Node 24:
-  `PATH="$HOME/.nvm/versions/node/v24.14.0/bin:$PATH" pnpm --filter @agent-platform/desktop run test:e2e -- project-access.e2e.ts`.
-- Note: running the Electron E2E under Node 25 fails before UI launch because native
-  `better-sqlite3` bindings are built for Node 24. Use the repo Node 24 baseline.
+- PR #238 required checks passed: browser and desktop E2E, packaged macOS VM E2E, verify, Docker,
+  CodeQL, SonarCloud, Promptfoo, dependency cycles, docs checks, GitGuardian, and Sourcery.
+- Browser Playwright passed 21/21 with the CI two-worker configuration.
+- Focused Electron Project access and Git workflow coverage passed 4/4 before merge.
+- Manual QA confirmed local IDE handoff, development DevTools, and existing Project reopen behavior.
+- The Promptfoo action is pinned to its Node 24-compatible `v0.1.8` commit. Its initial GitHub API
+  `503` passed on retry and did not reproduce in the completed scan.
+- The post-merge CodeQL run on `f1debb7` passed.
 
-**Project Experience Task 4:**
+**Repository State:**
 
-- Beads issue `agent-platform-project-experience.4` is claimed/in progress.
-- Implemented `Open local IDE` copy in Project Chat and the Git conflict resolver so the handoff is
-  clearly a local editor/folder handoff, not the internal `/ide` workbench.
-- Split desktop Project folder bridge detection from IDE handoff bridge detection, so stale or
-  partial preload bridges show the right unavailable state.
-- Added launcher unit coverage for unavailable Project folders, E2E test override, configured IDE
-  command precedence, system folder fallback, and no-opener fallback copy.
-- Added web unit coverage proving folder selection and local IDE handoff are detected separately.
-- Documented `AGENT_PLATFORM_DESKTOP_IDE_COMMAND` and
-  `AGENT_PLATFORM_DESKTOP_TEST_OPEN_IDE` in `docs/configuration.md`.
-- User manually confirmed `Open local IDE` works as expected.
-- `make electron:local` now enables development-only Electron DevTools through
-  `AGENT_PLATFORM_DESKTOP_DEVTOOLS=1`; user manually confirmed DevTools works.
-- User retested opening an existing Project and currently sees no UI error and no obvious log error.
-  The earlier `Request failed (500)` banner is most likely a stale UI banner: the global banner
-  combined load/session/chat errors, but dismiss only cleared chat error. `apps/web/app/page.tsx` now
-  clears load, session, and chat errors together.
-
-**Project Experience Task 4 Verification:**
-
-- Updated `e2e/ide-project-opening-parked.spec.ts` to assert that `Open local IDE` is visible and
-  disabled when the browser has folder selection but no desktop IDE bridge.
-- Added the required Gherkin E2E strategy to the task spec.
-- Passed: full browser Playwright E2E with CI's two-worker setting (21/21).
-- Passed: focused parked IDE Playwright E2E (6/6).
-- Passed: `pnpm typecheck`, `pnpm lint`, Prettier, markdownlint, and `git diff --check`.
-- Sonar MCP analysis was attempted twice but timed out during server initialization; fallback gates
-  passed with no errors.
-- Passed: `pnpm --filter @agent-platform/desktop run test -- test/ideLauncher.test.ts`.
-- Passed: `pnpm --filter @agent-platform/web run test -- test/desktop-projects.test.ts`.
-- Passed: `pnpm --filter @agent-platform/desktop run typecheck`.
-- Passed: `pnpm --filter @agent-platform/web run typecheck`.
-- Passed: `pnpm --filter @agent-platform/desktop run lint`.
-- Passed: `pnpm --filter @agent-platform/web run lint`.
-- Passed: `pnpm format:check`.
-- Passed: `pnpm docs:lint:md`.
-- Passed: `git diff --check`.
-- Passed: `pnpm --filter @agent-platform/desktop run test:e2e -- project-access.e2e.ts project-git-workflow.e2e.ts`
-  (4/4 Electron tests).
+- Remote branches are now only `main` and `staging`.
+- `staging` is 47 commits ahead of `main`.
+- No open `staging` to `main` pull request was visible at this handoff.
 
 **Context Optimisation:**
 
@@ -124,15 +84,20 @@ and actionable.
     activity/evidence, and external/default IDE handoff.
 - Automation, scheduled tasks, email/application workflows, docs/research workspaces, and
   generated-app workspaces remain deferred until their own product decisions and epics.
-- `.2` depends on `.1` and will simplify Workspaces/sidebar UI after capability metadata exists.
+- The completed `.1` through `.4` chain establishes capability metadata, simplified navigation,
+  Project Chat-first entry, and local IDE handoff.
+- Generated previews and activity/evidence remain required before the Project Experience epic can
+  close.
 
 ## Next
 
-1. Monitor PR #238 checks after commit `d1376be`; close `.4` when required CI is green or the
-   packaged macOS VM infrastructure failure is explicitly dispositioned.
-2. Review whether `.4` needs a future preferred-IDE settings picker task; current implementation
-   uses configured command, detected common IDEs, then system folder fallback.
-3. Keep `agent-platform-context-optimisation` queued as P1 once runner validation is available or
-   the issue starts blocking Project Chat again.
-4. Before implementing observability export, refine
-   `agent-platform-llm-observability-export` into a concrete implementation plan and DoD.
+1. Review and claim `agent-platform-project-experience.5`, now unblocked: audit remaining Project
+   labels and add quiet location context only where navigation is ambiguous.
+2. Continue the Project Experience chain with `.7` generated previews and `.8` activity/evidence;
+   both are ready, while `.6` remains blocked on the remaining experience tasks.
+3. Decide whether `agent-platform-context-optimisation` should interrupt the UI chain. It remains a
+   P1 due to demonstrated stale-session replay and token-pressure failures.
+4. Refine `agent-platform-llm-observability-export` before implementation; its tooling, redaction,
+   deployment, and first-increment decisions are still open.
+5. Keep macOS signing/notarization release tasks open until real signed and notarized artifact
+   evidence exists; staging capability does not satisfy the production release hold.
