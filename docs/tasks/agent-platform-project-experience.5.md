@@ -67,6 +67,9 @@ Keep Beads dependencies aligned with this table.
 - Component tests for breadcrumb labels and Project status copy.
 - Playwright: verify Project and secondary surfaces do not expose `/workspace` or backend
   accessibility in primary UI and verify breadcrumbs navigate back as expected.
+- Electron visual regression baselines for the Project controls and terminal controls, using
+  deterministic content, animations and caret rendering disabled, and a 1% maximum pixel-difference
+  ratio for cross-platform font rendering.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
 ### Playwright Scenario
@@ -81,6 +84,7 @@ Feature: Project location context without runtime path leakage
     When the Project terminal is opened
     Then the terminal location is shown as Project root
     And the application chrome does not show /workspace, the backend root, or the host Project root
+    And the Project and terminal controls match their approved visual baselines
     When the user selects Workspaces in the breadcrumb
     Then the workspace chooser is visible
 ```
@@ -91,3 +95,4 @@ Feature: Project location context without runtime path leakage
 - [ ] Project and secondary-surface labels show user-relevant Project/folder context.
 - [ ] Breadcrumbs or equivalent quiet location context exists where current navigation is ambiguous.
 - [ ] Font sizing matches existing compact navigation scale.
+- [ ] Project and terminal control visual-regression baselines pass in Electron E2E.

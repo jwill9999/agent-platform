@@ -318,6 +318,7 @@ export function ProjectTerminalDock({
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
   const activeState = activeTab?.state ?? 'closed';
   const locationLabel = projectTerminalLocationLabel(activeTab?.cwd);
+  const locationTitle = [projectName, activeBranch, locationLabel].filter(Boolean).join(' · ');
 
   const terminalContent = (() => {
     if (activeState === 'unavailable') {
@@ -370,7 +371,11 @@ export function ProjectTerminalDock({
       )}
       style={{ height }}
     >
-      <div className="flex h-10 items-center gap-2 border-b border-slate-800 px-3 text-xs">
+      <div
+        role="group"
+        aria-label="Terminal controls"
+        className="flex h-10 items-center gap-2 border-b border-slate-800 px-3 text-xs"
+      >
         <TerminalIcon className="h-4 w-4 shrink-0 text-slate-300" />
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
           {tabs.map((tab) => (
@@ -412,10 +417,9 @@ export function ProjectTerminalDock({
         <div
           aria-label="Terminal location"
           className="hidden min-w-0 max-w-[35%] truncate text-slate-400 lg:block"
+          title={locationTitle || undefined}
         >
-          {projectName ?? 'Terminal'}
-          {activeBranch ? ` · ${activeBranch}` : ''}
-          {locationLabel ? ` · ${locationLabel}` : ''}
+          {locationLabel ?? projectName ?? 'Terminal'}
         </div>
         <Select value={terminalFont} onValueChange={setTerminalFont}>
           <SelectTrigger

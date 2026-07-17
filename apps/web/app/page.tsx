@@ -545,7 +545,11 @@ function ProjectChatHeader({
   const showFolderLabel = folderLabel && folderLabel !== project.name;
 
   return (
-    <div className="ml-auto flex min-w-0 items-center gap-3">
+    <div
+      role="group"
+      aria-label="Project controls"
+      className="ml-auto flex min-w-0 items-center gap-3"
+    >
       <div className="min-w-0 text-right">
         <nav
           aria-label="Project location"

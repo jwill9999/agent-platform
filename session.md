@@ -44,8 +44,10 @@ and actionable.
   shows an always-visible host folder path.
 - Command readiness uses user-facing labels instead of runtime modes/messages, and the terminal
   header shows `Project root` instead of its absolute initial working directory.
-- Focused web unit, browser Playwright, and Electron Project access tests pass locally. PR #239 has
-  merged, and draft PR #240 now targets `staging`; keep the Bead open until checks and review pass.
+- Focused web unit, browser Playwright, and Electron Project access tests pass locally. Reviewed
+  Project and terminal control visual baselines now pass locally; their first capture exposed and
+  fixed a visually truncated `Project root` label. Keep the Bead open until CI verifies the shared
+  baselines and all required checks pass.
 
 **Merged Verification:**
 
