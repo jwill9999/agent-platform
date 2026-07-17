@@ -78,6 +78,10 @@ function terminalStatusLabel(state: TerminalState): string {
   return 'Unavailable';
 }
 
+export function projectTerminalLocationLabel(cwd: string | undefined): string | null {
+  return cwd ? 'Project root' : null;
+}
+
 export function ProjectTerminalDock({
   projectId,
   projectName,
@@ -313,6 +317,7 @@ export function ProjectTerminalDock({
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
   const activeState = activeTab?.state ?? 'closed';
+  const locationLabel = projectTerminalLocationLabel(activeTab?.cwd);
 
   const terminalContent = (() => {
     if (activeState === 'unavailable') {
@@ -404,10 +409,13 @@ export function ProjectTerminalDock({
             <Plus className="h-4 w-4" />
           </Button>
         </div>
-        <div className="hidden min-w-0 max-w-[35%] truncate text-slate-400 lg:block">
+        <div
+          aria-label="Terminal location"
+          className="hidden min-w-0 max-w-[35%] truncate text-slate-400 lg:block"
+        >
           {projectName ?? 'Terminal'}
           {activeBranch ? ` · ${activeBranch}` : ''}
-          {activeTab?.cwd ? ` · ${activeTab.cwd}` : ''}
+          {locationLabel ? ` · ${locationLabel}` : ''}
         </div>
         <Select value={terminalFont} onValueChange={setTerminalFont}>
           <SelectTrigger

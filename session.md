@@ -16,10 +16,10 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-07-17
-- **Session:** Merged the capability/navigation and local IDE handoff work into `staging`, confirmed
-  CI, synchronized the local checkout, and reviewed the Project Experience Beads chain.
-- **Branch:** `staging`
-- **Commit:** `f1debb7` (`origin/staging` matches local)
+- **Session:** Re-baselined Project Experience `.5` against the merged `.2` through `.4` work and
+  implemented the remaining user-facing label and location-context cleanup.
+- **Branch:** `jwill9999/project-experience-label-context`
+- **Base:** `jwill9999/session-handoff-beads-closeout` (draft PR #239 against `staging`)
 
 ## Current State
 
@@ -34,6 +34,17 @@ and actionable.
   system folder fallback, and presents explicit unavailable states in browser-only contexts.
 - User-facing Project navigation avoids `/workspace` and backend implementation terminology in the
   surfaces covered so far.
+
+**Project Experience `.5` In Progress:**
+
+- The relevance audit found most original scope already complete; remaining work was limited to the
+  Project header, command availability copy, and terminal location chrome.
+- Project Chat now uses a compact navigable Workspaces / Project / Chat breadcrumb and no longer
+  shows an always-visible host folder path.
+- Command readiness uses user-facing labels instead of runtime modes/messages, and the terminal
+  header shows `Project root` instead of its absolute initial working directory.
+- Focused web unit, browser Playwright, and Electron Project access tests pass locally. Keep the Bead
+  open until the task branch is pushed and remote PR checks pass.
 
 **Merged Verification:**
 
@@ -91,8 +102,8 @@ and actionable.
 
 ## Next
 
-1. Review and claim `agent-platform-project-experience.5`, now unblocked: audit remaining Project
-   labels and add quiet location context only where navigation is ambiguous.
+1. Finish `agent-platform-project-experience.5`: push its task branch, open/monitor the PR, and close
+   the Bead only after required checks and review feedback are complete.
 2. Continue the Project Experience chain with `.7` generated previews and `.8` activity/evidence;
    both are ready, while `.6` remains blocked on the remaining experience tasks.
 3. Decide whether `agent-platform-context-optimisation` should interrupt the UI chain. It remains a

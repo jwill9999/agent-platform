@@ -3,6 +3,7 @@ import {
   _electron as electron,
   type ElectronApplication,
   type FilePayload,
+  type Locator,
   type Page,
 } from 'playwright';
 import { execFileSync } from 'node:child_process';
@@ -189,13 +190,14 @@ test.describe('Electron Project access', () => {
 
       await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
-      await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
       await expect(page.getByText('Restore folder')).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
+
       await expect(page.getByRole('combobox', { name: 'Active branch' })).toContainText('main');
       await page.getByRole('combobox', { name: 'Active branch' }).click();
       await page.getByRole('option', { name: 'feature/e2e-branch' }).click();
@@ -210,6 +212,7 @@ test.describe('Electron Project access', () => {
 
       await page.getByRole('button', { name: /Terminal/ }).click();
       const projectTerminal = page.getByRole('region', { name: 'Project terminal' });
+      const terminalLocation = projectTerminal.getByLabel('Terminal location');
       const composer = page.getByRole('textbox', { name: /Ask about this Project/ });
       await expect(projectTerminal).toBeVisible();
       await expect(projectTerminal.getByRole('combobox', { name: 'Terminal font' })).toBeVisible();
@@ -217,7 +220,8 @@ test.describe('Electron Project access', () => {
       const terminalBox = await projectTerminal.boundingBox();
       const composerBox = await composer.boundingBox();
       expect(terminalBox?.y).toBeGreaterThan((composerBox?.y ?? 0) + (composerBox?.height ?? 0));
-      await expect(projectTerminal).toContainText(firstProjectDir, { timeout: 10_000 });
+      await expect(terminalLocation).toContainText('Project root', { timeout: 10_000 });
+      await expect(terminalLocation).not.toContainText(firstProjectDir);
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await expect(gitPanel).toBeVisible();
       writeFileSync(join(firstProjectDir, 'scratch.txt'), 'scratch\n');
@@ -254,7 +258,8 @@ test.describe('Electron Project access', () => {
       await projectTerminal.getByRole('button', { name: 'Hide terminal' }).click();
       await expect(projectTerminal).toBeHidden();
       await page.getByRole('button', { name: /Terminal/ }).click();
-      await expect(projectTerminal).toContainText(firstProjectDir);
+      await expect(terminalLocation).toContainText('Project root');
+      await expect(terminalLocation).not.toContainText(firstProjectDir);
       await projectTerminal.getByRole('button', { name: 'Close terminal', exact: true }).click();
       await expect(projectTerminal).toBeHidden();
 
@@ -303,6 +308,16 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('Scope: Selected Project').last()).toBeVisible();
       await expect(page.getByText('May update Project setup.').last()).toBeVisible();
 
+      await projectChatHeader.getByRole('button', { name: 'Workspaces' }).click();
+      await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
+      await page
+        .locator('section[aria-label="Recent Projects"]')
+        .getByRole('link')
+        .filter({ hasText: firstProjectName })
+        .click();
+      await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
+
       const recentProjects = page.locator('section[aria-label="Recent Projects"]');
       await expect(recentProjects).toHaveCount(1);
       await expect(
@@ -331,7 +346,7 @@ test.describe('Electron Project access', () => {
       await page.getByRole('button', { name: 'Open folder' }).click();
       await expect(projectChatHeader.getByText(secondProjectName, { exact: true })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
-      await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       const secondProject = await findRecentProjectExcluding(
@@ -354,7 +369,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('Opening Project chat...')).toHaveCount(0, { timeout: 15_000 });
       await expect(page.getByRole('heading', { name: firstProjectName })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
-      await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
       await expect(page.getByText('/help init', { exact: true }).last()).toBeVisible({
         timeout: 15_000,
       });
@@ -412,6 +427,16 @@ test.describe('Electron Project access', () => {
 async function openProjectChat(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForLoadState('networkidle');
+}
+
+async function expectProjectLocationBreadcrumb(projectChatHeader: Locator): Promise<void> {
+  const breadcrumb = projectChatHeader.getByRole('navigation', { name: 'Project location' });
+  await expect(breadcrumb.getByRole('button', { name: 'Workspaces' })).toBeVisible();
+  await expect(breadcrumb.getByText('Project', { exact: true })).toBeVisible();
+  await expect(breadcrumb.getByText('Chat', { exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
 }
 
 async function expectSimplifiedWorkspaceEntry(page: Page): Promise<void> {

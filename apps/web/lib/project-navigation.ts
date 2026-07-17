@@ -39,6 +39,12 @@ export interface ProjectCapabilityDisplay {
   readonly description: string;
 }
 
+export interface ProjectCommandStatus {
+  readonly canExecute: boolean;
+  readonly mode: string;
+  readonly status: string;
+}
+
 export const workspaceNavigationItems: readonly WorkspaceNavigationItem[] = [
   {
     name: 'Workspaces',
@@ -69,6 +75,27 @@ export const workspaceEntryCopy = {
   projectCreateAction: 'New project',
   projectOpenAction: 'Open folder',
 } as const;
+
+export function commandRunnerStatusLabel(commandRunner: ProjectCommandStatus): string {
+  if (commandRunner.canExecute) {
+    return 'Commands ready';
+  }
+  if (commandRunner.mode === 'disabled' && commandRunner.status === 'disabled') {
+    return 'Commands off';
+  }
+  if (commandRunner.status === 'failed' || commandRunner.status === 'unavailable') {
+    return 'Commands unavailable';
+  }
+  return 'Commands starting';
+}
+
+export function commandRunnerStatusDescription(commandRunner: ProjectCommandStatus): string {
+  const label = commandRunnerStatusLabel(commandRunner);
+  if (label === 'Commands ready') return 'Project commands are ready.';
+  if (label === 'Commands off') return 'Project commands are turned off.';
+  if (label === 'Commands unavailable') return 'Project commands are unavailable.';
+  return 'Project commands are starting.';
+}
 
 export const projectReopenSearchParam = 'projectId';
 export const sessionReopenSearchParam = 'sessionId';

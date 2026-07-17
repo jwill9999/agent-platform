@@ -9,6 +9,29 @@ Audit remaining Project/Chat labels after Electron stabilisation and remove impl
 copy from primary UI. Add quiet breadcrumbs or equivalent location context only where current
 navigation is still ambiguous.
 
+## Re-baseline Audit (2026-07-17)
+
+The task remains relevant, but most of its original surface area was completed by Project
+Experience `.2` through `.4`:
+
+- Workspaces and sidebar copy now separates Chat from Coding Projects without backend terminology.
+- Recent Projects use folder names by default and show a shortened path only to disambiguate
+  duplicate folder names.
+- Project Chat is the default Project surface and already has regression coverage for `/workspace`
+  and backend-root leakage.
+- Project Chat includes Project name, profile/capability summary, branch selection, terminal access,
+  and local IDE handoff.
+
+The remaining verified gaps are:
+
+- the Project header shows an always-visible folder path and a decorative `Project / Chat` label
+  beside a separate Workspaces action instead of one quiet navigable location affordance;
+- command-runner mode/status and raw readiness messages can surface runtime terminology;
+- the terminal dock renders its absolute initial `cwd`, exposing the host Project root.
+
+This task is narrowed to those gaps. Settings diagnostics and internal implementation identifiers
+remain out of scope unless they leak into a primary Project or Chat surface.
+
 ## Requirements
 
 - Hide `/workspace`, backend accessibility, backend root, and repository root from normal UI.
@@ -21,11 +44,14 @@ navigation is still ambiguous.
 
 ## Implementation Plan
 
-1. Audit Project/Chat/secondary-surface labels for implementation terminology.
-2. Replace primary copy with user-facing Project/folder language.
-3. Move runtime details to technical details/debug affordances if still needed.
-4. Add breadcrumbs or equivalent route context only where navigation remains unclear.
-5. Add tests for visible labels and navigation.
+1. Replace the Project header's decorative location label and duplicate action with a compact,
+   navigable Workspaces / Project / Chat breadcrumb.
+2. Keep the active Project name and useful profile/capability context, but remove its always-visible
+   folder path.
+3. Translate command-runner readiness into user-facing command availability without raw runtime
+   modes, reasons, or messages.
+4. Replace the terminal dock's absolute initial `cwd` with `Project root`.
+5. Extend unit and Playwright/Electron coverage for labels, navigation, and path leakage.
 
 ## Dependency Order
 
@@ -42,6 +68,22 @@ Keep Beads dependencies aligned with this table.
 - Playwright: verify Project and secondary surfaces do not expose `/workspace` or backend
   accessibility in primary UI and verify breadcrumbs navigate back as expected.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
+
+### Playwright Scenario
+
+```gherkin
+Feature: Project location context without runtime path leakage
+
+  Scenario: Navigate from Project Chat without exposing host paths
+    Given a desktop Project is open in Project Chat
+    Then the Project header shows a Workspaces / Project / Chat breadcrumb
+    And the header shows the Project name without its host folder path
+    When the Project terminal is opened
+    Then the terminal location is shown as Project root
+    And the application chrome does not show /workspace, the backend root, or the host Project root
+    When the user selects Workspaces in the breadcrumb
+    Then the workspace chooser is visible
+```
 
 ## Definition Of Done
 
