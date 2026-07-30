@@ -16,8 +16,8 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-07-17
-- **Session:** Re-baselined Project Experience `.5` against the merged `.2` through `.4` work and
-  implemented the remaining user-facing label and location-context cleanup.
+- **Session:** Fixed Project Experience `.5` desktop visual regression coverage with
+  platform-specific Project controls baselines after the Linux CI diagnosis.
 - **Branch:** `jwill9999/project-experience-label-context`
 - **Base:** `staging` at `e788063` after PR #239 merged
 
@@ -45,15 +45,20 @@ and actionable.
 - Command readiness uses user-facing labels instead of runtime modes/messages, and the terminal
   header shows `Project root` instead of its absolute initial working directory.
 - Focused web unit, browser Playwright, and Electron Project access tests pass locally. Reviewed
-  Project and terminal control visual baselines now pass locally; their first capture exposed and
-  fixed a visually truncated `Project root` label. Keep the Bead open until CI verifies the shared
-  baselines and all required checks pass.
+  Project and terminal control visual baselines pass locally; their first capture exposed and fixed
+  a visually truncated `Project root` label.
 - PR #240's first visual-baseline CI run passed browser E2E and application verification but exposed
   two stale Electron test definitions: Playwright rejected a non-destructured fixture argument, and
   the packaged VM scenarios still targeted the removed runtime-oriented status label. Both tests now
   use the current Playwright API and user-facing command status labels. The focused Electron run
   passes 3/3 locally under Node 24, including both visual baselines and the packaged VM ready/failure
-  paths; keep the Bead open for the replacement GitHub Actions result.
+  paths.
+- The replacement Linux run then exposed a deterministic platform rendering difference for Project
+  controls: Darwin is 647x52 and Ubuntu/Xvfb is 672x52. The test now selects a platform-specific
+  Project controls baseline; the Linux image is the exact stable capture uploaded by CI. Focused
+  Electron Project access passes 1/1 on Darwin under Node 24, and the pre-push desktop gate passes
+  build, typecheck, dependency-cycle analysis, and 107/107 unit tests. Keep the Bead open until the
+  new GitHub Actions run validates Linux and review is complete.
 
 **Merged Verification:**
 
@@ -112,7 +117,7 @@ and actionable.
 
 ## Next
 
-1. Monitor the replacement Project Experience `.5` PR #240 checks after the Electron test fix, and
+1. Monitor Project Experience `.5` PR #240 after the platform-specific visual baseline fix, and
    close the Bead only after required checks and review feedback are complete.
 2. Continue the Project Experience chain with `.7` generated previews and `.8` activity/evidence;
    both are ready, while `.6` remains blocked on the remaining experience tasks.
