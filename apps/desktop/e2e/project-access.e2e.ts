@@ -202,7 +202,7 @@ test.describe('Electron Project access', () => {
       const projectControls = projectChatHeader.getByRole('group', { name: 'Project controls' });
       await expect(projectControls.getByLabel(/Project command status:/)).toBeVisible();
       await expect(projectControls).toHaveScreenshot(
-        'project-chat-controls.png',
+        `project-chat-controls-${process.platform}.png`,
         VISUAL_REGRESSION_OPTIONS,
       );
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
