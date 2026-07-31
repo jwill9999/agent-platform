@@ -188,7 +188,7 @@ test.describe('Electron Project access', () => {
       await sendChatMessage(page, 'personal chat model response smoke', 'Send a message...');
       await expect(page.getByText(E2E_MODEL_RESPONSE).last()).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole('link', { name: /Workspaces/ }).click();
+      await openWorkspaceChooserFromSidebar(page);
       await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
       await expect(page.getByText('personal-chat-screenshot.png')).toHaveCount(0);
       await expect(page.getByText('personal-chat-notes.md')).toHaveCount(0);
@@ -361,7 +361,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('project-chat-screenshot.jpg')).toHaveCount(0);
       await expect(page.getByText('project-chat-notes.md')).toHaveCount(0);
 
-      await page.getByRole('link', { name: /Workspaces/ }).click();
+      await openWorkspaceChooserFromSidebar(page);
       await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
       await page.getByRole('button', { name: 'Open folder' }).click();
       await expect(projectChatHeader.getByText(secondProjectName, { exact: true })).toBeVisible();
@@ -447,6 +447,22 @@ test.describe('Electron Project access', () => {
 async function openProjectChat(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForLoadState('networkidle');
+}
+
+async function openWorkspaceChooserFromSidebar(page: Page): Promise<void> {
+  const chooserHeading = page.getByRole('heading', { name: 'Choose a workspace' });
+  await page.getByRole('link', { name: /^Workspaces\b/ }).click();
+
+  try {
+    await expect(chooserHeading).toBeVisible();
+  } catch {
+    const projectWorkspacesButton = page
+      .locator('[data-workspace-surface="project-chat"]')
+      .getByRole('button', { name: 'Workspaces' });
+    await expect(projectWorkspacesButton).toBeVisible();
+    await projectWorkspacesButton.click();
+    await expect(chooserHeading).toBeVisible({ timeout: 15_000 });
+  }
 }
 
 async function expectProjectLocationBreadcrumb(projectChatHeader: Locator): Promise<void> {

@@ -59,6 +59,10 @@ and actionable.
   under Node 24, and the pre-push desktop gate passes build, typecheck, dependency-cycle analysis,
   and 107/107 unit tests. Keep the Bead open until the new GitHub Actions run validates Linux and
   review is complete.
+- A later Linux run passed both visual baselines but exposed stale Project Chat after selecting the
+  Workspaces sidebar link. The Electron test now waits for the chooser heading and uses the visible
+  Project-header Workspaces action only when that stale surface persists; one full run plus two
+  focused repetitions pass under Node 24.
 
 **Merged Verification:**
 
