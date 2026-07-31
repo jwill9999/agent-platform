@@ -36,7 +36,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
 
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(projectName).first()).toBeVisible();
-      await expect(page.getByText('Project / Chat', { exact: true })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Project location' })).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page.getByText(backendProjectRoot)).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
@@ -45,7 +45,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
       await expect(openLocalIdeButton).toBeDisabled();
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(projectName).first()).toBeVisible();
-      await expect(page.getByText('Project / Chat', { exact: true })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Project location' })).toBeVisible();
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });
     }
@@ -172,7 +172,7 @@ test.describe('IDE Project opening is parked for desktop', () => {
 
       await expect(page).not.toHaveURL(/\/ide/);
       await expect(page.getByText(projectName).first()).toBeVisible();
-      await expect(page.getByText('Project / Chat', { exact: true })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Project location' })).toBeVisible();
 
       await page.getByPlaceholder('Ask about this Project...').fill('/init');
       await page.getByPlaceholder('Ask about this Project...').press('Enter');

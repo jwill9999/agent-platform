@@ -48,9 +48,11 @@ import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId, usableModelConfigs } from '@/lib/modelSelection';
 import {
   buildPersonalChatHref,
+  commandRunnerStatusDescription,
+  commandRunnerStatusLabel,
   createWorkspaceNavigationState,
   desktopProjectIsAvailable,
-  desktopProjectPathLabel,
+  desktopProjectFolderLabel,
   mostRecentTitledProjectSession,
   personalChatModeSearchValue,
   projectCapabilitySummary,
@@ -75,7 +77,13 @@ import {
   openDesktopProjectIde,
   selectAndRegisterDesktopProject,
 } from '@/lib/desktop-projects';
-import { FolderOpen, FolderPlus, MessageSquare, Terminal as TerminalIcon } from 'lucide-react';
+import {
+  ChevronRight,
+  FolderOpen,
+  FolderPlus,
+  MessageSquare,
+  Terminal as TerminalIcon,
+} from 'lucide-react';
 
 type WorkspaceMode = 'chat' | 'project-chat';
 type HomeEntryScreenProps = Readonly<{
@@ -211,16 +219,6 @@ function commandRunnerStatusColor(commandRunner: CommandRunnerDisplay): string {
   if (commandRunner.canExecute) return 'bg-emerald-500';
   if (commandRunner.status === 'failed') return 'bg-destructive';
   return 'bg-amber-500';
-}
-
-function commandRunnerStatusLabel(commandRunner: CommandRunnerDisplay): string {
-  if (commandRunner.mode === 'disabled' && commandRunner.status === 'disabled') {
-    return 'Agent commands off';
-  }
-  if (commandRunner.mode === commandRunner.status) {
-    return commandRunner.status;
-  }
-  return `${commandRunner.mode} ${commandRunner.status}`;
 }
 
 async function fetchCommandRunnerDisplay(): Promise<CommandRunnerDisplay> {
@@ -512,16 +510,17 @@ function ProjectCommandRunnerStatus({
     return null;
   }
 
+  const label = commandRunnerStatusLabel(commandRunner);
   return (
     <div
-      aria-label="Command runner status"
+      aria-label={`Project command status: ${label}`}
       className="hidden min-w-0 max-w-44 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground md:flex"
-      title={commandRunner.message}
+      title={commandRunnerStatusDescription(commandRunner)}
     >
       <span
         className={`h-2 w-2 shrink-0 rounded-full ${commandRunnerStatusColor(commandRunner)}`}
       />
-      <span className="truncate">{commandRunnerStatusLabel(commandRunner)}</span>
+      <span className="truncate">{label}</span>
     </div>
   );
 }
@@ -542,20 +541,38 @@ function ProjectChatHeader({
 
   const profile = projectDisplayProfile(project);
   const assessment = projectOnboardingAssessmentFromMetadata(project);
-  const folderPathLabel = desktopProjectPathLabel(project);
+  const folderLabel = desktopProjectFolderLabel(project);
+  const showFolderLabel = folderLabel && folderLabel !== project.name;
 
   return (
-    <div className="ml-auto flex min-w-0 items-center gap-3">
+    <div
+      role="group"
+      aria-label="Project controls"
+      className="ml-auto flex min-w-0 items-center gap-3"
+    >
       <div className="min-w-0 text-right">
-        <div className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
-          Project / Chat
-        </div>
+        <nav
+          aria-label="Project location"
+          className="flex items-center justify-end gap-1 text-xs text-muted-foreground"
+        >
+          <button
+            type="button"
+            className="truncate transition-colors hover:text-foreground"
+            onClick={onReturnHome}
+          >
+            Workspaces
+          </button>
+          <ChevronRight className="h-3 w-3 shrink-0" aria-hidden />
+          <span>Project</span>
+          <ChevronRight className="h-3 w-3 shrink-0" aria-hidden />
+          <span aria-current="page">Chat</span>
+        </nav>
         <div className="truncate text-sm font-medium text-foreground">{project.name}</div>
         <div className="truncate text-xs text-muted-foreground">
           {profile.label} - {projectCapabilitySummary(assessment?.capabilities)}
         </div>
-        {folderPathLabel && (
-          <div className="truncate text-[11px] text-muted-foreground">{folderPathLabel}</div>
+        {showFolderLabel && (
+          <div className="truncate text-[11px] text-muted-foreground">{folderLabel}</div>
         )}
       </div>
       <ProjectCommandRunnerStatus commandRunner={commandRunner} />
@@ -569,9 +586,6 @@ function ProjectChatHeader({
       >
         <TerminalIcon className="h-4 w-4" />
         <span className="hidden sm:inline">{terminalOpen ? 'Hide Terminal' : 'Terminal'}</span>
-      </Button>
-      <Button type="button" size="sm" variant="ghost" className="shrink-0" onClick={onReturnHome}>
-        Workspaces
       </Button>
       <Button
         type="button"

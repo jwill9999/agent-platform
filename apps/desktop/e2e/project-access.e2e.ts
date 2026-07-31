@@ -3,6 +3,7 @@ import {
   _electron as electron,
   type ElectronApplication,
   type FilePayload,
+  type Locator,
   type Page,
 } from 'playwright';
 import { execFileSync } from 'node:child_process';
@@ -40,9 +41,17 @@ const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
 const E2E_MODEL_RESPONSE = 'E2E model response received';
 const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 const IDE_URL_PATTERN = new RegExp(String.raw`/ide`);
+const VISUAL_REGRESSION_OPTIONS = {
+  animations: 'disabled',
+  caret: 'hide',
+  maxDiffPixelRatio: 0.01,
+  scale: 'css',
+  threshold: 0.3,
+} as const;
 
 test.describe('Electron Project access', () => {
   test('opens a local Project and binds chat/slash commands to the same Project session', async () => {
+    test.info().snapshotSuffix = '';
     const tempRoot = join(repoRoot, '.agent-platform', 'electron-e2e', String(Date.now()));
     const runtimeDir = join(tempRoot, 'runtime');
     const newProjectParentDir = join(tempRoot, 'new-projects');
@@ -179,7 +188,7 @@ test.describe('Electron Project access', () => {
       await sendChatMessage(page, 'personal chat model response smoke', 'Send a message...');
       await expect(page.getByText(E2E_MODEL_RESPONSE).last()).toBeVisible({ timeout: 15_000 });
 
-      await page.getByRole('link', { name: /Workspaces/ }).click();
+      await openWorkspaceChooserFromSidebar(page);
       await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
       await expect(page.getByText('personal-chat-screenshot.png')).toHaveCount(0);
       await expect(page.getByText('personal-chat-notes.md')).toHaveCount(0);
@@ -189,13 +198,20 @@ test.describe('Electron Project access', () => {
 
       await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
-      await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
+      const projectControls = projectChatHeader.getByRole('group', { name: 'Project controls' });
+      await expect(projectControls.getByLabel(/Project command status:/)).toBeVisible();
+      await expect(projectControls).toHaveScreenshot(
+        `project-chat-controls-${process.platform}.png`,
+        VISUAL_REGRESSION_OPTIONS,
+      );
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       await expect(page.getByRole('button', { name: 'Open Folder' })).toHaveCount(0);
       await expect(page.getByText('Restore folder')).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
+
       await expect(page.getByRole('combobox', { name: 'Active branch' })).toContainText('main');
       await page.getByRole('combobox', { name: 'Active branch' }).click();
       await page.getByRole('option', { name: 'feature/e2e-branch' }).click();
@@ -210,6 +226,8 @@ test.describe('Electron Project access', () => {
 
       await page.getByRole('button', { name: /Terminal/ }).click();
       const projectTerminal = page.getByRole('region', { name: 'Project terminal' });
+      const terminalLocation = projectTerminal.getByLabel('Terminal location');
+      const terminalControls = projectTerminal.getByRole('group', { name: 'Terminal controls' });
       const composer = page.getByRole('textbox', { name: /Ask about this Project/ });
       await expect(projectTerminal).toBeVisible();
       await expect(projectTerminal.getByRole('combobox', { name: 'Terminal font' })).toBeVisible();
@@ -217,7 +235,13 @@ test.describe('Electron Project access', () => {
       const terminalBox = await projectTerminal.boundingBox();
       const composerBox = await composer.boundingBox();
       expect(terminalBox?.y).toBeGreaterThan((composerBox?.y ?? 0) + (composerBox?.height ?? 0));
-      await expect(projectTerminal).toContainText(firstProjectDir, { timeout: 10_000 });
+      await expect(terminalLocation).toContainText('Project root', { timeout: 10_000 });
+      await expect(terminalLocation).not.toContainText(firstProjectDir);
+      await expect(projectTerminal.getByLabel('Terminal status: Running')).toBeVisible();
+      await expect(terminalControls).toHaveScreenshot(
+        `project-terminal-controls-${process.platform}.png`,
+        VISUAL_REGRESSION_OPTIONS,
+      );
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await expect(gitPanel).toBeVisible();
       writeFileSync(join(firstProjectDir, 'scratch.txt'), 'scratch\n');
@@ -254,7 +278,8 @@ test.describe('Electron Project access', () => {
       await projectTerminal.getByRole('button', { name: 'Hide terminal' }).click();
       await expect(projectTerminal).toBeHidden();
       await page.getByRole('button', { name: /Terminal/ }).click();
-      await expect(projectTerminal).toContainText(firstProjectDir);
+      await expect(terminalLocation).toContainText('Project root');
+      await expect(terminalLocation).not.toContainText(firstProjectDir);
       await projectTerminal.getByRole('button', { name: 'Close terminal', exact: true }).click();
       await expect(projectTerminal).toBeHidden();
 
@@ -303,6 +328,16 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('Scope: Selected Project').last()).toBeVisible();
       await expect(page.getByText('May update Project setup.').last()).toBeVisible();
 
+      await projectChatHeader.getByRole('button', { name: 'Workspaces' }).click();
+      await expect(page.getByRole('heading', { name: 'Choose a workspace' })).toBeVisible();
+      await page
+        .locator('section[aria-label="Recent Projects"]')
+        .getByRole('link')
+        .filter({ hasText: firstProjectName })
+        .click();
+      await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
+
       const recentProjects = page.locator('section[aria-label="Recent Projects"]');
       await expect(recentProjects).toHaveCount(1);
       await expect(
@@ -326,12 +361,12 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('project-chat-screenshot.jpg')).toHaveCount(0);
       await expect(page.getByText('project-chat-notes.md')).toHaveCount(0);
 
-      await page.getByRole('link', { name: /Workspaces/ }).click();
+      await openWorkspaceChooserFromSidebar(page);
       await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
       await page.getByRole('button', { name: 'Open folder' }).click();
       await expect(projectChatHeader.getByText(secondProjectName, { exact: true })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
-      await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
       const secondProject = await findRecentProjectExcluding(
@@ -354,7 +389,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('Opening Project chat...')).toHaveCount(0, { timeout: 15_000 });
       await expect(page.getByRole('heading', { name: firstProjectName })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
-      await expect(projectChatHeader.getByText('Project / Chat')).toBeVisible();
+      await expectProjectLocationBreadcrumb(projectChatHeader);
       await expect(page.getByText('/help init', { exact: true }).last()).toBeVisible({
         timeout: 15_000,
       });
@@ -412,6 +447,32 @@ test.describe('Electron Project access', () => {
 async function openProjectChat(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForLoadState('networkidle');
+}
+
+async function openWorkspaceChooserFromSidebar(page: Page): Promise<void> {
+  const chooserHeading = page.getByRole('heading', { name: 'Choose a workspace' });
+  await page.getByRole('link', { name: /^Workspaces\b/ }).click();
+
+  try {
+    await expect(chooserHeading).toBeVisible();
+  } catch {
+    const projectWorkspacesButton = page
+      .locator('[data-workspace-surface="project-chat"]')
+      .getByRole('button', { name: 'Workspaces' });
+    await expect(projectWorkspacesButton).toBeVisible();
+    await projectWorkspacesButton.click();
+    await expect(chooserHeading).toBeVisible({ timeout: 15_000 });
+  }
+}
+
+async function expectProjectLocationBreadcrumb(projectChatHeader: Locator): Promise<void> {
+  const breadcrumb = projectChatHeader.getByRole('navigation', { name: 'Project location' });
+  await expect(breadcrumb.getByRole('button', { name: 'Workspaces' })).toBeVisible();
+  await expect(breadcrumb.getByText('Project', { exact: true })).toBeVisible();
+  await expect(breadcrumb.getByText('Chat', { exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
 }
 
 async function expectSimplifiedWorkspaceEntry(page: Page): Promise<void> {

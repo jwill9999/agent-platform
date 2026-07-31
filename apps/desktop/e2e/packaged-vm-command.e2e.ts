@@ -50,7 +50,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
       await openProject(page);
       const realVmStatus = fixture.realVmRuntimeDir ? startRealVmRunner(fixture) : undefined;
 
-      await expect(page.getByLabel('Command runner status')).toContainText('macos-vm ready', {
+      await expect(page.getByLabel('Project command status: Commands ready')).toBeVisible({
         timeout: 15_000,
       });
       await sendChatMessage(page, '/help init');
@@ -86,7 +86,7 @@ test.describe('packaged Electron macOS VM command runner', () => {
       const page = await app.firstWindow();
       await openProject(page);
 
-      await expect(page.getByLabel('Command runner status')).toContainText('macos-vm failed', {
+      await expect(page.getByLabel('Project command status: Commands unavailable')).toBeVisible({
         timeout: 15_000,
       });
       await sendChatMessage(page, 'Show the VM working directory');

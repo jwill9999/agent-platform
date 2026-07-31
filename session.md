@@ -16,16 +16,17 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-07-17
-- **Session:** Merged the capability/navigation and local IDE handoff work into `staging`, confirmed
-  CI, synchronized the local checkout, and reviewed the Project Experience Beads chain.
-- **Branch:** `staging`
-- **Commit:** `f1debb7` (`origin/staging` matches local)
+- **Session:** Fixed Project Experience `.5` desktop visual regression coverage with
+  platform-specific Project and terminal controls baselines after Linux CI diagnosis.
+- **Branch:** `jwill9999/project-experience-label-context`
+- **Base:** `staging` at `e788063` after PR #239 merged
 
 ## Current State
 
 **Merged Project Experience Foundation:**
 
-- PR #236 and PR #238 are merged into `staging`; their remote topic branches were deleted.
+- PR #236, PR #238, and documentation closeout PR #239 are merged into `staging`; their remote topic
+  branches were deleted.
 - Project Experience `.1`, `.2`, `.3`, and `.4` are closed in Beads.
 - Workspaces exposes general Chat and one Coding Project entry with New project, Open folder, recent
   Project reopen, and explicit loading/error states.
@@ -34,6 +35,34 @@ and actionable.
   system folder fallback, and presents explicit unavailable states in browser-only contexts.
 - User-facing Project navigation avoids `/workspace` and backend implementation terminology in the
   surfaces covered so far.
+
+**Project Experience `.5` In Progress:**
+
+- The relevance audit found most original scope already complete; remaining work was limited to the
+  Project header, command availability copy, and terminal location chrome.
+- Project Chat now uses a compact navigable Workspaces / Project / Chat breadcrumb and no longer
+  shows an always-visible host folder path.
+- Command readiness uses user-facing labels instead of runtime modes/messages, and the terminal
+  header shows `Project root` instead of its absolute initial working directory.
+- Focused web unit, browser Playwright, and Electron Project access tests pass locally. Reviewed
+  Project and terminal control visual baselines pass locally; their first capture exposed and fixed
+  a visually truncated `Project root` label.
+- PR #240's first visual-baseline CI run passed browser E2E and application verification but exposed
+  two stale Electron test definitions: Playwright rejected a non-destructured fixture argument, and
+  the packaged VM scenarios still targeted the removed runtime-oriented status label. Both tests now
+  use the current Playwright API and user-facing command status labels. The focused Electron run
+  passes 3/3 locally under Node 24, including both visual baselines and the packaged VM ready/failure
+  paths.
+- Replacement Linux runs exposed deterministic platform rendering differences for both Project and
+  terminal controls. The test now selects platform-specific baselines for each; both Linux images
+  are exact stable captures uploaded by CI. Focused Electron Project access passes 1/1 on Darwin
+  under Node 24, and the pre-push desktop gate passes build, typecheck, dependency-cycle analysis,
+  and 107/107 unit tests. Keep the Bead open until the new GitHub Actions run validates Linux and
+  review is complete.
+- A later Linux run passed both visual baselines but exposed stale Project Chat after selecting the
+  Workspaces sidebar link. The Electron test now waits for the chooser heading and uses the visible
+  Project-header Workspaces action only when that stale surface persists; one full run plus two
+  focused repetitions pass under Node 24.
 
 **Merged Verification:**
 
@@ -48,8 +77,9 @@ and actionable.
 
 **Repository State:**
 
-- Remote branches are now only `main` and `staging`.
-- `staging` is 47 commits ahead of `main`.
+- Remote branches are `main`, `staging`, and the active PR #240 topic branch.
+- `staging` is 48 commits ahead of `main`.
+- Draft PR #240 is mergeable against `staging`, with required checks running.
 - No open `staging` to `main` pull request was visible at this handoff.
 
 **Context Optimisation:**
@@ -91,8 +121,8 @@ and actionable.
 
 ## Next
 
-1. Review and claim `agent-platform-project-experience.5`, now unblocked: audit remaining Project
-   labels and add quiet location context only where navigation is ambiguous.
+1. Monitor Project Experience `.5` PR #240 after the platform-specific visual baseline fix, and
+   close the Bead only after required checks and review feedback are complete.
 2. Continue the Project Experience chain with `.7` generated previews and `.8` activity/evidence;
    both are ready, while `.6` remains blocked on the remaining experience tasks.
 3. Decide whether `agent-platform-context-optimisation` should interrupt the UI chain. It remains a
