@@ -17,7 +17,7 @@ and actionable.
 
 - **Date:** 2026-07-17
 - **Session:** Fixed Project Experience `.5` desktop visual regression coverage with
-  platform-specific Project controls baselines after the Linux CI diagnosis.
+  platform-specific Project and terminal controls baselines after Linux CI diagnosis.
 - **Branch:** `jwill9999/project-experience-label-context`
 - **Base:** `staging` at `e788063` after PR #239 merged
 
@@ -53,12 +53,12 @@ and actionable.
   use the current Playwright API and user-facing command status labels. The focused Electron run
   passes 3/3 locally under Node 24, including both visual baselines and the packaged VM ready/failure
   paths.
-- The replacement Linux run then exposed a deterministic platform rendering difference for Project
-  controls: Darwin is 647x52 and Ubuntu/Xvfb is 672x52. The test now selects a platform-specific
-  Project controls baseline; the Linux image is the exact stable capture uploaded by CI. Focused
-  Electron Project access passes 1/1 on Darwin under Node 24, and the pre-push desktop gate passes
-  build, typecheck, dependency-cycle analysis, and 107/107 unit tests. Keep the Bead open until the
-  new GitHub Actions run validates Linux and review is complete.
+- Replacement Linux runs exposed deterministic platform rendering differences for both Project and
+  terminal controls. The test now selects platform-specific baselines for each; both Linux images
+  are exact stable captures uploaded by CI. Focused Electron Project access passes 1/1 on Darwin
+  under Node 24, and the pre-push desktop gate passes build, typecheck, dependency-cycle analysis,
+  and 107/107 unit tests. Keep the Bead open until the new GitHub Actions run validates Linux and
+  review is complete.
 
 **Merged Verification:**
 

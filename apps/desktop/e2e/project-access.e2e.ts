@@ -239,7 +239,7 @@ test.describe('Electron Project access', () => {
       await expect(terminalLocation).not.toContainText(firstProjectDir);
       await expect(projectTerminal.getByLabel('Terminal status: Running')).toBeVisible();
       await expect(terminalControls).toHaveScreenshot(
-        'project-terminal-controls.png',
+        `project-terminal-controls-${process.platform}.png`,
         VISUAL_REGRESSION_OPTIONS,
       );
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
