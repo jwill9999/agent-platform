@@ -15,11 +15,10 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-07-17
-- **Session:** Fixed Project Experience `.5` desktop visual regression coverage with
-  platform-specific Project and terminal controls baselines after Linux CI diagnosis.
-- **Branch:** `jwill9999/project-experience-label-context`
-- **Base:** `staging` at `e788063` after PR #239 merged
+- **Date:** 2026-07-31
+- **Session:** Closed Project Experience `.5` after PR #240 passed required CI and merged.
+- **Branch:** `staging`
+- **Head:** `2c3a227` (`Clean Project labels and location context (#240)`)
 
 ## Current State
 
@@ -27,7 +26,7 @@ and actionable.
 
 - PR #236, PR #238, and documentation closeout PR #239 are merged into `staging`; their remote topic
   branches were deleted.
-- Project Experience `.1`, `.2`, `.3`, and `.4` are closed in Beads.
+- Project Experience `.1` through `.5` are closed in Beads.
 - Workspaces exposes general Chat and one Coding Project entry with New project, Open folder, recent
   Project reopen, and explicit loading/error states.
 - Opening a Coding Project lands in Project Chat with Project-bound session context.
@@ -36,7 +35,7 @@ and actionable.
 - User-facing Project navigation avoids `/workspace` and backend implementation terminology in the
   surfaces covered so far.
 
-**Project Experience `.5` In Progress:**
+**Project Experience `.5` Complete:**
 
 - The relevance audit found most original scope already complete; remaining work was limited to the
   Project header, command availability copy, and terminal location chrome.
@@ -44,25 +43,12 @@ and actionable.
   shows an always-visible host folder path.
 - Command readiness uses user-facing labels instead of runtime modes/messages, and the terminal
   header shows `Project root` instead of its absolute initial working directory.
-- Focused web unit, browser Playwright, and Electron Project access tests pass locally. Reviewed
-  Project and terminal control visual baselines pass locally; their first capture exposed and fixed
-  a visually truncated `Project root` label.
-- PR #240's first visual-baseline CI run passed browser E2E and application verification but exposed
-  two stale Electron test definitions: Playwright rejected a non-destructured fixture argument, and
-  the packaged VM scenarios still targeted the removed runtime-oriented status label. Both tests now
-  use the current Playwright API and user-facing command status labels. The focused Electron run
-  passes 3/3 locally under Node 24, including both visual baselines and the packaged VM ready/failure
-  paths.
-- Replacement Linux runs exposed deterministic platform rendering differences for both Project and
-  terminal controls. The test now selects platform-specific baselines for each; both Linux images
-  are exact stable captures uploaded by CI. Focused Electron Project access passes 1/1 on Darwin
-  under Node 24, and the pre-push desktop gate passes build, typecheck, dependency-cycle analysis,
-  and 107/107 unit tests. Keep the Bead open until the new GitHub Actions run validates Linux and
-  review is complete.
-- A later Linux run passed both visual baselines but exposed stale Project Chat after selecting the
-  Workspaces sidebar link. The Electron test now waits for the chooser heading and uses the visible
-  Project-header Workspaces action only when that stale surface persists; one full run plus two
-  focused repetitions pass under Node 24.
+- Project and terminal control screenshots use explicit Darwin and Linux baselines; the Linux images
+  are stable Ubuntu/Xvfb CI captures.
+- The Project access flow now synchronizes on the Workspaces chooser readiness heading and uses the
+  visible Project-header Workspaces action only when the sidebar leaves stale Project content.
+- PR #240 passed every required check, including desktop E2E, and the staging packaged macOS VM E2E
+  passed. It merged into `staging` as `2c3a227`; the merged topic branch can be deleted.
 
 **Merged Verification:**
 
@@ -77,9 +63,8 @@ and actionable.
 
 **Repository State:**
 
-- Remote branches are `main`, `staging`, and the active PR #240 topic branch.
-- `staging` is 48 commits ahead of `main`.
-- Draft PR #240 is mergeable against `staging`, with required checks running.
+- `staging` includes merged PR #240 at `2c3a227`.
+- The user plans to delete the merged `jwill9999/project-experience-label-context` topic branch.
 - No open `staging` to `main` pull request was visible at this handoff.
 
 **Context Optimisation:**
@@ -114,19 +99,18 @@ and actionable.
     activity/evidence, and external/default IDE handoff.
 - Automation, scheduled tasks, email/application workflows, docs/research workspaces, and
   generated-app workspaces remain deferred until their own product decisions and epics.
-- The completed `.1` through `.4` chain establishes capability metadata, simplified navigation,
-  Project Chat-first entry, and local IDE handoff.
+- The completed `.1` through `.5` chain establishes capability metadata, simplified navigation,
+  Project Chat-first entry, local IDE handoff, and user-facing Project location/status context.
 - Generated previews and activity/evidence remain required before the Project Experience epic can
   close.
 
 ## Next
 
-1. Monitor Project Experience `.5` PR #240 after the platform-specific visual baseline fix, and
-   close the Bead only after required checks and review feedback are complete.
-2. Continue the Project Experience chain with `.7` generated previews and `.8` activity/evidence;
-   both are ready, while `.6` remains blocked on the remaining experience tasks.
-3. Decide whether `agent-platform-context-optimisation` should interrupt the UI chain. It remains a
-   P1 due to demonstrated stale-session replay and token-pressure failures.
+1. Start `agent-platform-project-experience.7`, **Render generated outputs in Project Chat**.
+2. Follow with `.8`, the Project activity/evidence side panel; `.6` remains blocked on the remaining
+   experience tasks.
+3. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token
+   pressure is demonstrated, but its validation path remains parked on self-hosted runner availability.
 4. Refine `agent-platform-llm-observability-export` before implementation; its tooling, redaction,
    deployment, and first-increment decisions are still open.
 5. Keep macOS signing/notarization release tasks open until real signed and notarized artifact
