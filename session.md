@@ -15,18 +15,19 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-07-31
-- **Session:** Closed Project Experience `.5` after PR #240 passed required CI and merged.
+- **Date:** 2026-08-01
+- **Session:** Local Electron launch is now ready after manual typing and Node-version validation.
 - **Branch:** `staging`
-- **Head:** `2c3a227` (`Clean Project labels and location context (#240)`)
+- **Head:** `b0ebd41` (`staging docs close Project Experience .5 (#241)`)
 
 ## Current State
 
 **Merged Project Experience Foundation:**
 
-- PR #236, PR #238, and documentation closeout PR #239 are merged into `staging`; their remote topic
-  branches were deleted.
+- PR #236, PR #238, documentation closeout PR #239, PR #240, and closeout PR #241 are merged into
+  `staging`; their remote topic branches can be deleted.
 - Project Experience `.1` through `.5` are closed in Beads.
+- The `agent-platform-electron-experience` epic is complete: all eight child tasks are closed.
 - Workspaces exposes general Chat and one Coding Project entry with New project, Open folder, recent
   Project reopen, and explicit loading/error states.
 - Opening a Coding Project lands in Project Chat with Project-bound session context.
@@ -63,8 +64,12 @@ and actionable.
 
 **Repository State:**
 
-- `staging` includes merged PR #240 at `2c3a227`.
-- The user plans to delete the merged `jwill9999/project-experience-label-context` topic branch.
+- `staging` includes merged closeout PR #241 at `b0ebd41`; the local checkout is clean and matches
+  `origin/staging`.
+- Manual local validation now confirms normal typed input works without voice input, the terminal uses
+  the correct Node version, and the Electron app can be started locally.
+- The merged Project Experience topic branches may be deleted when convenient; no deletion is required
+  for this handoff.
 - No open `staging` to `main` pull request was visible at this handoff.
 
 **Context Optimisation:**
@@ -106,9 +111,11 @@ and actionable.
 
 ## Next
 
-1. Start `agent-platform-project-experience.7`, **Render generated outputs in Project Chat**.
-2. Follow with `.8`, the Project activity/evidence side panel; `.6` remains blocked on the remaining
-   experience tasks.
+1. Start `agent-platform-project-experience.7`, **Render generated outputs in Project Chat**. Keep
+   generated HTML/app, Markdown/document, PDF/screenshot, and unsupported-output fallbacks inside
+   Project Chat with Project/session context and no implementation-path leakage.
+2. Follow with `.8`, the Project activity/evidence side panel; `.6` remains blocked until `.7` and `.8`
+   are complete, after which the staged Project Experience E2E gate can be finalized.
 3. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token
    pressure is demonstrated, but its validation path remains parked on self-hosted runner availability.
 4. Refine `agent-platform-llm-observability-export` before implementation; its tooling, redaction,
