@@ -193,7 +193,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('personal-chat-screenshot.png')).toHaveCount(0);
       await expect(page.getByText('personal-chat-notes.md')).toHaveCount(0);
 
-      await page.getByRole('button', { name: 'Open folder' }).click();
+      await clickOpenFolder(page);
       const projectChatHeader = page.locator('[data-workspace-surface="project-chat"]');
 
       await expect(projectChatHeader.getByText(firstProjectName, { exact: true })).toBeVisible();
@@ -363,7 +363,7 @@ test.describe('Electron Project access', () => {
 
       await openWorkspaceChooserFromSidebar(page);
       await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
-      await page.getByRole('button', { name: 'Open folder' }).click();
+      await clickOpenFolder(page);
       await expect(projectChatHeader.getByText(secondProjectName, { exact: true })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
       await expectProjectLocationBreadcrumb(projectChatHeader);
@@ -462,6 +462,25 @@ async function openWorkspaceChooserFromSidebar(page: Page): Promise<void> {
     await expect(projectWorkspacesButton).toBeVisible();
     await projectWorkspacesButton.click();
     await expect(chooserHeading).toBeVisible({ timeout: 15_000 });
+  }
+}
+
+async function clickOpenFolder(page: Page): Promise<void> {
+  const openFolder = page.getByRole('button', { name: 'Open folder' });
+
+  // The home screen can be re-rendered while recent projects and the desktop
+  // bridge finish settling. Reacquire the button after a detached-element
+  // failure instead of clicking a locator from the previous render.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await expect(openFolder).toBeVisible();
+      await expect(openFolder).toBeEnabled();
+      await openFolder.click();
+      return;
+    } catch (error) {
+      if (attempt === 2) throw error;
+      await page.waitForTimeout(100);
+    }
   }
 }
 
