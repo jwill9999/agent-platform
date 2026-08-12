@@ -16,7 +16,7 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-12
-- **Session:** Implemented task `.7` Project Chat resource cards/viewer and refined its follow-on tasks.
+- **Session:** Implemented task `.7` Project Chat resource cards/viewer and repaired its Node 24 CI runtime.
 - **Branch:** `task/project-experience-7`
 - **Head:** `38a40d4` (`Add Project Chat resource previews`)
 
@@ -29,6 +29,11 @@ and actionable.
   previously confirmed the interaction works as expected.
 - Follow-on tasks are fully specified: `.15` secure Download/Save As, `.16` multi-tab previews,
   `.8` activity/evidence panel, and `.6` staged Project Experience E2E gate.
+- PR #243 revealed two unrelated Node 24 native-addon failures: isolated API Vitest forks crashed
+  during `better-sqlite3` teardown, and the Alpine API container exited after database startup.
+  API tests now keep their single fork alive and `better-sqlite3` is pinned to Node 24-supported
+  `12.11.1`; local API tests pass 199/199. Docker is unavailable locally, so Compose validation is
+  delegated to the rerun CI E2E job.
 
 ## Current State
 
@@ -74,8 +79,8 @@ and actionable.
 
 **Repository State:**
 
-- `staging` includes merged closeout PR #241 at `b0ebd41`. Task `.7` is committed locally on
-  `task/project-experience-7` and awaiting push/PR pipeline confirmation.
+- `staging` includes merged closeout PR #241 at `b0ebd41`. Task `.7` is on
+  `task/project-experience-7`; PR #243 awaits rerun after its Node 24 native-runtime repair.
 - Manual local validation now confirms normal typed input works without voice input, the terminal uses
   the correct Node version, and the Electron app can be started locally.
 - The merged Project Experience topic branches may be deleted when convenient; no deletion is required

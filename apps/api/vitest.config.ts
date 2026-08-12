@@ -9,7 +9,7 @@ export default defineConfig({
     pool: 'forks',
     fileParallelism: false,
     poolOptions: {
-      forks: { minForks: 1, maxForks: 1 },
+      forks: { minForks: 1, maxForks: 1, isolate: false },
     },
   },
 });
