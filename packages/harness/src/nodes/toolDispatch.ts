@@ -9,7 +9,11 @@ import type {
   Tool as ContractTool,
   WorkspaceEvent,
 } from '@agent-platform/contracts';
-import { evaluateBrowserUrlPolicy, workspaceResourceUri } from '@agent-platform/contracts';
+import {
+  evaluateBrowserUrlPolicy,
+  normalizeWorkspaceResourcePath,
+  workspaceResourceUri,
+} from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
@@ -147,26 +151,15 @@ function successfulToolResult(output: Output): Record<string, unknown> | undefin
   return isRecord(output.data.result) ? output.data.result : output.data;
 }
 
-function workspaceRelativePath(value: string): string | undefined {
-  const normalized = value.replaceAll('\\', '/').replace(/^\/workspace\/?/, '');
-  if (
-    !normalized ||
-    normalized.startsWith('/') ||
-    normalized === '..' ||
-    normalized.startsWith('../')
-  ) {
-    return undefined;
-  }
-  return normalized;
-}
-
 function resourcePathsForWrite(result: Record<string, unknown>): string[] {
   if (result.dryRun === true) return [];
   const paths = changedFilePaths(result);
   const directPath = stringField(result, 'path');
   if (directPath) paths.push(directPath);
   return [
-    ...new Set(paths.map(workspaceRelativePath).filter((path): path is string => Boolean(path))),
+    ...new Set(
+      paths.map(normalizeWorkspaceResourcePath).filter((path): path is string => Boolean(path)),
+    ),
   ];
 }
 
@@ -204,7 +197,7 @@ export function workspaceResourceEventsForToolOutput(
 
   if (toolId === GIT_TOOL_IDS.status || toolId === GIT_TOOL_IDS.changedFiles) {
     return changedFilePaths(result)
-      .map(workspaceRelativePath)
+      .map(normalizeWorkspaceResourcePath)
       .filter((path): path is string => Boolean(path))
       .map((path) =>
         workspaceEventOutput({
@@ -225,7 +218,7 @@ export function workspaceResourceEventsForToolOutput(
 
   if (toolId === GIT_TOOL_IDS.diff) {
     const pathValue = stringField(result, 'path');
-    const path = pathValue ? workspaceRelativePath(pathValue) : undefined;
+    const path = normalizeWorkspaceResourcePath(pathValue);
     if (!path) return [];
     const staged = result.staged === true;
     return [

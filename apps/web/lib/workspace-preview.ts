@@ -1,4 +1,5 @@
 import {
+  normalizeWorkspaceResourcePath,
   parseWorkspaceResourceUri,
   type ProjectGitDiffMode,
   type WorkspaceResource,
@@ -75,30 +76,13 @@ function metadataString(resource: WorkspaceResource, key: string): string | unde
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function normalizedRelativePath(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const normalized = value
-    .trim()
-    .replaceAll('\\', '/')
-    .replace(/^\/workspace\/?/, '');
-  if (
-    !normalized ||
-    normalized.startsWith('/') ||
-    normalized === '..' ||
-    normalized.startsWith('../')
-  ) {
-    return undefined;
-  }
-  return normalized;
-}
-
 export function workspaceResourcePath(resource: WorkspaceResource): string | undefined {
   const metadataPath =
-    normalizedRelativePath(metadataString(resource, 'relativePath')) ??
-    normalizedRelativePath(metadataString(resource, 'path'));
+    normalizeWorkspaceResourcePath(metadataString(resource, 'relativePath')) ??
+    normalizeWorkspaceResourcePath(metadataString(resource, 'path'));
   if (metadataPath) return metadataPath;
   try {
-    return normalizedRelativePath(parseWorkspaceResourceUri(resource.uri).target);
+    return normalizeWorkspaceResourcePath(parseWorkspaceResourceUri(resource.uri).target);
   } catch {
     return undefined;
   }
@@ -107,7 +91,7 @@ export function workspaceResourcePath(resource: WorkspaceResource): string | und
 export function workspaceResourceDisplayLabel(resource: WorkspaceResource): string {
   const path = workspaceResourcePath(resource);
   if (path) return path;
-  const safeLabel = normalizedRelativePath(resource.label);
+  const safeLabel = normalizeWorkspaceResourcePath(resource.label);
   return safeLabel ?? (resource.kind === 'diff' ? 'File changes' : 'Generated file');
 }
 

@@ -53,6 +53,7 @@ describe('WorkspaceResourceCards', () => {
     );
 
     expect(html).toContain('data-testid="workspace-resource-html-preview"');
+    expect(html).toContain('tabindex="-1"');
     expect(html).toContain('sandbox="allow-forms allow-modals allow-popups allow-scripts"');
     expect(html).not.toContain('allow-same-origin');
     expect(html).toContain('generated/app.html');

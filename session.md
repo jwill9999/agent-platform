@@ -16,9 +16,9 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-12
-- **Session:** Implemented task `.7` Project Chat resource cards/viewer and repaired its Node 24 CI runtime.
+- **Session:** Addressed task `.7` review feedback by centralizing workspace-resource path handling and locally scoping preview Escape handling.
 - **Branch:** `task/project-experience-7`
-- **Head:** `38a40d4` (`Add Project Chat resource previews`)
+- **Head:** `bf67931` (`Address resource preview review feedback`)
 
 ## What Happened
 
@@ -32,8 +32,12 @@ and actionable.
 - PR #243 revealed two unrelated Node 24 native-addon failures: isolated API Vitest forks crashed
   during `better-sqlite3` teardown, and the Alpine API container exited after database startup.
   API tests now keep their single fork alive and `better-sqlite3` is pinned to Node 24-supported
-  `12.11.1`; local API tests pass 199/199. Docker is unavailable locally, so Compose validation is
-  delegated to the rerun CI E2E job.
+  `12.11.1`; local API tests pass 199/199. Compose validation then passed locally and in the rerun
+  CI E2E job.
+- Review feedback on PR #243 is being addressed with the canonical
+  `normalizeWorkspaceResourcePath` contract helper, used by both the web preview layer and harness
+  event producer. The resource viewer no longer listens on `window`; it receives focused Escape
+  key events locally instead.
 
 ## Current State
 
@@ -80,7 +84,8 @@ and actionable.
 **Repository State:**
 
 - `staging` includes merged closeout PR #241 at `b0ebd41`. Task `.7` is on
-  `task/project-experience-7`; PR #243 awaits rerun after its Node 24 native-runtime repair.
+  `task/project-experience-7`; PR #243 has passed all required checks following its Node 24
+  native-runtime repair and awaits final review-thread confirmation.
 - Manual local validation now confirms normal typed input works without voice input, the terminal uses
   the correct Node version, and the Electron app can be started locally.
 - The merged Project Experience topic branches may be deleted when convenient; no deletion is required
@@ -126,8 +131,8 @@ and actionable.
 
 ## Next
 
-1. Push task `.7`, open/monitor its PR into `staging`, and close the Beads task only after required
-   CI, E2E, SonarQube/Problems, and review checks pass.
+1. Commit and push the PR #243 review-feedback changes, then confirm the final review threads before
+   marking the PR ready and closing task `.7`.
 2. Implement `.15` (secure Download/Save As) and `.16` (multi-tab previews), then `.8` (activity/
    evidence panel). Finalize `.6` once `.7` and `.8` are complete.
 3. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token

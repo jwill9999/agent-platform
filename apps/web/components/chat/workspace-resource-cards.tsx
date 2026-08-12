@@ -16,7 +16,7 @@ import {
   Terminal,
   X,
 } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Markdown } from '@/components/chat/markdown';
 import { Button } from '@/components/ui/button';
@@ -356,6 +356,7 @@ export function WorkspaceResourceViewer({
   resource,
   onClose,
 }: Readonly<{ resource: WorkspaceResource; onClose: () => void }>) {
+  const panelRef = useRef<HTMLElement>(null);
   const descriptor = useMemo(() => workspacePreviewDescriptor(resource), [resource]);
   const state = useViewerContent(resource, descriptor);
   const displayLabel = workspaceResourceDisplayLabel(resource);
@@ -364,19 +365,22 @@ export function WorkspaceResourceViewer({
   const canOpenExternally = Boolean(externalUrl || getDesktopWorkspaceBridge());
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+    panelRef.current?.focus();
+  }, []);
 
   return (
     <aside
+      ref={panelRef}
       aria-label="File preview"
       aria-modal="false"
       role="dialog"
+      tabIndex={-1}
       data-testid="workspace-resource-viewer"
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        onClose();
+      }}
       className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col border-l border-border bg-background shadow-2xl"
     >
       <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
