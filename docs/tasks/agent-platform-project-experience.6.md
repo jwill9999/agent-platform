@@ -40,6 +40,9 @@ absolute path entry.
   - primary UI hides runtime implementation details, including `/workspace`, backend roots, host
     absolute paths, and internal state names.
 - Phase 2 E2E adds generated HTML/app, Markdown/document, and PDF preview assertions after `.7`.
+- Phase 2 also verifies generated images and repository-created/modified files are clickable from
+  main chat and open source, preview, or diff review in the in-app viewer without losing Project,
+  branch, session, or conversation context.
 - Phase 3 E2E adds right-side Project activity/evidence panel assertions after `.8`.
 - Phase 4 E2E adds profile-specific expectations for docs/content, research, automation, mixed, and
   unknown Projects after those workflows have product behavior beyond fallback states.
@@ -77,7 +80,7 @@ Keep Beads dependencies aligned with this table.
 - Focused tests needed to stabilize fixtures and route state.
 - Electron E2E for native Project open/reopen, Projects explorer, Project Chat, slash command
   context, branch selection, terminal dock, external/default IDE handoff, rendered previews,
-  activity-panel states, return navigation, and label cleanup.
+  activity-panel states, clickable file/diff review, return navigation, and label cleanup.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
 ## Definition Of Done

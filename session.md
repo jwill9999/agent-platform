@@ -15,10 +15,20 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-08-01
-- **Session:** Local Electron launch is now ready after manual typing and Node-version validation.
-- **Branch:** `staging`
-- **Head:** `b0ebd41` (`staging docs close Project Experience .5 (#241)`)
+- **Date:** 2026-08-12
+- **Session:** Implemented task `.7` Project Chat resource cards/viewer and refined its follow-on tasks.
+- **Branch:** `task/project-experience-7`
+- **Head:** `38a40d4` (`Add Project Chat resource previews`)
+
+## What Happened
+
+- Task `.7` now adds Project Chat cards for generated HTML, Markdown, PDF, and image resources,
+  plus repository file/source and diff review. The viewer remains Project/session scoped and does
+  not perform Git mutations.
+- Focused API, harness, web unit/component, and Playwright coverage was added. Manual validation
+  previously confirmed the interaction works as expected.
+- Follow-on tasks are fully specified: `.15` secure Download/Save As, `.16` multi-tab previews,
+  `.8` activity/evidence panel, and `.6` staged Project Experience E2E gate.
 
 ## Current State
 
@@ -64,8 +74,8 @@ and actionable.
 
 **Repository State:**
 
-- `staging` includes merged closeout PR #241 at `b0ebd41`; the local checkout is clean and matches
-  `origin/staging`.
+- `staging` includes merged closeout PR #241 at `b0ebd41`. Task `.7` is committed locally on
+  `task/project-experience-7` and awaiting push/PR pipeline confirmation.
 - Manual local validation now confirms normal typed input works without voice input, the terminal uses
   the correct Node version, and the Electron app can be started locally.
 - The merged Project Experience topic branches may be deleted when convenient; no deletion is required
@@ -106,16 +116,15 @@ and actionable.
   generated-app workspaces remain deferred until their own product decisions and epics.
 - The completed `.1` through `.5` chain establishes capability metadata, simplified navigation,
   Project Chat-first entry, local IDE handoff, and user-facing Project location/status context.
-- Generated previews and activity/evidence remain required before the Project Experience epic can
-  close.
+- Generated previews are implemented in task `.7`; activity/evidence, exports, multi-tab previews,
+  and staged E2E remain before the Project Experience epic can close.
 
 ## Next
 
-1. Start `agent-platform-project-experience.7`, **Render generated outputs in Project Chat**. Keep
-   generated HTML/app, Markdown/document, PDF/screenshot, and unsupported-output fallbacks inside
-   Project Chat with Project/session context and no implementation-path leakage.
-2. Follow with `.8`, the Project activity/evidence side panel; `.6` remains blocked until `.7` and `.8`
-   are complete, after which the staged Project Experience E2E gate can be finalized.
+1. Push task `.7`, open/monitor its PR into `staging`, and close the Beads task only after required
+   CI, E2E, SonarQube/Problems, and review checks pass.
+2. Implement `.15` (secure Download/Save As) and `.16` (multi-tab previews), then `.8` (activity/
+   evidence panel). Finalize `.6` once `.7` and `.8` are complete.
 3. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token
    pressure is demonstrated, but its validation path remains parked on self-hosted runner availability.
 4. Refine `agent-platform-llm-observability-export` before implementation; its tooling, redaction,
