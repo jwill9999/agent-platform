@@ -451,10 +451,12 @@ async function openProjectChat(page: Page): Promise<void> {
 
 async function openWorkspaceChooserFromSidebar(page: Page): Promise<void> {
   const chooserHeading = page.getByRole('heading', { name: 'Choose a workspace' });
+  const openFolder = page.getByRole('button', { name: 'Open folder' });
   await page.getByRole('link', { name: /^Workspaces\b/ }).click();
 
   try {
     await expect(chooserHeading).toBeVisible();
+    await expect(openFolder).toBeVisible();
   } catch {
     const projectWorkspacesButton = page
       .locator('[data-workspace-surface="project-chat"]')
@@ -462,6 +464,7 @@ async function openWorkspaceChooserFromSidebar(page: Page): Promise<void> {
     await expect(projectWorkspacesButton).toBeVisible();
     await projectWorkspacesButton.click();
     await expect(chooserHeading).toBeVisible({ timeout: 15_000 });
+    await expect(openFolder).toBeVisible({ timeout: 15_000 });
   }
 }
 

@@ -260,7 +260,25 @@ function DiffPreview({ content }: Readonly<{ content: string }>) {
   );
 }
 
-function ViewerBody({
+function PreviewLoadingState() {
+  return (
+    <div className="flex min-h-full items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
+      <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+      Loading preview…
+    </div>
+  );
+}
+
+function PreviewErrorState({ error }: Readonly<{ error: string }>) {
+  return (
+    <div className="flex min-h-full items-center justify-center gap-2 p-6 text-sm text-destructive">
+      <AlertCircle className="h-4 w-4" aria-hidden="true" />
+      {error}
+    </div>
+  );
+}
+
+function ViewerPreview({
   descriptor,
   displayLabel,
   resource,
@@ -271,22 +289,6 @@ function ViewerBody({
   resource: WorkspaceResource;
   state: ViewerContent;
 }>) {
-  if (state.loading) {
-    return (
-      <div className="flex min-h-full items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
-        <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-        Loading preview…
-      </div>
-    );
-  }
-  if (state.error) {
-    return (
-      <div className="flex min-h-full items-center justify-center gap-2 p-6 text-sm text-destructive">
-        <AlertCircle className="h-4 w-4" aria-hidden="true" />
-        {state.error}
-      </div>
-    );
-  }
   if (descriptor.kind === 'image' && state.previewUrl) {
     return (
       <div className="flex min-h-full items-start justify-center p-6">
@@ -352,11 +354,34 @@ function ViewerBody({
   );
 }
 
+function ViewerBody({
+  descriptor,
+  displayLabel,
+  resource,
+  state,
+}: Readonly<{
+  descriptor: WorkspacePreviewDescriptor;
+  displayLabel: string;
+  resource: WorkspaceResource;
+  state: ViewerContent;
+}>) {
+  if (state.loading) return <PreviewLoadingState />;
+  if (state.error) return <PreviewErrorState error={state.error} />;
+  return (
+    <ViewerPreview
+      descriptor={descriptor}
+      displayLabel={displayLabel}
+      resource={resource}
+      state={state}
+    />
+  );
+}
+
 export function WorkspaceResourceViewer({
   resource,
   onClose,
 }: Readonly<{ resource: WorkspaceResource; onClose: () => void }>) {
-  const panelRef = useRef<HTMLElement>(null);
+  const panelRef = useRef<HTMLDialogElement>(null);
   const descriptor = useMemo(() => workspacePreviewDescriptor(resource), [resource]);
   const state = useViewerContent(resource, descriptor);
   const displayLabel = workspaceResourceDisplayLabel(resource);
@@ -369,11 +394,10 @@ export function WorkspaceResourceViewer({
   }, []);
 
   return (
-    <aside
+    <dialog
       ref={panelRef}
+      open
       aria-label="File preview"
-      aria-modal="false"
-      role="dialog"
       tabIndex={-1}
       data-testid="workspace-resource-viewer"
       onKeyDown={(event) => {
@@ -426,6 +450,6 @@ export function WorkspaceResourceViewer({
         </span>
         {mimeType && <span>{mimeType}</span>}
       </footer>
-    </aside>
+    </dialog>
   );
 }

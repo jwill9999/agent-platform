@@ -15,10 +15,10 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-08-12
-- **Session:** Addressed task `.7` review feedback by centralizing workspace-resource path handling and locally scoping preview Escape handling.
+- **Date:** 2026-08-13
+- **Session:** Repaired PR #243 SonarCloud and Electron CI failures after the review-feedback update.
 - **Branch:** `task/project-experience-7`
-- **Head:** `bf67931` (`Address resource preview review feedback`)
+- **Head:** `c8c349b` (`Address resource preview review feedback`)
 
 ## What Happened
 
@@ -38,6 +38,9 @@ and actionable.
   `normalizeWorkspaceResourcePath` contract helper, used by both the web preview layer and harness
   event producer. The resource viewer no longer listens on `window`; it receives focused Escape
   key events locally instead.
+- The follow-up CI repair changes the viewer to a native non-modal `dialog`, separates viewer
+  loading/error states to reduce cognitive complexity, avoids direct callback references in path
+  normalization maps, and makes the Electron chooser test wait for its actionable Open folder state.
 
 ## Current State
 
@@ -131,8 +134,8 @@ and actionable.
 
 ## Next
 
-1. Commit and push the PR #243 review-feedback changes, then confirm the final review threads before
-   marking the PR ready and closing task `.7`.
+1. Push the PR #243 CI-repair changes, confirm the rerun clears SonarCloud and desktop E2E, then
+   confirm final review threads before marking the PR ready and closing task `.7`.
 2. Implement `.15` (secure Download/Save As) and `.16` (multi-tab previews), then `.8` (activity/
    evidence panel). Finalize `.6` once `.7` and `.8` are complete.
 3. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token

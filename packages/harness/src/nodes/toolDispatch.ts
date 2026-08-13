@@ -132,16 +132,18 @@ function stringField(value: Record<string, unknown>, key: string): string | unde
 }
 
 function changedFilePaths(result: Record<string, unknown>): string[] {
-  const source = Array.isArray(result.changedFiles)
-    ? result.changedFiles
-    : Array.isArray(result.files)
-      ? result.files
-      : [];
+  const source = changedFileSource(result);
   return source
     .map((entry) =>
       typeof entry === 'string' ? entry : isRecord(entry) ? stringField(entry, 'path') : undefined,
     )
     .filter((path): path is string => Boolean(path));
+}
+
+function changedFileSource(result: Record<string, unknown>): unknown[] {
+  if (Array.isArray(result.changedFiles)) return result.changedFiles;
+  if (Array.isArray(result.files)) return result.files;
+  return [];
 }
 
 function successfulToolResult(output: Output): Record<string, unknown> | undefined {
@@ -158,7 +160,9 @@ function resourcePathsForWrite(result: Record<string, unknown>): string[] {
   if (directPath) paths.push(directPath);
   return [
     ...new Set(
-      paths.map(normalizeWorkspaceResourcePath).filter((path): path is string => Boolean(path)),
+      paths
+        .map((path) => normalizeWorkspaceResourcePath(path))
+        .filter((path): path is string => Boolean(path)),
     ),
   ];
 }
@@ -197,7 +201,7 @@ export function workspaceResourceEventsForToolOutput(
 
   if (toolId === GIT_TOOL_IDS.status || toolId === GIT_TOOL_IDS.changedFiles) {
     return changedFilePaths(result)
-      .map(normalizeWorkspaceResourcePath)
+      .map((path) => normalizeWorkspaceResourcePath(path))
       .filter((path): path is string => Boolean(path))
       .map((path) =>
         workspaceEventOutput({
