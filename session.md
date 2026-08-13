@@ -16,9 +16,9 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-13
-- **Session:** Repaired PR #243 SonarCloud and Electron CI failures after the review-feedback update.
-- **Branch:** `task/project-experience-7`
-- **Head:** `c8c349b` (`Address resource preview review feedback`)
+- **Session:** Merged and closed Project Experience task `.7` (Project Chat resource previews).
+- **Branch:** `staging`
+- **Head:** `7fd7a90` (`Add Project Chat resource previews (#243)`)
 
 ## What Happened
 
@@ -34,13 +34,16 @@ and actionable.
   API tests now keep their single fork alive and `better-sqlite3` is pinned to Node 24-supported
   `12.11.1`; local API tests pass 199/199. Compose validation then passed locally and in the rerun
   CI E2E job.
-- Review feedback on PR #243 is being addressed with the canonical
+- PR #243 review feedback was addressed with the canonical
   `normalizeWorkspaceResourcePath` contract helper, used by both the web preview layer and harness
-  event producer. The resource viewer no longer listens on `window`; it receives focused Escape
-  key events locally instead.
-- The follow-up CI repair changes the viewer to a native non-modal `dialog`, separates viewer
+  event producer. The resource viewer uses a focused native non-modal `dialog` for local Escape
+  handling.
+- The CI repair separates viewer
   loading/error states to reduce cognitive complexity, avoids direct callback references in path
   normalization maps, and makes the Electron chooser test wait for its actionable Open folder state.
+- PR #243 passed all required checks after these repairs and merged into `staging` at `7fd7a90`.
+  Beads task `agent-platform-project-experience.7` is closed; its merged state is also retained in
+  persistent Beads memory (`project-experience-task-7-merged`).
 
 ## Current State
 
@@ -48,7 +51,7 @@ and actionable.
 
 - PR #236, PR #238, documentation closeout PR #239, PR #240, and closeout PR #241 are merged into
   `staging`; their remote topic branches can be deleted.
-- Project Experience `.1` through `.5` are closed in Beads.
+- Project Experience `.1` through `.5` and `.7` are closed in Beads.
 - The `agent-platform-electron-experience` epic is complete: all eight child tasks are closed.
 - Workspaces exposes general Chat and one Coding Project entry with New project, Open folder, recent
   Project reopen, and explicit loading/error states.
@@ -83,12 +86,14 @@ and actionable.
 - The Promptfoo action is pinned to its Node 24-compatible `v0.1.8` commit. Its initial GitHub API
   `503` passed on retry and did not reproduce in the completed scan.
 - The post-merge CodeQL run on `f1debb7` passed.
+- PR #243 passed verify, Docker, browser/Compose E2E, desktop E2E, packaged macOS VM E2E, CodeQL,
+  SonarCloud, Promptfoo, dependency cycles, documentation checks, GitGuardian, and Sourcery before
+  merge.
 
 **Repository State:**
 
-- `staging` includes merged closeout PR #241 at `b0ebd41`. Task `.7` is on
-  `task/project-experience-7`; PR #243 has passed all required checks following its Node 24
-  native-runtime repair and awaits final review-thread confirmation.
+- `staging` includes Project Chat resource previews from PR #243 at `7fd7a90`. Its topic branch
+  `task/project-experience-7` has been deleted after merge.
 - Manual local validation now confirms normal typed input works without voice input, the terminal uses
   the correct Node version, and the Electron app can be started locally.
 - The merged Project Experience topic branches may be deleted when convenient; no deletion is required
@@ -134,13 +139,11 @@ and actionable.
 
 ## Next
 
-1. Push the PR #243 CI-repair changes, confirm the rerun clears SonarCloud and desktop E2E, then
-   confirm final review threads before marking the PR ready and closing task `.7`.
-2. Implement `.15` (secure Download/Save As) and `.16` (multi-tab previews), then `.8` (activity/
+1. Implement `.15` (secure Download/Save As) and `.16` (multi-tab previews), then `.8` (activity/
    evidence panel). Finalize `.6` once `.7` and `.8` are complete.
-3. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token
+2. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token
    pressure is demonstrated, but its validation path remains parked on self-hosted runner availability.
-4. Refine `agent-platform-llm-observability-export` before implementation; its tooling, redaction,
+3. Refine `agent-platform-llm-observability-export` before implementation; its tooling, redaction,
    deployment, and first-increment decisions are still open.
-5. Keep macOS signing/notarization release tasks open until real signed and notarized artifact
+4. Keep macOS signing/notarization release tasks open until real signed and notarized artifact
    evidence exists; staging capability does not satisfy the production release hold.
