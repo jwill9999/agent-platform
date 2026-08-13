@@ -1583,7 +1583,7 @@ describe('toolDispatchNode', () => {
             projectId: 'project-1',
             label: 'src/index.ts',
             createdAt: '2026-05-23T12:00:00.000Z',
-            metadata: { path: 'src/index.ts', sourceTool: 'sys_git_changed_files' },
+            metadata: { relativePath: 'src/index.ts', sourceTool: 'sys_git_changed_files' },
           },
           metadata: { sourceTool: 'sys_git_changed_files' },
         },
@@ -1613,9 +1613,81 @@ describe('toolDispatchNode', () => {
         resource: {
           uri: 'workspace://project/project-1/diff/src/index.ts',
           kind: 'diff',
-          metadata: { path: 'src/index.ts', mode: 'staged' },
+          metadata: { relativePath: 'src/index.ts', mode: 'staged' },
         },
       },
     });
+  });
+
+  it('maps generated writes and coding edits to safe Project file resources', () => {
+    const written = workspaceResourceEventsForToolOutput(
+      'sys_write_file',
+      {
+        type: 'tool_result',
+        toolId: 'sys_write_file',
+        data: { written: true, path: '/workspace/generated/report.md' },
+      },
+      'project-1',
+      '2026-05-23T12:00:00.000Z',
+    );
+    const patched = workspaceResourceEventsForToolOutput(
+      'coding_apply_patch',
+      {
+        type: 'tool_result',
+        toolId: 'coding_apply_patch',
+        data: {
+          ok: true,
+          result: {
+            dryRun: false,
+            changedFiles: ['src/index.ts', '/workspace/generated/app.html'],
+          },
+        },
+      },
+      'project-1',
+      '2026-05-23T12:00:00.000Z',
+    );
+
+    expect(written).toEqual([
+      expect.objectContaining({
+        type: 'workspace_event',
+        event: expect.objectContaining({
+          type: 'resource_created',
+          action: 'preview',
+          resource: expect.objectContaining({
+            label: 'report.md',
+            metadata: {
+              relativePath: 'generated/report.md',
+              sourceTool: 'sys_write_file',
+            },
+          }),
+        }),
+      }),
+    ]);
+    expect(patched).toHaveLength(2);
+    expect(JSON.stringify([...written, ...patched])).not.toContain('/workspace');
+  });
+
+  it('does not expose host paths or dry-run edits as workspace resources', () => {
+    const hostPath = workspaceResourceEventsForToolOutput(
+      'sys_write_file',
+      {
+        type: 'tool_result',
+        toolId: 'sys_write_file',
+        data: { written: true, path: '/Users/example/private/report.md' },
+      },
+      'project-1',
+    );
+    const dryRun = workspaceResourceEventsForToolOutput(
+      'coding_apply_patch',
+      {
+        type: 'tool_result',
+        toolId: 'coding_apply_patch',
+        data: { ok: true, result: { dryRun: true, changedFiles: ['src/index.ts'] } },
+      },
+      'project-1',
+    );
+
+    expect(hostPath).toEqual([]);
+    expect(dryRun).toEqual([]);
   });
 });

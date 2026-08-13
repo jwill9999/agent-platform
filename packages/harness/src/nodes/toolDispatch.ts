@@ -9,7 +9,11 @@ import type {
   Tool as ContractTool,
   WorkspaceEvent,
 } from '@agent-platform/contracts';
-import { evaluateBrowserUrlPolicy, workspaceResourceUri } from '@agent-platform/contracts';
+import {
+  evaluateBrowserUrlPolicy,
+  normalizeWorkspaceResourcePath,
+  workspaceResourceUri,
+} from '@agent-platform/contracts';
 import { isToolExecutionAllowed, parseToolId } from '@agent-platform/agent-validation';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { PluginDispatcher } from '@agent-platform/plugin-sdk';
@@ -110,6 +114,14 @@ const WRITE_TOOL_IDS = new Set(
 );
 WRITE_TOOL_IDS.add(CODING_APPLY_PATCH_ID);
 
+const RESOURCE_WRITE_TOOL_IDS = new Set([
+  'sys_write_file',
+  'sys_append_file',
+  'sys_copy_file',
+  'sys_download_file',
+  CODING_APPLY_PATCH_ID,
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -120,14 +132,39 @@ function stringField(value: Record<string, unknown>, key: string): string | unde
 }
 
 function changedFilePaths(result: Record<string, unknown>): string[] {
-  const source = Array.isArray(result.changedFiles)
-    ? result.changedFiles
-    : Array.isArray(result.files)
-      ? result.files
-      : [];
+  const source = changedFileSource(result);
   return source
-    .map((entry) => (isRecord(entry) ? stringField(entry, 'path') : undefined))
+    .map((entry) =>
+      typeof entry === 'string' ? entry : isRecord(entry) ? stringField(entry, 'path') : undefined,
+    )
     .filter((path): path is string => Boolean(path));
+}
+
+function changedFileSource(result: Record<string, unknown>): unknown[] {
+  if (Array.isArray(result.changedFiles)) return result.changedFiles;
+  if (Array.isArray(result.files)) return result.files;
+  return [];
+}
+
+function successfulToolResult(output: Output): Record<string, unknown> | undefined {
+  if (output.type !== 'tool_result' || !isRecord(output.data) || output.data.ok === false) {
+    return undefined;
+  }
+  return isRecord(output.data.result) ? output.data.result : output.data;
+}
+
+function resourcePathsForWrite(result: Record<string, unknown>): string[] {
+  if (result.dryRun === true) return [];
+  const paths = changedFilePaths(result);
+  const directPath = stringField(result, 'path');
+  if (directPath) paths.push(directPath);
+  return [
+    ...new Set(
+      paths
+        .map((path) => normalizeWorkspaceResourcePath(path))
+        .filter((path): path is string => Boolean(path)),
+    ),
+  ];
 }
 
 function workspaceEventOutput(event: WorkspaceEvent): Output {
@@ -140,30 +177,52 @@ export function workspaceResourceEventsForToolOutput(
   projectId: string | undefined,
   now = new Date().toISOString(),
 ): Output[] {
-  if (!projectId || output.type !== 'tool_result' || !isRecord(output.data)) return [];
-  if (output.data.ok === false || !isRecord(output.data.result)) return [];
+  if (!projectId) return [];
+  const result = successfulToolResult(output);
+  if (!result) return [];
 
-  const result = output.data.result;
-  if (toolId === GIT_TOOL_IDS.status || toolId === GIT_TOOL_IDS.changedFiles) {
-    return changedFilePaths(result).map((path) =>
+  if (RESOURCE_WRITE_TOOL_IDS.has(toolId)) {
+    return resourcePathsForWrite(result).map((path) =>
       workspaceEventOutput({
         type: 'resource_created',
-        action: 'open',
+        action: 'preview',
         resource: {
           uri: workspaceResourceUri({ projectId, kind: 'file', target: path }),
           kind: 'file',
           projectId,
-          label: path,
+          label: path.split('/').at(-1) ?? 'Generated file',
           createdAt: now,
-          metadata: { path, sourceTool: toolId },
+          metadata: { relativePath: path, sourceTool: toolId },
         },
         metadata: { sourceTool: toolId },
       }),
     );
   }
 
+  if (toolId === GIT_TOOL_IDS.status || toolId === GIT_TOOL_IDS.changedFiles) {
+    return changedFilePaths(result)
+      .map((path) => normalizeWorkspaceResourcePath(path))
+      .filter((path): path is string => Boolean(path))
+      .map((path) =>
+        workspaceEventOutput({
+          type: 'resource_created',
+          action: 'open',
+          resource: {
+            uri: workspaceResourceUri({ projectId, kind: 'file', target: path }),
+            kind: 'file',
+            projectId,
+            label: path,
+            createdAt: now,
+            metadata: { relativePath: path, sourceTool: toolId },
+          },
+          metadata: { sourceTool: toolId },
+        }),
+      );
+  }
+
   if (toolId === GIT_TOOL_IDS.diff) {
-    const path = stringField(result, 'path');
+    const pathValue = stringField(result, 'path');
+    const path = normalizeWorkspaceResourcePath(pathValue);
     if (!path) return [];
     const staged = result.staged === true;
     return [
@@ -177,7 +236,7 @@ export function workspaceResourceEventsForToolOutput(
           label: `Diff: ${path}`,
           createdAt: now,
           metadata: {
-            path,
+            relativePath: path,
             mode: staged ? 'staged' : 'unstaged',
             sourceTool: toolId,
           },

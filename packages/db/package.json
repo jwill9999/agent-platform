@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@agent-platform/contracts": "workspace:*",
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "12.11.1",
     "drizzle-orm": "^0.38.3"
   },
   "devDependencies": {

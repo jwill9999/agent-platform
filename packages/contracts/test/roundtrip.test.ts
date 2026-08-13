@@ -47,6 +47,7 @@ import {
   ScheduledJobRunRecordSchema,
   SkillSchema,
   WorkspaceEventSchema,
+  normalizeWorkspaceResourcePath,
   parseWorkspaceResourceUri,
   workspaceResourceUri,
 } from '../src/index.js';
@@ -140,6 +141,15 @@ describe('contracts round-trip', () => {
         },
       }),
     ).toMatchObject({ type: 'diff_created' });
+  });
+
+  it('normalizes workspace resource paths consistently for producers and consumers', () => {
+    expect(normalizeWorkspaceResourcePath('/workspace/generated/report.md')).toBe(
+      'generated/report.md',
+    );
+    expect(normalizeWorkspaceResourcePath('src\\index.ts')).toBe('src/index.ts');
+    expect(normalizeWorkspaceResourcePath('/Users/example/private.txt')).toBeUndefined();
+    expect(normalizeWorkspaceResourcePath('../private.txt')).toBeUndefined();
   });
 
   it('SkillSchema + AgentSchema + limits', () => {

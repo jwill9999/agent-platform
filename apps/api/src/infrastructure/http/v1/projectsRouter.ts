@@ -100,6 +100,7 @@ import {
 import {
   basename,
   dirname,
+  extname,
   isAbsolute,
   join,
   parse,
@@ -758,6 +759,16 @@ const IGNORED_PROJECT_TREE_DIRECTORIES = new Set([
 const MAX_PROJECT_TREE_DEPTH = 8;
 const MAX_PROJECT_TREE_ENTRIES = 2000;
 const MAX_PROJECT_FILE_READ_BYTES = 512 * 1024;
+const MAX_PROJECT_FILE_PREVIEW_BYTES = 20 * 1024 * 1024;
+const PROJECT_FILE_PREVIEW_MIME_TYPES = new Map([
+  ['.avif', 'image/avif'],
+  ['.gif', 'image/gif'],
+  ['.jpeg', 'image/jpeg'],
+  ['.jpg', 'image/jpeg'],
+  ['.pdf', 'application/pdf'],
+  ['.png', 'image/png'],
+  ['.webp', 'image/webp'],
+]);
 const BINARY_PROBE_BYTES = 4096;
 
 function projectRootForBackendRead(project: ProjectRecord): string {
@@ -2614,7 +2625,11 @@ async function listProjectFiles(project: ProjectRecord) {
   });
 }
 
-async function readProjectFile(project: ProjectRecord, rawPath: unknown) {
+async function resolveReadableProjectFile(
+  project: ProjectRecord,
+  rawPath: unknown,
+  maxBytes: number,
+) {
   const projectRoot = projectRootForBackendRead(project);
   const relativePath = normalizeProjectRelativePath(rawPath);
   const jail = new PathJail([{ label: 'project', hostPath: projectRoot, permission: 'read_only' }]);
@@ -2632,21 +2647,47 @@ async function readProjectFile(project: ProjectRecord, rawPath: unknown) {
   if (!fileStat.isFile()) {
     throw new HttpError(400, 'PROJECT_FILE_INVALID', 'Only files can be opened');
   }
-  if (fileStat.size > MAX_PROJECT_FILE_READ_BYTES) {
+  if (fileStat.size > maxBytes) {
     throw new HttpError(413, 'PROJECT_FILE_TOO_LARGE', 'Project file is too large to open');
   }
 
-  const buffer = await readFile(validation.resolvedPath);
+  return {
+    resolvedPath: validation.resolvedPath,
+    relativePath: projectRelativePath(projectRoot, validation.resolvedPath),
+    size: fileStat.size,
+  };
+}
+
+async function readProjectFile(project: ProjectRecord, rawPath: unknown) {
+  const file = await resolveReadableProjectFile(project, rawPath, MAX_PROJECT_FILE_READ_BYTES);
+  const buffer = await readFile(file.resolvedPath);
   if (isLikelyBinary(buffer)) {
     throw new HttpError(415, 'PROJECT_FILE_BINARY', 'Binary files cannot be opened in the editor');
   }
 
   return ProjectFileReadResultSchema.parse({
-    name: basename(validation.resolvedPath),
-    path: projectRelativePath(projectRoot, validation.resolvedPath),
+    name: basename(file.resolvedPath),
+    path: file.relativePath,
     content: buffer.toString('utf8'),
-    size: fileStat.size,
+    size: file.size,
   });
+}
+
+async function previewProjectFile(project: ProjectRecord, rawPath: unknown) {
+  const file = await resolveReadableProjectFile(project, rawPath, MAX_PROJECT_FILE_PREVIEW_BYTES);
+  const mimeType = PROJECT_FILE_PREVIEW_MIME_TYPES.get(extname(file.resolvedPath).toLowerCase());
+  if (!mimeType) {
+    throw new HttpError(
+      415,
+      'PROJECT_FILE_PREVIEW_UNSUPPORTED',
+      'This file type cannot be previewed safely',
+    );
+  }
+  return {
+    ...file,
+    mimeType,
+    content: await readFile(file.resolvedPath),
+  };
 }
 
 function approveProjectOnboarding(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
@@ -3047,6 +3088,23 @@ export function createProjectsRouter(db: DrizzleDb): Router {
       const project = findProject(db, requireParam(req.params, 'id'));
       if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
       res.json({ data: await readProjectFile(project, req.query.path) });
+    }),
+  );
+
+  router.get(
+    '/:id/files/preview',
+    asyncHandler(async (req, res) => {
+      const project = findProject(db, requireParam(req.params, 'id'));
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      const preview = await previewProjectFile(project, req.query.path);
+      res.set({
+        'Cache-Control': 'no-store',
+        'Content-Disposition': `inline; filename="${basename(preview.resolvedPath).replaceAll('"', '')}"`,
+        'Content-Security-Policy': "sandbox; default-src 'none'",
+        'Content-Type': preview.mimeType,
+        'X-Content-Type-Options': 'nosniff',
+      });
+      res.send(preview.content);
     }),
   );
 

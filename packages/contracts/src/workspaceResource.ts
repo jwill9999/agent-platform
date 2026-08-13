@@ -34,6 +34,28 @@ export type ParsedWorkspaceResourceUri = {
   target: string;
 };
 
+/**
+ * Converts a container workspace path into the safe, project-relative form
+ * carried by workspace-resource metadata. Host-absolute and traversal paths
+ * are deliberately not representable in the resource contract.
+ */
+export function normalizeWorkspaceResourcePath(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const normalized = value
+    .trim()
+    .replaceAll('\\', '/')
+    .replace(/^\/workspace\/?/, '');
+  if (
+    !normalized ||
+    normalized.startsWith('/') ||
+    normalized === '..' ||
+    normalized.startsWith('../')
+  ) {
+    return undefined;
+  }
+  return normalized;
+}
+
 export function parseWorkspaceResourceUri(uri: string): ParsedWorkspaceResourceUri {
   WorkspaceResourceUriSchema.parse(uri);
   const match = WORKSPACE_RESOURCE_URI_PATTERN.exec(uri);

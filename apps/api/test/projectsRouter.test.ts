@@ -1950,6 +1950,7 @@ exit 1
     mkdirSync(path.join(repoDir, 'node_modules', 'hidden-package'), { recursive: true });
     writeFileSync(path.join(repoDir, 'README.md'), '# Desktop files\n');
     writeFileSync(path.join(repoDir, 'src', 'index.ts'), 'export const value = 1;\n');
+    writeFileSync(path.join(repoDir, 'chart.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     writeFileSync(path.join(repoDir, 'node_modules', 'hidden-package', 'index.js'), 'hidden\n');
     const realRoot = realpathSync(repoDir);
 
@@ -1969,6 +1970,7 @@ exit 1
         type: 'directory',
         children: [expect.objectContaining({ name: 'index.ts', path: 'src/index.ts' })],
       }),
+      expect.objectContaining({ name: 'chart.png', path: 'chart.png', type: 'file' }),
       expect.objectContaining({ name: 'README.md', path: 'README.md', type: 'file' }),
     ]);
     expect(JSON.stringify(tree.body.data)).not.toContain(realRoot);
@@ -1985,6 +1987,16 @@ exit 1
       size: 24,
     });
     expect(JSON.stringify(read.body.data)).not.toContain(realRoot);
+
+    const preview = await request(app)
+      .get(`/v1/projects/${projectId}/files/preview`)
+      .query({ path: 'chart.png' })
+      .expect('Content-Type', /image\/png/)
+      .expect('X-Content-Type-Options', 'nosniff')
+      .expect(200);
+    expect(preview.headers['content-disposition']).toBe('inline; filename="chart.png"');
+    expect(preview.headers['content-security-policy']).toContain('sandbox');
+    expect(JSON.stringify(preview.headers)).not.toContain(realRoot);
   });
 
   it('blocks project file traversal, symlink escapes, binary files, and oversized files', async () => {
@@ -2020,6 +2032,18 @@ exit 1
       .get(`/v1/projects/${projectId}/files/read`)
       .query({ path: 'large.txt' })
       .expect(413);
+    await request(app)
+      .get(`/v1/projects/${projectId}/files/preview`)
+      .query({ path: '../outside/secret.txt' })
+      .expect(403);
+    await request(app)
+      .get(`/v1/projects/${projectId}/files/preview`)
+      .query({ path: 'secret-link.txt' })
+      .expect(403);
+    await request(app)
+      .get(`/v1/projects/${projectId}/files/preview`)
+      .query({ path: 'binary.bin' })
+      .expect(415);
   });
 
   it('rejects desktop project registration without the desktop bridge or inspectable folder', async () => {

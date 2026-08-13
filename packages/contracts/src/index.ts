@@ -38,6 +38,7 @@ export {
   WorkspaceResourceResolutionSchema,
   WorkspaceEventTypeSchema,
   WorkspaceEventSchema,
+  normalizeWorkspaceResourcePath,
   parseWorkspaceResourceUri,
   workspaceResourceUri,
   type WorkspaceResourceKind,

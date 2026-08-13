@@ -15,10 +15,32 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-08-01
-- **Session:** Local Electron launch is now ready after manual typing and Node-version validation.
-- **Branch:** `staging`
-- **Head:** `b0ebd41` (`staging docs close Project Experience .5 (#241)`)
+- **Date:** 2026-08-13
+- **Session:** Repaired PR #243 SonarCloud and Electron CI failures after the review-feedback update.
+- **Branch:** `task/project-experience-7`
+- **Head:** `c8c349b` (`Address resource preview review feedback`)
+
+## What Happened
+
+- Task `.7` now adds Project Chat cards for generated HTML, Markdown, PDF, and image resources,
+  plus repository file/source and diff review. The viewer remains Project/session scoped and does
+  not perform Git mutations.
+- Focused API, harness, web unit/component, and Playwright coverage was added. Manual validation
+  previously confirmed the interaction works as expected.
+- Follow-on tasks are fully specified: `.15` secure Download/Save As, `.16` multi-tab previews,
+  `.8` activity/evidence panel, and `.6` staged Project Experience E2E gate.
+- PR #243 revealed two unrelated Node 24 native-addon failures: isolated API Vitest forks crashed
+  during `better-sqlite3` teardown, and the Alpine API container exited after database startup.
+  API tests now keep their single fork alive and `better-sqlite3` is pinned to Node 24-supported
+  `12.11.1`; local API tests pass 199/199. Compose validation then passed locally and in the rerun
+  CI E2E job.
+- Review feedback on PR #243 is being addressed with the canonical
+  `normalizeWorkspaceResourcePath` contract helper, used by both the web preview layer and harness
+  event producer. The resource viewer no longer listens on `window`; it receives focused Escape
+  key events locally instead.
+- The follow-up CI repair changes the viewer to a native non-modal `dialog`, separates viewer
+  loading/error states to reduce cognitive complexity, avoids direct callback references in path
+  normalization maps, and makes the Electron chooser test wait for its actionable Open folder state.
 
 ## Current State
 
@@ -64,8 +86,9 @@ and actionable.
 
 **Repository State:**
 
-- `staging` includes merged closeout PR #241 at `b0ebd41`; the local checkout is clean and matches
-  `origin/staging`.
+- `staging` includes merged closeout PR #241 at `b0ebd41`. Task `.7` is on
+  `task/project-experience-7`; PR #243 has passed all required checks following its Node 24
+  native-runtime repair and awaits final review-thread confirmation.
 - Manual local validation now confirms normal typed input works without voice input, the terminal uses
   the correct Node version, and the Electron app can be started locally.
 - The merged Project Experience topic branches may be deleted when convenient; no deletion is required
@@ -106,16 +129,15 @@ and actionable.
   generated-app workspaces remain deferred until their own product decisions and epics.
 - The completed `.1` through `.5` chain establishes capability metadata, simplified navigation,
   Project Chat-first entry, local IDE handoff, and user-facing Project location/status context.
-- Generated previews and activity/evidence remain required before the Project Experience epic can
-  close.
+- Generated previews are implemented in task `.7`; activity/evidence, exports, multi-tab previews,
+  and staged E2E remain before the Project Experience epic can close.
 
 ## Next
 
-1. Start `agent-platform-project-experience.7`, **Render generated outputs in Project Chat**. Keep
-   generated HTML/app, Markdown/document, PDF/screenshot, and unsupported-output fallbacks inside
-   Project Chat with Project/session context and no implementation-path leakage.
-2. Follow with `.8`, the Project activity/evidence side panel; `.6` remains blocked until `.7` and `.8`
-   are complete, after which the staged Project Experience E2E gate can be finalized.
+1. Push the PR #243 CI-repair changes, confirm the rerun clears SonarCloud and desktop E2E, then
+   confirm final review threads before marking the PR ready and closing task `.7`.
+2. Implement `.15` (secure Download/Save As) and `.16` (multi-tab previews), then `.8` (activity/
+   evidence panel). Finalize `.6` once `.7` and `.8` are complete.
 3. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token
    pressure is demonstrated, but its validation path remains parked on self-hosted runner availability.
 4. Refine `agent-platform-llm-observability-export` before implementation; its tooling, redaction,
