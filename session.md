@@ -19,7 +19,8 @@ and actionable.
 - **Session:** Implemented Project Experience `.16` multi-tab Project resource previews.
 - **Branch:** `task/project-experience-16-multi-tab-previews`
 - **Base:** `fd1aab1` (Project Experience `.15`, merged through PR #245)
-- **Pull request:** pending into `staging`
+- **Head:** `eb788d1` (`feat add scoped multi-tab resource previews`)
+- **Pull request:** [#246](https://github.com/jwill9999/agent-platform/pull/246) into `staging`
 
 ## What Happened
 
@@ -60,7 +61,6 @@ and actionable.
 
 ## Next
 
-1. Commit/push the `.16` branch and open its PR into `staging`.
-2. Monitor hosted CI, SonarCloud, security scans, artifacts, and review comments; fix findings until
+1. Monitor PR #246 hosted CI, SonarCloud, security scans, artifacts, and review comments; fix findings until
    all required checks are green.
-3. Merge the green PR, close/sync Beads `.16`, then start `.8` from the cumulative `staging` state.
+2. Merge the green PR, close/sync Beads `.16`, then start `.8` from the cumulative `staging` state.
