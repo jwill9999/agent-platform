@@ -59,6 +59,12 @@ type ProjectGitHubPanelProps = Readonly<{
 
 type PanelTab = 'overview' | 'changes' | 'commit' | 'push' | 'prs' | 'checks';
 
+function panelWidthClass(open: boolean, embedded: boolean): string {
+  if (!open) return 'w-12';
+  if (embedded) return 'w-full';
+  return 'w-[360px] max-w-[30vw]';
+}
+
 type GitWorkflowTab = Readonly<{
   id: PanelTab;
   label: string;
@@ -3388,7 +3394,7 @@ export function ProjectGitHubPanel({
         className={cn(
           'h-full max-h-full min-h-0 shrink-0 overflow-hidden bg-background/95',
           embedded ? 'flex' : 'hidden border-l border-border lg:flex',
-          open ? (embedded ? 'w-full' : 'w-[360px] max-w-[30vw]') : 'w-12',
+          panelWidthClass(open, embedded),
         )}
         aria-label="Git and GitHub"
       >

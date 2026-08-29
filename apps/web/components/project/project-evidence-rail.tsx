@@ -51,6 +51,8 @@ export function ProjectEvidenceRail({
             key={candidate}
             type="button"
             role="tab"
+            id={`project-evidence-${candidate}-tab`}
+            aria-controls={`project-evidence-${candidate}-panel`}
             aria-selected={view === candidate}
             className={cn(
               'flex-1 rounded px-2 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -64,8 +66,14 @@ export function ProjectEvidenceRail({
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1">
-        {view === 'activity' ? (
+      <div
+        role="tabpanel"
+        id="project-evidence-activity-panel"
+        aria-labelledby="project-evidence-activity-tab"
+        hidden={view !== 'activity'}
+        className="min-h-0 flex-1"
+      >
+        {view === 'activity' && (
           <ProjectActivityPanel
             embedded
             projectId={projectId}
@@ -76,7 +84,16 @@ export function ProjectEvidenceRail({
             toolEventsByMessage={toolEventsByMessage}
             refreshKey={refreshKey}
           />
-        ) : (
+        )}
+      </div>
+      <div
+        role="tabpanel"
+        id="project-evidence-git-panel"
+        aria-labelledby="project-evidence-git-tab"
+        hidden={view !== 'git'}
+        className="min-h-0 flex-1"
+      >
+        {view === 'git' && (
           <ProjectGitHubPanel
             embedded
             projectId={projectId}

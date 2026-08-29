@@ -85,6 +85,12 @@ function toolLabel(toolId: string): string {
     .replace(/\b\w/gu, (letter) => letter.toUpperCase());
 }
 
+function toolResultDetail(status: string): string {
+  if (status === 'success') return 'Completed successfully';
+  if (status === 'denied') return 'Action was denied';
+  return 'Action reported an issue';
+}
+
 function normalizedFindings(
   eventsByMessage?: Readonly<Record<string, readonly ToolTraceEvent[]>>,
 ): ProjectActivityFinding[] {
@@ -108,12 +114,7 @@ function normalizedFindings(
       entries.push({
         id: `${messageId}:${event.toolId}:${index}`,
         title: toolLabel(event.toolId),
-        detail:
-          event.status === 'success'
-            ? 'Completed successfully'
-            : event.status === 'denied'
-              ? 'Action was denied'
-              : 'Action reported an issue',
+        detail: toolResultDetail(event.status),
         status: event.status,
         category,
       });

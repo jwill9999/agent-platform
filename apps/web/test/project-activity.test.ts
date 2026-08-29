@@ -216,6 +216,11 @@ describe('normalizeProjectActivity', () => {
     expect(html).toContain('aria-label="Project evidence views"');
     expect(html).toContain('role="tab"');
     expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('aria-controls="project-evidence-activity-panel"');
+    expect(html).toContain('aria-controls="project-evidence-git-panel"');
+    expect(html).toContain('role="tabpanel"');
+    expect(html).toContain('aria-labelledby="project-evidence-activity-tab"');
+    expect(html).toContain('aria-labelledby="project-evidence-git-tab"');
     expect(html).toContain('Activity');
     expect(html).toContain('Git &amp; GitHub');
     expect(html).toContain('aria-label="Project activity"');

@@ -82,7 +82,7 @@ function safeCopy(value: string | undefined, fallback: string): string {
     .replace(/\/(?:Users|home)\/[^\s,;]+/gu, (path) => path.split('/').at(-1) ?? fallback)
     .replace(/^\/workspace\/?/u, '');
   if (normalized.startsWith('/') || /^[A-Za-z]:\//u.test(normalized)) {
-    return normalized.split('/').filter(Boolean).at(-1) ?? fallback;
+    return normalized.split('/').findLast(Boolean) ?? fallback;
   }
   return normalized.replace(/\b[0-9a-f]{40}\b/giu, 'a recent commit');
 }
@@ -90,6 +90,35 @@ function safeCopy(value: string | undefined, fallback: string): string {
 function fileTone(status: string): ProjectActivityTone {
   if (status === 'conflict' || status === 'deleted') return 'warning';
   return 'neutral';
+}
+
+function resultTone(status: string): ProjectActivityTone {
+  if (status === 'success') return 'success';
+  if (status === 'error') return 'danger';
+  return 'warning';
+}
+
+function checkTone(
+  running: boolean,
+  failed: boolean,
+  conclusion: string | null | undefined,
+): ProjectActivityTone {
+  if (running) return 'running';
+  if (failed) return 'danger';
+  if (conclusion === 'success') return 'success';
+  return 'neutral';
+}
+
+function reviewTone(decision: string): ProjectActivityTone {
+  if (decision === 'approved') return 'success';
+  if (decision === 'changes_requested') return 'danger';
+  return 'warning';
+}
+
+function approvalTone(status: string): ProjectActivityTone {
+  if (status === 'approved' || status === 'executed') return 'success';
+  if (status === 'rejected' || status === 'failed') return 'danger';
+  return 'warning';
 }
 
 function changedFileEntries(source: ProjectActivitySource): ProjectActivityEntry[] {
@@ -148,12 +177,7 @@ function checkEntries(source: ProjectActivitySource): ProjectActivityEntry[] {
       kind: 'check' as const,
       title: safeCopy(finding.title, 'Local check'),
       detail: finding.detail ? safeCopy(finding.detail, 'Completed') : 'Completed',
-      tone:
-        finding.status === 'success'
-          ? ('success' as const)
-          : finding.status === 'error'
-            ? ('danger' as const)
-            : ('warning' as const),
+      tone: resultTone(finding.status),
     }));
   if (!source.checks?.available) return localChecks;
   return [
@@ -166,13 +190,7 @@ function checkEntries(source: ProjectActivitySource): ProjectActivityEntry[] {
         kind: 'check',
         title: safeCopy(check.name, 'Project check'),
         detail: running ? 'Running' : safeCopy(check.conclusion, 'Completed').replaceAll('_', ' '),
-        tone: running
-          ? 'running'
-          : failed
-            ? 'danger'
-            : check.conclusion === 'success'
-              ? 'success'
-              : 'neutral',
+        tone: checkTone(running, failed, check.conclusion),
         ...(check.url ? { url: check.url } : {}),
       };
     }),
@@ -191,12 +209,7 @@ function reviewEntries(source: ProjectActivitySource): ProjectActivityEntry[] {
       kind: 'review',
       title: `Pull request #${pullRequest.number}`,
       detail: decision.replaceAll('_', ' '),
-      tone:
-        decision === 'approved'
-          ? 'success'
-          : decision === 'changes_requested'
-            ? 'danger'
-            : 'warning',
+      tone: reviewTone(decision),
       url: pullRequest.url,
     });
   }
@@ -206,12 +219,7 @@ function reviewEntries(source: ProjectActivitySource): ProjectActivityEntry[] {
       kind: 'approval',
       title: safeCopy(approval.title, 'Approval'),
       detail: safeCopy(approval.detail, approval.status).replaceAll('_', ' '),
-      tone:
-        approval.status === 'approved' || approval.status === 'executed'
-          ? 'success'
-          : approval.status === 'rejected' || approval.status === 'failed'
-            ? 'danger'
-            : 'warning',
+      tone: approvalTone(approval.status),
     });
   }
   return entries;
@@ -225,12 +233,7 @@ function findingEntries(source: ProjectActivitySource): ProjectActivityEntry[] {
       kind: 'finding',
       title: safeCopy(finding.title, 'Tool finding'),
       detail: finding.detail ? safeCopy(finding.detail, 'Details unavailable') : undefined,
-      tone:
-        finding.status === 'success'
-          ? 'success'
-          : finding.status === 'error'
-            ? 'danger'
-            : 'warning',
+      tone: resultTone(finding.status),
     }));
 }
 
@@ -301,6 +304,27 @@ function profileMessage(profile: ProjectProfile): string | undefined {
   return 'Activity will appear as this Project produces normalized evidence.';
 }
 
+function changesUnavailableMessage(source: ProjectActivitySource): string | undefined {
+  if (source.gitError) return 'Local changes are unavailable.';
+  if (source.changes?.available === false) return 'This Project does not have local Git changes.';
+  return undefined;
+}
+
+function snapshotState(
+  allProvidersUnavailable: boolean,
+  evidenceCount: number,
+): ProjectActivitySnapshot['state'] {
+  if (allProvidersUnavailable) return 'unavailable';
+  if (evidenceCount === 0) return 'empty';
+  return 'ready';
+}
+
+function evidenceSummary(evidenceCount: number): string {
+  if (evidenceCount === 0) return 'No activity has been recorded for this Project yet.';
+  const itemLabel = evidenceCount === 1 ? 'item' : 'items';
+  return `${evidenceCount} evidence ${itemLabel} in this Project session.`;
+}
+
 export function normalizeProjectActivity(source: ProjectActivitySource): ProjectActivitySnapshot {
   if (!source.projectId) {
     return { state: 'disconnected', summary: 'Open a Project to see its activity.', sections: [] };
@@ -317,11 +341,7 @@ export function normalizeProjectActivity(source: ProjectActivitySource): Project
       id: 'changes',
       title: 'Changed files',
       entries: changes,
-      unavailableMessage: source.gitError
-        ? 'Local changes are unavailable.'
-        : source.changes?.available === false
-          ? 'This Project does not have local Git changes.'
-          : undefined,
+      unavailableMessage: changesUnavailableMessage(source),
     },
     { id: 'generated', title: 'Generated outputs', entries: generated },
     {
@@ -348,11 +368,8 @@ export function normalizeProjectActivity(source: ProjectActivitySource): Project
     source.gitError && source.checksError && source.reviewsError && evidenceCount === 0,
   );
   return {
-    state: allProvidersUnavailable ? 'unavailable' : evidenceCount === 0 ? 'empty' : 'ready',
-    summary:
-      evidenceCount === 0
-        ? 'No activity has been recorded for this Project yet.'
-        : `${evidenceCount} evidence item${evidenceCount === 1 ? '' : 's'} in this Project session.`,
+    state: snapshotState(allProvidersUnavailable, evidenceCount),
+    summary: evidenceSummary(evidenceCount),
     profileMessage: profileMessage(source.profile),
     sections,
   };
