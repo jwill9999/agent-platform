@@ -16,67 +16,51 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-29
-- **Session:** Implemented Project Experience `.15` secure Download and Save As exports.
-- **Branch:** `task/project-experience-15-secure-export`
-- **Head:** `f35d932` (`task/project-experience-15-secure-export fix bind project reads to validated descriptors`)
-- **Pull request:** [#245](https://github.com/jwill9999/agent-platform/pull/245) into `staging`
+- **Session:** Implemented Project Experience `.16` multi-tab Project resource previews.
+- **Branch:** `task/project-experience-16-multi-tab-previews`
+- **Base:** `fd1aab1` (Project Experience `.15`, merged through PR #245)
+- **Pull request:** pending into `staging`
 
 ## What Happened
 
-- Added a Project-scoped attachment endpoint that accepts only normalized resource URIs and rejects
-  mismatched Projects, traversal, symlink escapes, missing files, directories, unsupported resource
-  kinds, and oversized files.
-- Added reusable Download controls for browser clients and native Save As controls for Electron.
-  Renderer requests cannot supply host source or destination paths; the trusted main process fetches
-  scoped bytes and writes only to the native-dialog destination.
-- Added safe attachment filenames, MIME selection, no-store/nosniff/CSP headers, cancellation as a
-  no-op, redacted failures, and explicit export contracts.
-- Added API, contracts, preload, desktop bridge, browser Playwright, and Electron Playwright coverage.
-  Browser E2E uses a real isolated Project and validates attachment name/bytes through the BFF.
-- Electron E2E caught and fixed a production-only preload generator omission where the typed bridge
-  declared `saveResourceAs` but the generated CommonJS preload did not expose it.
-- The first SonarCloud run failed its duplication threshold at 3.7% and reported four annotations.
-  Filename sanitization is now shared through contracts; the type, accessibility, assertion, and
-  Playwright readiness findings are fixed; duplicated Electron E2E runtime helpers were centralized.
-- The corrected SonarCloud analysis passes. Upgraded `better-sqlite3` to 13.0.3 to resolve its
-  Node 24.19 worker-thread cleanup abort; the next hosted verify and Linux Electron E2E jobs passed.
-- Addressed Sourcery's TOCTOU security review: reads now stay bound to an `O_NOFOLLOW` descriptor,
-  validate descriptor/path identity and regular-file metadata, and enforce the size cap while reading.
-- Refined the Gherkin E2E strategies for Project Experience `.15`, `.16`, `.8`, and `.6`.
+- PR #245 merged Project Experience `.15` into `staging` at `fd1aab1`; its Beads task is closed.
+- Added a normalized tab-state model with deterministic de-duplication, activation, adjacent
+  selection on close, close-last behavior, minimize, and restore.
+- Added one reusable Project/session-scoped preview provider for standard Chat and IDE Chat. State is
+  safely restored from session storage, filtered by Project, and isolated by Project/session scope.
+- Added accessible tablist/tab/tabpanel relationships, arrow/Home/End navigation, Delete and
+  Command/Ctrl+W close shortcuts, explicit per-tab close controls, and safe focus restoration.
+- Added an accessible minimized right-side dock, horizontal tab overflow, and a full-width narrow
+  viewport fallback that does not obscure desktop-width Project Chat controls.
+- Missing resources remain closeable error previews without disrupting other tabs. Existing
+  Markdown, HTML, image, PDF, source, diff, Download, and Electron Save As behavior is preserved.
+- Added a Gherkin E2E strategy plus browser and production-built Electron coverage for multi-tab
+  navigation, de-duplication, focus, minimize/restore, persistence, isolation, and unavailable files.
 
 ## Verification
 
-- Passed: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, and `pnpm docs:lint`.
-- Passed: Docker rebuild/start/health and database seed via `make restart`.
-- Passed: focused browser Project resource Playwright scenario.
-- Passed: all 10 Electron Playwright scenarios locally, including the cancellation/save destination
-  scenario using the production-built renderer, managed API, generated CommonJS preload, and
-  isolated app data.
-- Passed: pre-push circular-dependency, affected-package build, typecheck, and test hooks.
-- Passed on the hosted `6b4fd81` run: verify, Linux desktop E2E, browser E2E, Docker, SonarCloud,
-  CodeQL, security, documentation, dependency, Sourcery, and GitGuardian checks.
-- Local SonarQube Agentic Analysis was attempted but SonarQube Cloud returned an explicit 403
-  authorization denial. GitHub's SonarCloud annotations were retrieved through the check-run API,
-  fixed, locally revalidated, and the corrected SonarCloud quality gate passes.
-- Docker initially ran out of VM space; 18.03 GB of unused build cache was pruned, then the complete
-  Docker build and health checks passed. No project data or active volumes were removed.
+- Passed: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm docs:lint`, and
+  `pnpm deps:check-cycles` across the repository.
+- Passed: production Docker API/web rebuild and health checks.
+- Passed: all 22 browser Playwright scenarios, including the expanded Project resource scenario.
+- Passed: all 10 Electron Playwright scenarios using the production-built renderer and managed API.
+- SonarQube Agentic Analysis was attempted through the supported CLI fallback but SonarQube Cloud
+  returned the known explicit 403 authorization denial. The required typecheck/lint/test fallback
+  gate has no errors; hosted SonarCloud remains required on the PR.
 
 ## Current State
 
-- Beads task `agent-platform-project-experience.15` remains `in_progress` until PR #245 merges.
-- Local implementation and verification criteria are complete. The combined CI/Sonar checklist item
-  is satisfied on `6b4fd81`; the refreshed `f35d932` security-hardening run is pending.
-- The task branch is published at `origin/task/project-experience-15-secure-export`.
-- Project Experience `.1` through `.5` and `.7` are already closed. The planned remaining sequence is
-  `.16` multi-tab previews, `.8` activity/evidence, then `.6` staged E2E closure.
+- Beads task `agent-platform-project-experience.16` is `in_progress` until its PR passes hosted
+  CI/Sonar/review and merges into `staging`.
+- Local implementation and all planned local verification are complete.
+- Project Experience `.1` through `.5`, `.7`, and `.15` are closed. The remaining sequence is `.8`
+  activity/evidence, then `.6` staged E2E closure.
 - macOS production task `.6.3` remains externally blocked on a Developer ID identity, notarization
   credentials, and a VM-capable Apple Silicon runner; `.6.4` waits on that evidence.
 
 ## Next
 
-1. Monitor PR #245 checks, artifacts, review comments, and automated findings; fix failures on this
-   branch until all required checks are green.
-2. Once PR #245 is green, merge it into `staging`, close Beads task
-   `agent-platform-project-experience.15`, sync Beads, and record the merged evidence.
-3. Start `agent-platform-project-experience.16` from the cumulative Project Experience branch state,
-   then continue `.8` and `.6` in the documented sequence.
+1. Commit/push the `.16` branch and open its PR into `staging`.
+2. Monitor hosted CI, SonarCloud, security scans, artifacts, and review comments; fix findings until
+   all required checks are green.
+3. Merge the green PR, close/sync Beads `.16`, then start `.8` from the cumulative `staging` state.

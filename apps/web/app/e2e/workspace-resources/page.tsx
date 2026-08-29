@@ -4,7 +4,10 @@ import {
   type WorkspaceResource,
 } from '@agent-platform/contracts';
 
-import { WorkspaceResourceCards } from '@/components/chat/workspace-resource-cards';
+import {
+  WorkspaceResourceCards,
+  WorkspaceResourcePreviewProvider,
+} from '@/components/chat/workspace-resource-cards';
 
 const PROJECT_ID = 'e2e-project';
 const CREATED_AT = '2026-08-04T09:00:00.000Z';
@@ -38,6 +41,7 @@ function workspaceResources(projectId: string): WorkspaceResource[] {
     fileResource(projectId, 'src/index.ts', 'text/typescript', {
       content: 'export const projectExperience = true;\n',
     }),
+    fileResource(projectId, 'generated/missing.txt', 'text/plain'),
     fileResource(projectId, 'generated/archive.zip', 'application/zip'),
     {
       uri: workspaceResourceUri({
@@ -60,8 +64,10 @@ function workspaceResources(projectId: string): WorkspaceResource[] {
 
 export default async function WorkspaceResourcesE2EPage({
   searchParams,
-}: Readonly<{ searchParams: Promise<{ projectId?: string }> }>) {
-  const projectId = (await searchParams).projectId ?? PROJECT_ID;
+}: Readonly<{ searchParams: Promise<{ projectId?: string; sessionId?: string }> }>) {
+  const params = await searchParams;
+  const projectId = params.projectId ?? PROJECT_ID;
+  const sessionId = params.sessionId ?? 'e2e-session';
   const events: WorkspaceEvent[] = workspaceResources(projectId).map((resource) => ({
     type: resource.kind === 'diff' ? 'diff_created' : 'resource_created',
     resource,
@@ -77,9 +83,15 @@ export default async function WorkspaceResourcesE2EPage({
         <p className="text-xs text-muted-foreground">Project · feature/project-experience</p>
         <h1 className="mt-1 text-xl font-semibold">Project Chat resource previews</h1>
         <p data-testid="project-context" className="mt-2 text-sm text-muted-foreground">
-          Session e2e-session · Conversation e2e-conversation
+          Session {sessionId} · Conversation e2e-conversation
         </p>
-        <WorkspaceResourceCards events={events} />
+        <WorkspaceResourcePreviewProvider
+          key={`${projectId}:${sessionId}`}
+          scopeKey={`e2e:${projectId}:${sessionId}`}
+          projectId={projectId}
+        >
+          <WorkspaceResourceCards events={events} />
+        </WorkspaceResourcePreviewProvider>
       </section>
     </main>
   );

@@ -33,7 +33,7 @@ test('Project Chat opens generated outputs and file changes without losing conte
 
   const openedProjectResponse = await page.request.post('/api/v1/projects/open', {
     data: {
-      name: 'Project Chat resource previews',
+      name: projectDirectoryName,
       path: `/workspace/e2e/${projectDirectoryName}`,
     },
   });
@@ -69,10 +69,38 @@ test('Project Chat opens generated outputs and file changes without losing conte
     'sandbox',
     'allow-forms allow-modals allow-popups allow-scripts',
   );
-  await page.getByRole('button', { name: 'Close preview' }).click();
 
   await page.getByRole('button', { name: 'Preview Markdown: generated/notes.md' }).click();
+  const tabs = page.getByRole('tab');
+  await expect(tabs).toHaveCount(2);
+  await expect(page.getByRole('tab', { name: 'generated/notes.md' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(page.getByRole('heading', { name: 'Generated notes' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Preview HTML: generated/app.html' }).click();
+  await expect(tabs).toHaveCount(2);
+  await expect(page.getByRole('tab', { name: 'generated/app.html' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByRole('tab', { name: 'generated/app.html' }).press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'generated/notes.md' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Minimize previews' }).click();
+  await expect(page.getByTestId('workspace-resource-viewer')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Restore 2 open previews' }).click();
+  await expect(tabs).toHaveCount(2);
+  await expect(page.getByRole('heading', { name: 'Generated notes' })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const narrowViewer = await page.getByTestId('workspace-resource-viewer').boundingBox();
+  expect(narrowViewer?.width).toBeLessThanOrEqual(390);
+  await expect(page.getByRole('button', { name: 'Minimize previews' })).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download' }).click();
   const download = await downloadPromise;
@@ -82,19 +110,28 @@ test('Project Chat opens generated outputs and file changes without losing conte
   for await (const chunk of stream) chunks.push(Buffer.from(chunk));
   expect(Buffer.concat(chunks).toString('utf8')).toContain('# Generated notes');
   await expect(context).toContainText('e2e-conversation');
-  await page.getByRole('button', { name: 'Close preview' }).click();
+  await page.getByRole('tab', { name: 'generated/notes.md' }).press('Delete');
+  await expect(page.getByRole('tab', { name: 'generated/app.html' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Close preview generated/app.html' }).click();
+  await expect(page.getByTestId('workspace-resource-viewer')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Preview HTML: generated/app.html' }),
+  ).toBeFocused();
 
   await page.getByRole('button', { name: 'View image: generated/chart.png' }).click();
   await expect(page.getByRole('img', { name: 'generated/chart.png' })).toBeVisible();
-  await page.getByRole('button', { name: 'Close preview' }).click();
+  await page.getByRole('button', { name: 'Close preview generated/chart.png' }).click();
 
   await page.getByRole('button', { name: 'Preview PDF: generated/report.pdf' }).click();
   await expect(page.getByTitle('generated/report.pdf')).toBeVisible();
-  await page.getByRole('button', { name: 'Close preview' }).click();
+  await page.getByRole('button', { name: 'Close preview generated/report.pdf' }).click();
 
   await page.getByRole('button', { name: 'Open source: src/index.ts' }).click();
   await expect(page.getByText('export const projectExperience = true;')).toBeVisible();
-  await page.getByRole('button', { name: 'Close preview' }).click();
+  await page.getByRole('button', { name: 'Close preview src/index.ts' }).click();
 
   await page.getByRole('button', { name: 'Review changes: src/index.ts' }).click();
   await expect(page.getByTestId('workspace-resource-diff')).toContainText(
@@ -102,4 +139,24 @@ test('Project Chat opens generated outputs and file changes without losing conte
   );
   await expect(context).toContainText('e2e-conversation');
   await expect(page.getByRole('button', { name: /Stage|Commit|Push/ })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Open source: generated/missing.txt' }).click();
+  await expect(page.getByText(/not found|could not be loaded/i)).toBeVisible();
+  await page.getByRole('button', { name: 'Close preview generated/missing.txt' }).click();
+  await expect(page.getByTestId('workspace-resource-diff')).toContainText(
+    '+export const value = true;',
+  );
+
+  await page.reload();
+  await expect(page.getByRole('tab', { name: 'src/index.ts' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByTestId('workspace-resource-diff')).toContainText(
+    '+export const value = true;',
+  );
+
+  await page.goto('/e2e/workspace-resources?projectId=isolated-project&sessionId=isolated-session');
+  await expect(page.getByTestId('workspace-resource-viewer')).toHaveCount(0);
+  await expect(page.getByTestId('project-context')).toContainText('isolated-session');
 });

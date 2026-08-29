@@ -11,6 +11,7 @@ import type { CriticEvent } from '@/lib/critic-events';
 import type { ApprovalCardState, ApprovalDecision, ToolTraceEvent } from '@/hooks/use-harness-chat';
 import type { SensorDashboardResponse } from '@agent-platform/contracts';
 import type { WorkspaceEvent } from '@agent-platform/contracts';
+import { WorkspaceResourcePreviewProvider } from './workspace-resource-cards';
 
 export interface ChatProps {
   messages: UIMessage[];
@@ -119,92 +120,99 @@ export function Chat({
   }, [resetKey, scrollToBottom]);
 
   return (
-    <div className="grid h-full max-h-full min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] overflow-hidden bg-gradient-to-b from-background to-secondary/20">
-      <div className="grid h-full max-h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden">
-        {/* Messages */}
-        <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto min-h-full max-w-3xl px-4 pb-8">
-            {messages.length === 0 ? (
-              <>
-                <EmptyState title={emptyStateTitle} description={emptyStateDescription} />
-                {conversationAccessory}
-              </>
-            ) : (
-              <>
-                {messages.map((message, index) => (
-                  <Message
-                    key={message.id}
-                    message={message}
-                    isStreaming={
-                      isLoading && message.role === 'assistant' && index === messages.length - 1
-                    }
-                    isAwaitingStreamContent={
-                      isLoading &&
-                      message.role === 'assistant' &&
-                      index === messages.length - 1 &&
-                      !getMessageText(message).trim()
-                    }
-                    criticEvents={
-                      message.role === 'assistant' ? criticEventsByMessage?.[message.id] : undefined
-                    }
-                    thinking={
-                      message.role === 'assistant' ? thinkingByMessage?.[message.id] : undefined
-                    }
-                    toolEvents={
-                      message.role === 'assistant' ? toolEventsByMessage?.[message.id] : undefined
-                    }
-                    workspaceEvents={
-                      message.role === 'assistant'
-                        ? workspaceEventsByMessage?.[message.id]
-                        : undefined
-                    }
-                    workspaceWebViewProjectId={
-                      message.role === 'assistant' ? workspaceWebViewProjectId : null
-                    }
-                    approvals={
-                      message.role === 'assistant'
-                        ? approvalEventsByMessage?.[message.id]
-                        : undefined
-                    }
-                    onApprovalDecision={onApprovalDecision}
-                  />
-                ))}
-                {conversationAccessory}
-                <div ref={messagesEndRef} className="h-4" />
-              </>
-            )}
+    <WorkspaceResourcePreviewProvider
+      scopeKey={resetKey ?? workspaceWebViewProjectId ?? 'general-chat'}
+      projectId={workspaceWebViewProjectId ?? undefined}
+    >
+      <div className="grid h-full max-h-full min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] overflow-hidden bg-gradient-to-b from-background to-secondary/20">
+        <div className="grid h-full max-h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_auto_auto] overflow-hidden">
+          {/* Messages */}
+          <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto min-h-full max-w-3xl px-4 pb-8">
+              {messages.length === 0 ? (
+                <>
+                  <EmptyState title={emptyStateTitle} description={emptyStateDescription} />
+                  {conversationAccessory}
+                </>
+              ) : (
+                <>
+                  {messages.map((message, index) => (
+                    <Message
+                      key={message.id}
+                      message={message}
+                      isStreaming={
+                        isLoading && message.role === 'assistant' && index === messages.length - 1
+                      }
+                      isAwaitingStreamContent={
+                        isLoading &&
+                        message.role === 'assistant' &&
+                        index === messages.length - 1 &&
+                        !getMessageText(message).trim()
+                      }
+                      criticEvents={
+                        message.role === 'assistant'
+                          ? criticEventsByMessage?.[message.id]
+                          : undefined
+                      }
+                      thinking={
+                        message.role === 'assistant' ? thinkingByMessage?.[message.id] : undefined
+                      }
+                      toolEvents={
+                        message.role === 'assistant' ? toolEventsByMessage?.[message.id] : undefined
+                      }
+                      workspaceEvents={
+                        message.role === 'assistant'
+                          ? workspaceEventsByMessage?.[message.id]
+                          : undefined
+                      }
+                      workspaceWebViewProjectId={
+                        message.role === 'assistant' ? workspaceWebViewProjectId : null
+                      }
+                      approvals={
+                        message.role === 'assistant'
+                          ? approvalEventsByMessage?.[message.id]
+                          : undefined
+                      }
+                      onApprovalDecision={onApprovalDecision}
+                    />
+                  ))}
+                  {conversationAccessory}
+                  <div ref={messagesEndRef} className="h-4" />
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Input */}
+          <ChatInput
+            onSend={onSend}
+            isLoading={isLoading}
+            placeholder={inputPlaceholder}
+            canSend={canSend}
+            statusText={inputStatusText}
+            attachments={attachments}
+            onAddFiles={onAddFiles}
+            onRemoveAttachment={onRemoveAttachment}
+            onClearAttachments={onClearAttachments}
+            attachmentWarnings={attachmentWarnings}
+            selectorAccessory={inputSelectorAccessory}
+          />
+
+          {bottomAccessory}
         </div>
 
-        {/* Input */}
-        <ChatInput
-          onSend={onSend}
-          isLoading={isLoading}
-          placeholder={inputPlaceholder}
-          canSend={canSend}
-          statusText={inputStatusText}
-          attachments={attachments}
-          onAddFiles={onAddFiles}
-          onRemoveAttachment={onRemoveAttachment}
-          onClearAttachments={onClearAttachments}
-          attachmentWarnings={attachmentWarnings}
-          selectorAccessory={inputSelectorAccessory}
-        />
+        {sideAccessory}
 
-        {bottomAccessory}
+        {showSensors && (
+          <SensorStatusPanel
+            dashboard={sensorDashboard ?? null}
+            loading={sensorLoading}
+            error={sensorError}
+            onRetry={onRetrySensors}
+          />
+        )}
       </div>
-
-      {sideAccessory}
-
-      {showSensors && (
-        <SensorStatusPanel
-          dashboard={sensorDashboard ?? null}
-          loading={sensorLoading}
-          error={sensorError}
-          onRetry={onRetrySensors}
-        />
-      )}
-    </div>
+    </WorkspaceResourcePreviewProvider>
   );
 }
 
