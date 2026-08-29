@@ -110,12 +110,14 @@ test('Project Chat opens generated outputs and file changes without losing conte
   for await (const chunk of stream) chunks.push(Buffer.from(chunk));
   expect(Buffer.concat(chunks).toString('utf8')).toContain('# Generated notes');
   await expect(context).toContainText('e2e-conversation');
-  await page.getByRole('tab', { name: 'generated/notes.md' }).press('Delete');
-  await expect(page.getByRole('tab', { name: 'generated/app.html' })).toHaveAttribute(
+  await page.getByRole('tab', { name: 'generated/app.html' }).click();
+  await page.getByRole('button', { name: 'Close preview generated/app.html' }).click();
+  await expect(page.getByRole('tab', { name: 'generated/notes.md' })).toHaveAttribute(
     'aria-selected',
     'true',
   );
-  await page.getByRole('button', { name: 'Close preview generated/app.html' }).click();
+  await expect(page.getByRole('tab', { name: 'generated/notes.md' })).toBeFocused();
+  await page.getByRole('tab', { name: 'generated/notes.md' }).press('Delete');
   await expect(page.getByTestId('workspace-resource-viewer')).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Preview HTML: generated/app.html' }),

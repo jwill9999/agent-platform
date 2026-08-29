@@ -119,9 +119,12 @@ export function Chat({
     return () => cancelAnimationFrame(firstFrame);
   }, [resetKey, scrollToBottom]);
 
+  const resourcePreviewScopeKey = resetKey ?? workspaceWebViewProjectId ?? 'general-chat';
+
   return (
     <WorkspaceResourcePreviewProvider
-      scopeKey={resetKey ?? workspaceWebViewProjectId ?? 'general-chat'}
+      key={resourcePreviewScopeKey}
+      scopeKey={resourcePreviewScopeKey}
       projectId={workspaceWebViewProjectId ?? undefined}
     >
       <div className="grid h-full max-h-full min-h-0 flex-1 grid-cols-[minmax(0,1fr)_auto] overflow-hidden bg-gradient-to-b from-background to-secondary/20">

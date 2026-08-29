@@ -135,7 +135,7 @@ function tabsStorageKey(scopeKey: string): string {
 }
 
 function loadTabs(scopeKey: string, projectId?: string): WorkspaceResourceTabsState {
-  if (typeof globalThis.window === 'undefined') return EMPTY_WORKSPACE_RESOURCE_TABS;
+  if (globalThis.window === undefined) return EMPTY_WORKSPACE_RESOURCE_TABS;
   try {
     const value: unknown = JSON.parse(
       globalThis.sessionStorage.getItem(tabsStorageKey(scopeKey)) ?? 'null',
@@ -150,7 +150,10 @@ function loadTabs(scopeKey: string, projectId?: string): WorkspaceResourceTabsSt
           .filter((resource) => !projectId || resource.projectId === projectId)
       : [];
     if (resources.length === 0) return EMPTY_WORKSPACE_RESOURCE_TABS;
-    const restored = resources.reduce(openWorkspaceResourceTab, EMPTY_WORKSPACE_RESOURCE_TABS);
+    const restored = resources.reduce(
+      (current, resource) => openWorkspaceResourceTab(current, resource),
+      EMPTY_WORKSPACE_RESOURCE_TABS,
+    );
     const activeUri =
       typeof record.activeUri === 'string' &&
       restored.resources.some(
@@ -180,7 +183,7 @@ export function WorkspaceResourcePreviewProvider({
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     try {
       globalThis.sessionStorage.setItem(tabsStorageKey(scopeKey), JSON.stringify(state));
     } catch {
@@ -586,7 +589,7 @@ export function WorkspaceResourceViewer({
 
   useEffect(() => {
     tabRefs.current[Math.max(activeIndex, 0)]?.focus();
-  }, [activeIndex]);
+  }, [activeIndex, resource.uri]);
 
   function closeResourceAt(index: number): void {
     const target = resources[index];
