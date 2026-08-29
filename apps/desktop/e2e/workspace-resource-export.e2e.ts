@@ -95,6 +95,26 @@ test('Save As cancels safely and writes only the native-dialog destination', asy
     expect(readFileSync(sourceFile, 'utf8')).toContain('Desktop export remains scoped.');
     await expect(page.getByText('/workspace')).toHaveCount(0);
     await expect(page.getByText(projectDir)).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Preview HTML: generated/app.html' }).click();
+    await expect(page.getByRole('tab')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Minimize previews' }).click();
+    await expect(page.getByRole('button', { name: 'Restore 2 open previews' })).toBeVisible();
+    await page.getByRole('button', { name: 'Restore 2 open previews' }).click();
+    await page.reload();
+    await expect(page.getByRole('tab')).toHaveCount(2);
+    await expect(page.getByRole('tab', { name: 'generated/app.html' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    const isolatedFixtureUrl = new URL(fixtureUrl);
+    isolatedFixtureUrl.searchParams.set('projectId', 'isolated-project');
+    isolatedFixtureUrl.searchParams.set('sessionId', 'isolated-session');
+    await page.goto(isolatedFixtureUrl.toString());
+    await expect(page.getByTestId('workspace-resource-viewer')).toHaveCount(0);
+    await page.goto(fixtureUrl.toString());
+    await expect(page.getByRole('tab')).toHaveCount(2);
   } finally {
     await app?.close();
     rmSync(tempRoot, { recursive: true, force: true });

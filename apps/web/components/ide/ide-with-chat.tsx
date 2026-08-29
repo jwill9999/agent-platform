@@ -86,7 +86,10 @@ import { CriticBadges } from '@/components/chat/critic-badges';
 import { BrowserArtifactPreviews } from '@/components/chat/browser-artifact-previews';
 import { ThinkingBlock } from '@/components/chat/thinking-block';
 import { ToolTraceBlock } from '@/components/chat/tool-trace-block';
-import { WorkspaceResourceCards } from '@/components/chat/workspace-resource-cards';
+import {
+  WorkspaceResourceCards,
+  WorkspaceResourcePreviewProvider,
+} from '@/components/chat/workspace-resource-cards';
 import { formatCriticStatus, type CriticEvent } from '@/lib/critic-events';
 import { WorkbenchCodeEditor } from '@/components/ide/workbench-code-editor';
 import { getWorkbenchLanguage, updateWorkbenchTabContent } from '@/lib/code-workbench-editor';
@@ -3004,38 +3007,44 @@ export function IDEWithChat({ fileTree: initialFileTree }: Readonly<IDEWithChatP
           <>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={35} minSize={20} maxSize={50}>
-              <ChatPanel
-                messages={messages}
-                isLoading={isLoading}
-                chatInput={chatInput}
-                setChatInput={setChatInput}
-                onSendMessage={handleSendMessage}
-                contextDraft={contextDraft}
-                branchSummary={branchSummary}
-                activeFile={activeFile}
-                includeActiveFile={includeActiveFile}
-                pinnedPaths={pinnedContextPaths}
-                workspaceName={workspaceName}
-                onToggleIncludeActiveFile={handleToggleIncludeActiveFile}
-                onAddToContext={handleAddToContext}
-                onRemoveFromContext={handleRemoveFromContext}
-                onClearContext={handleClearContext}
-                onApplyCode={handleApplyCode}
-                onCreateFile={handleCreateFile}
-                onShowDiff={handleApplyCode}
-                getFileReferenceAction={getFileReferenceAction}
-                agents={agents}
-                selectedAgentId={selectedAgentId}
-                onAgentChange={setSelectedAgentId}
-                sessionReady={Boolean(sessionId)}
-                chatUnavailableText={chatUnavailableText}
-                criticEventsByMessage={criticEventsByMessage}
-                thinkingByMessage={thinkingByMessage}
-                toolEventsByMessage={toolEventsByMessage}
-                workspaceEventsByMessage={workspaceEventsByMessage}
-                approvalEventsByMessage={approvalEventsByMessage}
-                onApprovalDecision={decideApproval}
-              />
+              <WorkspaceResourcePreviewProvider
+                key={`${activeProject?.id ?? 'none'}:${sessionId ?? 'none'}`}
+                scopeKey={`ide:${activeProject?.id ?? 'none'}:${sessionId ?? 'none'}`}
+                projectId={activeProject?.id}
+              >
+                <ChatPanel
+                  messages={messages}
+                  isLoading={isLoading}
+                  chatInput={chatInput}
+                  setChatInput={setChatInput}
+                  onSendMessage={handleSendMessage}
+                  contextDraft={contextDraft}
+                  branchSummary={branchSummary}
+                  activeFile={activeFile}
+                  includeActiveFile={includeActiveFile}
+                  pinnedPaths={pinnedContextPaths}
+                  workspaceName={workspaceName}
+                  onToggleIncludeActiveFile={handleToggleIncludeActiveFile}
+                  onAddToContext={handleAddToContext}
+                  onRemoveFromContext={handleRemoveFromContext}
+                  onClearContext={handleClearContext}
+                  onApplyCode={handleApplyCode}
+                  onCreateFile={handleCreateFile}
+                  onShowDiff={handleApplyCode}
+                  getFileReferenceAction={getFileReferenceAction}
+                  agents={agents}
+                  selectedAgentId={selectedAgentId}
+                  onAgentChange={setSelectedAgentId}
+                  sessionReady={Boolean(sessionId)}
+                  chatUnavailableText={chatUnavailableText}
+                  criticEventsByMessage={criticEventsByMessage}
+                  thinkingByMessage={thinkingByMessage}
+                  toolEventsByMessage={toolEventsByMessage}
+                  workspaceEventsByMessage={workspaceEventsByMessage}
+                  approvalEventsByMessage={approvalEventsByMessage}
+                  onApprovalDecision={decideApproval}
+                />
+              </WorkspaceResourcePreviewProvider>
             </ResizablePanel>
           </>
         )}
