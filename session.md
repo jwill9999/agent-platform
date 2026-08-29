@@ -19,8 +19,8 @@ and actionable.
 - **Session:** Completing Project Experience `.6` staged Playwright/Electron gate.
 - **Branch:** `task/project-experience-6-e2e-gate`
 - **Base:** `38631cd` (Project Experience `.8`, merged through PR #247)
-- **Head:** local changes pending commit
-- **Pull request:** pending, targeting `staging`
+- **Head:** `042062c` (`test: complete Project Experience E2E gate`)
+- **Pull request:** [#248](https://github.com/jwill9999/agent-platform/pull/248) into `staging`
 
 ## What Happened
 
@@ -56,6 +56,5 @@ and actionable.
 
 ## Next
 
-1. Commit, push, and open the `.6` PR into `staging`.
-2. Monitor hosted CI, SonarCloud, security, and review feedback to green.
-3. Merge the PR, close/sync Beads `.6`, and verify the Project Experience epic state.
+1. Monitor PR #248 hosted CI, SonarCloud, security, and review feedback to green.
+2. Merge the PR, close/sync Beads `.6`, and verify the Project Experience epic state.
