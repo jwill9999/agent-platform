@@ -43,6 +43,7 @@ const DEFAULT_AGENT_ID = '00000000-0000-4000-8000-000000000001';
 const E2E_MODEL_RESPONSE = 'E2E model response received';
 const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 const IDE_URL_PATTERN = new RegExp(String.raw`/ide`);
+const OPEN_FOLDER_BUTTON_NAME = /open\s+folder/i;
 const VISUAL_REGRESSION_OPTIONS = {
   animations: 'disabled',
   caret: 'hide',
@@ -191,7 +192,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText(E2E_MODEL_RESPONSE).last()).toBeVisible({ timeout: 15_000 });
 
       await openWorkspaceChooserFromSidebar(page);
-      await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
+      await expect(page.getByRole('button', { name: OPEN_FOLDER_BUTTON_NAME })).toBeVisible();
       await expect(page.getByText('personal-chat-screenshot.png')).toHaveCount(0);
       await expect(page.getByText('personal-chat-notes.md')).toHaveCount(0);
 
@@ -383,7 +384,7 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('project-chat-notes.md')).toHaveCount(0);
 
       await openWorkspaceChooserFromSidebar(page);
-      await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
+      await expect(page.getByRole('button', { name: OPEN_FOLDER_BUTTON_NAME })).toBeVisible();
       await clickOpenFolder(page);
       await expect(projectChatHeader.getByText(secondProjectName, { exact: true })).toBeVisible();
       await expect(projectChatHeader.getByText(/Files(?:,| and) [Cc]hat/)).toBeVisible();
@@ -549,12 +550,13 @@ async function openProjectChat(page: Page): Promise<void> {
 
 async function openWorkspaceChooserFromSidebar(page: Page): Promise<void> {
   const chooserHeading = page.getByRole('heading', { name: 'Choose a workspace' });
-  const openFolder = page.getByRole('button', { name: 'Open folder' });
   await page.getByRole('link', { name: /^Workspaces\b/ }).click();
 
   try {
-    await expect(chooserHeading).toBeVisible();
-    await expect(openFolder).toBeVisible();
+    await expect(chooserHeading).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: OPEN_FOLDER_BUTTON_NAME })).toBeVisible({
+      timeout: 15_000,
+    });
   } catch {
     const projectWorkspacesButton = page
       .locator('[data-workspace-surface="project-chat"]')
@@ -562,25 +564,27 @@ async function openWorkspaceChooserFromSidebar(page: Page): Promise<void> {
     await expect(projectWorkspacesButton).toBeVisible();
     await projectWorkspacesButton.click();
     await expect(chooserHeading).toBeVisible({ timeout: 15_000 });
-    await expect(openFolder).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: OPEN_FOLDER_BUTTON_NAME })).toBeVisible({
+      timeout: 15_000,
+    });
   }
 }
 
 async function clickOpenFolder(page: Page): Promise<void> {
-  const openFolder = page.getByRole('button', { name: 'Open folder' });
-
   // The home screen can be re-rendered while recent projects and the desktop
-  // bridge finish settling. Reacquire the button after a detached-element
-  // failure instead of clicking a locator from the previous render.
+  // bridge finish settling. Reacquire the button and restore the workspace
+  // chooser when navigation returns to Project Chat between assertions.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      await expect(openFolder).toBeVisible();
-      await expect(openFolder).toBeEnabled();
+      const openFolder = page.getByRole('button', { name: OPEN_FOLDER_BUTTON_NAME });
+      await expect(openFolder).toBeVisible({ timeout: 5_000 });
+      await expect(openFolder).toBeEnabled({ timeout: 5_000 });
       await openFolder.click();
       return;
     } catch (error) {
       if (attempt === 2) throw error;
-      await page.waitForTimeout(100);
+      await openWorkspaceChooserFromSidebar(page);
+      await page.waitForTimeout(250);
     }
   }
 }
@@ -612,7 +616,7 @@ async function expectSimplifiedWorkspaceEntry(page: Page): Promise<void> {
     ),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'New project' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
+  await expect(page.getByRole('button', { name: OPEN_FOLDER_BUTTON_NAME })).toBeVisible();
   await expect(page.getByText('Folder or repository', { exact: true })).toBeVisible();
 
   for (const deferredWorkspace of [
