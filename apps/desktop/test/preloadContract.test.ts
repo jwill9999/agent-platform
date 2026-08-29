@@ -25,6 +25,7 @@ import {
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   resizeTerminalIpcChannel,
+  saveWorkspaceResourceIpcChannel,
   selectProjectFolderIpcChannel,
   setWorkspaceWebViewBoundsIpcChannel,
   desktopVersionsApiKeys,
@@ -75,6 +76,7 @@ describe('desktop preload bridge contract', () => {
 
   it('limits workspace helpers to explicit WebView lifecycle actions', () => {
     expect(desktopWorkspaceApiKeys).toEqual([
+      'saveResourceAs',
       'openResource',
       'openExternalFallback',
       'openWebView',
@@ -149,6 +151,7 @@ describe('desktop preload bridge contract', () => {
   });
 
   it('keeps workspace IPC channels scoped to explicit workspace actions', () => {
+    expect(saveWorkspaceResourceIpcChannel).toBe('agent-platform:workspace:save-resource-as');
     expect(openWorkspaceResourceIpcChannel).toBe('agent-platform:workspace:open-resource');
     expect(openWorkspaceExternalFallbackIpcChannel).toBe(
       'agent-platform:workspace:open-external-fallback',
@@ -164,6 +167,7 @@ describe('desktop preload bridge contract', () => {
     expect(workspaceWebViewUpdatedIpcChannel).toBe('agent-platform:workspace:webview-updated');
 
     for (const channel of [
+      saveWorkspaceResourceIpcChannel,
       openWorkspaceResourceIpcChannel,
       openWorkspaceExternalFallbackIpcChannel,
       openWorkspaceWebViewIpcChannel,

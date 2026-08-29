@@ -17,7 +17,10 @@ import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { CODING_PROJECT_WORKSPACE_CAPABILITIES } from '@agent-platform/contracts';
+import {
+  CODING_PROJECT_WORKSPACE_CAPABILITIES,
+  workspaceResourceUri,
+} from '@agent-platform/contracts';
 import {
   closeDatabase,
   createSession,
@@ -2044,6 +2047,79 @@ exit 1
       .get(`/v1/projects/${projectId}/files/preview`)
       .query({ path: 'binary.bin' })
       .expect(415);
+  });
+
+  it('exports a URI-scoped Project file with safe attachment headers and bytes', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-export-project');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    mkdirSync(path.join(repoDir, 'generated'), { recursive: true });
+    writeFileSync(path.join(repoDir, 'generated', 'report.md'), '# Exported report\n');
+    const realRoot = realpathSync(repoDir);
+
+    const openedProject = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Desktop Export Project' })
+      .expect(201);
+    const projectId = openedProject.body.data.project.id as string;
+    const uri = workspaceResourceUri({
+      projectId,
+      kind: 'file',
+      target: 'generated/report.md',
+    });
+
+    const exported = await request(app)
+      .get(`/v1/projects/${projectId}/resources/export`)
+      .query({ uri })
+      .expect('Content-Type', /text\/markdown/)
+      .expect('X-Content-Type-Options', 'nosniff')
+      .expect('Cache-Control', 'no-store')
+      .expect(200);
+
+    expect(exported.text).toBe('# Exported report\n');
+    expect(exported.headers['content-disposition']).toContain('attachment; filename="report.md"');
+    expect(exported.headers['content-disposition']).toContain("filename*=UTF-8''report.md");
+    expect(exported.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(JSON.stringify(exported.headers)).not.toContain(realRoot);
+  });
+
+  it('rejects mismatched, non-file, traversal, symlink, directory, and missing exports', async () => {
+    const repoDir = path.join(tmpDir, 'desktop-export-guarded');
+    const outsideDir = path.join(tmpDir, 'export-outside');
+    execFileSync(GIT_BINARY, ['init', '-b', 'main', repoDir], { stdio: 'ignore' });
+    mkdirSync(path.join(repoDir, 'generated'), { recursive: true });
+    mkdirSync(outsideDir, { recursive: true });
+    writeFileSync(path.join(outsideDir, 'secret.txt'), 'outside secret\n');
+    symlinkSync(path.join(outsideDir, 'secret.txt'), path.join(repoDir, 'generated', 'secret.txt'));
+
+    const openedProject = await request(app)
+      .post('/v1/projects/desktop/register')
+      .set('x-agent-platform-desktop-bridge', '1')
+      .send({ path: repoDir, name: 'Guarded Desktop Export' })
+      .expect(201);
+    const projectId = openedProject.body.data.project.id as string;
+    const exportRequest = (uri: string) =>
+      request(app).get(`/v1/projects/${projectId}/resources/export`).query({ uri });
+
+    const mismatchedProject = await exportRequest(
+      workspaceResourceUri({ projectId: 'another-project', kind: 'file', target: 'file.txt' }),
+    ).expect(403);
+    expect(mismatchedProject.body.error.code).toBe('PROJECT_RESOURCE_MISMATCH');
+    await exportRequest(
+      workspaceResourceUri({ projectId, kind: 'diff', target: 'generated/report.md' }),
+    ).expect(415);
+    await exportRequest(
+      workspaceResourceUri({ projectId, kind: 'file', target: '../export-outside/secret.txt' }),
+    ).expect(403);
+    await exportRequest(
+      workspaceResourceUri({ projectId, kind: 'file', target: 'generated/secret.txt' }),
+    ).expect(403);
+    await exportRequest(
+      workspaceResourceUri({ projectId, kind: 'file', target: 'generated' }),
+    ).expect(400);
+    await exportRequest(
+      workspaceResourceUri({ projectId, kind: 'file', target: 'generated/missing.txt' }),
+    ).expect(404);
   });
 
   it('rejects desktop project registration without the desktop bridge or inspectable folder', async () => {

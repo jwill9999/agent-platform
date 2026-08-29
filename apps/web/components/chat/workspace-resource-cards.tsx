@@ -9,6 +9,7 @@ import type {
 import {
   AlertCircle,
   Diff,
+  Download,
   ExternalLink,
   FileText,
   Globe,
@@ -382,12 +383,32 @@ export function WorkspaceResourceViewer({
   onClose,
 }: Readonly<{ resource: WorkspaceResource; onClose: () => void }>) {
   const panelRef = useRef<HTMLDialogElement>(null);
+  const [exportStatus, setExportStatus] = useState<string>();
   const descriptor = useMemo(() => workspacePreviewDescriptor(resource), [resource]);
   const state = useViewerContent(resource, descriptor);
   const displayLabel = workspaceResourceDisplayLabel(resource);
   const mimeType = metadataString(resource, 'mimeType');
   const externalUrl = safeWorkspacePreviewUrl(resource);
   const canOpenExternally = Boolean(externalUrl || getDesktopWorkspaceBridge());
+  const desktopWorkspace = getDesktopWorkspaceBridge();
+  const canExport = resource.kind === 'file' && Boolean(workspaceResourcePath(resource));
+  const exportUrl = `${apiPath('projects', resource.projectId, 'resources', 'export')}?${new URLSearchParams({ uri: resource.uri }).toString()}`;
+
+  async function saveAs(): Promise<void> {
+    if (!desktopWorkspace) return;
+    setExportStatus(undefined);
+    try {
+      const result = await desktopWorkspace.saveResourceAs({
+        uri: resource.uri,
+        suggestedFilename: displayLabel.split('/').at(-1) ?? displayLabel,
+      });
+      if (result.status === 'saved') {
+        setExportStatus(`${result.filename} was saved.`);
+      }
+    } catch {
+      setExportStatus('The resource could not be saved. Try again.');
+    }
+  }
 
   useEffect(() => {
     panelRef.current?.focus();
@@ -413,6 +434,20 @@ export function WorkspaceResourceViewer({
           <p className="text-xs text-muted-foreground">{descriptor.description}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {canExport &&
+            (desktopWorkspace ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => void saveAs()}>
+                <Download className="h-4 w-4" aria-hidden="true" />
+                Save As
+              </Button>
+            ) : (
+              <Button asChild size="sm" variant="outline">
+                <a href={exportUrl} download>
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  Download
+                </a>
+              </Button>
+            ))}
           {canOpenExternally && (
             <Button
               type="button"
@@ -434,6 +469,11 @@ export function WorkspaceResourceViewer({
           </Button>
         </div>
       </header>
+      {exportStatus && (
+        <output className="border-b border-border px-4 py-2 text-sm">
+          {exportStatus}
+        </output>
+      )}
       <div className="min-h-0 flex-1 overflow-auto bg-muted/20">
         <ViewerBody
           descriptor={descriptor}

@@ -1,4 +1,9 @@
-import type { DesktopWorkspaceOpenResult } from '@agent-platform/contracts';
+import {
+  parseWorkspaceResourceUri,
+  WorkspaceResourceExportRequestSchema,
+  type DesktopWorkspaceOpenResult,
+  type WorkspaceResourceExportRequest,
+} from '@agent-platform/contracts';
 
 import type { IpcValidationResult } from './ipcValidation.js';
 import { fail, ok } from './ipcValidation.js';
@@ -57,6 +62,16 @@ export function validateDesktopWorkspaceOpenResourceRequest(
   const match = WORKSPACE_RESOURCE_URI_PATTERN.exec(uri);
   if (!match) return fail('Workspace resource URI is invalid.');
   return ok({ uri, projectId: match[1] });
+}
+
+export function validateDesktopWorkspaceExportRequest(
+  payload: unknown,
+): IpcValidationResult<WorkspaceResourceExportRequest> {
+  const parsed = WorkspaceResourceExportRequestSchema.safeParse(payload);
+  if (!parsed.success) return fail('Workspace export request is invalid.');
+  const resource = parseWorkspaceResourceUri(parsed.data.uri);
+  if (resource.kind !== 'file') return fail('Only Project files can be exported.');
+  return ok(parsed.data);
 }
 
 export function validateDesktopWorkspaceOpenExternalFallbackRequest(

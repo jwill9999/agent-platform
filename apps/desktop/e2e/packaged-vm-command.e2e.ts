@@ -9,13 +9,14 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
+
+import { getOpenPort } from './support/runtime.js';
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
@@ -427,21 +428,4 @@ function outputToString(output: string | Buffer | undefined): string {
 
 function sha256(content: string): string {
   return createHash('sha256').update(content).digest('hex');
-}
-
-function getOpenPort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => {
-        if (typeof address === 'object' && address) {
-          resolvePort(address.port);
-          return;
-        }
-        reject(new Error('Failed to allocate a local port.'));
-      });
-    });
-  });
 }

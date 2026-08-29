@@ -83,6 +83,38 @@ Keep Beads dependencies aligned with this table.
   activity-panel states, clickable file/diff review, return navigation, and label cleanup.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Protect the complete Project Experience with a staged desktop gate
+
+  Background:
+    Given a built Electron app is running with isolated deterministic fixtures
+    And fixtures include a coding Project and a mixed or non-code Project
+
+  Scenario: Complete the primary coding Project workflow
+    When the user reopens the coding Project and works from Project Chat
+    Then Project-aware commands, branch selection, terminal, IDE handoff, and return navigation work
+    And the active Project, session, and conversation context are preserved
+
+  Scenario: Keep general Chat independent
+    Given a coding Project session exists
+    When the user opens general Chat
+    Then Project-only context and previous Project conversation content are absent
+    And normal UI does not expose runtime implementation paths or state labels
+
+  Scenario: Review generated resources and activity
+    Given generated resources and normalized activity evidence exist for the coding Project
+    When the user opens previews, export actions, tabs, and the activity panel
+    Then each surface remains usable through visible controls
+    And returning to Project Chat preserves the active context
+
+  Scenario: Show safe fallback behavior for a non-code Project
+    When the user opens the mixed or non-code Project
+    Then unsupported profile-specific surfaces show explicit safe fallback states
+    And coding evidence from another Project is not shown
+```
+
 ## Definition Of Done
 
 - [ ] Playwright/Electron defines a staged Project Experience automation gate.
@@ -94,3 +126,4 @@ Keep Beads dependencies aligned with this table.
 - [ ] Tests verify general Chat remains independent.
 - [ ] Tests verify rendered preview and right-side activity-panel behavior once `.7` and `.8` land.
 - [ ] Tests verify runtime implementation labels are hidden from primary UI.
+- [ ] Playwright/Electron tests cover the Gherkin scenarios through accessible user-facing controls.

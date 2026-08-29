@@ -8,9 +8,10 @@ import {
 } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -99,7 +100,7 @@ test.describe('Electron Project access', () => {
       join(secondProjectDir, 'docs', 'guide.md'),
       '# Guide\n\nhello from second electron project\n',
     );
-    seedDesktopDatabase(sqlitePath);
+    seedDesktopDatabase(sqlitePath, { secretsMasterKey: E2E_SECRETS_MASTER_KEY });
 
     try {
       app = await electron.launch({
@@ -609,34 +610,4 @@ async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   expect(response.ok).toBeTruthy();
   return (await response.json()) as T;
-}
-
-function seedDesktopDatabase(sqlitePath: string): void {
-  execFileSync(process.execPath, [join(repoRoot, 'packages/db/dist/seed/run.js')], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      SQLITE_PATH: sqlitePath,
-      E2E_SEED: '1',
-      SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
-    },
-    stdio: 'inherit',
-  });
-}
-
-function getOpenPort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => {
-        if (typeof address === 'object' && address) {
-          resolvePort(address.port);
-          return;
-        }
-        reject(new Error('Failed to allocate a local port.'));
-      });
-    });
-  });
 }

@@ -59,6 +59,8 @@ describe('WorkspaceResourceCards', () => {
     expect(html).toContain('sandbox="allow-forms allow-modals allow-popups allow-scripts"');
     expect(html).not.toContain('allow-same-origin');
     expect(html).toContain('generated/app.html');
+    expect(html).toContain('Download');
+    expect(html).toContain('/resources/export?uri=');
   });
 
   it('keeps unsupported files in a safe non-mutating fallback state', () => {

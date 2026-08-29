@@ -20,6 +20,7 @@ import {
   resetLocalDataConfirmationIpcChannel,
   resetLocalDataIpcChannel,
   resizeTerminalIpcChannel,
+  saveWorkspaceResourceIpcChannel,
   selectProjectFolderIpcChannel,
   setWorkspaceWebViewBoundsIpcChannel,
   terminalDataIpcChannel,
@@ -95,6 +96,10 @@ const desktopApi = {
     },
   },
   workspace: {
+    saveResourceAs: (request) =>
+      ipcRenderer.invoke(saveWorkspaceResourceIpcChannel, request) as ReturnType<
+        AgentPlatformDesktopApi['workspace']['saveResourceAs']
+      >,
     openResource: (request) =>
       ipcRenderer.invoke(openWorkspaceResourceIpcChannel, request) as ReturnType<
         AgentPlatformDesktopApi['workspace']['openResource']

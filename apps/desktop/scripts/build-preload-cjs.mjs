@@ -55,6 +55,9 @@ const resizeTerminalIpcChannel = ${JSON.stringify(desktopBridge.resizeTerminalIp
 const disposeTerminalIpcChannel = ${JSON.stringify(desktopBridge.disposeTerminalIpcChannel)};
 const terminalDataIpcChannel = ${JSON.stringify(desktopBridge.terminalDataIpcChannel)};
 const terminalExitIpcChannel = ${JSON.stringify(desktopBridge.terminalExitIpcChannel)};
+const saveWorkspaceResourceIpcChannel = ${JSON.stringify(
+    desktopBridge.saveWorkspaceResourceIpcChannel,
+  )};
 const openWorkspaceResourceIpcChannel = ${JSON.stringify(
     desktopBridge.openWorkspaceResourceIpcChannel,
   )};
@@ -115,6 +118,7 @@ const desktopApi = {
     },
   },
   workspace: {
+    saveResourceAs: (request) => ipcRenderer.invoke(saveWorkspaceResourceIpcChannel, request),
     openResource: (request) => ipcRenderer.invoke(openWorkspaceResourceIpcChannel, request),
     openExternalFallback: (request) =>
       ipcRenderer.invoke(openWorkspaceExternalFallbackIpcChannel, request),
@@ -177,6 +181,10 @@ function loadDesktopBridgeContract() {
     disposeTerminalIpcChannel: readExportedStringConst(sourceFile, 'disposeTerminalIpcChannel'),
     terminalDataIpcChannel: readExportedStringConst(sourceFile, 'terminalDataIpcChannel'),
     terminalExitIpcChannel: readExportedStringConst(sourceFile, 'terminalExitIpcChannel'),
+    saveWorkspaceResourceIpcChannel: readExportedStringConst(
+      sourceFile,
+      'saveWorkspaceResourceIpcChannel',
+    ),
     openWorkspaceResourceIpcChannel: readExportedStringConst(
       sourceFile,
       'openWorkspaceResourceIpcChannel',

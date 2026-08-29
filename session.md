@@ -15,132 +15,68 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-08-13
-- **Session:** Repaired PR #243 SonarCloud and Electron CI failures after the review-feedback update.
-- **Branch:** `task/project-experience-7`
-- **Head:** `c8c349b` (`Address resource preview review feedback`)
+- **Date:** 2026-08-29
+- **Session:** Implemented Project Experience `.15` secure Download and Save As exports.
+- **Branch:** `task/project-experience-15-secure-export`
+- **Head:** `f35d932` (`task/project-experience-15-secure-export fix bind project reads to validated descriptors`)
+- **Pull request:** [#245](https://github.com/jwill9999/agent-platform/pull/245) into `staging`
 
 ## What Happened
 
-- Task `.7` now adds Project Chat cards for generated HTML, Markdown, PDF, and image resources,
-  plus repository file/source and diff review. The viewer remains Project/session scoped and does
-  not perform Git mutations.
-- Focused API, harness, web unit/component, and Playwright coverage was added. Manual validation
-  previously confirmed the interaction works as expected.
-- Follow-on tasks are fully specified: `.15` secure Download/Save As, `.16` multi-tab previews,
-  `.8` activity/evidence panel, and `.6` staged Project Experience E2E gate.
-- PR #243 revealed two unrelated Node 24 native-addon failures: isolated API Vitest forks crashed
-  during `better-sqlite3` teardown, and the Alpine API container exited after database startup.
-  API tests now keep their single fork alive and `better-sqlite3` is pinned to Node 24-supported
-  `12.11.1`; local API tests pass 199/199. Compose validation then passed locally and in the rerun
-  CI E2E job.
-- Review feedback on PR #243 is being addressed with the canonical
-  `normalizeWorkspaceResourcePath` contract helper, used by both the web preview layer and harness
-  event producer. The resource viewer no longer listens on `window`; it receives focused Escape
-  key events locally instead.
-- The follow-up CI repair changes the viewer to a native non-modal `dialog`, separates viewer
-  loading/error states to reduce cognitive complexity, avoids direct callback references in path
-  normalization maps, and makes the Electron chooser test wait for its actionable Open folder state.
+- Added a Project-scoped attachment endpoint that accepts only normalized resource URIs and rejects
+  mismatched Projects, traversal, symlink escapes, missing files, directories, unsupported resource
+  kinds, and oversized files.
+- Added reusable Download controls for browser clients and native Save As controls for Electron.
+  Renderer requests cannot supply host source or destination paths; the trusted main process fetches
+  scoped bytes and writes only to the native-dialog destination.
+- Added safe attachment filenames, MIME selection, no-store/nosniff/CSP headers, cancellation as a
+  no-op, redacted failures, and explicit export contracts.
+- Added API, contracts, preload, desktop bridge, browser Playwright, and Electron Playwright coverage.
+  Browser E2E uses a real isolated Project and validates attachment name/bytes through the BFF.
+- Electron E2E caught and fixed a production-only preload generator omission where the typed bridge
+  declared `saveResourceAs` but the generated CommonJS preload did not expose it.
+- The first SonarCloud run failed its duplication threshold at 3.7% and reported four annotations.
+  Filename sanitization is now shared through contracts; the type, accessibility, assertion, and
+  Playwright readiness findings are fixed; duplicated Electron E2E runtime helpers were centralized.
+- The corrected SonarCloud analysis passes. Upgraded `better-sqlite3` to 13.0.3 to resolve its
+  Node 24.19 worker-thread cleanup abort; the next hosted verify and Linux Electron E2E jobs passed.
+- Addressed Sourcery's TOCTOU security review: reads now stay bound to an `O_NOFOLLOW` descriptor,
+  validate descriptor/path identity and regular-file metadata, and enforce the size cap while reading.
+- Refined the Gherkin E2E strategies for Project Experience `.15`, `.16`, `.8`, and `.6`.
+
+## Verification
+
+- Passed: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, and `pnpm docs:lint`.
+- Passed: Docker rebuild/start/health and database seed via `make restart`.
+- Passed: focused browser Project resource Playwright scenario.
+- Passed: all 10 Electron Playwright scenarios locally, including the cancellation/save destination
+  scenario using the production-built renderer, managed API, generated CommonJS preload, and
+  isolated app data.
+- Passed: pre-push circular-dependency, affected-package build, typecheck, and test hooks.
+- Passed on the hosted `6b4fd81` run: verify, Linux desktop E2E, browser E2E, Docker, SonarCloud,
+  CodeQL, security, documentation, dependency, Sourcery, and GitGuardian checks.
+- Local SonarQube Agentic Analysis was attempted but SonarQube Cloud returned an explicit 403
+  authorization denial. GitHub's SonarCloud annotations were retrieved through the check-run API,
+  fixed, locally revalidated, and the corrected SonarCloud quality gate passes.
+- Docker initially ran out of VM space; 18.03 GB of unused build cache was pruned, then the complete
+  Docker build and health checks passed. No project data or active volumes were removed.
 
 ## Current State
 
-**Merged Project Experience Foundation:**
-
-- PR #236, PR #238, documentation closeout PR #239, PR #240, and closeout PR #241 are merged into
-  `staging`; their remote topic branches can be deleted.
-- Project Experience `.1` through `.5` are closed in Beads.
-- The `agent-platform-electron-experience` epic is complete: all eight child tasks are closed.
-- Workspaces exposes general Chat and one Coding Project entry with New project, Open folder, recent
-  Project reopen, and explicit loading/error states.
-- Opening a Coding Project lands in Project Chat with Project-bound session context.
-- `Open local IDE` uses the selected Electron Project, supports configured/common IDE launchers and
-  system folder fallback, and presents explicit unavailable states in browser-only contexts.
-- User-facing Project navigation avoids `/workspace` and backend implementation terminology in the
-  surfaces covered so far.
-
-**Project Experience `.5` Complete:**
-
-- The relevance audit found most original scope already complete; remaining work was limited to the
-  Project header, command availability copy, and terminal location chrome.
-- Project Chat now uses a compact navigable Workspaces / Project / Chat breadcrumb and no longer
-  shows an always-visible host folder path.
-- Command readiness uses user-facing labels instead of runtime modes/messages, and the terminal
-  header shows `Project root` instead of its absolute initial working directory.
-- Project and terminal control screenshots use explicit Darwin and Linux baselines; the Linux images
-  are stable Ubuntu/Xvfb CI captures.
-- The Project access flow now synchronizes on the Workspaces chooser readiness heading and uses the
-  visible Project-header Workspaces action only when the sidebar leaves stale Project content.
-- PR #240 passed every required check, including desktop E2E, and the staging packaged macOS VM E2E
-  passed. It merged into `staging` as `2c3a227`; the merged topic branch can be deleted.
-
-**Merged Verification:**
-
-- PR #238 required checks passed: browser and desktop E2E, packaged macOS VM E2E, verify, Docker,
-  CodeQL, SonarCloud, Promptfoo, dependency cycles, docs checks, GitGuardian, and Sourcery.
-- Browser Playwright passed 21/21 with the CI two-worker configuration.
-- Focused Electron Project access and Git workflow coverage passed 4/4 before merge.
-- Manual QA confirmed local IDE handoff, development DevTools, and existing Project reopen behavior.
-- The Promptfoo action is pinned to its Node 24-compatible `v0.1.8` commit. Its initial GitHub API
-  `503` passed on retry and did not reproduce in the completed scan.
-- The post-merge CodeQL run on `f1debb7` passed.
-
-**Repository State:**
-
-- `staging` includes merged closeout PR #241 at `b0ebd41`. Task `.7` is on
-  `task/project-experience-7`; PR #243 has passed all required checks following its Node 24
-  native-runtime repair and awaits final review-thread confirmation.
-- Manual local validation now confirms normal typed input works without voice input, the terminal uses
-  the correct Node version, and the Electron app can be started locally.
-- The merged Project Experience topic branches may be deleted when convenient; no deletion is required
-  for this handoff.
-- No open `staging` to `main` pull request was visible at this handoff.
-
-**Context Optimisation:**
-
-- Beads issue `agent-platform-context-optimisation` is now P1.
-- Evidence added: a simple Beads question reused stale Coding session
-  `bad6e0a5-d8e0-4eee-b94d-a2dc4c8f65da` with 87 messages and about 526k stored characters,
-  including multiple very large tool outputs, causing OpenAI API TPM pressure.
-- Current implementation has an 8k approximate context window, but still needs durable compaction,
-  bounded tool-output replay, stale-session handling, explicit output-token caps, and clearer
-  rate-limit/context diagnostics.
-- Parked for now because self-hosted runner validation is unavailable; keep it as a P1 follow-up.
-
-**Developer Diagnostics And Observability:**
-
-- Beads issue `agent-platform-llm-observability-export` is now P1 and retitled
-  `Add developer diagnostics and LLM observability export`.
-- Spec now separates general app observability from agent/LLM observability:
-  Electron/Next/API logs, request failures, metrics, traces, crashes, and desktop diagnostics vs.
-  prompt assembly, context windows, memory retrieval, model calls, token usage, tool calls, and agent
-  run timelines.
-- Refinement gate added before implementation: choose concrete tooling, define data/redaction policy,
-  environment controls, implementation increment, and Definition of Done.
-- Candidate general observability stack: OpenTelemetry Collector, SigNoz, Grafana Loki/Grafana, and
-  Sentry-compatible error tooling. Candidate AI observability stack: Phoenix, Langfuse, Helicone.
-
-## Product Direction
-
-- Current visible workspace surfaces are:
-  - general Chat for assistant conversation and general tooling/app context;
-  - Coding Project for folder/repository workflows with Git/GitHub, branches, terminal, previews,
-    activity/evidence, and external/default IDE handoff.
-- Automation, scheduled tasks, email/application workflows, docs/research workspaces, and
-  generated-app workspaces remain deferred until their own product decisions and epics.
-- The completed `.1` through `.5` chain establishes capability metadata, simplified navigation,
-  Project Chat-first entry, local IDE handoff, and user-facing Project location/status context.
-- Generated previews are implemented in task `.7`; activity/evidence, exports, multi-tab previews,
-  and staged E2E remain before the Project Experience epic can close.
+- Beads task `agent-platform-project-experience.15` remains `in_progress` until PR #245 merges.
+- Local implementation and verification criteria are complete. The combined CI/Sonar checklist item
+  is satisfied on `6b4fd81`; the refreshed `f35d932` security-hardening run is pending.
+- The task branch is published at `origin/task/project-experience-15-secure-export`.
+- Project Experience `.1` through `.5` and `.7` are already closed. The planned remaining sequence is
+  `.16` multi-tab previews, `.8` activity/evidence, then `.6` staged E2E closure.
+- macOS production task `.6.3` remains externally blocked on a Developer ID identity, notarization
+  credentials, and a VM-capable Apple Silicon runner; `.6.4` waits on that evidence.
 
 ## Next
 
-1. Push the PR #243 CI-repair changes, confirm the rerun clears SonarCloud and desktop E2E, then
-   confirm final review threads before marking the PR ready and closing task `.7`.
-2. Implement `.15` (secure Download/Save As) and `.16` (multi-tab previews), then `.8` (activity/
-   evidence panel). Finalize `.6` once `.7` and `.8` are complete.
-3. Keep `agent-platform-context-optimisation` visible as a P1 follow-up: its stale-session/token
-   pressure is demonstrated, but its validation path remains parked on self-hosted runner availability.
-4. Refine `agent-platform-llm-observability-export` before implementation; its tooling, redaction,
-   deployment, and first-increment decisions are still open.
-5. Keep macOS signing/notarization release tasks open until real signed and notarized artifact
-   evidence exists; staging capability does not satisfy the production release hold.
+1. Monitor PR #245 checks, artifacts, review comments, and automated findings; fix failures on this
+   branch until all required checks are green.
+2. Once PR #245 is green, merge it into `staging`, close Beads task
+   `agent-platform-project-experience.15`, sync Beads, and record the merged evidence.
+3. Start `agent-platform-project-experience.16` from the cumulative Project Experience branch state,
+   then continue `.8` and `.6` in the documented sequence.
