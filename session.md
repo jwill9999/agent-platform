@@ -19,8 +19,8 @@ and actionable.
 - **Session:** Added project-scoped Codex custom-agent and skill-authoring structure.
 - **Branch:** `task/codex-agent-configuration`
 - **Base:** `fcb18c5` (Project Experience `.6`, merged through PR #248)
-- **Head:** local changes pending commit
-- **Pull request:** pending, targeting `staging`
+- **Head:** `c586b02` (`chore: add project Codex agent configuration`)
+- **Pull request:** [#249](https://github.com/jwill9999/agent-platform/pull/249) into `staging`
 
 ## What Happened
 
@@ -50,5 +50,5 @@ and actionable.
 
 ## Next
 
-1. Commit, push, and open the Codex configuration PR into `staging`.
-2. Monitor hosted checks, merge, then close/sync the Beads task.
+1. Monitor PR #249 hosted checks and review feedback to green.
+2. Merge the PR, then close/sync the Beads task.
