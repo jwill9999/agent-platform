@@ -89,8 +89,9 @@ import type { Request } from 'express';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { open, readdir, stat } from 'node:fs/promises';
 import {
+  constants,
   existsSync,
   lstatSync,
   readFileSync,
@@ -2678,23 +2679,76 @@ async function resolveReadableProjectFile(
   };
 }
 
+async function readBoundedProjectFile(project: ProjectRecord, rawPath: unknown, maxBytes: number) {
+  const file = await resolveReadableProjectFile(project, rawPath, maxBytes);
+  let handle: Awaited<ReturnType<typeof open>>;
+  try {
+    handle = await open(file.resolvedPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch {
+    throw new HttpError(404, 'PROJECT_FILE_NOT_FOUND', 'Project file not found');
+  }
+
+  try {
+    const descriptorStat = await handle.stat();
+    if (!descriptorStat.isFile()) {
+      throw new HttpError(400, 'PROJECT_FILE_INVALID', 'Only files can be opened');
+    }
+    if (descriptorStat.size > maxBytes) {
+      throw new HttpError(413, 'PROJECT_FILE_TOO_LARGE', 'Project file is too large to open');
+    }
+
+    const projectRoot = projectRootForBackendRead(project);
+    const jail = new PathJail([
+      { label: 'project', hostPath: projectRoot, permission: 'read_only' },
+    ]);
+    const revalidation = await jail.validate(file.resolvedPath, 'read');
+    if (!revalidation.allowed) {
+      throw new HttpError(403, 'PATH_ACCESS_DENIED', 'File path must stay inside the Project');
+    }
+    const pathStat = await stat(revalidation.resolvedPath);
+    if (pathStat.dev !== descriptorStat.dev || pathStat.ino !== descriptorStat.ino) {
+      throw new HttpError(403, 'PATH_ACCESS_DENIED', 'File changed while it was being opened');
+    }
+
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    while (totalBytes <= maxBytes) {
+      const chunk = Buffer.allocUnsafe(Math.min(64 * 1024, maxBytes + 1 - totalBytes));
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, totalBytes);
+      if (bytesRead === 0) break;
+      chunks.push(chunk.subarray(0, bytesRead));
+      totalBytes += bytesRead;
+    }
+    if (totalBytes > maxBytes) {
+      throw new HttpError(413, 'PROJECT_FILE_TOO_LARGE', 'Project file is too large to open');
+    }
+
+    return {
+      ...file,
+      content: Buffer.concat(chunks, totalBytes),
+      size: totalBytes,
+    };
+  } finally {
+    await handle.close();
+  }
+}
+
 async function readProjectFile(project: ProjectRecord, rawPath: unknown) {
-  const file = await resolveReadableProjectFile(project, rawPath, MAX_PROJECT_FILE_READ_BYTES);
-  const buffer = await readFile(file.resolvedPath);
-  if (isLikelyBinary(buffer)) {
+  const file = await readBoundedProjectFile(project, rawPath, MAX_PROJECT_FILE_READ_BYTES);
+  if (isLikelyBinary(file.content)) {
     throw new HttpError(415, 'PROJECT_FILE_BINARY', 'Binary files cannot be opened in the editor');
   }
 
   return ProjectFileReadResultSchema.parse({
     name: basename(file.resolvedPath),
     path: file.relativePath,
-    content: buffer.toString('utf8'),
+    content: file.content.toString('utf8'),
     size: file.size,
   });
 }
 
 async function previewProjectFile(project: ProjectRecord, rawPath: unknown) {
-  const file = await resolveReadableProjectFile(project, rawPath, MAX_PROJECT_FILE_PREVIEW_BYTES);
+  const file = await readBoundedProjectFile(project, rawPath, MAX_PROJECT_FILE_PREVIEW_BYTES);
   const mimeType = PROJECT_FILE_PREVIEW_MIME_TYPES.get(extname(file.resolvedPath).toLowerCase());
   if (!mimeType) {
     throw new HttpError(
@@ -2706,7 +2760,6 @@ async function previewProjectFile(project: ProjectRecord, rawPath: unknown) {
   return {
     ...file,
     mimeType,
-    content: await readFile(file.resolvedPath),
   };
 }
 
@@ -2737,14 +2790,10 @@ async function exportProjectFile(project: ProjectRecord, routeProjectId: string,
     throw new HttpError(415, 'PROJECT_RESOURCE_NOT_EXPORTABLE', 'This resource cannot be exported');
   }
 
-  const file = await resolveReadableProjectFile(
-    project,
-    parsed.target,
-    MAX_PROJECT_FILE_EXPORT_BYTES,
-  );
+  const file = await readBoundedProjectFile(project, parsed.target, MAX_PROJECT_FILE_EXPORT_BYTES);
   const filename = safeWorkspaceResourceFilename(file.relativePath);
   return {
-    content: await readFile(file.resolvedPath),
+    content: file.content,
     filename,
     mimeType:
       PROJECT_FILE_EXPORT_MIME_TYPES.get(extname(file.resolvedPath).toLowerCase()) ??
