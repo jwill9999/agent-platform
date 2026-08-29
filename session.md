@@ -19,8 +19,8 @@ and actionable.
 - **Session:** Implemented Project Experience `.8` Project activity/evidence panel.
 - **Branch:** `task/project-experience-8-activity-panel`
 - **Base:** `2facadb` (Project Experience `.16`, merged through PR #246)
-- **Head:** uncommitted implementation, ready to commit
-- **Pull request:** not opened yet; target `staging`
+- **Head:** `b74e4fc` (`feat add project activity evidence rail`)
+- **Pull request:** [#247](https://github.com/jwill9999/agent-platform/pull/247) into `staging`
 
 ## What Happened
 
@@ -60,5 +60,5 @@ and actionable.
 
 ## Next
 
-1. Commit/push `.8`, open its PR into `staging`, and monitor hosted CI/Sonar/security/review to green.
+1. Monitor PR #247 hosted CI, SonarCloud, security, and review feedback to green.
 2. Merge the PR, close/sync Beads `.8`, then continue with `.6` staged E2E closure.
