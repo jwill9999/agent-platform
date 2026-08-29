@@ -15,46 +15,43 @@ and actionable.
 
 ## Last Updated
 
-- **Date:** 2026-08-29
-- **Session:** Completing Project Experience `.6` staged Playwright/Electron gate.
-- **Branch:** `task/project-experience-6-e2e-gate`
-- **Base:** `38631cd` (Project Experience `.8`, merged through PR #247)
-- **Head:** `042062c` (`test: complete Project Experience E2E gate`)
-- **Pull request:** [#248](https://github.com/jwill9999/agent-platform/pull/248) into `staging`
+- **Date:** 2026-08-30
+- **Session:** Repairing the remaining Project Experience `.7` session-handoff pipeline.
+- **Branch:** `task/project-experience-7-session-handoff`
+- **Base:** `fcb18c5` (current `staging` when the repair began)
+- **Head:** this repair (`test: harden Electron workspace chooser retry`)
+- **Pull request:** [#244](https://github.com/jwill9999/agent-platform/pull/244) into `staging`
 
 ## What Happened
 
-- PR #247 merged Project Experience `.8` into `staging` at `38631cd`; Beads `.8` is closed.
-- Claimed Beads `.6` and documented the staged Phase 1-4 ownership across browser and Electron E2E
-  in `docs/qa/project-experience-automation-matrix.md`.
-- Expanded native Project-access coverage with the default Activity rail, terminal resize and a real
-  harmless shell command, Project URL/Activity identity, and an isolated docs-only non-Git fixture.
-- Added docs/content profile evidence and safe Git-unavailable assertions without leaking host or
-  runtime paths.
-- Fixed native Project open/create after Personal Chat so Project Chat updates the URL to the active
-  Project; explicit recent-session deep links retain their requested URL during restoration.
+- GitHub merge conflicts on PR #244 were resolved at `f4b616d`, but the required `desktop-e2e` job
+  then failed while locating the workspace chooser's **Open folder** button.
+- Downloaded and inspected the failing Playwright artifact. The screenshot showed that the app had
+  returned to Project Chat between confirming the chooser and clicking the button.
+- Made the accessible-name locator tolerant of capitalization and spacing changes.
+- Hardened `clickOpenFolder()` to reacquire the locator on every attempt and reopen the workspace
+  chooser when a render/navigation race returns the test to Project Chat.
 
 ## Verification
 
-- Passed: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`,
-  `pnpm docs:lint`, and `pnpm deps:check-cycles` across the repository.
-- Passed: clean production Docker API/web rebuild and health checks.
-- Passed: all 22 browser Playwright scenarios against Docker.
+- Passed: the formerly failing local-Project scenario once, then three consecutive times.
+- Passed: desktop lint and TypeScript checks.
 - Passed: all 11 Electron Playwright scenarios using the production-built renderer and managed API.
-- SonarQube Agentic Analysis was attempted for both touched TypeScript files; SonarQube Cloud
-  returned its known explicit 403 authorization denial. The required build/typecheck/lint/test
-  fallback gate has no errors; hosted SonarCloud remains required on the PR.
+- Passed: repository formatting, documentation lint, and diff-hygiene checks.
+- SonarQube Agentic Analysis was attempted for the touched TypeScript test; SonarQube Cloud
+  returned its known explicit 403 authorization denial. The required local fallback gate has no
+  errors; hosted SonarCloud remains required on the PR.
 
 ## Current State
 
-- Beads task `agent-platform-project-experience.6` is claimed and `in_progress`.
-- The implementation and complete local gate are green; spec DoD is checked off.
-- Project Experience `.1` through `.5`, `.7`, `.8`, `.15`, and `.16` are closed. `.6` is the active
-  staged Project Experience E2E closure task.
-- macOS production task `.6.3` remains externally blocked on a Developer ID identity, notarization
-  credentials, and a VM-capable Apple Silicon runner; `.6.4` waits on that evidence.
+- Beads task `agent-platform-project-experience.7` remains closed because its feature work already
+  merged through PR #243; PR #244 is the still-open session/Beads handoff.
+- All completed PR #244 checks were green except `desktop-e2e`; the remote macOS runner job was
+  queued while its server was unavailable.
+- The runner server is back online. A fresh hosted pipeline will start after this repair is pushed.
 
 ## Next
 
-1. Monitor PR #248 hosted CI, SonarCloud, security, and review feedback to green.
-2. Merge the PR, close/sync Beads `.6`, and verify the Project Experience epic state.
+1. Finish local completion gates, commit, and push the desktop E2E repair.
+2. Monitor PR #244 hosted CI and the restored remote macOS runner to green.
+3. Merge PR #244 into `staging` without reopening the already-completed `.7` Beads task.
