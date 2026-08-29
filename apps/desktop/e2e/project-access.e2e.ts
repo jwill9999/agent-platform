@@ -243,6 +243,7 @@ test.describe('Electron Project access', () => {
         `project-terminal-controls-${process.platform}.png`,
         VISUAL_REGRESSION_OPTIONS,
       );
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await expect(gitPanel).toBeVisible();
       writeFileSync(join(firstProjectDir, 'scratch.txt'), 'scratch\n');

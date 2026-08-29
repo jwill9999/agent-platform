@@ -16,30 +16,28 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-29
-- **Session:** Implemented Project Experience `.16` multi-tab Project resource previews.
-- **Branch:** `task/project-experience-16-multi-tab-previews`
-- **Base:** `fd1aab1` (Project Experience `.15`, merged through PR #245)
-- **Head:** `77fddb4` (`fix preserve focus across tab replacement`)
-- **Pull request:** [#246](https://github.com/jwill9999/agent-platform/pull/246) into `staging`
+- **Session:** Implemented Project Experience `.8` Project activity/evidence panel.
+- **Branch:** `task/project-experience-8-activity-panel`
+- **Base:** `2facadb` (Project Experience `.16`, merged through PR #246)
+- **Head:** `b853309` (`fix address activity rail review findings`)
+- **Pull request:** [#247](https://github.com/jwill9999/agent-platform/pull/247) into `staging`
 
 ## What Happened
 
-- PR #245 merged Project Experience `.15` into `staging` at `fd1aab1`; its Beads task is closed.
-- Added a normalized tab-state model with deterministic de-duplication, activation, adjacent
-  selection on close, close-last behavior, minimize, and restore.
-- Added one reusable Project/session-scoped preview provider for standard Chat and IDE Chat. State is
-  safely restored from session storage, filtered by Project, and isolated by Project/session scope.
-- Added accessible tablist/tab/tabpanel relationships, arrow/Home/End navigation, Delete and
-  Command/Ctrl+W close shortcuts, explicit per-tab close controls, and safe focus restoration.
-- Added an accessible minimized right-side dock, horizontal tab overflow, and a full-width narrow
-  viewport fallback that does not obscure desktop-width Project Chat controls.
-- Missing resources remain closeable error previews without disrupting other tabs. Existing
-  Markdown, HTML, image, PDF, source, diff, Download, and Electron Save As behavior is preserved.
-- Added a Gherkin E2E strategy plus browser and production-built Electron coverage for multi-tab
-  navigation, de-duplication, focus, minimize/restore, persistence, isolation, and unavailable files.
-- Addressed the first hosted review: active-resource identity now drives focus when a replacement tab
-  inherits the same index, Chat remounts the provider explicitly on scope changes, and Sonar's three
-  reliability/maintainability annotations were fixed with a regression assertion.
+- PR #246 merged Project Experience `.16` into `staging` at `2facadb`; Beads `.16` is closed.
+- Added a pure normalized Project activity boundary for changed/generated files, previews, local
+  checks, CI, review state, findings, approvals, and derived next actions.
+- Added a compact Project/session-aware Activity panel with explicit loading, empty, unavailable,
+  disconnected, and non-coding profile fallbacks. User copy strips workspace roots, host paths,
+  commit hashes, provider diagnostics, and internal enum formatting.
+- Changed/generated resources and diffs open through the shared `.16` multi-tab preview provider;
+  stale provider responses cannot overwrite a newly selected Project/session.
+- Activity and the existing Git/GitHub workflow share the established 360px evidence rail through
+  accessible tabs, preserving the terminal and chat layout.
+- Expanded browser and production-rendered Electron coverage for activity grouping, preview opening,
+  context preservation, provider fallback, Project/session isolation, and Git-rail navigation.
+- Addressed the hosted review with explicit tab/tabpanel associations and refactored all 12 new
+  Sonar maintainability findings into named, typed decision helpers.
 
 ## Verification
 
@@ -51,21 +49,20 @@ and actionable.
 - SonarQube Agentic Analysis was attempted through the supported CLI fallback but SonarQube Cloud
   returned the known explicit 403 authorization denial. The required typecheck/lint/test fallback
   gate has no errors; hosted SonarCloud remains required on the PR.
-- The first hosted PR run passed verify, Docker, 22 browser E2E, 10 Electron E2E, security, CodeQL,
-  docs, and dependency checks. Its Sonar/review findings are fixed in `77fddb4`; a clean rerun is pending.
+- PR #247's first hosted run passed SonarCloud's quality gate, review, security, verify, Docker,
+  22-test browser E2E, and 10-test Electron E2E. A clean rerun for the review fixes is pending.
 
 ## Current State
 
-- Beads task `agent-platform-project-experience.16` is `in_progress` until its PR passes hosted
-  CI/Sonar/review and merges into `staging`.
-- Local implementation and all planned local verification are complete.
-- Project Experience `.1` through `.5`, `.7`, and `.15` are closed. The remaining sequence is `.8`
-  activity/evidence, then `.6` staged E2E closure.
+- Beads task `agent-platform-project-experience.8` is claimed and `in_progress`.
+- Local implementation and planned local gates are complete, including the final production Docker
+  build, 22-test browser suite, and 10-test Electron suite after the shared-rail layout change.
+- Project Experience `.1` through `.5`, `.7`, `.15`, and `.16` are closed. After `.8`, `.6` is the
+  staged Project Experience E2E closure task.
 - macOS production task `.6.3` remains externally blocked on a Developer ID identity, notarization
   credentials, and a VM-capable Apple Silicon runner; `.6.4` waits on that evidence.
 
 ## Next
 
-1. Monitor PR #246 hosted CI, SonarCloud, security scans, artifacts, and review comments; fix findings until
-   all required checks are green.
-2. Merge the green PR, close/sync Beads `.16`, then start `.8` from the cumulative `staging` state.
+1. Monitor PR #247 hosted CI, SonarCloud, security, and review feedback to green.
+2. Merge the PR, close/sync Beads `.8`, then continue with `.6` staged E2E closure.

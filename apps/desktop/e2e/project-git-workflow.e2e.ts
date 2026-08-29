@@ -57,6 +57,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       await openProject(page);
 
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await expect(gitPanel.getByRole('button', { name: 'Overview' })).toBeVisible();
       await expect(gitPanel.getByRole('button', { name: 'Changes' })).toHaveCount(0);
@@ -208,6 +209,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       await openProject(page);
 
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
       await expect(gitPanel.getByRole('button', { name: /Pull/ })).toBeVisible({
@@ -328,6 +330,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       await openProject(page);
 
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
       await expect(gitPanel.getByRole('button', { name: 'PRs' })).toBeVisible({

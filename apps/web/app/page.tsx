@@ -38,7 +38,7 @@ import {
   ProjectInstructionsReview,
 } from '@/components/project/project-instructions-review';
 import { ProjectBranchSelector } from '@/components/project/project-branch-selector';
-import { ProjectGitHubPanel } from '@/components/project/project-git-github-panel';
+import { ProjectEvidenceRail } from '@/components/project/project-evidence-rail';
 import { ProjectTerminalDock } from '@/components/project/project-terminal-dock';
 import {
   ProjectWebViewPanel,
@@ -1677,8 +1677,16 @@ export default function HomePage() {
                       onViewModeChange={setProjectWebViewMode}
                     />
                     {projectWebViewMode === 'docked' && (
-                      <ProjectGitHubPanel
+                      <ProjectEvidenceRail
                         projectId={activeProject?.id ?? null}
+                        sessionId={sessionId}
+                        profile={
+                          projectOnboardingAssessmentFromMetadata(activeProject)?.profile ??
+                          'unknown'
+                        }
+                        workspaceEventsByMessage={workspaceEventsByMessage}
+                        approvalEventsByMessage={approvalEventsByMessage}
+                        toolEventsByMessage={toolEventsByMessage}
                         refreshKey={projectGitRefreshKey}
                         projectInstructionsStatus={projectInstructionsStatus}
                         isStartingProjectInstructions={isStartingProjectInstructions}

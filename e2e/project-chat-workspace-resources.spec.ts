@@ -64,6 +64,25 @@ test('Project Chat opens generated outputs and file changes without losing conte
   await expect(page.getByText('/workspace')).toHaveCount(0);
   await expect(page.getByText('/Users/')).toHaveCount(0);
 
+  const activityPanel = page.getByRole('complementary', { name: 'Project activity' });
+  await expect(activityPanel).toBeVisible();
+  await expect(activityPanel.getByRole('heading', { name: 'Activity' })).toBeVisible();
+  await expect(activityPanel.getByText('Generated outputs')).toBeVisible();
+  await expect(activityPanel.getByText('Changed files')).toBeVisible();
+  const generatedActivity = activityPanel.locator(
+    'section[aria-labelledby="project-activity-generated"]',
+  );
+  await generatedActivity.getByRole('button', { name: /app\.html/ }).click();
+  await expect(page.getByTestId('workspace-resource-html-preview')).toBeVisible();
+  await page.getByRole('button', { name: 'Close preview generated/app.html' }).click();
+  await expect(context).toContainText('e2e-conversation');
+  await activityPanel.getByRole('button', { name: 'Close Project activity panel' }).click();
+  await expect(
+    activityPanel.getByRole('button', { name: 'Open Project activity panel' }),
+  ).toBeVisible();
+  await activityPanel.getByRole('button', { name: 'Open Project activity panel' }).click();
+  await expect(activityPanel.getByText('Generated outputs')).toBeVisible();
+
   await page.getByRole('button', { name: 'Preview HTML: generated/app.html' }).click();
   await expect(page.getByTestId('workspace-resource-html-preview')).toHaveAttribute(
     'sandbox',
