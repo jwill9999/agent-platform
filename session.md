@@ -18,7 +18,7 @@ and actionable.
 - **Date:** 2026-08-29
 - **Session:** Implemented Project Experience `.15` secure Download and Save As exports.
 - **Branch:** `task/project-experience-15-secure-export`
-- **Head:** `32400b7` (`task/project-experience-15-secure-export fix address SonarCloud findings`)
+- **Head:** `35f5123` (`task/project-experience-15-secure-export test share desktop e2e runtime helpers`)
 - **Pull request:** [#245](https://github.com/jwill9999/agent-platform/pull/245) into `staging`
 
 ## What Happened
@@ -36,8 +36,11 @@ and actionable.
 - Electron E2E caught and fixed a production-only preload generator omission where the typed bridge
   declared `saveResourceAs` but the generated CommonJS preload did not expose it.
 - The first SonarCloud run failed its duplication threshold at 3.7% and reported four annotations.
-  Filename sanitization is now shared through contracts, and the type, accessibility, assertion,
-  and Playwright readiness findings are fixed; the corrected CI run is pending.
+  Filename sanitization is now shared through contracts; the type, accessibility, assertion, and
+  Playwright readiness findings are fixed; duplicated Electron E2E runtime helpers were centralized.
+- The corrected SonarCloud analysis passes. The latest general CI attempt hit two environment-only
+  failures not reproduced locally: `better-sqlite3` teardown aborts under Node 24.19 and Linux
+  Electron processes closing during startup after the first passing case. A clean rerun is pending.
 - Refined the Gherkin E2E strategies for Project Experience `.15`, `.16`, `.8`, and `.6`.
 
 ## Verification
@@ -45,12 +48,13 @@ and actionable.
 - Passed: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, and `pnpm docs:lint`.
 - Passed: Docker rebuild/start/health and database seed via `make restart`.
 - Passed: focused browser Project resource Playwright scenario.
-- Passed: focused Electron cancellation/save destination scenario using the production-built renderer,
-  managed API, generated CommonJS preload, and isolated app data.
+- Passed: all 10 Electron Playwright scenarios locally, including the cancellation/save destination
+  scenario using the production-built renderer, managed API, generated CommonJS preload, and
+  isolated app data.
 - Passed: pre-push circular-dependency, affected-package build, typecheck, and test hooks.
 - Local SonarQube Agentic Analysis was attempted but SonarQube Cloud returned an explicit 403
   authorization denial. GitHub's SonarCloud annotations were retrieved through the check-run API,
-  fixed, and locally revalidated; the corrected quality-gate run is pending.
+  fixed, locally revalidated, and the corrected SonarCloud quality gate passes.
 - Docker initially ran out of VM space; 18.03 GB of unused build cache was pruned, then the complete
   Docker build and health checks passed. No project data or active volumes were removed.
 
@@ -59,7 +63,7 @@ and actionable.
 - Beads task `agent-platform-project-experience.15` remains `in_progress` until PR #245 required CI,
   security, and review checks pass.
 - Local implementation and verification criteria are complete. The combined CI/Sonar checklist item
-  remains open because CI is pending and SonarQube analysis was authorization-blocked.
+  remains open because required CI is being rerun; the hosted SonarCloud quality gate is green.
 - The task branch is published at `origin/task/project-experience-15-secure-export`.
 - Project Experience `.1` through `.5` and `.7` are already closed. The planned remaining sequence is
   `.16` multi-tab previews, `.8` activity/evidence, then `.6` staged E2E closure.
