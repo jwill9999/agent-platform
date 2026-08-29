@@ -75,6 +75,8 @@ Keep Beads dependencies aligned with this table.
 
 ## Tests And Verification
 
+- The authoritative phase-to-test mapping and required CI commands live in
+  [Project Experience Automation Matrix](../qa/project-experience-automation-matrix.md).
 - Local gates: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, and `pnpm test:e2e`
   against the Docker runtime.
 - Focused tests needed to stabilize fixtures and route state.
@@ -117,13 +119,13 @@ Feature: Protect the complete Project Experience with a staged desktop gate
 
 ## Definition Of Done
 
-- [ ] Playwright/Electron defines a staged Project Experience automation gate.
-- [ ] Phase 1 covers the coding Project workflow deeply.
-- [ ] Tests verify Project reopen and context preservation across Project Chat and external/default
+- [x] Playwright/Electron defines a staged Project Experience automation gate.
+- [x] Phase 1 covers the coding Project workflow deeply.
+- [x] Tests verify Project reopen and context preservation across Project Chat and external/default
       IDE handoff.
-- [ ] Tests verify branch selection and terminal dock behavior from Project Chat.
-- [ ] Tests verify `/help` and `/init` run with the same Project context as ordinary Project chat.
-- [ ] Tests verify general Chat remains independent.
-- [ ] Tests verify rendered preview and right-side activity-panel behavior once `.7` and `.8` land.
-- [ ] Tests verify runtime implementation labels are hidden from primary UI.
-- [ ] Playwright/Electron tests cover the Gherkin scenarios through accessible user-facing controls.
+- [x] Tests verify branch selection and terminal dock behavior from Project Chat.
+- [x] Tests verify `/help` and `/init` run with the same Project context as ordinary Project chat.
+- [x] Tests verify general Chat remains independent.
+- [x] Tests verify rendered preview and right-side activity-panel behavior once `.7` and `.8` land.
+- [x] Tests verify runtime implementation labels are hidden from primary UI.
+- [x] Playwright/Electron tests cover the Gherkin scenarios through accessible user-facing controls.

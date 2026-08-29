@@ -16,53 +16,46 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-29
-- **Session:** Implemented Project Experience `.8` Project activity/evidence panel.
-- **Branch:** `task/project-experience-8-activity-panel`
-- **Base:** `2facadb` (Project Experience `.16`, merged through PR #246)
-- **Head:** `b853309` (`fix address activity rail review findings`)
-- **Pull request:** [#247](https://github.com/jwill9999/agent-platform/pull/247) into `staging`
+- **Session:** Completing Project Experience `.6` staged Playwright/Electron gate.
+- **Branch:** `task/project-experience-6-e2e-gate`
+- **Base:** `38631cd` (Project Experience `.8`, merged through PR #247)
+- **Head:** local changes pending commit
+- **Pull request:** pending, targeting `staging`
 
 ## What Happened
 
-- PR #246 merged Project Experience `.16` into `staging` at `2facadb`; Beads `.16` is closed.
-- Added a pure normalized Project activity boundary for changed/generated files, previews, local
-  checks, CI, review state, findings, approvals, and derived next actions.
-- Added a compact Project/session-aware Activity panel with explicit loading, empty, unavailable,
-  disconnected, and non-coding profile fallbacks. User copy strips workspace roots, host paths,
-  commit hashes, provider diagnostics, and internal enum formatting.
-- Changed/generated resources and diffs open through the shared `.16` multi-tab preview provider;
-  stale provider responses cannot overwrite a newly selected Project/session.
-- Activity and the existing Git/GitHub workflow share the established 360px evidence rail through
-  accessible tabs, preserving the terminal and chat layout.
-- Expanded browser and production-rendered Electron coverage for activity grouping, preview opening,
-  context preservation, provider fallback, Project/session isolation, and Git-rail navigation.
-- Addressed the hosted review with explicit tab/tabpanel associations and refactored all 12 new
-  Sonar maintainability findings into named, typed decision helpers.
+- PR #247 merged Project Experience `.8` into `staging` at `38631cd`; Beads `.8` is closed.
+- Claimed Beads `.6` and documented the staged Phase 1-4 ownership across browser and Electron E2E
+  in `docs/qa/project-experience-automation-matrix.md`.
+- Expanded native Project-access coverage with the default Activity rail, terminal resize and a real
+  harmless shell command, Project URL/Activity identity, and an isolated docs-only non-Git fixture.
+- Added docs/content profile evidence and safe Git-unavailable assertions without leaking host or
+  runtime paths.
+- Fixed native Project open/create after Personal Chat so Project Chat updates the URL to the active
+  Project; explicit recent-session deep links retain their requested URL during restoration.
 
 ## Verification
 
-- Passed: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm docs:lint`, and
-  `pnpm deps:check-cycles` across the repository.
-- Passed: production Docker API/web rebuild and health checks.
-- Passed: all 22 browser Playwright scenarios, including the expanded Project resource scenario.
-- Passed: all 10 Electron Playwright scenarios using the production-built renderer and managed API.
-- SonarQube Agentic Analysis was attempted through the supported CLI fallback but SonarQube Cloud
-  returned the known explicit 403 authorization denial. The required typecheck/lint/test fallback
-  gate has no errors; hosted SonarCloud remains required on the PR.
-- PR #247's first hosted run passed SonarCloud's quality gate, review, security, verify, Docker,
-  22-test browser E2E, and 10-test Electron E2E. A clean rerun for the review fixes is pending.
+- Passed: `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`,
+  `pnpm docs:lint`, and `pnpm deps:check-cycles` across the repository.
+- Passed: clean production Docker API/web rebuild and health checks.
+- Passed: all 22 browser Playwright scenarios against Docker.
+- Passed: all 11 Electron Playwright scenarios using the production-built renderer and managed API.
+- SonarQube Agentic Analysis was attempted for both touched TypeScript files; SonarQube Cloud
+  returned its known explicit 403 authorization denial. The required build/typecheck/lint/test
+  fallback gate has no errors; hosted SonarCloud remains required on the PR.
 
 ## Current State
 
-- Beads task `agent-platform-project-experience.8` is claimed and `in_progress`.
-- Local implementation and planned local gates are complete, including the final production Docker
-  build, 22-test browser suite, and 10-test Electron suite after the shared-rail layout change.
-- Project Experience `.1` through `.5`, `.7`, `.15`, and `.16` are closed. After `.8`, `.6` is the
+- Beads task `agent-platform-project-experience.6` is claimed and `in_progress`.
+- The implementation and complete local gate are green; spec DoD is checked off.
+- Project Experience `.1` through `.5`, `.7`, `.8`, `.15`, and `.16` are closed. `.6` is the active
   staged Project Experience E2E closure task.
 - macOS production task `.6.3` remains externally blocked on a Developer ID identity, notarization
   credentials, and a VM-capable Apple Silicon runner; `.6.4` waits on that evidence.
 
 ## Next
 
-1. Monitor PR #247 hosted CI, SonarCloud, security, and review feedback to green.
-2. Merge the PR, close/sync Beads `.8`, then continue with `.6` staged E2E closure.
+1. Commit, push, and open the `.6` PR into `staging`.
+2. Monitor hosted CI, SonarCloud, security, and review feedback to green.
+3. Merge the PR, close/sync Beads `.6`, and verify the Project Experience epic state.
