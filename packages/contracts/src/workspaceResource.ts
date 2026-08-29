@@ -12,6 +12,8 @@ export type WorkspaceResourceKind = z.infer<typeof WorkspaceResourceKindSchema>;
 export const WorkspaceResourceActionSchema = z.enum([
   'open',
   'preview',
+  'download',
+  'save_as',
   'reveal',
   'external_fallback',
 ]);
@@ -101,6 +103,40 @@ export const WorkspaceResourceResolutionSchema = z.object({
   downloadUrl: z.string().min(1).optional(),
 });
 export type WorkspaceResourceResolution = z.infer<typeof WorkspaceResourceResolutionSchema>;
+
+export const WorkspaceResourceExportRequestSchema = z
+  .object({
+    uri: WorkspaceResourceUriSchema,
+    suggestedFilename: z
+      .string()
+      .trim()
+      .min(1)
+      .max(255)
+      .refine(
+        (value) =>
+          !/[\\/]/u.test(value) &&
+          [...value].every((character) => {
+            const codePoint = character.codePointAt(0) ?? 0;
+            return codePoint >= 32 && codePoint !== 127;
+          }) &&
+          value !== '.' &&
+          value !== '..',
+        'Suggested filename must be a safe basename',
+      )
+      .optional(),
+  })
+  .strict();
+export type WorkspaceResourceExportRequest = z.infer<typeof WorkspaceResourceExportRequestSchema>;
+
+export const DesktopWorkspaceExportResultSchema = z.discriminatedUnion('status', [
+  z.object({ ok: z.literal(true), status: z.literal('cancelled') }),
+  z.object({
+    ok: z.literal(true),
+    status: z.literal('saved'),
+    filename: z.string().min(1).max(255),
+  }),
+]);
+export type DesktopWorkspaceExportResult = z.infer<typeof DesktopWorkspaceExportResultSchema>;
 
 export const WorkspaceEventTypeSchema = z.enum([
   'resource_open_requested',

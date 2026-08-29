@@ -26,6 +26,7 @@ import {
   ProjectGitStatusResultSchema,
   ProjectFileReadResultSchema,
   ProjectFileTreeResultSchema,
+  parseWorkspaceResourceUri,
   type ProjectOpenBody,
   ProjectOpenBodySchema,
   ProjectOnboardingAnswerBodySchema,
@@ -760,6 +761,7 @@ const MAX_PROJECT_TREE_DEPTH = 8;
 const MAX_PROJECT_TREE_ENTRIES = 2000;
 const MAX_PROJECT_FILE_READ_BYTES = 512 * 1024;
 const MAX_PROJECT_FILE_PREVIEW_BYTES = 20 * 1024 * 1024;
+const MAX_PROJECT_FILE_EXPORT_BYTES = 50 * 1024 * 1024;
 const PROJECT_FILE_PREVIEW_MIME_TYPES = new Map([
   ['.avif', 'image/avif'],
   ['.gif', 'image/gif'],
@@ -768,6 +770,23 @@ const PROJECT_FILE_PREVIEW_MIME_TYPES = new Map([
   ['.pdf', 'application/pdf'],
   ['.png', 'image/png'],
   ['.webp', 'image/webp'],
+]);
+const PROJECT_FILE_EXPORT_MIME_TYPES = new Map([
+  ...PROJECT_FILE_PREVIEW_MIME_TYPES,
+  ['.csv', 'text/csv; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'],
+  ['.html', 'text/html; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.json', 'application/json; charset=utf-8'],
+  ['.jsx', 'text/javascript; charset=utf-8'],
+  ['.md', 'text/markdown; charset=utf-8'],
+  ['.mjs', 'text/javascript; charset=utf-8'],
+  ['.svg', 'image/svg+xml'],
+  ['.ts', 'text/typescript; charset=utf-8'],
+  ['.tsx', 'text/typescript; charset=utf-8'],
+  ['.txt', 'text/plain; charset=utf-8'],
+  ['.xml', 'application/xml; charset=utf-8'],
+  ['.zip', 'application/zip'],
 ]);
 const BINARY_PROBE_BYTES = 4096;
 
@@ -2690,6 +2709,61 @@ async function previewProjectFile(project: ProjectRecord, rawPath: unknown) {
   };
 }
 
+function safeAttachmentFilename(value: string): string {
+  const filename = [...basename(value)]
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint < 32 || codePoint === 127 || character === '"' || character === '\\'
+        ? '_'
+        : character;
+    })
+    .join('')
+    .trim();
+  return filename && filename !== '.' && filename !== '..' ? filename.slice(0, 255) : 'download';
+}
+
+function attachmentContentDisposition(filename: string): string {
+  const asciiFallback = filename.replace(/[^\x20-\x7e]/gu, '_').replaceAll('"', '_');
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+async function exportProjectFile(project: ProjectRecord, routeProjectId: string, rawUri: unknown) {
+  if (typeof rawUri !== 'string') {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Project resource URI is required');
+  }
+
+  let parsed: ReturnType<typeof parseWorkspaceResourceUri>;
+  try {
+    parsed = parseWorkspaceResourceUri(rawUri);
+  } catch {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Project resource URI is invalid');
+  }
+  if (parsed.projectId !== routeProjectId) {
+    throw new HttpError(
+      403,
+      'PROJECT_RESOURCE_MISMATCH',
+      'Resource does not belong to this Project',
+    );
+  }
+  if (parsed.kind !== 'file') {
+    throw new HttpError(415, 'PROJECT_RESOURCE_NOT_EXPORTABLE', 'This resource cannot be exported');
+  }
+
+  const file = await resolveReadableProjectFile(
+    project,
+    parsed.target,
+    MAX_PROJECT_FILE_EXPORT_BYTES,
+  );
+  const filename = safeAttachmentFilename(file.relativePath);
+  return {
+    content: await readFile(file.resolvedPath),
+    filename,
+    mimeType:
+      PROJECT_FILE_EXPORT_MIME_TYPES.get(extname(file.resolvedPath).toLowerCase()) ??
+      'application/octet-stream',
+  };
+}
+
 function approveProjectOnboarding(db: DrizzleDb, id: string, body: unknown): ProjectRecord {
   const project = findProject(db, id);
   if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
@@ -3105,6 +3179,24 @@ export function createProjectsRouter(db: DrizzleDb): Router {
         'X-Content-Type-Options': 'nosniff',
       });
       res.send(preview.content);
+    }),
+  );
+
+  router.get(
+    '/:id/resources/export',
+    asyncHandler(async (req, res) => {
+      const projectId = requireParam(req.params, 'id');
+      const project = findProject(db, projectId);
+      if (!project) throw new HttpError(404, 'NOT_FOUND', 'Project not found');
+      const exported = await exportProjectFile(project, projectId, req.query.uri);
+      res.set({
+        'Cache-Control': 'no-store',
+        'Content-Disposition': attachmentContentDisposition(exported.filename),
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+        'Content-Type': exported.mimeType,
+        'X-Content-Type-Options': 'nosniff',
+      });
+      res.send(exported.content);
     }),
   );
 

@@ -341,12 +341,13 @@ On failure: `{ "data": { "ok": false, "latencyMs": 120, "error": "..." } }`
 
 ### Projects
 
-| Method | Path                            | Description                             |
-| ------ | ------------------------------- | --------------------------------------- |
-| `GET`  | `/v1/projects/desktop/recent`   | List recent desktop Projects            |
-| `GET`  | `/v1/projects/:id/files/tree`   | List Project-relative file tree         |
-| `GET`  | `/v1/projects/:id/files/read`   | Read one Project-relative text file     |
-| `POST` | `/v1/projects/desktop/register` | Register a trusted desktop Project path |
+| Method | Path                                | Description                             |
+| ------ | ----------------------------------- | --------------------------------------- |
+| `GET`  | `/v1/projects/desktop/recent`       | List recent desktop Projects            |
+| `GET`  | `/v1/projects/:id/files/tree`       | List Project-relative file tree         |
+| `GET`  | `/v1/projects/:id/files/read`       | Read one Project-relative text file     |
+| `GET`  | `/v1/projects/:id/resources/export` | Download a scoped Project resource      |
+| `POST` | `/v1/projects/desktop/register`     | Register a trusted desktop Project path |
 
 `GET /v1/projects/desktop/recent` returns `{ "data": { "projects": ProjectDesktopRecord[] } }`.
 Records include Project names, safe folder labels, onboarding state, and capability state. They do
@@ -365,6 +366,12 @@ The tree is built from the backend-bound Project root, omits generated or hidden
 `GET /v1/projects/:id/files/read?path=src/index.ts` reads a single Project-relative text file and
 returns `{ "data": { "name": "...", "path": "...", "content": "...", "size": 123 } }`. Absolute
 paths, parent traversal, symlink escapes, large files, and binary files are rejected.
+
+`GET /v1/projects/:id/resources/export?uri=workspace%3A%2F%2F...` returns a bounded attachment for
+a normalized file-backed Project resource. The resource URI's Project identity must match the
+route, and the target must resolve to a regular file inside the Project jail. Responses use a safe
+filename, a known MIME type or `application/octet-stream`, `Cache-Control: no-store`, and
+`X-Content-Type-Options: nosniff`; host paths are never returned.
 
 ### Sessions
 

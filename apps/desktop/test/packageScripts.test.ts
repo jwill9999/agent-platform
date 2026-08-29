@@ -51,6 +51,10 @@ describe('desktop package scripts', () => {
     expect(preloadBuilder).toContain(
       'openInIde: (request) => ipcRenderer.invoke(openProjectIdeIpcChannel, request)',
     );
+    expect(preloadBuilder).toContain('saveWorkspaceResourceIpcChannel');
+    expect(preloadBuilder).toContain(
+      'saveResourceAs: (request) => ipcRenderer.invoke(saveWorkspaceResourceIpcChannel, request)',
+    );
   });
 
   it('builds and tests the native macOS VM runner helper', () => {
