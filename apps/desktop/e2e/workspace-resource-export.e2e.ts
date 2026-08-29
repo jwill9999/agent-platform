@@ -62,6 +62,10 @@ test('Save As cancels safely and writes only the native-dialog destination', asy
     await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
     await page.getByRole('button', { name: 'Open folder' }).click();
     await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
+    const projectActivity = page.getByRole('complementary', { name: 'Project activity' });
+    await expect(projectActivity).toBeVisible();
+    await expect(projectActivity.getByText('Changed files')).toBeVisible();
+    await expect(projectActivity.getByText('Local changes are unavailable.')).toBeVisible();
 
     const projectsResponse = await fetch(`http://127.0.0.1:${backendPort}/v1/projects`);
     const projects = (await projectsResponse.json()) as {
@@ -83,7 +87,17 @@ test('Save As cancels safely and writes only the native-dialog destination', asy
     const fixtureUrl = new URL('/e2e/workspace-resources', page.url());
     fixtureUrl.searchParams.set('projectId', project?.id ?? 'missing-project');
     await page.goto(fixtureUrl.toString());
-    await page.getByRole('button', { name: 'Preview Markdown: generated/notes.md' }).click();
+    const fixtureActivity = page.getByRole('complementary', { name: 'Project activity' });
+    await expect(fixtureActivity).toHaveAttribute(
+      'data-project-id',
+      project?.id ?? 'missing-project',
+    );
+    await expect(fixtureActivity.getByText('Generated outputs')).toBeVisible();
+    await fixtureActivity
+      .locator('section[aria-labelledby="project-activity-generated"]')
+      .getByRole('button', { name: /notes\.md/ })
+      .click();
+    await expect(page.getByTestId('project-context')).toContainText('e2e-conversation');
 
     await page.getByRole('button', { name: 'Save As' }).click();
     expect(existsSync(cancelledDestination)).toBe(false);
@@ -113,6 +127,10 @@ test('Save As cancels safely and writes only the native-dialog destination', asy
     isolatedFixtureUrl.searchParams.set('sessionId', 'isolated-session');
     await page.goto(isolatedFixtureUrl.toString());
     await expect(page.getByTestId('workspace-resource-viewer')).toHaveCount(0);
+    await expect(page.getByRole('complementary', { name: 'Project activity' })).toHaveAttribute(
+      'data-session-id',
+      'isolated-session',
+    );
     await page.goto(fixtureUrl.toString());
     await expect(page.getByRole('tab')).toHaveCount(2);
   } finally {

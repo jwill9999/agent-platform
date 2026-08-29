@@ -111,4 +111,6 @@ Feature: Review Project activity and evidence beside Project Chat
 - [ ] Panel consumes a normalized/swappable activity boundary rather than hard-coding one provider.
 - [ ] Coding Project evidence is implemented first, with clear fallback states for other profiles.
 - [ ] Tests and CI/CD gates pass before the Beads task is closed.
+- [ ] Playwright and production-rendered Electron coverage prove panel grouping, shared preview
+      opening, context preservation, provider fallbacks, and Project/session isolation.
 - [ ] Playwright tests cover the Gherkin scenarios through accessible panel and resource controls.

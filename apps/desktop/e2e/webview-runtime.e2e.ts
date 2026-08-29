@@ -89,6 +89,7 @@ test.describe('Electron workspace WebView runtime', () => {
       await openProject(page);
       await expectDesktopWorkspaceBridge(page);
 
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await expect(gitPanel.getByRole('link', { name: 'Open remote repository' })).toBeVisible({
         timeout: 15_000,

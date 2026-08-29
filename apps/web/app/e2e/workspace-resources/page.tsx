@@ -8,6 +8,7 @@ import {
   WorkspaceResourceCards,
   WorkspaceResourcePreviewProvider,
 } from '@/components/chat/workspace-resource-cards';
+import { ProjectActivityPanel } from '@/components/project/project-activity-panel';
 
 const PROJECT_ID = 'e2e-project';
 const CREATED_AT = '2026-08-04T09:00:00.000Z';
@@ -76,23 +77,33 @@ export default async function WorkspaceResourcesE2EPage({
   }));
   return (
     <main
-      className="min-h-screen bg-background p-8 text-foreground"
+      className="h-screen overflow-hidden bg-background text-foreground"
       data-workspace-surface="project-chat"
     >
-      <section className="mx-auto max-w-3xl">
-        <p className="text-xs text-muted-foreground">Project · feature/project-experience</p>
-        <h1 className="mt-1 text-xl font-semibold">Project Chat resource previews</h1>
-        <p data-testid="project-context" className="mt-2 text-sm text-muted-foreground">
-          Session {sessionId} · Conversation e2e-conversation
-        </p>
-        <WorkspaceResourcePreviewProvider
-          key={`${projectId}:${sessionId}`}
-          scopeKey={`e2e:${projectId}:${sessionId}`}
-          projectId={projectId}
-        >
-          <WorkspaceResourceCards events={events} />
-        </WorkspaceResourcePreviewProvider>
-      </section>
+      <WorkspaceResourcePreviewProvider
+        key={`${projectId}:${sessionId}`}
+        scopeKey={`e2e:${projectId}:${sessionId}`}
+        projectId={projectId}
+      >
+        <div className="flex h-full min-h-0">
+          <section className="min-w-0 flex-1 overflow-y-auto p-8">
+            <div className="mx-auto max-w-3xl">
+              <p className="text-xs text-muted-foreground">Project · feature/project-experience</p>
+              <h1 className="mt-1 text-xl font-semibold">Project Chat resource previews</h1>
+              <p data-testid="project-context" className="mt-2 text-sm text-muted-foreground">
+                Session {sessionId} · Conversation e2e-conversation
+              </p>
+              <WorkspaceResourceCards events={events} />
+            </div>
+          </section>
+          <ProjectActivityPanel
+            projectId={projectId}
+            sessionId={sessionId}
+            profile="coding"
+            workspaceEventsByMessage={{ 'e2e-message': events }}
+          />
+        </div>
+      </WorkspaceResourcePreviewProvider>
     </main>
   );
 }
