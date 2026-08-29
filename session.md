@@ -19,7 +19,7 @@ and actionable.
 - **Session:** Implemented Project Experience `.8` Project activity/evidence panel.
 - **Branch:** `task/project-experience-8-activity-panel`
 - **Base:** `2facadb` (Project Experience `.16`, merged through PR #246)
-- **Head:** `b74e4fc` (`feat add project activity evidence rail`)
+- **Head:** `b853309` (`fix address activity rail review findings`)
 - **Pull request:** [#247](https://github.com/jwill9999/agent-platform/pull/247) into `staging`
 
 ## What Happened
@@ -36,6 +36,8 @@ and actionable.
   accessible tabs, preserving the terminal and chat layout.
 - Expanded browser and production-rendered Electron coverage for activity grouping, preview opening,
   context preservation, provider fallback, Project/session isolation, and Git-rail navigation.
+- Addressed the hosted review with explicit tab/tabpanel associations and refactored all 12 new
+  Sonar maintainability findings into named, typed decision helpers.
 
 ## Verification
 
@@ -47,6 +49,8 @@ and actionable.
 - SonarQube Agentic Analysis was attempted through the supported CLI fallback but SonarQube Cloud
   returned the known explicit 403 authorization denial. The required typecheck/lint/test fallback
   gate has no errors; hosted SonarCloud remains required on the PR.
+- PR #247's first hosted run passed SonarCloud's quality gate, review, security, verify, Docker,
+  22-test browser E2E, and 10-test Electron E2E. A clean rerun for the review fixes is pending.
 
 ## Current State
 
