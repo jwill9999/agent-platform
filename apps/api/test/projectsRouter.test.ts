@@ -2101,9 +2101,10 @@ exit 1
     const exportRequest = (uri: string) =>
       request(app).get(`/v1/projects/${projectId}/resources/export`).query({ uri });
 
-    await exportRequest(
+    const mismatchedProject = await exportRequest(
       workspaceResourceUri({ projectId: 'another-project', kind: 'file', target: 'file.txt' }),
     ).expect(403);
+    expect(mismatchedProject.body.error.code).toBe('PROJECT_RESOURCE_MISMATCH');
     await exportRequest(
       workspaceResourceUri({ projectId, kind: 'diff', target: 'generated/report.md' }),
     ).expect(415);

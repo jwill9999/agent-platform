@@ -58,7 +58,7 @@ test('Save As cancels safely and writes only the native-dialog destination', asy
     });
 
     const page = await app.firstWindow();
-    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
     await page.getByRole('button', { name: 'Open folder' }).click();
     await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
 

@@ -470,9 +470,9 @@ export function WorkspaceResourceViewer({
         </div>
       </header>
       {exportStatus && (
-        <p className="border-b border-border px-4 py-2 text-sm" role="status">
+        <output className="border-b border-border px-4 py-2 text-sm">
           {exportStatus}
-        </p>
+        </output>
       )}
       <div className="min-h-0 flex-1 overflow-auto bg-muted/20">
         <ViewerBody

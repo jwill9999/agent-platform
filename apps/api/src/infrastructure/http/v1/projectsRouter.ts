@@ -27,6 +27,7 @@ import {
   ProjectFileReadResultSchema,
   ProjectFileTreeResultSchema,
   parseWorkspaceResourceUri,
+  safeWorkspaceResourceFilename,
   type ProjectOpenBody,
   ProjectOpenBodySchema,
   ProjectOnboardingAnswerBodySchema,
@@ -2709,19 +2710,6 @@ async function previewProjectFile(project: ProjectRecord, rawPath: unknown) {
   };
 }
 
-function safeAttachmentFilename(value: string): string {
-  const filename = [...basename(value)]
-    .map((character) => {
-      const codePoint = character.codePointAt(0) ?? 0;
-      return codePoint < 32 || codePoint === 127 || character === '"' || character === '\\'
-        ? '_'
-        : character;
-    })
-    .join('')
-    .trim();
-  return filename && filename !== '.' && filename !== '..' ? filename.slice(0, 255) : 'download';
-}
-
 function attachmentContentDisposition(filename: string): string {
   const asciiFallback = filename.replace(/[^\x20-\x7e]/gu, '_').replaceAll('"', '_');
   return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
@@ -2754,7 +2742,7 @@ async function exportProjectFile(project: ProjectRecord, routeProjectId: string,
     parsed.target,
     MAX_PROJECT_FILE_EXPORT_BYTES,
   );
-  const filename = safeAttachmentFilename(file.relativePath);
+  const filename = safeWorkspaceResourceFilename(file.relativePath);
   return {
     content: await readFile(file.resolvedPath),
     filename,

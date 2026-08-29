@@ -58,6 +58,20 @@ export function normalizeWorkspaceResourcePath(value: string | undefined): strin
   return normalized;
 }
 
+export function safeWorkspaceResourceFilename(value: string): string {
+  const basename = value.split(/[\\/]/u).at(-1) ?? '';
+  const normalized = [...basename]
+    .map((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint < 32 || codePoint === 127 || character === '"' ? '_' : character;
+    })
+    .join('')
+    .trim();
+  return normalized && normalized !== '.' && normalized !== '..'
+    ? normalized.slice(0, 255)
+    : 'download';
+}
+
 export function parseWorkspaceResourceUri(uri: string): ParsedWorkspaceResourceUri {
   WorkspaceResourceUriSchema.parse(uri);
   const match = WORKSPACE_RESOURCE_URI_PATTERN.exec(uri);

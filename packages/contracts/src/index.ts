@@ -41,6 +41,7 @@ export {
   WorkspaceEventTypeSchema,
   WorkspaceEventSchema,
   normalizeWorkspaceResourcePath,
+  safeWorkspaceResourceFilename,
   parseWorkspaceResourceUri,
   workspaceResourceUri,
   type WorkspaceResourceKind,

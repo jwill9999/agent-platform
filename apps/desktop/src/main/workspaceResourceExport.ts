@@ -1,6 +1,7 @@
 import {
   DesktopWorkspaceExportResultSchema,
   parseWorkspaceResourceUri,
+  safeWorkspaceResourceFilename,
   type DesktopWorkspaceExportResult,
   type WorkspaceResourceExportRequest,
 } from '@agent-platform/contracts';
@@ -31,11 +32,11 @@ function consumeSaveDialogOverride(env: NodeJS.ProcessEnv): SaveDialogResult | u
   if (queued === undefined) return undefined;
   const parsed = JSON.parse(queued) as unknown;
   if (!Array.isArray(parsed)) {
-    throw new Error(`${desktopWorkspaceSaveOverrideQueueEnv} must be a JSON array.`);
+    throw new TypeError(`${desktopWorkspaceSaveOverrideQueueEnv} must be a JSON array.`);
   }
   const [next, ...remaining] = parsed;
   if (next !== null && typeof next !== 'string') {
-    throw new Error(`${desktopWorkspaceSaveOverrideQueueEnv} entries must be paths or null.`);
+    throw new TypeError(`${desktopWorkspaceSaveOverrideQueueEnv} entries must be paths or null.`);
   }
   env[desktopWorkspaceSaveOverrideQueueEnv] = JSON.stringify(remaining);
   return next === null || next === '' ? { canceled: true } : { canceled: false, filePath: next };
@@ -43,19 +44,7 @@ function consumeSaveDialogOverride(env: NodeJS.ProcessEnv): SaveDialogResult | u
 
 function safeSuggestedFilename(request: WorkspaceResourceExportRequest): string {
   const parsed = parseWorkspaceResourceUri(request.uri);
-  const candidate = request.suggestedFilename ?? basename(parsed.target);
-  const normalized = [...basename(candidate)]
-    .map((character) => {
-      const codePoint = character.codePointAt(0) ?? 0;
-      return codePoint < 32 || codePoint === 127 || character === '"' || character === '\\'
-        ? '_'
-        : character;
-    })
-    .join('')
-    .trim();
-  return normalized && normalized !== '.' && normalized !== '..'
-    ? normalized.slice(0, 255)
-    : 'download';
+  return safeWorkspaceResourceFilename(request.suggestedFilename ?? parsed.target);
 }
 
 export async function saveWorkspaceResourceAs(
