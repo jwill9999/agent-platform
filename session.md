@@ -18,7 +18,7 @@ and actionable.
 - **Date:** 2026-08-29
 - **Session:** Implemented Project Experience `.15` secure Download and Save As exports.
 - **Branch:** `task/project-experience-15-secure-export`
-- **Head:** `6ddeebc` (`task/project-experience-15-secure-export feat add secure project resource exports`)
+- **Head:** `32400b7` (`task/project-experience-15-secure-export fix address SonarCloud findings`)
 - **Pull request:** [#245](https://github.com/jwill9999/agent-platform/pull/245) into `staging`
 
 ## What Happened
@@ -35,6 +35,9 @@ and actionable.
   Browser E2E uses a real isolated Project and validates attachment name/bytes through the BFF.
 - Electron E2E caught and fixed a production-only preload generator omission where the typed bridge
   declared `saveResourceAs` but the generated CommonJS preload did not expose it.
+- The first SonarCloud run failed its duplication threshold at 3.7% and reported four annotations.
+  Filename sanitization is now shared through contracts, and the type, accessibility, assertion,
+  and Playwright readiness findings are fixed; the corrected CI run is pending.
 - Refined the Gherkin E2E strategies for Project Experience `.15`, `.16`, `.8`, and `.6`.
 
 ## Verification
@@ -45,8 +48,9 @@ and actionable.
 - Passed: focused Electron cancellation/save destination scenario using the production-built renderer,
   managed API, generated CommonJS preload, and isolated app data.
 - Passed: pre-push circular-dependency, affected-package build, typecheck, and test hooks.
-- SonarQube Agentic Analysis was attempted but SonarQube Cloud returned an explicit 403 authorization
-  denial. The repository fallback typecheck/lint/test gates passed with no errors.
+- Local SonarQube Agentic Analysis was attempted but SonarQube Cloud returned an explicit 403
+  authorization denial. GitHub's SonarCloud annotations were retrieved through the check-run API,
+  fixed, and locally revalidated; the corrected quality-gate run is pending.
 - Docker initially ran out of VM space; 18.03 GB of unused build cache was pruned, then the complete
   Docker build and health checks passed. No project data or active volumes were removed.
 
