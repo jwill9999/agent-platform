@@ -1,7 +1,9 @@
 import type {
   DesktopWorkspaceOpenExternalFallbackResult,
   DesktopWorkspaceOpenResult,
+  DesktopWorkspaceExportResult,
   DesktopWorkspaceWebViewState,
+  WorkspaceResourceExportRequest,
   WorkspaceResource,
 } from '@agent-platform/contracts';
 export type {
@@ -13,6 +15,9 @@ export type {
 } from '@agent-platform/contracts';
 
 export type DesktopWorkspaceBridge = Readonly<{
+  saveResourceAs: (
+    request: WorkspaceResourceExportRequest,
+  ) => Promise<DesktopWorkspaceExportResult>;
   openResource: (request: { readonly uri: string }) => Promise<DesktopWorkspaceOpenResult>;
   openExternalFallback: (request: {
     readonly url: string;

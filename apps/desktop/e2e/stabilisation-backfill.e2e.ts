@@ -2,9 +2,10 @@ import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -339,33 +340,4 @@ async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   expect(response.ok).toBeTruthy();
   return (await response.json()) as T;
-}
-
-function seedDesktopDatabase(sqlitePath: string): void {
-  execFileSync(process.execPath, [join(repoRoot, 'packages/db/dist/seed/run.js')], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      SQLITE_PATH: sqlitePath,
-      E2E_SEED: '1',
-    },
-    stdio: 'inherit',
-  });
-}
-
-function getOpenPort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => {
-        if (typeof address === 'object' && address) {
-          resolvePort(address.port);
-          return;
-        }
-        reject(new Error('Failed to allocate a local port.'));
-      });
-    });
-  });
 }

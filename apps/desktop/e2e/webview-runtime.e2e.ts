@@ -6,6 +6,8 @@ import { createServer, type Server } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
+
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
 const GIT_BINARY = '/usr/bin/git';
@@ -87,6 +89,7 @@ test.describe('Electron workspace WebView runtime', () => {
       await openProject(page);
       await expectDesktopWorkspaceBridge(page);
 
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await expect(gitPanel.getByRole('link', { name: 'Open remote repository' })).toBeVisible({
         timeout: 15_000,
@@ -243,35 +246,6 @@ async function openProject(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Open folder' }).click();
   await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
-}
-
-function seedDesktopDatabase(sqlitePath: string): void {
-  execFileSync(process.execPath, [join(repoRoot, 'packages/db/dist/seed/run.js')], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      SQLITE_PATH: sqlitePath,
-      E2E_SEED: '1',
-    },
-    stdio: 'inherit',
-  });
-}
-
-function getOpenPort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => {
-        if (typeof address === 'object' && address) {
-          resolvePort(address.port);
-          return;
-        }
-        reject(new Error('Failed to allocate a local port.'));
-      });
-    });
-  });
 }
 
 function startPreviewServer(port: number): Promise<Server> {

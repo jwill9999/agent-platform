@@ -51,12 +51,19 @@ import { openDesktopProjectIde } from '@/lib/desktop-projects';
 type ProjectGitHubPanelProps = Readonly<{
   projectId: string | null;
   refreshKey?: number;
+  embedded?: boolean;
   projectInstructionsStatus?: 'approved' | 'draft_ready' | 'missing';
   isStartingProjectInstructions?: boolean;
   onStartProjectInstructions?: () => void;
 }>;
 
 type PanelTab = 'overview' | 'changes' | 'commit' | 'push' | 'prs' | 'checks';
+
+function panelWidthClass(open: boolean, embedded: boolean): string {
+  if (!open) return 'w-12';
+  if (embedded) return 'w-full';
+  return 'w-[360px] max-w-[30vw]';
+}
 
 type GitWorkflowTab = Readonly<{
   id: PanelTab;
@@ -2381,6 +2388,7 @@ function ConflictChoiceButton({
 export function ProjectGitHubPanel({
   projectId,
   refreshKey,
+  embedded = false,
   projectInstructionsStatus = 'approved',
   isStartingProjectInstructions = false,
   onStartProjectInstructions,
@@ -3384,8 +3392,9 @@ export function ProjectGitHubPanel({
 
       <aside
         className={cn(
-          'hidden h-full max-h-full min-h-0 shrink-0 overflow-hidden border-l border-border bg-background/95 lg:flex',
-          open ? 'w-[360px] max-w-[30vw]' : 'w-12',
+          'h-full max-h-full min-h-0 shrink-0 overflow-hidden bg-background/95',
+          embedded ? 'flex' : 'hidden border-l border-border lg:flex',
+          panelWidthClass(open, embedded),
         )}
         aria-label="Git and GitHub"
       >
@@ -4191,7 +4200,7 @@ export function ProjectGitHubPanel({
                             <div className="space-y-3 rounded border border-border bg-background px-3 py-3">
                               <div>
                                 <div className="font-medium">Create a pull request</div>
-                              <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="mt-1 text-xs text-muted-foreground">
                                   Choose the target branch before creating a pull request for{' '}
                                   {currentStatus.currentBranch}.
                                 </p>

@@ -59,6 +59,8 @@ describe('WorkspaceResourceCards', () => {
     expect(html).toContain('sandbox="allow-forms allow-modals allow-popups allow-scripts"');
     expect(html).not.toContain('allow-same-origin');
     expect(html).toContain('generated/app.html');
+    expect(html).toContain('Download');
+    expect(html).toContain('/resources/export?uri=');
   });
 
   it('keeps unsupported files in a safe non-mutating fallback state', () => {
@@ -72,5 +74,39 @@ describe('WorkspaceResourceCards', () => {
     expect(html).not.toContain('Stage');
     expect(html).not.toContain('Commit');
     expect(html).not.toContain('Push');
+  });
+
+  it('exposes linked tab and panel semantics with accessible close controls', () => {
+    const first = resource('file', 'first.txt', {
+      relativePath: 'generated/first.txt',
+      mimeType: 'text/plain',
+      content: 'First',
+    });
+    const second = {
+      ...resource('file', 'second.txt', {
+        relativePath: 'generated/second.txt',
+        mimeType: 'text/plain',
+        content: 'Second',
+      }),
+      uri: 'workspace://project/project-1/file/generated/second.txt',
+    } as WorkspaceResource;
+
+    const html = renderToStaticMarkup(
+      createElement(WorkspaceResourceViewer, {
+        resource: second,
+        resources: [first, second],
+        onActivate: () => undefined,
+        onClose: () => undefined,
+        onCloseTab: () => undefined,
+        onMinimize: () => undefined,
+      }),
+    );
+
+    expect(html).toContain('role="tablist"');
+    expect(html.match(/role="tab"/gu)).toHaveLength(2);
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('role="tabpanel"');
+    expect(html).toContain('aria-label="Close preview generated/second.txt"');
+    expect(html).toContain('aria-label="Minimize previews"');
   });
 });

@@ -59,6 +59,7 @@ import {
   openWorkspaceWebViewIpcChannel,
   reloadWorkspaceWebViewIpcChannel,
   resizeTerminalIpcChannel,
+  saveWorkspaceResourceIpcChannel,
   selectProjectFolderIpcChannel,
   setWorkspaceWebViewBoundsIpcChannel,
   terminalDataIpcChannel,
@@ -77,12 +78,14 @@ import {
 } from './terminalService.js';
 import {
   validateDesktopWorkspaceOpenExternalFallbackRequest,
+  validateDesktopWorkspaceExportRequest,
   validateDesktopWorkspaceOpenResourceRequest,
   validateDesktopWorkspaceOpenWebViewRequest,
   validateDesktopWorkspaceWebViewBoundsRequest,
   validateDesktopWorkspaceWebViewIdRequest,
   workspaceOpenFallbackResult,
 } from './workspaceResourceBridge.js';
+import { saveWorkspaceResourceAs } from './workspaceResourceExport.js';
 import { createElectronWebViewFactory, DesktopWebViewService } from './webviewService.js';
 import {
   applyRendererSecurity,
@@ -321,6 +324,16 @@ function registerDesktopWorkspaceIpc(window: BrowserWindow): void {
   window.once('closed', () => {
     desktopWebViewService?.disposeAll();
     desktopWebViewService = undefined;
+  });
+
+  ipcMain.removeHandler(saveWorkspaceResourceIpcChannel);
+  ipcMain.handle(saveWorkspaceResourceIpcChannel, async (event, payload) => {
+    assertTrustedIpcSender(event, window.webContents);
+    const request = validateIpcPayload(payload, validateDesktopWorkspaceExportRequest);
+    return saveWorkspaceResourceAs(request, {
+      apiBaseUrl: resolveDesktopTerminalApiBaseUrl(),
+      showSaveDialog: (options) => dialog.showSaveDialog(window, options),
+    });
   });
 
   ipcMain.removeHandler(openWorkspaceResourceIpcChannel);

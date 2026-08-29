@@ -1,0 +1,140 @@
+import { expect, test } from '@playwright/test';
+import { _electron as electron, type ElectronApplication } from 'playwright';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { workspaceResourceUri } from '@agent-platform/contracts';
+
+import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
+
+const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = resolve(desktopDir, '../..');
+const GIT_BINARY = '/usr/bin/git';
+const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+
+test('Save As cancels safely and writes only the native-dialog destination', async () => {
+  const tempRoot = join(
+    repoRoot,
+    '.agent-platform',
+    'electron-resource-export-e2e',
+    String(Date.now()),
+  );
+  const runtimeDir = join(tempRoot, 'runtime');
+  const projectDir = join(tempRoot, 'client', 'resource-export-project');
+  const generatedDir = join(projectDir, 'generated');
+  const sourceFile = join(generatedDir, 'notes.md');
+  const destinationFile = join(tempRoot, 'saved', 'notes-copy.md');
+  const cancelledDestination = join(tempRoot, 'saved', 'cancelled.md');
+  const sqlitePath = join(runtimeDir, 'data', 'agent.sqlite');
+  const backendPort = await getOpenPort();
+  const rendererPort = await getOpenPort();
+  let app: ElectronApplication | undefined;
+
+  mkdirSync(generatedDir, { recursive: true });
+  mkdirSync(dirname(destinationFile), { recursive: true });
+  writeFileSync(sourceFile, '# Generated notes\n\nDesktop export remains scoped.\n');
+  execFileSync(GIT_BINARY, ['init', '-b', 'main'], { cwd: projectDir, stdio: 'ignore' });
+  seedDesktopDatabase(sqlitePath);
+
+  try {
+    app = await electron.launch({
+      cwd: desktopDir,
+      args: ['.'],
+      env: {
+        ...process.env,
+        AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
+        AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(backendPort),
+        AGENT_PLATFORM_DESKTOP_NODE_PATH: process.execPath,
+        AGENT_PLATFORM_DESKTOP_RENDERER: 'standalone',
+        AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
+        AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
+        AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
+        AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
+        AGENT_PLATFORM_DESKTOP_TEST_SAVE_RESOURCE_PATHS: JSON.stringify([null, destinationFile]),
+        SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
+        CI: process.env.CI,
+      },
+    });
+
+    const page = await app.firstWindow();
+    await expect(page.getByRole('button', { name: 'Open folder' })).toBeVisible();
+    await page.getByRole('button', { name: 'Open folder' }).click();
+    await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
+    const projectActivity = page.getByRole('complementary', { name: 'Project activity' });
+    await expect(projectActivity).toBeVisible();
+    await expect(projectActivity.getByText('Changed files')).toBeVisible();
+    await expect(projectActivity.getByText('Local changes are unavailable.')).toBeVisible();
+
+    const projectsResponse = await fetch(`http://127.0.0.1:${backendPort}/v1/projects`);
+    const projects = (await projectsResponse.json()) as {
+      data: Array<{ id: string; name: string }>;
+    };
+    const project = projects.data.find((candidate) => candidate.name === 'resource-export-project');
+    expect(project).toBeDefined();
+    const resourceUri = workspaceResourceUri({
+      projectId: project?.id ?? 'missing-project',
+      kind: 'file',
+      target: 'generated/notes.md',
+    });
+    const exportedResourceResponse = await fetch(
+      `http://127.0.0.1:${backendPort}/v1/projects/${encodeURIComponent(project?.id ?? 'missing-project')}/resources/export?${new URLSearchParams({ uri: resourceUri }).toString()}`,
+    );
+    expect(exportedResourceResponse.status).toBe(200);
+    expect(await exportedResourceResponse.text()).toBe(readFileSync(sourceFile, 'utf8'));
+
+    const fixtureUrl = new URL('/e2e/workspace-resources', page.url());
+    fixtureUrl.searchParams.set('projectId', project?.id ?? 'missing-project');
+    await page.goto(fixtureUrl.toString());
+    const fixtureActivity = page.getByRole('complementary', { name: 'Project activity' });
+    await expect(fixtureActivity).toHaveAttribute(
+      'data-project-id',
+      project?.id ?? 'missing-project',
+    );
+    await expect(fixtureActivity.getByText('Generated outputs')).toBeVisible();
+    await fixtureActivity
+      .locator('section[aria-labelledby="project-activity-generated"]')
+      .getByRole('button', { name: /notes\.md/ })
+      .click();
+    await expect(page.getByTestId('project-context')).toContainText('e2e-conversation');
+
+    await page.getByRole('button', { name: 'Save As' }).click();
+    expect(existsSync(cancelledDestination)).toBe(false);
+    await expect(page.getByRole('heading', { name: 'Generated notes' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Save As' }).click();
+    await expect(page.getByRole('status')).toHaveText('notes-copy.md was saved.');
+    expect(readFileSync(destinationFile, 'utf8')).toBe(readFileSync(sourceFile, 'utf8'));
+    expect(readFileSync(sourceFile, 'utf8')).toContain('Desktop export remains scoped.');
+    await expect(page.getByText('/workspace')).toHaveCount(0);
+    await expect(page.getByText(projectDir)).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Preview HTML: generated/app.html' }).click();
+    await expect(page.getByRole('tab')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Minimize previews' }).click();
+    await expect(page.getByRole('button', { name: 'Restore 2 open previews' })).toBeVisible();
+    await page.getByRole('button', { name: 'Restore 2 open previews' }).click();
+    await page.reload();
+    await expect(page.getByRole('tab')).toHaveCount(2);
+    await expect(page.getByRole('tab', { name: 'generated/app.html' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    const isolatedFixtureUrl = new URL(fixtureUrl);
+    isolatedFixtureUrl.searchParams.set('projectId', 'isolated-project');
+    isolatedFixtureUrl.searchParams.set('sessionId', 'isolated-session');
+    await page.goto(isolatedFixtureUrl.toString());
+    await expect(page.getByTestId('workspace-resource-viewer')).toHaveCount(0);
+    await expect(page.getByRole('complementary', { name: 'Project activity' })).toHaveAttribute(
+      'data-session-id',
+      'isolated-session',
+    );
+    await page.goto(fixtureUrl.toString());
+    await expect(page.getByRole('tab')).toHaveCount(2);
+  } finally {
+    await app?.close();
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+});

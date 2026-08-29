@@ -67,6 +67,41 @@ Task `.16` extends the single-resource viewer delivered by `.7`. It is independe
    switches.
 7. Reuse the shared viewer actions from Project Chat and the task `.8` activity panel.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Multi-tab Project resource previews
+
+  Background:
+    Given Project Chat is open with isolated Project and session data
+    And generated HTML, Markdown, image, PDF, source, diff, and missing-file resources are visible
+
+  Scenario: Keep several previews open and navigate them accessibly
+    When the user opens two different resources from Project Chat
+    Then both resources remain available as de-duplicated preview tabs
+    And keyboard navigation changes the active tab without changing the Project conversation
+    And closing the active tab selects its predictable neighbor and returns focus after the last tab
+
+  Scenario: Minimize and restore the same preview workspace
+    Given multiple preview tabs are open
+    When the user minimizes and restores the right-side preview dock
+    Then the same tab set and active resource are preserved
+    And the controls remain reachable in a narrow viewport
+
+  Scenario: Restore only the matching Project and session
+    Given preview tabs were opened in one Project session
+    When the browser or production-built Electron renderer reloads that session
+    Then the available tab set and active resource are restored
+    When a different Project and session is opened
+    Then no preview tabs from the prior context are shown
+
+  Scenario: A missing resource does not break remaining previews
+    Given a valid diff preview is open
+    When the user opens a resource that is no longer readable
+    Then an unavailable message is visible and can be closed
+    And the valid diff preview remains open without stage, commit, push, download, or save side effects
+```
+
 ## Tests And Verification
 
 - Unit tests cover add, activate, de-duplicate, close-active, close-inactive, close-last,
@@ -84,6 +119,39 @@ Task `.16` extends the single-resource viewer delivered by `.7`. It is independe
 - Run `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, relevant Playwright/Electron
   suites, documentation checks, and the repository SonarQube/Problems completion gate.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Keep multiple Project resources open for review
+
+  Background:
+    Given the app is running with isolated test data
+    And Project Chat contains several generated file resources
+
+  Scenario: Open and navigate de-duplicated preview tabs
+    When the user opens two resources and reopens the first
+    Then exactly two preview tabs remain open
+    And the first resource is active without losing Project Chat context
+
+  Scenario: Close and minimize previews predictably
+    Given multiple preview tabs are open
+    When the user closes the active tab and minimizes then restores the viewer
+    Then a predictable adjacent tab becomes active
+    And the remaining tab set is preserved after restore
+
+  Scenario: Isolate tab state across Project sessions
+    Given one Project session has open preview tabs
+    When the user switches to a different Project session
+    Then the previous session's resources are not visible
+    And reopening the original session restores only its available resources where supported
+
+  Scenario: Recover from an unavailable resource
+    Given a previously open resource is missing or no longer readable
+    When the preview workspace is restored
+    Then the unavailable tab can be closed safely
+    And the other tabs remain usable
+```
+
 ## Definition Of Done
 
 - [ ] Multiple Project resources can remain open in de-duplicated preview tabs.
@@ -95,4 +163,8 @@ Task `.16` extends the single-resource viewer delivered by `.7`. It is independe
 - [ ] Missing resources fail safely without breaking other tabs.
 - [ ] The shared tab boundary is reusable by the task `.8` activity panel.
 - [ ] Download/export behavior remains exclusively scoped to task `.15`.
+- [ ] Gherkin E2E Strategy is present and covered through accessible real-UI locators.
+- [ ] Focused browser and production-built Electron Playwright scenarios pass locally.
+- [ ] Required CI Playwright jobs pass, with any failure artifacts inspected and addressed.
 - [ ] Required local, Playwright/Electron, CI, and SonarQube/Problems gates pass before closure.
+- [ ] Playwright tests cover the Gherkin scenarios through accessible tab controls.

@@ -38,7 +38,7 @@ import {
   ProjectInstructionsReview,
 } from '@/components/project/project-instructions-review';
 import { ProjectBranchSelector } from '@/components/project/project-branch-selector';
-import { ProjectGitHubPanel } from '@/components/project/project-git-github-panel';
+import { ProjectEvidenceRail } from '@/components/project/project-evidence-rail';
 import { ProjectTerminalDock } from '@/components/project/project-terminal-dock';
 import {
   ProjectWebViewPanel,
@@ -48,6 +48,7 @@ import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId, usableModelConfigs } from '@/lib/modelSelection';
 import {
   buildPersonalChatHref,
+  buildProjectChatHref,
   commandRunnerStatusDescription,
   commandRunnerStatusLabel,
   createWorkspaceNavigationState,
@@ -949,7 +950,11 @@ export default function HomePage() {
   );
 
   const openProjectChat = useCallback(
-    (project: ProjectDesktopRecord) => {
+    (project: ProjectDesktopRecord, options?: { readonly updateUrl?: boolean }) => {
+      if (options?.updateUrl !== false && globalThis.window !== undefined) {
+        globalThis.window.history.pushState(null, '', buildProjectChatHref(project.id));
+        globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
+      }
       setSelectedMode('project-chat');
       setActiveProject(project);
       setSessionId(null);
@@ -1035,7 +1040,7 @@ export default function HomePage() {
           setSessionError('This recent Project is no longer available. Open it again.');
           return;
         }
-        const agentId = openProjectChat(project);
+        const agentId = openProjectChat(project, { updateUrl: false });
         if (requestedSessionId) {
           const session = await apiGet<SessionRecord>(apiPath('sessions', requestedSessionId));
           if (session?.mode === 'project' && session.projectId === project.id) {
@@ -1677,8 +1682,16 @@ export default function HomePage() {
                       onViewModeChange={setProjectWebViewMode}
                     />
                     {projectWebViewMode === 'docked' && (
-                      <ProjectGitHubPanel
+                      <ProjectEvidenceRail
                         projectId={activeProject?.id ?? null}
+                        sessionId={sessionId}
+                        profile={
+                          projectOnboardingAssessmentFromMetadata(activeProject)?.profile ??
+                          'unknown'
+                        }
+                        workspaceEventsByMessage={workspaceEventsByMessage}
+                        approvalEventsByMessage={approvalEventsByMessage}
+                        toolEventsByMessage={toolEventsByMessage}
                         refreshKey={projectGitRefreshKey}
                         projectInstructionsStatus={projectInstructionsStatus}
                         isStartingProjectInstructions={isStartingProjectInstructions}

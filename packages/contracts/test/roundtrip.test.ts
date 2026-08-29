@@ -49,6 +49,7 @@ import {
   WorkspaceEventSchema,
   normalizeWorkspaceResourcePath,
   parseWorkspaceResourceUri,
+  safeWorkspaceResourceFilename,
   workspaceResourceUri,
 } from '../src/index.js';
 
@@ -150,6 +151,13 @@ describe('contracts round-trip', () => {
     expect(normalizeWorkspaceResourcePath('src\\index.ts')).toBe('src/index.ts');
     expect(normalizeWorkspaceResourcePath('/Users/example/private.txt')).toBeUndefined();
     expect(normalizeWorkspaceResourcePath('../private.txt')).toBeUndefined();
+  });
+
+  it('derives safe export filenames consistently for API and desktop consumers', () => {
+    expect(safeWorkspaceResourceFilename('generated/report.md')).toBe('report.md');
+    expect(safeWorkspaceResourceFilename('generated\\report.md')).toBe('report.md');
+    expect(safeWorkspaceResourceFilename('generated/quo"te\n.md')).toBe('quo_te_.md');
+    expect(safeWorkspaceResourceFilename('..')).toBe('download');
   });
 
   it('SkillSchema + AgentSchema + limits', () => {

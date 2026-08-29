@@ -2,9 +2,10 @@ import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(desktopDir, '../..');
@@ -56,6 +57,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       await openProject(page);
 
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await expect(gitPanel.getByRole('button', { name: 'Overview' })).toBeVisible();
       await expect(gitPanel.getByRole('button', { name: 'Changes' })).toHaveCount(0);
@@ -207,6 +209,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       await openProject(page);
 
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
       await expect(gitPanel.getByRole('button', { name: /Pull/ })).toBeVisible({
@@ -327,6 +330,7 @@ test.describe('Electron Project Git workflow panel', () => {
       const page = await app.firstWindow();
       await openProject(page);
 
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await gitPanel.getByRole('button', { name: 'Refresh Git state' }).click();
       await expect(gitPanel.getByRole('button', { name: 'PRs' })).toBeVisible({
@@ -371,18 +375,6 @@ async function openProject(page: Page): Promise<void> {
   await expect(page.locator('[data-workspace-surface="project-chat"]')).toBeVisible();
 }
 
-function seedDesktopDatabase(sqlitePath: string): void {
-  execFileSync(process.execPath, [join(repoRoot, 'packages/db/dist/seed/run.js')], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      SQLITE_PATH: sqlitePath,
-      E2E_SEED: '1',
-    },
-    stdio: 'inherit',
-  });
-}
-
 function writeFakeGitHubCli(path: string, statePath: string): void {
   writeFileSync(
     path,
@@ -419,21 +411,4 @@ exit 1
 `,
   );
   chmodSync(path, 0o755);
-}
-
-function getOpenPort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => {
-        if (typeof address === 'object' && address) {
-          resolvePort(address.port);
-          return;
-        }
-        reject(new Error('Failed to allocate a local port.'));
-      });
-    });
-  });
 }

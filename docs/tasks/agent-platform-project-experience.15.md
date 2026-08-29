@@ -38,6 +38,25 @@ writes only to the destination the user selects.
 - The export contract and UI action are reusable by the Project activity/evidence panel from task
   `.8`.
 
+## Resolved Requirement Decisions
+
+- The MVP remains single-user/no-auth. "Authenticated" in the implementation plan means the
+  existing trusted API boundary plus strict Project/resource scoping; this task does not introduce
+  an authentication system.
+- Export is available only for file-backed resources whose normalized
+  `workspace://project/<projectId>/file/<relative-path>` identity resolves to a regular file inside
+  the active Project. Diffs, terminals, remote webviews, inline-only previews, and directories are
+  not downloadable.
+- The API accepts the normalized resource URI rather than a renderer-supplied host path, verifies
+  that its Project identity matches the route, and derives the relative file target from the URI.
+- Electron's renderer sends only the normalized resource URI and an optional safe display name.
+  The trusted main process obtains the attachment from the scoped API endpoint, opens the native
+  Save As dialog, and writes only to the destination returned by that dialog.
+- Attachment responses use a normalized basename, a conservative MIME fallback, `nosniff`, and
+  no-store caching. Export size is bounded so a download cannot cause unbounded process memory use.
+- Native dialog cancellation is a successful no-op. Existing-file replacement remains governed by
+  the platform save dialog rather than a custom renderer confirmation.
+
 ## Dependency Order
 
 | Upstream                              | Downstream                             |
@@ -74,13 +93,48 @@ Task `.15` extends the resource contracts and viewer delivered by `.7`; it does 
 - Run `pnpm build`, `pnpm format:check`, `pnpm lint`, `pnpm test`, relevant Playwright/Electron
   suites, documentation checks, and the repository SonarQube/Problems completion gate.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Export a generated Project resource
+
+  Background:
+    Given the app is running with isolated test data
+    And a Project Chat contains a generated file resource inside the active Project
+
+  Scenario: Download a generated resource in the web app
+    Given the resource viewer is open for a supported generated file
+    When the user chooses "Download"
+    Then the browser receives an attachment with the safe suggested filename and expected bytes
+    And the Project resource and Git state remain unchanged
+
+  Scenario: Cancel Save As in the desktop app
+    Given the resource viewer is open in Electron
+    When the user chooses "Save As" and cancels the native save dialog
+    Then no destination file is written
+    And the preview remains usable without exposing a host path
+
+  Scenario: Save a generated resource from the desktop app
+    Given the native save-dialog test hook returns an isolated destination
+    When the user chooses "Save As"
+    Then the selected destination contains the expected resource bytes
+    And the source resource remains unchanged
+
+  Scenario: Reject an unsafe or unavailable resource
+    Given a resource identity attempts traversal, a symlink escape, or names a missing file
+    When export is requested
+    Then the user sees an actionable redacted failure
+    And no internal root or arbitrary source or destination path is exposed
+```
+
 ## Definition Of Done
 
-- [ ] Generated Project resources have an explicit user-visible Download or Save As action.
-- [ ] Web/API exports are safe attachment responses scoped to the active Project.
-- [ ] Electron exports use a native user-gesture save dialog with platform overwrite confirmation.
-- [ ] No renderer/API request can supply an arbitrary host source or destination path.
-- [ ] Path jail, traversal, and symlink protections are covered by meaningful tests.
-- [ ] Export contracts/actions are reusable by the task `.8` activity panel.
-- [ ] Exporting never mutates Git state or leaks raw host paths.
+- [x] Generated Project resources have an explicit user-visible Download or Save As action.
+- [x] Web/API exports are safe attachment responses scoped to the active Project.
+- [x] Electron exports use a native user-gesture save dialog with platform overwrite confirmation.
+- [x] No renderer/API request can supply an arbitrary host source or destination path.
+- [x] Path jail, traversal, and symlink protections are covered by meaningful tests.
+- [x] Export contracts/actions are reusable by the task `.8` activity panel.
+- [x] Exporting never mutates Git state or leaks raw host paths.
 - [ ] Required local, Playwright/Electron, CI, and SonarQube/Problems gates pass before closure.
+- [x] Playwright tests cover the Gherkin scenarios through accessible user-facing controls.

@@ -9,6 +9,8 @@ import type {
   DesktopTerminalExitEvent,
   DesktopWorkspaceOpenExternalFallbackResult,
   DesktopWorkspaceOpenResult,
+  DesktopWorkspaceExportResult,
+  WorkspaceResourceExportRequest,
   DesktopWorkspaceWebViewState,
 } from '@agent-platform/contracts';
 export type {
@@ -24,6 +26,8 @@ export type {
   DesktopTerminalExitEvent,
   DesktopWorkspaceOpenExternalFallbackResult,
   DesktopWorkspaceOpenResult,
+  DesktopWorkspaceExportResult,
+  WorkspaceResourceExportRequest,
   DesktopWorkspaceWebViewState,
 } from '@agent-platform/contracts';
 
@@ -133,6 +137,9 @@ export interface DesktopWorkspaceWebViewBoundsRequest {
 export type DesktopWorkspaceWebViewUnsubscribe = () => void;
 
 export interface DesktopWorkspaceApi {
+  readonly saveResourceAs: (
+    request: WorkspaceResourceExportRequest,
+  ) => Promise<DesktopWorkspaceExportResult>;
   readonly openResource: (
     request: DesktopWorkspaceOpenResourceRequest,
   ) => Promise<DesktopWorkspaceOpenResult>;
@@ -189,6 +196,7 @@ export const disposeTerminalIpcChannel = 'agent-platform:terminal:dispose';
 export const terminalDataIpcChannel = 'agent-platform:terminal:data';
 export const terminalExitIpcChannel = 'agent-platform:terminal:exit';
 export const openWorkspaceResourceIpcChannel = 'agent-platform:workspace:open-resource';
+export const saveWorkspaceResourceIpcChannel = 'agent-platform:workspace:save-resource-as';
 export const openWorkspaceExternalFallbackIpcChannel =
   'agent-platform:workspace:open-external-fallback';
 export const openWorkspaceWebViewIpcChannel = 'agent-platform:workspace:open-webview';
@@ -231,6 +239,7 @@ export const desktopTerminalApiKeys = [
 ] as const satisfies readonly (keyof DesktopTerminalApi)[];
 
 export const desktopWorkspaceApiKeys = [
+  'saveResourceAs',
   'openResource',
   'openExternalFallback',
   'openWebView',

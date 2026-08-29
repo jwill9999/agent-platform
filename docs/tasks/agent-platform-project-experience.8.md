@@ -38,9 +38,10 @@ beside Project Chat without expanding the built-in IDE.
 
 ## Dependency Order
 
-| Upstream                              | Downstream                            |
-| ------------------------------------- | ------------------------------------- |
-| `agent-platform-project-experience.3` | `agent-platform-project-experience.6` |
+| Task                                  | Relationship                         |
+| ------------------------------------- | ------------------------------------ |
+| `agent-platform-project-experience.3` | upstream dependency of this task     |
+| `agent-platform-project-experience.6` | downstream task blocked by this task |
 
 Keep Beads dependencies aligned with this table.
 
@@ -72,6 +73,33 @@ and activity summaries. It should consume preview card components from
 - Verify the panel remains usable when CI/review/provider data is unavailable.
 - Open the task PR, monitor GitHub checks/SonarCloud/GitGuardian/Sourcery/comments until green.
 
+## Gherkin E2E Strategy
+
+```gherkin
+Feature: Review Project activity and evidence beside Project Chat
+
+  Background:
+    Given the app is running with isolated test data
+    And an active coding Project session has normalized activity evidence
+
+  Scenario: Review rich coding evidence
+    When the user opens the Project activity panel
+    Then changed and generated files, checks, and available review states are grouped clearly
+    And choosing a file or diff opens it in the shared viewer without losing Project context
+
+  Scenario: Handle unavailable providers safely
+    Given CI or review-provider data is unavailable
+    When the user opens the activity panel
+    Then an explicit user-facing unavailable state is shown
+    And no backend root, host path, internal enum, or provider diagnostic is exposed
+
+  Scenario: Isolate evidence across Project sessions
+    Given the current Project has visible activity
+    When the user switches to another Project session with no activity
+    Then the previous Project's evidence is absent
+    And the new session shows its own empty state
+```
+
 ## Definition Of Done
 
 - [ ] Project Chat has a right-side Project activity/evidence panel.
@@ -83,3 +111,6 @@ and activity summaries. It should consume preview card components from
 - [ ] Panel consumes a normalized/swappable activity boundary rather than hard-coding one provider.
 - [ ] Coding Project evidence is implemented first, with clear fallback states for other profiles.
 - [ ] Tests and CI/CD gates pass before the Beads task is closed.
+- [ ] Playwright and production-rendered Electron coverage prove panel grouping, shared preview
+      opening, context preservation, provider fallbacks, and Project/session isolation.
+- [ ] Playwright tests cover the Gherkin scenarios through accessible panel and resource controls.

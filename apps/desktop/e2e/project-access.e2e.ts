@@ -7,10 +7,12 @@ import {
   type Page,
 } from 'playwright';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { getOpenPort, seedDesktopDatabase } from './support/runtime.js';
 
 interface ApiEnvelope<T> {
   data: T;
@@ -99,7 +101,7 @@ test.describe('Electron Project access', () => {
       join(secondProjectDir, 'docs', 'guide.md'),
       '# Guide\n\nhello from second electron project\n',
     );
-    seedDesktopDatabase(sqlitePath);
+    seedDesktopDatabase(sqlitePath, { secretsMasterKey: E2E_SECRETS_MASTER_KEY });
 
     try {
       app = await electron.launch({
@@ -211,6 +213,12 @@ test.describe('Electron Project access', () => {
       await expect(page.getByText('Restore folder')).toHaveCount(0);
       await expect(page.getByText('/workspace')).toHaveCount(0);
       await expect(page.getByText(firstProjectDir)).toHaveCount(0);
+      const projectActivity = page.getByRole('complementary', { name: 'Project activity' });
+      await expect(projectActivity).toBeVisible();
+      await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
 
       await expect(page.getByRole('combobox', { name: 'Active branch' })).toContainText('main');
       await page.getByRole('combobox', { name: 'Active branch' }).click();
@@ -242,6 +250,13 @@ test.describe('Electron Project access', () => {
         `project-terminal-controls-${process.platform}.png`,
         VISUAL_REGRESSION_OPTIONS,
       );
+      const compactTerminalHeight = (await projectTerminal.boundingBox())?.height ?? 0;
+      await projectTerminal.getByRole('button', { name: 'Toggle terminal height' }).click();
+      await expect
+        .poll(async () => (await projectTerminal.boundingBox())?.height ?? 0)
+        .toBeGreaterThan(compactTerminalHeight + 100);
+      await projectTerminal.getByRole('button', { name: 'Toggle terminal height' }).click();
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
       const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
       await expect(gitPanel).toBeVisible();
       writeFileSync(join(firstProjectDir, 'scratch.txt'), 'scratch\n');
@@ -275,6 +290,12 @@ test.describe('Electron Project access', () => {
         .evaluate((element: HTMLElement) => element.click());
       const activeTerminalPane = projectTerminal.locator('[data-terminal-active="true"]');
       await expect(activeTerminalPane).toContainText('client-a/agent-platform');
+      await activeTerminalPane.click();
+      await page.keyboard.type("printf 'PROJECT_E2E_COMMAND_OK\\n'");
+      await page.keyboard.press('Enter');
+      await expect(activeTerminalPane).toContainText('PROJECT_E2E_COMMAND_OK', {
+        timeout: 10_000,
+      });
       await projectTerminal.getByRole('button', { name: 'Hide terminal' }).click();
       await expect(projectTerminal).toBeHidden();
       await page.getByRole('button', { name: /Terminal/ }).click();
@@ -369,11 +390,18 @@ test.describe('Electron Project access', () => {
       await expectProjectLocationBreadcrumb(projectChatHeader);
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeVisible();
       await expect(page).not.toHaveURL(IDE_URL_PATTERN);
-      const secondProject = await findRecentProjectExcluding(
-        backendPort,
-        secondProjectName,
-        project.id,
-      );
+      const secondProjectActivity = page.getByRole('complementary', {
+        name: 'Project activity',
+      });
+      await expect
+        .poll(
+          async () => (await secondProjectActivity.getAttribute('data-project-id')) ?? project.id,
+        )
+        .not.toBe(project.id);
+      const secondProjectId = await secondProjectActivity.getAttribute('data-project-id');
+      expect(secondProjectId).toBeTruthy();
+      expect(new URL(page.url()).searchParams.get('projectId')).toBe(secondProjectId);
+      const secondProject = await findRecentProject(backendPort, secondProjectName);
       expect(secondProject.metadata.source).toBe('desktop');
       expect(secondProject.metadata.folderName).toBe(secondProjectName);
       const secondProjectPathLabel = requiredFolderPathLabel(secondProject);
@@ -437,6 +465,76 @@ test.describe('Electron Project access', () => {
         `http://127.0.0.1:${backendPort}/v1/sessions/${session.id}`,
       );
       expect(refreshedSession.data.projectId).toBe(project.id);
+    } finally {
+      await app?.close();
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('shows profile-aware evidence and safe Git fallback for a docs-only Project', async () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'agent-platform-electron-profile-e2e-'));
+    const runtimeDir = join(tempRoot, 'runtime');
+    const projectName = 'docs-only-e2e-project';
+    const projectDir = join(tempRoot, 'client', projectName);
+    const backendPort = await getOpenPort();
+    const rendererPort = await getOpenPort();
+    let app: ElectronApplication | undefined;
+
+    mkdirSync(join(projectDir, 'docs'), { recursive: true });
+    writeFileSync(join(projectDir, 'README.md'), '# Docs-only E2E Project\n');
+    writeFileSync(join(projectDir, 'docs', 'guide.md'), '# Guide\n\nDocs evidence only.\n');
+    seedDesktopDatabase(join(runtimeDir, 'data', 'agent.sqlite'), {
+      secretsMasterKey: E2E_SECRETS_MASTER_KEY,
+    });
+
+    try {
+      app = await electron.launch({
+        cwd: desktopDir,
+        args: ['.'],
+        env: {
+          ...process.env,
+          AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
+          AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(backendPort),
+          AGENT_PLATFORM_DESKTOP_NODE_PATH: process.execPath,
+          AGENT_PLATFORM_DESKTOP_RENDERER: 'standalone',
+          AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(rendererPort),
+          AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: runtimeDir,
+          AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(runtimeDir, 'tmp'),
+          AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([projectDir]),
+          SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
+          CI: process.env.CI,
+        },
+      });
+
+      const page = await app.firstWindow();
+      await openProjectChat(page);
+      await clickOpenFolder(page);
+      await expect(page.getByRole('heading', { name: projectName })).toBeVisible();
+
+      const activityPanel = page.getByRole('complementary', { name: 'Project activity' });
+      const projectId = await activityPanel.getAttribute('data-project-id');
+      expect(projectId).toBeTruthy();
+      expect(new URL(page.url()).searchParams.get('projectId')).toBe(projectId);
+
+      await expect
+        .poll(async () => {
+          const project = await fetchProject(backendPort, projectId ?? '');
+          return (project.metadata.onboardingAssessment as { profile?: string } | undefined)
+            ?.profile;
+        })
+        .toBe('docs_content');
+      await expect(activityPanel).toContainText(
+        'Docs and content evidence appears as outputs become available.',
+        { timeout: 15_000 },
+      );
+
+      await page.getByRole('tab', { name: 'Git & GitHub' }).click();
+      const gitPanel = page.getByRole('complementary', { name: 'Git and GitHub' });
+      await expect(gitPanel).toContainText('Project is not a Git repository.', {
+        timeout: 15_000,
+      });
+      await expect(page.getByText(projectDir)).toHaveCount(0);
+      await expect(page.getByText('/workspace')).toHaveCount(0);
     } finally {
       await app?.close();
       rmSync(tempRoot, { recursive: true, force: true });
@@ -567,15 +665,11 @@ async function findRecentProject(port: number, name: string): Promise<ProjectRec
   return project as ProjectRecord;
 }
 
-async function findRecentProjectExcluding(port: number, name: string, excludedId: string) {
-  const response = await fetchJson<ApiEnvelope<RecentDesktopProjects>>(
-    `http://127.0.0.1:${port}/v1/projects/desktop/recent`,
+async function fetchProject(port: number, projectId: string): Promise<ProjectRecord> {
+  const response = await fetchJson<ApiEnvelope<ProjectRecord>>(
+    `http://127.0.0.1:${port}/v1/projects/${encodeURIComponent(projectId)}`,
   );
-  const project = response.data.projects.find(
-    (candidate) => candidate.name === name && candidate.id !== excludedId,
-  );
-  expect(project).toBeDefined();
-  return project as ProjectRecord;
+  return response.data;
 }
 
 function requiredFolderPathLabel(project: ProjectRecord): string {
@@ -609,34 +703,4 @@ async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   expect(response.ok).toBeTruthy();
   return (await response.json()) as T;
-}
-
-function seedDesktopDatabase(sqlitePath: string): void {
-  execFileSync(process.execPath, [join(repoRoot, 'packages/db/dist/seed/run.js')], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      SQLITE_PATH: sqlitePath,
-      E2E_SEED: '1',
-      SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
-    },
-    stdio: 'inherit',
-  });
-}
-
-function getOpenPort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      server.close(() => {
-        if (typeof address === 'object' && address) {
-          resolvePort(address.port);
-          return;
-        }
-        reject(new Error('Failed to allocate a local port.'));
-      });
-    });
-  });
 }

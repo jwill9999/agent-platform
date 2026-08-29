@@ -6,17 +6,30 @@ import type {
   WorkspaceEvent,
   WorkspaceResource,
 } from '@agent-platform/contracts';
+import { WorkspaceResourceSchema } from '@agent-platform/contracts';
 import {
   AlertCircle,
   Diff,
+  Download,
   ExternalLink,
   FileText,
   Globe,
   LoaderCircle,
+  Minimize2,
+  PanelRightOpen,
   Terminal,
   X,
 } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  createContext,
+  type KeyboardEvent,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { Markdown } from '@/components/chat/markdown';
 import { Button } from '@/components/ui/button';
@@ -33,6 +46,16 @@ import {
   workspaceResourcePath,
   type WorkspacePreviewDescriptor,
 } from '@/lib/workspace-preview';
+import {
+  activateWorkspaceResourceTab,
+  closeWorkspaceResourceTab,
+  EMPTY_WORKSPACE_RESOURCE_TABS,
+  minimizeWorkspaceResourceTabs,
+  openWorkspaceResourceTab,
+  restoreWorkspaceResourceTabs,
+  workspaceResourceIdentity,
+  type WorkspaceResourceTabsState,
+} from '@/lib/workspace-resource-tabs';
 
 type Props = Readonly<{
   events: readonly WorkspaceEvent[];
@@ -101,8 +124,139 @@ function resourceKey(resource: WorkspaceResource): string {
   return `${resource.uri}-${resource.createdAt}`;
 }
 
+export type WorkspaceResourcePreviewActions = Readonly<{
+  openResource: (resource: WorkspaceResource, trigger?: HTMLElement | null) => void;
+}>;
+
+const ResourceTabsContext = createContext<WorkspaceResourcePreviewActions | null>(null);
+
+function tabsStorageKey(scopeKey: string): string {
+  return `agent-platform:workspace-resource-tabs:${encodeURIComponent(scopeKey)}`;
+}
+
+function loadTabs(scopeKey: string, projectId?: string): WorkspaceResourceTabsState {
+  if (globalThis.window === undefined) return EMPTY_WORKSPACE_RESOURCE_TABS;
+  try {
+    const value: unknown = JSON.parse(
+      globalThis.sessionStorage.getItem(tabsStorageKey(scopeKey)) ?? 'null',
+    );
+    if (!value || typeof value !== 'object') return EMPTY_WORKSPACE_RESOURCE_TABS;
+    const record = value as Record<string, unknown>;
+    const resources = Array.isArray(record.resources)
+      ? record.resources
+          .map((resource) => WorkspaceResourceSchema.safeParse(resource))
+          .filter((result) => result.success)
+          .map((result) => result.data)
+          .filter((resource) => !projectId || resource.projectId === projectId)
+      : [];
+    if (resources.length === 0) return EMPTY_WORKSPACE_RESOURCE_TABS;
+    const restored = resources.reduce(
+      (current, resource) => openWorkspaceResourceTab(current, resource),
+      EMPTY_WORKSPACE_RESOURCE_TABS,
+    );
+    const activeUri =
+      typeof record.activeUri === 'string' &&
+      restored.resources.some(
+        (resource) => workspaceResourceIdentity(resource) === record.activeUri,
+      )
+        ? record.activeUri
+        : restored.activeUri;
+    return { activeUri, minimized: record.minimized === true, resources: restored.resources };
+  } catch {
+    return EMPTY_WORKSPACE_RESOURCE_TABS;
+  }
+}
+
+export function WorkspaceResourcePreviewProvider({
+  children,
+  projectId,
+  scopeKey,
+}: Readonly<{
+  children: ReactNode;
+  projectId?: string;
+  scopeKey: string;
+}>) {
+  const [state, setState] = useState<WorkspaceResourceTabsState>(() =>
+    loadTabs(scopeKey, projectId),
+  );
+  const dockRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (globalThis.window === undefined) return;
+    try {
+      globalThis.sessionStorage.setItem(tabsStorageKey(scopeKey), JSON.stringify(state));
+    } catch {
+      // A full or disabled session store must not break the preview workspace.
+    }
+  }, [scopeKey, state]);
+
+  useEffect(() => {
+    if (state.minimized) dockRef.current?.focus();
+  }, [state.minimized]);
+
+  const activeResource = state.resources.find(
+    (resource) => workspaceResourceIdentity(resource) === state.activeUri,
+  );
+
+  function closeTab(uri: string): void {
+    setState((current) => {
+      const next = closeWorkspaceResourceTab(current, uri);
+      if (next.resources.length === 0) {
+        globalThis.queueMicrotask(() => returnFocusRef.current?.focus());
+      }
+      return next;
+    });
+  }
+
+  const context = useMemo<WorkspaceResourcePreviewActions>(
+    () => ({
+      openResource(resource, trigger) {
+        if (projectId && resource.projectId !== projectId) return;
+        if (trigger) returnFocusRef.current = trigger;
+        setState((current) => openWorkspaceResourceTab(current, resource));
+      },
+    }),
+    [projectId],
+  );
+
+  return (
+    <ResourceTabsContext.Provider value={context}>
+      {children}
+      {activeResource && !state.minimized && (
+        <WorkspaceResourceViewer
+          resource={activeResource}
+          resources={state.resources}
+          onActivate={(uri) => setState((current) => activateWorkspaceResourceTab(current, uri))}
+          onClose={() => closeTab(workspaceResourceIdentity(activeResource))}
+          onCloseTab={closeTab}
+          onMinimize={() => setState(minimizeWorkspaceResourceTabs)}
+        />
+      )}
+      {activeResource && state.minimized && (
+        <Button
+          ref={dockRef}
+          type="button"
+          className="fixed right-3 top-1/2 z-50 max-w-[calc(100vw-1.5rem)] -translate-y-1/2 shadow-xl"
+          onClick={() => setState(restoreWorkspaceResourceTabs)}
+          aria-label={`Restore ${state.resources.length} open preview${state.resources.length === 1 ? '' : 's'}`}
+          data-testid="workspace-resource-preview-dock"
+        >
+          <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
+          {state.resources.length} preview{state.resources.length === 1 ? '' : 's'}
+        </Button>
+      )}
+    </ResourceTabsContext.Provider>
+  );
+}
+
+export function useWorkspaceResourcePreviewActions(): WorkspaceResourcePreviewActions | null {
+  return useContext(ResourceTabsContext);
+}
+
 export function WorkspaceResourceCards({ events }: Props) {
   const [selected, setSelected] = useState<WorkspaceResource | null>(null);
+  const tabs = useWorkspaceResourcePreviewActions();
   const resources = useMemo(
     () =>
       events
@@ -128,7 +282,10 @@ export function WorkspaceResourceCards({ events }: Props) {
                 'flex min-w-0 items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:border-primary/40 hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 resourceTone(resource),
               )}
-              onClick={() => setSelected(resource)}
+              onClick={(event) => {
+                if (tabs) tabs.openResource(resource, event.currentTarget);
+                else setSelected(resource);
+              }}
               aria-label={`${descriptor.label}: ${displayLabel}`}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -144,7 +301,7 @@ export function WorkspaceResourceCards({ events }: Props) {
           );
         })}
       </div>
-      {selected && (
+      {!tabs && selected && (
         <WorkspaceResourceViewer resource={selected} onClose={() => setSelected(null)} />
       )}
     </>
@@ -379,25 +536,93 @@ function ViewerBody({
 
 export function WorkspaceResourceViewer({
   resource,
+  resources = [resource],
+  onActivate,
   onClose,
-}: Readonly<{ resource: WorkspaceResource; onClose: () => void }>) {
+  onCloseTab,
+  onMinimize,
+}: Readonly<{
+  resource: WorkspaceResource;
+  resources?: readonly WorkspaceResource[];
+  onActivate?: (uri: string) => void;
+  onClose: () => void;
+  onCloseTab?: (uri: string) => void;
+  onMinimize?: () => void;
+}>) {
   const panelRef = useRef<HTMLDialogElement>(null);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [exportStatus, setExportStatus] = useState<string>();
   const descriptor = useMemo(() => workspacePreviewDescriptor(resource), [resource]);
   const state = useViewerContent(resource, descriptor);
   const displayLabel = workspaceResourceDisplayLabel(resource);
   const mimeType = metadataString(resource, 'mimeType');
   const externalUrl = safeWorkspacePreviewUrl(resource);
   const canOpenExternally = Boolean(externalUrl || getDesktopWorkspaceBridge());
+  const desktopWorkspace = getDesktopWorkspaceBridge();
+  const canExport = resource.kind === 'file' && Boolean(workspaceResourcePath(resource));
+  const exportUrl = `${apiPath('projects', resource.projectId, 'resources', 'export')}?${new URLSearchParams({ uri: resource.uri }).toString()}`;
+  const activeIndex = resources.findIndex(
+    (candidate) => workspaceResourceIdentity(candidate) === workspaceResourceIdentity(resource),
+  );
+  const activeTabId = `workspace-resource-tab-${Math.max(activeIndex, 0)}`;
+  const activePanelId = `workspace-resource-panel-${Math.max(activeIndex, 0)}`;
+
+  async function saveAs(): Promise<void> {
+    if (!desktopWorkspace) return;
+    setExportStatus(undefined);
+    try {
+      const result = await desktopWorkspace.saveResourceAs({
+        uri: resource.uri,
+        suggestedFilename: displayLabel.split('/').at(-1) ?? displayLabel,
+      });
+      if (result.status === 'saved') {
+        setExportStatus(`${result.filename} was saved.`);
+      }
+    } catch {
+      setExportStatus('The resource could not be saved. Try again.');
+    }
+  }
 
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    tabRefs.current[Math.max(activeIndex, 0)]?.focus();
+  }, [activeIndex, resource.uri]);
+
+  function closeResourceAt(index: number): void {
+    const target = resources[index];
+    if (!target) return;
+    if (onCloseTab) onCloseTab(workspaceResourceIdentity(target));
+    else onClose();
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number): void {
+    let nextIndex: number | undefined;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % resources.length;
+    else if (event.key === 'ArrowLeft')
+      nextIndex = (index - 1 + resources.length) % resources.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = resources.length - 1;
+    else if (event.key === 'Delete' || ((event.metaKey || event.ctrlKey) && event.key === 'w')) {
+      event.preventDefault();
+      closeResourceAt(index);
+      return;
+    }
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    const next = resources[nextIndex];
+    if (!next) return;
+    onActivate?.(workspaceResourceIdentity(next));
+    tabRefs.current[nextIndex]?.focus();
+  }
+
   return (
     <dialog
       ref={panelRef}
       open
-      aria-label="File preview"
+      aria-label="Resource previews"
       tabIndex={-1}
       data-testid="workspace-resource-viewer"
       onKeyDown={(event) => {
@@ -405,7 +630,7 @@ export function WorkspaceResourceViewer({
         event.stopPropagation();
         onClose();
       }}
-      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col border-l border-border bg-background shadow-2xl"
+      className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-border bg-background shadow-2xl md:w-[min(42rem,45vw)]"
     >
       <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
@@ -413,6 +638,20 @@ export function WorkspaceResourceViewer({
           <p className="text-xs text-muted-foreground">{descriptor.description}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {canExport &&
+            (desktopWorkspace ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => void saveAs()}>
+                <Download className="h-4 w-4" aria-hidden="true" />
+                Save As
+              </Button>
+            ) : (
+              <Button asChild size="sm" variant="outline">
+                <a href={exportUrl} download>
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  Download
+                </a>
+              </Button>
+            ))}
           {canOpenExternally && (
             <Button
               type="button"
@@ -421,6 +660,17 @@ export function WorkspaceResourceViewer({
               onClick={() => openWorkspaceResourceCard(resource)}
             >
               Open externally
+            </Button>
+          )}
+          {onMinimize && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={onMinimize}
+              aria-label="Minimize previews"
+            >
+              <Minimize2 className="h-4 w-4" aria-hidden="true" />
             </Button>
           )}
           <Button
@@ -434,7 +684,61 @@ export function WorkspaceResourceViewer({
           </Button>
         </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-auto bg-muted/20">
+      <div
+        role="tablist"
+        aria-label="Open resource previews"
+        className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 pt-2"
+      >
+        {resources.map((tabResource, index) => {
+          const uri = workspaceResourceIdentity(tabResource);
+          const selected = uri === workspaceResourceIdentity(resource);
+          const label = workspaceResourceDisplayLabel(tabResource);
+          return (
+            <div
+              key={uri}
+              className={cn(
+                'flex max-w-56 shrink-0 items-center rounded-t-md border border-b-0',
+                selected ? 'bg-background text-foreground' : 'bg-muted/50 text-muted-foreground',
+              )}
+            >
+              <button
+                ref={(element) => {
+                  tabRefs.current[index] = element;
+                }}
+                id={`workspace-resource-tab-${index}`}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls={`workspace-resource-panel-${index}`}
+                tabIndex={selected ? 0 : -1}
+                className="min-w-0 flex-1 truncate px-3 py-2 text-left text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                onClick={() => onActivate?.(uri)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+              >
+                {label}
+              </button>
+              <button
+                type="button"
+                className="mr-1 rounded p-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Close preview ${label}`}
+                onClick={() => closeResourceAt(index)}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {exportStatus && (
+        <output className="border-b border-border px-4 py-2 text-sm">{exportStatus}</output>
+      )}
+      <div
+        id={activePanelId}
+        role="tabpanel"
+        aria-labelledby={activeTabId}
+        tabIndex={0}
+        className="min-h-0 flex-1 overflow-auto bg-muted/20"
+      >
         <ViewerBody
           descriptor={descriptor}
           displayLabel={displayLabel}
