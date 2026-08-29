@@ -19,7 +19,7 @@ and actionable.
 - **Session:** Implemented Project Experience `.16` multi-tab Project resource previews.
 - **Branch:** `task/project-experience-16-multi-tab-previews`
 - **Base:** `fd1aab1` (Project Experience `.15`, merged through PR #245)
-- **Head:** `eb788d1` (`feat add scoped multi-tab resource previews`)
+- **Head:** `77fddb4` (`fix preserve focus across tab replacement`)
 - **Pull request:** [#246](https://github.com/jwill9999/agent-platform/pull/246) into `staging`
 
 ## What Happened
@@ -37,6 +37,9 @@ and actionable.
   Markdown, HTML, image, PDF, source, diff, Download, and Electron Save As behavior is preserved.
 - Added a Gherkin E2E strategy plus browser and production-built Electron coverage for multi-tab
   navigation, de-duplication, focus, minimize/restore, persistence, isolation, and unavailable files.
+- Addressed the first hosted review: active-resource identity now drives focus when a replacement tab
+  inherits the same index, Chat remounts the provider explicitly on scope changes, and Sonar's three
+  reliability/maintainability annotations were fixed with a regression assertion.
 
 ## Verification
 
@@ -48,6 +51,8 @@ and actionable.
 - SonarQube Agentic Analysis was attempted through the supported CLI fallback but SonarQube Cloud
   returned the known explicit 403 authorization denial. The required typecheck/lint/test fallback
   gate has no errors; hosted SonarCloud remains required on the PR.
+- The first hosted PR run passed verify, Docker, 22 browser E2E, 10 Electron E2E, security, CodeQL,
+  docs, and dependency checks. Its Sonar/review findings are fixed in `77fddb4`; a clean rerun is pending.
 
 ## Current State
 
