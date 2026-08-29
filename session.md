@@ -18,7 +18,7 @@ and actionable.
 - **Date:** 2026-08-29
 - **Session:** Implemented Project Experience `.15` secure Download and Save As exports.
 - **Branch:** `task/project-experience-15-secure-export`
-- **Head:** `35f5123` (`task/project-experience-15-secure-export test share desktop e2e runtime helpers`)
+- **Head:** `f35d932` (`task/project-experience-15-secure-export fix bind project reads to validated descriptors`)
 - **Pull request:** [#245](https://github.com/jwill9999/agent-platform/pull/245) into `staging`
 
 ## What Happened
@@ -38,9 +38,10 @@ and actionable.
 - The first SonarCloud run failed its duplication threshold at 3.7% and reported four annotations.
   Filename sanitization is now shared through contracts; the type, accessibility, assertion, and
   Playwright readiness findings are fixed; duplicated Electron E2E runtime helpers were centralized.
-- The corrected SonarCloud analysis passes. The latest general CI attempt hit two environment-only
-  failures not reproduced locally: `better-sqlite3` teardown aborts under Node 24.19 and Linux
-  Electron processes closing during startup after the first passing case. A clean rerun is pending.
+- The corrected SonarCloud analysis passes. Upgraded `better-sqlite3` to 13.0.3 to resolve its
+  Node 24.19 worker-thread cleanup abort; the next hosted verify and Linux Electron E2E jobs passed.
+- Addressed Sourcery's TOCTOU security review: reads now stay bound to an `O_NOFOLLOW` descriptor,
+  validate descriptor/path identity and regular-file metadata, and enforce the size cap while reading.
 - Refined the Gherkin E2E strategies for Project Experience `.15`, `.16`, `.8`, and `.6`.
 
 ## Verification
@@ -52,6 +53,8 @@ and actionable.
   scenario using the production-built renderer, managed API, generated CommonJS preload, and
   isolated app data.
 - Passed: pre-push circular-dependency, affected-package build, typecheck, and test hooks.
+- Passed on the hosted `6b4fd81` run: verify, Linux desktop E2E, browser E2E, Docker, SonarCloud,
+  CodeQL, security, documentation, dependency, Sourcery, and GitGuardian checks.
 - Local SonarQube Agentic Analysis was attempted but SonarQube Cloud returned an explicit 403
   authorization denial. GitHub's SonarCloud annotations were retrieved through the check-run API,
   fixed, locally revalidated, and the corrected SonarCloud quality gate passes.
@@ -60,10 +63,9 @@ and actionable.
 
 ## Current State
 
-- Beads task `agent-platform-project-experience.15` remains `in_progress` until PR #245 required CI,
-  security, and review checks pass.
+- Beads task `agent-platform-project-experience.15` remains `in_progress` until PR #245 merges.
 - Local implementation and verification criteria are complete. The combined CI/Sonar checklist item
-  remains open because required CI is being rerun; the hosted SonarCloud quality gate is green.
+  is satisfied on `6b4fd81`; the refreshed `f35d932` security-hardening run is pending.
 - The task branch is published at `origin/task/project-experience-15-secure-export`.
 - Project Experience `.1` through `.5` and `.7` are already closed. The planned remaining sequence is
   `.16` multi-tab previews, `.8` activity/evidence, then `.6` staged E2E closure.
