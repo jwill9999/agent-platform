@@ -48,6 +48,7 @@ import { pickDefaultAgentForMode } from '@/lib/default-agent';
 import { resolveChatModelConfigId, usableModelConfigs } from '@/lib/modelSelection';
 import {
   buildPersonalChatHref,
+  buildProjectChatHref,
   commandRunnerStatusDescription,
   commandRunnerStatusLabel,
   createWorkspaceNavigationState,
@@ -949,7 +950,11 @@ export default function HomePage() {
   );
 
   const openProjectChat = useCallback(
-    (project: ProjectDesktopRecord) => {
+    (project: ProjectDesktopRecord, options?: { readonly updateUrl?: boolean }) => {
+      if (options?.updateUrl !== false && globalThis.window !== undefined) {
+        globalThis.window.history.pushState(null, '', buildProjectChatHref(project.id));
+        globalThis.window.dispatchEvent(new CustomEvent(workspaceNavigationChangedEvent));
+      }
       setSelectedMode('project-chat');
       setActiveProject(project);
       setSessionId(null);
@@ -1035,7 +1040,7 @@ export default function HomePage() {
           setSessionError('This recent Project is no longer available. Open it again.');
           return;
         }
-        const agentId = openProjectChat(project);
+        const agentId = openProjectChat(project, { updateUrl: false });
         if (requestedSessionId) {
           const session = await apiGet<SessionRecord>(apiPath('sessions', requestedSessionId));
           if (session?.mode === 'project' && session.projectId === project.id) {
