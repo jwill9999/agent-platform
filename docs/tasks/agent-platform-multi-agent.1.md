@@ -41,7 +41,7 @@ machine-valid before privileged orchestration code is introduced.
 - [x] Acceptance criteria and requirements pass.
 - [x] Exact-head review and tests pass; branch is pushed through the approved Git/ref path.
 - [x] Intermediate-task integration gate passes; no segment-tip PR is required.
-- [ ] Brokered Beads close is verified before `.2` becomes ready.
+- [x] Brokered Beads close is verified before `.2` becomes ready.
 
 ## Sign-off
 

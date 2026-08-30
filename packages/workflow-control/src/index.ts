@@ -15,6 +15,7 @@ export {
   type ExecutionContract,
   type TaskPacket,
   type WorkflowOperation,
+  type WorkflowRole,
 } from './contracts.js';
 export {
   assertContractRevisionIsNotAuthorityExpansion,
@@ -38,6 +39,33 @@ export {
   type TransitionRequest,
   type WaitRecord,
 } from './lifecycle.js';
+export {
+  DEFAULT_ROLE_OPERATION_POLICY,
+  ProcessCapabilityBroker,
+  assertBuiltInCollaborationAgentAllowed,
+  capabilityTokenDigest,
+  digestNormalizedArguments,
+  revalidateApproval,
+  type ApprovalBinding,
+  type ApprovalResumeContext,
+  type AuthorizationAuditEvent,
+  type AuthorizationDecision,
+  type AuthorizationRequest,
+  type CapabilityClaims,
+  type CapabilityHandle,
+  type ProcessIdentity,
+  type RoleOperationPolicy,
+} from './authorization.js';
+export {
+  buildDockerSpecialistLaunch,
+  executeDockerSpecialist,
+  prepareSpecialistWorkspace,
+  type DockerSpecialistLaunch,
+  type SpecialistLaunchRequest,
+  type SpecialistExecutionResult,
+  type SpecialistProcessExecutor,
+  type SpecialistWorkspace,
+} from './specialistLauncher.js';
 export {
   NORMATIVE_TRANSITIONS,
   validateTransition,

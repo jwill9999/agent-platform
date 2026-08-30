@@ -237,6 +237,7 @@ export type ExecutionContract = z.infer<typeof executionContractSchema>;
 export type TaskPacket = z.infer<typeof taskPacketSchema>;
 export type AgentResult = z.infer<typeof agentResultSchema>;
 export type WorkflowOperation = z.infer<typeof workflowOperationSchema>;
+export type WorkflowRole = z.infer<typeof workflowRoleSchema>;
 
 export function assertTaskPacketWithinContract(contractInput: unknown, packetInput: unknown): void {
   const contract = executionContractSchema.parse(contractInput);
