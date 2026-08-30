@@ -7,6 +7,11 @@ Single source of truth for **architectural and product decisions** agreed with t
 
 ## Session continuity
 
+- **2026-08-30 (Codex development orchestration boundary):** Multi-agent orchestration is
+  repository-local Codex development automation, not an end-user Agent Platform capability. A local
+  `packages/workflow-control` stdio MCP/CLI control plane owns durable checkpoints and narrow mutation
+  brokers while official Beads MCP remains authoritative for issue CRUD. Architectural record:
+  **[ADR-0004](docs/adr/0004-codex-development-orchestration-control-plane.md)**.
 - **2026-08-30 (multi-agent orchestration refinement):** Approved the autonomous delivery policy:
   create `feature/*` from current `staging`, preserve chained task branches into the feature, and
   permit the orchestrator to merge a completed
@@ -125,7 +130,10 @@ Unless an issue states otherwise, **done** means:
 4. **Quality:** typecheck passes; linters clean for touched files.
 5. **Git:** **Chained segment:** branch from **`feature/<feature-name>`** (first task) or from **previous `task/<task-name>`** (later tasks). **Segment finale:** one **PR** from **tip branch** → **`feature/<feature-name>`**. Task branch created **before** implementation. **Overall:** approved gates permit **`feature/<feature-name>` → `staging`**; **`staging` → `main`** requires explicit human approval.
 6. **Documentation:** `decisions.md` updated if a **new** architectural decision was made; `session.md` updated at session end.
-7. **Tracking:** issue **closed** in bd with a short reason **after** PR merge and checklist completion; discovered follow-ups filed as new issues.
+7. **Tracking:** an **intermediate** chained task closes in bd after its exact-head acceptance,
+   checklist, required tests/review, push, and declared segment integration gate pass; it does not wait
+   for a PR that exists only at the segment tip. A **segment-tip** task closes only after its PR merges
+   and its checklist/gates pass. Discovered follow-ups are filed as new issues.
 
 ---
 

@@ -134,11 +134,19 @@ Pass the repository root as `workspace_root`, and call the MCP `context` tool be
 operation. Use the CLI when MCP is unavailable and for commands the MCP does not expose, including
 `bd prime`, Dolt synchronization, diagnostics, linting, and administration.
 
+**Autonomous workflow-control exception:** while a durable workflow-control run is active, its
+journaled Beads broker is the exclusive writer. Every agent, including the primary orchestrator, must
+route issue mutations and Dolt synchronization through that broker and must not call write-capable
+Beads MCP tools or `bd` mutation/sync commands directly. Direct MCP/CLI writes remain the manual
+workflow outside an active run. Generated autonomous task specs must name the brokered transition
+instead of a direct `bd close` command.
+
 In the current embedded-Dolt workspace, the MCP `context` response may say the database is not found
 even though operations with explicit `workspace_root` succeed. Do not run MCP `context init` in an
 existing Beads repository; verify with a read operation and keep passing `workspace_root` explicitly.
 
 ```bash
+# Manual workflow only; active autonomous runs use the journaled broker.
 bd ready              # find unblocked work
 bd show <id>          # view issue details
 bd update <id> --claim  # claim atomically
@@ -272,6 +280,10 @@ When ending a work session, you MUST complete ALL steps below. Work is **NOT** c
    git push
    git status  # MUST show "up to date with origin"
    ```
+
+   During an active autonomous workflow-control run, use its journaled Git/ref and Beads/Dolt broker
+   operations for the equivalent pull/reconcile, Dolt sync, and push transitions; do not bypass them
+   with direct commands.
 
 5. **Clean up** — clear stashes, prune remote branches
 6. **Verify** — all changes committed AND pushed
