@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { executionContractSchema } from '../src/index.js';
+import { assertTaskPacketWithinContract, executionContractSchema } from '../src/index.js';
 
 const digest = `sha256:${'a'.repeat(64)}`;
 const contract = {
@@ -74,5 +74,47 @@ describe('executionContractSchema', () => {
       constraints: { ...contract.constraints, allowedPaths: ['../outside'] },
     };
     expect(() => executionContractSchema.parse(escaped)).toThrow('workspace-relative');
+  });
+
+  it('rejects undefined and cyclic task dependencies', () => {
+    const undefinedDependency = {
+      ...contract,
+      tasks: [{ ...contract.tasks[0], dependsOn: ['missing'] }],
+    };
+    expect(() => executionContractSchema.parse(undefinedDependency)).toThrow('not defined');
+
+    const cyclic = {
+      ...contract,
+      tasks: [
+        { ...contract.tasks[0], id: 'one', dependsOn: ['two'] },
+        { ...contract.tasks[0], id: 'two', dependsOn: ['one'] },
+      ],
+    };
+    expect(() => executionContractSchema.parse(cyclic)).toThrow('cyclic');
+  });
+
+  it('rejects task paths outside the contract envelope', () => {
+    const expanded = {
+      ...contract,
+      tasks: [{ ...contract.tasks[0], allowedPaths: ['apps/api'] }],
+    };
+    expect(() => executionContractSchema.parse(expanded)).toThrow('task path');
+  });
+
+  it('rejects task packets that expand task authority', () => {
+    const packet = {
+      runId: 'run-1',
+      taskId: contract.tasks[0].id,
+      contractVersion: 1,
+      policyDigest: digest,
+      assignedRole: 'implementation_worker',
+      objective: contract.objective,
+      acceptanceCriteria: contract.acceptanceCriteria,
+      allowedPaths: ['apps/api'],
+      allowedOperations: ['workspace.read'],
+      retryBudget: contract.retryPolicy,
+      evidence: [],
+    };
+    expect(() => assertTaskPacketWithinContract(contract, packet)).toThrow('allowed paths');
   });
 });

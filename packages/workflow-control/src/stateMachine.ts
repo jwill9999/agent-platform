@@ -24,7 +24,7 @@ export const workflowStateSchema = z.enum([
 
 export type WorkflowState = z.infer<typeof workflowStateSchema>;
 
-const ordinaryEdges: Readonly<Record<WorkflowState, readonly WorkflowState[]>> = {
+export const NORMATIVE_TRANSITIONS: Readonly<Record<WorkflowState, readonly WorkflowState[]>> = {
   approved: ['scheduling'],
   scheduling: ['implementing'],
   implementing: ['task_verification'],
@@ -36,7 +36,7 @@ const ordinaryEdges: Readonly<Record<WorkflowState, readonly WorkflowState[]>> =
   feature_evaluation: ['pipeline', 'repair_planning'],
   repair_planning: ['implementing', 'escalated'],
   pipeline: ['delivery', 'repair_planning', 'waiting'],
-  waiting: ['pipeline', 'escalated'],
+  waiting: ['pipeline', 'waiting', 'escalated'],
   delivery: ['finalizing'],
   finalizing: ['closed'],
   cancelling: ['cancelled', 'escalated'],
@@ -71,7 +71,16 @@ const recoverableStates = new Set<WorkflowState>([
   'repair',
   'pipeline',
   'waiting',
+  'delivery',
   'finalizing',
+]);
+
+const taskFencedStates = new Set<WorkflowState>([
+  'implementing',
+  'task_verification',
+  'task_review',
+  'repair',
+  'task_accepted',
 ]);
 
 export interface TransitionContext {
@@ -81,6 +90,17 @@ export interface TransitionContext {
   requestedContractVersion: number;
   currentPolicyDigest: string;
   requestedPolicyDigest: string;
+  workspaceLeaseEpoch: number;
+  actorWorkspaceLeaseEpoch: number;
+  taskLeaseEpoch?: number;
+  actorTaskLeaseEpoch?: number;
+  finalizationVerified?: boolean;
+  wait?: {
+    now: string;
+    nextPollAt: string;
+    absoluteWaitDeadline: string;
+    matchingEventReceived: boolean;
+  };
 }
 
 export function validateTransition(
@@ -93,6 +113,21 @@ export function validateTransition(
   }
   if (context.requestedPolicyDigest !== context.currentPolicyDigest) {
     throw new Error('stale policy digest');
+  }
+  if (context.actorWorkspaceLeaseEpoch !== context.workspaceLeaseEpoch) {
+    throw new Error('stale workspace fencing token');
+  }
+  if (!Number.isInteger(context.workspaceLeaseEpoch) || context.workspaceLeaseEpoch < 1) {
+    throw new Error('invalid workspace fencing token');
+  }
+  if (
+    taskFencedStates.has(from) &&
+    (context.taskLeaseEpoch === undefined || context.actorTaskLeaseEpoch === undefined)
+  ) {
+    throw new Error('task transition requires a fencing token');
+  }
+  if (context.taskLeaseEpoch !== context.actorTaskLeaseEpoch) {
+    throw new Error('stale task fencing token');
   }
 
   if (to === 'cancelling' && cancellableStates.has(from)) return;
@@ -110,7 +145,30 @@ export function validateTransition(
     return;
   }
 
-  if (!ordinaryEdges[from]!.includes(to)) {
+  if (from === 'waiting') {
+    if (context.wait === undefined) throw new Error('waiting transition requires wait state');
+    const now = Date.parse(context.wait.now);
+    const nextPoll = Date.parse(context.wait.nextPollAt);
+    const deadline = Date.parse(context.wait.absoluteWaitDeadline);
+    if (![now, nextPoll, deadline].every(Number.isFinite) || nextPoll >= deadline) {
+      throw new Error('invalid wait timing');
+    }
+    if (to === 'pipeline' && !context.wait.matchingEventReceived && now < nextPoll) {
+      throw new Error('wait cannot resume before an event or next poll');
+    }
+    if (to === 'escalated' && now < deadline) {
+      throw new Error('wait deadline has not elapsed');
+    }
+    if (to === 'waiting' && now >= deadline) {
+      throw new Error('wait may not retry after its absolute deadline');
+    }
+  }
+
+  if (from === 'finalizing' && to === 'closed' && !context.finalizationVerified) {
+    throw new Error('finalization postconditions are not verified');
+  }
+
+  if (!NORMATIVE_TRANSITIONS[from]!.includes(to)) {
     throw new Error(`invalid workflow transition: ${from} -> ${to}`);
   }
 }
