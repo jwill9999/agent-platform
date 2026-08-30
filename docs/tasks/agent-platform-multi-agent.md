@@ -434,6 +434,48 @@ Beads remains authoritative for feature and task lifecycle. The workflow store r
 checkpoints, attempts, agent results, artifacts, and pending waits; it must not become a competing
 issue tracker.
 
+### Current MCP Access Gap Analysis
+
+This inventory was verified on 2026-08-30 against the MCP servers configured on the local Codex host,
+the tools exposed to the active Codex session, and read-only capability smoke tests. CLI availability
+is recorded separately because a working CLI does not provide the role-scoped, structured MCP contract
+required by the target workflow.
+
+| Capability                           | Current access                                                                                           | Operational status                                                 | Gap and required action                                                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Codex subagent control               | Built-in Codex collaboration tools                                                                       | Available; not an MCP server                                       | No MCP gap; define orchestrator instructions and result contracts                                             |
+| GitHub repository and Actions        | Authenticated `gh` CLI with `repo` and `workflow` scopes                                                 | CLI operational; no dedicated GitHub MCP enabled                   | Enable the official GitHub MCP with scoped credentials and tool allow lists                                   |
+| Beads and Dolt task state            | Local `bd` CLI and Dolt remote                                                                           | CLI operational                                                    | Build the workflow-control/Beads MCP; only the orchestrator receives write tools                              |
+| SonarQube quality gates              | SonarQube tools exposed through the Docker MCP gateway                                                   | Tools load, but a live project query returns `Not authorized`      | Repair or rotate the SonarQube token and verify project and PR access                                         |
+| Browser and Playwright QA            | Standalone Playwright CLI 1.59.1; Playwright MCP configured; browser tools exposed by the Docker gateway | CLI operational; Docker-gateway browser launch fails with `ENOSPC` | Reclaim or resize Docker storage, then smoke-test the standalone and gateway MCP paths                        |
+| Developer documentation              | Context7 MCP is callable; OpenAI Docs skill and web access are available                                 | Context7 operational; no dedicated OpenAI Docs MCP configured      | Add the official OpenAI Developer Docs MCP for narrow, source-authoritative access                            |
+| Workflow checkpoints and resume      | None                                                                                                     | Missing                                                            | Implement durable workflow run state, checkpoint, resume, retry, and wait tools                               |
+| Artifacts and orchestration evidence | Repository observability packages exist; no dedicated workflow MCP                                       | Missing as an agent-facing service                                 | Add artifact and evidence operations to workflow control or a dedicated observability MCP                     |
+| Pipeline and runner health           | `gh` CLI can inspect Actions runs                                                                        | Repository CI visible; no narrow remote-runner health service      | Use GitHub MCP for jobs and add a read-only runner/dependency health endpoint if Actions data is insufficient |
+| Notebook research                    | `notebooklm-mcp`                                                                                         | Operational, but not required for core delivery                    | Keep optional and do not grant by default                                                                     |
+| JavaScript scratch execution         | `node_repl` MCP                                                                                          | Operational, but not required for core delivery                    | Keep optional and role-scoped                                                                                 |
+| Computer use                         | `computer-use` and `cua_repl` are configured but disabled                                                | Unavailable by policy                                              | Keep disabled unless an approved QA scenario proves it is necessary                                           |
+
+The Docker MCP catalog currently offers GitHub, official GitHub, Playwright, SonarQube, Temporal,
+task-orchestrator, Testkube, Sentry, and other candidate servers. Catalog availability does not mean a
+server is enabled, authenticated, least-privilege, or suitable as the platform's source of truth.
+
+#### MCP Readiness Priorities
+
+Before the end-to-end pilot can run autonomously:
+
+1. Implement workflow-control/Beads MCP and durable execution checkpoints.
+2. Enable and scope the official GitHub MCP for PR, review, Actions, and merge operations.
+3. Repair SonarQube MCP authorization and verify project/PR quality-gate access.
+4. Restore Playwright MCP browser operation and prove artifact capture.
+5. Decide whether workflow artifacts live inside workflow control or a separate observability MCP.
+6. Add narrow runner-health access only if GitHub Actions job data cannot classify the remote runner.
+
+OpenAI Docs MCP is recommended for planning and review quality but is not a delivery blocker because
+the existing official-docs skill and web path provide a bounded fallback. NotebookLM, Node REPL,
+computer use, and the broader Docker catalog remain optional capabilities rather than default agent
+access.
+
 ## Observability And Evidence
 
 Every feature run records:
