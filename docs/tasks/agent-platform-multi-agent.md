@@ -2,8 +2,7 @@
 
 **Beads id:** `agent-platform-multi-agent`
 
-**Status:** Refinement; implementation tasks must not begin until the policy decisions in this spec
-are approved.
+**Status:** Policy approved; ready for independent plan criticism and implementation task breakdown.
 
 **Primary configuration:** `.codex/agents/*.toml`
 
@@ -447,7 +446,7 @@ required by the target workflow.
 | ------------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Codex subagent control               | Built-in Codex collaboration tools                                                 | Available; not an MCP server                                           | Define orchestrator instructions, result contracts, and durable state                                       |
 | GitHub repository and pull requests  | Official GitHub MCP through the Docker `codex` profile                             | Read and write smoke tests pass                                        | Add role-specific tool allowlists; restrict merge and mutation tools to the orchestrator                    |
-| GitHub Actions                       | Authenticated `gh` CLI with `repo` and `workflow` scopes                           | Recent workflow and job queries pass; no Actions tools in GitHub MCP   | Decide whether the pilot uses CLI or a narrow typed wrapper; add durable pipeline waiting                   |
+| GitHub Actions                       | Authenticated `gh` CLI with `repo` and `workflow` scopes                           | Recent workflow and job queries pass; no Actions tools in GitHub MCP   | Use bounded orchestrator-owned CLI access for the pilot and add durable pipeline waiting                    |
 | Beads issue state                    | Official `beads-mcp` plus local `bd` CLI                                           | Fifteen tools load; explicit-root reads and writes pass                | Restrict writes to the orchestrator; avoid `context init` when embedded-Dolt detection reports a false miss |
 | Beads Dolt synchronization           | Local `bd dolt push`/`pull` CLI                                                    | Available outside MCP; embedded mode limits some diagnostics           | Keep deterministic CLI closeout or add a narrowly scoped synchronization operation                          |
 | SonarQube quality gates              | SonarQube MCP through the Docker `codex` profile                                   | Authentication works; PR 251 gate passes                               | Clear one historical project-baseline hotspot and enforce role-appropriate mutation access                  |
@@ -472,9 +471,10 @@ Before the end-to-end pilot can run autonomously:
 1. Enforce role-specific MCP access, especially Beads mutations, GitHub writes, and unsafe browser tools.
 2. Implement durable workflow checkpoints, resume, retry state, and external waits around the official
    Beads MCP rather than rebuilding its issue CRUD adapter.
-3. Decide whether GitHub Actions remains a bounded CLI capability for the pilot or receives a narrow
-   typed wrapper with durable pipeline waiting.
-4. Decide whether workflow artifacts live inside workflow control or a separate observability service.
+3. Implement bounded orchestrator-owned GitHub Actions CLI access with durable pipeline waiting; add
+   a typed wrapper later only if the CLI contract proves insufficient.
+4. Store workflow artifacts and evidence in workflow control initially behind a separable storage
+   boundary.
 5. Clear the historical SonarQube hotspot so both PR and project-baseline quality gates pass.
 6. Add narrow runner-health access only if GitHub Actions job data cannot classify the remote runner.
 
@@ -506,7 +506,7 @@ unbounded prompt or tool payloads must not be persisted.
 
 The orchestrator follows the repository's locked branch policy:
 
-1. Create or use `feature/<feature-name>` as the integration branch.
+1. Create or use `feature/<feature-name>` from current `staging` as the integration branch.
 2. Create the first `task/<task-name>` branch from the feature branch.
 3. Create each sequential task branch from the previous accepted task branch.
 4. Use isolated branches or worktrees for approved parallel tasks.
@@ -515,10 +515,10 @@ The orchestrator follows the repository's locked branch policy:
 7. Run feature-branch integration gates.
 8. Promote the feature only to the destination authorized by the execution contract.
 
-The recommended initial delivery policy is automatic merge into `staging` when all approved gates
-pass, with human approval retained for `main` or production promotion. The exact staging/main branch
-relationship must be confirmed during policy review so implementation matches the repository's
-release process.
+The approved initial delivery policy preserves the locked task-to-feature chain. After all approved
+feature gates pass, the orchestrator may automatically merge the completed `feature/*` integration
+branch into protected `staging`. Promotion from `staging` to `main`, or any production promotion,
+requires explicit human approval.
 
 Pipeline completion uses durable waiting or event-driven updates. The orchestrator must not require a
 human to poll GitHub. Infrastructure failures are distinguished from source failures so unavailable
@@ -621,24 +621,28 @@ A pilot feature must demonstrate:
 - Tests cover success, failure, repair, cancellation, resume, policy denial, and escalation.
 - A real pilot feature completes end to end.
 
-## Policy Decisions For Review
+## Approved Policy Decisions
 
-| Decision             | Recommended default                                                      | Status               |
-| -------------------- | ------------------------------------------------------------------------ | -------------------- |
-| Configuration root   | Agents in `.codex`; workflow skills in `.agents/skills`                  | Agreed in refinement |
-| Planning model       | Human plus primary planner, then independent critic                      | Agreed in refinement |
-| Execution model      | Feature-level orchestration over Beads child tasks                       | Agreed in refinement |
-| Human involvement    | Required for planning approval and exceptions, not routine delivery      | Agreed in refinement |
-| Beads authority      | Orchestrator is the only workflow agent allowed to mutate Beads          | Proposed             |
-| Delivery automation  | Automatically merge to `staging` after all approved gates pass           | Proposed             |
-| Production authority | Require human approval for `main` or production promotion                | Proposed             |
-| Closeout owner       | Deterministic orchestrator skill rather than a separate delivery agent   | Proposed             |
-| Initial concurrency  | Four spawned-agent threads per primary session                           | Proposed             |
-| Durable control      | Add workflow-control MCP backed by Beads plus execution checkpoints      | Proposed             |
-| Retry budgets        | Use the initial budgets in this spec and tune from evidence              | Proposed             |
-| Parallel writes      | Require isolation, non-overlapping ownership, and planned integration    | Proposed             |
-| Model selection      | Inherit parent model initially; benchmark before role-specific overrides | Proposed             |
-| Workflow visibility  | Provide structured status and evidence without requiring human steering  | Proposed             |
+| Decision             | Approved policy                                                                  | Status              |
+| -------------------- | -------------------------------------------------------------------------------- | ------------------- |
+| Configuration root   | Agents in `.codex`; workflow skills in `.agents/skills`                          | Approved 2026-08-30 |
+| Planning model       | Human plus primary planner, then independent critic                              | Approved 2026-08-30 |
+| Execution model      | Feature-level orchestration over Beads child tasks                               | Approved 2026-08-30 |
+| Human involvement    | Required for planning approval and exceptions, not routine delivery              | Approved 2026-08-30 |
+| Beads authority      | Orchestrator is the only workflow agent allowed to mutate Beads                  | Approved 2026-08-30 |
+| Beads integration    | Official Beads MCP for issue CRUD; CLI for Dolt sync and unsupported operations  | Approved 2026-08-30 |
+| Delivery automation  | Auto-merge the completed feature branch into protected `staging` after gates     | Approved 2026-08-30 |
+| Production authority | Human approval is required for `staging` to `main` or production promotion       | Approved 2026-08-30 |
+| Closeout owner       | Deterministic orchestrator skill rather than a separate delivery agent           | Approved 2026-08-30 |
+| Initial concurrency  | Four spawned-agent threads per primary session                                   | Approved 2026-08-30 |
+| Durable control      | Compose official Beads MCP with checkpoints, evidence, waits, and resume         | Approved 2026-08-30 |
+| Retry budgets        | Use the initial budgets in this spec and tune from evidence                      | Approved 2026-08-30 |
+| Parallel writes      | Require isolation, non-overlapping ownership, and planned integration            | Approved 2026-08-30 |
+| Model selection      | Inherit parent model initially; benchmark before role-specific overrides         | Approved 2026-08-30 |
+| Workflow visibility  | Provide structured status and evidence without requiring human steering          | Approved 2026-08-30 |
+| Evidence storage     | Store evidence in workflow control initially behind a separable storage boundary | Approved 2026-08-30 |
+| Tool authorization   | Enforce per-role allowlists outside prompts; reserve mutations for owners        | Approved 2026-08-30 |
+| Pipeline access      | Use bounded orchestrator-owned `gh` access for the pilot; add wrappers as needed | Approved 2026-08-30 |
 
-Implementation child tasks should not be created until the proposed decisions are reviewed, amended as
-needed, and marked approved.
+The refinement policy gate is complete. Run an independent plan-critic pass before creating the
+approved implementation child-task graph.

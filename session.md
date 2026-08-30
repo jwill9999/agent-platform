@@ -39,6 +39,10 @@ and actionable.
   and mutations succeed with explicit `workspace_root`. Its `context` helper does not detect the
   embedded-Dolt database, so agents must not initialize over it. Dolt synchronization, durable
   checkpoints, role enforcement, pipeline waits, and evidence storage remain outside the server.
+- Completed the orchestration policy review. All proposed defaults are approved with the delivery
+  path clarified as current `staging` → feature branch → task chain → automated protected `staging`
+  merge after gates; `staging` → `main` and production promotion remain human-approved. Workflow
+  evidence stays in workflow control initially behind a separable storage boundary.
 
 ## Verification
 
@@ -50,18 +54,16 @@ and actionable.
 ## Current State
 
 - `feature/multi-agent-orchestration` and `task/multi-agent-orchestration-epic-design` are pushed.
-- Epic `agent-platform-multi-agent` remains open in refinement; no child implementation tasks were
-  created or claimed.
+- Epic `agent-platform-multi-agent` remains open with its policy gate approved; no child
+  implementation tasks were created or claimed.
 - PR #251 is mergeable and its CI and PR-specific Sonar quality gate pass.
 - Tool connectivity is ready for a pilot, but the global MCP configuration does not yet enforce
   per-role least privilege. The project-wide Sonar baseline has one historical hotspot to review.
 
 ## Next
 
-1. Review the expanded epic design with the owner and resolve each proposed policy decision.
-2. Define enforceable per-role tool access for Beads, GitHub mutations, Sonar mutations, and unsafe
-   browser tools.
-3. Scope workflow control as durable state around official Beads MCP rather than rebuilding Beads CRUD.
-4. Decide whether the pilot uses `gh` for Actions or adds a narrow typed pipeline wrapper.
-5. Update the epic with approved decisions and run an independent plan-critic pass.
-6. Create child Beads issues and focused specs only after the refinement gate is approved.
+1. Run an independent plan-critic pass against the approved epic and resolve any findings.
+2. Create the child Beads issues and focused specs from the approved task graph.
+3. Begin with execution-contract/state-machine work and enforceable per-role tool access.
+4. Implement workflow control as durable state around official Beads MCP, including evidence and waits.
+5. Use bounded orchestrator-owned `gh` access for the pilot and add a typed wrapper only if needed.

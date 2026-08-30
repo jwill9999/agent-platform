@@ -165,15 +165,16 @@ Branching rules (locked):
 - **`feature/<feature-name>`** — integration branch
 - **`task/<task-name>`** — individual work units, chained linearly (each branches from the previous task branch)
 - **Never commit directly to `main`**
-- One PR per segment tip → `feature/<feature-name>`; then `feature` → `main` at release
+- One PR per segment tip → `feature/<feature-name>`; completed features → protected `staging`; human-approved `staging` → `main`
 
 Required branch lifecycle:
 
-1. Create or use a **`feature/<feature-name>`** branch as the integration branch.
+1. Create or use a **`feature/<feature-name>`** branch from current **`staging`** as the integration branch.
 2. Create the first **`task/<task-name>`** branch from that feature branch.
 3. Each subsequent task branch must be created from the previous task branch.
 4. The final task branch in the chain contains the cumulative task changes and opens the integration PR into **`feature/<feature-name>`**.
-5. After integration testing and CI/CD pipelines pass on the feature branch, merge **`feature/<feature-name>`** into **`main`** via PR.
+5. After approved integration gates pass, merge **`feature/<feature-name>`** into protected **`staging`** via PR. An approved autonomous workflow may perform this merge.
+6. Merge **`staging`** into **`main`** only with explicit human approval; production promotion is never implied by feature approval.
 
 ---
 
