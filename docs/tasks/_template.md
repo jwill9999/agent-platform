@@ -42,15 +42,15 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 
 **Chained tasks:** **`feature/<feature-name>`** → **`task/<task-1>`** → **`task/<task-2>`** → … → **one PR** from **`task/<last>`** → **`feature/<feature-name>`**.
 
-| Rule                       | Detail                                                                                                                           |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **No `main`**              | Never push commits directly to **`main`**.                                                                                       |
-| **First task in segment**  | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-persistence`).                     |
-| **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed.                     |
-| **Intermediate tasks**     | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch. |
-| **Last task in segment**   | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment.                                             |
-| **Next segment**           | First task branches from **updated** **`feature/<feature-name>`** after the segment PR is merged.                                |
-| **Release**                | When the feature is ready: run integration testing and CI/CD, then merge **`feature/<feature-name>` → `main`** via one PR.       |
+| Rule                       | Detail                                                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **No `main`**              | Never push commits directly to **`main`**.                                                                                                             |
+| **First task in segment**  | Branch **`task/<task-name>`** from **`feature/<feature-name>`** (e.g. `feature/agent-platform-persistence`).                                           |
+| **Later tasks in segment** | Branch **`task/<task-name>`** from **`task/<previous-task-name>`** after the previous task’s work is pushed.                                           |
+| **Intermediate tasks**     | **No** separate PR to `feature`. Push your branch; complete sign-off; next developer checks out from your **`task/...`** branch.                       |
+| **Last task in segment**   | Open **one** PR **`task/<tip> → feature/<feature-name>`** to land the whole segment.                                                                   |
+| **Next segment**           | First task branches from **updated** **`feature/<feature-name>`** after the segment PR is merged.                                                      |
+| **Release**                | After approved gates, merge **`feature/<feature-name>` → protected `staging`** via PR. Merge **`staging` → `main`** only with explicit human approval. |
 
 ## Tests (required before sign-off)
 
@@ -60,20 +60,31 @@ If planning discovers **additional** dependencies (e.g. shared contracts, env va
 ## Definition of done
 
 - [ ] Beads **description** and **acceptance_criteria** satisfied.
-- [ ] **Every checkbox** in this spec (including **Sign-off**) is complete.
+- [ ] Every **pre-close** checkbox below is complete before the Beads close transition.
 - [ ] All **upstream** Beads issues are **closed** (per Beads).
 - [ ] **Unit tests** run and pass (minimum); integration/E2E as required above.
 - [ ] **Git:** branch pushed; **if this is the segment tip**, **PR** merged **`task/<tip> → feature/<feature-name>`**; if **not** tip, next task can branch from **`task/<this-task-name>`**.
+- [ ] **Intermediate task:** exact-head acceptance, required review/tests, push, and declared segment integration gate pass; no nonexistent PR is required.
 - [ ] This spec file updated if scope or dependencies changed during implementation.
 
-## Sign-off
+## Pre-close sign-off
 
 - [ ] **Task branch** created from the correct **parent** (`feature/...` or previous **`task/...`**) **before** implementation work
 - [ ] **Unit tests** executed and passing (minimum gate)
-- [ ] **Checklists** in this document (Definition of done + Sign-off) are complete
+- [ ] **Definition of done and pre-close checklists** are complete
 - [ ] If **segment tip:** **PR** merged **`task/<tip> → feature/<feature-name>`** (link: **\*\*\*\***\_**\*\*\*\***) — _if not tip, write “N/A — merge at segment end”_
-- [ ] `bd close <issue-id> --reason "…"`
+- [ ] If **intermediate:** exact accepted head and segment integration evidence recorded — _if tip, write “N/A — tip PR gate applies”_
 - [ ] `decisions.md` updated only if architectural decision changed
 - [ ] `session.md` updated if handoff needed
 
-**Reviewer / owner:** ****\*\*****\_****\*\***** **Date:** **\*\***\_**\*\***
+The close operation happens **after** every pre-close checkbox passes. During an active autonomous
+workflow-control run, use its journaled Beads close broker; outside an active run, use the normal
+manual Beads MCP/CLI workflow.
+
+## Post-close verification
+
+- [ ] Close transition id/reason recorded (broker transition for an active run; manual operation id otherwise)
+- [ ] Beads issue re-read as `closed`; downstream readiness reconciled
+- [ ] During an active run, broker journal and authoritative Beads state agree
+
+**Reviewer / owner:** \***\*\*\*\*\***\_\***\*\*\*\*\*** **Date:** **\*\***\_**\*\***

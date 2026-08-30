@@ -32,8 +32,9 @@ ADRs are sequentially numbered, four-digit, kebab-case:
 
 ## Index
 
-| #    | Title                                                                                                 | Status   |
-| ---- | ----------------------------------------------------------------------------------------------------- | -------- |
-| 0001 | [Tier 1 gap remediation: evaluator, DoD, observability tools, docs CI](0001-tier1-gap-remediation.md) | Accepted |
-| 0002 | [Electron desktop runtime for local Project access](0002-electron-desktop-runtime.md)                 | Accepted |
-| 0003 | [macOS production command sandbox runner](0003-macos-production-sandbox-runner.md)                    | Accepted |
+| #    | Title                                                                                                  | Status   |
+| ---- | ------------------------------------------------------------------------------------------------------ | -------- |
+| 0001 | [Tier 1 gap remediation: evaluator, DoD, observability tools, docs CI](0001-tier1-gap-remediation.md)  | Accepted |
+| 0002 | [Electron desktop runtime for local Project access](0002-electron-desktop-runtime.md)                  | Accepted |
+| 0003 | [macOS production command sandbox runner](0003-macos-production-sandbox-runner.md)                     | Accepted |
+| 0004 | [Codex development orchestration control plane](0004-codex-development-orchestration-control-plane.md) | Accepted |

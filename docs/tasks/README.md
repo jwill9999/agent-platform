@@ -16,11 +16,24 @@ Every **task** (child of an epic) has a **Markdown spec** in this directory. **B
    - Every **upstream** task in the spec’s table is done **and**
    - Beads `bd ready` / dependency graph agrees (if not, fix Beads first).
 
+   During an active autonomous workflow-control run, the journaled Beads broker performs claim,
+   dependency, close, and Dolt-sync mutations. Child specs must not instruct agents to bypass it with
+   direct write-capable Beads MCP or CLI commands. Direct mutations are for manual workflows outside
+   an active run.
+
 5. **Git (mandatory)** — **Never commit directly to `main`.**
    - **Naming:** **`feature/<feature-name>`** and **`task/<task-name>`** (e.g. `feature/agent-platform-persistence`, `task/agent-platform-mov.1`).
    - **Chained segments (default):** tasks run **in order** on Git. The **first** task in a segment branches from **`feature/<feature-name>`**. **Each following** task branches from the **previous task’s branch** (after that task is complete and pushed). **Intermediate** tasks do **not** get their own PR to `feature`—only the **last task in the segment** opens **one PR** from **`task/<tip>` → `feature/<feature-name>`**, merging the whole chain. Then the **next** segment’s first task branches from the **updated** `feature` branch.
-   - **Sign-off:** **Done means local gates and CI/CD are green.** Local gates pass before push/PR: build, format, lint, unit tests, and relevant integration/E2E/Playwright checks from the task strategy. **`bd close`** per task only after the local gates, PR checks, reviews, and task checklist are complete. **PR to `feature`** only on the **segment tip** (unless a spec explicitly says otherwise). When a spec requires a PR per ticket, open the task PR after local gates pass, monitor GitHub checks/logs/artifacts/reviews until green, fix failures on the same task branch, then merge before closing the Bead. If CI/CD fails, the task is not done.
-   - **Release:** when ready, run integration testing and ensure CI/CD pipelines are green, then merge **`feature/<feature-name>` → `main`** via one PR.
+   - **Sign-off:** **Done means the task's declared gates are green.** Local gates pass before push/PR:
+     build, format, lint, unit tests, and relevant integration/E2E/Playwright checks from the task
+     strategy. An **intermediate** chained task closes after its exact-head acceptance, required
+     review/tests, pushed branch, checklist, and declared segment integration gate pass; it does not
+     wait for the segment-tip PR. A **segment-tip** task closes only after its PR to `feature` merges
+     and all required hosted checks pass. When a spec requires a PR per ticket, use the segment-tip
+     rule. If a required gate fails, the task is not done.
+   - **Release:** when ready, run integration testing and ensure CI/CD pipelines are green, then merge
+     **`feature/<feature-name>` → protected `staging`** via PR. Merge **`staging` → `main`** only with
+     explicit human approval.
 
 6. **Template** — Copy [`_template.md`](./_template.md) when creating a new task spec; then wire the Beads issue.
 
@@ -64,8 +77,9 @@ Spec: docs/tasks/<issue-id>.md
 - Dependencies in Beads match upstream/downstream sections in the spec.
 - Testing strategy identifies local gates, Playwright UI actions/assertions when applicable, and
   GitHub Actions checks/artifacts to monitor.
-- Done is defined as complete implementation plus green local tests, green UI/E2E verification when
-  applicable, and green CI/CD. A pushed branch or open PR alone is not done.
+- Done distinguishes intermediate and segment-tip tasks: intermediate tasks require exact-head local,
+  review, push, and declared integration gates; segment tips additionally require the PR and hosted
+  CI/CD gates. A pushed branch or open PR alone is not done.
 
 ## Epic index (task spec files)
 
@@ -98,7 +112,7 @@ Spec: docs/tasks/<issue-id>.md
 | Research tools           | `agent-platform-research-tools`           | child specs pending                                                                              |
 | Memory management        | `agent-platform-memory`                   | child specs pending                                                                              |
 | Scheduler                | `agent-platform-scheduler`                | child specs pending                                                                              |
-| Multi-agent              | `agent-platform-multi-agent`              | child specs pending                                                                              |
+| Multi-agent              | `agent-platform-multi-agent`              | `agent-platform-multi-agent.{1-10}.md`, `agent-platform-multi-agent-review.md`                   |
 | Capability registry      | `agent-platform-capability-registry`      | child specs pending                                                                              |
 | Skill authoring          | `agent-platform-skill-authoring`          | child specs pending                                                                              |
 | Agent profile governance | `agent-platform-agent-profile-governance` | child specs pending                                                                              |
