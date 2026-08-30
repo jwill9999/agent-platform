@@ -32,6 +32,9 @@ and actionable.
 - Expanded `docs/tasks/agent-platform-multi-agent.md` from a high-level sketch into the complete epic
   design, including agent roles, workflow state, tools/MCP boundaries, repair loops, delivery policy,
   implementation sequencing, verification, and decisions awaiting review.
+- Audited current MCP access and recorded the dated gap analysis in the epic: GitHub and Beads have
+  CLI fallbacks but no scoped orchestration MCP, SonarQube authorization is invalid, and the Docker
+  Playwright path is blocked by storage exhaustion.
 
 ## Verification
 
@@ -45,10 +48,12 @@ and actionable.
 - `feature/multi-agent-orchestration` and `task/multi-agent-orchestration-epic-design` are pushed.
 - Epic `agent-platform-multi-agent` remains open in refinement; no child implementation tasks were
   created or claimed.
-- The epic document contains a policy-decision table with agreed and proposed defaults.
+- The epic contains the policy-decision table, MCP readiness gaps, and ordered remediation priorities.
 
 ## Next
 
 1. Review the expanded epic design with the owner and resolve each proposed policy decision.
-2. Update the epic with approved decisions and run an independent plan-critic pass.
-3. Create child Beads issues and focused specs only after the refinement gate is approved.
+2. Decide whether to build the workflow-control/Beads MCP and enable the official GitHub MCP as the
+   first orchestration infrastructure tasks.
+3. Update the epic with approved decisions and run an independent plan-critic pass.
+4. Create child Beads issues and focused specs only after the refinement gate is approved.
