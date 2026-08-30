@@ -15,37 +15,40 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-30
-- **Session:** Completing project-scoped Codex agent configuration and Beads closeout.
-- **Branch:** `task/codex-agent-configuration-closeout`
-- **Base:** `76ccfb5` (PR #249 merged into `staging`)
-- **Head:** closeout (`chore: record Codex configuration task closure`)
-- **Pull request:** closeout PR pending into `staging`
+- **Session:** Refining the autonomous multi-agent feature-delivery epic.
+- **Branch:** `task/multi-agent-orchestration-epic-design`
+- **Base:** `feature/multi-agent-orchestration` at `68e5fc7`
+- **Head:** `ae539e5` (`docs: define autonomous multi-agent feature delivery`)
+- **Pull request:** not opened; design review with the owner is next.
 
 ## What Happened
 
-- Repaired PR #244's flaky Electron workspace-chooser retry and merged it into `staging` at
-  `0fb4fc6` after every hosted and self-hosted gate passed.
-- Added project-scoped Codex configuration, four focused custom-agent TOMLs, and the supported
-  `.agents/skills` discovery structure through PR #249.
-- Verified a review comment about agent concurrency against current OpenAI documentation. Kept
-  `max_concurrent_threads_per_session`, documented `max_threads` as a legacy alias in the review,
-  and resolved the false-positive thread.
-- Merged PR #249 into `staging` at `76ccfb5` and closed Beads task
-  `agent-platform-codex-agent-configuration`.
+- Merged the Codex configuration closeout through PR #250 at `68e5fc7`; the associated Beads task is
+  closed and synced to Dolt.
+- Reviewed the Beads portfolio and completed a retrospective on closeout overhead, stale WIP, and
+  excessive human coordination between feature tasks.
+- Agreed on a target model: collaborative human/primary-agent planning, independent plan criticism,
+  then autonomous feature-level delivery over a Beads task graph with bounded specialist agents.
+- Expanded `docs/tasks/agent-platform-multi-agent.md` from a high-level sketch into the complete epic
+  design, including agent roles, workflow state, tools/MCP boundaries, repair loops, delivery policy,
+  implementation sequencing, verification, and decisions awaiting review.
 
 ## Verification
 
-- PR #249 passed verify, dependency-cycle checks, Docker, 22 browser E2E scenarios, 11 Electron E2E
-  scenarios, the packaged macOS VM runner, CodeQL, SonarCloud, security scans, and docs checks.
-- The closeout branch changes only the Beads interaction record and this session handoff.
+- `pnpm exec prettier --check docs/tasks/agent-platform-multi-agent.md`
+- `pnpm docs:lint`
+- `git diff --check`
+- The pre-push hook passed dependency-cycle, affected-package build, typecheck, and test gates.
 
 ## Current State
 
-- PR #244 and PR #249 are merged into `staging`.
-- Beads task `agent-platform-codex-agent-configuration` is closed and synced to the Dolt remote.
-- Branch `task/codex-agent-configuration-closeout` preserves the generated Beads closure event.
+- `feature/multi-agent-orchestration` and `task/multi-agent-orchestration-epic-design` are pushed.
+- Epic `agent-platform-multi-agent` remains open in refinement; no child implementation tasks were
+  created or claimed.
+- The epic document contains a policy-decision table with agreed and proposed defaults.
 
 ## Next
 
-1. Open and merge the closeout PR containing the Beads completion event and this handoff.
-2. Continue designing role-specific agent workflows and reusable skills from the merged scaffold.
+1. Review the expanded epic design with the owner and resolve each proposed policy decision.
+2. Update the epic with approved decisions and run an independent plan-critic pass.
+3. Create child Beads issues and focused specs only after the refinement gate is approved.
