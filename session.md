@@ -15,11 +15,11 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-31
-- **Session:** Completing independent review and starting autonomous multi-agent implementation.
-- **Branch:** `task/multi-agent-orchestration-epic-design`
-- **Base:** `feature/multi-agent-orchestration` at `68e5fc7`
-- **Head:** current working branch contains the critic-approved planning amendments; push pending.
-- **Pull request:** #251 into `staging`; open and will rerun checks after the planning update.
+- **Session:** Merged the critic-approved plan and started workflow-control task `.1`.
+- **Branch:** `task/agent-platform-multi-agent.1`
+- **Base:** `feature/multi-agent-orchestration` at merged `staging` tip `6b63ea5`.
+- **Head:** `0922173` starts the workflow contract package and is pushed.
+- **Pull request:** Planning PR #251 merged into `staging`; the `.1` task PR is not open yet.
 
 ## What Happened
 
@@ -52,6 +52,11 @@ and actionable.
 - Closed review task `agent-platform-multi-agent-review`, then created the sequential implementation
   chain `agent-platform-multi-agent.1` through `.10` with focused specs and Beads dependencies. Task
   `.1` is claimed and is the only implementation task currently in progress.
+- Merged critic-approved planning PR #251 after all checks passed, fast-forwarded
+  `feature/multi-agent-orchestration`, and created the first chained task branch.
+- Started `packages/workflow-control` with strict Zod schemas for the versioned execution contract,
+  role/operation capabilities, packets, results, findings, evidence and retries, plus a pure
+  normative transition validator and initial authority/version/recovery tests.
 
 ## Verification
 
@@ -60,10 +65,12 @@ and actionable.
 - `git diff --check`
 - Global `beads-workflow` skill quick validation passed.
 - The pre-push hook passed dependency-cycle, affected-package build, typecheck, and test gates.
+- `@agent-platform/workflow-control` lint, build, typecheck, and 16 focused tests pass.
 
 ## Current State
 
-- `feature/multi-agent-orchestration` and `task/multi-agent-orchestration-epic-design` are pushed.
+- Planning PR #251 is merged. `feature/multi-agent-orchestration` is refreshed and pushed at
+  `6b63ea5`; `task/agent-platform-multi-agent.1` is pushed at `0922173`.
 - Epic `agent-platform-multi-agent` remains open. The independent review is closed and the critic gate
   is approved with all required amendments applied.
 - Ten sequential implementation children exist; `.1` is claimed, while `.2` through `.10` remain
@@ -74,9 +81,8 @@ and actionable.
 
 ## Next
 
-1. Commit and push the critic-approved planning state; wait for PR #251 checks and merge it to
-   protected `staging`.
-2. Refresh `feature/multi-agent-orchestration` from the merged `staging` tip.
-3. Create `task/agent-platform-multi-agent.1` from the feature branch before editing code.
-4. Implement the execution contract and normative state machine from the `.1` spec.
-5. Do not begin `.2` until `.1` exact-head gates pass and its Beads issue closes.
+1. Complete `.1` schemas for waits, cancellation, repair children, finalization and retry accounting.
+2. Expand table/property tests to cover every normative edge and invariant; document migrations.
+3. Run full exact-head quality, Sonar, review, and intermediate integration gates.
+4. Close `.1` through Beads only after its branch is accepted and integrated.
+5. Do not begin `.2` until `.1` closes and Beads reports `.2` ready.
