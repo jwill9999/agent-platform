@@ -396,26 +396,28 @@ decision request. It does not ask the human to rediscover the problem from raw l
 
 ## Tools And MCP Services
 
-| Service or tool                    | Agents                             | Required access                                      |
-| ---------------------------------- | ---------------------------------- | ---------------------------------------------------- |
-| Codex subagent controls            | Orchestrator                       | Spawn, steer, wait, cancel, and collect results      |
-| Built-in shell and patch tools     | Implementation worker, test runner | Repository-scoped execution and edits                |
-| GitHub MCP                         | Orchestrator, reviewer, evaluator  | Orchestrator writes PR/merge state; others read      |
-| Workflow-control/Beads MCP         | Planner, orchestrator              | Planner reads; orchestrator transitions and syncs    |
-| SonarQube MCP                      | Reviewer, worker, evaluator        | Read findings and gates; worker repairs code         |
-| Browser or Playwright MCP          | Test runner, QA evaluator          | Execute journeys and capture artifacts               |
-| OpenAI Developer Docs MCP          | Planner, critic, reviewer          | Read-only API and configuration evidence             |
-| Artifact and observability service | All agents                         | Record scoped evidence; orchestrator reads run state |
-| Runner-health service, optional    | Orchestrator                       | Read-only runner and dependency health               |
+| Service or tool                    | Agents                             | Required access                                       |
+| ---------------------------------- | ---------------------------------- | ----------------------------------------------------- |
+| Codex subagent controls            | Orchestrator                       | Spawn, steer, wait, cancel, and collect results       |
+| Built-in shell and patch tools     | Implementation worker, test runner | Repository-scoped execution and edits                 |
+| GitHub MCP                         | Orchestrator, reviewer, evaluator  | Orchestrator writes PR/merge state; others read       |
+| Official Beads MCP                 | Planner, orchestrator              | Planner reads; orchestrator alone mutates issue state |
+| Workflow-control service           | Orchestrator                       | Checkpoint, resume, waits, findings, and artifacts    |
+| SonarQube MCP                      | Reviewer, worker, evaluator        | Read findings and gates; worker repairs code          |
+| Browser or Playwright MCP          | Test runner, QA evaluator          | Execute journeys and capture artifacts                |
+| OpenAI Developer Docs MCP          | Planner, critic, reviewer          | Read-only API and configuration evidence              |
+| Artifact and observability service | All agents                         | Record scoped evidence; orchestrator reads run state  |
+| Runner-health service, optional    | Orchestrator                       | Read-only runner and dependency health                |
 
 File and shell operations do not require an MCP server when Codex built-ins provide them safely.
 External systems should use narrow MCP interfaces instead of general-purpose remote shell access.
 
 ### Workflow-Control MCP
 
-Agent TOMLs and skills alone do not provide durable execution across process restarts and long pipeline
-waits. A workflow-control MCP service should expose structured operations backed by Beads and durable
-run state:
+The installed official Beads MCP provides structured issue reads and mutations, but it does not
+provide Dolt synchronization, role enforcement, or durable execution across process restarts and
+long pipeline waits. A separate workflow-control service should compose official Beads operations
+with durable run state and expose:
 
 - `feature_load`;
 - `feature_approve`;
@@ -441,20 +443,23 @@ the tools exposed to the active Codex session, and read-only capability smoke te
 is recorded separately because a working CLI does not provide the role-scoped, structured MCP contract
 required by the target workflow.
 
-| Capability                           | Current access                                                                                           | Operational status                                                 | Gap and required action                                                                                       |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| Codex subagent control               | Built-in Codex collaboration tools                                                                       | Available; not an MCP server                                       | No MCP gap; define orchestrator instructions and result contracts                                             |
-| GitHub repository and Actions        | Authenticated `gh` CLI with `repo` and `workflow` scopes                                                 | CLI operational; no dedicated GitHub MCP enabled                   | Enable the official GitHub MCP with scoped credentials and tool allow lists                                   |
-| Beads and Dolt task state            | Local `bd` CLI and Dolt remote                                                                           | CLI operational                                                    | Build the workflow-control/Beads MCP; only the orchestrator receives write tools                              |
-| SonarQube quality gates              | SonarQube tools exposed through the Docker MCP gateway                                                   | Tools load, but a live project query returns `Not authorized`      | Repair or rotate the SonarQube token and verify project and PR access                                         |
-| Browser and Playwright QA            | Standalone Playwright CLI 1.59.1; Playwright MCP configured; browser tools exposed by the Docker gateway | CLI operational; Docker-gateway browser launch fails with `ENOSPC` | Reclaim or resize Docker storage, then smoke-test the standalone and gateway MCP paths                        |
-| Developer documentation              | Context7 MCP is callable; OpenAI Docs skill and web access are available                                 | Context7 operational; no dedicated OpenAI Docs MCP configured      | Add the official OpenAI Developer Docs MCP for narrow, source-authoritative access                            |
-| Workflow checkpoints and resume      | None                                                                                                     | Missing                                                            | Implement durable workflow run state, checkpoint, resume, retry, and wait tools                               |
-| Artifacts and orchestration evidence | Repository observability packages exist; no dedicated workflow MCP                                       | Missing as an agent-facing service                                 | Add artifact and evidence operations to workflow control or a dedicated observability MCP                     |
-| Pipeline and runner health           | `gh` CLI can inspect Actions runs                                                                        | Repository CI visible; no narrow remote-runner health service      | Use GitHub MCP for jobs and add a read-only runner/dependency health endpoint if Actions data is insufficient |
-| Notebook research                    | `notebooklm-mcp`                                                                                         | Operational, but not required for core delivery                    | Keep optional and do not grant by default                                                                     |
-| JavaScript scratch execution         | `node_repl` MCP                                                                                          | Operational, but not required for core delivery                    | Keep optional and role-scoped                                                                                 |
-| Computer use                         | `computer-use` and `cua_repl` are configured but disabled                                                | Unavailable by policy                                              | Keep disabled unless an approved QA scenario proves it is necessary                                           |
+| Capability                           | Current access                                                                     | Operational status                                                     | Gap and required action                                                                                     |
+| ------------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Codex subagent control               | Built-in Codex collaboration tools                                                 | Available; not an MCP server                                           | Define orchestrator instructions, result contracts, and durable state                                       |
+| GitHub repository and pull requests  | Official GitHub MCP through the Docker `codex` profile                             | Read and write smoke tests pass                                        | Add role-specific tool allowlists; restrict merge and mutation tools to the orchestrator                    |
+| GitHub Actions                       | Authenticated `gh` CLI with `repo` and `workflow` scopes                           | Recent workflow and job queries pass; no Actions tools in GitHub MCP   | Decide whether the pilot uses CLI or a narrow typed wrapper; add durable pipeline waiting                   |
+| Beads issue state                    | Official `beads-mcp` plus local `bd` CLI                                           | Fifteen tools load; explicit-root reads and writes pass                | Restrict writes to the orchestrator; avoid `context init` when embedded-Dolt detection reports a false miss |
+| Beads Dolt synchronization           | Local `bd dolt push`/`pull` CLI                                                    | Available outside MCP; embedded mode limits some diagnostics           | Keep deterministic CLI closeout or add a narrowly scoped synchronization operation                          |
+| SonarQube quality gates              | SonarQube MCP through the Docker `codex` profile                                   | Authentication works; PR 251 gate passes                               | Clear one historical project-baseline hotspot and enforce role-appropriate mutation access                  |
+| Browser and Playwright QA            | Playwright MCP through the Docker `codex` profile                                  | Browser navigation and snapshots pass; prior `ENOSPC` failure resolved | Define artifact retention and restrict unsafe browser execution                                             |
+| Developer documentation              | Context7 MCP, OpenAI Docs skill, and web access                                    | Operational; dedicated OpenAI Developer Docs MCP not configured        | Optional improvement; existing official-docs path is sufficient for the pilot                               |
+| Workflow checkpoints and resume      | None                                                                               | Missing                                                                | Implement durable workflow run state, checkpoint, resume, retry, and wait tools                             |
+| Artifacts and orchestration evidence | Repository observability packages exist; no agent-facing workflow evidence service | Missing                                                                | Add artifact and evidence operations to workflow control or a dedicated observability service               |
+| Tool authorization                   | Global Codex MCP configuration and an unrestricted Docker `codex` profile          | Tools are visible across agent roles; no profile tool allowlists       | Enforce least privilege outside prompt instructions                                                         |
+| Pipeline and runner health           | `gh` CLI can inspect Actions runs                                                  | Repository CI visible; no narrow remote-runner health service          | Add a read-only runner/dependency health endpoint only if Actions data is insufficient                      |
+| Notebook research                    | `notebooklm-mcp`                                                                   | Operational, but not required for core delivery                        | Keep optional and do not grant by default                                                                   |
+| JavaScript scratch execution         | `node_repl` MCP                                                                    | Operational, but not required for core delivery                        | Keep optional and role-scoped                                                                               |
+| Computer use                         | `computer-use` and `cua_repl` are configured but disabled                          | Unavailable by policy                                                  | Keep disabled unless an approved QA scenario proves it is necessary                                         |
 
 The Docker MCP catalog currently offers GitHub, official GitHub, Playwright, SonarQube, Temporal,
 task-orchestrator, Testkube, Sentry, and other candidate servers. Catalog availability does not mean a
@@ -464,11 +469,13 @@ server is enabled, authenticated, least-privilege, or suitable as the platform's
 
 Before the end-to-end pilot can run autonomously:
 
-1. Implement workflow-control/Beads MCP and durable execution checkpoints.
-2. Enable and scope the official GitHub MCP for PR, review, Actions, and merge operations.
-3. Repair SonarQube MCP authorization and verify project/PR quality-gate access.
-4. Restore Playwright MCP browser operation and prove artifact capture.
-5. Decide whether workflow artifacts live inside workflow control or a separate observability MCP.
+1. Enforce role-specific MCP access, especially Beads mutations, GitHub writes, and unsafe browser tools.
+2. Implement durable workflow checkpoints, resume, retry state, and external waits around the official
+   Beads MCP rather than rebuilding its issue CRUD adapter.
+3. Decide whether GitHub Actions remains a bounded CLI capability for the pilot or receives a narrow
+   typed wrapper with durable pipeline waiting.
+4. Decide whether workflow artifacts live inside workflow control or a separate observability service.
+5. Clear the historical SonarQube hotspot so both PR and project-baseline quality gates pass.
 6. Add narrow runner-health access only if GitHub Actions job data cannot classify the remote runner.
 
 OpenAI Docs MCP is recommended for planning and review quality but is not a delivery blocker because
@@ -535,7 +542,7 @@ Child tasks are created only after this epic design and its policy decisions are
 | ------------------------------------------- | ------------------------------------------------------------------------------ | ---------- | ----------------------------------- |
 | `.1` Execution contract and state machine   | Define schemas, transitions, result envelopes, retries, and policy boundaries  | None       | No                                  |
 | `.2` Planning and critic agents             | Add TOMLs, planning skill, critic rubric, and human approval gate              | `.1`       | With `.3`                           |
-| `.3` Workflow-control MCP                   | Add durable checkpoints, Beads adapter, findings, artifacts, and resume        | `.1`       | With `.2`                           |
+| `.3` Workflow-control service               | Compose Beads MCP with checkpoints, findings, artifacts, waits, and resume     | `.1`       | With `.2`                           |
 | `.4` Orchestrator and scheduler             | Execute the task DAG, isolate work, enforce ownership, and collect results     | `.2`, `.3` | No                                  |
 | `.5` Implementation, review, and test loops | Refine existing agents and implement structured repair routing                 | `.4`       | With `.6` after contracts stabilize |
 | `.6` GitHub CI and delivery control         | Add durable pipeline waiting, classification, repair routing, and merge policy | `.3`, `.4` | With `.5`                           |

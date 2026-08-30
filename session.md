@@ -18,8 +18,8 @@ and actionable.
 - **Session:** Refining the autonomous multi-agent feature-delivery epic.
 - **Branch:** `task/multi-agent-orchestration-epic-design`
 - **Base:** `feature/multi-agent-orchestration` at `68e5fc7`
-- **Head:** `ae539e5` (`docs: define autonomous multi-agent feature delivery`)
-- **Pull request:** not opened; design review with the owner is next.
+- **Head:** current pushed branch tip; see `git log -1`
+- **Pull request:** #251 into `staging`; open, mergeable, and passing all reported checks.
 
 ## What Happened
 
@@ -32,9 +32,13 @@ and actionable.
 - Expanded `docs/tasks/agent-platform-multi-agent.md` from a high-level sketch into the complete epic
   design, including agent roles, workflow state, tools/MCP boundaries, repair loops, delivery policy,
   implementation sequencing, verification, and decisions awaiting review.
-- Audited current MCP access and recorded the dated gap analysis in the epic: GitHub and Beads have
-  CLI fallbacks but no scoped orchestration MCP, SonarQube authorization is invalid, and the Docker
-  Playwright path is blocked by storage exhaustion.
+- Re-ran the MCP readiness audit after restarting Codex. Official GitHub MCP, SonarQube MCP, and
+  Playwright MCP now pass live smoke tests through Docker MCP; the prior Sonar authorization and
+  Playwright `ENOSPC` blockers are resolved.
+- Installed and registered official `beads-mcp`; fifteen structured tools load and repository queries
+  and mutations succeed with explicit `workspace_root`. Its `context` helper does not detect the
+  embedded-Dolt database, so agents must not initialize over it. Dolt synchronization, durable
+  checkpoints, role enforcement, pipeline waits, and evidence storage remain outside the server.
 
 ## Verification
 
@@ -48,12 +52,16 @@ and actionable.
 - `feature/multi-agent-orchestration` and `task/multi-agent-orchestration-epic-design` are pushed.
 - Epic `agent-platform-multi-agent` remains open in refinement; no child implementation tasks were
   created or claimed.
-- The epic contains the policy-decision table, MCP readiness gaps, and ordered remediation priorities.
+- PR #251 is mergeable and its CI and PR-specific Sonar quality gate pass.
+- Tool connectivity is ready for a pilot, but the global MCP configuration does not yet enforce
+  per-role least privilege. The project-wide Sonar baseline has one historical hotspot to review.
 
 ## Next
 
 1. Review the expanded epic design with the owner and resolve each proposed policy decision.
-2. Decide whether to build the workflow-control/Beads MCP and enable the official GitHub MCP as the
-   first orchestration infrastructure tasks.
-3. Update the epic with approved decisions and run an independent plan-critic pass.
-4. Create child Beads issues and focused specs only after the refinement gate is approved.
+2. Define enforceable per-role tool access for Beads, GitHub mutations, Sonar mutations, and unsafe
+   browser tools.
+3. Scope workflow control as durable state around official Beads MCP rather than rebuilding Beads CRUD.
+4. Decide whether the pilot uses `gh` for Actions or adds a narrow typed pipeline wrapper.
+5. Update the epic with approved decisions and run an independent plan-critic pass.
+6. Create child Beads issues and focused specs only after the refinement gate is approved.

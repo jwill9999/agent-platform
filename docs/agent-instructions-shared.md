@@ -129,19 +129,32 @@ See [docs/configuration.md](configuration.md) for the full environment variable 
 
 This project uses **bd (beads)** for ALL issue tracking — not markdown TODOs, TodoWrite, TaskCreate, or external trackers.
 
+Prefer the official Beads MCP for structured issue reads and mutations when its tools are available.
+Pass the repository root as `workspace_root`, and call the MCP `context` tool before the first write
+operation. Use the CLI when MCP is unavailable and for commands the MCP does not expose, including
+`bd prime`, Dolt synchronization, diagnostics, linting, and administration.
+
+In the current embedded-Dolt workspace, the MCP `context` response may say the database is not found
+even though operations with explicit `workspace_root` succeed. Do not run MCP `context init` in an
+existing Beads repository; verify with a read operation and keep passing `workspace_root` explicitly.
+
 ```bash
 bd ready              # find unblocked work
 bd show <id>          # view issue details
 bd update <id> --claim  # claim atomically
 bd close <id>         # complete work
-bd sync               # sync with git
+bd dolt push          # push Beads state to the Dolt remote
 ```
 
 Run `bd prime` for the detailed command reference and session-close protocol. Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files. Task spec files live in `docs/tasks/<issue-id>.md` (requirements, implementation plan, DoD); do not delete them after completion.
 
 Every task issue must follow the required Beads schema in `docs/tasks/README.md` under **Expected Beads Schema (required)**, including a description first line of `Spec: docs/tasks/<issue-id>.md`.
 
-**Beads = task state** (next task, open/done, dependencies). **Git = code history** (branches, commits). When picking or finishing work, use `bd ready` / `bd show` / `bd close` — do not rely on Git alone. See `decisions.md` → _Task management: Beads vs Git_.
+The official Beads MCP manages issue state but does not replace `bd dolt push` or provide orchestration
+checkpoints, durable waits, artifact storage, or role enforcement. Those remain separate workflow
+control responsibilities.
+
+**Beads = task state** (next task, open/done, dependencies). **Git = code history** (branches, commits). When picking or finishing work, use Beads MCP or `bd ready` / `bd show` / `bd close` — do not rely on Git alone. See `decisions.md` → _Task management: Beads vs Git_.
 
 ---
 
