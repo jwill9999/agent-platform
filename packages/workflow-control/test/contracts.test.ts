@@ -116,5 +116,19 @@ describe('executionContractSchema', () => {
       evidence: [],
     };
     expect(() => assertTaskPacketWithinContract(contract, packet)).toThrow('allowed paths');
+    expect(() =>
+      assertTaskPacketWithinContract(contract, {
+        ...packet,
+        allowedPaths: contract.tasks[0].allowedPaths,
+        retryBudget: { ...contract.retryPolicy, implementationAttempts: 999 },
+      }),
+    ).toThrow('retry budget');
+    expect(() =>
+      assertTaskPacketWithinContract(contract, {
+        ...packet,
+        allowedPaths: contract.tasks[0].allowedPaths,
+        acceptanceCriteria: ['invented criterion'],
+      }),
+    ).toThrow('acceptance criteria');
   });
 });

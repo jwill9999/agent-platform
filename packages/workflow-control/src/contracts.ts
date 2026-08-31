@@ -249,6 +249,18 @@ export function assertTaskPacketWithinContract(contractInput: unknown, packetInp
   if (packet.policyDigest !== contract.policyDigest) throw new Error('stale task packet policy');
   if (packet.assignedRole !== task.assignedRole)
     throw new Error('task packet changes assigned role');
+  if (packet.objective !== contract.objective) throw new Error('task packet changes objective');
+  if (
+    packet.acceptanceCriteria.length !== contract.acceptanceCriteria.length ||
+    packet.acceptanceCriteria.some(
+      (criterion, index) => criterion !== contract.acceptanceCriteria[index],
+    )
+  ) {
+    throw new Error('task packet changes acceptance criteria');
+  }
+  if (JSON.stringify(packet.retryBudget) !== JSON.stringify(contract.retryPolicy)) {
+    throw new Error('task packet changes retry budget');
+  }
   if (
     packet.allowedPaths.some((path) => !task.allowedPaths.some((root) => isPathWithin(path, root)))
   ) {

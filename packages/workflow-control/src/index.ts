@@ -58,9 +58,6 @@ export {
   WorkflowOrchestrator,
   selectBeadsReadyTasks,
   type BeadsTaskSnapshot,
-  type BrokeredTaskCloser,
-  type ExactHeadGate,
-  type IsolatedSpecialistLauncher,
   type SpecialistReservation,
 } from './orchestrator.js';
 export {
@@ -83,25 +80,37 @@ export {
 export {
   buildDockerSpecialistLaunch,
   executeDockerSpecialist,
+  DockerIsolatedSpecialistLauncher,
+  RevocableSpecialistCredentialBroker,
   prepareSpecialistWorkspace,
   type DockerSpecialistLaunch,
   type SpecialistLaunchRequest,
   type SpecialistExecutionResult,
+  type SpecialistCredentialLease,
   type SpecialistProcessExecutor,
   type SpecialistWorkspace,
 } from './specialistLauncher.js';
+export {
+  LocalExactHeadIntegrationGate,
+  type GateCommandExecutor,
+  type VerifiedIntegrationGate,
+} from './integrationGate.js';
 export {
   WorkflowStore,
   resolveWorkflowControlPaths,
   type LeaseRecord,
   type PrepareTransitionInput,
   type RunRecord,
+  type SchedulerExecutionRecord,
+  type SchedulerCredentialStatus,
+  type SchedulerExecutionStatus,
   type TransitionRecord,
   type TransitionStatus,
   type WorkflowControlPaths,
 } from './storage.js';
 export {
   JournaledBeadsDoltBroker,
+  JournaledBeadsTaskCloser,
   OfficialBeadsDoltPort,
   JournaledMutationBroker,
   compareBeadsAuthoritativeState,

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 
 import { executionContractSchema, type ExecutionContract } from './contracts.js';
+import { deriveTransitionIdempotencyKey } from './lifecycle.js';
 import {
   approvalInvalidationReason,
   criticReviewSchema,
@@ -15,7 +16,7 @@ import {
   type FindingDisposition,
   type PlanApproval,
 } from './planning.js';
-import type { WorkflowState } from './stateMachine.js';
+import { validateTransition, type TransitionContext, type WorkflowState } from './stateMachine.js';
 
 export interface WorkflowControlPaths {
   workspaceId: string;
@@ -59,6 +60,40 @@ export interface LeaseRecord {
   expiresAtMs: number;
 }
 
+export type SchedulerExecutionStatus = 'active' | 'completed' | 'cancelled' | 'escalated';
+export type SchedulerCredentialStatus =
+  | 'pending'
+  | 'issuing'
+  | 'issued'
+  | 'revoking'
+  | 'revoked'
+  | 'legacy_quarantined';
+
+export const workflowCredentialJournalCapability = Symbol('workflowCredentialJournalCapability');
+
+export interface SchedulerExecutionRecord {
+  id: string;
+  workspaceId: string;
+  runId: string;
+  taskId: string;
+  role: string;
+  mode: 'read_only' | 'mutating';
+  status: SchedulerExecutionStatus;
+  deadlineMs: number;
+  ownerId: string;
+  workspaceLeaseEpoch: number;
+  runLeaseEpoch: number;
+  taskLeaseEpoch: number;
+  processIdentity: string;
+  credentialLeaseId: string;
+  credentialStatus: SchedulerCredentialStatus;
+  credentialBrokerGeneration: string | null;
+  packet: unknown;
+  result: unknown | null;
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
 export interface PrepareTransitionInput {
   id: string;
   runId: string;
@@ -72,6 +107,13 @@ export interface PrepareTransitionInput {
   policyDigest: string;
   leaseOwnerId: string;
   leaseEpoch: number;
+  transitionContext: Pick<TransitionContext, 'workspaceLeaseEpoch'> &
+    Partial<
+      Pick<
+        TransitionContext,
+        'taskLeaseEpoch' | 'recoveryTarget' | 'mergeVerified' | 'finalizationVerified' | 'wait'
+      >
+    >;
   expectedExternalState: unknown;
   externalArguments: unknown;
   nowMs: number;
@@ -112,14 +154,49 @@ type TransitionRow = {
   policy_digest: string;
   lease_owner_id: string;
   lease_epoch: number;
+  transition_context_json: string;
   expected_external_state_json: string;
   external_arguments_json: string;
   result_json: string | null;
   created_at_ms: number;
 };
 
+type SchedulerExecutionRow = {
+  id: string;
+  workspace_id: string;
+  run_id: string;
+  task_id: string;
+  role: string;
+  mode: SchedulerExecutionRecord['mode'];
+  status: SchedulerExecutionStatus;
+  deadline_ms: number;
+  owner_id: string;
+  workspace_lease_epoch: number;
+  run_lease_epoch: number;
+  task_lease_epoch: number;
+  process_identity: string;
+  credential_lease_id: string;
+  credential_status: SchedulerCredentialStatus;
+  credential_broker_generation: string | null;
+  packet_json: string;
+  result_json: string | null;
+  created_at_ms: number;
+  updated_at_ms: number;
+};
+
 function parseJson(value: string | null): unknown | null {
   return value === null ? null : (JSON.parse(value) as unknown);
+}
+
+function requiredTransitionTaskId(arguments_: unknown): string {
+  if (typeof arguments_ !== 'object' || arguments_ === null || Array.isArray(arguments_)) {
+    throw new Error('task-fenced transition arguments must be an object');
+  }
+  const taskId = (arguments_ as Record<string, unknown>).taskId;
+  if (typeof taskId !== 'string' || taskId.trim() === '') {
+    throw new Error('task-fenced transition requires taskId');
+  }
+  return taskId;
 }
 
 function transitionFromRow(row: TransitionRow): TransitionRecord {
@@ -137,11 +214,63 @@ function transitionFromRow(row: TransitionRow): TransitionRecord {
     policyDigest: row.policy_digest,
     leaseOwnerId: row.lease_owner_id,
     leaseEpoch: row.lease_epoch,
+    transitionContext: JSON.parse(
+      row.transition_context_json,
+    ) as PrepareTransitionInput['transitionContext'],
     expectedExternalState: parseJson(row.expected_external_state_json),
     externalArguments: parseJson(row.external_arguments_json),
     result: parseJson(row.result_json),
     nowMs: row.created_at_ms,
   };
+}
+
+function schedulerExecutionFromRow(row: SchedulerExecutionRow): SchedulerExecutionRecord {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    runId: row.run_id,
+    taskId: row.task_id,
+    role: row.role,
+    mode: row.mode,
+    status: row.status,
+    deadlineMs: row.deadline_ms,
+    ownerId: row.owner_id,
+    workspaceLeaseEpoch: row.workspace_lease_epoch,
+    runLeaseEpoch: row.run_lease_epoch,
+    taskLeaseEpoch: row.task_lease_epoch,
+    processIdentity: row.process_identity,
+    credentialLeaseId: row.credential_lease_id,
+    credentialStatus: row.credential_status,
+    credentialBrokerGeneration: row.credential_broker_generation,
+    packet: parseJson(row.packet_json),
+    result: parseJson(row.result_json),
+    createdAtMs: row.created_at_ms,
+    updatedAtMs: row.updated_at_ms,
+  };
+}
+
+function sameImmutableTransition(
+  existing: TransitionRecord,
+  input: PrepareTransitionInput,
+): boolean {
+  return (
+    existing.id === input.id &&
+    existing.runId === input.runId &&
+    existing.from === input.from &&
+    existing.to === input.to &&
+    existing.operation === input.operation &&
+    existing.expectedRunVersion === input.expectedRunVersion &&
+    existing.idempotencyKey === input.idempotencyKey &&
+    existing.actorRole === input.actorRole &&
+    existing.contractVersion === input.contractVersion &&
+    existing.policyDigest === input.policyDigest &&
+    existing.leaseOwnerId === input.leaseOwnerId &&
+    existing.leaseEpoch === input.leaseEpoch &&
+    JSON.stringify(existing.transitionContext) === JSON.stringify(input.transitionContext) &&
+    JSON.stringify(existing.expectedExternalState) ===
+      JSON.stringify(input.expectedExternalState) &&
+    JSON.stringify(existing.externalArguments) === JSON.stringify(input.externalArguments)
+  );
 }
 
 export class WorkflowStore {
@@ -212,6 +341,13 @@ export class WorkflowStore {
         };
   }
 
+  assertRunUsesContract(runId: string, contract: ExecutionContract): void {
+    const stored = this.#contractForRun(runId);
+    if (JSON.stringify(stored) !== JSON.stringify(contract)) {
+      throw new Error('workflow run does not use the approved execution contract');
+    }
+  }
+
   acquireLease(
     resourceType: LeaseRecord['resourceType'],
     resourceId: string,
@@ -252,30 +388,66 @@ export class WorkflowStore {
 
   prepareTransition(input: PrepareTransitionInput): TransitionRecord {
     return this.#database.transaction(() => {
+      const canonicalKey = deriveTransitionIdempotencyKey({
+        runId: input.runId,
+        transitionId: input.id,
+        operation: input.operation,
+        expectedVersion: input.expectedRunVersion,
+      });
+      if (input.idempotencyKey !== canonicalKey) {
+        throw new Error('transition idempotency key does not match canonical transition identity');
+      }
       const replay = this.getTransitionByIdempotencyKey(input.idempotencyKey);
       if (replay !== undefined) {
-        if (
-          replay.runId !== input.runId ||
-          replay.operation !== input.operation ||
-          replay.expectedRunVersion !== input.expectedRunVersion
-        ) {
-          throw new Error('idempotency key collision');
-        }
+        if (!sameImmutableTransition(replay, input)) throw new Error('idempotency key collision');
         return replay;
       }
       const run = this.getRun(input.runId);
       if (run === undefined) throw new Error('workflow run not found');
       const approved = this.#database
         .prepare(
-          `SELECT contracts.contract_version, contracts.policy_digest
+          `SELECT contracts.contract_version, contracts.policy_digest, contracts.workspace_id
            FROM runs JOIN contracts ON contracts.id = runs.contract_id WHERE runs.id = ?`,
         )
-        .get(input.runId) as { contract_version: number; policy_digest: string };
+        .get(input.runId) as {
+        contract_version: number;
+        policy_digest: string;
+        workspace_id: string;
+      };
       if (
         approved.contract_version !== input.contractVersion ||
         approved.policy_digest !== input.policyDigest
       ) {
         throw new Error('transition contract or policy is stale');
+      }
+      this.#assertResourceLease(
+        'workspace',
+        approved.workspace_id,
+        input.leaseOwnerId,
+        input.transitionContext.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      if (input.transitionContext.taskLeaseEpoch !== undefined) {
+        this.#assertResourceLease(
+          'task',
+          requiredTransitionTaskId(input.externalArguments),
+          input.leaseOwnerId,
+          input.transitionContext.taskLeaseEpoch,
+          input.nowMs,
+        );
+      }
+      validateTransition(input.from, input.to, {
+        ...input.transitionContext,
+        mergeVerified: run.mergeVerified,
+        currentContractVersion: approved.contract_version,
+        requestedContractVersion: input.contractVersion,
+        currentPolicyDigest: approved.policy_digest,
+        requestedPolicyDigest: input.policyDigest,
+        actorWorkspaceLeaseEpoch: input.transitionContext.workspaceLeaseEpoch,
+        actorTaskLeaseEpoch: input.transitionContext.taskLeaseEpoch,
+      });
+      if (input.from === 'finalizing' && input.to === 'closed' && !run.mergeVerified) {
+        throw new Error('finalization requires persisted merge verification');
       }
       if (run.version !== input.expectedRunVersion || run.state !== input.from) {
         throw new Error('run compare-and-swap failed');
@@ -290,8 +462,9 @@ export class WorkflowStore {
           `INSERT INTO transitions
            (id, run_id, from_state, to_state, operation, expected_run_version, idempotency_key,
             status, actor_role, contract_version, policy_digest, lease_owner_id, lease_epoch,
-            expected_external_state_json, external_arguments_json, result_json, created_at_ms, updated_at_ms)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+            transition_context_json, expected_external_state_json, external_arguments_json,
+            result_json, created_at_ms, updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
         )
         .run(
           input.id,
@@ -306,6 +479,7 @@ export class WorkflowStore {
           input.policyDigest,
           input.leaseOwnerId,
           input.leaseEpoch,
+          JSON.stringify(input.transitionContext),
           JSON.stringify(input.expectedExternalState),
           JSON.stringify(input.externalArguments),
           input.nowMs,
@@ -350,6 +524,7 @@ export class WorkflowStore {
       if (transition.status === 'committed') return transition;
       if (transition.status !== 'prepared') throw new Error('transition cannot be committed');
       this.#assertLease(transition.runId, ownerId, leaseEpoch, nowMs);
+      this.#assertTransitionResourceLeases(transition, ownerId, nowMs);
       if (ownerId !== transition.leaseOwnerId || leaseEpoch !== transition.leaseEpoch) {
         throw new Error('transition fencing token changed');
       }
@@ -384,6 +559,7 @@ export class WorkflowStore {
       if (transition === undefined) throw new Error('transition not found');
       if (transition.status !== 'prepared') throw new Error('transition cannot be escalated');
       this.#assertLease(transition.runId, ownerId, leaseEpoch, nowMs);
+      this.#assertTransitionResourceLeases(transition, ownerId, nowMs);
       this.#database
         .prepare(
           `UPDATE transitions SET status = 'escalated', result_json = ?, updated_at_ms = ? WHERE id = ?`,
@@ -431,6 +607,7 @@ export class WorkflowStore {
     newOwnerId: string,
     newLeaseEpoch: number,
     nowMs = Date.now(),
+    recoveryContext?: PrepareTransitionInput['transitionContext'],
   ): TransitionRecord {
     return this.#database.transaction(() => {
       const transition = this.getTransition(transitionId);
@@ -441,13 +618,353 @@ export class WorkflowStore {
         throw new Error('recovery lease does not fence the interrupted owner');
       }
       this.#assertLease(transition.runId, newOwnerId, newLeaseEpoch, nowMs);
+      const nextContext = recoveryContext ?? transition.transitionContext;
+      this.#assertResourceLease(
+        'workspace',
+        this.#workspaceForRun(transition.runId),
+        newOwnerId,
+        nextContext.workspaceLeaseEpoch,
+        nowMs,
+      );
+      if (nextContext.taskLeaseEpoch !== undefined) {
+        this.#assertResourceLease(
+          'task',
+          requiredTransitionTaskId(transition.externalArguments),
+          newOwnerId,
+          nextContext.taskLeaseEpoch,
+          nowMs,
+        );
+      }
       this.#database
         .prepare(
-          `UPDATE transitions SET lease_owner_id = ?, lease_epoch = ?, updated_at_ms = ?
+          `UPDATE transitions SET lease_owner_id = ?, lease_epoch = ?, transition_context_json = ?,
+           updated_at_ms = ?
            WHERE id = ? AND status = 'prepared'`,
         )
-        .run(newOwnerId, newLeaseEpoch, nowMs, transitionId);
+        .run(newOwnerId, newLeaseEpoch, JSON.stringify(nextContext), nowMs, transitionId);
       return this.getTransition(transitionId)!;
+    })();
+  }
+
+  createSchedulerExecution(input: {
+    id: string;
+    workspaceId: string;
+    runId: string;
+    taskId: string;
+    role: string;
+    mode: SchedulerExecutionRecord['mode'];
+    deadlineMs: number;
+    ownerId: string;
+    workspaceLeaseEpoch: number;
+    runLeaseEpoch: number;
+    taskLeaseEpoch: number;
+    processIdentity: string;
+    credentialLeaseId: string;
+    packet: unknown;
+    nowMs?: number;
+  }): SchedulerExecutionRecord {
+    const nowMs = input.nowMs ?? Date.now();
+    if (input.deadlineMs <= nowMs) throw new Error('specialist deadline has elapsed');
+    return this.#database.transaction(() => {
+      this.#assertResourceLease(
+        'workspace',
+        input.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        nowMs,
+      );
+      this.#assertResourceLease('run', input.runId, input.ownerId, input.runLeaseEpoch, nowMs);
+      this.#assertResourceLease('task', input.taskId, input.ownerId, input.taskLeaseEpoch, nowMs);
+      const runWorkspace = this.#database
+        .prepare(
+          `SELECT contracts.workspace_id FROM runs
+           JOIN contracts ON contracts.id = runs.contract_id WHERE runs.id = ?`,
+        )
+        .get(input.runId) as { workspace_id: string } | undefined;
+      if (runWorkspace?.workspace_id !== input.workspaceId) {
+        throw new Error('scheduler execution run is outside the fenced workspace');
+      }
+      const counts = this.#database
+        .prepare(
+          `SELECT
+             SUM(CASE WHEN mode = 'mutating' THEN 1 ELSE 0 END) AS mutating,
+             SUM(CASE WHEN mode = 'read_only' THEN 1 ELSE 0 END) AS read_only
+           FROM scheduler_executions WHERE workspace_id = ? AND status = 'active'`,
+        )
+        .get(input.workspaceId) as { mutating: number | null; read_only: number | null };
+      if (input.mode === 'mutating' && (counts.mutating ?? 0) >= 1) {
+        throw new Error('pilot permits only one mutating specialist');
+      }
+      if ((counts.mutating ?? 0) + (counts.read_only ?? 0) >= 4) {
+        throw new Error('specialist concurrency limit reached');
+      }
+      this.#database
+        .prepare(
+          `INSERT INTO scheduler_executions
+           (id, workspace_id, run_id, task_id, role, mode, status, deadline_ms, owner_id,
+            workspace_lease_epoch, run_lease_epoch, task_lease_epoch, process_identity,
+            credential_lease_id, credential_status, credential_broker_generation, packet_json,
+            result_json, created_at_ms,
+            updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, NULL, ?, ?)`,
+        )
+        .run(
+          input.id,
+          input.workspaceId,
+          input.runId,
+          input.taskId,
+          input.role,
+          input.mode,
+          input.deadlineMs,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.runLeaseEpoch,
+          input.taskLeaseEpoch,
+          input.processIdentity,
+          input.credentialLeaseId,
+          JSON.stringify(input.packet),
+          nowMs,
+          nowMs,
+        );
+      return this.getSchedulerExecution(input.id)!;
+    })();
+  }
+
+  bindSchedulerCredentialGeneration(
+    input: {
+      id: string;
+      leaseId: string;
+      generation: string;
+      nowMs?: number;
+    },
+    capability?: symbol,
+  ): SchedulerExecutionRecord {
+    if (capability !== workflowCredentialJournalCapability) {
+      throw new Error('credential journal mutation requires broker capability');
+    }
+    if (input.generation.trim() === '') throw new Error('credential broker generation is required');
+    const result = this.#database
+      .prepare(
+        `UPDATE scheduler_executions
+         SET credential_broker_generation = ?, updated_at_ms = ?
+         WHERE id = ? AND status = 'active' AND credential_lease_id = ?
+           AND credential_status = 'pending'
+           AND (credential_broker_generation IS NULL OR credential_broker_generation = ?)`,
+      )
+      .run(input.generation, input.nowMs ?? Date.now(), input.id, input.leaseId, input.generation);
+    if (result.changes !== 1) {
+      const current = this.getSchedulerExecution(input.id);
+      if (current?.credentialBrokerGeneration === input.generation) return current;
+      throw new Error('credential broker generation binding changed');
+    }
+    return this.getSchedulerExecution(input.id)!;
+  }
+
+  advanceSchedulerCredential(
+    input: {
+      id: string;
+      leaseId: string;
+      from: readonly SchedulerCredentialStatus[];
+      to: SchedulerCredentialStatus;
+      nowMs?: number;
+    },
+    capability?: symbol,
+  ): SchedulerExecutionRecord {
+    if (capability !== workflowCredentialJournalCapability) {
+      throw new Error('credential journal mutation requires broker capability');
+    }
+    const execution = this.getSchedulerExecution(input.id);
+    if (execution === undefined || execution.status !== 'active') {
+      throw new Error('active scheduler execution not found for credential transition');
+    }
+    if (execution.credentialLeaseId !== input.leaseId) {
+      throw new Error('scheduler credential lease identity changed');
+    }
+    if (execution.credentialStatus === input.to) return execution;
+    const normativeTransitions: Readonly<
+      Record<SchedulerCredentialStatus, readonly SchedulerCredentialStatus[]>
+    > = {
+      pending: ['issuing', 'revoking'],
+      issuing: ['issued', 'revoking'],
+      issued: ['revoking'],
+      revoking: ['revoked'],
+      revoked: [],
+      legacy_quarantined: [],
+    };
+    if (!normativeTransitions[execution.credentialStatus].includes(input.to)) {
+      throw new Error(
+        `credential transition ${execution.credentialStatus} -> ${input.to} is forbidden`,
+      );
+    }
+    if (!input.from.includes(execution.credentialStatus)) {
+      throw new Error(
+        `credential transition ${execution.credentialStatus} -> ${input.to} is not allowed`,
+      );
+    }
+    if (
+      !this.#compareAndSwapSchedulerCredential({
+        id: input.id,
+        leaseId: input.leaseId,
+        expected: execution.credentialStatus,
+        to: input.to,
+        nowMs: input.nowMs,
+      })
+    ) {
+      const current = this.getSchedulerExecution(input.id);
+      if (current?.credentialStatus === input.to) return current;
+      throw new Error('credential transition lost compare-and-swap race');
+    }
+    return this.getSchedulerExecution(input.id)!;
+  }
+
+  #compareAndSwapSchedulerCredential(input: {
+    id: string;
+    leaseId: string;
+    expected: SchedulerCredentialStatus;
+    to: SchedulerCredentialStatus;
+    nowMs?: number;
+  }): boolean {
+    const normativeTransitions: Readonly<
+      Record<SchedulerCredentialStatus, readonly SchedulerCredentialStatus[]>
+    > = {
+      pending: ['issuing', 'revoking'],
+      issuing: ['issued', 'revoking'],
+      issued: ['revoking'],
+      revoking: ['revoked'],
+      revoked: [],
+      legacy_quarantined: [],
+    };
+    if (!normativeTransitions[input.expected].includes(input.to)) {
+      throw new Error(`credential transition ${input.expected} -> ${input.to} is forbidden`);
+    }
+    const updated = this.#database
+      .prepare(
+        `UPDATE scheduler_executions SET credential_status = ?, updated_at_ms = ?
+         WHERE id = ? AND status = 'active' AND credential_lease_id = ?
+           AND credential_status = ?`,
+      )
+      .run(input.to, input.nowMs ?? Date.now(), input.id, input.leaseId, input.expected);
+    return updated.changes === 1;
+  }
+
+  finishSchedulerExecution(input: {
+    id: string;
+    status: Exclude<SchedulerExecutionStatus, 'active'>;
+    ownerId: string;
+    workspaceLeaseEpoch: number;
+    runLeaseEpoch: number;
+    taskLeaseEpoch: number;
+    result: unknown;
+    nowMs?: number;
+  }): SchedulerExecutionRecord {
+    const nowMs = input.nowMs ?? Date.now();
+    return this.#database.transaction(() => {
+      const execution = this.getSchedulerExecution(input.id);
+      if (execution === undefined) throw new Error('scheduler execution not found');
+      if (execution.status !== 'active') return execution;
+      this.#assertResourceLease(
+        'workspace',
+        execution.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        nowMs,
+      );
+      this.#assertResourceLease('run', execution.runId, input.ownerId, input.runLeaseEpoch, nowMs);
+      this.#assertResourceLease(
+        'task',
+        execution.taskId,
+        input.ownerId,
+        input.taskLeaseEpoch,
+        nowMs,
+      );
+      if (execution.ownerId !== input.ownerId) throw new Error('scheduler execution owner changed');
+      if (
+        execution.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+        execution.runLeaseEpoch !== input.runLeaseEpoch ||
+        execution.taskLeaseEpoch !== input.taskLeaseEpoch
+      ) {
+        throw new Error('scheduler execution fencing token changed');
+      }
+      if (execution.credentialStatus !== 'revoked') {
+        throw new Error('scheduler execution cannot finish before credential revocation');
+      }
+      if (input.status === 'completed' && execution.deadlineMs <= nowMs) {
+        throw new Error('specialist reservation timed out');
+      }
+      this.#database
+        .prepare(
+          `UPDATE scheduler_executions SET status = ?, result_json = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'active'`,
+        )
+        .run(input.status, JSON.stringify(input.result), nowMs, input.id);
+      return this.getSchedulerExecution(input.id)!;
+    })();
+  }
+
+  getSchedulerExecution(id: string): SchedulerExecutionRecord | undefined {
+    const row = this.#database
+      .prepare('SELECT * FROM scheduler_executions WHERE id = ?')
+      .get(id) as SchedulerExecutionRow | undefined;
+    return row === undefined ? undefined : schedulerExecutionFromRow(row);
+  }
+
+  listActiveSchedulerExecutions(workspaceId: string): SchedulerExecutionRecord[] {
+    const rows = this.#database
+      .prepare(
+        `SELECT * FROM scheduler_executions
+         WHERE workspace_id = ? AND status = 'active' ORDER BY created_at_ms, id`,
+      )
+      .all(workspaceId) as SchedulerExecutionRow[];
+    return rows.map(schedulerExecutionFromRow);
+  }
+
+  adoptSchedulerExecution(input: {
+    id: string;
+    ownerId: string;
+    workspaceLeaseEpoch: number;
+    runLeaseTtlMs: number;
+    taskLeaseTtlMs: number;
+    nowMs: number;
+  }): SchedulerExecutionRecord | undefined {
+    return this.#database.transaction(() => {
+      const execution = this.getSchedulerExecution(input.id);
+      if (execution === undefined || execution.status !== 'active') return undefined;
+      this.#assertResourceLease(
+        'workspace',
+        execution.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      const runLease = this.acquireLease(
+        'run',
+        execution.runId,
+        input.ownerId,
+        input.runLeaseTtlMs,
+        input.nowMs,
+      );
+      const taskLease = this.acquireLease(
+        'task',
+        execution.taskId,
+        input.ownerId,
+        input.taskLeaseTtlMs,
+        input.nowMs,
+      );
+      this.#database
+        .prepare(
+          `UPDATE scheduler_executions SET owner_id = ?, workspace_lease_epoch = ?,
+             run_lease_epoch = ?, task_lease_epoch = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'active'`,
+        )
+        .run(
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          runLease.epoch,
+          taskLease.epoch,
+          input.nowMs,
+          input.id,
+        );
+      return this.getSchedulerExecution(input.id)!;
     })();
   }
 
@@ -590,35 +1107,115 @@ export class WorkflowStore {
     headSha?: string;
     createdAtMs?: number;
   }): void {
-    this.#database
-      .prepare(
-        `INSERT OR IGNORE INTO evidence
-         (digest, media_type, size_bytes, kind, producer, producer_role, workspace_id, run_id,
-          task_id, transition_id, contract_version, policy_digest, head_sha, created_at_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        input.digest,
-        input.mediaType,
-        input.sizeBytes,
-        input.kind,
-        input.producer,
-        input.producerRole,
-        input.workspaceId,
-        input.runId,
-        input.taskId ?? null,
-        input.transitionId ?? null,
-        input.contractVersion,
-        input.policyDigest,
-        input.headSha ?? null,
-        input.createdAtMs ?? Date.now(),
-      );
+    const createdAtMs = input.createdAtMs ?? Date.now();
+    this.#database.transaction(() => {
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO evidence
+           (digest, media_type, size_bytes, kind, producer, producer_role, workspace_id, run_id,
+            task_id, transition_id, contract_version, policy_digest, head_sha, created_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          input.digest,
+          input.mediaType,
+          input.sizeBytes,
+          input.kind,
+          input.producer,
+          input.producerRole,
+          input.workspaceId,
+          input.runId,
+          input.taskId ?? null,
+          input.transitionId ?? null,
+          input.contractVersion,
+          input.policyDigest,
+          input.headSha ?? null,
+          createdAtMs,
+        );
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO evidence_bindings
+           (digest, workspace_id, run_id, task_id, transition_id, contract_version, policy_digest,
+            head_sha, producer, producer_role, kind, created_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          input.digest,
+          input.workspaceId,
+          input.runId,
+          input.taskId ?? '',
+          input.transitionId ?? '',
+          input.contractVersion,
+          input.policyDigest,
+          input.headSha ?? '',
+          input.producer,
+          input.producerRole,
+          input.kind,
+          createdAtMs,
+        );
+    })();
   }
 
   hasEvidence(digest: string): boolean {
     return (
       this.#database.prepare('SELECT 1 AS found FROM evidence WHERE digest = ?').get(digest) !==
       undefined
+    );
+  }
+
+  hasRunEvidenceBinding(input: {
+    digest: string;
+    workspaceId: string;
+    runId: string;
+    contractVersion: number;
+    policyDigest: string;
+    allowedProducerRoles: readonly string[];
+  }): boolean {
+    if (input.allowedProducerRoles.length === 0) return false;
+    const placeholders = input.allowedProducerRoles.map(() => '?').join(', ');
+    return (
+      this.#database
+        .prepare(
+          `SELECT 1 AS found FROM evidence_bindings
+           WHERE digest = ? AND workspace_id = ? AND run_id = ? AND contract_version = ?
+             AND policy_digest = ? AND producer_role IN (${placeholders}) LIMIT 1`,
+        )
+        .get(
+          input.digest,
+          input.workspaceId,
+          input.runId,
+          input.contractVersion,
+          input.policyDigest,
+          ...input.allowedProducerRoles,
+        ) !== undefined
+    );
+  }
+
+  hasTaskEvidenceAtHead(input: {
+    digest: string;
+    workspaceId: string;
+    runId: string;
+    taskId: string;
+    headSha: string;
+    contractVersion: number;
+    policyDigest: string;
+  }): boolean {
+    return (
+      this.#database
+        .prepare(
+          `SELECT 1 AS found FROM evidence_bindings
+           WHERE digest = ? AND workspace_id = ? AND run_id = ? AND task_id = ? AND head_sha = ?
+             AND contract_version = ? AND policy_digest = ?`,
+        )
+        .get(
+          input.digest,
+          input.workspaceId,
+          input.runId,
+          input.taskId,
+          input.headSha,
+          input.contractVersion,
+          input.policyDigest,
+        ) !== undefined
     );
   }
 
@@ -836,17 +1433,50 @@ export class WorkflowStore {
     this.#assertLease(runId, ownerId, epoch, nowMs);
   }
 
+  assertTransitionLeases(
+    transition: TransitionRecord,
+    ownerId: string,
+    runLeaseEpoch: number,
+    nowMs = Date.now(),
+  ): void {
+    this.#assertLease(transition.runId, ownerId, runLeaseEpoch, nowMs);
+    this.#assertTransitionResourceLeases(transition, ownerId, nowMs);
+    if (transition.leaseOwnerId !== ownerId || transition.leaseEpoch !== runLeaseEpoch) {
+      throw new Error('transition fencing token changed');
+    }
+  }
+
+  assertResourceLease(
+    resourceType: LeaseRecord['resourceType'],
+    resourceId: string,
+    ownerId: string,
+    epoch: number,
+    nowMs = Date.now(),
+  ): void {
+    this.#assertResourceLease(resourceType, resourceId, ownerId, epoch, nowMs);
+  }
+
   #assertLease(runId: string, ownerId: string, epoch: number, nowMs: number): void {
+    this.#assertResourceLease('run', runId, ownerId, epoch, nowMs);
+  }
+
+  #assertResourceLease(
+    resourceType: LeaseRecord['resourceType'],
+    resourceId: string,
+    ownerId: string,
+    epoch: number,
+    nowMs: number,
+  ): void {
     const lease = this.#database
-      .prepare(`SELECT * FROM leases WHERE resource_type = 'run' AND resource_id = ?`)
-      .get(runId) as LeaseRow | undefined;
+      .prepare(`SELECT * FROM leases WHERE resource_type = ? AND resource_id = ?`)
+      .get(resourceType, resourceId) as LeaseRow | undefined;
     if (
       lease === undefined ||
       lease.owner_id !== ownerId ||
       lease.epoch !== epoch ||
       lease.expires_at_ms <= nowMs
     ) {
-      throw new Error('stale or expired run fencing token');
+      throw new Error(`stale or expired ${resourceType} fencing token`);
     }
   }
 
@@ -859,6 +1489,40 @@ export class WorkflowStore {
       .get(runId) as { body_json: string } | undefined;
     if (row === undefined) throw new Error('workflow run not found');
     return JSON.parse(row.body_json) as ExecutionContract;
+  }
+
+  #workspaceForRun(runId: string): string {
+    const row = this.#database
+      .prepare(
+        `SELECT contracts.workspace_id FROM runs
+         JOIN contracts ON contracts.id = runs.contract_id WHERE runs.id = ?`,
+      )
+      .get(runId) as { workspace_id: string } | undefined;
+    if (row === undefined) throw new Error('workflow run not found');
+    return row.workspace_id;
+  }
+
+  #assertTransitionResourceLeases(
+    transition: TransitionRecord,
+    ownerId: string,
+    nowMs: number,
+  ): void {
+    this.#assertResourceLease(
+      'workspace',
+      this.#workspaceForRun(transition.runId),
+      ownerId,
+      transition.transitionContext.workspaceLeaseEpoch,
+      nowMs,
+    );
+    if (transition.transitionContext.taskLeaseEpoch !== undefined) {
+      this.#assertResourceLease(
+        'task',
+        requiredTransitionTaskId(transition.externalArguments),
+        ownerId,
+        transition.transitionContext.taskLeaseEpoch,
+        nowMs,
+      );
+    }
   }
 
   #assertEvidenceReferences(references: ReadonlyArray<{ digest: string }>): void {
@@ -914,6 +1578,7 @@ export class WorkflowStore {
         policy_digest TEXT NOT NULL,
         lease_owner_id TEXT NOT NULL,
         lease_epoch INTEGER NOT NULL,
+        transition_context_json TEXT NOT NULL,
         expected_external_state_json TEXT NOT NULL,
         external_arguments_json TEXT NOT NULL,
         result_json TEXT,
@@ -974,6 +1639,21 @@ export class WorkflowStore {
         head_sha TEXT,
         created_at_ms INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS evidence_bindings (
+        digest TEXT NOT NULL REFERENCES evidence(digest),
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        transition_id TEXT NOT NULL,
+        contract_version INTEGER NOT NULL,
+        policy_digest TEXT NOT NULL,
+        head_sha TEXT NOT NULL,
+        producer TEXT NOT NULL,
+        producer_role TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(digest, workspace_id, run_id, task_id, transition_id, head_sha, producer, kind)
+      );
       CREATE TABLE IF NOT EXISTS critic_reviews (
         id TEXT PRIMARY KEY,
         run_id TEXT NOT NULL REFERENCES runs(id),
@@ -1012,9 +1692,102 @@ export class WorkflowStore {
         invalidation_reason TEXT,
         evidence_json TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS scheduler_executions (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        mode TEXT NOT NULL CHECK(mode IN ('read_only', 'mutating')),
+        status TEXT NOT NULL CHECK(status IN ('active', 'completed', 'cancelled', 'escalated')),
+        deadline_ms INTEGER NOT NULL,
+        owner_id TEXT NOT NULL,
+        workspace_lease_epoch INTEGER NOT NULL,
+        run_lease_epoch INTEGER NOT NULL,
+        task_lease_epoch INTEGER NOT NULL,
+        process_identity TEXT NOT NULL,
+        credential_lease_id TEXT NOT NULL,
+        credential_status TEXT NOT NULL CHECK(
+          credential_status IN (
+            'pending', 'issuing', 'issued', 'revoking', 'revoked', 'legacy_quarantined'
+          )
+        ),
+        credential_broker_generation TEXT,
+        packet_json TEXT NOT NULL,
+        result_json TEXT,
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS scheduler_executions_workspace_status
+        ON scheduler_executions(workspace_id, status, mode);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (1, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (2, unixepoch() * 1000);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (3, unixepoch() * 1000);
     `);
+    const transitionColumns = this.#database
+      .prepare('PRAGMA table_info(transitions)')
+      .all() as Array<{
+      name: string;
+    }>;
+    if (!transitionColumns.some((column) => column.name === 'transition_context_json')) {
+      this.#database.exec(
+        `ALTER TABLE transitions ADD COLUMN transition_context_json TEXT NOT NULL
+         DEFAULT '{"workspaceLeaseEpoch":0}'`,
+      );
+    }
+    const schedulerColumns = this.#database
+      .prepare('PRAGMA table_info(scheduler_executions)')
+      .all() as Array<{ name: string }>;
+    if (!schedulerColumns.some((column) => column.name === 'process_identity')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN process_identity TEXT NOT NULL
+         DEFAULT 'unknown:legacy-execution'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_lease_id')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_lease_id TEXT NOT NULL
+         DEFAULT 'credential:legacy-execution'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_status')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_status TEXT NOT NULL
+         DEFAULT 'legacy_quarantined'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_broker_generation')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_broker_generation TEXT`,
+      );
+    }
+    this.#database
+      .prepare(
+        `UPDATE scheduler_executions
+         SET credential_lease_id = 'legacy-quarantined:' || id
+         WHERE credential_lease_id = 'credential:legacy-execution'`,
+      )
+      .run();
+    this.#database
+      .prepare(
+        'INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (4, unixepoch() * 1000)',
+      )
+      .run();
+    this.#database
+      .prepare(
+        'INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (5, unixepoch() * 1000)',
+      )
+      .run();
+    this.#database
+      .prepare(
+        'INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (6, unixepoch() * 1000)',
+      )
+      .run();
+    this.#database
+      .prepare(
+        'INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (7, unixepoch() * 1000)',
+      )
+      .run();
   }
 }
 

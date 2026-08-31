@@ -1,4 +1,5 @@
 import type { PrepareTransitionInput, TransitionRecord, WorkflowStore } from './storage.js';
+import { deriveTransitionIdempotencyKey } from './lifecycle.js';
 
 export type ExternalObservation =
   | { kind: 'expected'; result: unknown }
@@ -56,8 +57,8 @@ export class JournaledMutationBroker {
     }
     if (before.kind === 'unchanged') {
       this.#fault('before_external_mutation', transition);
-      this.#store.assertRunLease(
-        transition.runId,
+      this.#store.assertTransitionLeases(
+        transition,
         transition.leaseOwnerId,
         transition.leaseEpoch,
         this.#clock(),
@@ -94,17 +95,31 @@ export class JournaledMutationBroker {
     runId: string;
     recoveryOwnerId: string;
     recoveryLeaseEpoch: number;
+    recoveryWorkspaceLeaseEpoch: number;
+    recoveryTaskLeaseEpochs?: Readonly<Record<string, number>>;
     currentContractVersion: number;
     currentPolicyDigest: string;
     nowMs: number;
+    operations?: readonly string[];
   }): Promise<TransitionRecord[]> {
     const reconciled: TransitionRecord[] = [];
-    for (const prepared of this.#store.listPreparedTransitions(input.runId)) {
+    const preparedTransitions = this.#store
+      .listPreparedTransitions(input.runId)
+      .filter(
+        (transition) =>
+          input.operations === undefined || input.operations.includes(transition.operation),
+      );
+    for (const prepared of preparedTransitions) {
       const transition = this.#store.adoptPreparedTransition(
         prepared.id,
         input.recoveryOwnerId,
         input.recoveryLeaseEpoch,
-        input.nowMs,
+        this.#clock(),
+        {
+          ...prepared.transitionContext,
+          workspaceLeaseEpoch: input.recoveryWorkspaceLeaseEpoch,
+          taskLeaseEpoch: recoveryTaskLeaseEpoch(prepared, input.recoveryTaskLeaseEpochs),
+        },
       );
       if (
         transition.contractVersion !== input.currentContractVersion ||
@@ -115,7 +130,7 @@ export class JournaledMutationBroker {
           input.recoveryOwnerId,
           input.recoveryLeaseEpoch,
           { reason: 'contract_or_policy_changed_during_recovery' },
-          input.nowMs,
+          this.#clock(),
         );
         reconciled.push(this.#store.getTransition(transition.id)!);
         continue;
@@ -128,12 +143,12 @@ export class JournaledMutationBroker {
             input.recoveryOwnerId,
             input.recoveryLeaseEpoch,
             observed.result,
-            input.nowMs,
+            this.#clock(),
           ),
         );
       } else if (observed.kind === 'unchanged') {
-        this.#store.assertRunLease(
-          transition.runId,
+        this.#store.assertTransitionLeases(
+          transition,
           input.recoveryOwnerId,
           input.recoveryLeaseEpoch,
           this.#clock(),
@@ -147,7 +162,7 @@ export class JournaledMutationBroker {
               input.recoveryOwnerId,
               input.recoveryLeaseEpoch,
               replayed.result,
-              input.nowMs,
+              this.#clock(),
             );
           }
           throw new Error('replayed external mutation remains ambiguous');
@@ -158,7 +173,7 @@ export class JournaledMutationBroker {
             input.recoveryOwnerId,
             input.recoveryLeaseEpoch,
             replayed.result,
-            input.nowMs,
+            this.#clock(),
           ),
         );
       } else {
@@ -167,7 +182,7 @@ export class JournaledMutationBroker {
           input.recoveryOwnerId,
           input.recoveryLeaseEpoch,
           observed.result,
-          input.nowMs,
+          this.#clock(),
         );
         reconciled.push(this.#store.getTransition(transition.id)!);
       }
@@ -204,7 +219,10 @@ export interface OfficialBeadsDoltClient {
   readIssue(
     workspaceRoot: string,
     taskId: string,
-  ): Promise<{ status: 'open' | 'in_progress' | 'closed' }>;
+  ): Promise<{
+    status: 'open' | 'in_progress' | 'closed';
+    blockingDependencies: string[];
+  }>;
   claimIssue(workspaceRoot: string, taskId: string, idempotencyKey: string): Promise<unknown>;
   closeIssue(
     workspaceRoot: string,
@@ -234,6 +252,17 @@ function requiredString(record: Record<string, unknown>, key: string): string {
   return value;
 }
 
+function recoveryTaskLeaseEpoch(
+  transition: TransitionRecord,
+  epochs: Readonly<Record<string, number>> | undefined,
+): number | undefined {
+  if (transition.transitionContext.taskLeaseEpoch === undefined) return undefined;
+  const taskId = requiredString(asRecord(transition.externalArguments), 'taskId');
+  const epoch = epochs?.[taskId];
+  if (epoch === undefined) throw new Error(`recovery task lease is required for ${taskId}`);
+  return epoch;
+}
+
 export class OfficialBeadsDoltPort implements JournaledMutationPort {
   readonly #workspaceRoot: string;
   readonly #client: OfficialBeadsDoltClient;
@@ -245,7 +274,11 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
   }
 
   async observe(transition: TransitionRecord): Promise<ExternalObservation> {
+    if (transition.actorRole !== 'workflow_orchestrator') {
+      throw new Error('Beads/Dolt mutations require the trusted orchestrator role');
+    }
     if (transition.operation === 'beads.dolt_push') {
+      assertExpectedStatus(transition, 'synced');
       const state = await this.#client.readDoltSync(this.#workspaceRoot, transition.idempotencyKey);
       if (state === 'synced') return { kind: 'expected', result: { status: state } };
       if (state === 'pending') return { kind: 'unchanged', result: { status: state } };
@@ -254,7 +287,16 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
     const arguments_ = asRecord(transition.externalArguments);
     const taskId = requiredString(arguments_, 'taskId');
     const issue = await this.#client.readIssue(this.#workspaceRoot, taskId);
-    const expected = asRecord(transition.expectedExternalState).status;
+    const expected =
+      transition.operation === 'beads.task_claim'
+        ? 'in_progress'
+        : transition.operation === 'beads.task_close'
+          ? 'closed'
+          : undefined;
+    if (expected === undefined) {
+      throw new Error(`unsupported Beads/Dolt broker operation: ${transition.operation}`);
+    }
+    assertExpectedStatus(transition, expected);
     if (issue.status === expected) return { kind: 'expected', result: issue };
     const validBefore =
       transition.operation === 'beads.task_claim'
@@ -265,7 +307,32 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
     return validBefore ? { kind: 'unchanged', result: issue } : { kind: 'conflict', result: issue };
   }
 
+  async readTaskSnapshots(taskIds: readonly string[]): Promise<
+    Array<{
+      id: string;
+      status: 'open' | 'in_progress' | 'closed';
+      blockingDependencies: string[];
+    }>
+  > {
+    return Promise.all(
+      taskIds.map(async (taskId) => {
+        const issue = await this.#client.readIssue(this.#workspaceRoot, taskId);
+        if (!Array.isArray(issue.blockingDependencies)) {
+          throw new Error(`authoritative Beads snapshot is missing dependencies for ${taskId}`);
+        }
+        return {
+          id: taskId,
+          status: issue.status,
+          blockingDependencies: issue.blockingDependencies,
+        };
+      }),
+    );
+  }
+
   async mutate(transition: TransitionRecord): Promise<unknown> {
+    if (transition.actorRole !== 'workflow_orchestrator') {
+      throw new Error('Beads/Dolt mutations require the trusted orchestrator role');
+    }
     const arguments_ = asRecord(transition.externalArguments);
     if (transition.operation === 'beads.task_claim') {
       return this.#client.claimIssue(
@@ -289,7 +356,16 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
   }
 }
 
+function assertExpectedStatus(transition: TransitionRecord, status: string): void {
+  const expected = asRecord(transition.expectedExternalState);
+  if (Object.keys(expected).length !== 1 || expected.status !== status) {
+    throw new Error(`${transition.operation} has an invalid expected external state`);
+  }
+}
+
 export class JournaledBeadsDoltBroker extends JournaledMutationBroker {
+  readonly #officialPort: OfficialBeadsDoltPort;
+
   constructor(
     store: WorkflowStore,
     port: OfficialBeadsDoltPort,
@@ -300,5 +376,142 @@ export class JournaledBeadsDoltBroker extends JournaledMutationBroker {
       throw new Error('Beads/Dolt mutations require the exclusive official broker port');
     }
     super(store, port, fault, clock);
+    this.#officialPort = port;
+  }
+
+  usesPort(port: OfficialBeadsDoltPort): boolean {
+    return this.#officialPort === port;
+  }
+}
+
+export class JournaledBeadsTaskCloser {
+  readonly #broker: JournaledBeadsDoltBroker;
+  readonly #port: OfficialBeadsDoltPort;
+
+  constructor(broker: JournaledBeadsDoltBroker, port: OfficialBeadsDoltPort) {
+    if (!(broker instanceof JournaledBeadsDoltBroker) || !broker.usesPort(port)) {
+      throw new Error('task closure requires the exclusive journaled Beads broker');
+    }
+    this.#broker = broker;
+    this.#port = port;
+  }
+
+  readTaskSnapshots(taskIds: readonly string[]) {
+    return this.#port.readTaskSnapshots(taskIds);
+  }
+
+  reconcilePreparedTaskTransition(input: {
+    runId: string;
+    recoveryOwnerId: string;
+    recoveryRunLeaseEpoch: number;
+    recoveryWorkspaceLeaseEpoch: number;
+    taskId: string;
+    recoveryTaskLeaseEpoch: number;
+    contractVersion: number;
+    policyDigest: string;
+    nowMs: number;
+  }): Promise<TransitionRecord[]> {
+    return this.#broker.reconcilePrepared({
+      runId: input.runId,
+      recoveryOwnerId: input.recoveryOwnerId,
+      recoveryLeaseEpoch: input.recoveryRunLeaseEpoch,
+      recoveryWorkspaceLeaseEpoch: input.recoveryWorkspaceLeaseEpoch,
+      recoveryTaskLeaseEpochs: { [input.taskId]: input.recoveryTaskLeaseEpoch },
+      currentContractVersion: input.contractVersion,
+      currentPolicyDigest: input.policyDigest,
+      nowMs: input.nowMs,
+      operations: ['beads.task_claim', 'beads.task_close'],
+    });
+  }
+
+  async claimTask(input: {
+    transitionId: string;
+    runId: string;
+    taskId: string;
+    expectedRunVersion: number;
+    contractVersion: number;
+    policyDigest: string;
+    leaseOwnerId: string;
+    runLeaseEpoch: number;
+    workspaceLeaseEpoch: number;
+    taskLeaseEpoch: number;
+    nowMs: number;
+  }): Promise<TransitionRecord> {
+    const idempotencyKey = deriveTransitionIdempotencyKey({
+      runId: input.runId,
+      transitionId: input.transitionId,
+      operation: 'beads.task_claim',
+      expectedVersion: input.expectedRunVersion,
+    });
+    return this.#broker.execute({
+      id: input.transitionId,
+      runId: input.runId,
+      from: 'scheduling',
+      to: 'implementing',
+      operation: 'beads.task_claim',
+      expectedRunVersion: input.expectedRunVersion,
+      idempotencyKey,
+      actorRole: 'workflow_orchestrator',
+      contractVersion: input.contractVersion,
+      policyDigest: input.policyDigest,
+      leaseOwnerId: input.leaseOwnerId,
+      leaseEpoch: input.runLeaseEpoch,
+      transitionContext: {
+        workspaceLeaseEpoch: input.workspaceLeaseEpoch,
+        taskLeaseEpoch: input.taskLeaseEpoch,
+      },
+      expectedExternalState: { status: 'in_progress' },
+      externalArguments: { taskId: input.taskId },
+      nowMs: input.nowMs,
+    });
+  }
+
+  async closeTask(input: {
+    transitionId: string;
+    runId: string;
+    taskId: string;
+    reason: string;
+    evidenceDigests: string[];
+    expectedRunVersion: number;
+    nextState: 'scheduling' | 'integration';
+    contractVersion: number;
+    policyDigest: string;
+    leaseOwnerId: string;
+    runLeaseEpoch: number;
+    workspaceLeaseEpoch: number;
+    taskLeaseEpoch: number;
+    nowMs: number;
+  }): Promise<TransitionRecord> {
+    const idempotencyKey = deriveTransitionIdempotencyKey({
+      runId: input.runId,
+      transitionId: input.transitionId,
+      operation: 'beads.task_close',
+      expectedVersion: input.expectedRunVersion,
+    });
+    return this.#broker.execute({
+      id: input.transitionId,
+      runId: input.runId,
+      from: 'task_accepted',
+      to: input.nextState,
+      operation: 'beads.task_close',
+      expectedRunVersion: input.expectedRunVersion,
+      idempotencyKey,
+      actorRole: 'workflow_orchestrator',
+      contractVersion: input.contractVersion,
+      policyDigest: input.policyDigest,
+      leaseOwnerId: input.leaseOwnerId,
+      leaseEpoch: input.runLeaseEpoch,
+      transitionContext: {
+        workspaceLeaseEpoch: input.workspaceLeaseEpoch,
+        taskLeaseEpoch: input.taskLeaseEpoch,
+      },
+      expectedExternalState: { status: 'closed' },
+      externalArguments: {
+        taskId: input.taskId,
+        reason: input.reason,
+        evidenceDigests: input.evidenceDigests,
+      },
+      nowMs: input.nowMs,
+    });
   }
 }
