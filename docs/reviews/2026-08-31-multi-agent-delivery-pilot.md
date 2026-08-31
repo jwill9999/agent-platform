@@ -19,7 +19,36 @@ that the second contract must authorize. Authority is never inferred across that
 - **Required checks:** `verify`, `docker`, `e2e`, `desktop-e2e`, `markdownlint`, `lychee`, and
   `deps:check-cycles`
 - **Merge authority:** squash only; administrative bypass prohibited
-- **Approval:** pending a passing critic review and explicit owner approval of the exact digest above
+- **Historical approval:** the owner approved the exact task material and PR #252 merged as
+  `6a653a939f518db8ff6f96598e3c62a5eccd45aa`, but production recovery subsequently proved that
+  the recorded workspace digest included a trailing newline. The contract is preserved as invalid
+  historical evidence and cannot authorize further delivery.
+
+### Workspace-binding recovery
+
+- **Machine contract:**
+  `docs/reviews/2026-08-31-multi-agent-recovery-contract.json`
+- **Execution contract version:** `1`
+- **Material digest:**
+  `sha256:52f25c4af6d461927e63397e7c7172210f55f5a4506116bbd9ea3768484f74aa`
+- **Execution digest:**
+  `sha256:e64b9698603e6d5e431383249295f612d465dd75aa21b6c12adccfb4b46c79bb`
+- **Canonical workspace digest:**
+  `sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8`
+- **Recovery task/base:** `task/agent-platform-multi-agent.repair.3` to
+  `feature/multi-agent-orchestration`
+- **Authority:** `.beads` and `docs` only; the same seven feature-boundary checks; squash only;
+  administrative bypass prohibited
+- **Approval:** independently reviewed with zero findings and explicitly owner-approved before
+  implementation
+
+The unusable workspace digest
+`sha256:47138a2c85a3e5becf742f6a2aac432295dec34a5a198471606d305c802bcedc`
+is the SHA-256 of the canonical repository path plus a newline. Production brokers hash the raw
+`realpathSync` value and correctly rejected it before any Git or GitHub mutation. The resulting
+workflow journal contains zero delivery operations and is quarantined in place. It must not be
+rewritten, replayed, copied into the corrected run, or deleted without a separate retention decision.
+PR #252 remains immutable predecessor evidence and is not eligible for historical adoption.
 
 ### Feature to protected staging
 
@@ -31,11 +60,12 @@ squash-only merge method, `adminBypass: false`, decision time, and evidence. An 
 must approve that exact intent digest before the task-to-feature merge may proceed. Intent creation
 after delivery begins is rejected.
 
-After the first merge, the orchestrator must persist a `FeatureDeliveryContract` containing the
-committed origin operation and attestation, pull-request number, exact post-squash integrated feature
-head, `feature/multi-agent-orchestration` source, `staging` base, exact required checks, active ruleset
-digest, squash-only merge method, and `adminBypass: false`. Its contract and domain-separated material
-digests cannot be derived until GitHub returns the first committed merge attestation.
+After the recovery-task merge, the orchestrator must persist a `FeatureDeliveryContract` containing
+that new committed origin operation and attestation, pull-request number, exact post-squash integrated
+feature head, `feature/multi-agent-orchestration` source, `staging` base, exact required checks, active
+ruleset digest, squash-only merge method, and `adminBypass: false`. PR #252 cannot supply this origin.
+The contract and domain-separated material digests cannot be derived until GitHub returns the new
+committed merge attestation.
 
 Before any staging PR operation, the instantiated contract must receive a fresh independent critic
 review and an immutable active human approval bound to its run, contract digest, material digest,
@@ -59,17 +89,17 @@ and a fresh owner decision is required against the corrected digest.
 
 ## Executed workflow
 
-| Phase                        | Evidence                                                              | Result   |
-| ---------------------------- | --------------------------------------------------------------------- | -------- |
-| Planning and refinement      | Versioned task specs `.1`-`.10` and ADR-0004                          | Complete |
-| Independent plan critique    | `docs/tasks/agent-platform-multi-agent-review.md`                     | Complete |
-| Human approval               | Exact-digest owner decision after final critic approval               | Pending  |
-| Isolated implementation      | Linear pushed task branches `.1`-`.9`                                 | Complete |
-| Repair loop                  | Independent `.9` critic failures followed by bounded fixes and reruns | Complete |
-| Review, test, QA, evaluation | Final critics `PASS`; package and monorepo gates                      | Complete |
-| Hosted CI                    | Segment-tip and feature-delivery pull requests                        | Pending  |
-| Protected delivery           | `feature/multi-agent-orchestration` then `staging`                    | Pending  |
-| Authoritative closeout       | Beads task/epic closure and `bd dolt push`                            | Pending  |
+| Phase                        | Evidence                                                               | Result   |
+| ---------------------------- | ---------------------------------------------------------------------- | -------- |
+| Planning and refinement      | Versioned task specs `.1`-`.10` and ADR-0004                           | Complete |
+| Independent plan critique    | `docs/tasks/agent-platform-multi-agent-review.md`                      | Complete |
+| Human approval               | Original exact approval plus separately approved recovery contract     | Complete |
+| Isolated implementation      | Linear pushed task branches `.1`-`.9`                                  | Complete |
+| Repair loop                  | Independent `.9` critic failures followed by bounded fixes and reruns  | Complete |
+| Review, test, QA, evaluation | Final critics `PASS`; package and monorepo gates                       | Complete |
+| Hosted CI                    | PR #252 green; recovery and feature-delivery pull requests outstanding | Active   |
+| Protected delivery           | `feature/multi-agent-orchestration` then `staging`                     | Pending  |
+| Authoritative closeout       | Beads task/epic closure and `bd dolt push`                             | Pending  |
 
 ## Repair-loop evidence
 
@@ -91,9 +121,10 @@ earlier in the same linear feature chain.
 ## Security and quality gate
 
 - SonarQube hotspot `AZ4YM2i11EaT2bQAPFS4` is `REVIEWED / FIXED`; no hotspots remain.
-- The installed Sonar agentic-analysis client reached SonarQube Cloud but the organization endpoint
-  returned an explicit identity-policy `403`. The repository completion policy therefore used its
-  documented fallback: full typecheck, lint, tests, and independent code/security review.
+- SonarQube Cloud authentication was corrected. PR #252 then passed the hosted SonarCloud quality
+  gate with Security and Reliability restored to passing ratings.
+- GitGuardian also passed the rebuilt exact task tip after credential-shaped test fixtures were
+  reconstructed without embedding scanner signatures.
 - No Blocker/Critical reviewer finding or local Problems/typecheck/lint error remains.
 
 ## Operational measurements
@@ -124,11 +155,11 @@ earlier in the same linear feature chain.
 
 ## Final acceptance trace
 
-| Acceptance criterion                                          | Implementation/evidence                           | Status  |
-| ------------------------------------------------------------- | ------------------------------------------------- | ------- |
-| Seeded plan omission is corrected before approval             | This report plus independent critic result        | Passed  |
-| A failed verification enters a bounded successful repair loop | `.9` critic/fix/retest history and recovery tests | Passed  |
-| Local review, QA, and security gates pass at the exact head   | Final critic `PASS`; full gate results            | Passed  |
-| Hosted checks pass on the segment tip                         | GitHub pull-request checks                        | Pending |
-| Delivery stops at protected `staging`                         | Integration and staging pull requests             | Pending |
-| Beads/Dolt and workflow closeout are authoritative            | Beads issue state, Dolt push, final report        | Pending |
+| Acceptance criterion                                          | Implementation/evidence                            | Status  |
+| ------------------------------------------------------------- | -------------------------------------------------- | ------- |
+| Seeded plan omission is corrected before approval             | This report plus independent critic result         | Passed  |
+| A failed verification enters a bounded successful repair loop | `.9` critic/fix/retest history and recovery tests  | Passed  |
+| Local review, QA, and security gates pass at the exact head   | Final critic `PASS`; full gate results             | Passed  |
+| Hosted checks pass on the segment tip                         | PR #252 GitHub, SonarCloud, and GitGuardian checks | Passed  |
+| Delivery stops at protected `staging`                         | Integration and staging pull requests              | Pending |
+| Beads/Dolt and workflow closeout are authoritative            | Beads issue state, Dolt push, final report         | Pending |

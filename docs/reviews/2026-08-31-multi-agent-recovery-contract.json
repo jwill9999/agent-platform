@@ -1,0 +1,114 @@
+{
+  "featureId": "agent-platform-multi-agent-recovery",
+  "contractVersion": 1,
+  "policyDigest": "sha256:c3c1823525b41bdf812e89186cedb3c4f693d2a64c3426db01144381a366ff46",
+  "workspaceId": "sha256:28d0df6dc7d1762064d7c275c3b1411f1dbc97ec01bd91beeb11c287afbca3b8",
+  "objective": "Repair the autonomous delivery pilot workspace binding and produce a legitimate current feature-origin merge for protected staging delivery.",
+  "requirements": [
+    "Add a new immutable recovery execution contract bound to the raw canonical workspace digest; preserve the original invalid contract as historical evidence.",
+    "Document and quarantine the empty failed 47138 journal and PR #252 as predecessor/failure evidence; do not adopt, rewrite, replay, or delete either.",
+    "Deliver only the bounded documentation and task-record repair from task/agent-platform-multi-agent.repair.3 to feature/multi-agent-orchestration through the production delivery broker.",
+    "Before the repair merge, persist a fresh owner-approved staging intent bound to the corrected workspace, exact repair task head, staging ruleset digest, exact staging checks, squash-only merge, and adminBypass false.",
+    "Use the committed repair merge attestation, not PR #252, as the origin of the later feature-to-staging contract."
+  ],
+  "nonGoals": [
+    "Historically adopt or retroactively authorize PR #252.",
+    "Change workflow-control source code or expand specialist mutation authority.",
+    "Deliver directly to staging, main, production, or any branch other than feature/multi-agent-orchestration."
+  ],
+  "acceptanceCriteria": [
+    "The recovery contract parses as execution-contract version 1 and its workspace ID equals SHA-256 of realpathSync for the current repository.",
+    "The repair changes only .beads and docs paths and records the invalid prior digest, empty failed journal, corrected identity, and recovery procedure.",
+    "An independent critic approves the exact recovery contract material and exact repair candidate.",
+    "The exact published repair tip passes verify, docker, e2e, desktop-e2e, markdownlint, lychee, and deps:check-cycles, then squash-merges without administrative bypass into feature/multi-agent-orchestration.",
+    "The committed repair merge attestation supplies the exact integrated feature head for a separately reviewed and owner-approved staging contract."
+  ],
+  "constraints": {
+    "architecture": [
+      "Use the repository-local workflow-control version-1 execution contract and production delivery broker.",
+      "Keep the recovery task single-writer and use independent critics read-only."
+    ],
+    "security": [
+      "Fail closed on workspace, exact-head, protection, check-set, merge-method, or approval mismatch.",
+      "Preserve the invalid journal and historical PR as immutable evidence; prohibit direct database backfill and historical adoption.",
+      "Prohibit administrative bypass, direct integration-branch pushes, and main promotion."
+    ],
+    "allowedPaths": [".beads", "docs"]
+  },
+  "authority": {
+    "deliveryTarget": "feature/multi-agent-orchestration",
+    "allowedActions": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write",
+      "workflow.transition",
+      "beads.read",
+      "beads.mutate",
+      "git.read",
+      "git.commit",
+      "git.push",
+      "github.read",
+      "github.deliver"
+    ],
+    "github": {
+      "repository": "jwill9999/agent-platform",
+      "base": "feature/multi-agent-orchestration",
+      "mergeMethod": "squash",
+      "requiredChecks": [
+        "verify",
+        "docker",
+        "e2e",
+        "desktop-e2e",
+        "markdownlint",
+        "lychee",
+        "deps:check-cycles"
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "agent-platform-multi-agent.repair.3",
+      "dependsOn": [],
+      "risk": "high",
+      "assignedRole": "workflow_orchestrator",
+      "branchParent": "feature/multi-agent-orchestration",
+      "allowedPaths": [".beads", "docs"],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "workflow.transition",
+        "beads.read",
+        "beads.mutate",
+        "git.read",
+        "git.commit",
+        "git.push",
+        "github.read",
+        "github.deliver"
+      ]
+    }
+  ],
+  "qualityGates": [
+    "Recovery contract schema and canonical digest verification pass.",
+    "Independent plan critic approves the exact recovery contract material.",
+    "Repository documentation and full feature-boundary hosted checks pass at the exact repair tip."
+  ],
+  "retryPolicy": {
+    "implementationAttempts": 2,
+    "findingAttempts": 3,
+    "infrastructureAttempts": 3,
+    "waitDeadlineSeconds": 86400
+  },
+  "repairTaskPolicy": {
+    "idPattern": "agent-platform-multi-agent.repair.3.fix.<sequence>",
+    "maxChildren": 0,
+    "allowedRoles": ["implementation_worker"],
+    "allowedPaths": [".beads", "docs"],
+    "authorityMayExpand": false
+  },
+  "escalationPolicy": [
+    "Escalate any workspace-identity mismatch, authority expansion, historical-adoption request, exhausted retry budget, contradictory external state, or destination beyond the named feature branch."
+  ]
+}
