@@ -119,6 +119,25 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     return this.#workspaceRoot;
   }
 
+  readLocalTaskRef(ref: string): string | null {
+    if (!/^refs\/heads\/task\/[A-Za-z0-9._-]+$/u.test(ref)) {
+      throw new Error('repair-child ref is not a task ref');
+    }
+    return this.#readRef(ref);
+  }
+
+  createLocalTaskRefCas(ref: string, expectedOldSha: null, newSha: string): unknown {
+    if (
+      expectedOldSha !== null ||
+      !/^refs\/heads\/task\/[A-Za-z0-9._-]+$/u.test(ref) ||
+      !/^[a-f0-9]{40}$/u.test(newSha)
+    ) {
+      throw new Error('repair-child ref creation is not a create-only task-ref CAS');
+    }
+    this.#git(['update-ref', ref, newSha, '0'.repeat(40)]);
+    return { ref, sha: newSha };
+  }
+
   async observe(request: DeliveryRequest): Promise<ExternalObservation> {
     this.#assertNoReplacementMetadata();
     if (!request.kind.startsWith('git.'))

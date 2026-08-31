@@ -149,6 +149,8 @@ export {
   type LeaseRecord,
   type DeliveryOperationRecord,
   type DeliveryOperationStatus,
+  type SecureEvidenceRecord,
+  type AuthorizedRunTask,
   type PrepareDeliveryOperationInput,
   type PipelineWaitEscalationRecord,
   type PrepareTransitionInput,
@@ -182,6 +184,29 @@ export {
   type ArtifactFaultBoundary,
   type StoredArtifact,
 } from './artifacts.js';
+export {
+  SecureEvidenceVault,
+  type EvidenceCapability,
+  type SecureEvidenceInput,
+  type SecureEvidenceResult,
+} from './secureEvidence.js';
+export {
+  ContractEvaluator,
+  DurableRepairChildBroker,
+  OfficialRepairChildPort,
+  collectEvaluationEvidence,
+  deriveEvaluationDigest,
+  featureEvaluationRequestSchema,
+  type FeatureEvaluationRequest,
+  type FeatureEvaluationResult,
+  type RepairChildFaultBoundary,
+  type RepairChildFaultInjector,
+  type RepairChildFence,
+  type RepairChildMutationPort,
+  type RepairChildRequest,
+  type OfficialRepairChildClient,
+  type OfficialRepairChildSnapshot,
+} from './featureEvaluation.js';
 export {
   NORMATIVE_TRANSITIONS,
   validateTransition,

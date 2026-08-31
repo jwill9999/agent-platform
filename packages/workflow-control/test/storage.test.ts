@@ -524,7 +524,7 @@ describe('JournaledMutationBroker recovery', () => {
       const client = new FakeBeadsDoltClient();
       if (operation === 'beads.dolt_push') client.syncStatus = before;
       else client.issueStatus = before;
-      const port = new OfficialBeadsDoltPort('/repo/root', client);
+      const port = OfficialBeadsDoltPort.createForTest('/repo/root', client);
       const broker = new JournaledBeadsDoltBroker(store, port, undefined, () => 1000);
       const result = await broker.execute(
         withCanonicalKey(input, {
@@ -548,7 +548,7 @@ describe('JournaledMutationBroker recovery', () => {
     client.issueStatus = 'open';
     const broker = new JournaledBeadsDoltBroker(
       store,
-      new OfficialBeadsDoltPort('/repo/root', client),
+      OfficialBeadsDoltPort.createForTest('/repo/root', client),
       undefined,
       () => 1000,
     );
@@ -568,7 +568,7 @@ describe('JournaledMutationBroker recovery', () => {
   it('fails closed when the official Beads snapshot omits dependency data', async () => {
     const client = new FakeBeadsDoltClient();
     client.readIssue = async () => ({ status: 'open' }) as never;
-    const port = new OfficialBeadsDoltPort('/repo/root', client);
+    const port = OfficialBeadsDoltPort.createForTest('/repo/root', client);
     await expect(port.readTaskSnapshots(['feature-persistence.1'])).rejects.toThrow(
       'missing dependencies',
     );

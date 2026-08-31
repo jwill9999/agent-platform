@@ -157,7 +157,7 @@ async function setup(
       return { status: 'synced' };
     },
   };
-  const port = new OfficialBeadsDoltPort('/repo/root', client);
+  const port = OfficialBeadsDoltPort.createForTest('/repo/root', client);
   const closer = new JournaledBeadsTaskCloser(
     new JournaledBeadsDoltBroker(store, port, undefined, options.clock ?? (() => 1000)),
     port,
@@ -1018,7 +1018,7 @@ if (command === 'conformance') {
     first.store.close();
 
     const store = new WorkflowStore(join(first.root, 'workflow.sqlite'));
-    const port = new OfficialBeadsDoltPort('/repo/root', first.client);
+    const port = OfficialBeadsDoltPort.createForTest('/repo/root', first.client);
     const closer = new JournaledBeadsTaskCloser(
       new JournaledBeadsDoltBroker(store, port, undefined, () => 1100),
       port,
@@ -1140,7 +1140,7 @@ if (command === 'conformance') {
     });
     await first.client.closeIssue('/repo/root', packet.taskId, 'external conflict', 'external');
 
-    const port = new OfficialBeadsDoltPort('/repo/root', first.client);
+    const port = OfficialBeadsDoltPort.createForTest('/repo/root', first.client);
     const closer = new JournaledBeadsTaskCloser(
       new JournaledBeadsDoltBroker(first.store, port, undefined, () => 1100),
       port,

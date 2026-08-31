@@ -1,5 +1,9 @@
 import type { PrepareTransitionInput, TransitionRecord, WorkflowStore } from './storage.js';
 import { deriveTransitionIdempotencyKey } from './lifecycle.js';
+import { registerProductionBeadsPort } from './beadsPortCapability.js';
+
+const productionBeadsPortCapability = Symbol('productionBeadsPortCapability');
+const testBeadsPortCapability = Symbol('testBeadsPortCapability');
 
 export type ExternalObservation =
   | { kind: 'expected'; result: unknown }
@@ -235,6 +239,12 @@ export interface OfficialBeadsDoltClient {
     idempotencyKey: string,
   ): Promise<'pending' | 'synced' | 'conflict'>;
   pushDolt(workspaceRoot: string, idempotencyKey: string): Promise<unknown>;
+  readRepairChild?(workspaceRoot: string, childId: string): Promise<unknown>;
+  createRepairChild?(
+    workspaceRoot: string,
+    request: unknown,
+    idempotencyKey: string,
+  ): Promise<unknown>;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -265,12 +275,58 @@ function recoveryTaskLeaseEpoch(
 
 export class OfficialBeadsDoltPort implements JournaledMutationPort {
   readonly #workspaceRoot: string;
-  readonly #client: OfficialBeadsDoltClient;
+  readonly #readIssue: OfficialBeadsDoltClient['readIssue'];
+  readonly #claimIssue: OfficialBeadsDoltClient['claimIssue'];
+  readonly #closeIssue: OfficialBeadsDoltClient['closeIssue'];
+  readonly #readDoltSync: OfficialBeadsDoltClient['readDoltSync'];
+  readonly #pushDolt: OfficialBeadsDoltClient['pushDolt'];
+  readonly #readRepairChild: OfficialBeadsDoltClient['readRepairChild'];
+  readonly #createRepairChild: OfficialBeadsDoltClient['createRepairChild'];
 
-  constructor(workspaceRoot: string, client: OfficialBeadsDoltClient) {
+  constructor(workspaceRoot: string, client: OfficialBeadsDoltClient, capability: symbol) {
+    if (
+      capability !== productionBeadsPortCapability &&
+      !(process.env.NODE_ENV === 'test' && capability === testBeadsPortCapability)
+    ) {
+      throw new Error('Beads/Dolt port construction requires the package bootstrap capability');
+    }
     if (workspaceRoot.trim() === '') throw new Error('workspace root is required');
     this.#workspaceRoot = workspaceRoot;
-    this.#client = client;
+    this.#readIssue = client.readIssue.bind(client);
+    this.#claimIssue = client.claimIssue.bind(client);
+    this.#closeIssue = client.closeIssue.bind(client);
+    this.#readDoltSync = client.readDoltSync.bind(client);
+    this.#pushDolt = client.pushDolt.bind(client);
+    this.#readRepairChild = client.readRepairChild?.bind(client);
+    this.#createRepairChild = client.createRepairChild?.bind(client);
+  }
+
+  static createForTest(
+    workspaceRoot: string,
+    client: OfficialBeadsDoltClient,
+  ): OfficialBeadsDoltPort {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error('test Beads/Dolt client is unavailable outside the test runtime');
+    }
+    return new OfficialBeadsDoltPort(workspaceRoot, client, testBeadsPortCapability);
+  }
+
+  get workspaceRoot(): string {
+    return this.#workspaceRoot;
+  }
+
+  async readRepairChild(childId: string): Promise<unknown> {
+    if (this.#readRepairChild === undefined) {
+      throw new Error('official Beads client does not expose repair-child reads');
+    }
+    return this.#readRepairChild(this.#workspaceRoot, childId);
+  }
+
+  async createRepairChild(request: unknown, idempotencyKey: string): Promise<unknown> {
+    if (this.#createRepairChild === undefined) {
+      throw new Error('official Beads client does not expose repair-child creation');
+    }
+    return this.#createRepairChild(this.#workspaceRoot, request, idempotencyKey);
   }
 
   async observe(transition: TransitionRecord): Promise<ExternalObservation> {
@@ -279,14 +335,14 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
     }
     if (transition.operation === 'beads.dolt_push') {
       assertExpectedStatus(transition, 'synced');
-      const state = await this.#client.readDoltSync(this.#workspaceRoot, transition.idempotencyKey);
+      const state = await this.#readDoltSync(this.#workspaceRoot, transition.idempotencyKey);
       if (state === 'synced') return { kind: 'expected', result: { status: state } };
       if (state === 'pending') return { kind: 'unchanged', result: { status: state } };
       return { kind: 'conflict', result: { status: state } };
     }
     const arguments_ = asRecord(transition.externalArguments);
     const taskId = requiredString(arguments_, 'taskId');
-    const issue = await this.#client.readIssue(this.#workspaceRoot, taskId);
+    const issue = await this.#readIssue(this.#workspaceRoot, taskId);
     const expected =
       transition.operation === 'beads.task_claim'
         ? 'in_progress'
@@ -316,7 +372,7 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
   > {
     return Promise.all(
       taskIds.map(async (taskId) => {
-        const issue = await this.#client.readIssue(this.#workspaceRoot, taskId);
+        const issue = await this.#readIssue(this.#workspaceRoot, taskId);
         if (!Array.isArray(issue.blockingDependencies)) {
           throw new Error(`authoritative Beads snapshot is missing dependencies for ${taskId}`);
         }
@@ -335,14 +391,14 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
     }
     const arguments_ = asRecord(transition.externalArguments);
     if (transition.operation === 'beads.task_claim') {
-      return this.#client.claimIssue(
+      return this.#claimIssue(
         this.#workspaceRoot,
         requiredString(arguments_, 'taskId'),
         transition.idempotencyKey,
       );
     }
     if (transition.operation === 'beads.task_close') {
-      return this.#client.closeIssue(
+      return this.#closeIssue(
         this.#workspaceRoot,
         requiredString(arguments_, 'taskId'),
         requiredString(arguments_, 'reason'),
@@ -350,10 +406,20 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
       );
     }
     if (transition.operation === 'beads.dolt_push') {
-      return this.#client.pushDolt(this.#workspaceRoot, transition.idempotencyKey);
+      return this.#pushDolt(this.#workspaceRoot, transition.idempotencyKey);
     }
     throw new Error(`unsupported Beads/Dolt broker operation: ${transition.operation}`);
   }
+}
+
+// Package-internal bootstrap only. Deliberately omitted from the package index.
+export function createProductionBeadsDoltPort(
+  workspaceRoot: string,
+  client: OfficialBeadsDoltClient,
+): OfficialBeadsDoltPort {
+  return registerProductionBeadsPort(
+    new OfficialBeadsDoltPort(workspaceRoot, client, productionBeadsPortCapability),
+  );
 }
 
 function assertExpectedStatus(transition: TransitionRecord, status: string): void {

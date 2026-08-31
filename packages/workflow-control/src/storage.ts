@@ -72,6 +72,10 @@ export type SchedulerCredentialStatus =
 export const workflowCredentialJournalCapability = Symbol('workflowCredentialJournalCapability');
 export const workflowRepairMutationCapability = Symbol('workflowRepairMutationCapability');
 export const workflowDeliveryMutationCapability = Symbol('workflowDeliveryMutationCapability');
+export const workflowEvaluationMutationCapability = Symbol('workflowEvaluationMutationCapability');
+export const workflowSecureEvidenceMutationCapability = Symbol(
+  'workflowSecureEvidenceMutationCapability',
+);
 
 export type DeliveryOperationStatus = 'prepared' | 'committed' | 'escalated';
 
@@ -94,6 +98,64 @@ export interface DeliveryOperationRecord {
   resultJson: string | null;
   createdAtMs: number;
   updatedAtMs: number;
+}
+
+export interface SecureEvidenceRecord {
+  digest: string;
+  workspaceId: string;
+  runId: string;
+  taskId: string;
+  mediaType: string;
+  sizeBytes: number;
+  kind: string;
+  producer: string;
+  producerRole: string;
+  contractVersion: number;
+  policyDigest: string;
+  headSha: string;
+  redactionCount: number;
+  retentionClass: 'raw' | 'summary';
+  retentionUntilMs: number;
+  acceptedAtMs: number | null;
+  deletedAtMs: number | null;
+  tombstoneDigest: string | null;
+  createdAtMs: number;
+}
+
+export interface EvaluationRecord {
+  id: string;
+  workspaceId: string;
+  runId: string;
+  taskId: string;
+  headSha: string;
+  evaluatorRole: string;
+  result: unknown;
+  createdAtMs: number;
+}
+
+export interface RepairChildIntentRecord {
+  id: string;
+  workspaceId: string;
+  runId: string;
+  sequence: number;
+  findingDigest: string;
+  chainTipTaskId: string;
+  request: unknown;
+  status: 'prepared' | 'committed' | 'escalated';
+  ownerId: string;
+  workspaceLeaseEpoch: number;
+  runLeaseEpoch: number;
+  taskLeaseEpoch: number;
+  result: unknown | null;
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
+export interface AuthorizedRunTask {
+  id: string;
+  assignedRole: string;
+  allowedPaths: string[];
+  allowedOperations: string[];
 }
 
 export interface PrepareDeliveryOperationInput {
@@ -571,6 +633,293 @@ export class WorkflowStore {
     if (JSON.stringify(stored) !== JSON.stringify(contract)) {
       throw new Error('workflow run does not use the approved execution contract');
     }
+  }
+
+  assertApprovedTaskHead(
+    input: { workspaceId: string; runId: string; taskId: string; headSha: string },
+    capability?: symbol,
+  ): void {
+    if (
+      capability !== workflowSecureEvidenceMutationCapability &&
+      capability !== workflowEvaluationMutationCapability
+    ) {
+      throw new Error('approved task-head verification requires an internal capability');
+    }
+    const row = this.#database
+      .prepare(
+        `SELECT current_sha FROM delivery_approved_heads
+         WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?
+         UNION ALL
+         SELECT current_sha FROM repair_approved_heads
+         WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?`,
+      )
+      .get(
+        input.workspaceId,
+        input.runId,
+        input.taskId,
+        `refs/heads/task/${input.taskId}`,
+        input.workspaceId,
+        input.runId,
+        input.taskId,
+        `refs/heads/task/${input.taskId}`,
+      ) as { current_sha: string } | undefined;
+    if (row?.current_sha !== input.headSha) {
+      throw new Error('evidence head is not the broker-approved exact task head');
+    }
+  }
+
+  getAuthorizedRunTask(
+    runId: string,
+    taskId: string,
+    capability?: symbol,
+  ): AuthorizedRunTask | undefined {
+    if (
+      capability !== workflowSecureEvidenceMutationCapability &&
+      capability !== workflowEvaluationMutationCapability
+    ) {
+      throw new Error('run-task authorization requires an internal capability');
+    }
+    const contract = this.#contractForRun(runId);
+    const contractTask = contract.tasks.find((task) => task.id === taskId);
+    if (contractTask !== undefined) {
+      return {
+        id: contractTask.id,
+        assignedRole: contractTask.assignedRole,
+        allowedPaths: [...contractTask.allowedPaths],
+        allowedOperations: [...contractTask.allowedOperations],
+      };
+    }
+    const row = this.#database
+      .prepare(
+        `SELECT request_json FROM repair_child_intents
+         WHERE run_id = ? AND id = ? AND status = 'committed'`,
+      )
+      .get(runId, taskId) as { request_json: string } | undefined;
+    if (row === undefined) return undefined;
+    const request = JSON.parse(row.request_json) as Record<string, unknown>;
+    if (
+      request.id !== taskId ||
+      typeof request.assignedRole !== 'string' ||
+      !Array.isArray(request.allowedPaths) ||
+      !request.allowedPaths.every((path) => typeof path === 'string') ||
+      !Array.isArray(request.allowedOperations) ||
+      !request.allowedOperations.every((operation) => typeof operation === 'string')
+    ) {
+      throw new Error('committed repair-child authority is malformed');
+    }
+    return {
+      id: taskId,
+      assignedRole: request.assignedRole,
+      allowedPaths: request.allowedPaths as string[],
+      allowedOperations: request.allowedOperations as string[],
+    };
+  }
+
+  remainingRepairBudgetForChild(
+    input: {
+      runId: string;
+      featureId: string;
+      childId: string;
+      findingId: string;
+      policy: ExecutionContract['retryPolicy'];
+    },
+    capability?: symbol,
+  ): ExecutionContract['retryPolicy'] {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('repair budget calculation requires an internal capability');
+    }
+    const reservations = this.#database
+      .prepare(`SELECT child_id, finding_id FROM repair_child_budget_reservations WHERE run_id = ?`)
+      .all(input.runId) as Array<{ child_id: string; finding_id: string }>;
+    const existing = reservations.some((reservation) => reservation.child_id === input.childId);
+    const reservationCount = reservations.length + (existing ? 0 : 1);
+    const taskAttempts = this.#database
+      .prepare(
+        `SELECT scope_id, COUNT(*) AS count FROM attempts
+         WHERE run_id = ? AND scope = 'task' AND scope_id LIKE ? GROUP BY scope_id`,
+      )
+      .all(input.runId, `${input.featureId}.repair.%`) as Array<{
+      scope_id: string;
+      count: number;
+    }>;
+    const findingIds = new Set([
+      ...reservations.map((reservation) => reservation.finding_id),
+      input.findingId,
+    ]);
+    const findingAttempts = this.#database
+      .prepare(
+        `SELECT scope_id, COUNT(*) AS count FROM attempts
+         WHERE run_id = ? AND scope = 'finding' GROUP BY scope_id`,
+      )
+      .all(input.runId) as Array<{ scope_id: string; count: number }>;
+    const taskExtras = taskAttempts.reduce((total, row) => total + Math.max(0, row.count - 1), 0);
+    const findingExtras = findingAttempts.reduce(
+      (total, row) => total + (findingIds.has(row.scope_id) ? Math.max(0, row.count - 1) : 0),
+      0,
+    );
+    const infrastructure = this.#database
+      .prepare(
+        `SELECT COUNT(*) AS count FROM attempts WHERE run_id = ? AND scope = 'infrastructure'`,
+      )
+      .get(input.runId) as { count: number };
+    if (
+      !existing &&
+      (reservations.length + taskExtras >= input.policy.implementationAttempts ||
+        reservations.length + findingExtras >= input.policy.findingAttempts)
+    ) {
+      throw new Error('repair-child retry budget is exhausted');
+    }
+    return {
+      implementationAttempts: Math.max(
+        0,
+        input.policy.implementationAttempts - reservationCount - taskExtras,
+      ),
+      findingAttempts: Math.max(0, input.policy.findingAttempts - reservationCount - findingExtras),
+      infrastructureAttempts: Math.max(
+        0,
+        input.policy.infrastructureAttempts - infrastructure.count,
+      ),
+      waitDeadlineSeconds: input.policy.waitDeadlineSeconds,
+    };
+  }
+
+  assertAcceptedRepairPredecessor(
+    input: { workspaceId: string; runId: string; taskId: string; headSha: string },
+    capability?: symbol,
+  ): void {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('repair predecessor verification requires an internal capability');
+    }
+    const head = this.#database
+      .prepare(
+        `SELECT base_sha, current_sha FROM repair_approved_heads
+         WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?`,
+      )
+      .get(input.workspaceId, input.runId, input.taskId, `refs/heads/task/${input.taskId}`) as
+      | { base_sha: string; current_sha: string }
+      | undefined;
+    const closed = this.#database
+      .prepare(
+        `SELECT 1 FROM transitions
+         WHERE run_id = ? AND operation = 'beads.task_close' AND status = 'committed'
+           AND from_state = 'task_accepted' AND to_state = 'integration'
+           AND json_extract(external_arguments_json, '$.taskId') = ?
+         LIMIT 1`,
+      )
+      .get(input.runId, input.taskId);
+    if (
+      head === undefined ||
+      head.current_sha !== input.headSha ||
+      head.current_sha === head.base_sha ||
+      closed === undefined
+    ) {
+      throw new Error(
+        'repair predecessor is not accepted, Beads-closed, and advanced to an approved head',
+      );
+    }
+  }
+
+  seedAcceptedRepairTaskForTest(input: {
+    workspaceId: string;
+    runId: string;
+    taskId: string;
+    headSha: string;
+    nowMs?: number;
+  }): void {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error('repair predecessor acceptance seeding is test-only');
+    }
+    const nowMs = input.nowMs ?? Date.now();
+    const contract = this.#contractForRun(input.runId);
+    this.#database.transaction(() => {
+      const updated = this.#database
+        .prepare(
+          `UPDATE repair_approved_heads SET current_sha = ?, updated_at_ms = ?
+           WHERE workspace_id = ? AND run_id = ? AND task_id = ?`,
+        )
+        .run(input.headSha, nowMs, input.workspaceId, input.runId, input.taskId);
+      if (updated.changes !== 1) throw new Error('repair test predecessor head is unavailable');
+      const transitionId = `test-repair-close:${input.runId}:${input.taskId}`;
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO transitions
+           (id, run_id, from_state, to_state, operation, expected_run_version, idempotency_key,
+            status, actor_role, contract_version, policy_digest, lease_owner_id, lease_epoch,
+            transition_context_json, expected_external_state_json, external_arguments_json,
+            result_json, created_at_ms, updated_at_ms)
+           VALUES (?, ?, 'task_accepted', 'integration', 'beads.task_close', 0, ?, 'committed',
+            'workflow_orchestrator', ?, ?, 'test-lineage', 0, '{}', '{"status":"closed"}', ?,
+            '{"status":"closed"}', ?, ?)`,
+        )
+        .run(
+          transitionId,
+          input.runId,
+          transitionId,
+          contract.contractVersion,
+          contract.policyDigest,
+          JSON.stringify({ taskId: input.taskId }),
+          nowMs,
+          nowMs,
+        );
+    })();
+  }
+
+  seedApprovedTaskHeadForTest(input: {
+    workspaceId: string;
+    runId: string;
+    taskId: string;
+    headSha: string;
+    nowMs?: number;
+  }): void {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error('approved task-head seeding is test-only');
+    }
+    const nowMs = input.nowMs ?? Date.now();
+    const ref = `refs/heads/task/${input.taskId}`;
+    const operationId = `test-approved-head:${input.runId}:${input.taskId}`;
+    const request = { kind: 'git.commit', ref, headSha: input.headSha };
+    const requestJson = JSON.stringify(request);
+    const requestDigest = `sha256:${createHash('sha256').update(requestJson).digest('hex')}`;
+    this.#database.transaction(() => {
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO delivery_operations
+           (id, workspace_id, run_id, task_id, kind, actor_role, request_digest, request_json,
+            status, owner_id, workspace_lease_epoch, run_lease_epoch, task_lease_epoch, result_json,
+            created_at_ms, updated_at_ms)
+           VALUES (?, ?, ?, ?, 'git.commit', 'workflow_orchestrator', ?, ?, 'committed',
+            'test-lineage', 0, 0, 0, ?, ?, ?)`,
+        )
+        .run(
+          operationId,
+          input.workspaceId,
+          input.runId,
+          input.taskId,
+          requestDigest,
+          requestJson,
+          JSON.stringify({ sha: input.headSha }),
+          nowMs,
+          nowMs,
+        );
+      this.#database
+        .prepare(
+          `INSERT OR REPLACE INTO delivery_approved_heads
+           (workspace_id, run_id, task_id, ref, base_sha, current_sha, published_sha,
+            operation_id, updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          input.workspaceId,
+          input.runId,
+          input.taskId,
+          ref,
+          input.headSha,
+          input.headSha,
+          input.headSha,
+          operationId,
+          nowMs,
+        );
+    })();
   }
 
   acquireLease(
@@ -1910,11 +2259,21 @@ export class WorkflowStore {
       const published = this.#database
         .prepare(
           `SELECT current_sha, published_sha FROM delivery_approved_heads
+           WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?
+           UNION ALL
+           SELECT current_sha, published_sha FROM repair_approved_heads
            WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?`,
         )
-        .get(operation.workspaceId, operation.runId, operation.taskId, ref) as
-        | { current_sha: string; published_sha: string | null }
-        | undefined;
+        .get(
+          operation.workspaceId,
+          operation.runId,
+          operation.taskId,
+          ref,
+          operation.workspaceId,
+          operation.runId,
+          operation.taskId,
+          ref,
+        ) as { current_sha: string; published_sha: string | null } | undefined;
       if (published?.current_sha !== headSha || published.published_sha !== headSha) {
         throw new Error('GitHub delivery head is not the current published Git/ref broker head');
       }
@@ -1928,11 +2287,21 @@ export class WorkflowStore {
     const approved = this.#database
       .prepare(
         `SELECT current_sha FROM delivery_approved_heads
+         WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?
+         UNION ALL
+         SELECT current_sha FROM repair_approved_heads
          WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?`,
       )
-      .get(operation.workspaceId, operation.runId, operation.taskId, ref) as
-      | { current_sha: string }
-      | undefined;
+      .get(
+        operation.workspaceId,
+        operation.runId,
+        operation.taskId,
+        ref,
+        operation.workspaceId,
+        operation.runId,
+        operation.taskId,
+        ref,
+      ) as { current_sha: string } | undefined;
     if (approved?.current_sha !== expectedSha) {
       throw new Error('Git delivery request does not descend from the broker-approved task head');
     }
@@ -2000,8 +2369,27 @@ export class WorkflowStore {
           ref,
           request?.parentSha,
         );
-      if (updated.changes !== 1)
-        throw new Error('broker-approved task head compare-and-swap failed');
+      if (updated.changes !== 1) {
+        const repaired = this.#database
+          .prepare(
+            `UPDATE repair_approved_heads SET current_sha = ?, published_sha = NULL,
+               updated_at_ms = ?
+               WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?
+                 AND current_sha = ?`,
+          )
+          .run(
+            resultSha,
+            nowMs,
+            operation.workspaceId,
+            operation.runId,
+            operation.taskId,
+            ref,
+            request?.parentSha,
+          );
+        if (repaired.changes !== 1) {
+          throw new Error('broker-approved task head compare-and-swap failed');
+        }
+      }
     } else {
       if (resultSha !== request?.newSha) {
         throw new Error('pushed task ref differs from the broker-approved head');
@@ -2021,7 +2409,25 @@ export class WorkflowStore {
           ref,
           resultSha,
         );
-      if (published.changes !== 1) throw new Error('published task head compare-and-swap failed');
+      if (published.changes !== 1) {
+        const repaired = this.#database
+          .prepare(
+            `UPDATE repair_approved_heads SET published_sha = ?, updated_at_ms = ?
+             WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ? AND current_sha = ?`,
+          )
+          .run(
+            resultSha,
+            nowMs,
+            operation.workspaceId,
+            operation.runId,
+            operation.taskId,
+            ref,
+            resultSha,
+          );
+        if (repaired.changes !== 1) {
+          throw new Error('published task head compare-and-swap failed');
+        }
+      }
     }
   }
 
@@ -2556,6 +2962,15 @@ export class WorkflowStore {
           input.headSha ?? null,
           createdAtMs,
         );
+      const contentMetadata = this.#database
+        .prepare('SELECT media_type, size_bytes FROM evidence WHERE digest = ?')
+        .get(input.digest) as { media_type: string; size_bytes: number };
+      if (
+        contentMetadata.media_type !== input.mediaType ||
+        contentMetadata.size_bytes !== input.sizeBytes
+      ) {
+        throw new Error('evidence digest already exists with different content metadata');
+      }
       this.#database
         .prepare(
           `INSERT OR IGNORE INTO evidence_bindings
@@ -2578,6 +2993,739 @@ export class WorkflowStore {
           createdAtMs,
         );
     })();
+  }
+
+  recordSecureEvidence(
+    input: Omit<SecureEvidenceRecord, 'acceptedAtMs' | 'deletedAtMs' | 'tombstoneDigest'>,
+    content: Uint8Array,
+    maxRunBytes: number,
+    capability?: symbol,
+  ): SecureEvidenceRecord {
+    if (capability !== workflowSecureEvidenceMutationCapability) {
+      throw new Error('secure evidence mutation requires the internal vault capability');
+    }
+    return this.#database.transaction(() => {
+      if (!Number.isInteger(maxRunBytes) || maxRunBytes <= 0) {
+        throw new Error('invalid secure evidence run-size bound');
+      }
+      const contract = this.#contractForRun(input.runId);
+      if (
+        contract.workspaceId !== input.workspaceId ||
+        contract.contractVersion !== input.contractVersion ||
+        contract.policyDigest !== input.policyDigest ||
+        this.getAuthorizedRunTask(
+          input.runId,
+          input.taskId,
+          workflowSecureEvidenceMutationCapability,
+        ) === undefined
+      ) {
+        throw new Error('secure evidence binding differs from the run contract');
+      }
+      const actualDigest = `sha256:${createHash('sha256').update(content).digest('hex')}`;
+      if (actualDigest !== input.digest || content.byteLength !== input.sizeBytes) {
+        throw new Error('secure evidence content differs from its digest or size');
+      }
+      const existingIdentity = this.getSecureEvidence(input.digest, input.runId, input.taskId);
+      if (existingIdentity !== undefined && existingIdentity.deletedAtMs !== null) {
+        throw new Error('tombstoned secure evidence cannot be recreated');
+      }
+      const liveDigest = this.#database
+        .prepare(
+          `SELECT 1 FROM secure_evidence
+           WHERE digest = ? AND run_id = ? AND deleted_at_ms IS NULL LIMIT 1`,
+        )
+        .get(input.digest, input.runId);
+      if (
+        liveDigest === undefined &&
+        this.sumLiveSecureEvidenceBytes(input.runId) + input.sizeBytes > maxRunBytes
+      ) {
+        throw new Error('evidence exceeds the approved per-run size bound');
+      }
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO secure_evidence_blobs (digest, content, size_bytes)
+           VALUES (?, ?, ?)`,
+        )
+        .run(input.digest, Buffer.from(content), input.sizeBytes);
+      const blob = this.#database
+        .prepare('SELECT content, size_bytes FROM secure_evidence_blobs WHERE digest = ?')
+        .get(input.digest) as { content: Buffer; size_bytes: number };
+      if (
+        blob.size_bytes !== input.sizeBytes ||
+        !Buffer.from(blob.content).equals(Buffer.from(content))
+      ) {
+        throw new Error('secure evidence digest already exists with different content');
+      }
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO secure_evidence
+           (digest, workspace_id, run_id, task_id, media_type, size_bytes, kind, producer,
+            producer_role, contract_version, policy_digest, head_sha, redaction_count, retention_class,
+            retention_until_ms, accepted_at_ms, deleted_at_ms, tombstone_digest, created_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?)`,
+        )
+        .run(
+          input.digest,
+          input.workspaceId,
+          input.runId,
+          input.taskId,
+          input.mediaType,
+          input.sizeBytes,
+          input.kind,
+          input.producer,
+          input.producerRole,
+          input.contractVersion,
+          input.policyDigest,
+          input.headSha,
+          input.redactionCount,
+          input.retentionClass,
+          input.retentionUntilMs,
+          input.createdAtMs,
+        );
+      const stored = this.getSecureEvidence(input.digest, input.runId, input.taskId);
+      if (stored === undefined) throw new Error('secure evidence record was not persisted');
+      if (
+        stored.workspaceId !== input.workspaceId ||
+        stored.mediaType !== input.mediaType ||
+        stored.sizeBytes !== input.sizeBytes ||
+        stored.kind !== input.kind ||
+        stored.producer !== input.producer ||
+        stored.producerRole !== input.producerRole ||
+        stored.contractVersion !== input.contractVersion ||
+        stored.policyDigest !== input.policyDigest ||
+        stored.headSha !== input.headSha ||
+        stored.redactionCount !== input.redactionCount ||
+        stored.retentionClass !== input.retentionClass
+      ) {
+        throw new Error('secure evidence identity already exists with different metadata');
+      }
+      return stored;
+    })();
+  }
+
+  getSecureEvidence(
+    digest: string,
+    runId: string,
+    taskId: string,
+  ): SecureEvidenceRecord | undefined {
+    const row = this.#database
+      .prepare(`SELECT * FROM secure_evidence WHERE digest = ? AND run_id = ? AND task_id = ?`)
+      .get(digest, runId, taskId) as Record<string, unknown> | undefined;
+    return row === undefined ? undefined : secureEvidenceRecordFromRow(row);
+  }
+
+  getSecureEvidenceBlob(digest: string, capability?: symbol): Uint8Array {
+    if (capability !== workflowSecureEvidenceMutationCapability) {
+      throw new Error('secure evidence read requires the internal vault capability');
+    }
+    const row = this.#database
+      .prepare('SELECT content FROM secure_evidence_blobs WHERE digest = ?')
+      .get(digest) as { content: Buffer } | undefined;
+    if (row === undefined) throw new Error('secure evidence blob is unavailable');
+    const content = Buffer.from(row.content);
+    const actual = `sha256:${createHash('sha256').update(content).digest('hex')}`;
+    if (actual !== digest) throw new Error('secure evidence blob integrity check failed');
+    return content;
+  }
+
+  acceptSecureEvidence(
+    input: {
+      digest: string;
+      runId: string;
+      taskId: string;
+      acceptedAtMs: number;
+    },
+    capability?: symbol,
+  ): SecureEvidenceRecord {
+    if (
+      capability !== workflowSecureEvidenceMutationCapability &&
+      capability !== workflowEvaluationMutationCapability
+    ) {
+      throw new Error('secure evidence acceptance requires an internal capability');
+    }
+    const before = this.getSecureEvidence(input.digest, input.runId, input.taskId);
+    if (
+      before !== undefined &&
+      before.acceptedAtMs !== null &&
+      before.acceptedAtMs !== input.acceptedAtMs
+    ) {
+      throw new Error('secure evidence acceptance is immutable');
+    }
+    this.#database
+      .prepare(
+        `UPDATE secure_evidence SET accepted_at_ms = COALESCE(accepted_at_ms, ?)
+         WHERE digest = ? AND run_id = ? AND task_id = ? AND deleted_at_ms IS NULL`,
+      )
+      .run(input.acceptedAtMs, input.digest, input.runId, input.taskId);
+    const record = this.getSecureEvidence(input.digest, input.runId, input.taskId);
+    if (record?.acceptedAtMs === null || record === undefined) {
+      throw new Error('secure evidence cannot be accepted');
+    }
+    return record;
+  }
+
+  tombstoneSecureEvidence(
+    input: {
+      digest: string;
+      runId: string;
+      taskId: string;
+      deletedAtMs: number;
+      tombstoneDigest: string;
+    },
+    capability?: symbol,
+  ): SecureEvidenceRecord {
+    if (capability !== workflowSecureEvidenceMutationCapability) {
+      throw new Error('secure evidence deletion requires the internal vault capability');
+    }
+    return this.#database.transaction(() => {
+      const before = this.getSecureEvidence(input.digest, input.runId, input.taskId);
+      if (before === undefined) throw new Error('secure evidence not found');
+      if (before.deletedAtMs !== null) {
+        if (
+          before.deletedAtMs !== input.deletedAtMs ||
+          before.tombstoneDigest !== input.tombstoneDigest
+        ) {
+          throw new Error('secure evidence tombstone is immutable');
+        }
+        return before;
+      }
+      if (input.deletedAtMs < before.retentionUntilMs) {
+        throw new Error('secure evidence retention has not expired');
+      }
+      this.#database
+        .prepare(
+          `UPDATE secure_evidence SET deleted_at_ms = COALESCE(deleted_at_ms, ?),
+           tombstone_digest = COALESCE(tombstone_digest, ?)
+           WHERE digest = ? AND run_id = ? AND task_id = ?`,
+        )
+        .run(input.deletedAtMs, input.tombstoneDigest, input.digest, input.runId, input.taskId);
+      if (this.countLiveSecureEvidenceBindings(input.digest) === 0) {
+        this.#database
+          .prepare('DELETE FROM secure_evidence_blobs WHERE digest = ?')
+          .run(input.digest);
+      }
+      return this.getSecureEvidence(input.digest, input.runId, input.taskId)!;
+    })();
+  }
+
+  countLiveSecureEvidenceBindings(digest: string): number {
+    const row = this.#database
+      .prepare(
+        'SELECT COUNT(*) AS count FROM secure_evidence WHERE digest = ? AND deleted_at_ms IS NULL',
+      )
+      .get(digest) as { count: number };
+    return row.count;
+  }
+
+  sumLiveSecureEvidenceBytes(runId: string): number {
+    const row = this.#database
+      .prepare(
+        `SELECT COALESCE(SUM(size_bytes), 0) AS bytes FROM (
+           SELECT digest, MAX(size_bytes) AS size_bytes FROM secure_evidence
+           WHERE run_id = ? AND deleted_at_ms IS NULL GROUP BY digest
+         )`,
+      )
+      .get(runId) as { bytes: number };
+    return row.bytes;
+  }
+
+  recordEvaluation(
+    input: Omit<EvaluationRecord, 'result'> & { result: unknown },
+    capability?: symbol,
+  ): EvaluationRecord {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('evaluation records require the internal evaluator capability');
+    }
+    const contract = this.#contractForRun(input.runId);
+    if (
+      contract.workspaceId !== input.workspaceId ||
+      this.getAuthorizedRunTask(input.runId, input.taskId, workflowEvaluationMutationCapability) ===
+        undefined
+    ) {
+      throw new Error('evaluation binding differs from the run contract');
+    }
+    const resultJson = serializeDurableJson(input.result);
+    this.#database
+      .prepare(
+        `INSERT OR IGNORE INTO evaluations
+         (id, workspace_id, run_id, task_id, head_sha, evaluator_role, result_json, created_at_ms)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.id,
+        input.workspaceId,
+        input.runId,
+        input.taskId,
+        input.headSha,
+        input.evaluatorRole,
+        resultJson,
+        input.createdAtMs,
+      );
+    const record = this.getEvaluation(input.id);
+    if (
+      record === undefined ||
+      record.workspaceId !== input.workspaceId ||
+      record.runId !== input.runId ||
+      record.taskId !== input.taskId ||
+      record.headSha !== input.headSha ||
+      record.evaluatorRole !== input.evaluatorRole ||
+      serializeDurableJson(record.result) !== resultJson
+    ) {
+      throw new Error('evaluation identity already exists with different content');
+    }
+    return record;
+  }
+
+  recordEvaluationWithEvidence(
+    input: Omit<EvaluationRecord, 'result'> & { result: unknown },
+    evidenceDigests: readonly string[],
+    capability?: symbol,
+  ): EvaluationRecord {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('evaluation records require the internal evaluator capability');
+    }
+    return this.#database.transaction(() => {
+      const record = this.recordEvaluation(input, capability);
+      for (const digest of new Set(evidenceDigests)) {
+        const secure = this.getSecureEvidence(digest, input.runId, input.taskId);
+        if (secure === undefined || secure.deletedAtMs !== null) {
+          throw new Error('evaluation acceptance references unavailable secure evidence');
+        }
+        this.#database
+          .prepare(
+            `INSERT OR IGNORE INTO evaluation_evidence_acceptances
+             (evaluation_id, digest, run_id, task_id, accepted_at_ms)
+             VALUES (?, ?, ?, ?, ?)`,
+          )
+          .run(record.id, digest, input.runId, input.taskId, record.createdAtMs);
+        const acceptance = this.#database
+          .prepare(
+            `SELECT accepted_at_ms FROM evaluation_evidence_acceptances
+             WHERE evaluation_id = ? AND digest = ? AND run_id = ? AND task_id = ?`,
+          )
+          .get(record.id, digest, input.runId, input.taskId) as { accepted_at_ms: number };
+        if (acceptance.accepted_at_ms !== record.createdAtMs) {
+          throw new Error('evaluation evidence acceptance identity changed');
+        }
+        this.#database
+          .prepare(
+            `UPDATE secure_evidence SET accepted_at_ms = COALESCE(accepted_at_ms, ?)
+             WHERE digest = ? AND run_id = ? AND task_id = ? AND deleted_at_ms IS NULL`,
+          )
+          .run(record.createdAtMs, digest, input.runId, input.taskId);
+      }
+      return record;
+    })();
+  }
+
+  getEvaluation(id: string): EvaluationRecord | undefined {
+    const row = this.#database.prepare('SELECT * FROM evaluations WHERE id = ?').get(id) as
+      | {
+          id: string;
+          workspace_id: string;
+          run_id: string;
+          task_id: string;
+          head_sha: string;
+          evaluator_role: string;
+          result_json: string;
+          created_at_ms: number;
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          id: row.id,
+          workspaceId: row.workspace_id,
+          runId: row.run_id,
+          taskId: row.task_id,
+          headSha: row.head_sha,
+          evaluatorRole: row.evaluator_role,
+          result: JSON.parse(row.result_json) as unknown,
+          createdAtMs: row.created_at_ms,
+        };
+  }
+
+  prepareRepairChildIntent(
+    input: Omit<RepairChildIntentRecord, 'status' | 'result' | 'updatedAtMs'>,
+    capability?: symbol,
+  ): RepairChildIntentRecord {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('repair-child intent requires the internal evaluator capability');
+    }
+    const contract = this.#contractForRun(input.runId);
+    if (contract.workspaceId !== input.workspaceId) {
+      throw new Error('repair-child workspace differs from the run contract');
+    }
+    const run = this.getRun(input.runId);
+    if (run?.state !== 'repair_planning') {
+      throw new Error('repair children require the repair_planning state');
+    }
+    this.#assertResourceLease(
+      'workspace',
+      input.workspaceId,
+      input.ownerId,
+      input.workspaceLeaseEpoch,
+      input.createdAtMs,
+    );
+    this.#assertResourceLease(
+      'run',
+      input.runId,
+      input.ownerId,
+      input.runLeaseEpoch,
+      input.createdAtMs,
+    );
+    this.#assertResourceLease(
+      'task',
+      input.chainTipTaskId,
+      input.ownerId,
+      input.taskLeaseEpoch,
+      input.createdAtMs,
+    );
+    const requestJson = serializeDurableJson(input.request);
+    const request = input.request as Record<string, unknown>;
+    return this.#database.transaction(() => {
+      if (
+        typeof request.featureId !== 'string' ||
+        typeof request.finding !== 'object' ||
+        request.finding === null ||
+        typeof (request.finding as Record<string, unknown>).id !== 'string'
+      ) {
+        throw new Error('repair-child budget request is malformed');
+      }
+      const remaining = this.remainingRepairBudgetForChild(
+        {
+          runId: input.runId,
+          featureId: request.featureId,
+          childId: input.id,
+          findingId: (request.finding as Record<string, unknown>).id as string,
+          policy: contract.retryPolicy,
+        },
+        workflowEvaluationMutationCapability,
+      );
+      if (JSON.stringify(request.remainingRetryBudget) !== JSON.stringify(remaining)) {
+        throw new Error('repair-child retry reservation changed before prepare');
+      }
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO repair_child_budget_reservations
+           (child_id, run_id, finding_id, created_at_ms) VALUES (?, ?, ?, ?)`,
+        )
+        .run(
+          input.id,
+          input.runId,
+          (request.finding as Record<string, unknown>).id,
+          input.createdAtMs,
+        );
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO repair_child_intents
+         (id, workspace_id, run_id, sequence, finding_digest, chain_tip_task_id, request_json,
+          status, owner_id, workspace_lease_epoch, run_lease_epoch, task_lease_epoch, result_json,
+          created_at_ms, updated_at_ms)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?, NULL, ?, ?)`,
+        )
+        .run(
+          input.id,
+          input.workspaceId,
+          input.runId,
+          input.sequence,
+          input.findingDigest,
+          input.chainTipTaskId,
+          requestJson,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.runLeaseEpoch,
+          input.taskLeaseEpoch,
+          input.createdAtMs,
+          input.createdAtMs,
+        );
+      const record = this.getRepairChildIntent(input.id);
+      if (
+        record === undefined ||
+        record.workspaceId !== input.workspaceId ||
+        record.runId !== input.runId ||
+        record.sequence !== input.sequence ||
+        record.findingDigest !== input.findingDigest ||
+        record.chainTipTaskId !== input.chainTipTaskId ||
+        record.ownerId !== input.ownerId ||
+        record.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+        record.runLeaseEpoch !== input.runLeaseEpoch ||
+        record.taskLeaseEpoch !== input.taskLeaseEpoch ||
+        record.createdAtMs !== input.createdAtMs ||
+        serializeDurableJson(record.request) !== requestJson
+      ) {
+        throw new Error('repair-child identity already exists with different content');
+      }
+      return record;
+    })();
+  }
+
+  finalizeRepairChildIntent(
+    input: {
+      id: string;
+      status: 'committed' | 'escalated';
+      result: unknown;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      updatedAtMs: number;
+    },
+    capability?: symbol,
+  ): RepairChildIntentRecord {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('repair-child intent requires the internal evaluator capability');
+    }
+    const before = this.getRepairChildIntent(input.id);
+    if (before === undefined) throw new Error('repair-child intent not found');
+    this.#assertResourceLease(
+      'workspace',
+      before.workspaceId,
+      input.ownerId,
+      input.workspaceLeaseEpoch,
+      input.updatedAtMs,
+    );
+    this.#assertResourceLease(
+      'run',
+      before.runId,
+      input.ownerId,
+      input.runLeaseEpoch,
+      input.updatedAtMs,
+    );
+    this.#assertResourceLease(
+      'task',
+      before.chainTipTaskId,
+      input.ownerId,
+      input.taskLeaseEpoch,
+      input.updatedAtMs,
+    );
+    if (
+      before.ownerId !== input.ownerId ||
+      before.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+      before.runLeaseEpoch !== input.runLeaseEpoch ||
+      before.taskLeaseEpoch !== input.taskLeaseEpoch
+    ) {
+      throw new Error('repair-child fencing token changed');
+    }
+    if (before.status !== 'prepared') {
+      if (
+        before.status !== input.status ||
+        serializeDurableJson(before.result) !== serializeDurableJson(input.result)
+      ) {
+        throw new Error('repair-child intent is already finalized differently');
+      }
+      return before;
+    }
+    return this.#database.transaction(() => {
+      this.#database
+        .prepare(
+          `UPDATE repair_child_intents SET status = ?, result_json = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'prepared'`,
+        )
+        .run(input.status, serializeDurableJson(input.result), input.updatedAtMs, input.id);
+      if (input.status === 'committed') {
+        const request = before.request as Record<string, unknown>;
+        if (
+          request.id !== before.id ||
+          typeof request.branchParentSha !== 'string' ||
+          !/^[a-f0-9]{40}$/u.test(request.branchParentSha)
+        ) {
+          throw new Error('repair-child lineage request is malformed');
+        }
+        this.#database
+          .prepare(
+            `INSERT OR IGNORE INTO repair_approved_heads
+             (intent_id, workspace_id, run_id, task_id, ref, base_sha, current_sha, updated_at_ms)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            before.id,
+            before.workspaceId,
+            before.runId,
+            before.id,
+            `refs/heads/task/${before.id}`,
+            request.branchParentSha,
+            request.branchParentSha,
+            input.updatedAtMs,
+          );
+        const lineage = this.#database
+          .prepare('SELECT * FROM repair_approved_heads WHERE intent_id = ?')
+          .get(before.id) as { task_id: string; base_sha: string; current_sha: string } | undefined;
+        if (
+          lineage?.task_id !== before.id ||
+          lineage.base_sha !== request.branchParentSha ||
+          lineage.current_sha !== request.branchParentSha
+        ) {
+          throw new Error('repair-child approved-head lineage conflicts with the intent');
+        }
+      }
+      return this.getRepairChildIntent(input.id)!;
+    })();
+  }
+
+  getRepairChildIntent(id: string): RepairChildIntentRecord | undefined {
+    const row = this.#database
+      .prepare('SELECT * FROM repair_child_intents WHERE id = ?')
+      .get(id) as
+      | {
+          id: string;
+          workspace_id: string;
+          run_id: string;
+          sequence: number;
+          finding_digest: string;
+          chain_tip_task_id: string;
+          request_json: string;
+          status: RepairChildIntentRecord['status'];
+          owner_id: string;
+          workspace_lease_epoch: number;
+          run_lease_epoch: number;
+          task_lease_epoch: number;
+          result_json: string | null;
+          created_at_ms: number;
+          updated_at_ms: number;
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          id: row.id,
+          workspaceId: row.workspace_id,
+          runId: row.run_id,
+          sequence: row.sequence,
+          findingDigest: row.finding_digest,
+          chainTipTaskId: row.chain_tip_task_id,
+          request: JSON.parse(row.request_json) as unknown,
+          status: row.status,
+          ownerId: row.owner_id,
+          workspaceLeaseEpoch: row.workspace_lease_epoch,
+          runLeaseEpoch: row.run_lease_epoch,
+          taskLeaseEpoch: row.task_lease_epoch,
+          result: row.result_json === null ? null : (JSON.parse(row.result_json) as unknown),
+          createdAtMs: row.created_at_ms,
+          updatedAtMs: row.updated_at_ms,
+        };
+  }
+
+  assertRepairChildIntentFence(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): RepairChildIntentRecord {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('repair-child intent requires the internal evaluator capability');
+    }
+    const intent = this.getRepairChildIntent(input.id);
+    if (intent === undefined) throw new Error('repair-child intent not found');
+    if (this.getRun(intent.runId)?.state !== 'repair_planning') {
+      throw new Error('repair children require the repair_planning state');
+    }
+    if (
+      intent.ownerId !== input.ownerId ||
+      intent.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+      intent.runLeaseEpoch !== input.runLeaseEpoch ||
+      intent.taskLeaseEpoch !== input.taskLeaseEpoch
+    ) {
+      throw new Error('repair-child fencing token changed');
+    }
+    this.#assertResourceLease(
+      'workspace',
+      intent.workspaceId,
+      input.ownerId,
+      input.workspaceLeaseEpoch,
+      input.nowMs,
+    );
+    this.#assertResourceLease('run', intent.runId, input.ownerId, input.runLeaseEpoch, input.nowMs);
+    this.#assertResourceLease(
+      'task',
+      intent.chainTipTaskId,
+      input.ownerId,
+      input.taskLeaseEpoch,
+      input.nowMs,
+    );
+    return intent;
+  }
+
+  adoptPreparedRepairChildIntent(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): RepairChildIntentRecord {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('repair-child intent requires the internal evaluator capability');
+    }
+    return this.#database.transaction(() => {
+      const intent = this.getRepairChildIntent(input.id);
+      if (intent?.status !== 'prepared') throw new Error('prepared repair-child intent not found');
+      if (this.getRun(intent.runId)?.state !== 'repair_planning') {
+        throw new Error('repair children require the repair_planning state');
+      }
+      this.#assertResourceLease(
+        'workspace',
+        intent.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        intent.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        intent.chainTipTaskId,
+        input.ownerId,
+        input.taskLeaseEpoch,
+        input.nowMs,
+      );
+      const regresses =
+        input.workspaceLeaseEpoch < intent.workspaceLeaseEpoch ||
+        input.runLeaseEpoch < intent.runLeaseEpoch ||
+        input.taskLeaseEpoch < intent.taskLeaseEpoch;
+      const advances =
+        input.workspaceLeaseEpoch > intent.workspaceLeaseEpoch ||
+        input.runLeaseEpoch > intent.runLeaseEpoch ||
+        input.taskLeaseEpoch > intent.taskLeaseEpoch;
+      if (regresses || (!advances && input.ownerId === intent.ownerId)) {
+        throw new Error('repair-child adoption does not fence the interrupted owner');
+      }
+      this.#database
+        .prepare(
+          `UPDATE repair_child_intents SET owner_id = ?, workspace_lease_epoch = ?,
+           run_lease_epoch = ?, task_lease_epoch = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'prepared'`,
+        )
+        .run(
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.runLeaseEpoch,
+          input.taskLeaseEpoch,
+          input.nowMs,
+          input.id,
+        );
+      return this.getRepairChildIntent(input.id)!;
+    })();
+  }
+
+  countRepairChildIntents(runId: string): number {
+    const row = this.#database
+      .prepare('SELECT COUNT(*) AS count FROM repair_child_intents WHERE run_id = ?')
+      .get(runId) as { count: number };
+    return row.count;
   }
 
   hasEvidence(digest: string): boolean {
@@ -2650,7 +3798,7 @@ export class WorkflowStore {
                 evidence_bindings.transition_id FROM evidence_bindings
            JOIN evidence ON evidence.digest = evidence_bindings.digest
            WHERE evidence_bindings.digest = ? AND evidence.media_type = ? AND evidence.size_bytes = ?
-             AND evidence.kind = ? AND evidence_bindings.workspace_id = ?
+             AND evidence_bindings.kind = ? AND evidence_bindings.workspace_id = ?
              AND evidence_bindings.run_id = ? AND evidence_bindings.task_id = ?
              AND evidence_bindings.contract_version = ? AND evidence_bindings.policy_digest = ?
              AND evidence_bindings.producer_role IN (${placeholders})
@@ -3142,6 +4290,93 @@ export class WorkflowStore {
         created_at_ms INTEGER NOT NULL,
         PRIMARY KEY(digest, workspace_id, run_id, task_id, transition_id, head_sha, producer, kind)
       );
+      CREATE TABLE IF NOT EXISTS secure_evidence_blobs (
+        digest TEXT PRIMARY KEY,
+        content BLOB NOT NULL,
+        size_bytes INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS secure_evidence (
+        digest TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        media_type TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        producer TEXT NOT NULL,
+        producer_role TEXT NOT NULL,
+        contract_version INTEGER NOT NULL,
+        policy_digest TEXT NOT NULL,
+        head_sha TEXT NOT NULL,
+        redaction_count INTEGER NOT NULL,
+        retention_class TEXT NOT NULL CHECK(retention_class IN ('raw', 'summary')),
+        retention_until_ms INTEGER NOT NULL,
+        accepted_at_ms INTEGER,
+        deleted_at_ms INTEGER,
+        tombstone_digest TEXT,
+        created_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(digest, run_id, task_id)
+      );
+      CREATE INDEX IF NOT EXISTS secure_evidence_digest_live
+        ON secure_evidence(digest, deleted_at_ms);
+      CREATE TABLE IF NOT EXISTS evaluations (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        head_sha TEXT NOT NULL,
+        evaluator_role TEXT NOT NULL CHECK(evaluator_role IN ('qa_evaluator', 'feature_evaluator')),
+        result_json TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS evaluations_run_task_head
+        ON evaluations(run_id, task_id, head_sha);
+      CREATE TABLE IF NOT EXISTS evaluation_evidence_acceptances (
+        evaluation_id TEXT NOT NULL REFERENCES evaluations(id),
+        digest TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        accepted_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(evaluation_id, digest, run_id, task_id),
+        FOREIGN KEY(digest, run_id, task_id) REFERENCES secure_evidence(digest, run_id, task_id)
+      );
+      CREATE TABLE IF NOT EXISTS repair_child_intents (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        sequence INTEGER NOT NULL,
+        finding_digest TEXT NOT NULL,
+        chain_tip_task_id TEXT NOT NULL,
+        request_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('prepared', 'committed', 'escalated')),
+        owner_id TEXT NOT NULL,
+        workspace_lease_epoch INTEGER NOT NULL,
+        run_lease_epoch INTEGER NOT NULL,
+        task_lease_epoch INTEGER NOT NULL,
+        result_json TEXT,
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        UNIQUE(run_id, sequence),
+        UNIQUE(run_id, finding_digest)
+      );
+      CREATE TABLE IF NOT EXISTS repair_child_budget_reservations (
+        child_id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        finding_id TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS repair_approved_heads (
+        intent_id TEXT PRIMARY KEY REFERENCES repair_child_intents(id),
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        ref TEXT NOT NULL,
+        base_sha TEXT NOT NULL,
+        current_sha TEXT NOT NULL,
+        published_sha TEXT,
+        updated_at_ms INTEGER NOT NULL,
+        UNIQUE(workspace_id, run_id, task_id, ref)
+      );
       CREATE TABLE IF NOT EXISTS critic_reviews (
         id TEXT PRIMARY KEY,
         run_id TEXT NOT NULL REFERENCES runs(id),
@@ -3288,6 +4523,7 @@ export class WorkflowStore {
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (3, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (8, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (9, unixepoch() * 1000);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (10, unixepoch() * 1000);
     `);
     const transitionColumns = this.#database
       .prepare('PRAGMA table_info(transitions)')
@@ -3335,6 +4571,20 @@ export class WorkflowStore {
         `ALTER TABLE scheduler_executions ADD COLUMN credential_broker_generation TEXT`,
       );
     }
+    const secureEvidenceColumns = this.#database
+      .prepare('PRAGMA table_info(secure_evidence)')
+      .all() as Array<{ name: string }>;
+    if (!secureEvidenceColumns.some((column) => column.name === 'retention_class')) {
+      this.#database.exec(
+        `ALTER TABLE secure_evidence ADD COLUMN retention_class TEXT NOT NULL DEFAULT 'raw'`,
+      );
+    }
+    const repairHeadColumns = this.#database
+      .prepare('PRAGMA table_info(repair_approved_heads)')
+      .all() as Array<{ name: string }>;
+    if (!repairHeadColumns.some((column) => column.name === 'published_sha')) {
+      this.#database.exec('ALTER TABLE repair_approved_heads ADD COLUMN published_sha TEXT');
+    }
     this.#database
       .prepare(
         `UPDATE scheduler_executions
@@ -3367,4 +4617,28 @@ export class WorkflowStore {
 
 function executionContractForApproval(input: unknown): ExecutionContract {
   return executionContractSchema.parse(input);
+}
+
+function secureEvidenceRecordFromRow(row: Record<string, unknown>): SecureEvidenceRecord {
+  return {
+    digest: String(row.digest),
+    workspaceId: String(row.workspace_id),
+    runId: String(row.run_id),
+    taskId: String(row.task_id),
+    mediaType: String(row.media_type),
+    sizeBytes: Number(row.size_bytes),
+    kind: String(row.kind),
+    producer: String(row.producer),
+    producerRole: String(row.producer_role),
+    contractVersion: Number(row.contract_version),
+    policyDigest: String(row.policy_digest),
+    headSha: String(row.head_sha),
+    redactionCount: Number(row.redaction_count),
+    retentionClass: row.retention_class === 'summary' ? 'summary' : 'raw',
+    retentionUntilMs: Number(row.retention_until_ms),
+    acceptedAtMs: row.accepted_at_ms === null ? null : Number(row.accepted_at_ms),
+    deletedAtMs: row.deleted_at_ms === null ? null : Number(row.deleted_at_ms),
+    tombstoneDigest: row.tombstone_digest === null ? null : String(row.tombstone_digest),
+    createdAtMs: Number(row.created_at_ms),
+  };
 }
