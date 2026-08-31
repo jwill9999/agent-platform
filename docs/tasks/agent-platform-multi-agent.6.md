@@ -37,8 +37,18 @@ evidence-driven repair.
 
 ## Definition of done
 
-- [ ] Every loop is bounded, role-correct, and evidence-driven.
-- [ ] Intermediate integration gate and brokered close pass.
+- [x] Every loop is bounded, role-correct, and evidence-driven.
+- [x] Intermediate integration gate and brokered close pass.
+
+## Completion evidence
+
+- `DurableRepairCoordinator` persists role-routed repair dispatches, atomic task/finding budgets,
+  idempotent escalation, fenced acceptance, cancellation, and accepted-result recovery.
+- Acceptance uses source-authoritative evidence plus a trusted local Git verifier for strict ancestry,
+  exact clean `HEAD`, and exact authority-bounded changed paths, including both rename/copy endpoints.
+- The final independent critic pass reported no actionable findings after reviewing the complete diff.
+- Workflow-control gates passed: 140 tests, the separately executed Docker isolation test, build,
+  typecheck, lint, formatting, documentation lint, dependency-cycle analysis, and diff checks.
 
 ## Sign-off
 
