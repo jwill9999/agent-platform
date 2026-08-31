@@ -70,6 +70,7 @@ export type SchedulerCredentialStatus =
   | 'legacy_quarantined';
 
 export const workflowCredentialJournalCapability = Symbol('workflowCredentialJournalCapability');
+export const workflowRepairMutationCapability = Symbol('workflowRepairMutationCapability');
 
 export interface SchedulerExecutionRecord {
   id: string;
@@ -93,6 +94,42 @@ export interface SchedulerExecutionRecord {
   createdAtMs: number;
   updatedAtMs: number;
 }
+
+export interface RepairDispatchRecord {
+  id: string;
+  runId: string;
+  taskId: string;
+  findingId: string;
+  taskAttempt: number;
+  findingAttempt: number;
+  ownerRole: string;
+  findingDigest: string;
+  failureHeadSha: string;
+  changeDigest: string;
+  changeEvidenceMinAtMs: number | null;
+  changeEvidenceAtMs: number | null;
+  changeHeadSha: string | null;
+  packet: unknown;
+  status: 'dispatched' | 'accepted' | 'cancelled';
+  result: unknown | null;
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
+export interface RepairEscalationRecord {
+  id: string;
+  runId: string;
+  scope: 'task' | 'finding';
+  scopeId: string;
+  findingId: string;
+  findingDigest: string;
+  report: unknown;
+  createdAtMs: number;
+}
+
+export type RepairPlanResult =
+  | { kind: 'dispatch'; dispatch: RepairDispatchRecord }
+  | { kind: 'escalated'; escalation: RepairEscalationRecord };
 
 export interface PrepareTransitionInput {
   id: string;
@@ -184,6 +221,38 @@ type SchedulerExecutionRow = {
   updated_at_ms: number;
 };
 
+type RepairDispatchRow = {
+  id: string;
+  run_id: string;
+  task_id: string;
+  finding_id: string;
+  task_attempt: number;
+  finding_attempt: number;
+  owner_role: string;
+  finding_digest: string;
+  failure_head_sha: string;
+  change_digest: string;
+  change_evidence_min_at_ms: number | null;
+  change_evidence_at_ms: number | null;
+  change_head_sha: string | null;
+  packet_json: string;
+  status: RepairDispatchRecord['status'];
+  result_json: string | null;
+  created_at_ms: number;
+  updated_at_ms: number;
+};
+
+type RepairEscalationRow = {
+  id: string;
+  run_id: string;
+  scope: RepairEscalationRecord['scope'];
+  scope_id: string;
+  finding_id: string;
+  finding_digest: string;
+  report_json: string;
+  created_at_ms: number;
+};
+
 function parseJson(value: string | null): unknown | null {
   return value === null ? null : (JSON.parse(value) as unknown);
 }
@@ -246,6 +315,42 @@ function schedulerExecutionFromRow(row: SchedulerExecutionRow): SchedulerExecuti
     result: parseJson(row.result_json),
     createdAtMs: row.created_at_ms,
     updatedAtMs: row.updated_at_ms,
+  };
+}
+
+function repairDispatchFromRow(row: RepairDispatchRow): RepairDispatchRecord {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    taskId: row.task_id,
+    findingId: row.finding_id,
+    taskAttempt: row.task_attempt,
+    findingAttempt: row.finding_attempt,
+    ownerRole: row.owner_role,
+    findingDigest: row.finding_digest,
+    failureHeadSha: row.failure_head_sha,
+    changeDigest: row.change_digest,
+    changeEvidenceMinAtMs: row.change_evidence_min_at_ms,
+    changeEvidenceAtMs: row.change_evidence_at_ms,
+    changeHeadSha: row.change_head_sha,
+    packet: JSON.parse(row.packet_json) as unknown,
+    status: row.status,
+    result: parseJson(row.result_json),
+    createdAtMs: row.created_at_ms,
+    updatedAtMs: row.updated_at_ms,
+  };
+}
+
+function repairEscalationFromRow(row: RepairEscalationRow): RepairEscalationRecord {
+  return {
+    id: row.id,
+    runId: row.run_id,
+    scope: row.scope,
+    scopeId: row.scope_id,
+    findingId: row.finding_id,
+    findingDigest: row.finding_digest,
+    report: JSON.parse(row.report_json) as unknown,
+    createdAtMs: row.created_at_ms,
   };
 }
 
@@ -985,7 +1090,8 @@ export class WorkflowStore {
         .get(input.runId, input.scope, input.scopeId) as { attempt: number | null };
       const attempt = (row.attempt ?? 0) + 1;
       if (attempt > input.maxAttempts) throw new Error('retry budget exhausted');
-      if (input.hypothesis.trim() === '') throw new Error('attempt hypothesis is required');
+      const hypothesis = input.hypothesis.trim();
+      if (hypothesis === '') throw new Error('attempt hypothesis is required');
       this.#database
         .prepare(
           `INSERT INTO attempts
@@ -998,11 +1104,377 @@ export class WorkflowStore {
           input.scopeId,
           attempt,
           input.maxAttempts,
-          input.hypothesis,
+          hypothesis,
           input.nowMs ?? Date.now(),
         );
       return attempt;
     })();
+  }
+
+  planRepairDispatch(
+    input: {
+      id: string;
+      runId: string;
+      taskId: string;
+      findingId: string;
+      ownerRole: string;
+      findingDigest: string;
+      failureHeadSha: string;
+      hypothesis: string;
+      requiresHypothesisChange: boolean;
+      changeDigest: string;
+      changeEvidenceMinAtMs: number | null;
+      changeEvidenceAtMs: number | null;
+      changeHeadSha: string | null;
+      failureEvidenceAtMs: number;
+      packet: (taskAttempt: number, findingAttempt: number) => unknown;
+      maxTaskAttempts: number;
+      maxFindingAttempts: number;
+      escalationReport: (scope: 'task' | 'finding', attemptsUsed: number) => unknown;
+      workspaceId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs?: number;
+    },
+    capability?: symbol,
+  ): RepairPlanResult {
+    if (capability !== workflowRepairMutationCapability) {
+      throw new Error('repair mutation requires coordinator capability');
+    }
+    const nowMs = input.nowMs ?? Date.now();
+    return this.#database.transaction((): RepairPlanResult => {
+      if (this.#workspaceForRun(input.runId) !== input.workspaceId) {
+        throw new Error('repair workspace does not match the run contract');
+      }
+      if (!this.#contractForRun(input.runId).tasks.some((task) => task.id === input.taskId)) {
+        throw new Error('repair task does not match the run contract');
+      }
+      this.#assertResourceLease(
+        'workspace',
+        input.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        nowMs,
+      );
+      this.#assertResourceLease('run', input.runId, input.ownerId, input.runLeaseEpoch, nowMs);
+      this.#assertResourceLease('task', input.taskId, input.ownerId, input.taskLeaseEpoch, nowMs);
+      const run = this.getRun(input.runId);
+      if (run?.state !== 'repair' && run?.state !== 'repair_planning') {
+        throw new Error('run is not in a repair state');
+      }
+      const existing = this.getRepairDispatch(input.id);
+      if (existing !== undefined) {
+        if (
+          existing.runId !== input.runId ||
+          existing.taskId !== input.taskId ||
+          existing.findingId !== input.findingId ||
+          existing.ownerRole !== input.ownerRole ||
+          existing.findingDigest !== input.findingDigest ||
+          existing.failureHeadSha !== input.failureHeadSha ||
+          existing.changeDigest !== input.changeDigest ||
+          existing.changeEvidenceMinAtMs !== input.changeEvidenceMinAtMs ||
+          existing.changeEvidenceAtMs !== input.changeEvidenceAtMs ||
+          existing.changeHeadSha !== input.changeHeadSha ||
+          JSON.stringify(existing.packet) !==
+            JSON.stringify(input.packet(existing.taskAttempt, existing.findingAttempt))
+        ) {
+          throw new Error('repair dispatch id is already bound to different immutable input');
+        }
+        return { kind: 'dispatch', dispatch: existing };
+      }
+      const taskEscalation = this.getRepairEscalation(input.runId, 'task', input.taskId);
+      if (taskEscalation !== undefined) {
+        if (
+          taskEscalation.findingId === input.findingId &&
+          taskEscalation.findingDigest !== input.findingDigest
+        ) {
+          throw new Error('repair finding id is already bound to different immutable input');
+        }
+        return { kind: 'escalated', escalation: taskEscalation };
+      }
+      const findingEscalation = this.getRepairEscalation(input.runId, 'finding', input.findingId);
+      if (findingEscalation !== undefined) {
+        if (findingEscalation.findingDigest !== input.findingDigest) {
+          throw new Error('repair finding id is already bound to different immutable input');
+        }
+        return { kind: 'escalated', escalation: findingEscalation };
+      }
+      if (input.hypothesis.trim() === '') throw new Error('repair hypothesis is required');
+      const lastDispatch = this.#database
+        .prepare(
+          `SELECT * FROM repair_dispatches WHERE run_id = ? AND finding_id = ?
+           ORDER BY finding_attempt DESC LIMIT 1`,
+        )
+        .get(input.runId, input.findingId) as RepairDispatchRow | undefined;
+      if (lastDispatch?.change_digest === input.changeDigest) {
+        throw new Error('identical repair retry is forbidden');
+      }
+      if (
+        input.changeEvidenceMinAtMs !== null &&
+        input.changeEvidenceMinAtMs <=
+          (lastDispatch?.change_evidence_at_ms ?? input.failureEvidenceAtMs)
+      ) {
+        throw new Error('repair evidence does not prove a newer changed condition');
+      }
+      if (
+        lastDispatch?.finding_digest !== undefined &&
+        lastDispatch.finding_digest !== input.findingDigest
+      ) {
+        throw new Error('repair finding id is already bound to different immutable input');
+      }
+      if (input.requiresHypothesisChange && lastDispatch === undefined) {
+        const previousTaskAttempt = this.#database
+          .prepare(
+            `SELECT hypothesis FROM attempts WHERE run_id = ? AND scope = 'task' AND scope_id = ?
+             ORDER BY attempt DESC LIMIT 1`,
+          )
+          .get(input.runId, input.taskId) as { hypothesis: string } | undefined;
+        if (previousTaskAttempt?.hypothesis.trim() === input.hypothesis.trim()) {
+          throw new Error('repair retry requires a changed hypothesis');
+        }
+      }
+      const attemptCount = (
+        scope: 'task' | 'finding',
+        scopeId: string,
+        expectedMaximum: number,
+      ): number => {
+        const row = this.#database
+          .prepare(
+            `SELECT COALESCE(MAX(attempt), 0) AS attempt, MIN(max_attempts) AS minimum,
+                    MAX(max_attempts) AS maximum FROM attempts
+             WHERE run_id = ? AND scope = ? AND scope_id = ?`,
+          )
+          .get(input.runId, scope, scopeId) as {
+          attempt: number;
+          minimum: number | null;
+          maximum: number | null;
+        };
+        if (
+          row.minimum !== null &&
+          (row.minimum !== expectedMaximum || row.maximum !== expectedMaximum)
+        ) {
+          throw new Error('repair attempt budget does not match the approved contract');
+        }
+        return row.attempt;
+      };
+      const taskAttempts = attemptCount('task', input.taskId, input.maxTaskAttempts);
+      const findingAttempts = attemptCount('finding', input.findingId, input.maxFindingAttempts);
+      const exhausted =
+        taskAttempts >= input.maxTaskAttempts
+          ? ({ scope: 'task', scopeId: input.taskId, attempts: taskAttempts } as const)
+          : findingAttempts >= input.maxFindingAttempts
+            ? ({ scope: 'finding', scopeId: input.findingId, attempts: findingAttempts } as const)
+            : undefined;
+      if (exhausted !== undefined) {
+        const id = `repair-escalation:${input.runId}:${exhausted.scope}:${exhausted.scopeId}`;
+        this.#database
+          .prepare(
+            `INSERT OR IGNORE INTO repair_escalations
+             (id, run_id, scope, scope_id, finding_id, finding_digest, report_json, created_at_ms)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .run(
+            id,
+            input.runId,
+            exhausted.scope,
+            exhausted.scopeId,
+            input.findingId,
+            input.findingDigest,
+            JSON.stringify(input.escalationReport(exhausted.scope, exhausted.attempts)),
+            nowMs,
+          );
+        return {
+          kind: 'escalated',
+          escalation: this.getRepairEscalation(input.runId, exhausted.scope, exhausted.scopeId)!,
+        };
+      }
+      const taskAttempt = taskAttempts + 1;
+      const findingAttempt = findingAttempts + 1;
+      const insertAttempt = this.#database.prepare(
+        `INSERT INTO attempts
+         (run_id, scope, scope_id, attempt, max_attempts, hypothesis, created_at_ms)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      );
+      insertAttempt.run(
+        input.runId,
+        'task',
+        input.taskId,
+        taskAttempt,
+        input.maxTaskAttempts,
+        input.hypothesis.trim(),
+        nowMs,
+      );
+      insertAttempt.run(
+        input.runId,
+        'finding',
+        input.findingId,
+        findingAttempt,
+        input.maxFindingAttempts,
+        input.hypothesis.trim(),
+        nowMs,
+      );
+      this.#database
+        .prepare(
+          `INSERT INTO repair_dispatches
+           (id, run_id, task_id, finding_id, task_attempt, finding_attempt, owner_role, finding_digest,
+            failure_head_sha, change_digest, change_evidence_min_at_ms, change_evidence_at_ms, change_head_sha,
+            packet_json, status, result_json, created_at_ms, updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'dispatched', NULL, ?, ?)`,
+        )
+        .run(
+          input.id,
+          input.runId,
+          input.taskId,
+          input.findingId,
+          taskAttempt,
+          findingAttempt,
+          input.ownerRole,
+          input.findingDigest,
+          input.failureHeadSha,
+          input.changeDigest,
+          input.changeEvidenceMinAtMs,
+          input.changeEvidenceAtMs,
+          input.changeHeadSha,
+          JSON.stringify(input.packet(taskAttempt, findingAttempt)),
+          nowMs,
+          nowMs,
+        );
+      return { kind: 'dispatch', dispatch: this.getRepairDispatch(input.id)! };
+    })();
+  }
+
+  getRepairDispatch(id: string): RepairDispatchRecord | undefined {
+    const row = this.#database.prepare('SELECT * FROM repair_dispatches WHERE id = ?').get(id) as
+      | RepairDispatchRow
+      | undefined;
+    return row === undefined ? undefined : repairDispatchFromRow(row);
+  }
+
+  acceptRepairDispatch(
+    input: {
+      id: string;
+      result: unknown;
+      workspaceId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      assertExternalState: () => void;
+      clock: () => number;
+    },
+    capability?: symbol,
+  ): RepairDispatchRecord {
+    if (capability !== workflowRepairMutationCapability) {
+      throw new Error('repair mutation requires coordinator capability');
+    }
+    const nowMs = input.clock();
+    return this.#database.transaction(() => {
+      const before = this.getRepairDispatch(input.id);
+      if (before === undefined) throw new Error('repair dispatch not found');
+      this.#assertRepairMutationLeases(before, input, nowMs);
+      const run = this.getRun(before.runId);
+      if (run?.state !== 'repair' && run?.state !== 'repair_planning') {
+        throw new Error('run is not in a repair state');
+      }
+      input.assertExternalState();
+      const verifiedAtMs = input.clock();
+      this.#assertRepairMutationLeases(before, input, verifiedAtMs);
+      const changed = this.#database
+        .prepare(
+          `UPDATE repair_dispatches SET status = 'accepted', result_json = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'dispatched'`,
+        )
+        .run(JSON.stringify(input.result), verifiedAtMs, input.id);
+      const dispatch = this.getRepairDispatch(input.id)!;
+      if (
+        dispatch.status === 'accepted' &&
+        changed.changes === 0 &&
+        JSON.stringify(dispatch.result) !== JSON.stringify(input.result)
+      ) {
+        throw new Error('accepted repair result is immutable');
+      }
+      if (changed.changes === 0 && dispatch.status !== 'accepted') {
+        throw new Error('only an active repair dispatch can be accepted');
+      }
+      return dispatch;
+    })();
+  }
+
+  cancelRepairDispatch(
+    input: {
+      id: string;
+      reason: unknown;
+      workspaceId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs?: number;
+    },
+    capability?: symbol,
+  ): RepairDispatchRecord {
+    if (capability !== workflowRepairMutationCapability) {
+      throw new Error('repair mutation requires coordinator capability');
+    }
+    const nowMs = input.nowMs ?? Date.now();
+    return this.#database.transaction(() => {
+      const before = this.getRepairDispatch(input.id);
+      if (before === undefined) throw new Error('repair dispatch not found');
+      this.#assertRepairMutationLeases(before, input, nowMs);
+      const run = this.getRun(before.runId);
+      if (
+        run?.state !== 'repair' &&
+        run?.state !== 'repair_planning' &&
+        run?.state !== 'cancelling'
+      ) {
+        throw new Error('run cannot cancel a repair dispatch from its current state');
+      }
+      this.#database
+        .prepare(
+          `UPDATE repair_dispatches SET status = 'cancelled', result_json = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'dispatched'`,
+        )
+        .run(JSON.stringify(input.reason), nowMs, input.id);
+      return this.getRepairDispatch(input.id)!;
+    })();
+  }
+
+  #assertRepairMutationLeases(
+    dispatch: RepairDispatchRecord,
+    input: {
+      workspaceId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+    },
+    nowMs: number,
+  ): void {
+    if (this.#workspaceForRun(dispatch.runId) !== input.workspaceId) {
+      throw new Error('repair workspace does not match the run contract');
+    }
+    this.#assertResourceLease(
+      'workspace',
+      input.workspaceId,
+      input.ownerId,
+      input.workspaceLeaseEpoch,
+      nowMs,
+    );
+    this.#assertResourceLease('run', dispatch.runId, input.ownerId, input.runLeaseEpoch, nowMs);
+    this.#assertResourceLease('task', dispatch.taskId, input.ownerId, input.taskLeaseEpoch, nowMs);
+  }
+
+  getRepairEscalation(
+    runId: string,
+    scope: RepairEscalationRecord['scope'],
+    scopeId: string,
+  ): RepairEscalationRecord | undefined {
+    const row = this.#database
+      .prepare('SELECT * FROM repair_escalations WHERE run_id = ? AND scope = ? AND scope_id = ?')
+      .get(runId, scope, scopeId) as RepairEscalationRow | undefined;
+    return row === undefined ? undefined : repairEscalationFromRow(row);
   }
 
   putWait(input: {
@@ -1189,6 +1661,68 @@ export class WorkflowStore {
           ...input.allowedProducerRoles,
         ) !== undefined
     );
+  }
+
+  hasTaskEvidenceBinding(input: {
+    digest: string;
+    mediaType: string;
+    sizeBytes: number;
+    kind: string;
+    workspaceId: string;
+    runId: string;
+    taskId: string;
+    contractVersion: number;
+    policyDigest: string;
+    allowedProducerRoles: readonly string[];
+  }): boolean {
+    return this.getTaskEvidenceBindingCreatedAt(input) !== undefined;
+  }
+
+  getTaskEvidenceBindingCreatedAt(input: {
+    digest: string;
+    mediaType: string;
+    sizeBytes: number;
+    kind: string;
+    workspaceId: string;
+    runId: string;
+    taskId: string;
+    contractVersion: number;
+    policyDigest: string;
+    allowedProducerRoles: readonly string[];
+  }): { createdAtMs: number; headSha: string; transitionId: string } | undefined {
+    if (input.allowedProducerRoles.length === 0) return undefined;
+    const placeholders = input.allowedProducerRoles.map(() => '?').join(', ');
+    const row = this.#database
+      .prepare(
+        `SELECT evidence_bindings.created_at_ms, evidence_bindings.head_sha,
+                evidence_bindings.transition_id FROM evidence_bindings
+           JOIN evidence ON evidence.digest = evidence_bindings.digest
+           WHERE evidence_bindings.digest = ? AND evidence.media_type = ? AND evidence.size_bytes = ?
+             AND evidence.kind = ? AND evidence_bindings.workspace_id = ?
+             AND evidence_bindings.run_id = ? AND evidence_bindings.task_id = ?
+             AND evidence_bindings.contract_version = ? AND evidence_bindings.policy_digest = ?
+             AND evidence_bindings.producer_role IN (${placeholders})
+           ORDER BY evidence_bindings.created_at_ms ASC LIMIT 1`,
+      )
+      .get(
+        input.digest,
+        input.mediaType,
+        input.sizeBytes,
+        input.kind,
+        input.workspaceId,
+        input.runId,
+        input.taskId,
+        input.contractVersion,
+        input.policyDigest,
+        ...input.allowedProducerRoles,
+      ) as { created_at_ms: number; head_sha: string; transition_id: string } | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          createdAtMs: row.created_at_ms,
+          headSha: row.head_sha,
+          transitionId: row.transition_id,
+        };
   }
 
   hasTaskEvidenceAtHead(input: {
@@ -1720,9 +2254,42 @@ export class WorkflowStore {
       );
       CREATE INDEX IF NOT EXISTS scheduler_executions_workspace_status
         ON scheduler_executions(workspace_id, status, mode);
+      CREATE TABLE IF NOT EXISTS repair_dispatches (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        finding_id TEXT NOT NULL,
+        task_attempt INTEGER NOT NULL,
+        finding_attempt INTEGER NOT NULL,
+        owner_role TEXT NOT NULL,
+        finding_digest TEXT NOT NULL,
+        failure_head_sha TEXT NOT NULL,
+        change_digest TEXT NOT NULL,
+        change_evidence_min_at_ms INTEGER,
+        change_evidence_at_ms INTEGER,
+        change_head_sha TEXT,
+        packet_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('dispatched', 'accepted', 'cancelled')),
+        result_json TEXT,
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        UNIQUE(run_id, finding_id, finding_attempt)
+      );
+      CREATE TABLE IF NOT EXISTS repair_escalations (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        scope TEXT NOT NULL CHECK(scope IN ('task', 'finding')),
+        scope_id TEXT NOT NULL,
+        finding_id TEXT NOT NULL,
+        finding_digest TEXT NOT NULL,
+        report_json TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL,
+        UNIQUE(run_id, scope, scope_id)
+      );
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (1, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (2, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (3, unixepoch() * 1000);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (8, unixepoch() * 1000);
     `);
     const transitionColumns = this.#database
       .prepare('PRAGMA table_info(transitions)')

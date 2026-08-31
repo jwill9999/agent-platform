@@ -15,10 +15,10 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-31
-- **Session:** Completed implementation and independent review of `.5`.
-- **Branch:** `task/agent-platform-multi-agent.5`
-- **Parent tip:** `.4` at `73e512d`.
-- **Current base commit:** `.5` checkpoint at `43fa20b`; completion commit follows final gates.
+- **Session:** Closed `.5` and started durable bounded repair loops in `.6`.
+- **Branch:** `task/agent-platform-multi-agent.6`
+- **Parent tip:** `.5` at `46a189f`.
+- **Current base commit:** `.6` branches exactly from the pushed `.5` completion tip.
 - **Pull request:** Planning PR #251 is merged; open the cumulative task PR only from `.10`.
 
 ## Completed Through `.5`
@@ -35,26 +35,30 @@ and actionable.
     active-lease quarantine;
   - reconciles crashed executions independently so one cleanup failure cannot suppress later work;
   - requires clean-tree, immutable-base, stable exact-head evidence before brokered Beads close.
+- `.6` in progress: typed repair sources and deterministic producer/owner routing; task and finding
+  budgets charged atomically; canonical hypothesis and monotonic evidence-change detection; durable
+  idempotent escalation; strict repair acceptance; accepted-result recovery.
 
 ## Review and Verification
 
 - Independent critic review iterated through concurrency, restart, diff-integrity, capability, and
   credential-race findings; the final pass reports no actionable findings.
-- Focused package gates pass: typecheck, lint, and 112 tests; one Docker test is skipped in the normal
-  suite and executed separately by `test:isolation`.
+- `.5` gates passed: typecheck, lint, 112 tests, and the separately executed real Docker isolation
+  test. The final `.5` critic pass reported no actionable findings.
+- `.6` has 28 focused repair-loop tests and 140 package tests passing. Its final independent critic
+  pass reported no actionable findings after reviewing the trusted Git-diff hardening.
 - SonarQube hotspot `AZ4YM2i11EaT2bQAPFS4` is `REVIEWED / FIXED`; zero hotspots remain.
 - Sonar per-file MCP analysis timed out during server startup, so the documented local fallback gates
   are the completion evidence for this task.
 
 ## Current State
 
-- Epic `agent-platform-multi-agent` remains open; `.1`-`.4` are closed and Dolt-synced.
-- `.5` is implementation-complete and awaiting final gates, commit, push, Beads close, and Dolt sync.
+- Epic `agent-platform-multi-agent` remains open; `.1`-`.5` are closed, pushed, and Dolt-synced.
+- `.6` is claimed and in progress on the correctly chained task branch.
 - No pull request is expected yet; the linear task chain continues through `.10`.
 
 ## Next
 
-1. Finish `.5` final gates, commit, push, close the Beads task, and run `bd dolt push`.
-2. Create `task/agent-platform-multi-agent.6` exactly from the `.5` tip and claim `.6`.
-3. Implement bounded work, review, and test-repair loops with incremental tests and critic review.
-4. Continue through `.10`, then open the single cumulative PR to `feature/multi-agent-orchestration`.
+1. Commit, push, close `.6`, and sync Beads/Dolt.
+2. Create `.7` exactly from the `.6` tip and implement Git/ref and GitHub delivery brokers.
+3. Continue through `.10`, then open the single cumulative PR to `feature/multi-agent-orchestration`.
