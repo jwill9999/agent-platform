@@ -12,6 +12,8 @@ ${CODEX_HOME}/workflow-control/<workspace-hash>/
 The SQLite database runs with foreign keys and WAL enabled. Schema migration `1` creates immutable
 execution contracts plus runs, fenced leases, transitions, attempts, waits, findings, external-effect
 intents, and evidence metadata. Reopening the store applies migrations idempotently.
+Schema migration `2` adds persisted critic reviews/findings, focused human-decision payloads, finding
+dispositions, and evidence-backed human approvals.
 
 ## Mutation protocol
 

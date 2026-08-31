@@ -40,6 +40,19 @@ export {
   type WaitRecord,
 } from './lifecycle.js';
 export {
+  approvalInvalidationReason,
+  criticFindingSchema,
+  criticReviewSchema,
+  deriveContractMaterialDigest,
+  findingDispositionSchema,
+  humanDecisionRequestSchema,
+  planApprovalSchema,
+  validateDraftContract,
+  type CriticReview,
+  type FindingDisposition,
+  type PlanApproval,
+} from './planning.js';
+export {
   DEFAULT_ROLE_OPERATION_POLICY,
   ProcessCapabilityBroker,
   assertBuiltInCollaborationAgentAllowed,

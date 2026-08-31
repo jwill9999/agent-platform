@@ -4,7 +4,17 @@ import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import type { ExecutionContract } from './contracts.js';
+import { executionContractSchema, type ExecutionContract } from './contracts.js';
+import {
+  approvalInvalidationReason,
+  criticReviewSchema,
+  deriveContractMaterialDigest,
+  findingDispositionSchema,
+  planApprovalSchema,
+  type CriticReview,
+  type FindingDisposition,
+  type PlanApproval,
+} from './planning.js';
 import type { WorkflowState } from './stateMachine.js';
 
 export interface WorkflowControlPaths {
@@ -150,6 +160,7 @@ export class WorkflowStore {
 
   createContract(contract: ExecutionContract, createdAtMs = Date.now()): string {
     const id = `${contract.featureId}:v${contract.contractVersion}:${contract.policyDigest}`;
+    const body = JSON.stringify(contract);
     this.#database
       .prepare(
         `INSERT OR IGNORE INTO contracts
@@ -162,9 +173,17 @@ export class WorkflowStore {
         contract.contractVersion,
         contract.policyDigest,
         contract.workspaceId,
-        JSON.stringify(contract),
+        body,
         createdAtMs,
       );
+    const stored = this.#database
+      .prepare('SELECT body_json FROM contracts WHERE id = ?')
+      .get(id) as {
+      body_json: string;
+    };
+    if (stored.body_json !== body) {
+      throw new Error('immutable contract identity already exists with different content');
+    }
     return id;
   }
 
@@ -603,6 +622,216 @@ export class WorkflowStore {
     );
   }
 
+  recordCriticReview(reviewInput: unknown, createdAtMs = Date.now()): CriticReview {
+    const review = criticReviewSchema.parse(reviewInput);
+    this.#database.transaction(() => {
+      const run = this.getRun(review.runId);
+      if (run === undefined) throw new Error('workflow run not found');
+      const contract = this.#contractForRun(review.runId);
+      if (
+        contract.contractVersion !== review.contractVersion ||
+        contract.policyDigest !== review.policyDigest ||
+        deriveContractMaterialDigest(contract) !== review.materialDigest
+      ) {
+        throw new Error('critic review contract or policy is stale');
+      }
+      this.#assertEvidenceReferences(review.evidence);
+      for (const finding of review.findings) this.#assertEvidenceReferences(finding.evidence);
+      this.#database
+        .prepare(
+          `INSERT INTO critic_reviews
+           (id, run_id, planner_id, critic_id, contract_version, policy_digest, material_digest, verdict,
+            summary, evidence_json, human_decision_json, created_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          review.reviewId,
+          review.runId,
+          review.plannerId,
+          review.criticId,
+          review.contractVersion,
+          review.policyDigest,
+          review.materialDigest,
+          review.verdict,
+          review.summary,
+          JSON.stringify(review.evidence),
+          JSON.stringify(review.humanDecision),
+          createdAtMs,
+        );
+      const insertFinding = this.#database.prepare(
+        `INSERT INTO critic_findings
+         (id, review_id, severity, summary, requirement, evidence_json, proposed_correction,
+          requires_human_decision, disposition_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+      );
+      for (const finding of review.findings) {
+        insertFinding.run(
+          finding.id,
+          review.reviewId,
+          finding.severity,
+          finding.summary,
+          finding.requirement,
+          JSON.stringify(finding.evidence),
+          finding.proposedCorrection ?? null,
+          finding.requiresHumanDecision ? 1 : 0,
+        );
+      }
+    })();
+    return review;
+  }
+
+  disposeCriticFinding(dispositionInput: unknown): FindingDisposition {
+    const disposition = findingDispositionSchema.parse(dispositionInput);
+    this.#assertEvidenceReferences(disposition.evidence);
+    const changed = this.#database
+      .prepare(
+        `UPDATE critic_findings SET disposition_json = ?
+         WHERE id = ? AND disposition_json IS NULL`,
+      )
+      .run(JSON.stringify(disposition), disposition.findingId);
+    if (changed.changes !== 1) throw new Error('finding not found or already disposed');
+    return disposition;
+  }
+
+  createPlanApproval(input: {
+    approvalId: string;
+    runId: string;
+    approverId: string;
+    contract: unknown;
+    evidence: PlanApproval['evidence'];
+    approvedAtMs?: number;
+  }): PlanApproval {
+    const contract = executionContractForApproval(input.contract);
+    this.#assertEvidenceReferences(input.evidence);
+    return this.#database.transaction(() => {
+      const storedContract = this.#contractForRun(input.runId);
+      if (
+        storedContract.contractVersion !== contract.contractVersion ||
+        storedContract.policyDigest !== contract.policyDigest ||
+        deriveContractMaterialDigest(storedContract) !== deriveContractMaterialDigest(contract)
+      ) {
+        throw new Error('approval contract or policy is stale');
+      }
+      const latestReview = this.#database
+        .prepare(
+          `SELECT id, verdict FROM critic_reviews
+           WHERE run_id = ? ORDER BY created_at_ms DESC, id DESC LIMIT 1`,
+        )
+        .get(input.runId) as { id: string; verdict: string } | undefined;
+      if (latestReview?.verdict !== 'approved')
+        throw new Error('latest critic review is not approved');
+      const unresolved = this.#database
+        .prepare(
+          `SELECT COUNT(*) AS count FROM critic_findings
+           JOIN critic_reviews ON critic_reviews.id = critic_findings.review_id
+           WHERE critic_reviews.run_id = ? AND critic_findings.disposition_json IS NULL`,
+        )
+        .get(input.runId) as { count: number };
+      if (unresolved.count > 0) throw new Error('critic findings remain unresolved');
+      this.#database
+        .prepare(
+          `UPDATE plan_approvals SET status = 'invalidated', invalidated_at_ms = ?,
+          invalidation_reason = 'superseded' WHERE run_id = ? AND status = 'active'`,
+        )
+        .run(input.approvedAtMs ?? Date.now(), input.runId);
+      const approval = planApprovalSchema.parse({
+        approvalId: input.approvalId,
+        runId: input.runId,
+        approverId: input.approverId,
+        contractVersion: contract.contractVersion,
+        policyDigest: contract.policyDigest,
+        materialDigest: deriveContractMaterialDigest(contract),
+        status: 'active',
+        approvedAtMs: input.approvedAtMs ?? Date.now(),
+        invalidatedAtMs: null,
+        invalidationReason: null,
+        evidence: input.evidence,
+      });
+      this.#database
+        .prepare(
+          `INSERT INTO plan_approvals
+           (id, run_id, approver_id, contract_version, policy_digest, material_digest, status,
+            approved_at_ms, invalidated_at_ms, invalidation_reason, evidence_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`,
+        )
+        .run(
+          approval.approvalId,
+          approval.runId,
+          approval.approverId,
+          approval.contractVersion,
+          approval.policyDigest,
+          approval.materialDigest,
+          approval.status,
+          approval.approvedAtMs,
+          JSON.stringify(approval.evidence),
+        );
+      return approval;
+    })();
+  }
+
+  invalidatePlanApproval(
+    approvalId: string,
+    reason: string,
+    invalidatedAtMs = Date.now(),
+  ): PlanApproval {
+    if (reason.trim() === '') throw new Error('invalidation reason is required');
+    const changed = this.#database
+      .prepare(
+        `UPDATE plan_approvals SET status = 'invalidated', invalidated_at_ms = ?,
+         invalidation_reason = ? WHERE id = ? AND status = 'active'`,
+      )
+      .run(invalidatedAtMs, reason, approvalId);
+    if (changed.changes !== 1) throw new Error('active approval not found');
+    return this.getPlanApproval(approvalId)!;
+  }
+
+  revalidatePlanApproval(
+    approvalId: string,
+    contractInput: unknown,
+    nowMs = Date.now(),
+  ): PlanApproval {
+    const approval = this.getPlanApproval(approvalId);
+    if (approval === undefined) throw new Error('approval not found');
+    if (approval.status === 'invalidated') return approval;
+    const reason = approvalInvalidationReason(approval, contractInput);
+    return reason === undefined ? approval : this.invalidatePlanApproval(approvalId, reason, nowMs);
+  }
+
+  getPlanApproval(approvalId: string): PlanApproval | undefined {
+    const row = this.#database
+      .prepare('SELECT * FROM plan_approvals WHERE id = ?')
+      .get(approvalId) as
+      | {
+          id: string;
+          run_id: string;
+          approver_id: string;
+          contract_version: 1;
+          policy_digest: string;
+          material_digest: string;
+          status: 'active' | 'invalidated';
+          approved_at_ms: number;
+          invalidated_at_ms: number | null;
+          invalidation_reason: string | null;
+          evidence_json: string;
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : planApprovalSchema.parse({
+          approvalId: row.id,
+          runId: row.run_id,
+          approverId: row.approver_id,
+          contractVersion: row.contract_version,
+          policyDigest: row.policy_digest,
+          materialDigest: row.material_digest,
+          status: row.status,
+          approvedAtMs: row.approved_at_ms,
+          invalidatedAtMs: row.invalidated_at_ms,
+          invalidationReason: row.invalidation_reason,
+          evidence: JSON.parse(row.evidence_json) as unknown,
+        });
+  }
+
   assertRunLease(runId: string, ownerId: string, epoch: number, nowMs = Date.now()): void {
     this.#assertLease(runId, ownerId, epoch, nowMs);
   }
@@ -618,6 +847,23 @@ export class WorkflowStore {
       lease.expires_at_ms <= nowMs
     ) {
       throw new Error('stale or expired run fencing token');
+    }
+  }
+
+  #contractForRun(runId: string): ExecutionContract {
+    const row = this.#database
+      .prepare(
+        `SELECT contracts.body_json FROM runs JOIN contracts ON contracts.id = runs.contract_id
+        WHERE runs.id = ?`,
+      )
+      .get(runId) as { body_json: string } | undefined;
+    if (row === undefined) throw new Error('workflow run not found');
+    return JSON.parse(row.body_json) as ExecutionContract;
+  }
+
+  #assertEvidenceReferences(references: ReadonlyArray<{ digest: string }>): void {
+    if (references.some((reference) => !this.hasEvidence(reference.digest))) {
+      throw new Error('planning evidence is not recorded');
     }
   }
 
@@ -728,7 +974,50 @@ export class WorkflowStore {
         head_sha TEXT,
         created_at_ms INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS critic_reviews (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        planner_id TEXT NOT NULL,
+        critic_id TEXT NOT NULL,
+        contract_version INTEGER NOT NULL,
+        policy_digest TEXT NOT NULL,
+        material_digest TEXT NOT NULL,
+        verdict TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        evidence_json TEXT NOT NULL,
+        human_decision_json TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS critic_findings (
+        id TEXT PRIMARY KEY,
+        review_id TEXT NOT NULL REFERENCES critic_reviews(id),
+        severity TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        requirement TEXT NOT NULL,
+        evidence_json TEXT NOT NULL,
+        proposed_correction TEXT,
+        requires_human_decision INTEGER NOT NULL CHECK (requires_human_decision IN (0, 1)),
+        disposition_json TEXT
+      );
+      CREATE TABLE IF NOT EXISTS plan_approvals (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        approver_id TEXT NOT NULL,
+        contract_version INTEGER NOT NULL,
+        policy_digest TEXT NOT NULL,
+        material_digest TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('active', 'invalidated')),
+        approved_at_ms INTEGER NOT NULL,
+        invalidated_at_ms INTEGER,
+        invalidation_reason TEXT,
+        evidence_json TEXT NOT NULL
+      );
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (1, unixepoch() * 1000);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (2, unixepoch() * 1000);
     `);
   }
+}
+
+function executionContractForApproval(input: unknown): ExecutionContract {
+  return executionContractSchema.parse(input);
 }
