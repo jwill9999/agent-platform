@@ -15,10 +15,10 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-31
-- **Session:** Completed workflow-control tasks `.1`–`.3`; durable broker persistence is ready.
-- **Branch:** `task/agent-platform-multi-agent.3`
+- **Session:** Completed workflow-control tasks `.1`–`.4`; planning approval is now durable.
+- **Branch:** `task/agent-platform-multi-agent.4`
 - **Base:** `feature/multi-agent-orchestration` at merged `staging` tip `6b63ea5`.
-- **Head:** `edbf2dc` completes `.3`; task-chain push/close is pending final evidence commit.
+- **Head:** `04c0a1e` completes `.4`; evidence commit/push/close is pending.
 - **Pull request:** Planning PR #251 is merged; the cumulative task PR opens only from `.10`.
 
 ## What Happened
@@ -31,6 +31,8 @@ and actionable.
   state, findings, content-addressed evidence, restart reconciliation, CLI, and read-only stdio MCP.
 - Added a concrete workspace-pinned official Beads/Dolt adapter. Active-run claim, close, and Dolt push
   are journaled and operation-restricted; no direct write subprocess exists in workflow control.
+- Completed `.4`: read-only planner/critic agents and skills, material-digest-bound critic reviews,
+  persisted findings/dispositions, focused owner decisions, explicit approval, and invalidation.
 - SonarQube project lookup succeeds, but per-file analysis still times out during server startup. The
   documented fallback gates pass with no errors.
 
@@ -45,9 +47,9 @@ and actionable.
 
 ## Current State
 
-- Epic `agent-platform-multi-agent` remains open. `.1` and `.2` are closed and pushed; `.3` is ready
-  for its evidence commit, push, Beads close, and Dolt sync.
-- The current cumulative branch is `task/agent-platform-multi-agent.3`; `.4` becomes ready after `.3`
+- Epic `agent-platform-multi-agent` remains open. `.1`–`.3` are closed and pushed; `.4` is ready for
+  its evidence commit, push, Beads close, and Dolt sync.
+- The current cumulative branch is `task/agent-platform-multi-agent.4`; `.5` becomes ready after `.4`
   closes and must branch from this tip.
 - Contracts, isolation, authorization, persistence, artifacts, and Beads/Dolt brokerage are present.
   Git/ref and GitHub brokers begin in `.5` and `.6`; autonomous delivery remains disabled meanwhile.
@@ -55,7 +57,7 @@ and actionable.
 
 ## Next
 
-1. Commit/push `.3` evidence, close/sync it in Beads, then create `.4` from the `.3` tip.
-2. Implement `.4` planning, independent critic, approval, and version-invalidation gate.
-3. Continue the linear `.5`–`.10` chain, running exact-head gates at every task boundary.
+1. Commit/push `.4` evidence, close/sync it in Beads, then create `.5` from the `.4` tip.
+2. Implement `.5` orchestrator scheduling and brokered Beads lifecycle.
+3. Continue the linear `.6`–`.10` chain, running exact-head gates at every task boundary.
 4. Open the single cumulative task-tip PR to `feature/multi-agent-orchestration` only after `.10`.
