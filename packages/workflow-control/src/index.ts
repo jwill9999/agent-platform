@@ -12,6 +12,7 @@ export {
   workflowOperationSchema,
   workflowRoleSchema,
   type AgentResult,
+  type EvidenceReference,
   type ExecutionContract,
   type TaskPacket,
   type WorkflowOperation,
@@ -52,6 +53,16 @@ export {
   type FindingDisposition,
   type PlanApproval,
 } from './planning.js';
+export {
+  PilotConcurrencyController,
+  WorkflowOrchestrator,
+  selectBeadsReadyTasks,
+  type BeadsTaskSnapshot,
+  type BrokeredTaskCloser,
+  type ExactHeadGate,
+  type IsolatedSpecialistLauncher,
+  type SpecialistReservation,
+} from './orchestrator.js';
 export {
   DEFAULT_ROLE_OPERATION_POLICY,
   ProcessCapabilityBroker,

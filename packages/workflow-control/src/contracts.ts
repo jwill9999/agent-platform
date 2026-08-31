@@ -236,6 +236,7 @@ export const agentResultSchema = z
 export type ExecutionContract = z.infer<typeof executionContractSchema>;
 export type TaskPacket = z.infer<typeof taskPacketSchema>;
 export type AgentResult = z.infer<typeof agentResultSchema>;
+export type EvidenceReference = z.infer<typeof evidenceReferenceSchema>;
 export type WorkflowOperation = z.infer<typeof workflowOperationSchema>;
 export type WorkflowRole = z.infer<typeof workflowRoleSchema>;
 
