@@ -113,10 +113,10 @@ that isolation, the workflow remains planning/read-only and must not claim auton
 
 ### Follow-up actions
 
-- [ ] Implement the execution contract, capability matrix, and normative state machine.
-- [ ] Prove the external `codex exec` specialist-launch boundary prevents credential, broker, Beads,
+- [x] Implement the execution contract, capability matrix, and normative state machine.
+- [x] Prove the external `codex exec` specialist-launch boundary prevents credential, broker, Beads,
       Git, and host-state access before enabling autonomous execution.
-- [ ] Implement `packages/workflow-control/` with fenced leases, transition journal, artifacts, and
+- [x] Implement `packages/workflow-control/` with fenced leases, transition journal, artifacts, and
       reconciliation.
 - [ ] Implement narrow Beads, Git/ref, and GitHub mutation brokers and negative authorization tests.
 - [ ] Pilot one repository feature through the complete workflow before increasing authority.

@@ -39,7 +39,7 @@ Implement and prove the external specialist-launch boundary and deny-by-default 
 
 - [x] Isolation feasibility gate passes on the pilot host; otherwise autonomous delivery remains disabled.
 - [x] Authorization denials are deterministic and audited.
-- [ ] Intermediate exact-head integration gate and brokered Beads close pass.
+- [x] Intermediate exact-head integration gate and Beads close pass.
 
 ## Sign-off
 
