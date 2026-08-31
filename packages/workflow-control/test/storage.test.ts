@@ -7,12 +7,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   JournaledBeadsDoltBroker,
   JournaledMutationBroker,
+  OfficialBeadsDoltPort,
   WorkflowStore,
   compareBeadsAuthoritativeState,
   resolveWorkflowControlPaths,
   type ExecutionContract,
   type FaultBoundary,
   type JournaledMutationPort,
+  type OfficialBeadsDoltClient,
   type PrepareTransitionInput,
 } from '../src/index.js';
 
@@ -115,6 +117,43 @@ class FakeMutationPort implements JournaledMutationPort {
     this.mutations += 1;
     this.state = 'expected';
     return { status: 'claimed' };
+  }
+}
+
+class FakeBeadsDoltClient implements OfficialBeadsDoltClient {
+  issueStatus: 'open' | 'in_progress' | 'closed' = 'open';
+  syncStatus: 'pending' | 'synced' | 'conflict' = 'pending';
+  calls: Array<{ operation: string; workspaceRoot: string; idempotencyKey: string }> = [];
+
+  async readIssue() {
+    return { status: this.issueStatus };
+  }
+
+  async claimIssue(workspaceRoot: string, _taskId: string, idempotencyKey: string) {
+    this.calls.push({ operation: 'claim', workspaceRoot, idempotencyKey });
+    this.issueStatus = 'in_progress';
+    return { status: this.issueStatus };
+  }
+
+  async closeIssue(
+    workspaceRoot: string,
+    _taskId: string,
+    _reason: string,
+    idempotencyKey: string,
+  ) {
+    this.calls.push({ operation: 'close', workspaceRoot, idempotencyKey });
+    this.issueStatus = 'closed';
+    return { status: this.issueStatus };
+  }
+
+  async readDoltSync() {
+    return this.syncStatus;
+  }
+
+  async pushDolt(workspaceRoot: string, idempotencyKey: string) {
+    this.calls.push({ operation: 'dolt_push', workspaceRoot, idempotencyKey });
+    this.syncStatus = 'synced';
+    return { status: this.syncStatus };
   }
 }
 
@@ -401,6 +440,34 @@ describe('JournaledMutationBroker recovery', () => {
     ).toThrow('exclusive official broker port');
     store.close();
   });
+
+  it.each([
+    ['beads.task_claim', 'open', 'in_progress', 'claim'],
+    ['beads.task_close', 'in_progress', 'closed', 'close'],
+    ['beads.dolt_push', 'pending', 'synced', 'dolt_push'],
+  ] as const)(
+    'brokers %s through the pinned official adapter',
+    async (operation, before, after, call) => {
+      const { store, input } = await createStore();
+      const client = new FakeBeadsDoltClient();
+      if (operation === 'beads.dolt_push') client.syncStatus = before;
+      else client.issueStatus = before;
+      const port = new OfficialBeadsDoltPort('/repo/root', client);
+      const broker = new JournaledBeadsDoltBroker(store, port, undefined, () => 1000);
+      const result = await broker.execute({
+        ...input,
+        operation,
+        expectedExternalState: { status: after },
+        externalArguments: { taskId: 'feature-persistence.1', reason: 'accepted' },
+      });
+
+      expect(result.status).toBe('committed');
+      expect(client.calls).toEqual([
+        { operation: call, workspaceRoot: '/repo/root', idempotencyKey: input.idempotencyKey },
+      ]);
+      store.close();
+    },
+  );
 
   it('treats Beads as lifecycle authority and blocks unmatched closes', () => {
     expect(

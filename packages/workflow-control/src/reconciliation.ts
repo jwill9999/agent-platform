@@ -200,18 +200,103 @@ export function compareBeadsAuthoritativeState(input: {
   return { action: 'consistent' };
 }
 
-export interface BeadsDoltMutationPort extends JournaledMutationPort {
-  readonly writerKind: 'official-beads-mcp-and-dolt-broker';
+export interface OfficialBeadsDoltClient {
+  readIssue(
+    workspaceRoot: string,
+    taskId: string,
+  ): Promise<{ status: 'open' | 'in_progress' | 'closed' }>;
+  claimIssue(workspaceRoot: string, taskId: string, idempotencyKey: string): Promise<unknown>;
+  closeIssue(
+    workspaceRoot: string,
+    taskId: string,
+    reason: string,
+    idempotencyKey: string,
+  ): Promise<unknown>;
+  readDoltSync(
+    workspaceRoot: string,
+    idempotencyKey: string,
+  ): Promise<'pending' | 'synced' | 'conflict'>;
+  pushDolt(workspaceRoot: string, idempotencyKey: string): Promise<unknown>;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('broker arguments must be an object');
+  }
+  return value as Record<string, unknown>;
+}
+
+function requiredString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`broker argument ${key} is required`);
+  }
+  return value;
+}
+
+export class OfficialBeadsDoltPort implements JournaledMutationPort {
+  readonly #workspaceRoot: string;
+  readonly #client: OfficialBeadsDoltClient;
+
+  constructor(workspaceRoot: string, client: OfficialBeadsDoltClient) {
+    if (workspaceRoot.trim() === '') throw new Error('workspace root is required');
+    this.#workspaceRoot = workspaceRoot;
+    this.#client = client;
+  }
+
+  async observe(transition: TransitionRecord): Promise<ExternalObservation> {
+    if (transition.operation === 'beads.dolt_push') {
+      const state = await this.#client.readDoltSync(this.#workspaceRoot, transition.idempotencyKey);
+      if (state === 'synced') return { kind: 'expected', result: { status: state } };
+      if (state === 'pending') return { kind: 'unchanged', result: { status: state } };
+      return { kind: 'conflict', result: { status: state } };
+    }
+    const arguments_ = asRecord(transition.externalArguments);
+    const taskId = requiredString(arguments_, 'taskId');
+    const issue = await this.#client.readIssue(this.#workspaceRoot, taskId);
+    const expected = asRecord(transition.expectedExternalState).status;
+    if (issue.status === expected) return { kind: 'expected', result: issue };
+    const validBefore =
+      transition.operation === 'beads.task_claim'
+        ? issue.status === 'open'
+        : transition.operation === 'beads.task_close'
+          ? issue.status === 'in_progress'
+          : false;
+    return validBefore ? { kind: 'unchanged', result: issue } : { kind: 'conflict', result: issue };
+  }
+
+  async mutate(transition: TransitionRecord): Promise<unknown> {
+    const arguments_ = asRecord(transition.externalArguments);
+    if (transition.operation === 'beads.task_claim') {
+      return this.#client.claimIssue(
+        this.#workspaceRoot,
+        requiredString(arguments_, 'taskId'),
+        transition.idempotencyKey,
+      );
+    }
+    if (transition.operation === 'beads.task_close') {
+      return this.#client.closeIssue(
+        this.#workspaceRoot,
+        requiredString(arguments_, 'taskId'),
+        requiredString(arguments_, 'reason'),
+        transition.idempotencyKey,
+      );
+    }
+    if (transition.operation === 'beads.dolt_push') {
+      return this.#client.pushDolt(this.#workspaceRoot, transition.idempotencyKey);
+    }
+    throw new Error(`unsupported Beads/Dolt broker operation: ${transition.operation}`);
+  }
 }
 
 export class JournaledBeadsDoltBroker extends JournaledMutationBroker {
   constructor(
     store: WorkflowStore,
-    port: BeadsDoltMutationPort,
+    port: OfficialBeadsDoltPort,
     fault?: FaultInjector,
     clock?: () => number,
   ) {
-    if (port.writerKind !== 'official-beads-mcp-and-dolt-broker') {
+    if (!(port instanceof OfficialBeadsDoltPort)) {
       throw new Error('Beads/Dolt mutations require the exclusive official broker port');
     }
     super(store, port, fault, clock);

@@ -78,10 +78,11 @@ export {
 } from './storage.js';
 export {
   JournaledBeadsDoltBroker,
+  OfficialBeadsDoltPort,
   JournaledMutationBroker,
   compareBeadsAuthoritativeState,
   type BeadsAuthorityComparison,
-  type BeadsDoltMutationPort,
+  type OfficialBeadsDoltClient,
   type ExternalObservation,
   type FaultBoundary,
   type FaultInjector,
