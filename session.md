@@ -15,7 +15,7 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-31
-- **Session:** Closed `.5` and started durable bounded repair loops in `.6`.
+- **Session:** Completed and closed durable bounded repair loops in `.6`.
 - **Branch:** `task/agent-platform-multi-agent.6`
 - **Parent tip:** `.5` at `46a189f`.
 - **Current base commit:** `.6` branches exactly from the pushed `.5` completion tip.
@@ -35,9 +35,9 @@ and actionable.
     active-lease quarantine;
   - reconciles crashed executions independently so one cleanup failure cannot suppress later work;
   - requires clean-tree, immutable-base, stable exact-head evidence before brokered Beads close.
-- `.6` in progress: typed repair sources and deterministic producer/owner routing; task and finding
-  budgets charged atomically; canonical hypothesis and monotonic evidence-change detection; durable
-  idempotent escalation; strict repair acceptance; accepted-result recovery.
+- `.6`: typed repair sources and deterministic producer/owner routing; atomic task/finding budgets;
+  canonical hypothesis and monotonic evidence-change detection; durable idempotent escalation; strict
+  Git-backed repair acceptance; accepted-result recovery.
 
 ## Review and Verification
 
@@ -53,12 +53,11 @@ and actionable.
 
 ## Current State
 
-- Epic `agent-platform-multi-agent` remains open; `.1`-`.5` are closed, pushed, and Dolt-synced.
-- `.6` is claimed and in progress on the correctly chained task branch.
+- Epic `agent-platform-multi-agent` remains open; `.1`-`.6` are closed and Dolt-synced.
+- `.6` is committed on its correctly chained task branch; its final exact tip is being pushed.
 - No pull request is expected yet; the linear task chain continues through `.10`.
 
 ## Next
 
-1. Commit, push, close `.6`, and sync Beads/Dolt.
-2. Create `.7` exactly from the `.6` tip and implement Git/ref and GitHub delivery brokers.
-3. Continue through `.10`, then open the single cumulative PR to `feature/multi-agent-orchestration`.
+1. Create `.7` exactly from the pushed `.6` tip and implement Git/ref and GitHub delivery brokers.
+2. Continue through `.10`, then open the single cumulative PR to `feature/multi-agent-orchestration`.
