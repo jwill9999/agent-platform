@@ -67,6 +67,33 @@ export {
   type SpecialistWorkspace,
 } from './specialistLauncher.js';
 export {
+  WorkflowStore,
+  resolveWorkflowControlPaths,
+  type LeaseRecord,
+  type PrepareTransitionInput,
+  type RunRecord,
+  type TransitionRecord,
+  type TransitionStatus,
+  type WorkflowControlPaths,
+} from './storage.js';
+export {
+  JournaledBeadsDoltBroker,
+  JournaledMutationBroker,
+  compareBeadsAuthoritativeState,
+  type BeadsAuthorityComparison,
+  type BeadsDoltMutationPort,
+  type ExternalObservation,
+  type FaultBoundary,
+  type FaultInjector,
+  type JournaledMutationPort,
+} from './reconciliation.js';
+export {
+  ContentAddressedArtifactStore,
+  JournaledArtifactRecorder,
+  type ArtifactFaultBoundary,
+  type StoredArtifact,
+} from './artifacts.js';
+export {
   NORMATIVE_TRANSITIONS,
   validateTransition,
   workflowStateSchema,
