@@ -114,9 +114,43 @@ export {
   type RepairGitExecutor,
 } from './repairLoops.js';
 export {
+  DurableDeliveryBroker,
+  casPushRequestSchema,
+  createTaskRefRequestSchema,
+  deliveryRequestSchema,
+  deriveDeliveryRequestDigest,
+  exactTreeCommitRequestSchema,
+  githubChecksRequestSchema,
+  githubMergeRequestSchema,
+  pullRequestMutationSchema,
+  type DeliveryFaultBoundary,
+  type DeliveryFaultInjector,
+  type DeliveryBrokerPolicy,
+  type DeliveryFence,
+  type DeliveryMutationPort,
+  type DeliveryRequest,
+  type DeliveryReconciliationResult,
+  type PipelineObservationDecision,
+} from './deliveryBrokers.js';
+export {
+  CompositeDeliveryMutationPort,
+  LocalGitDeliveryPort,
+  type BrokeredRemoteRefClient,
+} from './gitDeliveryPort.js';
+export {
+  GitHubDeliveryPort,
+  type GitHubCheckConclusion,
+  type GitHubPullRequestSnapshot,
+  type NarrowGitHubDeliveryClient,
+} from './githubDeliveryPort.js';
+export {
   WorkflowStore,
   resolveWorkflowControlPaths,
   type LeaseRecord,
+  type DeliveryOperationRecord,
+  type DeliveryOperationStatus,
+  type PrepareDeliveryOperationInput,
+  type PipelineWaitEscalationRecord,
   type PrepareTransitionInput,
   type RepairDispatchRecord,
   type RepairEscalationRecord,

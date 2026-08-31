@@ -15,13 +15,13 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-31
-- **Session:** Completed and closed durable bounded repair loops in `.6`.
-- **Branch:** `task/agent-platform-multi-agent.6`
-- **Parent tip:** `.5` at `46a189f`.
-- **Current base commit:** `.6` branches exactly from the pushed `.5` completion tip.
+- **Session:** Completed Git/ref and GitHub delivery brokers in `.7`.
+- **Branch:** `task/agent-platform-multi-agent.7`
+- **Parent tip:** `.6` at `7d2ee7a`.
+- **Current base commit:** `.7` branches exactly from the pushed `.6` completion tip.
 - **Pull request:** Planning PR #251 is merged; open the cumulative task PR only from `.10`.
 
-## Completed Through `.5`
+## Completed Through `.7`
 
 - `.1`: versioned execution contracts and normative workflow state machine.
 - `.2`: process-bound authorization and real Docker malicious-specialist isolation proof.
@@ -38,6 +38,9 @@ and actionable.
 - `.6`: typed repair sources and deterministic producer/owner routing; atomic task/finding budgets;
   canonical hypothesis and monotonic evidence-change detection; durable idempotent escalation; strict
   Git-backed repair acceptance; accepted-result recovery.
+- `.7`: fenced durable Git/ref and GitHub delivery sagas; exact-tree commits and CAS pushes; current
+  and published head lineage; exact PR/check/protected-merge validation; immutable merge attestation;
+  takeover-safe durable pipeline waits; frozen, captured production dispatch chain.
 
 ## Review and Verification
 
@@ -47,17 +50,20 @@ and actionable.
   test. The final `.5` critic pass reported no actionable findings.
 - `.6` has 28 focused repair-loop tests and 140 package tests passing. Its final independent critic
   pass reported no actionable findings after reviewing the trusted Git-diff hardening.
+- `.7` has 35 focused delivery tests and 175 package tests passing (plus one skipped Docker test in the
+  normal run); the Docker isolation test passed separately. Its final independent critic pass found
+  no actionable findings after adversarial recovery, lineage, wait, and method-replacement review.
 - SonarQube hotspot `AZ4YM2i11EaT2bQAPFS4` is `REVIEWED / FIXED`; zero hotspots remain.
-- Sonar per-file MCP analysis timed out during server startup, so the documented local fallback gates
-  are the completion evidence for this task.
+- Sonar's installed agentic CLI reached its server-side endpoint for `.7` but returned an explicit
+  `403`; the documented local fallback gates are the completion evidence for this task.
 
 ## Current State
 
-- Epic `agent-platform-multi-agent` remains open; `.1`-`.6` are closed and Dolt-synced.
-- `.6` is committed on its correctly chained task branch; its final exact tip is being pushed.
+- Epic `agent-platform-multi-agent` remains open; `.1`-`.7` are complete.
+- `.7` is ready for its final closeout commit, Dolt sync, and exact-tip push.
 - No pull request is expected yet; the linear task chain continues through `.10`.
 
 ## Next
 
-1. Create `.7` exactly from the pushed `.6` tip and implement Git/ref and GitHub delivery brokers.
+1. Create `.8` exactly from the pushed `.7` tip and implement integration and merge gates.
 2. Continue through `.10`, then open the single cumulative PR to `feature/multi-agent-orchestration`.

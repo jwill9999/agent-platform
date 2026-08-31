@@ -71,6 +71,59 @@ export type SchedulerCredentialStatus =
 
 export const workflowCredentialJournalCapability = Symbol('workflowCredentialJournalCapability');
 export const workflowRepairMutationCapability = Symbol('workflowRepairMutationCapability');
+export const workflowDeliveryMutationCapability = Symbol('workflowDeliveryMutationCapability');
+
+export type DeliveryOperationStatus = 'prepared' | 'committed' | 'escalated';
+
+export interface DeliveryOperationRecord {
+  id: string;
+  workspaceId: string;
+  runId: string;
+  taskId: string;
+  kind: string;
+  actorRole: string;
+  requestDigest: string;
+  request: unknown;
+  requestJson: string;
+  status: DeliveryOperationStatus;
+  ownerId: string;
+  workspaceLeaseEpoch: number;
+  runLeaseEpoch: number;
+  taskLeaseEpoch: number;
+  result: unknown | null;
+  resultJson: string | null;
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
+export interface PrepareDeliveryOperationInput {
+  id: string;
+  workspaceId: string;
+  runId: string;
+  taskId: string;
+  kind: string;
+  actorRole: string;
+  requestDigest: string;
+  request: unknown;
+  contractVersion: number;
+  policyDigest: string;
+  ownerId: string;
+  workspaceLeaseEpoch: number;
+  runLeaseEpoch: number;
+  taskLeaseEpoch: number;
+  nowMs: number;
+}
+
+export interface PipelineWaitEscalationRecord {
+  id: string;
+  workspaceId: string;
+  runId: string;
+  taskId: string;
+  checkId: string;
+  eventIdentity: string;
+  report: unknown;
+  createdAtMs: number;
+}
 
 export interface SchedulerExecutionRecord {
   id: string;
@@ -221,6 +274,25 @@ type SchedulerExecutionRow = {
   updated_at_ms: number;
 };
 
+type DeliveryOperationRow = {
+  id: string;
+  workspace_id: string;
+  run_id: string;
+  task_id: string;
+  kind: string;
+  actor_role: string;
+  request_digest: string;
+  request_json: string;
+  status: DeliveryOperationStatus;
+  owner_id: string;
+  workspace_lease_epoch: number;
+  run_lease_epoch: number;
+  task_lease_epoch: number;
+  result_json: string | null;
+  created_at_ms: number;
+  updated_at_ms: number;
+};
+
 type RepairDispatchRow = {
   id: string;
   run_id: string;
@@ -255,6 +327,17 @@ type RepairEscalationRow = {
 
 function parseJson(value: string | null): unknown | null {
   return value === null ? null : (JSON.parse(value) as unknown);
+}
+
+function serializeDurableJson(value: unknown): string {
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    throw new Error('delivery result must be JSON-compatible');
+  }
+  if (serialized === undefined) throw new Error('delivery result must be JSON-compatible');
+  return serialized;
 }
 
 function requiredTransitionTaskId(arguments_: unknown): string {
@@ -351,6 +434,43 @@ function repairEscalationFromRow(row: RepairEscalationRow): RepairEscalationReco
     findingDigest: row.finding_digest,
     report: JSON.parse(row.report_json) as unknown,
     createdAtMs: row.created_at_ms,
+  };
+}
+
+function deliveryOperationFromRow(row: DeliveryOperationRow): DeliveryOperationRecord {
+  let request: unknown;
+  try {
+    request = JSON.parse(row.request_json) as unknown;
+  } catch {
+    request = undefined;
+  }
+  let result: unknown | null = null;
+  if (row.result_json !== null) {
+    try {
+      result = JSON.parse(row.result_json) as unknown;
+    } catch {
+      result = undefined;
+    }
+  }
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    runId: row.run_id,
+    taskId: row.task_id,
+    kind: row.kind,
+    actorRole: row.actor_role,
+    requestDigest: row.request_digest,
+    request,
+    requestJson: row.request_json,
+    status: row.status,
+    ownerId: row.owner_id,
+    workspaceLeaseEpoch: row.workspace_lease_epoch,
+    runLeaseEpoch: row.run_lease_epoch,
+    taskLeaseEpoch: row.task_lease_epoch,
+    result,
+    resultJson: row.result_json,
+    createdAtMs: row.created_at_ms,
+    updatedAtMs: row.updated_at_ms,
   };
 }
 
@@ -1386,7 +1506,7 @@ export class WorkflowStore {
           `UPDATE repair_dispatches SET status = 'accepted', result_json = ?, updated_at_ms = ?
            WHERE id = ? AND status = 'dispatched'`,
         )
-        .run(JSON.stringify(input.result), verifiedAtMs, input.id);
+        .run(serializeDurableJson(input.result), verifiedAtMs, input.id);
       const dispatch = this.getRepairDispatch(input.id)!;
       if (
         dispatch.status === 'accepted' &&
@@ -1477,6 +1597,450 @@ export class WorkflowStore {
     return row === undefined ? undefined : repairEscalationFromRow(row);
   }
 
+  prepareDeliveryOperation(
+    input: PrepareDeliveryOperationInput,
+    capability?: symbol,
+  ): DeliveryOperationRecord {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery operations require the internal delivery broker capability');
+    }
+    return this.#database.transaction(() => {
+      const contract = this.#contractForRun(input.runId);
+      if (
+        contract.workspaceId !== input.workspaceId ||
+        contract.contractVersion !== input.contractVersion ||
+        contract.policyDigest !== input.policyDigest
+      ) {
+        throw new Error('delivery operation contract, policy, or workspace is stale');
+      }
+      if (!contract.tasks.some((task) => task.id === input.taskId)) {
+        throw new Error('delivery operation task is outside the contract');
+      }
+      const replay = this.#database
+        .prepare('SELECT * FROM delivery_operations WHERE request_digest = ?')
+        .get(input.requestDigest) as DeliveryOperationRow | undefined;
+      if (replay !== undefined) {
+        const operation = deliveryOperationFromRow(replay);
+        if (
+          operation.id !== input.id ||
+          operation.workspaceId !== input.workspaceId ||
+          operation.runId !== input.runId ||
+          operation.taskId !== input.taskId ||
+          operation.kind !== input.kind ||
+          operation.actorRole !== input.actorRole ||
+          JSON.stringify(operation.request) !== JSON.stringify(input.request)
+        ) {
+          throw new Error('delivery operation idempotency collision');
+        }
+        if (operation.status === 'prepared') {
+          this.#assertDeliveryRunState(input.runId, input.kind);
+        }
+        return operation;
+      }
+      this.#assertDeliveryRunState(input.runId, input.kind);
+      this.#assertResourceLease(
+        'workspace',
+        input.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        input.taskId,
+        input.ownerId,
+        input.taskLeaseEpoch,
+        input.nowMs,
+      );
+      this.#database
+        .prepare(
+          `INSERT INTO delivery_operations
+           (id, workspace_id, run_id, task_id, kind, actor_role, request_digest, request_json, status,
+            owner_id, workspace_lease_epoch, run_lease_epoch, task_lease_epoch, result_json,
+            created_at_ms, updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?, NULL, ?, ?)`,
+        )
+        .run(
+          input.id,
+          input.workspaceId,
+          input.runId,
+          input.taskId,
+          input.kind,
+          input.actorRole,
+          input.requestDigest,
+          JSON.stringify(input.request),
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.runLeaseEpoch,
+          input.taskLeaseEpoch,
+          input.nowMs,
+          input.nowMs,
+        );
+      return this.getDeliveryOperation(input.id)!;
+    })();
+  }
+
+  getDeliveryOperation(id: string): DeliveryOperationRecord | undefined {
+    const row = this.#database.prepare('SELECT * FROM delivery_operations WHERE id = ?').get(id) as
+      | DeliveryOperationRow
+      | undefined;
+    return row === undefined ? undefined : deliveryOperationFromRow(row);
+  }
+
+  listPreparedDeliveryOperations(runId: string): DeliveryOperationRecord[] {
+    return (
+      this.#database
+        .prepare(
+          `SELECT * FROM delivery_operations
+           WHERE run_id = ? AND status = 'prepared' ORDER BY created_at_ms, id`,
+        )
+        .all(runId) as DeliveryOperationRow[]
+    ).map(deliveryOperationFromRow);
+  }
+
+  commitDeliveryOperation(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      result: unknown;
+      assertExternalState: () => void;
+      clock: () => number;
+    },
+    capability?: symbol,
+  ): DeliveryOperationRecord {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery operations require the internal delivery broker capability');
+    }
+    return this.#database.transaction(() => {
+      const operation = this.getDeliveryOperation(input.id);
+      if (operation === undefined) throw new Error('delivery operation not found');
+      if (operation.status === 'committed') return operation;
+      if (operation.status !== 'prepared')
+        throw new Error('delivery operation cannot be committed');
+      this.#assertDeliveryOperationLeases(operation, input, input.clock());
+      this.#assertDeliveryRunState(operation.runId, operation.kind);
+      input.assertExternalState();
+      const verifiedAtMs = input.clock();
+      this.#assertDeliveryOperationLeases(operation, input, verifiedAtMs);
+      this.#assertDeliveryRunState(operation.runId, operation.kind);
+      this.#database
+        .prepare(
+          `UPDATE delivery_operations SET status = 'committed', result_json = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'prepared'`,
+        )
+        .run(serializeDurableJson(input.result), verifiedAtMs, input.id);
+      this.#commitDeliveryLineage(operation, input.result, verifiedAtMs);
+      return this.getDeliveryOperation(input.id)!;
+    })();
+  }
+
+  escalateDeliveryOperation(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      result: unknown;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): DeliveryOperationRecord {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery operations require the internal delivery broker capability');
+    }
+    return this.#database.transaction(() => {
+      const operation = this.getDeliveryOperation(input.id);
+      if (operation === undefined) throw new Error('delivery operation not found');
+      if (operation.status === 'escalated') return operation;
+      if (operation.status !== 'prepared')
+        throw new Error('delivery operation cannot be escalated');
+      this.#assertDeliveryOperationLeases(operation, input, input.nowMs);
+      this.#assertDeliveryRunState(operation.runId, operation.kind);
+      this.#database
+        .prepare(
+          `UPDATE delivery_operations SET status = 'escalated', result_json = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'prepared'`,
+        )
+        .run(serializeDurableJson(input.result), input.nowMs, input.id);
+      return this.getDeliveryOperation(input.id)!;
+    })();
+  }
+
+  adoptPreparedDeliveryOperation(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): DeliveryOperationRecord {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery operations require the internal delivery broker capability');
+    }
+    return this.#database.transaction(() => {
+      const operation = this.getDeliveryOperation(input.id);
+      if (operation === undefined || operation.status !== 'prepared') {
+        throw new Error('prepared delivery operation not found');
+      }
+      if (
+        input.ownerId === operation.ownerId &&
+        input.workspaceLeaseEpoch === operation.workspaceLeaseEpoch &&
+        input.runLeaseEpoch === operation.runLeaseEpoch &&
+        input.taskLeaseEpoch === operation.taskLeaseEpoch
+      ) {
+        this.#assertDeliveryOperationLeases(operation, input, input.nowMs);
+        this.#assertDeliveryRunState(operation.runId, operation.kind);
+        return operation;
+      }
+      if (input.runLeaseEpoch <= operation.runLeaseEpoch) {
+        throw new Error('recovery lease does not fence the interrupted delivery owner');
+      }
+      this.#assertDeliveryRunState(operation.runId, operation.kind);
+      this.#assertResourceLease(
+        'workspace',
+        operation.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        operation.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        operation.taskId,
+        input.ownerId,
+        input.taskLeaseEpoch,
+        input.nowMs,
+      );
+      this.#database
+        .prepare(
+          `UPDATE delivery_operations SET owner_id = ?, workspace_lease_epoch = ?,
+           run_lease_epoch = ?, task_lease_epoch = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'prepared'`,
+        )
+        .run(
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.runLeaseEpoch,
+          input.taskLeaseEpoch,
+          input.nowMs,
+          input.id,
+        );
+      return this.getDeliveryOperation(input.id)!;
+    })();
+  }
+
+  #assertDeliveryOperationLeases(
+    operation: DeliveryOperationRecord,
+    input: {
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+    },
+    nowMs: number,
+  ): void {
+    if (
+      operation.ownerId !== input.ownerId ||
+      operation.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+      operation.runLeaseEpoch !== input.runLeaseEpoch ||
+      operation.taskLeaseEpoch !== input.taskLeaseEpoch
+    ) {
+      throw new Error('delivery operation fencing token changed');
+    }
+    this.#assertResourceLease(
+      'workspace',
+      operation.workspaceId,
+      input.ownerId,
+      input.workspaceLeaseEpoch,
+      nowMs,
+    );
+    this.#assertResourceLease('run', operation.runId, input.ownerId, input.runLeaseEpoch, nowMs);
+    this.#assertResourceLease('task', operation.taskId, input.ownerId, input.taskLeaseEpoch, nowMs);
+  }
+
+  assertDeliveryOperationReady(
+    operation: DeliveryOperationRecord,
+    fence: {
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+    },
+    nowMs: number,
+    capability?: symbol,
+  ): void {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery operations require the internal delivery broker capability');
+    }
+    this.#database.transaction(() => {
+      this.#assertDeliveryOperationLeases(operation, fence, nowMs);
+      this.#assertDeliveryRunState(operation.runId, operation.kind);
+      this.#assertDeliveryLineage(operation);
+    })();
+  }
+
+  #assertDeliveryLineage(operation: DeliveryOperationRecord): void {
+    const request = operation.request as Record<string, unknown> | undefined;
+    const ref = operation.kind.startsWith('github.')
+      ? `refs/heads/task/${operation.taskId}`
+      : request?.ref;
+    if (operation.kind.startsWith('github.')) {
+      const headSha = request?.headSha;
+      if (typeof headSha !== 'string') throw new Error('GitHub delivery request has invalid head');
+      const published = this.#database
+        .prepare(
+          `SELECT current_sha, published_sha FROM delivery_approved_heads
+           WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?`,
+        )
+        .get(operation.workspaceId, operation.runId, operation.taskId, ref) as
+        | { current_sha: string; published_sha: string | null }
+        | undefined;
+      if (published?.current_sha !== headSha || published.published_sha !== headSha) {
+        throw new Error('GitHub delivery head is not the current published Git/ref broker head');
+      }
+      return;
+    }
+    if (operation.kind !== 'git.commit' && operation.kind !== 'git.push') return;
+    const expectedSha = operation.kind === 'git.commit' ? request?.parentSha : request?.newSha;
+    if (typeof ref !== 'string' || typeof expectedSha !== 'string') {
+      throw new Error('Git delivery request has invalid lineage fields');
+    }
+    const approved = this.#database
+      .prepare(
+        `SELECT current_sha FROM delivery_approved_heads
+         WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?`,
+      )
+      .get(operation.workspaceId, operation.runId, operation.taskId, ref) as
+      | { current_sha: string }
+      | undefined;
+    if (approved?.current_sha !== expectedSha) {
+      throw new Error('Git delivery request does not descend from the broker-approved task head');
+    }
+  }
+
+  #commitDeliveryLineage(operation: DeliveryOperationRecord, result: unknown, nowMs: number): void {
+    if (!operation.kind.startsWith('git.')) return;
+    const request = operation.request as Record<string, unknown> | undefined;
+    const resultRecord = result as Record<string, unknown> | undefined;
+    const ref = request?.ref;
+    const resultSha = resultRecord?.sha;
+    if (typeof ref !== 'string' || typeof resultSha !== 'string') {
+      throw new Error('Git delivery result has invalid lineage fields');
+    }
+    if (operation.kind === 'git.create_ref') {
+      if (resultSha !== request?.parentSha) {
+        throw new Error('created task ref differs from its approved parent');
+      }
+      const existing = this.#database
+        .prepare(
+          `SELECT current_sha FROM delivery_approved_heads
+           WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ?`,
+        )
+        .get(operation.workspaceId, operation.runId, operation.taskId, ref) as
+        | { current_sha: string }
+        | undefined;
+      if (existing !== undefined && existing.current_sha !== resultSha) {
+        throw new Error('broker-approved task head already differs');
+      }
+      this.#database
+        .prepare(
+          `INSERT INTO delivery_approved_heads
+           (workspace_id, run_id, task_id, ref, base_sha, current_sha, operation_id, updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(workspace_id, run_id, task_id, ref) DO UPDATE SET
+             operation_id = excluded.operation_id, updated_at_ms = excluded.updated_at_ms`,
+        )
+        .run(
+          operation.workspaceId,
+          operation.runId,
+          operation.taskId,
+          ref,
+          resultSha,
+          resultSha,
+          operation.id,
+          nowMs,
+        );
+      return;
+    }
+    this.#assertDeliveryLineage(operation);
+    if (operation.kind === 'git.commit') {
+      const updated = this.#database
+        .prepare(
+          `UPDATE delivery_approved_heads SET current_sha = ?, published_sha = NULL,
+           operation_id = ?, updated_at_ms = ?
+           WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ? AND current_sha = ?`,
+        )
+        .run(
+          resultSha,
+          operation.id,
+          nowMs,
+          operation.workspaceId,
+          operation.runId,
+          operation.taskId,
+          ref,
+          request?.parentSha,
+        );
+      if (updated.changes !== 1)
+        throw new Error('broker-approved task head compare-and-swap failed');
+    } else {
+      if (resultSha !== request?.newSha) {
+        throw new Error('pushed task ref differs from the broker-approved head');
+      }
+      const published = this.#database
+        .prepare(
+          `UPDATE delivery_approved_heads SET published_sha = ?, operation_id = ?, updated_at_ms = ?
+           WHERE workspace_id = ? AND run_id = ? AND task_id = ? AND ref = ? AND current_sha = ?`,
+        )
+        .run(
+          resultSha,
+          operation.id,
+          nowMs,
+          operation.workspaceId,
+          operation.runId,
+          operation.taskId,
+          ref,
+          resultSha,
+        );
+      if (published.changes !== 1) throw new Error('published task head compare-and-swap failed');
+    }
+  }
+
+  #assertDeliveryRunState(runId: string, kind: string): void {
+    const state = this.getRun(runId)?.state;
+    if (state === undefined) throw new Error('workflow run not found');
+    const allowedStates: Readonly<Record<string, readonly WorkflowState[]>> = {
+      'git.create_ref': ['scheduling', 'implementing', 'repair'],
+      'git.commit': ['implementing', 'repair'],
+      'git.push': ['implementing', 'repair', 'pipeline'],
+      'github.pr': ['pipeline', 'waiting', 'delivery'],
+      'github.checks': ['pipeline', 'waiting', 'delivery'],
+      'github.merge': ['delivery'],
+    };
+    if (!(allowedStates[kind] ?? []).includes(state)) {
+      throw new Error(`delivery operation ${kind} is not allowed while run is ${state}`);
+    }
+  }
+
   putWait(input: {
     runId: string;
     checkId: string;
@@ -1487,8 +2051,20 @@ export class WorkflowStore {
   }): void {
     this.#database.transaction(() => {
       const existing = this.#database
-        .prepare('SELECT absolute_deadline_ms FROM waits WHERE run_id = ? AND check_id = ?')
-        .get(input.runId, input.checkId) as { absolute_deadline_ms: number } | undefined;
+        .prepare(
+          `SELECT absolute_deadline_ms, workspace_id, task_id
+           FROM waits WHERE run_id = ? AND check_id = ?`,
+        )
+        .get(input.runId, input.checkId) as
+        | {
+            absolute_deadline_ms: number;
+            workspace_id: string | null;
+            task_id: string | null;
+          }
+        | undefined;
+      if (existing !== undefined && (existing.workspace_id !== null || existing.task_id !== null)) {
+        throw new Error('generic wait API cannot mutate a delivery-bound wait');
+      }
       const effectiveDeadline = Math.min(
         existing?.absolute_deadline_ms ?? input.absoluteDeadlineMs,
         input.absoluteDeadlineMs,
@@ -1516,6 +2092,382 @@ export class WorkflowStore {
           input.backoffCount,
         );
     })();
+  }
+
+  putDeliveryWait(
+    input: Parameters<WorkflowStore['putWait']>[0] & {
+      workspaceId: string;
+      taskId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): void {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery waits require the internal delivery broker capability');
+    }
+    this.#database.transaction(() => {
+      this.#assertDeliveryWaitRunBinding(input);
+      if (this.getDeliveryWaitEscalation(input.runId, input.checkId) !== undefined) {
+        throw new Error('pipeline wait is already terminally escalated');
+      }
+      this.#assertDeliveryRunState(input.runId, 'github.checks');
+      this.#assertResourceLease(
+        'workspace',
+        input.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        input.taskId,
+        input.ownerId,
+        input.taskLeaseEpoch,
+        input.nowMs,
+      );
+      const existing = this.getWait(input.runId, input.checkId);
+      if (
+        existing !== undefined &&
+        (existing.workspaceId !== null || existing.taskId !== null) &&
+        (existing.workspaceId !== input.workspaceId || existing.taskId !== input.taskId)
+      ) {
+        throw new Error('pipeline wait identity differs from its durable binding');
+      }
+      const effectiveDeadline = Math.min(
+        existing?.workspaceId === input.workspaceId && existing.taskId === input.taskId
+          ? existing.absoluteDeadlineMs
+          : input.absoluteDeadlineMs,
+        input.absoluteDeadlineMs,
+      );
+      if (input.nextPollAtMs >= effectiveDeadline) {
+        throw new Error('next poll must precede absolute deadline');
+      }
+      this.#database
+        .prepare(
+          `INSERT INTO waits
+           (run_id, check_id, event_identity, next_poll_at_ms, absolute_deadline_ms, backoff_count,
+            workspace_id, task_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(run_id, check_id) DO UPDATE SET
+             event_identity = excluded.event_identity,
+             next_poll_at_ms = excluded.next_poll_at_ms,
+             absolute_deadline_ms = CASE
+               WHEN waits.workspace_id IS NULL AND waits.task_id IS NULL
+                 THEN excluded.absolute_deadline_ms
+               ELSE MIN(waits.absolute_deadline_ms, excluded.absolute_deadline_ms)
+             END,
+             backoff_count = excluded.backoff_count,
+             workspace_id = excluded.workspace_id,
+             task_id = excluded.task_id`,
+        )
+        .run(
+          input.runId,
+          input.checkId,
+          input.eventIdentity,
+          input.nextPollAtMs,
+          input.absoluteDeadlineMs,
+          input.backoffCount,
+          input.workspaceId,
+          input.taskId,
+        );
+    })();
+  }
+
+  getWait(
+    runId: string,
+    checkId: string,
+  ):
+    | {
+        runId: string;
+        checkId: string;
+        eventIdentity: string;
+        nextPollAtMs: number;
+        absoluteDeadlineMs: number;
+        backoffCount: number;
+        workspaceId: string | null;
+        taskId: string | null;
+      }
+    | undefined {
+    const row = this.#database
+      .prepare(
+        `SELECT run_id, check_id, event_identity, next_poll_at_ms, absolute_deadline_ms,
+                backoff_count, workspace_id, task_id
+         FROM waits WHERE run_id = ? AND check_id = ?`,
+      )
+      .get(runId, checkId) as
+      | {
+          run_id: string;
+          check_id: string;
+          event_identity: string;
+          next_poll_at_ms: number;
+          absolute_deadline_ms: number;
+          backoff_count: number;
+          workspace_id: string | null;
+          task_id: string | null;
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          runId: row.run_id,
+          checkId: row.check_id,
+          eventIdentity: row.event_identity,
+          nextPollAtMs: row.next_poll_at_ms,
+          absoluteDeadlineMs: row.absolute_deadline_ms,
+          backoffCount: row.backoff_count,
+          workspaceId: row.workspace_id,
+          taskId: row.task_id,
+        };
+  }
+
+  assertDeliveryWaitReady(
+    input: {
+      workspaceId: string;
+      runId: string;
+      taskId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): void {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery waits require the internal delivery broker capability');
+    }
+    this.#database.transaction(() => {
+      this.#assertDeliveryWaitRunBinding(input);
+      this.#assertDeliveryRunState(input.runId, 'github.checks');
+      this.#assertResourceLease(
+        'workspace',
+        input.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        input.taskId,
+        input.ownerId,
+        input.taskLeaseEpoch,
+        input.nowMs,
+      );
+    })();
+  }
+
+  completeDeliveryWait(
+    input: {
+      workspaceId: string;
+      runId: string;
+      taskId: string;
+      checkId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): void {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery waits require the internal delivery broker capability');
+    }
+    this.#database.transaction(() => {
+      this.#assertDeliveryWaitRunBinding(input);
+      if (this.getDeliveryWaitEscalation(input.runId, input.checkId) !== undefined) {
+        throw new Error('pipeline wait is already terminally escalated');
+      }
+      const wait = this.getWait(input.runId, input.checkId);
+      if (
+        wait === undefined ||
+        wait.workspaceId !== input.workspaceId ||
+        wait.taskId !== input.taskId
+      ) {
+        throw new Error('pipeline wait identity differs from its durable binding');
+      }
+      if (input.nowMs >= wait.absoluteDeadlineMs) {
+        throw new Error('pipeline wait deadline expired before observation completion');
+      }
+      this.#assertDeliveryRunState(input.runId, 'github.checks');
+      this.#assertResourceLease(
+        'workspace',
+        input.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        input.taskId,
+        input.ownerId,
+        input.taskLeaseEpoch,
+        input.nowMs,
+      );
+      this.#database
+        .prepare('DELETE FROM waits WHERE run_id = ? AND check_id = ?')
+        .run(input.runId, input.checkId);
+    })();
+  }
+
+  escalateDeliveryWait(
+    input: {
+      id: string;
+      workspaceId: string;
+      runId: string;
+      taskId: string;
+      checkId: string;
+      eventIdentity: string;
+      report: unknown;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): PipelineWaitEscalationRecord {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('delivery waits require the internal delivery broker capability');
+    }
+    return this.#database.transaction(() => {
+      this.#assertDeliveryWaitRunBinding(input);
+      this.#assertDeliveryRunState(input.runId, 'github.checks');
+      this.#assertResourceLease(
+        'workspace',
+        input.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        input.taskId,
+        input.ownerId,
+        input.taskLeaseEpoch,
+        input.nowMs,
+      );
+      const existing = this.getDeliveryWaitEscalation(input.runId, input.checkId);
+      if (existing !== undefined) {
+        if (
+          existing.workspaceId !== input.workspaceId ||
+          existing.taskId !== input.taskId ||
+          existing.eventIdentity !== input.eventIdentity
+        ) {
+          throw new Error('pipeline wait escalation identity differs from its durable binding');
+        }
+        return existing;
+      }
+      const wait = this.getWait(input.runId, input.checkId);
+      if (wait === undefined) throw new Error('pipeline wait not found');
+      if (wait.eventIdentity !== input.eventIdentity) {
+        throw new Error('pipeline wait event identity changed');
+      }
+      if (wait.workspaceId !== input.workspaceId || wait.taskId !== input.taskId) {
+        throw new Error('pipeline wait identity differs from its durable binding');
+      }
+      if (input.nowMs < wait.absoluteDeadlineMs) {
+        throw new Error('pipeline wait deadline has not expired');
+      }
+      this.#database
+        .prepare(
+          `INSERT INTO delivery_wait_escalations
+           (id, workspace_id, run_id, task_id, check_id, event_identity, report_json, created_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          input.id,
+          input.workspaceId,
+          input.runId,
+          input.taskId,
+          input.checkId,
+          input.eventIdentity,
+          serializeDurableJson(input.report),
+          input.nowMs,
+        );
+      this.#database
+        .prepare('DELETE FROM waits WHERE run_id = ? AND check_id = ?')
+        .run(input.runId, input.checkId);
+      return this.getDeliveryWaitEscalation(input.runId, input.checkId)!;
+    })();
+  }
+
+  getDeliveryWaitEscalation(
+    runId: string,
+    checkId: string,
+  ): PipelineWaitEscalationRecord | undefined {
+    const row = this.#database
+      .prepare('SELECT * FROM delivery_wait_escalations WHERE run_id = ? AND check_id = ?')
+      .get(runId, checkId) as
+      | {
+          id: string;
+          workspace_id: string;
+          run_id: string;
+          task_id: string;
+          check_id: string;
+          event_identity: string;
+          report_json: string;
+          created_at_ms: number;
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          id: row.id,
+          workspaceId: row.workspace_id,
+          runId: row.run_id,
+          taskId: row.task_id,
+          checkId: row.check_id,
+          eventIdentity: row.event_identity,
+          report: JSON.parse(row.report_json) as unknown,
+          createdAtMs: row.created_at_ms,
+        };
+  }
+
+  #assertDeliveryWaitRunBinding(input: {
+    workspaceId: string;
+    runId: string;
+    taskId: string;
+  }): void {
+    const contract = this.#contractForRun(input.runId);
+    if (contract.workspaceId !== input.workspaceId) {
+      throw new Error('pipeline wait workspace does not match the run contract');
+    }
+    if (!contract.tasks.some((task) => task.id === input.taskId)) {
+      throw new Error('pipeline wait task does not match the run contract');
+    }
   }
 
   listDueWaits(nowMs: number): Array<{
@@ -2136,6 +3088,8 @@ export class WorkflowStore {
         next_poll_at_ms INTEGER NOT NULL,
         absolute_deadline_ms INTEGER NOT NULL,
         backoff_count INTEGER NOT NULL,
+        workspace_id TEXT,
+        task_id TEXT,
         PRIMARY KEY(run_id, check_id)
       );
       CREATE TABLE IF NOT EXISTS findings (
@@ -2286,10 +3240,54 @@ export class WorkflowStore {
         created_at_ms INTEGER NOT NULL,
         UNIQUE(run_id, scope, scope_id)
       );
+      CREATE TABLE IF NOT EXISTS delivery_operations (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        actor_role TEXT NOT NULL,
+        request_digest TEXT NOT NULL UNIQUE,
+        request_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('prepared', 'committed', 'escalated')),
+        owner_id TEXT NOT NULL,
+        workspace_lease_epoch INTEGER NOT NULL,
+        run_lease_epoch INTEGER NOT NULL,
+        task_lease_epoch INTEGER NOT NULL,
+        result_json TEXT,
+        created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS delivery_operations_run_status
+        ON delivery_operations(run_id, status, created_at_ms);
+      CREATE TABLE IF NOT EXISTS delivery_approved_heads (
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        ref TEXT NOT NULL,
+        base_sha TEXT NOT NULL,
+        current_sha TEXT NOT NULL,
+        published_sha TEXT,
+        operation_id TEXT NOT NULL REFERENCES delivery_operations(id),
+        updated_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(workspace_id, run_id, task_id, ref)
+      );
+      CREATE TABLE IF NOT EXISTS delivery_wait_escalations (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL,
+        run_id TEXT NOT NULL REFERENCES runs(id),
+        task_id TEXT NOT NULL,
+        check_id TEXT NOT NULL,
+        event_identity TEXT NOT NULL,
+        report_json TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL,
+        UNIQUE(run_id, check_id)
+      );
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (1, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (2, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (3, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (8, unixepoch() * 1000);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (9, unixepoch() * 1000);
     `);
     const transitionColumns = this.#database
       .prepare('PRAGMA table_info(transitions)')
@@ -2301,6 +3299,15 @@ export class WorkflowStore {
         `ALTER TABLE transitions ADD COLUMN transition_context_json TEXT NOT NULL
          DEFAULT '{"workspaceLeaseEpoch":0}'`,
       );
+    }
+    const waitColumns = this.#database.prepare('PRAGMA table_info(waits)').all() as Array<{
+      name: string;
+    }>;
+    if (!waitColumns.some((column) => column.name === 'workspace_id')) {
+      this.#database.exec('ALTER TABLE waits ADD COLUMN workspace_id TEXT');
+    }
+    if (!waitColumns.some((column) => column.name === 'task_id')) {
+      this.#database.exec('ALTER TABLE waits ADD COLUMN task_id TEXT');
     }
     const schedulerColumns = this.#database
       .prepare('PRAGMA table_info(scheduler_executions)')
