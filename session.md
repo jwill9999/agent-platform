@@ -15,68 +15,88 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-31
-- **Session:** Completing independent review and starting autonomous multi-agent implementation.
-- **Branch:** `task/multi-agent-orchestration-epic-design`
-- **Base:** `feature/multi-agent-orchestration` at `68e5fc7`
-- **Head:** current working branch contains the critic-approved planning amendments; push pending.
-- **Pull request:** #251 into `staging`; open and will rerun checks after the planning update.
+- **Session:** Completed `.10` pilot repair and independent review; preparing exact delivery approval.
+- **Branch:** `task/agent-platform-multi-agent.10`
+- **Parent tip:** `.9` at `6bec3b6`.
+- **Current tip:** `.10` repair commit `afeddf6`; this handoff update will create the final task tip.
+- **Pull request:** Planning PR #251 is merged; the cumulative `.10` PR is not yet opened.
 
-## What Happened
+## Completed Implementation
 
-- Merged the Codex configuration closeout through PR #250 at `68e5fc7`; the associated Beads task is
-  closed and synced to Dolt.
-- Reviewed the Beads portfolio and completed a retrospective on closeout overhead, stale WIP, and
-  excessive human coordination between feature tasks.
-- Agreed on a target model: collaborative human/primary-agent planning, independent plan criticism,
-  then autonomous feature-level delivery over a Beads task graph with bounded specialist agents.
-- Expanded `docs/tasks/agent-platform-multi-agent.md` from a high-level sketch into the complete epic
-  design, including agent roles, workflow state, tools/MCP boundaries, repair loops, delivery policy,
-  implementation sequencing, verification, and decisions awaiting review.
-- Re-ran the MCP readiness audit after restarting Codex. Official GitHub MCP, SonarQube MCP, and
-  Playwright MCP now pass live smoke tests through Docker MCP; the prior Sonar authorization and
-  Playwright `ENOSPC` blockers are resolved.
-- Installed and registered official `beads-mcp`; fifteen structured tools load and repository queries
-  and mutations succeed with explicit `workspace_root`. Its `context` helper does not detect the
-  embedded-Dolt database, so agents must not initialize over it. Dolt synchronization, durable
-  checkpoints, role enforcement, pipeline waits, and evidence storage remain outside the server.
-- Completed the orchestration policy review. All proposed defaults are approved with the delivery
-  path clarified as current `staging` → feature branch → task chain → automated protected `staging`
-  merge after gates; `staging` → `main` and production promotion remain human-approved. Workflow
-  evidence stays in workflow control initially behind a separable storage boundary.
-- Ran the same independent read-only critic through four review rounds. Verdicts were `BLOCKED` with
-  10 findings, `BLOCKED` with 6, `BLOCKED` with 4, then `APPROVED WITH AMENDMENTS`; the final localized
-  tool-authority mismatch was corrected. The critic reported no mutations in every pass.
-- Accepted ADR-0004: this is repository-local Codex development automation, not an end-user Agent
-  Platform feature. Active runs use externally isolated `codex exec` specialists and journaled
-  workflow-control, Beads/Dolt, Git/ref, and GitHub brokers.
-- Closed review task `agent-platform-multi-agent-review`, then created the sequential implementation
-  chain `agent-platform-multi-agent.1` through `.10` with focused specs and Beads dependencies. Task
-  `.1` is claimed and is the only implementation task currently in progress.
+- `.1`: versioned execution contracts and normative workflow state machine.
+- `.2`: process-bound authorization and real Docker malicious-specialist isolation proof.
+- `.3`: durable SQLite state, fenced leases, sagas, evidence, reconciliation, CLI, and read-only MCP.
+- `.4`: planner/critic workflow, material-bound findings and dispositions, approval, and invalidation.
+- `.5`: single-writer Beads scheduler and orchestrator:
+  - persists scheduler intent before authoritative Beads claim and admits only dependency-ready work;
+  - enforces one mutating specialist or at most four isolated read-only specialists;
+  - launches Docker specialists with create/start fencing, cancellation, timeout, and restart cleanup;
+  - uses generation-pinned revoke-wins credentials, broker-owned TTL cleanup, durable CAS, and legacy
+    active-lease quarantine;
+  - reconciles crashed executions independently so one cleanup failure cannot suppress later work;
+  - requires clean-tree, immutable-base, stable exact-head evidence before brokered Beads close.
+- `.6`: typed repair sources and deterministic producer/owner routing; atomic task/finding budgets;
+  canonical hypothesis and monotonic evidence-change detection; durable idempotent escalation; strict
+  Git-backed repair acceptance; accepted-result recovery.
+- `.7`: fenced durable Git/ref and GitHub delivery sagas; exact-tree commits and CAS pushes; current
+  and published head lineage; exact PR/check/protected-merge validation; immutable merge attestation;
+  takeover-safe durable pipeline waits; frozen, captured production dispatch chain.
+- `.8`: transactional content-addressed secure-evidence BLOBs; fail-closed redaction and residual
+  credential scanning; exact-head criterion evaluation and immutable acceptance bindings;
+  contract-bounded repair children with concrete captured Beads/Git adapters, accepted predecessor
+  lineage, and atomic attempt-derived remaining budgets.
+- `.9`: merge-atomic finalizing; persisted exact-head acceptance reports; fenced Beads epic/Dolt
+  closeout; exact recovery predecessors including the merge boundary; restart-safe waits and
+  cancellation; bounded cleanup/fence timeouts; sealed official mutation brokers and ports; durable
+  cancellation recovery enumeration; multi-reference evidence preservation.
+- `.10` repair: separate immutable task-to-feature and feature-to-staging authorities; authenticated
+  pre-merge staging intent; feature-specific critic and owner approval; exact integrated-head and
+  protection binding; durable PR/check/merge recovery; staging-attestation finalization.
 
-## Verification
+## Review and Verification
 
-- `pnpm exec prettier --check docs/tasks/agent-platform-multi-agent.md`
-- `pnpm docs:lint`
-- `git diff --check`
-- Global `beads-workflow` skill quick validation passed.
-- The pre-push hook passed dependency-cycle, affected-package build, typecheck, and test gates.
+- Independent critic review iterated through concurrency, restart, diff-integrity, capability, and
+  credential-race findings; the final pass reports no actionable findings.
+- `.5` gates passed: typecheck, lint, 112 tests, and the separately executed real Docker isolation
+  test. The final `.5` critic pass reported no actionable findings.
+- `.6` has 28 focused repair-loop tests and 140 package tests passing. Its final independent critic
+  pass reported no actionable findings after reviewing the trusted Git-diff hardening.
+- `.7` has 35 focused delivery tests and 175 package tests passing (plus one skipped Docker test in the
+  normal run); the Docker isolation test passed separately. Its final independent critic pass found
+  no actionable findings after adversarial recovery, lineage, wait, and method-replacement review.
+- `.8` has 207 package tests passing plus one intentional Docker-isolation skip. Monorepo formatting,
+  typecheck, lint, documentation lint, and tests pass; the Sonar secrets scan passes. Six independent
+  critic passes closed entropy, BLOB integrity, adapter authority, lineage, lifecycle, retention,
+  quota, retry-budget, and crash-recovery findings; the final pass reports no actionable findings.
+- `.9` has 223 package tests passing plus one intentional Docker-isolation skip. Monorepo formatting,
+  typecheck, lint, documentation lint, and dependency-cycle checks pass. Repeated independent review
+  closed finalization ordering, merge/cancellation races, recovery identity, clock/fence, timeout,
+  wait binding, repair-child lineage, cross-store broker, and mutation-port replacement findings;
+  the final pass reports `PASS`.
+- `.10` has 271 workflow-control tests passing plus one intentional isolation skip. Full monorepo
+  format, lint, typecheck, build, tests, docs, and dependency-cycle gates pass; one unrelated API test
+  run returned two transient 403s and both the isolated rerun and complete rerun passed. Seven critic
+  rounds closed two-boundary authority, approval, evidence, prototype, transaction, and recovery
+  findings; the final pass reports `PASS`.
+- SonarQube hotspot `AZ4YM2i11EaT2bQAPFS4` is `REVIEWED / FIXED`; zero hotspots remain.
+- Sonar's installed agentic CLI reached its server-side endpoint for `.7` but returned an explicit
+  `403`; the documented local fallback gates are the completion evidence for this task.
 
 ## Current State
 
-- `feature/multi-agent-orchestration` and `task/multi-agent-orchestration-epic-design` are pushed.
-- Epic `agent-platform-multi-agent` remains open. The independent review is closed and the critic gate
-  is approved with all required amendments applied.
-- Ten sequential implementation children exist; `.1` is claimed, while `.2` through `.10` remain
-  blocked by the linear dependency chain.
-- Tool connectivity is ready for manual planning. Autonomous mutation remains disabled until `.2`
-  proves the external specialist isolation and broker authorization boundary.
-- Sonar hotspot `AZ4YM2i11EaT2bQAPFS4` is `REVIEWED / FIXED`; zero hotspots remain to review.
+- Epic `agent-platform-multi-agent` remains open; `.1`-`.9` and repair child `.repair.1` are closed and
+  Dolt-synced. `.10` remains in progress until protected delivery and final closeout complete.
+- The exact v1 task-to-feature contract is machine-valid with material digest
+  `sha256:affc3fadf66acc056898c59e190e22c413699684e154ae00c90e54643911e83d`.
+- No GitHub delivery mutation has occurred. The staging intent must be derived from the final task SHA
+  and explicitly approved before push/PR; the feature contract is instantiated and separately
+  approved only after the task-to-feature squash merge reveals the integrated head.
 
 ## Next
 
-1. Commit and push the critic-approved planning state; wait for PR #251 checks and merge it to
-   protected `staging`.
-2. Refresh `feature/multi-agent-orchestration` from the merged `staging` tip.
-3. Create `task/agent-platform-multi-agent.1` from the feature branch before editing code.
-4. Implement the execution contract and normative state machine from the `.1` spec.
-5. Do not begin `.2` until `.1` exact-head gates pass and its Beads issue closes.
+1. Commit this handoff, derive the exact pre-merge staging-intent digest from the final task SHA, and
+   obtain explicit owner approval for the v1 contract plus intent.
+2. Push `.10`, open the squash PR to `feature/multi-agent-orchestration`, and require all hosted gates.
+3. Derive, critique, and obtain owner approval for the exact post-merge feature-delivery contract;
+   then squash the protected PR to `staging` after every required check passes.
+4. Close `.10` and the epic, push Dolt, and finalize the acceptance report without promoting `main`.
