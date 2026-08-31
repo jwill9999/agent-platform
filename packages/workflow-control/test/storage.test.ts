@@ -525,7 +525,7 @@ describe('JournaledMutationBroker recovery', () => {
       if (operation === 'beads.dolt_push') client.syncStatus = before;
       else client.issueStatus = before;
       const port = OfficialBeadsDoltPort.createForTest('/repo/root', client);
-      const broker = new JournaledBeadsDoltBroker(store, port, undefined, () => 1000);
+      const broker = JournaledBeadsDoltBroker.createForTest(store, port, undefined, () => 1000);
       const result = await broker.execute(
         withCanonicalKey(input, {
           operation,
@@ -546,7 +546,7 @@ describe('JournaledMutationBroker recovery', () => {
     const { store, input } = await createStore();
     const client = new FakeBeadsDoltClient();
     client.issueStatus = 'open';
-    const broker = new JournaledBeadsDoltBroker(
+    const broker = JournaledBeadsDoltBroker.createForTest(
       store,
       OfficialBeadsDoltPort.createForTest('/repo/root', client),
       undefined,

@@ -14,6 +14,7 @@ import type { ExternalObservation } from './reconciliation.js';
 import { isProductionDeliveryPort } from './deliveryPortCapability.js';
 import {
   workflowDeliveryMutationCapability,
+  type AuthorizedRunTask,
   type DeliveryOperationRecord,
   type PipelineWaitEscalationRecord,
   type WorkflowStore,
@@ -188,6 +189,7 @@ export type DeliveryFaultBoundary =
   | 'before_mutation'
   | 'after_mutation'
   | 'before_commit'
+  | 'after_commit'
   | 'after_adoption'
   | 'after_replay_mutation';
 
@@ -229,6 +231,7 @@ function assertRequestWithinContract(
   contract: ExecutionContract,
   request: DeliveryRequest,
   policy: DeliveryBrokerPolicy,
+  authorizedTask?: AuthorizedRunTask,
 ): void {
   if (
     request.workspaceId !== contract.workspaceId ||
@@ -238,7 +241,8 @@ function assertRequestWithinContract(
   ) {
     throw new Error('delivery request changes its approved contract binding');
   }
-  const task = contract.tasks.find((candidate) => candidate.id === request.taskId);
+  const contractTask = contract.tasks.find((candidate) => candidate.id === request.taskId);
+  const task = contractTask ?? authorizedTask;
   if (task === undefined) throw new Error('delivery request references an unknown task');
   const authority = correspondingAuthority(request.kind);
   if (
@@ -251,7 +255,10 @@ function assertRequestWithinContract(
   if ('ref' in request && request.ref !== expectedRef) {
     throw new Error('delivery request targets an unapproved task ref');
   }
-  if (request.kind === 'git.create_ref' && request.parentRef !== task.branchParent) {
+  if (
+    request.kind === 'git.create_ref' &&
+    (contractTask === undefined || request.parentRef !== contractTask.branchParent)
+  ) {
     throw new Error('task ref parent differs from the immutable contract');
   }
   if (
@@ -394,7 +401,16 @@ export class DurableDeliveryBroker {
   async execute(requestInput: unknown, fence: DeliveryFence): Promise<DeliveryOperationRecord> {
     const request = deliveryRequestSchema.parse(requestInput);
     this.#store.assertRunUsesContract(request.runId, this.#contract);
-    assertRequestWithinContract(this.#contract, request, this.#policy);
+    assertRequestWithinContract(
+      this.#contract,
+      request,
+      this.#policy,
+      this.#store.getAuthorizedRunTask(
+        request.runId,
+        request.taskId,
+        workflowDeliveryMutationCapability,
+      ),
+    );
     const requestDigest = deriveDeliveryRequestDigest(request);
     let operation = this.#store.prepareDeliveryOperation(
       {
@@ -450,6 +466,7 @@ export class DurableDeliveryBroker {
       },
       workflowDeliveryMutationCapability,
     );
+    this.#fault('after_commit', operation);
     return operation;
   }
 
@@ -508,7 +525,16 @@ export class DurableDeliveryBroker {
           );
           continue;
         }
-        assertRequestWithinContract(this.#contract, request, this.#policy);
+        assertRequestWithinContract(
+          this.#contract,
+          request,
+          this.#policy,
+          this.#store.getAuthorizedRunTask(
+            request.runId,
+            request.taskId,
+            workflowDeliveryMutationCapability,
+          ),
+        );
         let observed = await this.#port.observe(request);
         if (observed.kind === 'conflict') {
           operations.push(this.#escalate(operation, input.fence, observed.result));
@@ -583,7 +609,16 @@ export class DurableDeliveryBroker {
     }
     this.#store.assertRunUsesContract(operation.runId, this.#contract);
     const request = githubChecksRequestSchema.parse(operation.request);
-    assertRequestWithinContract(this.#contract, request, this.#policy);
+    assertRequestWithinContract(
+      this.#contract,
+      request,
+      this.#policy,
+      this.#store.getAuthorizedRunTask(
+        request.runId,
+        request.taskId,
+        workflowDeliveryMutationCapability,
+      ),
+    );
     this.#store.assertDeliveryWaitReady(
       {
         workspaceId: request.workspaceId,
@@ -685,6 +720,7 @@ export class DurableDeliveryBroker {
         nextPollAtMs: input.nextPollAtMs,
         absoluteDeadlineMs: input.absoluteDeadlineMs,
         backoffCount,
+        operationId: operation.id,
         ...input.fence,
         nowMs,
       },

@@ -159,7 +159,7 @@ async function setup(
   };
   const port = OfficialBeadsDoltPort.createForTest('/repo/root', client);
   const closer = new JournaledBeadsTaskCloser(
-    new JournaledBeadsDoltBroker(store, port, undefined, options.clock ?? (() => 1000)),
+    JournaledBeadsDoltBroker.createForTest(store, port, undefined, options.clock ?? (() => 1000)),
     port,
   );
   const executor: SpecialistProcessExecutor =
@@ -956,6 +956,18 @@ if (command === 'conformance') {
       taskLeaseEpoch,
       nowMs: 1000,
     });
+    first.store.recordEvidence({
+      ...evidence[0]!,
+      producer: 'workflow-recovery-checkpoint',
+      producerRole: 'workflow_orchestrator',
+      workspaceId: contract.workspaceId,
+      runId: packet.runId,
+      taskId: packet.taskId,
+      transitionId: 'restart-claim-transition',
+      contractVersion: contract.contractVersion,
+      policyDigest: contract.policyDigest,
+      createdAtMs: 1000,
+    });
     const executionId = '11111111-1111-4111-8111-111111111111';
     first.store.createSchedulerExecution({
       id: executionId,
@@ -1012,6 +1024,8 @@ if (command === 'conformance') {
       externalArguments: {
         taskId: packet.taskId,
         processIdentity: `docker:workflow-specialist-${executionId}`,
+        interruptedTransitionId: 'restart-claim-transition',
+        evidenceDigests: packet.evidence.map((reference) => reference.digest),
       },
       nowMs: 1000,
     });
@@ -1020,7 +1034,7 @@ if (command === 'conformance') {
     const store = new WorkflowStore(join(first.root, 'workflow.sqlite'));
     const port = OfficialBeadsDoltPort.createForTest('/repo/root', first.client);
     const closer = new JournaledBeadsTaskCloser(
-      new JournaledBeadsDoltBroker(store, port, undefined, () => 1100),
+      JournaledBeadsDoltBroker.createForTest(store, port, undefined, () => 1100),
       port,
     );
     const stopped: string[] = [];
@@ -1142,7 +1156,7 @@ if (command === 'conformance') {
 
     const port = OfficialBeadsDoltPort.createForTest('/repo/root', first.client);
     const closer = new JournaledBeadsTaskCloser(
-      new JournaledBeadsDoltBroker(first.store, port, undefined, () => 1100),
+      JournaledBeadsDoltBroker.createForTest(first.store, port, undefined, () => 1100),
       port,
     );
     const recovered = new WorkflowOrchestrator({

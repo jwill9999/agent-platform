@@ -15,13 +15,13 @@ and actionable.
 ## Last Updated
 
 - **Date:** 2026-08-31
-- **Session:** Completed implementation and final review for `.8`; preparing `.9` closeout work.
-- **Branch:** `task/agent-platform-multi-agent.8`
-- **Parent tip:** `.7` at `4cf19d2`.
-- **Current base commit:** `.8` branches exactly from the pushed `.7` completion tip.
+- **Session:** Completed implementation and final review for `.9`; preparing `.10` pilot work.
+- **Branch:** `task/agent-platform-multi-agent.9`
+- **Parent tip:** `.8` at `7288308`.
+- **Current base commit:** `.9` branches exactly from the pushed `.8` completion tip.
 - **Pull request:** Planning PR #251 is merged; open the cumulative task PR only from `.10`.
 
-## Completed Through `.8`
+## Completed Through `.9`
 
 - `.1`: versioned execution contracts and normative workflow state machine.
 - `.2`: process-bound authorization and real Docker malicious-specialist isolation proof.
@@ -45,6 +45,10 @@ and actionable.
   credential scanning; exact-head criterion evaluation and immutable acceptance bindings;
   contract-bounded repair children with concrete captured Beads/Git adapters, accepted predecessor
   lineage, and atomic attempt-derived remaining budgets.
+- `.9`: merge-atomic finalizing; persisted exact-head acceptance reports; fenced Beads epic/Dolt
+  closeout; exact recovery predecessors including the merge boundary; restart-safe waits and
+  cancellation; bounded cleanup/fence timeouts; sealed official mutation brokers and ports; durable
+  cancellation recovery enumeration; multi-reference evidence preservation.
 
 ## Review and Verification
 
@@ -61,19 +65,24 @@ and actionable.
   typecheck, lint, documentation lint, and tests pass; the Sonar secrets scan passes. Six independent
   critic passes closed entropy, BLOB integrity, adapter authority, lineage, lifecycle, retention,
   quota, retry-budget, and crash-recovery findings; the final pass reports no actionable findings.
+- `.9` has 223 package tests passing plus one intentional Docker-isolation skip. Monorepo formatting,
+  typecheck, lint, documentation lint, and dependency-cycle checks pass. Repeated independent review
+  closed finalization ordering, merge/cancellation races, recovery identity, clock/fence, timeout,
+  wait binding, repair-child lineage, cross-store broker, and mutation-port replacement findings;
+  the final pass reports `PASS`.
 - SonarQube hotspot `AZ4YM2i11EaT2bQAPFS4` is `REVIEWED / FIXED`; zero hotspots remain.
 - Sonar's installed agentic CLI reached its server-side endpoint for `.7` but returned an explicit
   `403`; the documented local fallback gates are the completion evidence for this task.
 
 ## Current State
 
-- Epic `agent-platform-multi-agent` remains open; `.1`-`.7` are closed and Dolt-synced.
-- `.8` implementation and review are complete on its task branch; commit, push, and Beads close are
-  the remaining closeout actions before `.9` is claimed.
+- Epic `agent-platform-multi-agent` remains open; `.1`-`.8` are closed and Dolt-synced.
+- `.9` implementation and review are complete on its task branch; commit, push, and Beads close are
+  the remaining closeout actions before `.10` is claimed.
 - No pull request is expected yet; the linear task chain continues through `.10`.
 
 ## Next
 
-1. Commit, push, and close `.8`, then create `.9` exactly from the pushed `.8` tip.
-2. Implement finalization and fault-recovery verification in `.9`.
-3. Continue through `.10`, then open the single cumulative PR to `feature/multi-agent-orchestration`.
+1. Commit, push, and close `.9`, then create `.10` exactly from the pushed `.9` tip.
+2. Run the bounded end-to-end autonomous delivery pilot and record its evidence in `.10`.
+3. Open the single cumulative PR from `.10` to `feature/multi-agent-orchestration`.

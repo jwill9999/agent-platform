@@ -634,7 +634,7 @@ export class WorkflowOrchestrator {
   #commitInternalTransition(input: {
     execution: SchedulerExecutionRecord;
     workspaceLeaseEpoch: number;
-    from: 'implementing' | 'recovering';
+    from: 'implementing' | 'finalizing' | 'recovering';
     to: 'recovering' | 'escalated';
     expectedRunVersion: number;
     operation: string;
@@ -675,6 +675,29 @@ export class WorkflowOrchestrator {
       );
       return;
     }
+    const interrupted =
+      input.to === 'recovering'
+        ? (this.#store.getLatestCommittedTransitionInto(input.execution.runId, input.from) ??
+          (input.from === 'finalizing'
+            ? this.#store.getCommittedMergeAttestation(input.execution.runId)
+            : undefined))
+        : undefined;
+    if (input.to === 'recovering' && interrupted !== undefined) {
+      for (const reference of (input.execution.packet as TaskPacket).evidence) {
+        this.#store.recordEvidence({
+          ...reference,
+          producer: 'workflow-recovery-checkpoint',
+          producerRole: 'workflow_orchestrator',
+          workspaceId: this.#contract.workspaceId,
+          runId: input.execution.runId,
+          taskId: input.execution.taskId,
+          transitionId: interrupted.id,
+          contractVersion: this.#contract.contractVersion,
+          policyDigest: this.#contract.policyDigest,
+          createdAtMs: this.#clock(),
+        });
+      }
+    }
     const prepared = this.#store.prepareTransition({
       id: transitionId,
       runId: input.execution.runId,
@@ -693,6 +716,14 @@ export class WorkflowOrchestrator {
       externalArguments: {
         taskId: input.execution.taskId,
         processIdentity: input.execution.processIdentity,
+        ...(input.to === 'recovering'
+          ? {
+              interruptedTransitionId: interrupted?.id ?? '',
+              evidenceDigests: (input.execution.packet as TaskPacket).evidence.map(
+                (reference) => reference.digest,
+              ),
+            }
+          : {}),
       },
       nowMs: this.#clock(),
     });

@@ -149,6 +149,8 @@ export {
   type LeaseRecord,
   type DeliveryOperationRecord,
   type DeliveryOperationStatus,
+  type FeatureFinalizationRecord,
+  type WorkflowCancellationRecord,
   type SecureEvidenceRecord,
   type AuthorizedRunTask,
   type PrepareDeliveryOperationInput,
@@ -165,6 +167,25 @@ export {
   type TransitionStatus,
   type WorkflowControlPaths,
 } from './storage.js';
+export {
+  WorkflowCancellationCoordinator,
+  WorkflowCancellationRecoveryDriver,
+  OfficialCancellationCleanupPort,
+  type CancellationCleanupClient,
+  type CancellationFaultBoundary,
+  type CancellationFaultInjector,
+} from './cancellation.js';
+export { PipelineWaitRecoveryDriver, type WaitRecoveryResult } from './waitRecovery.js';
+export {
+  FeatureFinalizationCoordinator,
+  featureFinalReportSchema,
+  finalAcceptanceEvidenceSchema,
+  type FeatureFinalReport,
+  type FinalAcceptanceEvidence,
+  type FinalizationFaultBoundary,
+  type FinalizationFaultInjector,
+  type FinalizationFence,
+} from './finalization.js';
 export {
   JournaledBeadsDoltBroker,
   JournaledBeadsTaskCloser,

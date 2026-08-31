@@ -4,6 +4,8 @@ import { registerProductionBeadsPort } from './beadsPortCapability.js';
 
 const productionBeadsPortCapability = Symbol('productionBeadsPortCapability');
 const testBeadsPortCapability = Symbol('testBeadsPortCapability');
+const testBeadsBrokerCapability = Symbol('testBeadsBrokerCapability');
+const beadsBrokerStores = new WeakMap<JournaledBeadsDoltBroker, WorkflowStore>();
 
 export type ExternalObservation =
   | { kind: 'expected'; result: unknown }
@@ -41,6 +43,10 @@ export class JournaledMutationBroker {
     this.#port = port;
     this.#fault = fault;
     this.#clock = clock;
+  }
+
+  usesStore(store: WorkflowStore): boolean {
+    return this.#store === store;
   }
 
   async execute(input: PrepareTransitionInput): Promise<TransitionRecord> {
@@ -100,6 +106,7 @@ export class JournaledMutationBroker {
     recoveryOwnerId: string;
     recoveryLeaseEpoch: number;
     recoveryWorkspaceLeaseEpoch: number;
+    recoveryCloseoutLeaseEpoch?: number;
     recoveryTaskLeaseEpochs?: Readonly<Record<string, number>>;
     currentContractVersion: number;
     currentPolicyDigest: string;
@@ -114,6 +121,12 @@ export class JournaledMutationBroker {
           input.operations === undefined || input.operations.includes(transition.operation),
       );
     for (const prepared of preparedTransitions) {
+      if (
+        prepared.transitionContext.closeoutLeaseEpoch !== undefined &&
+        input.recoveryCloseoutLeaseEpoch === undefined
+      ) {
+        throw new Error('recovery closeout lease is required');
+      }
       const transition = this.#store.adoptPreparedTransition(
         prepared.id,
         input.recoveryOwnerId,
@@ -123,6 +136,10 @@ export class JournaledMutationBroker {
           ...prepared.transitionContext,
           workspaceLeaseEpoch: input.recoveryWorkspaceLeaseEpoch,
           taskLeaseEpoch: recoveryTaskLeaseEpoch(prepared, input.recoveryTaskLeaseEpochs),
+          closeoutLeaseEpoch:
+            prepared.transitionContext.closeoutLeaseEpoch === undefined
+              ? undefined
+              : input.recoveryCloseoutLeaseEpoch,
         },
       );
       if (
@@ -299,6 +316,7 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
     this.#pushDolt = client.pushDolt.bind(client);
     this.#readRepairChild = client.readRepairChild?.bind(client);
     this.#createRepairChild = client.createRepairChild?.bind(client);
+    Object.freeze(this);
   }
 
   static createForTest(
@@ -412,6 +430,8 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
   }
 }
 
+Object.freeze(OfficialBeadsDoltPort.prototype);
+
 // Package-internal bootstrap only. Deliberately omitted from the package index.
 export function createProductionBeadsDoltPort(
   workspaceRoot: string,
@@ -435,20 +455,62 @@ export class JournaledBeadsDoltBroker extends JournaledMutationBroker {
   constructor(
     store: WorkflowStore,
     port: OfficialBeadsDoltPort,
-    fault?: FaultInjector,
-    clock?: () => number,
+    testing?: { capability: symbol; fault?: FaultInjector; clock?: () => number },
   ) {
-    if (!(port instanceof OfficialBeadsDoltPort)) {
+    if (
+      !(port instanceof OfficialBeadsDoltPort) ||
+      Object.getPrototypeOf(port) !== OfficialBeadsDoltPort.prototype ||
+      !Object.isFrozen(port)
+    ) {
       throw new Error('Beads/Dolt mutations require the exclusive official broker port');
     }
-    super(store, port, fault, clock);
+    if (testing !== undefined && testing.capability !== testBeadsBrokerCapability) {
+      throw new Error('Beads/Dolt broker test overrides require the test capability');
+    }
+    super(store, port, testing?.fault, testing?.clock);
     this.#officialPort = port;
+    beadsBrokerStores.set(this, store);
+    Object.freeze(this);
+  }
+
+  static createForTest(
+    store: WorkflowStore,
+    port: OfficialBeadsDoltPort,
+    fault?: FaultInjector,
+    clock?: () => number,
+  ): JournaledBeadsDoltBroker {
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error('test Beads/Dolt broker is unavailable outside tests');
+    }
+    return new JournaledBeadsDoltBroker(store, port, {
+      capability: testBeadsBrokerCapability,
+      fault,
+      clock,
+    });
   }
 
   usesPort(port: OfficialBeadsDoltPort): boolean {
     return this.#officialPort === port;
   }
+
+  readTaskSnapshots(taskIds: readonly string[]) {
+    return this.#officialPort.readTaskSnapshots(taskIds);
+  }
 }
+
+export function isJournaledBeadsDoltBrokerForStore(
+  broker: JournaledBeadsDoltBroker,
+  store: WorkflowStore,
+): boolean {
+  return (
+    Object.getPrototypeOf(broker) === JournaledBeadsDoltBroker.prototype &&
+    broker.execute === JournaledBeadsDoltBroker.prototype.execute &&
+    broker.reconcilePrepared === JournaledBeadsDoltBroker.prototype.reconcilePrepared &&
+    beadsBrokerStores.get(broker) === store
+  );
+}
+
+Object.freeze(JournaledBeadsDoltBroker.prototype);
 
 export class JournaledBeadsTaskCloser {
   readonly #broker: JournaledBeadsDoltBroker;

@@ -38,7 +38,7 @@ export const NORMATIVE_TRANSITIONS: Readonly<Record<WorkflowState, readonly Work
   pipeline: ['delivery', 'repair_planning', 'waiting'],
   waiting: ['pipeline', 'waiting', 'escalated'],
   delivery: ['finalizing'],
-  finalizing: ['closed'],
+  finalizing: ['finalizing', 'closed'],
   cancelling: ['cancelled', 'escalated'],
   cancelled: [],
   recovering: [],
@@ -94,6 +94,7 @@ export interface TransitionContext {
   actorWorkspaceLeaseEpoch: number;
   taskLeaseEpoch?: number;
   actorTaskLeaseEpoch?: number;
+  closeoutLeaseEpoch?: number;
   finalizationVerified?: boolean;
   wait?: {
     now: string;
@@ -131,7 +132,18 @@ export function validateTransition(
   }
 
   if (to === 'cancelling' && cancellableStates.has(from)) return;
-  if (to === 'recovering' && recoverableStates.has(from)) return;
+  if (to === 'recovering' && recoverableStates.has(from)) {
+    if (context.recoveryTarget === undefined) {
+      throw new Error('recovery entry requires a durable recovery target');
+    }
+    if (context.mergeVerified && context.recoveryTarget !== 'finalizing') {
+      throw new Error('verified merge recovery may only target finalizing');
+    }
+    if (!context.mergeVerified && context.recoveryTarget !== from) {
+      throw new Error('recovery target must equal the interrupted state');
+    }
+    return;
+  }
 
   if (from === 'recovering') {
     if (to === 'escalated') return;

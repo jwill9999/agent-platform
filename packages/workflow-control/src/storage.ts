@@ -76,6 +76,12 @@ export const workflowEvaluationMutationCapability = Symbol('workflowEvaluationMu
 export const workflowSecureEvidenceMutationCapability = Symbol(
   'workflowSecureEvidenceMutationCapability',
 );
+export const workflowFinalizationMutationCapability = Symbol(
+  'workflowFinalizationMutationCapability',
+);
+export const workflowCancellationMutationCapability = Symbol(
+  'workflowCancellationMutationCapability',
+);
 
 export type DeliveryOperationStatus = 'prepared' | 'committed' | 'escalated';
 
@@ -120,6 +126,31 @@ export interface SecureEvidenceRecord {
   deletedAtMs: number | null;
   tombstoneDigest: string | null;
   createdAtMs: number;
+}
+
+export interface FeatureFinalizationRecord {
+  runId: string;
+  featureId: string;
+  epicId: string;
+  status: 'prepared' | 'finalizing' | 'closed';
+  reportDigest: string;
+  report: unknown;
+  createdAtMs: number;
+  closedAtMs: number | null;
+}
+
+export interface WorkflowCancellationRecord {
+  id: string;
+  runId: string;
+  requestedBy: string;
+  reason: string;
+  requestedAtMs: number;
+  stopDeadlineMs: number;
+  status: 'requested' | 'cancelled' | 'escalated';
+  ownedWorkStopped: boolean;
+  incompleteCleanup: string[];
+  retainedEvidence: unknown[];
+  completedAtMs: number | null;
 }
 
 export interface EvaluationRecord {
@@ -263,7 +294,12 @@ export interface PrepareTransitionInput {
     Partial<
       Pick<
         TransitionContext,
-        'taskLeaseEpoch' | 'recoveryTarget' | 'mergeVerified' | 'finalizationVerified' | 'wait'
+        | 'taskLeaseEpoch'
+        | 'closeoutLeaseEpoch'
+        | 'recoveryTarget'
+        | 'mergeVerified'
+        | 'finalizationVerified'
+        | 'wait'
       >
     >;
   expectedExternalState: unknown;
@@ -641,7 +677,8 @@ export class WorkflowStore {
   ): void {
     if (
       capability !== workflowSecureEvidenceMutationCapability &&
-      capability !== workflowEvaluationMutationCapability
+      capability !== workflowEvaluationMutationCapability &&
+      capability !== workflowDeliveryMutationCapability
     ) {
       throw new Error('approved task-head verification requires an internal capability');
     }
@@ -675,7 +712,8 @@ export class WorkflowStore {
   ): AuthorizedRunTask | undefined {
     if (
       capability !== workflowSecureEvidenceMutationCapability &&
-      capability !== workflowEvaluationMutationCapability
+      capability !== workflowEvaluationMutationCapability &&
+      capability !== workflowDeliveryMutationCapability
     ) {
       throw new Error('run-task authorization requires an internal capability');
     }
@@ -1010,8 +1048,32 @@ export class WorkflowStore {
           input.nowMs,
         );
       }
+      if (input.transitionContext.closeoutLeaseEpoch !== undefined) {
+        this.#assertResourceLease(
+          'closeout',
+          input.runId,
+          input.leaseOwnerId,
+          input.transitionContext.closeoutLeaseEpoch,
+          input.nowMs,
+        );
+      }
+      const activeRecovery = this.#activeRecovery(input.runId);
+      if (input.from === 'recovering' && activeRecovery === undefined) {
+        throw new Error('recovering run has no durable recovery target');
+      }
+      if (
+        input.from === 'recovering' &&
+        input.transitionContext.recoveryTarget !== activeRecovery?.recovery_target
+      ) {
+        throw new Error('requested recovery target differs from the durable recovery target');
+      }
+      const recoveryTarget =
+        input.from === 'recovering'
+          ? activeRecovery!.recovery_target
+          : input.transitionContext.recoveryTarget;
       validateTransition(input.from, input.to, {
         ...input.transitionContext,
+        recoveryTarget,
         mergeVerified: run.mergeVerified,
         currentContractVersion: approved.contract_version,
         requestedContractVersion: input.contractVersion,
@@ -1022,6 +1084,96 @@ export class WorkflowStore {
       });
       if (input.from === 'finalizing' && input.to === 'closed' && !run.mergeVerified) {
         throw new Error('finalization requires persisted merge verification');
+      }
+      if (input.from === 'finalizing' && input.to === 'closed') {
+        throw new Error('feature closure requires the durable finalization coordinator');
+      }
+      if (
+        input.from === 'finalizing' &&
+        input.to === 'finalizing' &&
+        (!['beads.task_close', 'beads.dolt_push'].includes(input.operation) ||
+          input.transitionContext.closeoutLeaseEpoch === undefined)
+      ) {
+        throw new Error('finalizing self-transition requires a fenced closeout operation');
+      }
+      let recoveryInterruptedTransitionId: string | undefined;
+      if (input.to === 'recovering') {
+        const preparedMerge = this.#database
+          .prepare(
+            `SELECT 1 FROM delivery_operations
+             WHERE run_id = ? AND kind = 'github.merge' AND status = 'prepared' LIMIT 1`,
+          )
+          .get(input.runId);
+        if (preparedMerge !== undefined) {
+          throw new Error('prepared merge must be reconciled before recovery');
+        }
+        const arguments_ = input.externalArguments as Record<string, unknown> | null;
+        const interruptedTransitionId = arguments_?.interruptedTransitionId;
+        const evidenceDigests = arguments_?.evidenceDigests;
+        if (
+          typeof interruptedTransitionId !== 'string' ||
+          interruptedTransitionId.length === 0 ||
+          !Array.isArray(evidenceDigests) ||
+          evidenceDigests.length === 0 ||
+          !evidenceDigests.every(
+            (digest) => typeof digest === 'string' && /^sha256:[a-f0-9]{64}$/u.test(digest),
+          )
+        ) {
+          throw new Error('recovery entry requires interrupted-transition evidence');
+        }
+        const interrupted = this.getTransition(interruptedTransitionId);
+        const latestTransition = this.getLatestCommittedTransitionInto(input.runId, input.from);
+        const mergePredecessor =
+          input.from === 'finalizing' && run.mergeVerified
+            ? this.getCommittedMergeAttestation(input.runId)
+            : undefined;
+        const transitionIsCurrent =
+          interrupted !== undefined &&
+          interrupted.runId === input.runId &&
+          interrupted.status === 'committed' &&
+          interrupted.to === input.from &&
+          interrupted.expectedRunVersion + 2 === input.expectedRunVersion &&
+          latestTransition?.id === interruptedTransitionId;
+        const mergeIsCurrent =
+          latestTransition === undefined &&
+          mergePredecessor?.id === interruptedTransitionId &&
+          mergePredecessor.status === 'committed';
+        if (!transitionIsCurrent && !mergeIsCurrent) {
+          throw new Error('recovery interrupted transition is not the committed run predecessor');
+        }
+        recoveryInterruptedTransitionId = interruptedTransitionId;
+        const authoritativeRoles = [
+          'workflow_orchestrator',
+          'planner',
+          'plan_critic',
+          'human_approver',
+          'implementation_worker',
+          'code_reviewer',
+          'test_runner',
+          'qa_evaluator',
+          'feature_evaluator',
+        ];
+        if (
+          evidenceDigests.some(
+            (digest) =>
+              !this.hasRecoveryEvidenceBinding({
+                digest,
+                workspaceId: approved.workspace_id,
+                runId: input.runId,
+                contractVersion: input.contractVersion,
+                policyDigest: input.policyDigest,
+                allowedProducerRoles: authoritativeRoles,
+                taskId: typeof arguments_?.taskId === 'string' ? arguments_.taskId : undefined,
+                minCreatedAtMs: interrupted?.nowMs ?? mergePredecessor!.updatedAtMs,
+                interruptedTransitionId,
+              }),
+          )
+        ) {
+          throw new Error('recovery evidence is not bound to the interrupted run');
+        }
+        if (activeRecovery !== undefined) {
+          throw new Error('run already has an active recovery target');
+        }
       }
       if (run.version !== input.expectedRunVersion || run.state !== input.from) {
         throw new Error('run compare-and-swap failed');
@@ -1059,6 +1211,27 @@ export class WorkflowStore {
           input.nowMs,
           input.nowMs,
         );
+      if (input.to === 'recovering') {
+        const arguments_ = input.externalArguments as Record<string, unknown>;
+        this.#database
+          .prepare(
+            `INSERT INTO recovery_records
+             (transition_id, run_id, interrupted_state, recovery_target,
+              interrupted_transition_id, merge_verified, evidence_json, created_at_ms,
+              resumed_at_ms)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+          )
+          .run(
+            input.id,
+            input.runId,
+            input.from,
+            input.transitionContext.recoveryTarget,
+            recoveryInterruptedTransitionId,
+            run.mergeVerified ? 1 : 0,
+            JSON.stringify(arguments_.evidenceDigests),
+            input.nowMs,
+          );
+      }
       this.#database
         .prepare(
           `INSERT INTO external_effects
@@ -1097,6 +1270,9 @@ export class WorkflowStore {
       if (transition === undefined) throw new Error('transition not found');
       if (transition.status === 'committed') return transition;
       if (transition.status !== 'prepared') throw new Error('transition cannot be committed');
+      if (transition.from === 'finalizing' && transition.to === 'closed') {
+        throw new Error('feature closure requires the durable finalization coordinator');
+      }
       this.#assertLease(transition.runId, ownerId, leaseEpoch, nowMs);
       this.#assertTransitionResourceLeases(transition, ownerId, nowMs);
       if (ownerId !== transition.leaseOwnerId || leaseEpoch !== transition.leaseEpoch) {
@@ -1114,9 +1290,31 @@ export class WorkflowStore {
            WHERE transition_id = ?`,
         )
         .run(JSON.stringify(result), nowMs, transitionId);
-      this.#database
-        .prepare('UPDATE runs SET state = ?, version = version + 1, updated_at_ms = ? WHERE id = ?')
-        .run(transition.to, nowMs, transition.runId);
+      const runUpdate = this.#database
+        .prepare(
+          `UPDATE runs SET state = ?, version = version + 1, updated_at_ms = ?
+           WHERE id = ? AND state = ? AND version = ?`,
+        )
+        .run(
+          transition.to,
+          nowMs,
+          transition.runId,
+          transition.from,
+          transition.expectedRunVersion + 1,
+        );
+      if (runUpdate.changes !== 1) throw new Error('transition run commit failed');
+      if (transition.from === 'recovering') {
+        this.#database
+          .prepare(
+            `UPDATE recovery_records SET resumed_at_ms = ?, terminal_outcome = 'resumed'
+             WHERE transition_id = (
+               SELECT transition_id FROM recovery_records
+               WHERE run_id = ? AND resumed_at_ms IS NULL
+               ORDER BY created_at_ms DESC, transition_id DESC LIMIT 1
+             ) AND resumed_at_ms IS NULL`,
+          )
+          .run(nowMs, transition.runId);
+      }
       return this.getTransition(transitionId)!;
     })();
   }
@@ -1145,11 +1343,32 @@ export class WorkflowStore {
            WHERE transition_id = ?`,
         )
         .run(JSON.stringify(evidence), nowMs, transitionId);
-      this.#database
+      const runUpdate = this.#database
         .prepare(
-          `UPDATE runs SET state = 'escalated', version = version + 1, updated_at_ms = ? WHERE id = ?`,
+          `UPDATE runs SET state = 'escalated', version = version + 1, updated_at_ms = ?
+           WHERE id = ? AND state = ? AND version = ?`,
         )
-        .run(nowMs, transition.runId);
+        .run(nowMs, transition.runId, transition.from, transition.expectedRunVersion + 1);
+      if (runUpdate.changes !== 1) throw new Error('transition escalation compare-and-swap failed');
+      if (transition.to === 'recovering') {
+        this.#database
+          .prepare(
+            `UPDATE recovery_records SET resumed_at_ms = ?, terminal_outcome = 'escalated'
+             WHERE transition_id = ? AND resumed_at_ms IS NULL`,
+          )
+          .run(nowMs, transition.id);
+      } else if (transition.from === 'recovering') {
+        this.#database
+          .prepare(
+            `UPDATE recovery_records SET resumed_at_ms = ?, terminal_outcome = 'escalated'
+             WHERE transition_id = (
+               SELECT transition_id FROM recovery_records
+               WHERE run_id = ? AND resumed_at_ms IS NULL
+               ORDER BY created_at_ms DESC, transition_id DESC LIMIT 1
+             ) AND resumed_at_ms IS NULL`,
+          )
+          .run(nowMs, transition.runId);
+      }
     })();
   }
 
@@ -1174,6 +1393,19 @@ export class WorkflowStore {
       )
       .all(runId) as TransitionRow[];
     return rows.map(transitionFromRow);
+  }
+
+  getLatestCommittedTransitionInto(
+    runId: string,
+    state: WorkflowState,
+  ): TransitionRecord | undefined {
+    const row = this.#database
+      .prepare(
+        `SELECT * FROM transitions WHERE run_id = ? AND to_state = ? AND status = 'committed'
+         ORDER BY updated_at_ms DESC, id DESC LIMIT 1`,
+      )
+      .get(runId, state) as TransitionRow | undefined;
+    return row === undefined ? undefined : transitionFromRow(row);
   }
 
   adoptPreparedTransition(
@@ -1962,7 +2194,16 @@ export class WorkflowStore {
       ) {
         throw new Error('delivery operation contract, policy, or workspace is stale');
       }
-      if (!contract.tasks.some((task) => task.id === input.taskId)) {
+      const preparedTransition = this.#database
+        .prepare(`SELECT 1 FROM transitions WHERE run_id = ? AND status = 'prepared' LIMIT 1`)
+        .get(input.runId);
+      if (preparedTransition !== undefined) {
+        throw new Error('delivery operation cannot race a prepared workflow transition');
+      }
+      if (
+        this.getAuthorizedRunTask(input.runId, input.taskId, workflowDeliveryMutationCapability) ===
+        undefined
+      ) {
         throw new Error('delivery operation task is outside the contract');
       }
       const replay = this.#database
@@ -2043,6 +2284,17 @@ export class WorkflowStore {
     return row === undefined ? undefined : deliveryOperationFromRow(row);
   }
 
+  getCommittedMergeAttestation(runId: string): DeliveryOperationRecord | undefined {
+    const row = this.#database
+      .prepare(
+        `SELECT * FROM delivery_operations
+         WHERE run_id = ? AND kind = 'github.merge' AND status = 'committed'
+         ORDER BY updated_at_ms DESC, id DESC LIMIT 1`,
+      )
+      .get(runId) as DeliveryOperationRow | undefined;
+    return row === undefined ? undefined : deliveryOperationFromRow(row);
+  }
+
   listPreparedDeliveryOperations(runId: string): DeliveryOperationRecord[] {
     return (
       this.#database
@@ -2089,8 +2341,42 @@ export class WorkflowStore {
         )
         .run(serializeDurableJson(input.result), verifiedAtMs, input.id);
       this.#commitDeliveryLineage(operation, input.result, verifiedAtMs);
+      if (operation.kind === 'github.merge') {
+        this.#commitVerifiedMerge(operation, input.result, verifiedAtMs);
+      }
       return this.getDeliveryOperation(input.id)!;
     })();
+  }
+
+  #commitVerifiedMerge(
+    operation: DeliveryOperationRecord,
+    result: unknown,
+    verifiedAtMs: number,
+  ): void {
+    const request = operation.request as Record<string, unknown>;
+    const attestation = result as Record<string, unknown> | null;
+    if (
+      attestation === null ||
+      typeof attestation.mergeSha !== 'string' ||
+      !/^[a-f0-9]{40,64}$/u.test(attestation.mergeSha) ||
+      attestation.headSha !== request.headSha ||
+      attestation.base !== request.base ||
+      attestation.mergeMethod !== request.mergeMethod ||
+      typeof attestation.eventIdentity !== 'string' ||
+      attestation.eventIdentity.length === 0
+    ) {
+      throw new Error('GitHub merge result is not an exact durable attestation');
+    }
+    const updated = this.#database
+      .prepare(
+        `UPDATE runs SET state = 'finalizing', merge_verified = 1,
+         version = version + 1, updated_at_ms = ?
+         WHERE id = ? AND state = 'delivery' AND merge_verified = 0`,
+      )
+      .run(verifiedAtMs, operation.runId);
+    if (updated.changes !== 1) {
+      throw new Error('verified merge could not atomically enter finalizing');
+    }
   }
 
   escalateDeliveryOperation(
@@ -2504,6 +2790,7 @@ export class WorkflowStore {
     input: Parameters<WorkflowStore['putWait']>[0] & {
       workspaceId: string;
       taskId: string;
+      operationId: string;
       ownerId: string;
       workspaceLeaseEpoch: number;
       runLeaseEpoch: number;
@@ -2563,8 +2850,8 @@ export class WorkflowStore {
         .prepare(
           `INSERT INTO waits
            (run_id, check_id, event_identity, next_poll_at_ms, absolute_deadline_ms, backoff_count,
-            workspace_id, task_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            workspace_id, task_id, operation_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(run_id, check_id) DO UPDATE SET
              event_identity = excluded.event_identity,
              next_poll_at_ms = excluded.next_poll_at_ms,
@@ -2575,7 +2862,8 @@ export class WorkflowStore {
              END,
              backoff_count = excluded.backoff_count,
              workspace_id = excluded.workspace_id,
-             task_id = excluded.task_id`,
+             task_id = excluded.task_id,
+             operation_id = excluded.operation_id`,
         )
         .run(
           input.runId,
@@ -2586,6 +2874,7 @@ export class WorkflowStore {
           input.backoffCount,
           input.workspaceId,
           input.taskId,
+          input.operationId,
         );
     })();
   }
@@ -2603,12 +2892,13 @@ export class WorkflowStore {
         backoffCount: number;
         workspaceId: string | null;
         taskId: string | null;
+        operationId: string | null;
       }
     | undefined {
     const row = this.#database
       .prepare(
         `SELECT run_id, check_id, event_identity, next_poll_at_ms, absolute_deadline_ms,
-                backoff_count, workspace_id, task_id
+                backoff_count, workspace_id, task_id, operation_id
          FROM waits WHERE run_id = ? AND check_id = ?`,
       )
       .get(runId, checkId) as
@@ -2621,6 +2911,7 @@ export class WorkflowStore {
           backoff_count: number;
           workspace_id: string | null;
           task_id: string | null;
+          operation_id: string | null;
         }
       | undefined;
     return row === undefined
@@ -2634,6 +2925,7 @@ export class WorkflowStore {
           backoffCount: row.backoff_count,
           workspaceId: row.workspace_id,
           taskId: row.task_id,
+          operationId: row.operation_id,
         };
   }
 
@@ -2871,7 +3163,10 @@ export class WorkflowStore {
     if (contract.workspaceId !== input.workspaceId) {
       throw new Error('pipeline wait workspace does not match the run contract');
     }
-    if (!contract.tasks.some((task) => task.id === input.taskId)) {
+    if (
+      this.getAuthorizedRunTask(input.runId, input.taskId, workflowDeliveryMutationCapability) ===
+      undefined
+    ) {
       throw new Error('pipeline wait task does not match the run contract');
     }
   }
@@ -2896,6 +3191,20 @@ export class WorkflowStore {
       checkId: row.check_id,
       deadlineReached: row.absolute_deadline_ms <= nowMs,
     }));
+  }
+
+  getLatestCommittedChecksOperation(
+    runId: string,
+    taskId: string,
+  ): DeliveryOperationRecord | undefined {
+    const row = this.#database
+      .prepare(
+        `SELECT * FROM delivery_operations
+         WHERE run_id = ? AND task_id = ? AND kind = 'github.checks' AND status = 'committed'
+         ORDER BY updated_at_ms DESC, id DESC LIMIT 1`,
+      )
+      .get(runId, taskId) as DeliveryOperationRow | undefined;
+    return row === undefined ? undefined : deliveryOperationFromRow(row);
   }
 
   recordFinding(input: {
@@ -3112,6 +3421,627 @@ export class WorkflowStore {
       .prepare(`SELECT * FROM secure_evidence WHERE digest = ? AND run_id = ? AND task_id = ?`)
       .get(digest, runId, taskId) as Record<string, unknown> | undefined;
     return row === undefined ? undefined : secureEvidenceRecordFromRow(row);
+  }
+
+  recordFeatureFinalization(
+    input: {
+      runId: string;
+      featureId: string;
+      epicId: string;
+      childTaskIds: readonly string[];
+      reportDigest: string;
+      report: unknown;
+      evidenceBindings: ReadonlyArray<{
+        criterion: string;
+        taskId: string;
+        digest: string;
+        mediaType: string;
+        sizeBytes: number;
+        kind: string;
+      }>;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      closeoutLeaseEpoch: number;
+      createdAtMs: number;
+    },
+    capability?: symbol,
+  ): FeatureFinalizationRecord {
+    if (capability !== workflowFinalizationMutationCapability) {
+      throw new Error('feature finalization requires the internal closeout capability');
+    }
+    return this.#database.transaction(() => {
+      const contract = this.#contractForRun(input.runId);
+      const run = this.getRun(input.runId);
+      if (
+        run?.state !== 'finalizing' ||
+        !run.mergeVerified ||
+        contract.featureId !== input.featureId ||
+        input.epicId !== input.featureId
+      ) {
+        throw new Error('feature finalization binding or merge state is invalid');
+      }
+      this.#assertResourceLease(
+        'workspace',
+        contract.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.createdAtMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.createdAtMs,
+      );
+      this.#assertResourceLease(
+        'closeout',
+        input.runId,
+        input.ownerId,
+        input.closeoutLeaseEpoch,
+        input.createdAtMs,
+      );
+      const reportJson = serializeDurableJson(input.report);
+      const actualDigest = `sha256:${createHash('sha256').update(reportJson).digest('hex')}`;
+      if (actualDigest !== input.reportDigest) {
+        throw new Error('final report digest does not match its canonical content');
+      }
+      const criteria = [...new Set(input.evidenceBindings.map((binding) => binding.criterion))];
+      if (
+        criteria.length !== contract.acceptanceCriteria.length ||
+        contract.acceptanceCriteria.some((criterion) => !criteria.includes(criterion))
+      ) {
+        throw new Error('final report must map every approved acceptance criterion exactly once');
+      }
+      const childIds = [...new Set(input.childTaskIds)];
+      const authoritativeChildIds = [
+        ...contract.tasks.map((task) => task.id),
+        ...this.listCommittedRepairChildIds(input.runId),
+      ];
+      if (
+        childIds.length !== input.childTaskIds.length ||
+        JSON.stringify(childIds) !== JSON.stringify(authoritativeChildIds)
+      ) {
+        throw new Error('final report child lineage differs from the authoritative task graph');
+      }
+      for (const childId of childIds) {
+        const closed = this.#database
+          .prepare(
+            `SELECT 1 FROM transitions WHERE run_id = ? AND operation = 'beads.task_close'
+             AND status = 'committed' AND json_extract(external_arguments_json, '$.taskId') = ?
+             LIMIT 1`,
+          )
+          .get(input.runId, childId);
+        if (closed === undefined) throw new Error(`implementation child is not closed: ${childId}`);
+      }
+      const merge = this.getCommittedMergeAttestation(input.runId);
+      const mergeRequest = merge?.request as Record<string, unknown> | undefined;
+      const mergedHeadSha = mergeRequest?.headSha;
+      if (typeof mergedHeadSha !== 'string') {
+        throw new Error('final report has no committed merge head');
+      }
+      const evaluation = this.getPassedFeatureEvaluation(input.runId, mergedHeadSha);
+      const evaluationResult = evaluation?.result as Record<string, unknown> | undefined;
+      const evaluatedCriteria = Array.isArray(evaluationResult?.criteria)
+        ? (evaluationResult.criteria as Array<Record<string, unknown>>)
+        : [];
+      if (evaluation === undefined || evaluationResult?.verdict !== 'passed') {
+        throw new Error('final report requires a passed feature evaluation at the merged head');
+      }
+      const report = input.report as Record<string, unknown>;
+      if (
+        report.runId !== input.runId ||
+        report.featureId !== input.featureId ||
+        report.epicId !== input.epicId ||
+        report.mergedHeadSha !== mergedHeadSha ||
+        report.evaluationId !== evaluation.id
+      ) {
+        throw new Error('final report identity differs from its authoritative run evidence');
+      }
+      for (const binding of input.evidenceBindings) {
+        const evidence = this.getSecureEvidence(binding.digest, input.runId, binding.taskId);
+        const evaluated = evaluatedCriteria.find(
+          (criterion) =>
+            criterion.criterion === binding.criterion &&
+            criterion.status === 'passed' &&
+            Array.isArray(criterion.evidence) &&
+            criterion.evidence.some(
+              (reference) =>
+                typeof reference === 'object' &&
+                reference !== null &&
+                (reference as Record<string, unknown>).digest === binding.digest &&
+                (reference as Record<string, unknown>).mediaType === binding.mediaType &&
+                (reference as Record<string, unknown>).sizeBytes === binding.sizeBytes &&
+                (reference as Record<string, unknown>).kind === binding.kind,
+            ),
+        );
+        if (
+          evidence === undefined ||
+          evidence.deletedAtMs !== null ||
+          evidence.acceptedAtMs === null ||
+          evidence.workspaceId !== contract.workspaceId ||
+          evidence.contractVersion !== contract.contractVersion ||
+          evidence.policyDigest !== contract.policyDigest ||
+          evidence.headSha !== mergedHeadSha ||
+          evidence.mediaType !== binding.mediaType ||
+          evidence.sizeBytes !== binding.sizeBytes ||
+          evidence.kind !== binding.kind ||
+          !['test_runner', 'qa_evaluator', 'code_reviewer', 'feature_evaluator'].includes(
+            evidence.producerRole,
+          ) ||
+          evaluated === undefined
+        ) {
+          throw new Error(
+            `final report references non-final evaluation evidence: ${binding.digest}`,
+          );
+        }
+      }
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO feature_finalizations
+           (run_id, feature_id, epic_id, status, report_digest, report_json,
+            created_at_ms, closed_at_ms)
+           VALUES (?, ?, ?, 'prepared', ?, ?, ?, NULL)`,
+        )
+        .run(
+          input.runId,
+          input.featureId,
+          input.epicId,
+          input.reportDigest,
+          reportJson,
+          input.createdAtMs,
+        );
+      const record = this.getFeatureFinalization(input.runId);
+      if (
+        record === undefined ||
+        record.featureId !== input.featureId ||
+        record.epicId !== input.epicId ||
+        record.reportDigest !== input.reportDigest ||
+        serializeDurableJson(record.report) !== reportJson
+      ) {
+        throw new Error('immutable feature finalization identity changed');
+      }
+      return record;
+    })();
+  }
+
+  getFeatureFinalization(runId: string): FeatureFinalizationRecord | undefined {
+    const row = this.#database
+      .prepare('SELECT * FROM feature_finalizations WHERE run_id = ?')
+      .get(runId) as
+      | {
+          run_id: string;
+          feature_id: string;
+          epic_id: string;
+          status: 'prepared' | 'finalizing' | 'closed';
+          report_digest: string;
+          report_json: string;
+          created_at_ms: number;
+          closed_at_ms: number | null;
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          runId: row.run_id,
+          featureId: row.feature_id,
+          epicId: row.epic_id,
+          status: row.status,
+          reportDigest: row.report_digest,
+          report: JSON.parse(row.report_json) as unknown,
+          createdAtMs: row.created_at_ms,
+          closedAtMs: row.closed_at_ms,
+        };
+  }
+
+  closeFeatureFinalization(
+    input: {
+      runId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      closeoutLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): FeatureFinalizationRecord {
+    if (capability !== workflowFinalizationMutationCapability) {
+      throw new Error('feature finalization requires the internal closeout capability');
+    }
+    return this.#database.transaction(() => {
+      const existing = this.getFeatureFinalization(input.runId);
+      if (existing === undefined) throw new Error('final evidence report is not recorded');
+      if (existing.status === 'closed') return existing;
+      if (existing.status !== 'finalizing') {
+        throw new Error('closeout effects are not verified');
+      }
+      const contract = this.#contractForRun(input.runId);
+      const run = this.getRun(input.runId);
+      if (run?.state !== 'finalizing' || !run.mergeVerified) {
+        throw new Error('run is not ready for feature closure');
+      }
+      this.#assertResourceLease(
+        'workspace',
+        contract.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'closeout',
+        input.runId,
+        input.ownerId,
+        input.closeoutLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertCommittedCloseoutEffects(input.runId, existing.epicId);
+      this.#database
+        .prepare(
+          `UPDATE feature_finalizations SET status = 'closed', closed_at_ms = ?
+           WHERE run_id = ? AND status = 'finalizing'`,
+        )
+        .run(input.nowMs, input.runId);
+      const updated = this.#database
+        .prepare(
+          `UPDATE runs SET state = 'closed', version = version + 1, updated_at_ms = ?
+           WHERE id = ? AND state = 'finalizing' AND merge_verified = 1`,
+        )
+        .run(input.nowMs, input.runId);
+      if (updated.changes !== 1) throw new Error('feature closure compare-and-swap failed');
+      return this.getFeatureFinalization(input.runId)!;
+    })();
+  }
+
+  verifyFeatureFinalizationEffects(
+    input: {
+      runId: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      closeoutLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): FeatureFinalizationRecord {
+    if (capability !== workflowFinalizationMutationCapability) {
+      throw new Error('feature finalization requires the internal closeout capability');
+    }
+    return this.#database.transaction(() => {
+      const existing = this.getFeatureFinalization(input.runId);
+      if (existing === undefined) throw new Error('finalization intent is not prepared');
+      if (existing.status !== 'prepared') return existing;
+      const contract = this.#contractForRun(input.runId);
+      this.#assertResourceLease(
+        'workspace',
+        contract.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'closeout',
+        input.runId,
+        input.ownerId,
+        input.closeoutLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertCommittedCloseoutEffects(input.runId, existing.epicId);
+      this.#database
+        .prepare(
+          `UPDATE feature_finalizations SET status = 'finalizing'
+           WHERE run_id = ? AND status = 'prepared'`,
+        )
+        .run(input.runId);
+      return this.getFeatureFinalization(input.runId)!;
+    })();
+  }
+
+  requestWorkflowCancellation(
+    input: {
+      id: string;
+      runId: string;
+      requestedBy: string;
+      reason: string;
+      requestedAtMs: number;
+      stopDeadlineMs: number;
+      retainedEvidence: readonly unknown[];
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): WorkflowCancellationRecord {
+    if (capability !== workflowCancellationMutationCapability) {
+      throw new Error('workflow cancellation requires the internal cancellation capability');
+    }
+    if (input.requestedAtMs !== input.nowMs) {
+      throw new Error('cancellation request time must come from the coordinator clock');
+    }
+    if (input.stopDeadlineMs < input.requestedAtMs) {
+      throw new Error('cancellation stop deadline precedes the request');
+    }
+    return this.#database.transaction(() => {
+      const existing = this.getWorkflowCancellation(input.runId);
+      if (existing !== undefined) {
+        if (
+          existing.id !== input.id ||
+          existing.requestedBy !== input.requestedBy ||
+          existing.reason !== input.reason ||
+          existing.requestedAtMs !== input.requestedAtMs ||
+          existing.stopDeadlineMs !== input.stopDeadlineMs ||
+          serializeDurableJson(existing.retainedEvidence) !==
+            serializeDurableJson(input.retainedEvidence)
+        ) {
+          throw new Error('immutable cancellation request changed');
+        }
+        return existing;
+      }
+      const contract = this.#contractForRun(input.runId);
+      const run = this.getRun(input.runId);
+      const invalidEvidence = input.retainedEvidence.some((reference) => {
+        if (
+          typeof reference !== 'object' ||
+          reference === null ||
+          !('digest' in reference) ||
+          !('mediaType' in reference) ||
+          !('sizeBytes' in reference) ||
+          !('kind' in reference)
+        ) {
+          return true;
+        }
+        const candidate = reference as Record<string, unknown>;
+        return (
+          this.#database
+            .prepare(
+              `SELECT 1 FROM secure_evidence
+               WHERE digest = ? AND run_id = ? AND workspace_id = ?
+                 AND contract_version = ? AND policy_digest = ?
+                 AND media_type = ? AND size_bytes = ? AND kind = ?
+                 AND accepted_at_ms IS NOT NULL AND deleted_at_ms IS NULL
+               LIMIT 1`,
+            )
+            .get(
+              candidate.digest,
+              input.runId,
+              contract.workspaceId,
+              contract.contractVersion,
+              contract.policyDigest,
+              candidate.mediaType,
+              candidate.sizeBytes,
+              candidate.kind,
+            ) === undefined
+        );
+      });
+      if (invalidEvidence) {
+        throw new Error('cancellation retained evidence is not recorded');
+      }
+      const cancellable = new Set<WorkflowState>([
+        'approved',
+        'scheduling',
+        'implementing',
+        'task_verification',
+        'task_review',
+        'repair',
+        'task_accepted',
+        'integration',
+        'feature_evaluation',
+        'repair_planning',
+        'pipeline',
+        'waiting',
+        'delivery',
+        'finalizing',
+        'recovering',
+        'escalated',
+      ]);
+      if (run === undefined || !cancellable.has(run.state)) {
+        throw new Error('workflow run is not cancellable');
+      }
+      const preparedMerge = this.#database
+        .prepare(
+          `SELECT 1 FROM delivery_operations
+           WHERE run_id = ? AND kind = 'github.merge' AND status = 'prepared' LIMIT 1`,
+        )
+        .get(input.runId);
+      if (preparedMerge !== undefined || run.mergeVerified) {
+        throw new Error(
+          'verified or prepared merge must reconcile to finalizing before cancellation',
+        );
+      }
+      this.#assertResourceLease(
+        'workspace',
+        contract.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#database
+        .prepare(
+          `INSERT INTO workflow_cancellations
+           (id, run_id, requested_by, reason, requested_at_ms, stop_deadline_ms, status,
+            owned_work_stopped, incomplete_cleanup_json, retained_evidence_json, completed_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, 'requested', 0, '[]', ?, NULL)`,
+        )
+        .run(
+          input.id,
+          input.runId,
+          input.requestedBy,
+          input.reason,
+          input.requestedAtMs,
+          input.stopDeadlineMs,
+          serializeDurableJson(input.retainedEvidence),
+        );
+      this.#database
+        .prepare(
+          `UPDATE runs SET state = 'cancelling', version = version + 1, updated_at_ms = ?
+           WHERE id = ? AND state = ?`,
+        )
+        .run(input.nowMs, input.runId, run.state);
+      return this.getWorkflowCancellation(input.runId)!;
+    })();
+  }
+
+  completeWorkflowCancellation(
+    input: {
+      runId: string;
+      ownedWorkStopped: boolean;
+      incompleteCleanup: readonly string[];
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): WorkflowCancellationRecord {
+    if (capability !== workflowCancellationMutationCapability) {
+      throw new Error('workflow cancellation requires the internal cancellation capability');
+    }
+    return this.#database.transaction(() => {
+      const record = this.getWorkflowCancellation(input.runId);
+      if (record === undefined) throw new Error('cancellation request not found');
+      if (record.status !== 'requested') return record;
+      const contract = this.#contractForRun(input.runId);
+      this.#assertResourceLease(
+        'workspace',
+        contract.workspaceId,
+        input.ownerId,
+        input.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        input.runId,
+        input.ownerId,
+        input.runLeaseEpoch,
+        input.nowMs,
+      );
+      const durableIncomplete: string[] = [];
+      const blockers = [
+        [
+          'active-specialists',
+          `SELECT 1 FROM scheduler_executions WHERE run_id = ? AND status = 'active' LIMIT 1`,
+        ],
+        [
+          'prepared-transitions',
+          `SELECT 1 FROM transitions WHERE run_id = ? AND status = 'prepared' LIMIT 1`,
+        ],
+        [
+          'prepared-delivery',
+          `SELECT 1 FROM delivery_operations WHERE run_id = ? AND status = 'prepared' LIMIT 1`,
+        ],
+        [
+          'active-repairs',
+          `SELECT 1 FROM repair_dispatches WHERE run_id = ? AND status = 'dispatched' LIMIT 1`,
+        ],
+        [
+          'prepared-repair-children',
+          `SELECT 1 FROM repair_child_intents WHERE run_id = ? AND status = 'prepared' LIMIT 1`,
+        ],
+        ['active-waits', `SELECT 1 FROM waits WHERE run_id = ? LIMIT 1`],
+      ] as const;
+      for (const [label, query] of blockers) {
+        if (this.#database.prepare(query).get(input.runId) !== undefined) {
+          durableIncomplete.push(label);
+        }
+      }
+      const incomplete = [...new Set([...input.incompleteCleanup, ...durableIncomplete])];
+      const complete = input.ownedWorkStopped && incomplete.length === 0;
+      if (!complete && input.nowMs < record.stopDeadlineMs) return record;
+      const status = complete ? 'cancelled' : 'escalated';
+      this.#database
+        .prepare(
+          `UPDATE workflow_cancellations SET status = ?, owned_work_stopped = ?,
+           incomplete_cleanup_json = ?, completed_at_ms = ?
+           WHERE run_id = ? AND status = 'requested'`,
+        )
+        .run(
+          status,
+          input.ownedWorkStopped ? 1 : 0,
+          serializeDurableJson(incomplete),
+          input.nowMs,
+          input.runId,
+        );
+      this.#database
+        .prepare(
+          `UPDATE runs SET state = ?, version = version + 1, updated_at_ms = ?
+           WHERE id = ? AND state = 'cancelling'`,
+        )
+        .run(status, input.nowMs, input.runId);
+      return this.getWorkflowCancellation(input.runId)!;
+    })();
+  }
+
+  getWorkflowCancellation(runId: string): WorkflowCancellationRecord | undefined {
+    const row = this.#database
+      .prepare('SELECT * FROM workflow_cancellations WHERE run_id = ?')
+      .get(runId) as Record<string, unknown> | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          id: String(row.id),
+          runId: String(row.run_id),
+          requestedBy: String(row.requested_by),
+          reason: String(row.reason),
+          requestedAtMs: Number(row.requested_at_ms),
+          stopDeadlineMs: Number(row.stop_deadline_ms),
+          status: row.status as WorkflowCancellationRecord['status'],
+          ownedWorkStopped: row.owned_work_stopped === 1,
+          incompleteCleanup: JSON.parse(String(row.incomplete_cleanup_json)) as string[],
+          retainedEvidence: JSON.parse(String(row.retained_evidence_json)) as unknown[],
+          completedAtMs: row.completed_at_ms === null ? null : Number(row.completed_at_ms),
+        };
+  }
+
+  listRequestedWorkflowCancellations(): WorkflowCancellationRecord[] {
+    const rows = this.#database
+      .prepare(
+        "SELECT run_id FROM workflow_cancellations WHERE status = 'requested' ORDER BY requested_at_ms, id",
+      )
+      .all() as Array<{ run_id: string }>;
+    return rows.map((row) => this.getWorkflowCancellation(row.run_id)!);
+  }
+
+  #assertCommittedCloseoutEffects(runId: string, epicId: string): void {
+    const epicClose = this.#database
+      .prepare(
+        `SELECT result_json FROM transitions WHERE run_id = ? AND operation = 'beads.task_close'
+         AND status = 'committed' AND json_extract(external_arguments_json, '$.taskId') = ?
+         ORDER BY updated_at_ms DESC LIMIT 1`,
+      )
+      .get(runId, epicId) as { result_json: string } | undefined;
+    const doltSync = this.#database
+      .prepare(
+        `SELECT result_json FROM transitions WHERE run_id = ? AND operation = 'beads.dolt_push'
+         AND status = 'committed' ORDER BY updated_at_ms DESC LIMIT 1`,
+      )
+      .get(runId) as { result_json: string } | undefined;
+    const epicResult = epicClose === undefined ? undefined : JSON.parse(epicClose.result_json);
+    const doltResult = doltSync === undefined ? undefined : JSON.parse(doltSync.result_json);
+    if (epicResult?.status !== 'closed' || doltResult?.status !== 'synced') {
+      throw new Error('epic closure and remote Dolt synchronization are not verified');
+    }
   }
 
   getSecureEvidenceBlob(digest: string, capability?: symbol): Uint8Array {
@@ -3343,6 +4273,51 @@ export class WorkflowStore {
           result: JSON.parse(row.result_json) as unknown,
           createdAtMs: row.created_at_ms,
         };
+  }
+
+  getPassedFeatureEvaluation(runId: string, headSha: string): EvaluationRecord | undefined {
+    const row = this.#database
+      .prepare(
+        `SELECT * FROM evaluations WHERE run_id = ? AND head_sha = ?
+         AND evaluator_role = 'feature_evaluator'
+         AND json_extract(result_json, '$.verdict') = 'passed'
+         ORDER BY created_at_ms DESC, id DESC LIMIT 1`,
+      )
+      .get(runId, headSha) as
+      | {
+          id: string;
+          workspace_id: string;
+          run_id: string;
+          task_id: string;
+          head_sha: string;
+          evaluator_role: string;
+          result_json: string;
+          created_at_ms: number;
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          id: row.id,
+          workspaceId: row.workspace_id,
+          runId: row.run_id,
+          taskId: row.task_id,
+          headSha: row.head_sha,
+          evaluatorRole: row.evaluator_role,
+          result: JSON.parse(row.result_json) as unknown,
+          createdAtMs: row.created_at_ms,
+        };
+  }
+
+  listCommittedRepairChildIds(runId: string): string[] {
+    return (
+      this.#database
+        .prepare(
+          `SELECT id FROM repair_child_intents WHERE run_id = ? AND status = 'committed'
+           ORDER BY sequence, id`,
+        )
+        .all(runId) as Array<{ id: string }>
+    ).map((row) => row.id);
   }
 
   prepareRepairChildIntent(
@@ -3763,6 +4738,57 @@ export class WorkflowStore {
     );
   }
 
+  hasRecoveryEvidenceBinding(input: {
+    digest: string;
+    workspaceId: string;
+    runId: string;
+    contractVersion: number;
+    policyDigest: string;
+    allowedProducerRoles: readonly string[];
+    taskId?: string;
+    minCreatedAtMs: number;
+    interruptedTransitionId: string;
+  }): boolean {
+    if (input.allowedProducerRoles.length === 0) return false;
+    const placeholders = input.allowedProducerRoles.map(() => '?').join(', ');
+    const taskClause = input.taskId === undefined ? '' : 'AND binding.task_id = ?';
+    const parameters = [
+      input.digest,
+      input.workspaceId,
+      input.runId,
+      input.contractVersion,
+      input.policyDigest,
+      ...input.allowedProducerRoles,
+      ...(input.taskId === undefined ? [] : [input.taskId]),
+      input.interruptedTransitionId,
+      input.minCreatedAtMs,
+    ];
+    return (
+      this.#database
+        .prepare(
+          `SELECT 1 FROM evidence_bindings AS binding
+           WHERE binding.digest = ? AND binding.workspace_id = ? AND binding.run_id = ?
+             AND binding.contract_version = ? AND binding.policy_digest = ?
+             AND binding.producer_role IN (${placeholders}) ${taskClause}
+             AND (
+               binding.transition_id = ? OR (
+                 binding.created_at_ms >= ? AND binding.head_sha <> ''
+                 AND binding.head_sha = COALESCE(
+                   (SELECT current_sha FROM delivery_approved_heads
+                    WHERE workspace_id = binding.workspace_id AND run_id = binding.run_id
+                      AND task_id = binding.task_id AND ref = 'refs/heads/task/' || binding.task_id),
+                   (SELECT current_sha FROM repair_approved_heads
+                    WHERE workspace_id = binding.workspace_id AND run_id = binding.run_id
+                      AND task_id = binding.task_id AND ref = 'refs/heads/task/' || binding.task_id)
+                 )
+               )
+             )
+           LIMIT 1`,
+        )
+        .get(...parameters) !== undefined
+    );
+  }
+
   hasTaskEvidenceBinding(input: {
     digest: string;
     mediaType: string;
@@ -4157,6 +5183,27 @@ export class WorkflowStore {
         nowMs,
       );
     }
+    if (transition.transitionContext.closeoutLeaseEpoch !== undefined) {
+      this.#assertResourceLease(
+        'closeout',
+        transition.runId,
+        ownerId,
+        transition.transitionContext.closeoutLeaseEpoch,
+        nowMs,
+      );
+    }
+  }
+
+  #activeRecovery(
+    runId: string,
+  ): { recovery_target: WorkflowState; merge_verified: number } | undefined {
+    return this.#database
+      .prepare(
+        `SELECT recovery_target, merge_verified FROM recovery_records
+         WHERE run_id = ? AND resumed_at_ms IS NULL
+         ORDER BY created_at_ms DESC, transition_id DESC LIMIT 1`,
+      )
+      .get(runId) as { recovery_target: WorkflowState; merge_verified: number } | undefined;
   }
 
   #assertEvidenceReferences(references: ReadonlyArray<{ digest: string }>): void {
@@ -4170,6 +5217,46 @@ export class WorkflowStore {
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version INTEGER PRIMARY KEY,
         applied_at_ms INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS recovery_records (
+        transition_id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        interrupted_state TEXT NOT NULL,
+        recovery_target TEXT NOT NULL,
+        interrupted_transition_id TEXT NOT NULL,
+        merge_verified INTEGER NOT NULL CHECK (merge_verified IN (0, 1)),
+        evidence_json TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL,
+        resumed_at_ms INTEGER,
+        terminal_outcome TEXT CHECK (terminal_outcome IN ('resumed', 'escalated')),
+        FOREIGN KEY(run_id) REFERENCES runs(id)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS recovery_records_one_active
+        ON recovery_records(run_id) WHERE resumed_at_ms IS NULL;
+      CREATE TABLE IF NOT EXISTS feature_finalizations (
+        run_id TEXT PRIMARY KEY,
+        feature_id TEXT NOT NULL,
+        epic_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('prepared', 'finalizing', 'closed')),
+        report_digest TEXT NOT NULL,
+        report_json TEXT NOT NULL,
+        created_at_ms INTEGER NOT NULL,
+        closed_at_ms INTEGER,
+        FOREIGN KEY(run_id) REFERENCES runs(id)
+      );
+      CREATE TABLE IF NOT EXISTS workflow_cancellations (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL UNIQUE,
+        requested_by TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        requested_at_ms INTEGER NOT NULL,
+        stop_deadline_ms INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('requested', 'cancelled', 'escalated')),
+        owned_work_stopped INTEGER NOT NULL CHECK (owned_work_stopped IN (0, 1)),
+        incomplete_cleanup_json TEXT NOT NULL,
+        retained_evidence_json TEXT NOT NULL,
+        completed_at_ms INTEGER,
+        FOREIGN KEY(run_id) REFERENCES runs(id)
       );
       CREATE TABLE IF NOT EXISTS contracts (
         id TEXT PRIMARY KEY,
@@ -4238,6 +5325,7 @@ export class WorkflowStore {
         backoff_count INTEGER NOT NULL,
         workspace_id TEXT,
         task_id TEXT,
+        operation_id TEXT REFERENCES delivery_operations(id),
         PRIMARY KEY(run_id, check_id)
       );
       CREATE TABLE IF NOT EXISTS findings (
@@ -4544,6 +5632,20 @@ export class WorkflowStore {
     }
     if (!waitColumns.some((column) => column.name === 'task_id')) {
       this.#database.exec('ALTER TABLE waits ADD COLUMN task_id TEXT');
+    }
+    if (!waitColumns.some((column) => column.name === 'operation_id')) {
+      this.#database.exec(
+        'ALTER TABLE waits ADD COLUMN operation_id TEXT REFERENCES delivery_operations(id)',
+      );
+    }
+    const recoveryColumns = this.#database
+      .prepare('PRAGMA table_info(recovery_records)')
+      .all() as Array<{ name: string }>;
+    if (!recoveryColumns.some((column) => column.name === 'terminal_outcome')) {
+      this.#database.exec(
+        `ALTER TABLE recovery_records ADD COLUMN terminal_outcome TEXT
+         CHECK (terminal_outcome IN ('resumed', 'escalated'))`,
+      );
     }
     const schedulerColumns = this.#database
       .prepare('PRAGMA table_info(scheduler_executions)')
