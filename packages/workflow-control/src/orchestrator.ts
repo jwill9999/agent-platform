@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import {
   agentResultSchema,
+  assertAgentResultAccepted,
   assertTaskPacketWithinContract,
   type AgentResult,
   type EvidenceReference,
@@ -243,6 +244,8 @@ export class WorkflowOrchestrator {
     runLeaseEpoch: number;
     claimTransitionId: string;
     deadlineMs: number;
+    /** Trusted composition supplies exact-head evidence binding; storage validates it atomically. */
+    completionCallback?: (input: { executionId: string; result: unknown }) => unknown;
   }): Promise<unknown> {
     assertTaskPacketWithinContract(this.#contract, input.packet);
     this.#store.assertRunUsesContract(input.packet.runId, this.#contract);
@@ -347,6 +350,10 @@ export class WorkflowOrchestrator {
         runLeaseEpoch: input.runLeaseEpoch,
         taskLeaseEpoch,
         result: result ?? null,
+        callback: input.completionCallback?.({
+          executionId: reservation.id,
+          result: result ?? null,
+        }),
         nowMs: finishedAtMs,
       });
       return result;
@@ -547,25 +554,7 @@ export class WorkflowOrchestrator {
     )
       ? 'integration'
       : 'scheduling';
-    if (result.status !== 'passed' || result.acceptanceCriteria.failed.length > 0) {
-      throw new Error('task result is not accepted');
-    }
-    const passedCriteria = new Set(result.acceptanceCriteria.passed);
-    if (
-      this.#contract.acceptanceCriteria.some((criterion) => !passedCriteria.has(criterion)) ||
-      result.acceptanceCriteria.passed.some(
-        (criterion) => !this.#contract.acceptanceCriteria.includes(criterion),
-      )
-    ) {
-      throw new Error('task result does not prove every approved acceptance criterion');
-    }
-    if (
-      result.findings.length > 0 ||
-      result.remainingRisks.length > 0 ||
-      result.recommendedTransition !== 'integrate'
-    ) {
-      throw new Error('task result has unresolved findings, risks, or transition intent');
-    }
+    assertAgentResultAccepted(result, this.#contract.acceptanceCriteria, 'integrate');
     const gate = await this.#integrationGate.verify({
       contract: this.#contract,
       runId: input.packet.runId,

@@ -9,6 +9,9 @@ import type {
 import type { ExternalObservation } from './reconciliation.js';
 
 type GitHubRequest = Extract<DeliveryRequest, { kind: `github.${string}` }>;
+const productionGitHubPortCapability = Symbol('productionGitHubPortCapability');
+const testGitHubPortCapability = Symbol('testGitHubPortCapability');
+const authenticatedGitHubPorts = new WeakSet<object>();
 
 export type GitHubCheckConclusion = 'pending' | 'success' | 'failure';
 
@@ -27,6 +30,14 @@ export interface GitHubPullRequestSnapshot {
   mergeMethod: 'merge' | 'squash' | 'rebase' | null;
   mergeSha: string | null;
   eventIdentity: string;
+  latestReviewEventIdentity: string;
+  reviewThreads: readonly {
+    id: string;
+    isResolved: boolean;
+    headSha: string;
+    reviewEventIdentity: string;
+    acceptedDispositionDigest: string | null;
+  }[];
   mergeAttestation: {
     headSha: string;
     base: string;
@@ -46,7 +57,32 @@ export interface NarrowGitHubDeliveryClient {
     number?: number;
   }): Promise<GitHubPullRequestSnapshot | null>;
   createPullRequest(request: Extract<GitHubRequest, { kind: 'github.pr' }>): Promise<void>;
-  mergePullRequest(request: Extract<GitHubRequest, { kind: 'github.merge' }>): Promise<void>;
+  compareAndMergePullRequest(
+    request: Extract<GitHubRequest, { kind: 'github.merge' }> & {
+      expectedReviewEventIdentity: string;
+      verifiedObservationDigest: string;
+    },
+  ): Promise<void>;
+  observeReviewThreads?(input: {
+    repository: string;
+    pullRequestNumber: number;
+    headSha: string;
+  }): Promise<readonly import('./governedOperations.js').ReviewThreadSnapshot[]>;
+  replyToReviewThread?(input: {
+    repository: string;
+    pullRequestNumber: number;
+    threadId: string;
+    body: string;
+    idempotencyKey: string;
+  }): Promise<{ messageId: string }>;
+  resolveReviewThread?(input: {
+    repository: string;
+    pullRequestNumber: number;
+    threadId: string;
+    expectedHeadSha: string;
+    expectedReviewEventIdentity: string;
+    idempotencyKey: string;
+  }): Promise<{ resolved: true }>;
 }
 
 export interface NarrowFeatureGitHubDeliveryClient {
@@ -88,15 +124,62 @@ function commonIdentityMatches(
 export class GitHubDeliveryPort implements DeliveryMutationPort {
   readonly #findPullRequest: NarrowGitHubDeliveryClient['findPullRequest'];
   readonly #createPullRequest: NarrowGitHubDeliveryClient['createPullRequest'];
-  readonly #mergePullRequest: NarrowGitHubDeliveryClient['mergePullRequest'];
+  readonly #compareAndMergePullRequest: NarrowGitHubDeliveryClient['compareAndMergePullRequest'];
+  readonly #observeReviewThreads: NarrowGitHubDeliveryClient['observeReviewThreads'];
+  readonly #replyToReviewThread: NarrowGitHubDeliveryClient['replyToReviewThread'];
+  readonly #resolveReviewThread: NarrowGitHubDeliveryClient['resolveReviewThread'];
 
   constructor(
     client: NarrowGitHubDeliveryClient,
     readonly repository: string,
+    capability: symbol,
   ) {
+    if (
+      capability !== productionGitHubPortCapability &&
+      !(process.env.NODE_ENV === 'test' && capability === testGitHubPortCapability)
+    ) {
+      throw new Error('GitHub port construction requires the package bootstrap capability');
+    }
     this.#findPullRequest = client.findPullRequest.bind(client);
     this.#createPullRequest = client.createPullRequest.bind(client);
-    this.#mergePullRequest = client.mergePullRequest.bind(client);
+    this.#compareAndMergePullRequest = client.compareAndMergePullRequest.bind(client);
+    this.#observeReviewThreads = client.observeReviewThreads?.bind(client);
+    this.#replyToReviewThread = client.replyToReviewThread?.bind(client);
+    this.#resolveReviewThread = client.resolveReviewThread?.bind(client);
+    authenticatedGitHubPorts.add(this);
+    Object.freeze(this);
+  }
+
+  static createForTest(client: NarrowGitHubDeliveryClient, repository: string): GitHubDeliveryPort {
+    if (process.env.NODE_ENV !== 'test') throw new Error('test GitHub client is unavailable');
+    return new GitHubDeliveryPort(client, repository, testGitHubPortCapability);
+  }
+
+  async observeReviewThreads(
+    input: Parameters<NonNullable<NarrowGitHubDeliveryClient['observeReviewThreads']>>[0],
+  ) {
+    if (input.repository !== this.repository) throw new Error('GitHub repository route changed');
+    if (this.#observeReviewThreads === undefined)
+      throw new Error('hardened GitHub port lacks review-thread observation');
+    return this.#observeReviewThreads(input);
+  }
+
+  async replyToReviewThread(
+    input: Parameters<NonNullable<NarrowGitHubDeliveryClient['replyToReviewThread']>>[0],
+  ) {
+    if (input.repository !== this.repository) throw new Error('GitHub repository route changed');
+    if (this.#replyToReviewThread === undefined)
+      throw new Error('hardened GitHub port lacks review-thread reply');
+    return this.#replyToReviewThread(input);
+  }
+
+  async resolveReviewThread(
+    input: Parameters<NonNullable<NarrowGitHubDeliveryClient['resolveReviewThread']>>[0],
+  ) {
+    if (input.repository !== this.repository) throw new Error('GitHub repository route changed');
+    if (this.#resolveReviewThread === undefined)
+      throw new Error('hardened GitHub port lacks review-thread resolve');
+    return this.#resolveReviewThread(input);
   }
 
   async observe(request: DeliveryRequest): Promise<ExternalObservation> {
@@ -178,24 +261,43 @@ export class GitHubDeliveryPort implements DeliveryMutationPort {
     const allChecksPass = githubRequest.requiredChecks.every(
       (check) => snapshot.checks[check] === 'success',
     );
+    const reviewThreadsAreCurrent = snapshot.reviewThreads.every(
+      (thread) =>
+        thread.headSha === githubRequest.headSha &&
+        thread.reviewEventIdentity === snapshot.latestReviewEventIdentity,
+    );
     if (
       snapshot.state !== 'open' ||
       snapshot.reviewDecision !== githubRequest.reviewDecision ||
-      !allChecksPass
+      !allChecksPass ||
+      !reviewThreadsAreCurrent
     ) {
       return { kind: 'conflict', result: snapshot };
     }
     return {
       kind: 'unchanged',
       result: {
+        repository: snapshot.repository,
         pullRequestNumber: snapshot.number,
         headSha: snapshot.headSha,
         base: snapshot.base,
+        protectionDigest: snapshot.protectionDigest,
+        reviewDecision: snapshot.reviewDecision,
+        requiredChecks: [...githubRequest.requiredChecks],
+        checks: snapshot.checks,
+        reviewEventIdentity: snapshot.latestReviewEventIdentity,
+        threads: snapshot.reviewThreads,
       },
     };
   }
 
-  async mutate(request: DeliveryRequest): Promise<unknown> {
+  async mutate(
+    request: DeliveryRequest,
+    verifiedMergePrecondition?: {
+      reviewEventIdentity: string;
+      verifiedObservationDigest: string;
+    },
+  ): Promise<unknown> {
     if (!request.kind.startsWith('github.')) {
       throw new Error('GitHub delivery port received a Git request');
     }
@@ -213,9 +315,30 @@ export class GitHubDeliveryPort implements DeliveryMutationPort {
 
     // The typed client must perform the same head/base/check/review/protection comparison as one
     // conditional server-side merge. It receives no arbitrary API route, workflow, or admin flag.
-    await this.#mergePullRequest(githubRequest);
+    if (verifiedMergePrecondition === undefined) {
+      throw new Error('conditional merge lacks a durable verified provider precondition');
+    }
+    await this.#compareAndMergePullRequest({
+      ...githubRequest,
+      expectedReviewEventIdentity: verifiedMergePrecondition.reviewEventIdentity,
+      verifiedObservationDigest: verifiedMergePrecondition.verifiedObservationDigest,
+    });
     return { merged: true };
   }
+}
+
+Object.freeze(GitHubDeliveryPort.prototype);
+
+export function assertAuthenticatedGitHubDeliveryPort(port: GitHubDeliveryPort): void {
+  if (!authenticatedGitHubPorts.has(port)) throw new Error('unauthenticated GitHub delivery port');
+}
+
+// Package-internal bootstrap only. Deliberately omitted from the package index.
+export function createProductionGitHubDeliveryPort(
+  client: NarrowGitHubDeliveryClient,
+  repository: string,
+): GitHubDeliveryPort {
+  return new GitHubDeliveryPort(client, repository, productionGitHubPortCapability);
 }
 
 export class FeatureGitHubDeliveryPort implements FeatureDeliveryMutationPort {

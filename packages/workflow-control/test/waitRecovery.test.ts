@@ -119,7 +119,7 @@ describe('PipelineWaitRecoveryDriver', () => {
     const database = join(root, 'workflow.sqlite');
     let store = new WorkflowStore(database);
     const contractId = store.createContract(contract, 100);
-    store.createRun(contractId, 'pipeline', 'run-wait');
+    store.createRunForTest(contractId, 'pipeline', 'run-wait');
     const raw = new Database(database);
     const request = JSON.stringify({
       id: repairTaskId,

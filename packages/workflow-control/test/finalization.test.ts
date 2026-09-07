@@ -196,8 +196,26 @@ function insertFeatureDeliveryAttestation(databasePath: string): {
 }
 
 class MergePort implements DeliveryMutationPort {
+  merged = false;
   async observe(request: DeliveryRequest): Promise<ExternalObservation> {
     if (request.kind !== 'github.merge') throw new Error('unexpected delivery request');
+    if (!this.merged) {
+      return {
+        kind: 'unchanged',
+        result: {
+          repository: request.repository,
+          pullRequestNumber: request.pullRequestNumber,
+          headSha: request.headSha,
+          base: request.base,
+          protectionDigest: request.protectionDigest,
+          reviewDecision: request.reviewDecision,
+          requiredChecks: request.requiredChecks,
+          checks: {},
+          reviewEventIdentity: 'review-event-1',
+          threads: [],
+        },
+      };
+    }
     return {
       kind: 'expected',
       result: {
@@ -212,7 +230,8 @@ class MergePort implements DeliveryMutationPort {
   }
 
   async mutate(): Promise<unknown> {
-    throw new Error('already merged');
+    this.merged = true;
+    return { merged: true };
   }
 }
 

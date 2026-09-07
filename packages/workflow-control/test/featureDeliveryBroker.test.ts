@@ -181,8 +181,26 @@ class FakeFeaturePort implements FeatureDeliveryMutationPort {
 }
 
 class IntegratedOriginPort implements DeliveryMutationPort {
+  merged = false;
   async observe(request: DeliveryRequest): Promise<ExternalObservation> {
     if (request.kind !== 'github.merge') throw new Error('unexpected origin request');
+    if (!this.merged) {
+      return {
+        kind: 'unchanged',
+        result: {
+          repository: request.repository,
+          pullRequestNumber: request.pullRequestNumber,
+          headSha: request.headSha,
+          base: request.base,
+          protectionDigest: request.protectionDigest,
+          reviewDecision: request.reviewDecision,
+          requiredChecks: request.requiredChecks,
+          checks: { integration: 'success' },
+          reviewEventIdentity: 'origin-review-11',
+          threads: [],
+        },
+      };
+    }
     return {
       kind: 'expected',
       result: {
@@ -197,7 +215,8 @@ class IntegratedOriginPort implements DeliveryMutationPort {
   }
 
   async mutate(): Promise<unknown> {
-    throw new Error('origin is already merged');
+    this.merged = true;
+    return { merged: true };
   }
 }
 

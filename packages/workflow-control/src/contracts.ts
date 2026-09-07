@@ -33,6 +33,9 @@ export const workflowOperationSchema = z.enum([
   'process.test',
   'artifact.write',
   'workflow.transition',
+  'workflow.delegate_callback',
+  'workflow.lineage_import',
+  'notification.approval',
   'beads.read',
   'beads.mutate',
   'git.read',
@@ -66,6 +69,13 @@ export const taskContractSchema = z
     dependsOn: z.array(identifierSchema),
     risk: z.enum(['low', 'standard', 'high']),
     assignedRole: workflowRoleSchema,
+    phaseRoles: z
+      .object({
+        task_verification: z.literal('test_runner').optional(),
+        task_review: z.literal('code_reviewer').optional(),
+      })
+      .strict()
+      .optional(),
     branchParent: z.string().min(1),
     allowedPaths: z.array(relativePathSchema),
     allowedOperations: z.array(workflowOperationSchema),
@@ -240,14 +250,42 @@ export type EvidenceReference = z.infer<typeof evidenceReferenceSchema>;
 export type WorkflowOperation = z.infer<typeof workflowOperationSchema>;
 export type WorkflowRole = z.infer<typeof workflowRoleSchema>;
 
-export function assertTaskPacketWithinContract(contractInput: unknown, packetInput: unknown): void {
+/** Shared acceptance semantics for phase results and final brokered task acceptance. */
+export function assertAgentResultAccepted(
+  resultInput: unknown,
+  approvedCriteria: readonly string[],
+  transition: 'continue' | 'integrate',
+): AgentResult {
+  const result = agentResultSchema.parse(resultInput);
+  if (result.status !== 'passed' || result.acceptanceCriteria.failed.length > 0)
+    throw new Error('task result is not accepted');
+  const passed = new Set(result.acceptanceCriteria.passed);
+  if (
+    approvedCriteria.some((criterion) => !passed.has(criterion)) ||
+    result.acceptanceCriteria.passed.some((criterion) => !approvedCriteria.includes(criterion))
+  )
+    throw new Error('task result does not prove every approved acceptance criterion');
+  if (
+    result.findings.length > 0 ||
+    result.remainingRisks.length > 0 ||
+    result.recommendedTransition !== transition
+  )
+    throw new Error('task result has unresolved findings, risks, or transition intent');
+  return result;
+}
+
+export function assertTaskPacketWithinContract(
+  contractInput: unknown,
+  packetInput: unknown,
+  phase?: 'task_verification' | 'task_review',
+): void {
   const contract = executionContractSchema.parse(contractInput);
   const packet = taskPacketSchema.parse(packetInput);
   const task = contract.tasks.find((candidate) => candidate.id === packet.taskId);
   if (task === undefined) throw new Error('task packet references an unknown task');
   if (packet.contractVersion !== contract.contractVersion) throw new Error('stale task packet');
   if (packet.policyDigest !== contract.policyDigest) throw new Error('stale task packet policy');
-  if (packet.assignedRole !== task.assignedRole)
+  if (packet.assignedRole !== (phase === undefined ? task.assignedRole : task.phaseRoles?.[phase]))
     throw new Error('task packet changes assigned role');
   if (packet.objective !== contract.objective) throw new Error('task packet changes objective');
   if (

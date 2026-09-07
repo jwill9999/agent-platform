@@ -1,0 +1,21 @@
+services:
+  workflow-coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    command:
+      ['node', 'packages/workflow-control/dist/cli.js', 'coordinator', '/workflow/workflow.sqlite']
+    environment:
+      WORKFLOW_WATCHDOG_POLL_MS: '${WORKFLOW_WATCHDOG_POLL_MS:-1000}'
+      WORKFLOW_WATCHDOG_OVERDUE_MS: '${WORKFLOW_WATCHDOG_OVERDUE_MS:-30000}'
+      WORKFLOW_WATCHDOG_MAX_ATTEMPTS: '${WORKFLOW_WATCHDOG_MAX_ATTEMPTS:-10}'
+      WORKFLOW_WATCHDOG_DEADLINE_MS: '${WORKFLOW_WATCHDOG_DEADLINE_MS:-300000}'
+      WORKFLOW_CONTINUATION_LEASE_MS: '${WORKFLOW_CONTINUATION_LEASE_MS:-30000}'
+      WORKFLOW_HOST_TIMEOUT_MS: '${WORKFLOW_HOST_TIMEOUT_MS:-5000}'
+      WORKFLOW_NOTIFICATION_POLL_MS: '${WORKFLOW_NOTIFICATION_POLL_MS:-1000}'
+    volumes:
+      - '${WORKFLOW_DATABASE_HOST_DIRECTORY:?Set the directory containing the authorized workflow.sqlite journal}:/workflow:rw'
+    healthcheck:
+      disable: true

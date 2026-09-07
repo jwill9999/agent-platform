@@ -241,6 +241,16 @@ export function assertContractRevisionIsNotAuthorityExpansion(
   if (next.constraints.allowedPaths.some((path) => !previousPaths.has(path))) {
     throw new Error('contract revision expands allowed paths');
   }
+  for (const task of next.tasks) {
+    const prior = previous.tasks.find((candidate) => candidate.id === task.id);
+    for (const phase of ['task_verification', 'task_review'] as const) {
+      if (
+        task.phaseRoles?.[phase] !== undefined &&
+        task.phaseRoles[phase] !== prior?.phaseRoles?.[phase]
+      )
+        throw new Error('contract revision expands phase role authority');
+    }
+  }
 }
 
 export function assertRepairChildWithinContract(

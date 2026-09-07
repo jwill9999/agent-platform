@@ -262,6 +262,38 @@ export interface OfficialBeadsDoltClient {
     request: unknown,
     idempotencyKey: string,
   ): Promise<unknown>;
+  readIssueWithNotes?(
+    workspaceRoot: string,
+    taskId: string,
+  ): Promise<{
+    id: string;
+    notes: string;
+    status: string;
+    description: string;
+    acceptanceCriteria: string;
+    owner: string | null;
+    dependencies: readonly string[];
+    revision: string;
+  }>;
+  compareAndSwapIssueNotes?(input: {
+    workspaceRoot: string;
+    taskId: string;
+    expectedRevision: string;
+    expectedPriorNotesDigest: string;
+    expectedNonNotesDigest: string;
+    replacementNotes: string;
+    replacementNotesDigest: string;
+    idempotencyKey: string;
+  }): Promise<{
+    id: string;
+    notes: string;
+    status: string;
+    description: string;
+    acceptanceCriteria: string;
+    owner: string | null;
+    dependencies: readonly string[];
+    revision: string;
+  }>;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -299,6 +331,8 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
   readonly #pushDolt: OfficialBeadsDoltClient['pushDolt'];
   readonly #readRepairChild: OfficialBeadsDoltClient['readRepairChild'];
   readonly #createRepairChild: OfficialBeadsDoltClient['createRepairChild'];
+  readonly #readIssueWithNotes: OfficialBeadsDoltClient['readIssueWithNotes'];
+  readonly #compareAndSwapIssueNotes: OfficialBeadsDoltClient['compareAndSwapIssueNotes'];
 
   constructor(workspaceRoot: string, client: OfficialBeadsDoltClient, capability: symbol) {
     if (
@@ -316,6 +350,8 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
     this.#pushDolt = client.pushDolt.bind(client);
     this.#readRepairChild = client.readRepairChild?.bind(client);
     this.#createRepairChild = client.createRepairChild?.bind(client);
+    this.#readIssueWithNotes = client.readIssueWithNotes?.bind(client);
+    this.#compareAndSwapIssueNotes = client.compareAndSwapIssueNotes?.bind(client);
     Object.freeze(this);
   }
 
@@ -331,6 +367,23 @@ export class OfficialBeadsDoltPort implements JournaledMutationPort {
 
   get workspaceRoot(): string {
     return this.#workspaceRoot;
+  }
+
+  async readIssueWithNotes(taskId: string) {
+    if (this.#readIssueWithNotes === undefined)
+      throw new Error('official Beads client lacks governed notes reads');
+    return this.#readIssueWithNotes(this.#workspaceRoot, taskId);
+  }
+
+  async compareAndSwapIssueNotes(
+    input: Omit<
+      Parameters<NonNullable<OfficialBeadsDoltClient['compareAndSwapIssueNotes']>>[0],
+      'workspaceRoot'
+    >,
+  ) {
+    if (this.#compareAndSwapIssueNotes === undefined)
+      throw new Error('official Beads client lacks governed notes CAS capability');
+    return this.#compareAndSwapIssueNotes({ ...input, workspaceRoot: this.#workspaceRoot });
   }
 
   async readRepairChild(childId: string): Promise<unknown> {

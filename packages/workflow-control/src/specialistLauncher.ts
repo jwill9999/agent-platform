@@ -5,6 +5,11 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 import { promisify } from 'node:util';
 
 import type { TaskPacket } from './contracts.js';
+import {
+  specialistInputEnvelopeSchema,
+  specialistExecutionDigest,
+  type SpecialistInputEnvelope,
+} from './specialistInput.js';
 import { WorkflowStore, workflowCredentialJournalCapability } from './storage.js';
 
 const FORBIDDEN_NAMES = new Set(['.git', '.beads', '.ssh']);
@@ -575,7 +580,28 @@ export class DockerIsolatedSpecialistLauncher {
   }
 
   launch(packet: TaskPacket, reservation: DockerSpecialistReservation): Promise<unknown> {
-    const launched = this.#launch(packet, reservation);
+    return this.#trackLaunch(packet, reservation);
+  }
+
+  launchBound(
+    input: SpecialistInputEnvelope,
+    reservation: DockerSpecialistReservation,
+  ): Promise<unknown> {
+    const envelope = specialistInputEnvelopeSchema.parse(input);
+    if (
+      envelope.binding.executionDigest !== specialistExecutionDigest(reservation.id) ||
+      envelope.task.assignedRole !== reservation.role
+    )
+      throw new Error('specialist input envelope execution binding mismatch');
+    return this.#trackLaunch(envelope.task, reservation, envelope);
+  }
+
+  #trackLaunch(
+    packet: TaskPacket,
+    reservation: DockerSpecialistReservation,
+    envelope?: SpecialistInputEnvelope,
+  ): Promise<unknown> {
+    const launched = this.#launch(packet, reservation, envelope);
     const settlement = launched.then(
       () => undefined,
       () => undefined,
@@ -588,6 +614,7 @@ export class DockerIsolatedSpecialistLauncher {
   async #launch(
     packet: TaskPacket,
     reservation: DockerSpecialistReservation,
+    envelope?: SpecialistInputEnvelope,
   ): Promise<SpecialistExecutionResult> {
     const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
     const workspace = await prepareSpecialistWorkspace(
@@ -606,7 +633,7 @@ export class DockerIsolatedSpecialistLauncher {
         reservation.id,
         credentialBrokerGeneration,
       );
-      await writeFile(promptFile, `${JSON.stringify(packet)}\n`, { mode: 0o600 });
+      await writeFile(promptFile, `${JSON.stringify(envelope ?? packet)}\n`, { mode: 0o600 });
       const launch = await buildDockerSpecialistLaunch({
         image: this.#options.image,
         workspaceRoot: workspace.root,
