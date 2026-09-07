@@ -120,6 +120,15 @@ Spec: docs/tasks/<issue-id>.md
 | UI quality sensors       | `agent-platform-ui-quality-sensors`       | child specs pending                                                                              |
 | Session handoff hygiene  | `agent-platform-session-handoff-hygiene`  | `agent-platform-session-handoff-hygiene.md`                                                      |
 
+## Epic index additions and standalone follow-ups
+
+| Kind                                 | Beads id                               | Specification                                                      |
+| ------------------------------------ | -------------------------------------- | ------------------------------------------------------------------ |
+| Epic: reusable orchestration toolkit | `agent-platform-orchestration-toolkit` | [Toolkit investigation](./agent-platform-orchestration-toolkit.md) |
+| Standalone bug: Git hook isolation   | `agent-platform-hook-isolation`        | [Hook isolation](./agent-platform-hook-isolation.md)               |
+
+The hook-isolation bug has no parent epic; it is listed separately rather than inventing a parent.
+
 ## Commands
 
 ```bash
