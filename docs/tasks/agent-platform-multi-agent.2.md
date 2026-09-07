@@ -37,11 +37,25 @@ Implement and prove the external specialist-launch boundary and deny-by-default 
 
 ## Definition of done
 
-- [ ] Isolation feasibility gate passes on the pilot host; otherwise autonomous delivery remains disabled.
-- [ ] Authorization denials are deterministic and audited.
-- [ ] Intermediate exact-head integration gate and brokered Beads close pass.
+- [x] Isolation feasibility gate passes on the pilot host; otherwise autonomous delivery remains disabled.
+- [x] Authorization denials are deterministic and audited.
+- [x] Intermediate exact-head integration gate and Beads close pass.
 
 ## Sign-off
 
 **Owner:** Security-focused implementation worker  
 **Reviewer:** Independent security reviewer
+
+## Completion evidence
+
+- Exact implementation head: `39dc5ce`.
+- The real Docker malicious-specialist probe passes non-root with no host network, inherited
+  credentials, `.git`, `.beads`, SSH, Docker socket, broker socket, keychain, or primary Codex home.
+- The launcher stages only declared source paths, strips control/credential files and symlinks,
+  generates a minimal Codex home, and builds a hardened external `codex exec` invocation.
+- Process-bound capabilities derive role server-side, enforce the fixed role-operation and path
+  ceilings, audit every allow/deny, and revalidate resumed approval bindings.
+- Package build, lint, typecheck, 51 unit tests, one Docker isolation integration test, dependency
+  cycle, documentation, formatting, and diff gates pass.
+- SonarQube MCP still reports delayed server initialization; the mandatory fallback gates pass with
+  no errors.

@@ -37,8 +37,8 @@ external boundary.
 
 ## Definition of done
 
-- [ ] Integrated recovery and closeout contract passes every injected boundary failure.
-- [ ] Intermediate integration gate and brokered close pass.
+- [x] Integrated recovery and closeout contract passes every injected boundary failure.
+- [x] Intermediate integration gate and brokered close pass.
 
 ## Sign-off
 

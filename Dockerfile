@@ -15,6 +15,7 @@ COPY packages/plugin-session packages/plugin-session
 COPY packages/plugin-observability packages/plugin-observability
 COPY packages/planner packages/planner
 COPY packages/agent-validation packages/agent-validation
+COPY packages/workflow-control packages/workflow-control
 COPY contracts contracts
 COPY apps/api apps/api
 RUN pnpm install --frozen-lockfile

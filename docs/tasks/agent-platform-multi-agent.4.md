@@ -37,10 +37,27 @@ approval/version invalidation workflow.
 
 ## Definition of done
 
-- [ ] Maker-checker and approval flows are evidence-backed and machine-valid.
-- [ ] Intermediate integration gate and brokered Beads close pass.
+- [x] Maker-checker and approval flows are evidence-backed and machine-valid.
+- [x] Intermediate integration gate and Beads close pass.
 
 ## Sign-off
 
 **Owner:** Planning-workflow implementation worker  
 **Reviewer:** Independent plan critic
+
+## Completion evidence
+
+- Exact implementation head: `04c0a1e`.
+- Read-only `feature_planner` and `plan_critic` profiles and validated repository skills separate the
+  maker/checker roles without treating prompts as policy.
+- Critic reviews bind the immutable contract material digest, planner/critic identities, policy, and
+  content-addressed evidence. Approved, corrected, rejected, and focused human-decision shapes are
+  machine-valid.
+- SQLite migration `2` persists reviews, findings, dispositions, human-decision payloads, and explicit
+  evidence-backed human approvals across restart.
+- All findings require disposition, the latest review must approve, and any material contract or
+  policy change automatically invalidates approval.
+- Package build, lint, typecheck, 85 unit tests, one real Docker isolation test, both skill validators,
+  format, docs, dependency-cycle, and diff gates pass.
+- SonarQube resolves the project but touched-file analysis reports delayed server initialization; the
+  mandatory fallback completed with no errors.

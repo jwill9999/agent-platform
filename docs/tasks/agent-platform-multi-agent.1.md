@@ -38,12 +38,22 @@ machine-valid before privileged orchestration code is introduced.
 
 ## Definition of done
 
-- [ ] Acceptance criteria and requirements pass.
-- [ ] Exact-head review and tests pass; branch is pushed through the approved Git/ref path.
-- [ ] Intermediate-task integration gate passes; no segment-tip PR is required.
-- [ ] Brokered Beads close is verified before `.2` becomes ready.
+- [x] Acceptance criteria and requirements pass.
+- [x] Exact-head review and tests pass; branch is pushed through the approved Git/ref path.
+- [x] Intermediate-task integration gate passes; no segment-tip PR is required.
+- [x] Brokered Beads close is verified before `.2` becomes ready.
 
 ## Sign-off
 
 **Owner:** Implementation worker  
 **Reviewer:** Code reviewer and workflow-contract evaluator
+
+## Completion evidence
+
+- Exact implementation head: `5f5587e`.
+- Package build, lint, typecheck, and 32 focused tests pass.
+- Every ordinary state edge and absent edge is table-tested; cancellation, waits, fencing, retry,
+  recovery, repair-child, authority, idempotency, and finalization failures have focused coverage.
+- Dependency-cycle, Prettier, documentation-link, and diff checks pass.
+- SonarQube MCP was attempted twice but reported delayed server initialization; the mandatory fallback
+  lint, typecheck, tests, build, and static dependency checks passed with no errors.

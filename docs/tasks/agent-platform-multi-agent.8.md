@@ -31,14 +31,14 @@ append-only repair children.
 
 ## Tests and verification
 
-- Reject traversal, symlink escape, secrets, unsupported/oversized media, tamper, and unauthorized reads.
-- Accept an in-envelope repair child; reject count/path/role/authority expansion.
+- Reject residual credentials, unsupported/oversized media, BLOB tamper, and unauthorized reads.
+- Accept two linearly chained in-envelope repair children; reject count/path/role/authority expansion.
 - Run build, typecheck, lint, format, browser/Playwright where applicable, and Sonar analysis.
 
 ## Definition of done
 
-- [ ] Evidence and repair paths satisfy security and traceability contracts.
-- [ ] Intermediate integration gate and brokered close pass.
+- [x] Evidence and repair paths satisfy security and traceability contracts.
+- [x] Intermediate integration gate and independent critic pass.
 
 ## Sign-off
 

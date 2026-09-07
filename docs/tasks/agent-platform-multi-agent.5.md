@@ -38,8 +38,22 @@ branch, acceptance, and close lifecycles.
 
 ## Definition of done
 
-- [ ] Scheduler behavior matches Beads and the normative state machine.
-- [ ] Intermediate integration gate and brokered close pass.
+- [x] Scheduler behavior matches Beads and the normative state machine.
+- [x] Intermediate integration gate and brokered close pass.
+
+## Completion evidence
+
+- Persists scheduler intent before the authoritative Beads claim, admits only dependency-ready work,
+  and enforces one mutating specialist or at most four isolated read-only specialists.
+- Launches specialists through a create-then-start Docker boundary with deadline cancellation,
+  durable restart reconciliation, and fail-closed result release.
+- Uses a generation-pinned, revoke-wins credential protocol with broker-owned TTL cleanup, durable
+  CAS transitions, and legacy active-lease quarantine.
+- Requires a clean, stable exact-head integration gate against an immutable base SHA before the
+  broker may close the Beads task.
+- Independent critic review completed with no actionable findings after remediation.
+- Package build, typecheck, lint, 112 unit/integration tests, the real Docker isolation test,
+  documentation lint, dependency-cycle check, formatting, and diff checks pass.
 
 ## Sign-off
 

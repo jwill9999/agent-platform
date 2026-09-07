@@ -38,8 +38,26 @@ paths for an active run.
 
 ## Definition of done
 
-- [ ] No active-run direct Git/GitHub write credential path exists outside the brokers.
-- [ ] Intermediate integration gate and brokered Beads close pass.
+- [x] No active-run direct Git/GitHub write credential path exists outside the brokers.
+- [x] Intermediate integration gate and brokered Beads close pass.
+
+## Completion evidence
+
+- Typed, contract-bound Git/ref and GitHub requests are journaled through a fenced durable saga with
+  exact replay, takeover adoption, reconciliation, and stable escalation.
+- The Git port verifies canonical repository identity, exact trees and complete rename/copy diffs,
+  blocks executable Git configuration and replacement metadata, and delegates only exact CAS pushes
+  through a captured narrow remote client.
+- The GitHub port permits only exact PR creation, check observation, and conditional protected merge;
+  immutable merge attestation and the current/published head ledger reject stale or substituted PRs.
+- Durable pipeline waits enforce exact contract and task binding, monotonic backoff, immutable
+  deadlines, takeover recovery, idempotent response-loss replay, and exactly-once terminal cleanup.
+- Production composition uses a package-private registration, frozen composite, and captured bound
+  concrete/client methods; adversarial method-replacement regressions cover every dispatch layer.
+- The final independent critic pass reported no actionable findings. Workflow-control gates passed:
+  175 package tests (including 35 delivery tests), with one Docker test skipped in the normal run,
+  plus the separately executed Docker isolation test, build, typecheck, lint, formatting,
+  documentation lint, dependency-cycle analysis, and diff checks.
 
 ## Sign-off
 

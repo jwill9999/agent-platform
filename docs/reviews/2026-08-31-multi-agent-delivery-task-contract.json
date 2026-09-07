@@ -1,0 +1,109 @@
+{
+  "featureId": "agent-platform-multi-agent",
+  "contractVersion": 1,
+  "policyDigest": "sha256:c3c1823525b41bdf812e89186cedb3c4f693d2a64c3426db01144381a366ff46",
+  "workspaceId": "sha256:47138a2c85a3e5becf742f6a2aac432295dec34a5a198471606d305c802bcedc",
+  "objective": "Integrate the accepted autonomous delivery-pilot task tip into the named feature branch through an exact-head pull request.",
+  "requirements": [
+    "Open the final task-tip pull request from task/agent-platform-multi-agent.10 to feature/multi-agent-orchestration.",
+    "Require the exact feature-boundary hosted checks and squash merge without administrative bypass.",
+    "Stop this contract at the feature integration boundary."
+  ],
+  "nonGoals": [
+    "Deliver the feature branch to staging.",
+    "Promote staging to main or production.",
+    "Expand specialist mutation authority."
+  ],
+  "acceptanceCriteria": [
+    "The exact published task tip is reviewed by every required feature-boundary check.",
+    "The pull request targets only feature/multi-agent-orchestration and merges only with squash.",
+    "The committed merge attestation records the resulting integrated feature head for the separate staging contract."
+  ],
+  "constraints": {
+    "architecture": [
+      "Use the repository-local workflow-control version-1 execution contract and delivery broker.",
+      "Keep the mutating task chain linear; independent critics remain read-only."
+    ],
+    "security": [
+      "Use brokered least-privilege mutations and content-addressed evidence.",
+      "Prohibit administrative bypass and direct integration-branch pushes.",
+      "Require exact-head verification immediately before merge."
+    ],
+    "allowedPaths": [".beads", "docs", "packages/workflow-control"]
+  },
+  "authority": {
+    "deliveryTarget": "feature/multi-agent-orchestration",
+    "allowedActions": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write",
+      "workflow.transition",
+      "beads.read",
+      "beads.mutate",
+      "git.read",
+      "git.commit",
+      "git.push",
+      "github.read",
+      "github.deliver"
+    ],
+    "github": {
+      "repository": "jwill9999/agent-platform",
+      "base": "feature/multi-agent-orchestration",
+      "mergeMethod": "squash",
+      "requiredChecks": [
+        "verify",
+        "docker",
+        "e2e",
+        "desktop-e2e",
+        "markdownlint",
+        "lychee",
+        "deps:check-cycles"
+      ]
+    }
+  },
+  "tasks": [
+    {
+      "id": "agent-platform-multi-agent.10",
+      "dependsOn": [],
+      "risk": "standard",
+      "assignedRole": "workflow_orchestrator",
+      "branchParent": "task/agent-platform-multi-agent.9",
+      "allowedPaths": [".beads", "docs", "packages/workflow-control"],
+      "allowedOperations": [
+        "workspace.read",
+        "workspace.patch",
+        "process.test",
+        "artifact.write",
+        "workflow.transition",
+        "beads.read",
+        "beads.mutate",
+        "git.read",
+        "git.commit",
+        "git.push",
+        "github.read",
+        "github.deliver"
+      ]
+    }
+  ],
+  "qualityGates": [
+    "Independent critic approves the exact task-boundary material digest.",
+    "Workflow-control and monorepo local gates pass at the exact task tip."
+  ],
+  "retryPolicy": {
+    "implementationAttempts": 3,
+    "findingAttempts": 8,
+    "infrastructureAttempts": 3,
+    "waitDeadlineSeconds": 86400
+  },
+  "repairTaskPolicy": {
+    "idPattern": "agent-platform-multi-agent.repair.<sequence>",
+    "maxChildren": 2,
+    "allowedRoles": ["implementation_worker"],
+    "allowedPaths": [".beads", "docs", "packages/workflow-control"],
+    "authorityMayExpand": false
+  },
+  "escalationPolicy": [
+    "Escalate authority expansion, exhausted retry budget, contradictory external state, or any destination beyond the named feature branch."
+  ]
+}
