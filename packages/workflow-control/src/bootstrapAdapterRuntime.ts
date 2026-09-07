@@ -185,7 +185,8 @@ function assertGitHelperPins(config: BootstrapAdapterConfig): void {
 }
 
 function quoteShell(value: string): string {
-  return `'${value.replaceAll("'", String.raw`'\''`)}'`;
+  const escaped = value.replaceAll("'", String.raw`'\''`);
+  return `'${escaped}'`;
 }
 
 function assertRequest(

@@ -7516,7 +7516,7 @@ export class WorkflowStore {
       const featureContractVersion = request.featureContractVersion;
       const featureContractDigest = request.featureContractDigest;
       if (typeof featureContractVersion !== 'number' || typeof featureContractDigest !== 'string') {
-        throw new Error('feature delivery operation lacks approved contract identity');
+        throw new TypeError('feature delivery operation lacks approved contract identity');
       }
       const activeApproval = this.#database
         .prepare(
@@ -7645,8 +7645,7 @@ export class WorkflowStore {
           this.getCommittedMergeAttestation(input.runId))
         : undefined;
     const transitionIsCurrent =
-      interrupted !== undefined &&
-      interrupted.runId === input.runId &&
+      interrupted?.runId === input.runId &&
       interrupted.status === 'committed' &&
       interrupted.to === input.from &&
       interrupted.expectedRunVersion + 2 === input.expectedRunVersion &&

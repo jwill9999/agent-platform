@@ -334,12 +334,9 @@ export class BootstrapJournal {
           this.assertStored(runId, policy);
           return;
         }
-        const from =
-          run.state === 'approved' && run.version === 0
-            ? 'approved'
-            : run.state === 'scheduling' && run.version === 1 && prior
-              ? 'scheduling'
-              : undefined;
+        const scheduledFrom =
+          run.state === 'scheduling' && run.version === 1 && prior ? 'scheduling' : undefined;
+        const from = run.state === 'approved' && run.version === 0 ? 'approved' : scheduledFrom;
         if (!from) throw new Error('bootstrap lifecycle is not a fresh approved observation');
         const to = from === 'approved' ? 'scheduling' : 'implementing';
         validateTransition(from, to, {

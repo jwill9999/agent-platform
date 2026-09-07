@@ -15,7 +15,18 @@ node packages/workflow-control/dist/bootstrapAdapterBundle.js CONFIG_JSON NEW_AB
 ```
 
 Alternatively use `pnpm --filter @agent-platform/workflow-control build:bootstrap-adapters --`
-followed by those two arguments. The destination must not exist. The builder creates an owner-only
+followed by those two arguments. The destination must be a strict descendant of the canonical
+working directory and must not exist. Run the CLI from the intentionally chosen deployment root;
+an absolute path outside that root is rejected. Config JSON and CLI arguments cannot override
+this boundary. Paths must be canonical, with no traversal or symlinked parent directories.
+
+Trusted embedding code may intentionally place a bundle outside its working directory by calling
+`buildBootstrapAdapters(config, absoluteDestination, { deploymentRoot: trustedAbsoluteRoot })`.
+The root must come from trusted caller configuration, never forwarded unchecked from request data,
+CLI arguments or the adapter config JSON. It must be an existing canonical directory other than
+the filesystem root; the destination must remain strictly inside it.
+
+The builder creates an owner-only
 directory and `bootstrap-beads.mjs` / `bootstrap-remote.mjs`, both mode 0700. It prints the complete
 `policy.adapters` object, including each executable digest and `dependencies`. Copy the entire
 object into the final reviewed policy. Never omit dependency pins or update an approved bundle in

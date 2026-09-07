@@ -49,10 +49,31 @@ function readBuildConfig(inputPath: string): unknown {
 }
 
 /** Build only: writes a new deployment directory, never executes Beads/Git or changes a journal. */
-export function buildBootstrapAdapters(configInput: unknown, outputDirectory: string) {
+export function buildBootstrapAdapters(
+  configInput: unknown,
+  outputDirectory: string,
+  trustedOptions: { deploymentRoot?: string } = {},
+) {
   const config = validateBootstrapAdapterConfig(configInput);
   if (!isAbsolute(outputDirectory) || /\s/u.test(config.node.path))
     throw new Error('bootstrap adapter deployment requires absolute paths');
+  // Only trusted embedding code may select a different root; CLI/config JSON cannot override it.
+  const deploymentRoot = trustedOptions.deploymentRoot ?? realpathSync(process.cwd());
+  assertCanonicalBuildPath(deploymentRoot);
+  if (
+    dirname(deploymentRoot) === deploymentRoot ||
+    realpathSync(deploymentRoot) !== deploymentRoot ||
+    !statSync(deploymentRoot).isDirectory()
+  )
+    throw new Error('bootstrap adapter deployment root is not canonical');
+  const destination = relative(deploymentRoot, outputDirectory);
+  if (
+    destination === '' ||
+    destination === '..' ||
+    destination.startsWith(`..${sep}`) ||
+    isAbsolute(destination)
+  )
+    throw new Error('bootstrap adapter deployment must remain inside its trusted root');
   const runtime = readFileSync(
     new URL('../dist/bootstrapAdapterRuntime.js', import.meta.url),
     'utf8',

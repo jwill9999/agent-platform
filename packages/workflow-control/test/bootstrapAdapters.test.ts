@@ -125,7 +125,9 @@ else process.stdout.write(JSON.stringify(behavior==='wrong-task'?[{id:'other',st
     gitExecPath: execPath,
     https: null,
   };
-  const adapters = buildBootstrapAdapters(config, join(root, 'deployment'));
+  const adapters = buildBootstrapAdapters(config, join(root, 'deployment'), {
+    deploymentRoot: root,
+  });
   const binding = {
     workspaceRoot: workspace,
     repository: config.repository,
@@ -376,14 +378,18 @@ describe('pinned production bootstrap subprocess adapters', () => {
         .status,
     ).toBe(1);
     expect(existsSync(f.log)).toBe(false);
-    expect(() => buildBootstrapAdapters(f.config, join(f.root, 'another'))).toThrow();
+    expect(() =>
+      buildBootstrapAdapters(f.config, join(f.root, 'another'), { deploymentRoot: f.root }),
+    ).toThrow();
   });
 
   it('binds deployment dependency pins and never overwrites an existing reviewed directory', () => {
     const f = fixture();
     expect(f.adapters.dependencies).toEqual([f.config.node, f.config.git, f.config.beads]);
     expect(pin(f.adapters.remoteBinary).digest).toBe(f.adapters.remoteBinaryDigest);
-    expect(() => buildBootstrapAdapters(f.config, join(f.root, 'deployment'))).toThrow();
+    expect(() =>
+      buildBootstrapAdapters(f.config, join(f.root, 'deployment'), { deploymentRoot: f.root }),
+    ).toThrow();
     expect(() =>
       validateBootstrapAdapterConfig({ ...f.config, remoteUrl: 'ext::sh arbitrary' }),
     ).toThrow();
@@ -401,10 +407,30 @@ describe('pinned production bootstrap subprocess adapters', () => {
       `${f.root}/bad\nname`,
       'relative-deployment',
     ]) {
-      expect(() => buildBootstrapAdapters(f.config, path)).toThrow();
+      expect(() => buildBootstrapAdapters(f.config, path, { deploymentRoot: f.root })).toThrow();
     }
     expect(existsSync(target)).toBe(false);
     expect(existsSync(join(f.root, 'escaped'))).toBe(false);
+  });
+
+  it('confines deployment to the default or explicitly trusted root', () => {
+    const f = fixture();
+    const outside = join(f.root, 'outside');
+    expect(() => buildBootstrapAdapters(f.config, outside)).toThrow('trusted root');
+    for (const destination of [outside, join(f.root, 'workspace-sibling'), f.workspace]) {
+      expect(() =>
+        buildBootstrapAdapters(f.config, destination, { deploymentRoot: f.workspace }),
+      ).toThrow('trusted root');
+      if (destination !== f.workspace) expect(existsSync(destination)).toBe(false);
+    }
+    const alias = join(f.root, 'root-alias');
+    symlinkSync(f.workspace, alias);
+    expect(() =>
+      buildBootstrapAdapters(f.config, join(alias, 'bundle'), { deploymentRoot: alias }),
+    ).toThrow('canonical');
+    const adapters = buildBootstrapAdapters(f.config, outside, { deploymentRoot: f.root });
+    expect(adapters.remoteBinary).toBe(join(outside, 'bootstrap-remote.mjs'));
+    expect(pin(adapters.remoteBinary).digest).toBe(adapters.remoteBinaryDigest);
   });
 
   it('validates CLI config files and rejects symlinks and relative escapes', () => {
@@ -434,5 +460,13 @@ describe('pinned production bootstrap subprocess adapters', () => {
     const adapters = JSON.parse(result.stdout);
     expect(adapters.remoteBinary).toBe(join(output, 'bootstrap-remote.mjs'));
     expect(pin(adapters.remoteBinary).digest).toBe(adapters.remoteBinaryDigest);
+    const outside = join(f.root, 'cli-outside');
+    const outsideResult = spawnSync(node, [script, config, outside], {
+      cwd: f.workspace,
+      encoding: 'utf8',
+      timeout: 10_000,
+    });
+    expect(outsideResult.status).toBe(1);
+    expect(existsSync(outside)).toBe(false);
   });
 });

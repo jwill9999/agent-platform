@@ -157,7 +157,11 @@ export function bootstrapJson(value: unknown): string {
 export function bootstrapDigest(value: unknown): string {
   return `sha256:${createHash('sha256').update(bootstrapJson(value)).digest('hex')}`;
 }
-export function bootstrapGit(root: string, args: string[]): Buffer {
+export function bootstrapGit(
+  root: string,
+  args: string[],
+  options: { input?: Buffer; maxBuffer?: number } = {},
+): Buffer {
   return execFileSync(
     '/usr/bin/git',
     [
@@ -182,7 +186,8 @@ export function bootstrapGit(root: string, args: string[]): Buffer {
         GIT_SSH_COMMAND: '/usr/bin/false',
       },
       timeout: 5000,
-      maxBuffer: 16 * 1024 * 1024,
+      input: options.input,
+      maxBuffer: options.maxBuffer ?? 16 * 1024 * 1024,
     },
   );
 }
@@ -219,13 +224,17 @@ interface TreeFile {
   oid: string;
   mode: '100644' | '100755';
   digest: string;
+  sizeBytes: number;
 }
-function objectHash(kind: string, content: Buffer): string {
-  // Git's SHA-1 object format requires this exact header and digest for blob/tree identity.
-  // Approval integrity is separately bound by SHA-256 policy, manifest and diff digests.
-  return createHash('sha1').update(`${kind} ${content.length}\0`).update(content).digest('hex');
+function objectHash(root: string, kind: 'blob' | 'tree', content: Buffer): string {
+  // Git owns repository-format object identity; no object or index is written without -w.
+  return sha.parse(
+    bootstrapGit(root, ['hash-object', '-t', kind, '--stdin'], { input: content })
+      .toString('utf8')
+      .trim(),
+  );
 }
-function treeHash(files: TreeFile[], prefix = ''): string {
+function treeHash(root: string, files: TreeFile[], prefix = ''): string {
   const entries = new Map<string, { mode: string; oid: string; directory: boolean }>();
   for (const file of files) {
     const rest = file.path.slice(prefix.length);
@@ -237,6 +246,7 @@ function treeHash(files: TreeFile[], prefix = ''): string {
         entries.set(name, {
           mode: '40000',
           oid: treeHash(
+            root,
             files.filter((item) => item.path.startsWith(`${prefix}${name}/`)),
             `${prefix}${name}/`,
           ),
@@ -251,6 +261,7 @@ function treeHash(files: TreeFile[], prefix = ''): string {
     ),
   );
   return objectHash(
+    root,
     'tree',
     Buffer.concat(
       sorted.flatMap(([name, entry]) => [
@@ -259,6 +270,20 @@ function treeHash(files: TreeFile[], prefix = ''): string {
       ]),
     ),
   );
+}
+
+function bootstrapFileChanged(
+  root: string,
+  initial: { mode: string; oid: string } | undefined,
+  current: TreeFile | undefined,
+): boolean {
+  if (initial?.oid !== current?.oid || initial?.mode !== current?.mode) return true;
+  if (initial === undefined || current === undefined) return false;
+  // Equal Git IDs must not hide changed bytes from the SHA-256 reviewed manifest.
+  const baseline = bootstrapGit(root, ['cat-file', 'blob', initial.oid], {
+    maxBuffer: Math.max(16 * 1024 * 1024, current.sizeBytes),
+  });
+  return `sha256:${createHash('sha256').update(baseline).digest('hex')}` !== current.digest;
 }
 
 /** Pure observation: no index, objects, refs, journal or remote are written. */
@@ -302,17 +327,16 @@ export function observeBootstrapCandidate(
     files.push({
       path,
       mode: stat.mode & 0o111 ? '100755' : '100644',
-      oid: objectHash('blob', content),
+      oid: objectHash(policy.sourceRoot, 'blob', content),
       digest: `sha256:${createHash('sha256').update(content).digest('hex')}`,
+      sizeBytes: content.length,
     });
   }
   const current = new Map(files.map((file) => [file.path, file]));
   const changed = [...new Set([...initial.keys(), ...current.keys()])]
     .sort(comparePaths)
-    .filter(
-      (path) =>
-        initial.get(path)?.oid !== current.get(path)?.oid ||
-        initial.get(path)?.mode !== current.get(path)?.mode,
+    .filter((path) =>
+      bootstrapFileChanged(policy.sourceRoot, initial.get(path), current.get(path)),
     );
   const manifest = changed.map((path) => ({
     path,
@@ -333,7 +357,7 @@ export function observeBootstrapCandidate(
     kind: 'bootstrap_candidate_observed' as const,
     ref: policy.ref,
     headSha: expectedHead,
-    treeSha: treeHash(files),
+    treeSha: treeHash(policy.sourceRoot, files),
     manifest,
     diffDigest: `sha256:${createHash('sha256').update(rawDiff).digest('hex')}`,
   };
