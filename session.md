@@ -2,43 +2,46 @@
 
 ## Last updated
 
-2026-09-07: owner-authorized manual fix-forward for the staging CodeQL finding.
-Task tracking remains agent-platform-multi-agent.repair.4; the unattended pilot is incomplete.
+2026-09-07: staging delivery complete; Beads reconciled for supervised pilot and follow-ups.
 
-## Verified state
+## Verified delivery
 
-PR #254 merged into feature/multi-agent-orchestration as
-bd42e14acc23731496a019594945bb6a87bd75bc after hosted CI, Sonar and review checks passed.
-The owner opened PR #255 into staging. All executed checks passed except the separate CodeQL
-security-alert check for polynomial private-key redaction. Staging and production remain unchanged.
+PR #254 merged the orchestration repairs into the feature branch. PR #256 added bounded private-key
+redaction and resolved review feedback; its Sourcery dummy-key false-positive exception was explicitly
+owner-approved and documented. All other executed checks passed.
+PR #255 then merged into staging as 491518811ab53d003a2d2f90ed79dd6fb9d07d0e with every executed
+check passing, including CodeQL, Sonar, GitGuardian, Promptfoo and packaged macOS tests.
+Sourcery was skipped on that final staging run. No production/main promotion occurred.
 
-## Current repair and evidence
+Local staging was aligned with origin/staging and verified clean. The three historical loose files
+were identical to staging; they are preserved in a named recovery stash. Prior branch history is
+preserved in /Users/letuscode/.codex/branch-cleanup-zlHuce/before-cleanup.bundle.
+GitHub topic branches were cleaned up; older local branches/worktrees still require careful review.
 
-The private-key wildcard regex is replaced with monotonically advancing delimiter scans.
-Complete-key matching and redaction order are preserved; unterminated recognized keys are
-conservatively redacted through end-of-input. Independent critique found no actionable issues.
-Independent Node 24 verification: 488 tests passed, one intentional Docker-isolation test skipped;
-26 focused tests, build, typecheck, lint and formatting passed. Differential tests covered 432
-complete-key cases and a large repeated-header input. Hosted clearance remains pending.
+## Beads and remaining work
 
-The reviewed source and test changes are on task/agent-platform-multi-agent.codeql-redaction
-in /Users/letuscode/.codex/worktrees/codeql-redaction/agent-platform, based on the merged feature.
-The original repair4 worktree retains its stale ordinary index; do not reset it or disturb other
-worktrees. This handoff does not itself constitute a push or merge receipt.
+The multi-agent epic and autonomous pilot remain in progress: manual supervised delivery does not
+prove unattended progression. The owner favors one-to-two weeks of supervised use, recording snags
+in Beads. Refine operational exit criteria before claiming acceptance; no production deployment
+is required. Repair3 is superseded by repair4, not evidence of a completed brokered repair3 merge.
+Repair4 publication is verified, but exact bootstrap artifact/terminalization acceptance still needs
+an evidence audit. Preserve historical approvals and terminal runs; do not relabel manual PR work
+as brokered attestations.
 
-## Authority and next transition
+The local hook isolation bug is tracked as agent-platform-hook-isolation. The proposed patch at
+/private/tmp/repair4-hook-env.DrIB2a/pre-push-isolation.patch remains unapplied.
+Future reuse/package/init/doctor investigation is P3 agent-platform-orchestration-toolkit, blocked
+on multi-agent pilot learning. No package implementation or release is authorized.
+The orchestration-repair-progress monitor is paused after completed staging delivery.
 
-The owner authorized bounded repairs, tests, independent critique and pushes for CI, including
-local hook bypasses. Keep hooks installed. Publish the task-to-feature repair PR and recheck its
-hosted gates, then the staging PR's CodeQL, Sonar and review comments after feature integration.
-Staging/main merge and deployment are not authorized. Explicitly surface any required approval.
+## Verification evidence and next boundary
 
-Former governed publication runs are terminal according to the prior coordinator handoff; this
-session did not re-observe the runtime database. Do not reopen runs or relabel old attestations.
+Latest full independent package run: 488 passed, one intentional Docker-isolation skip.
+Secure-evidence focused tests: 26 passed after the timing-assertion adjustment.
+Independent critique, build, typecheck, lint and formatting passed. The final staging check set
+cleared the original CodeQL alert with no new alerts.
 
-## Remaining limitations
-
-The local hook has an inherited-Git-environment isolation defect. Its proposed patch remains at
-/private/tmp/repair4-hook-env.DrIB2a/pre-push-isolation.patch, unapplied; repair it separately.
-Neither the standalone unattended pilot nor application-harness multiagency is completed by this fix.
-The orchestration-repair-progress monitor follows callbacks and staging repair CI.
+Reconcile acceptance evidence and refine the supervised operational pilot; track notification,
+progression and recovery snags as they occur. Hook repair is separate. Documentation/backlog capture
+is pushed on task/orchestration-toolkit-backlog, not yet integrated into staging; its proposed
+feature parent is feature/orchestration-toolkit-backlog. Do not imply this handoff is already merged.
