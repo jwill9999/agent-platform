@@ -77,7 +77,7 @@ async function createStore(state: 'pipeline' | 'implementing') {
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
   const contractId = store.createContract(contract, 100);
-  store.createRun(contractId, state, 'run-recovery');
+  store.createRunForTest(contractId, state, 'run-recovery');
   store.seedApprovedTaskHeadForTest({
     workspaceId,
     runId: 'run-recovery',

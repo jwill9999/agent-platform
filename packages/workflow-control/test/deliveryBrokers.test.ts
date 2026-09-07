@@ -118,7 +118,7 @@ async function setup(input?: {
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
   const contractId = store.createContract(contract, 1000);
-  const run = store.createRun(contractId, input?.state ?? 'implementing', 'run-delivery');
+  const run = store.createRunForTest(contractId, input?.state ?? 'implementing', 'run-delivery');
   const ownerId = 'delivery-owner';
   const fence = {
     ownerId,
@@ -216,6 +216,84 @@ function checksRequest(pollAttempt: number): DeliveryRequest {
   };
 }
 
+function mergeRequest(): DeliveryRequest {
+  const checks = { ...checksRequest(0) } as Record<string, unknown>;
+  delete checks.pollAttempt;
+  return {
+    ...(checks as Omit<Extract<DeliveryRequest, { kind: 'github.checks' }>, 'pollAttempt'>),
+    kind: 'github.merge',
+    reviewDecision: 'approved',
+    mergeMethod: 'squash',
+    adminBypass: false,
+  };
+}
+
+class AttestedMergePort implements DeliveryMutationPort {
+  mutationCount = 0;
+  observationCount = 0;
+  changedOnSecondObservation = false;
+  merged = false;
+  receivedPrecondition:
+    | { reviewEventIdentity: string; verifiedObservationDigest: string }
+    | undefined;
+  threads: Array<{
+    id: string;
+    isResolved: boolean;
+    headSha: string;
+    reviewEventIdentity: string;
+    acceptedDispositionDigest: string | null;
+  }> = [];
+
+  async observe(request: DeliveryRequest): Promise<ExternalObservation> {
+    this.observationCount += 1;
+    if (request.kind !== 'github.merge') throw new Error('merge request required');
+    if (this.merged) {
+      return {
+        kind: 'expected',
+        result: {
+          pullRequestNumber: request.pullRequestNumber,
+          mergeSha: '9'.repeat(40),
+          headSha: request.headSha,
+          base: request.base,
+          mergeMethod: request.mergeMethod,
+          eventIdentity: 'merged-event',
+        },
+      };
+    }
+    return {
+      kind: 'unchanged',
+      result: {
+        repository: request.repository,
+        pullRequestNumber: request.pullRequestNumber,
+        headSha: request.headSha,
+        base: request.base,
+        protectionDigest: request.protectionDigest,
+        reviewDecision: request.reviewDecision,
+        requiredChecks: [...request.requiredChecks],
+        checks: { test: 'success', review: 'success' },
+        reviewEventIdentity:
+          this.changedOnSecondObservation && this.observationCount > 1
+            ? 'review-event-raced'
+            : 'review-event',
+        threads: this.threads,
+      },
+    };
+  }
+
+  async mutate(
+    _request: DeliveryRequest,
+    verifiedMergePrecondition?: {
+      reviewEventIdentity: string;
+      verifiedObservationDigest: string;
+    },
+  ): Promise<unknown> {
+    this.receivedPrecondition = verifiedMergePrecondition;
+    this.mutationCount += 1;
+    this.merged = true;
+    return { merged: true };
+  }
+}
+
 const brokerPolicy = {
   authorName: 'Agent Platform',
   authorEmail: 'agent@example.com',
@@ -224,6 +302,173 @@ const brokerPolicy = {
 } as const;
 
 describe('DurableDeliveryBroker', () => {
+  async function setupMergePort(input?: {
+    fault?: Parameters<typeof DurableDeliveryBroker.createForTest>[0]['fault'];
+  }) {
+    const prepared = await setup();
+    await prepared.broker.execute(createRefRequest(), prepared.fence);
+    await prepared.broker.execute(commitRequest(), prepared.fence);
+    await prepared.broker.execute(pushRequest(), prepared.fence);
+    const sqlite = new Database(prepared.database);
+    sqlite.prepare("UPDATE runs SET state = 'delivery' WHERE id = ?").run(prepared.run.id);
+    sqlite.close();
+    const port = new AttestedMergePort();
+    const broker = DurableDeliveryBroker.createForTest({
+      store: prepared.store,
+      contract,
+      port,
+      policy: brokerPolicy,
+      clock: () => 1000,
+      fault: input?.fault,
+    });
+    return { ...prepared, port, broker };
+  }
+
+  it('persists an attested zero-thread snapshot before the immediate merge re-observation', async () => {
+    const { broker, fence, port, store } = await setupMergePort();
+    const operation = await broker.execute(mergeRequest(), fence);
+
+    expect(operation.status).toBe('committed');
+    expect(operation.mergeObservationStatus).toBe('prepared_verified');
+    expect(operation.verifiedObservationDigest).toMatch(/^sha256:/u);
+    expect(operation.verifiedObservation).toMatchObject({
+      reviewEventIdentity: 'review-event',
+      threads: [],
+    });
+    expect(port.observationCount).toBe(3);
+    expect(port.mutationCount).toBe(1);
+    expect(port.receivedPrecondition).toEqual({
+      reviewEventIdentity: 'review-event',
+      verifiedObservationDigest: operation.verifiedObservationDigest,
+    });
+    expect(store.getRun('run-delivery')).toMatchObject({
+      state: 'finalizing',
+      mergeVerified: true,
+    });
+  });
+
+  it('rejects a provider review-event race after persisting the merge snapshot', async () => {
+    const { broker, fence, port } = await setupMergePort();
+    port.changedOnSecondObservation = true;
+
+    await expect(broker.execute(mergeRequest(), fence)).resolves.toMatchObject({
+      status: 'escalated',
+      result: { reason: 'provider_merge_observation_changed_before_mutation' },
+    });
+    expect(port.mutationCount).toBe(0);
+  });
+
+  it('rejects unresolved threads and resolved threads without matching durable dispositions', async () => {
+    for (const thread of [
+      {
+        id: 'thread-unresolved',
+        isResolved: false,
+        headSha,
+        reviewEventIdentity: 'review-event',
+        acceptedDispositionDigest: null,
+      },
+      {
+        id: 'thread-substituted',
+        isResolved: true,
+        headSha,
+        reviewEventIdentity: 'review-event',
+        acceptedDispositionDigest: `sha256:${'8'.repeat(64)}`,
+      },
+    ]) {
+      const { broker, fence, port } = await setupMergePort();
+      port.threads = [thread];
+      await expect(broker.execute(mergeRequest(), fence)).rejects.toThrow(
+        thread.isResolved ? 'matching durable disposition' : 'unresolved or stale thread',
+      );
+      expect(port.mutationCount).toBe(0);
+    }
+  });
+
+  it('recovers response loss only after a durable verified merge precondition', async () => {
+    const first = await setupMergePort({
+      fault(boundary) {
+        if (boundary === 'after_mutation') throw new Error('response lost');
+      },
+    });
+    await expect(first.broker.execute(mergeRequest(), first.fence)).rejects.toThrow(
+      'response lost',
+    );
+    expect(first.store.listPreparedDeliveryOperations(first.run.id)).toEqual([
+      expect.objectContaining({
+        status: 'prepared',
+        mergeObservationStatus: 'prepared_verified',
+        verifiedObservationDigest: expect.stringMatching(/^sha256:/u),
+      }),
+    ]);
+
+    const recovered = DurableDeliveryBroker.createForTest({
+      store: first.store,
+      contract,
+      port: first.port,
+      policy: brokerPolicy,
+      clock: () => 1000,
+    });
+    await expect(
+      recovered.reconcilePrepared({ runId: first.run.id, fence: first.fence }),
+    ).resolves.toMatchObject({ operations: [{ status: 'committed' }], errors: [] });
+    expect(first.port.mutationCount).toBe(1);
+  });
+
+  it('escalates an already-merged result without a durable verified precondition', async () => {
+    const { broker, fence, port } = await setupMergePort();
+    port.merged = true;
+    await expect(broker.execute(mergeRequest(), fence)).resolves.toMatchObject({
+      status: 'escalated',
+      result: { reason: 'merge_result_without_verified_precondition' },
+    });
+    expect(port.mutationCount).toBe(0);
+  });
+
+  it('migrates a legacy prepared merge and completes verified recovery', async () => {
+    const first = await setupMergePort({
+      fault(boundary) {
+        if (boundary === 'after_prepare') throw new Error('legacy prepare crash');
+      },
+    });
+    await expect(first.broker.execute(mergeRequest(), first.fence)).rejects.toThrow(
+      'legacy prepare crash',
+    );
+    first.store.close();
+    const legacy = new Database(first.database);
+    legacy.exec(`
+      ALTER TABLE delivery_operations DROP COLUMN merge_observation_status;
+      ALTER TABLE delivery_operations DROP COLUMN verified_observation_digest;
+      ALTER TABLE delivery_operations DROP COLUMN verified_observation_json;
+      DELETE FROM schema_migrations WHERE version = 12;
+    `);
+    legacy.close();
+
+    const reopened = new WorkflowStore(first.database);
+    expect(reopened.listPreparedDeliveryOperations(first.run.id)).toEqual([
+      expect.objectContaining({ mergeObservationStatus: 'prepared_unobserved' }),
+    ]);
+    const recovered = DurableDeliveryBroker.createForTest({
+      store: reopened,
+      contract,
+      port: first.port,
+      policy: brokerPolicy,
+      clock: () => 1000,
+    });
+    await expect(
+      recovered.reconcilePrepared({ runId: first.run.id, fence: first.fence }),
+    ).resolves.toMatchObject({
+      operations: [
+        {
+          status: 'committed',
+          mergeObservationStatus: 'prepared_verified',
+          verifiedObservationDigest: expect.stringMatching(/^sha256:/u),
+        },
+      ],
+      errors: [],
+    });
+    expect(first.port.mutationCount).toBe(1);
+    reopened.close();
+  });
   it('journals an approved mutation and replays it without a second side effect', async () => {
     const { broker, database, fence, port } = await setup();
     const first = await broker.execute(createRefRequest(), fence);

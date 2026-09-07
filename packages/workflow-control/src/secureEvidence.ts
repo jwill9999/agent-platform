@@ -12,6 +12,13 @@ import {
 } from './contracts.js';
 import { ProcessCapabilityBroker, type ProcessIdentity } from './authorization.js';
 import {
+  bootstrapPolicySchema,
+  bootstrapDigest,
+  bootstrapJson,
+  implementationArtifactReadySchema,
+} from './bootstrapPolicy.js';
+import { deriveContractMaterialDigest } from './planning.js';
+import {
   workflowSecureEvidenceMutationCapability,
   type SecureEvidenceRecord,
   type WorkflowStore,
@@ -148,7 +155,10 @@ function redact(content: Uint8Array, mediaType: string): { content: Uint8Array; 
   return { content, count: 0 };
 }
 
-function assertNoResidualSecrets(content: Uint8Array): void {
+function assertNoResidualSecrets(
+  content: Uint8Array,
+  approvedIdentifiers: ReadonlySet<string>,
+): void {
   const text = Buffer.from(content).toString('utf8');
   const residual = [...directSecretPatterns, keyValueSecretPattern].some((pattern) => {
     pattern.lastIndex = 0;
@@ -158,6 +168,9 @@ function assertNoResidualSecrets(content: Uint8Array): void {
     .replace(/\bsha256:[a-f0-9]{64}\b/giu, '')
     .replace(/\b(?:commit|head|sha)\s*[:=]\s*[a-f0-9]{40}\b/giu, '');
   const unknownHighEntropy = scanText.match(/[^\s"'`,;:()[\]{}<>]{24,}/gu)?.some((candidate) => {
+    // Exact approved task paths and journal identifiers are known non-secret schema values.
+    // Direct secret patterns above still apply, even to these approved identifiers.
+    if (approvedIdentifiers.has(candidate)) return false;
     const frequencies = new Map<string, number>();
     for (const character of candidate) {
       frequencies.set(character, (frequencies.get(character) ?? 0) + 1);
@@ -250,6 +263,89 @@ export class SecureEvidenceVault {
   }
 
   async record(input: SecureEvidenceInput): Promise<SecureEvidenceResult> {
+    return this.#record(input, input.producerRole);
+  }
+
+  /** Trusted launcher ingestion: the specialist never receives a write capability.
+   * The caller authenticates as orchestrator; producer and role come from its scheduler record.
+   */
+  async recordSpecialistResult(input: {
+    executionId: string;
+    content: Uint8Array;
+    headSha: string;
+    capability: EvidenceCapability;
+  }): Promise<SecureEvidenceResult> {
+    const execution = this.#store.getSchedulerExecution(input.executionId);
+    if (execution?.status !== 'active' || execution.credentialStatus !== 'revoked')
+      throw new Error('specialist result ingestion requires settled credential-revoked execution');
+    this.#store.assertRunUsesContract(execution.runId, this.#contract);
+    return this.#record(
+      {
+        content: input.content,
+        mediaType: 'application/json',
+        kind: 'artifact',
+        producer: execution.processIdentity,
+        producerRole: workflowRoleSchema.parse(execution.role),
+        workspaceId: execution.workspaceId,
+        runId: execution.runId,
+        taskId: execution.taskId,
+        contractVersion: this.#contract.contractVersion,
+        policyDigest: this.#contract.policyDigest,
+        headSha: input.headSha,
+        capability: input.capability,
+      },
+      'workflow_orchestrator',
+    );
+  }
+
+  async recordBootstrapAttestation(input: {
+    attestation: unknown;
+    capability: EvidenceCapability;
+  }): Promise<SecureEvidenceResult> {
+    const value = implementationArtifactReadySchema.parse(input.attestation);
+    const policy = bootstrapPolicySchema.parse(this.#store.getBootstrapPolicy(value.runId));
+    if (
+      bootstrapDigest(policy) !== this.#contract.policyDigest ||
+      value.policyDigest !== this.#contract.policyDigest ||
+      value.contractDigest !== bootstrapDigest(this.#contract) ||
+      value.materialDigest !== deriveContractMaterialDigest(this.#contract) ||
+      value.taskId !== policy.taskId ||
+      value.ref !== policy.ref ||
+      value.treeSha !== policy.treeSha ||
+      value.beadsSnapshotDigest !== bootstrapDigest(policy.beadsSnapshot) ||
+      bootstrapJson(value.evidence) !== bootstrapJson(policy.evidence)
+    )
+      throw new Error('bootstrap attestation differs from stored approved policy');
+    const result = await this.#record(
+      {
+        content: Buffer.from(bootstrapJson(value)),
+        mediaType: 'application/json',
+        kind: 'artifact',
+        producer: 'bootstrap-coordinator',
+        producerRole: 'workflow_orchestrator',
+        workspaceId: this.#contract.workspaceId,
+        runId: value.runId,
+        taskId: value.taskId,
+        contractVersion: 1,
+        policyDigest: value.policyDigest,
+        headSha: value.headSha,
+        capability: input.capability,
+      },
+      'workflow_orchestrator',
+      // Evidence equality above binds these identifiers to the stored approved policy.
+      // This exempts only the entropy heuristic; direct secret redaction/scanning still applies.
+      [value.kind, policy.ref, policy.treeSha, ...policy.evidence.map((item) => item.producer)],
+    );
+    if (result.reference.digest !== bootstrapDigest(value))
+      throw new Error('bootstrap attestation was redacted');
+    return result;
+  }
+
+  async #record(
+    input: SecureEvidenceInput,
+    capabilityRole: WorkflowRole,
+    approvedBootstrapIdentifiers: readonly string[] = [],
+  ): Promise<SecureEvidenceResult> {
     workflowRoleSchema.parse(input.producerRole);
     if (input.content.byteLength === 0 || input.content.byteLength > this.#maxBytes) {
       throw new Error('evidence size is outside the approved bound');
@@ -272,7 +368,7 @@ export class SecureEvidenceVault {
     }
     this.#assertCapability(
       input.capability,
-      input.producerRole,
+      capabilityRole,
       'artifact.write',
       task.allowedPaths[0] ?? this.#contract.constraints.allowedPaths[0],
       input.runId,
@@ -291,7 +387,16 @@ export class SecureEvidenceVault {
     if (!Number.isFinite(createdAtMs)) throw new Error('evidence clock must be finite');
     const retentionUntilMs = createdAtMs + 30 * 24 * 60 * 60 * 1000;
     const processed = redact(input.content, input.mediaType);
-    assertNoResidualSecrets(processed.content);
+    assertNoResidualSecrets(
+      processed.content,
+      new Set([
+        ...task.allowedPaths,
+        input.runId,
+        input.taskId,
+        input.headSha,
+        ...approvedBootstrapIdentifiers,
+      ]),
+    );
     assertMedia(processed.content, input.mediaType);
     if (processed.content.byteLength === 0 || processed.content.byteLength > this.#maxBytes) {
       throw new Error('redacted evidence size is outside the approved bound');

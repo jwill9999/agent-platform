@@ -17,9 +17,15 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:bootstrap-adapters": "pnpm build && node dist/bootstrapAdapterBundle.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
+    "test:progression": "pnpm build && vitest run test/continuationWorker.test.ts test/continuationProcess.test.ts test/continuationNotifications.test.ts",
+    "test:standalone-runtime": "pnpm build && vitest run test/phaseJobs.test.ts test/phaseRuntime.test.ts",
+    "test:standalone-conformance": "pnpm build && node dist/cli.js standalone-conformance",
+    "test:host-conformance": "pnpm build && node dist/cli.js host-conformance",
+    "gate:autonomous-progression": "pnpm test:progression && pnpm test:host-conformance",
     "test:isolation": "WORKFLOW_DOCKER_ISOLATION=1 vitest run test/isolation.integration.test.ts"
   },
   "dependencies": {

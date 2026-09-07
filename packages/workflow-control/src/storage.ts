@@ -1,8 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { fenceRunWork, runAcceptsWork } from './workCancellation.js';
+import { assertBootstrapDeliveryPolicy, initializeBootstrapSchema } from './bootstrapJournal.js';
 import { mkdir, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
+import { enqueueContinuation, initializeContinuationSchema } from './continuationJournal.js';
+import { specialistTerminalResult } from './specialistTerminalResult.js';
 
 import {
   executionContractSchema,
@@ -34,6 +38,16 @@ import {
   type PlanApproval,
 } from './planning.js';
 import { validateTransition, type TransitionContext, type WorkflowState } from './stateMachine.js';
+import {
+  approvalNotificationSchema,
+  delegateCallbackSchema,
+  delegateCallbackTarget,
+  lineageImportSchema,
+  validateApprovalNotificationTransition,
+  type ApprovalNotificationRecord,
+  type ApprovalNotificationState,
+  type DelegateCallback,
+} from './governedOperations.js';
 
 export interface WorkflowControlPaths {
   workspaceId: string;
@@ -108,6 +122,27 @@ export const workflowFinalizationMutationCapability = Symbol(
 export const workflowCancellationMutationCapability = Symbol(
   'workflowCancellationMutationCapability',
 );
+export const workflowGovernedPersistenceCapability = Symbol(
+  'workflowGovernedPersistenceCapability',
+);
+
+export interface DelegateCallbackDispositionRecord {
+  callback: DelegateCallback;
+  targetState: WorkflowState;
+  status: 'committed';
+  parentVersion: number;
+  createdAtMs: number;
+}
+
+export interface ApprovalWaitContextRecord {
+  runId: string;
+  taskId: string;
+  predecessor: WorkflowState;
+  resumeTarget: WorkflowState;
+  eventId: string;
+  deadlineMs: number;
+  status: 'waiting' | 'resumed';
+}
 
 export type DeliveryOperationStatus = 'prepared' | 'committed' | 'escalated';
 
@@ -128,6 +163,10 @@ export interface DeliveryOperationRecord {
   taskLeaseEpoch: number;
   result: unknown | null;
   resultJson: string | null;
+  verifiedObservation: unknown;
+  verifiedObservationJson: string | null;
+  verifiedObservationDigest: string | null;
+  mergeObservationStatus: 'prepared_unobserved' | 'prepared_verified' | null;
   createdAtMs: number;
   updatedAtMs: number;
 }
@@ -249,6 +288,7 @@ export interface SchedulerExecutionRecord {
   workspaceId: string;
   runId: string;
   taskId: string;
+  attemptNumber: number;
   role: string;
   mode: 'read_only' | 'mutating';
   status: SchedulerExecutionStatus;
@@ -380,6 +420,7 @@ type SchedulerExecutionRow = {
   workspace_id: string;
   run_id: string;
   task_id: string;
+  attempt_number: number;
   role: string;
   mode: SchedulerExecutionRecord['mode'];
   status: SchedulerExecutionStatus;
@@ -413,6 +454,9 @@ type DeliveryOperationRow = {
   run_lease_epoch: number;
   task_lease_epoch: number;
   result_json: string | null;
+  verified_observation_json: string | null;
+  verified_observation_digest: string | null;
+  merge_observation_status: 'prepared_unobserved' | 'prepared_verified' | null;
   created_at_ms: number;
   updated_at_ms: number;
 };
@@ -451,6 +495,15 @@ type RepairEscalationRow = {
 
 function parseJson(value: string | null): unknown | null {
   return value === null ? null : (JSON.parse(value) as unknown);
+}
+
+// Canonical check ordering must use UTF-16 code units, independent of the host locale.
+function compareCodeUnits(left: string, right: string): number {
+  const leftString = `${left}`;
+  const rightString = `${right}`;
+  if (leftString < rightString) return -1;
+  if (leftString > rightString) return 1;
+  return 0;
 }
 
 function serializeDurableJson(value: unknown): string {
@@ -506,6 +559,7 @@ function schedulerExecutionFromRow(row: SchedulerExecutionRow): SchedulerExecuti
     workspaceId: row.workspace_id,
     runId: row.run_id,
     taskId: row.task_id,
+    attemptNumber: row.attempt_number,
     role: row.role,
     mode: row.mode,
     status: row.status,
@@ -576,6 +630,14 @@ function deliveryOperationFromRow(row: DeliveryOperationRow): DeliveryOperationR
       result = undefined;
     }
   }
+  let verifiedObservation: unknown = null;
+  if (row.verified_observation_json !== null) {
+    try {
+      verifiedObservation = JSON.parse(row.verified_observation_json) as unknown;
+    } catch {
+      verifiedObservation = undefined;
+    }
+  }
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -593,6 +655,10 @@ function deliveryOperationFromRow(row: DeliveryOperationRow): DeliveryOperationR
     taskLeaseEpoch: row.task_lease_epoch,
     result,
     resultJson: row.result_json,
+    verifiedObservation,
+    verifiedObservationJson: row.verified_observation_json,
+    verifiedObservationDigest: row.verified_observation_digest,
+    mergeObservationStatus: row.merge_observation_status,
     createdAtMs: row.created_at_ms,
     updatedAtMs: row.updated_at_ms,
   };
@@ -630,6 +696,7 @@ export class WorkflowStore {
     this.#database.pragma('foreign_keys = ON');
     this.#database.pragma('journal_mode = WAL');
     this.#migrate();
+    initializeBootstrapSchema(this.#database);
   }
 
   close(): void {
@@ -666,6 +733,23 @@ export class WorkflowStore {
   }
 
   createRun(contractId: string, state: WorkflowState = 'approved', id = randomUUID()): RunRecord {
+    if (state === 'pipeline') {
+      throw new Error('pipeline runs must be entered through exact lineage import');
+    }
+    return this.#createRunFixture(contractId, state, id);
+  }
+
+  /** Explicit fixture seam; unavailable in production and never used by orchestration code. */
+  createRunForTest(
+    contractId: string,
+    state: WorkflowState = 'approved',
+    id = randomUUID(),
+  ): RunRecord {
+    if (process.env.NODE_ENV !== 'test') throw new Error('test run fixture is unavailable');
+    return this.#createRunFixture(contractId, state, id);
+  }
+
+  #createRunFixture(contractId: string, state: WorkflowState, id: string): RunRecord {
     this.#database.transaction(() => {
       const nowMs = Date.now();
       this.#database
@@ -693,11 +777,888 @@ export class WorkflowStore {
         };
   }
 
+  getBootstrapPolicy(runId: string): unknown {
+    const row = this.#database
+      .prepare('SELECT policy_json FROM bootstrap_artifacts WHERE run_id=?')
+      .get(runId) as { policy_json: string } | undefined;
+    return row === undefined ? undefined : (JSON.parse(row.policy_json) as unknown);
+  }
+
+  prepareApprovalNotification(
+    eventInput: unknown,
+    nowMs: number,
+    capability?: symbol,
+  ): ApprovalNotificationRecord {
+    if (capability !== workflowGovernedPersistenceCapability)
+      throw new Error('approval notification persistence requires coordinator capability');
+    const event = approvalNotificationSchema.parse(eventInput);
+    return this.#database.transaction(() => {
+      const existing = this.getApprovalNotification(event.eventId);
+      if (existing !== undefined) {
+        if (JSON.stringify(existing.event) !== JSON.stringify(event))
+          throw new Error('approval notification identity collision');
+        return existing;
+      }
+      const contract = this.#contractForRun(event.runId);
+      if (
+        contract.workspaceId !== event.workspaceId ||
+        contract.policyDigest !== event.policyDigest ||
+        contract.contractVersion !== event.contractVersion ||
+        !contract.tasks.some((task) => task.id === event.taskId) ||
+        this.getRun(event.runId)?.state !== 'approval_waiting'
+      ) {
+        throw new Error('approval notification contract or waiting-state binding mismatch');
+      }
+      const authorizedTask = contract.tasks.find((task) => task.id === event.taskId);
+      if (!authorizedTask?.allowedOperations.includes('notification.approval'))
+        throw new Error('approval notification exceeds task authority');
+      const intent = this.#database
+        .prepare("SELECT * FROM approval_wait_contexts WHERE run_id = ? AND status = 'waiting'")
+        .get(event.runId) as
+        | {
+            task_id: string;
+            predecessor_state: string;
+            resume_target_state: string;
+            event_id: string;
+            recipient_identity: string;
+            phase: string;
+            deadline_ms: number;
+          }
+        | undefined;
+      if (
+        intent === undefined ||
+        intent.task_id !== event.taskId ||
+        intent.predecessor_state !== event.predecessor ||
+        intent.resume_target_state !== event.resumeTarget ||
+        intent.event_id !== event.eventId ||
+        intent.recipient_identity !== event.recipientIdentity ||
+        intent.phase !== event.phase ||
+        intent.deadline_ms !== event.expiresAtMs
+      ) {
+        throw new Error('approval notification differs from authoritative wait intent');
+      }
+      const approval = this.#database
+        .prepare(
+          `SELECT 1 FROM plan_approvals WHERE run_id = ? AND status = 'active'
+           AND contract_version = ? AND policy_digest = ? AND material_digest = ? LIMIT 1`,
+        )
+        .get(event.runId, event.contractVersion, event.policyDigest, event.materialDigest);
+      if (approval === undefined)
+        throw new Error('approval notification lacks active material approval');
+      const approvedHeadEvidence = this.#database
+        .prepare(
+          `SELECT 1 FROM secure_evidence WHERE workspace_id = ? AND run_id = ? AND task_id = ?
+           AND head_sha = ? AND contract_version = ? AND policy_digest = ?
+           AND deleted_at_ms IS NULL LIMIT 1`,
+        )
+        .get(
+          event.workspaceId,
+          event.runId,
+          event.taskId,
+          event.headSha,
+          event.contractVersion,
+          event.policyDigest,
+        );
+      if (approvedHeadEvidence === undefined)
+        throw new Error('approval notification lacks approved head evidence');
+      this.#assertResourceLease(
+        'workspace',
+        event.workspaceId,
+        event.ownerId,
+        event.workspaceLeaseEpoch,
+        nowMs,
+      );
+      this.#assertResourceLease('run', event.runId, event.ownerId, event.runLeaseEpoch, nowMs);
+      this.#assertResourceLease('task', event.taskId, event.ownerId, event.taskLeaseEpoch, nowMs);
+      this.#database
+        .prepare(
+          `INSERT INTO approval_notifications
+        (event_id, run_id, task_id, event_json, state, generation, message_id, provider_accepted_at_ms, created_at_ms, updated_at_ms)
+        VALUES (?, ?, ?, ?, 'prepared', NULL, NULL, NULL, ?, ?)`,
+        )
+        .run(event.eventId, event.runId, event.taskId, JSON.stringify(event), nowMs, nowMs);
+      return this.getApprovalNotification(event.eventId)!;
+    })();
+  }
+
+  getApprovalNotification(eventId: string): ApprovalNotificationRecord | undefined {
+    const row = this.#database
+      .prepare('SELECT * FROM approval_notifications WHERE event_id = ?')
+      .get(eventId) as
+      | {
+          event_json: string;
+          state: ApprovalNotificationState;
+          generation: string | null;
+          message_id: string | null;
+          provider_accepted_at_ms: number | null;
+          failure_purpose: 'approval' | 'resume' | null;
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          event: approvalNotificationSchema.parse(JSON.parse(row.event_json) as unknown),
+          state: row.state,
+          generation: row.generation,
+          messageId: row.message_id,
+          providerAcceptedAtMs: row.provider_accepted_at_ms,
+          failurePurpose: row.failure_purpose,
+        };
+  }
+
+  getApprovalWaitContext(runId: string): ApprovalWaitContextRecord | undefined {
+    const row = this.#database
+      .prepare(
+        'SELECT * FROM approval_wait_contexts WHERE run_id = ? ORDER BY run_version DESC LIMIT 1',
+      )
+      .get(runId) as
+      | {
+          run_id: string;
+          task_id: string;
+          predecessor_state: WorkflowState;
+          resume_target_state: WorkflowState;
+          event_id: string;
+          deadline_ms: number;
+          status: 'waiting' | 'resumed';
+        }
+      | undefined;
+    return row === undefined
+      ? undefined
+      : {
+          runId: row.run_id,
+          taskId: row.task_id,
+          predecessor: row.predecessor_state,
+          resumeTarget: row.resume_target_state,
+          eventId: row.event_id,
+          deadlineMs: row.deadline_ms,
+          status: row.status,
+        };
+  }
+
+  seedApprovalWaitIntentForTest(eventInput: unknown, nowMs: number): void {
+    if (process.env.NODE_ENV !== 'test') throw new Error('test approval intent is unavailable');
+    const event = approvalNotificationSchema.parse(eventInput);
+    this.#database.transaction(() => {
+      this.#database
+        .prepare(
+          `INSERT INTO approval_wait_contexts
+           (run_id, task_id, predecessor_state, resume_target_state, event_id,
+            recipient_identity, phase, deadline_ms, status, created_at_ms, updated_at_ms, run_version)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?)`,
+        )
+        .run(
+          event.runId,
+          event.taskId,
+          event.predecessor,
+          event.resumeTarget,
+          event.eventId,
+          event.recipientIdentity,
+          event.phase,
+          event.expiresAtMs,
+          nowMs,
+          nowMs,
+          this.getRun(event.runId)!.version,
+        );
+      this.#database
+        .prepare(
+          `INSERT INTO secure_evidence
+           (digest, workspace_id, run_id, task_id, media_type, size_bytes, kind, producer,
+            producer_role, contract_version, policy_digest, head_sha, redaction_count,
+            retention_class, retention_until_ms, created_at_ms)
+           VALUES (?, ?, ?, ?, 'application/json', 1, 'artifact', 'fixture-orchestrator',
+            'workflow_orchestrator', ?, ?, ?, 0, 'summary', ?, ?)`,
+        )
+        .run(
+          event.actionScopeDigest,
+          event.workspaceId,
+          event.runId,
+          event.taskId,
+          event.contractVersion,
+          event.policyDigest,
+          event.headSha,
+          event.expiresAtMs,
+          nowMs,
+        );
+      this.#database
+        .prepare(
+          `INSERT INTO plan_approvals
+           (id, run_id, approver_id, contract_version, policy_digest, material_digest, status,
+            approved_at_ms, invalidated_at_ms, invalidation_reason, evidence_json)
+           VALUES (?, ?, ?, ?, ?, ?, 'active', ?, NULL, NULL, '[]')`,
+        )
+        .run(
+          `notification-approval:${event.eventId}`,
+          event.runId,
+          event.recipientIdentity,
+          event.contractVersion,
+          event.policyDigest,
+          event.materialDigest,
+          nowMs,
+        );
+    })();
+  }
+
+  casApprovalNotification(
+    input: {
+      eventId: string;
+      from: ApprovalNotificationState;
+      to: ApprovalNotificationState;
+      generation?: string;
+      messageId?: string;
+      providerAcceptedAtMs?: number;
+      authenticatedHumanResponse?: boolean;
+      responderIdentity?: string;
+      responseEvidenceDigest?: string;
+      humanAcceptedAtMs?: number;
+      failurePurpose?: 'approval' | 'resume';
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): ApprovalNotificationRecord {
+    if (capability !== workflowGovernedPersistenceCapability)
+      throw new Error('approval notification persistence requires coordinator capability');
+    return this.#database.transaction(() => {
+      const record = this.getApprovalNotification(input.eventId);
+      if (record === undefined) throw new Error('approval notification not found');
+      const event = record.event;
+      if (this.getApprovalWaitContext(event.runId)?.eventId !== event.eventId) {
+        throw new Error('approval notification generation is stale');
+      }
+      if (event.expiresAtMs <= input.nowMs)
+        throw new Error('approval notification deadline elapsed');
+      if (this.getRun(event.runId)?.state !== 'approval_waiting') {
+        throw new Error('approval notification run is not approval_waiting');
+      }
+      this.#assertResourceLease(
+        'workspace',
+        event.workspaceId,
+        event.ownerId,
+        event.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        event.runId,
+        event.ownerId,
+        event.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        event.taskId,
+        event.ownerId,
+        event.taskLeaseEpoch,
+        input.nowMs,
+      );
+      validateApprovalNotificationTransition({
+        from: input.from,
+        to: input.to,
+        providerAcceptedAtMs:
+          input.providerAcceptedAtMs ?? record.providerAcceptedAtMs ?? undefined,
+        authenticatedHumanResponse: input.authenticatedHumanResponse,
+      });
+      if (
+        input.to === 'approved' &&
+        (input.responderIdentity?.trim() === '' ||
+          input.responderIdentity === undefined ||
+          input.responderIdentity !== event.recipientIdentity ||
+          input.responseEvidenceDigest === undefined ||
+          !/^sha256:[a-f0-9]{64}$/u.test(input.responseEvidenceDigest) ||
+          input.humanAcceptedAtMs === undefined)
+      ) {
+        throw new Error('authenticated approval identity and evidence are required');
+      }
+      if (
+        (input.to === 'delivered' || input.to === 'resumed') &&
+        ((input.generation ?? record.generation) === null ||
+          (input.messageId ?? record.messageId) === null)
+      ) {
+        throw new Error('notification transition lacks provider generation or message id');
+      }
+      const changed = this.#database
+        .prepare(
+          `UPDATE approval_notifications SET state = ?, generation = COALESCE(?, generation), message_id = COALESCE(?, message_id), provider_accepted_at_ms = COALESCE(?, provider_accepted_at_ms), responder_identity = COALESCE(?, responder_identity), response_evidence_digest = COALESCE(?, response_evidence_digest), human_accepted_at_ms = COALESCE(?, human_accepted_at_ms), failure_purpose = CASE WHEN ? = 'delivery_failed' THEN ? WHEN ? IN ('delivered', 'resumed') THEN NULL ELSE failure_purpose END, attempt_count = attempt_count + CASE WHEN ? IN ('delivery_pending', 'resume_pending') THEN 1 ELSE 0 END, updated_at_ms = ? WHERE event_id = ? AND state = ? AND (? NOT IN ('delivery_pending', 'resume_pending') OR attempt_count < ?)`,
+        )
+        .run(
+          input.to,
+          input.generation ?? null,
+          input.messageId ?? null,
+          input.providerAcceptedAtMs ?? null,
+          input.responderIdentity ?? null,
+          input.responseEvidenceDigest ?? null,
+          input.humanAcceptedAtMs ?? null,
+          input.to,
+          input.failurePurpose ?? null,
+          input.to,
+          input.from === input.to ? '' : input.to,
+          input.nowMs,
+          input.eventId,
+          input.from,
+          input.from === input.to ? '' : input.to,
+          event.maxAttempts,
+        );
+      if (changed.changes !== 1) throw new Error('approval notification compare-and-swap failed');
+      if (input.to === 'resume_pending' && input.from !== 'resume_pending') {
+        this.#database
+          .prepare(
+            'UPDATE approval_notifications SET generation = NULL, message_id = NULL, provider_accepted_at_ms = NULL WHERE event_id = ?',
+          )
+          .run(input.eventId);
+      }
+      if (input.to === 'resumed')
+        throw new Error('approval resume requires committed parent transition');
+      return this.getApprovalNotification(input.eventId)!;
+    })();
+  }
+
+  recordDelegateCallbackAndTransition(
+    input: { callback: unknown; target: WorkflowState; ownerId: string; nowMs: number },
+    capability?: symbol,
+  ): {
+    disposition: 'committed' | 'duplicate';
+    state: WorkflowState;
+    version: number;
+    needsWake: boolean;
+  } {
+    if (capability !== workflowGovernedPersistenceCapability)
+      throw new Error('delegate callback persistence requires coordinator capability');
+    const callback = delegateCallbackSchema.parse(input.callback);
+    if (delegateCallbackTarget(callback) !== input.target) {
+      throw new Error('delegate callback target does not match validated transition');
+    }
+    return this.#database.transaction(
+      (): {
+        disposition: 'committed' | 'duplicate';
+        state: WorkflowState;
+        version: number;
+        needsWake: boolean;
+      } => {
+        const prior = this.#database
+          .prepare(
+            'SELECT callback_json, target_state, parent_version, wake_status FROM delegate_callbacks WHERE callback_id = ?',
+          )
+          .get(callback.callbackId) as
+          | {
+              callback_json: string;
+              target_state: WorkflowState;
+              parent_version: number;
+              wake_status: 'pending' | 'woken';
+            }
+          | undefined;
+        if (prior !== undefined) {
+          if (
+            prior.callback_json !== JSON.stringify(callback) ||
+            prior.target_state !== input.target
+          ) {
+            throw new Error('delegate callback identity collision');
+          }
+          return {
+            disposition: 'duplicate',
+            state: prior.target_state,
+            version: prior.parent_version,
+            needsWake: prior.wake_status === 'pending',
+          };
+        }
+        const contract = this.#contractForRun(callback.parentRunId);
+        if (
+          contract.workspaceId !== callback.workspaceId ||
+          contract.contractVersion !== callback.contractVersion ||
+          contract.policyDigest !== callback.policyDigest
+        )
+          throw new Error('delegate callback contract binding is stale');
+        const authorizedTask = contract.tasks.find((task) => task.id === callback.parentTaskId);
+        if (!authorizedTask?.allowedOperations.includes('workflow.delegate_callback')) {
+          throw new Error('delegate callback is outside task authority');
+        }
+        const execution = this.getSchedulerExecution(callback.delegationId);
+        if (
+          execution?.status !== 'completed' ||
+          execution.ownerId !== input.ownerId ||
+          execution.workspaceId !== callback.workspaceId ||
+          execution.runId !== callback.parentRunId ||
+          execution.taskId !== callback.parentTaskId ||
+          execution.role !== callback.delegateRole ||
+          execution.processIdentity !== callback.delegateAgentId ||
+          execution.credentialStatus !== 'revoked' ||
+          execution.workspaceLeaseEpoch !== callback.workspaceLeaseEpoch ||
+          execution.runLeaseEpoch !== callback.parentRunLeaseEpoch ||
+          execution.taskLeaseEpoch !== callback.taskLeaseEpoch ||
+          execution.attemptNumber !== callback.attemptNumber ||
+          `sha256:${createHash('sha256').update(JSON.stringify(execution.packet)).digest('hex')}` !==
+            callback.inputArtifactDigest ||
+          `sha256:${createHash('sha256').update(JSON.stringify(execution.result)).digest('hex')}` !==
+            callback.resultArtifactDigest
+        ) {
+          throw new Error('delegate callback lacks immutable scheduler authorization');
+        }
+        this.#assertDelegateTerminalResult(execution, callback);
+        const approval = this.#database
+          .prepare(
+            `SELECT 1 FROM plan_approvals WHERE run_id = ? AND status = 'active'
+             AND contract_version = ? AND policy_digest = ? AND material_digest = ? LIMIT 1`,
+          )
+          .get(
+            callback.parentRunId,
+            callback.contractVersion,
+            callback.policyDigest,
+            callback.materialDigest,
+          );
+        if (approval === undefined)
+          throw new Error('delegate callback has no active material approval');
+        const evidenceBindings = [
+          {
+            digest: callback.inputArtifactDigest,
+            producer: callback.inputProducerIdentity,
+            role: 'workflow_orchestrator',
+          },
+          {
+            digest: callback.resultArtifactDigest,
+            producer: callback.resultProducerIdentity,
+            role: callback.delegateRole,
+          },
+        ];
+        for (const evidence of evidenceBindings) {
+          const found = this.#database
+            .prepare(
+              `SELECT 1 FROM secure_evidence WHERE digest = ? AND workspace_id = ? AND run_id = ?
+               AND task_id = ? AND producer = ? AND producer_role = ? AND contract_version = ?
+               AND policy_digest = ? AND head_sha = ? AND deleted_at_ms IS NULL LIMIT 1`,
+            )
+            .get(
+              evidence.digest,
+              callback.workspaceId,
+              callback.parentRunId,
+              callback.parentTaskId,
+              evidence.producer,
+              evidence.role,
+              callback.contractVersion,
+              callback.policyDigest,
+              callback.headSha,
+            );
+          if (found === undefined) throw new Error('delegate callback evidence binding is stale');
+        }
+        this.#assertResourceLease(
+          'workspace',
+          callback.workspaceId,
+          input.ownerId,
+          callback.workspaceLeaseEpoch,
+          input.nowMs,
+        );
+        this.#assertResourceLease(
+          'run',
+          callback.parentRunId,
+          input.ownerId,
+          callback.parentRunLeaseEpoch,
+          input.nowMs,
+        );
+        this.#assertResourceLease(
+          'task',
+          callback.parentTaskId,
+          input.ownerId,
+          callback.taskLeaseEpoch,
+          input.nowMs,
+        );
+        const updated = this.#database
+          .prepare(
+            'UPDATE runs SET state = ?, version = version + 1, updated_at_ms = ? WHERE id = ? AND state = ? AND version = ?',
+          )
+          .run(
+            input.target,
+            input.nowMs,
+            callback.parentRunId,
+            callback.parentState,
+            callback.parentRunVersion,
+          );
+        if (updated.changes !== 1)
+          throw new Error('delegate callback parent compare-and-swap failed');
+        if (input.target === 'approval_waiting') {
+          const intent = callback.approvalIntent!;
+          this.#database
+            .prepare(
+              `INSERT INTO approval_wait_contexts
+               (run_id, task_id, predecessor_state, resume_target_state, event_id,
+                recipient_identity, phase, deadline_ms, status, created_at_ms, updated_at_ms, run_version)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', ?, ?, ?)`,
+            )
+            .run(
+              callback.parentRunId,
+              callback.parentTaskId,
+              callback.parentState,
+              intent.resumeTarget,
+              intent.eventId,
+              intent.recipientIdentity,
+              intent.phase,
+              intent.deadlineMs,
+              input.nowMs,
+              input.nowMs,
+              callback.parentRunVersion + 1,
+            );
+        }
+        const version = callback.parentRunVersion + 1;
+        this.#database
+          .prepare(
+            `INSERT INTO delegate_callbacks (callback_id, run_id, task_id, callback_json, target_state, parent_version, status, created_at_ms) VALUES (?, ?, ?, ?, ?, ?, 'committed', ?)`,
+          )
+          .run(
+            callback.callbackId,
+            callback.parentRunId,
+            callback.parentTaskId,
+            JSON.stringify(callback),
+            input.target,
+            version,
+            input.nowMs,
+          );
+        enqueueContinuation(
+          this.#database,
+          callback.delegationId,
+          callback.parentRunId,
+          input.nowMs,
+          callback,
+        );
+        return { disposition: 'committed', state: input.target, version, needsWake: true };
+      },
+    )();
+  }
+
+  /** Explicit callback authorization fixture; unavailable to production orchestration. */
+  seedDelegateCallbackAuthorizationForTest(input: {
+    workspaceId: string;
+    runId: string;
+    taskId: string;
+    delegationId: string;
+    delegateAgentId: string;
+    delegateRole: string;
+    ownerId: string;
+    workspaceLeaseEpoch: number;
+    runLeaseEpoch: number;
+    taskLeaseEpoch: number;
+    materialDigest: string;
+    headSha: string;
+    inputProducerIdentity: string;
+    input: unknown;
+    result: unknown;
+    nowMs: number;
+  }): { inputArtifactDigest: string; resultArtifactDigest: string } {
+    if (process.env.NODE_ENV !== 'test') throw new Error('test callback fixture is unavailable');
+    const contract = this.#contractForRun(input.runId);
+    const inputArtifactDigest = `sha256:${createHash('sha256')
+      .update(JSON.stringify(input.input))
+      .digest('hex')}`;
+    const resultArtifactDigest = `sha256:${createHash('sha256')
+      .update(JSON.stringify(input.result))
+      .digest('hex')}`;
+    this.#database.transaction(() => {
+      this.#database
+        .prepare(
+          `INSERT INTO plan_approvals
+           (id, run_id, approver_id, contract_version, policy_digest, material_digest, status,
+            approved_at_ms, invalidated_at_ms, invalidation_reason, evidence_json)
+           VALUES (?, ?, 'fixture-owner', ?, ?, ?, 'active', ?, NULL, NULL, '[]')`,
+        )
+        .run(
+          `fixture:${input.delegationId}`,
+          input.runId,
+          contract.contractVersion,
+          contract.policyDigest,
+          input.materialDigest,
+          input.nowMs,
+        );
+      this.#database
+        .prepare(
+          `INSERT INTO scheduler_executions
+           (id, workspace_id, run_id, task_id, attempt_number, role, mode, status, deadline_ms, owner_id,
+            workspace_lease_epoch, run_lease_epoch, task_lease_epoch, process_identity,
+            credential_lease_id, credential_status, packet_json, result_json, created_at_ms,
+            updated_at_ms)
+           VALUES (?, ?, ?, ?, 1, ?, 'read_only', 'completed', ?, ?, ?, ?, ?, ?, ?, 'revoked', ?, ?, ?, ?)`,
+        )
+        .run(
+          input.delegationId,
+          input.workspaceId,
+          input.runId,
+          input.taskId,
+          input.delegateRole,
+          input.nowMs + 10_000,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.runLeaseEpoch,
+          input.taskLeaseEpoch,
+          input.delegateAgentId,
+          `fixture-credential:${input.delegationId}`,
+          JSON.stringify(input.input),
+          JSON.stringify(input.result),
+          input.nowMs,
+          input.nowMs,
+        );
+      const evidence = [
+        [inputArtifactDigest, input.inputProducerIdentity, 'workflow_orchestrator'],
+        [resultArtifactDigest, input.delegateAgentId, input.delegateRole],
+      ] as const;
+      for (const [digest, producer, role] of evidence) {
+        this.#database
+          .prepare(
+            `INSERT INTO secure_evidence
+             (digest, workspace_id, run_id, task_id, media_type, size_bytes, kind, producer,
+              producer_role, contract_version, policy_digest, head_sha, redaction_count,
+              retention_class, retention_until_ms, created_at_ms)
+             VALUES (?, ?, ?, ?, 'application/json', 1, 'artifact', ?, ?, ?, ?, ?, 0,
+              'summary', ?, ?)`,
+          )
+          .run(
+            digest,
+            input.workspaceId,
+            input.runId,
+            input.taskId,
+            producer,
+            role,
+            contract.contractVersion,
+            contract.policyDigest,
+            input.headSha,
+            input.nowMs + 10_000,
+            input.nowMs,
+          );
+      }
+    })();
+    return { inputArtifactDigest, resultArtifactDigest };
+  }
+
+  listPendingDelegateWakeups(
+    capability?: symbol,
+  ): Array<{ callbackId: string; parentRunId: string }> {
+    if (capability !== workflowGovernedPersistenceCapability)
+      throw new Error('delegate wakeup persistence requires coordinator capability');
+    return (
+      this.#database
+        .prepare(
+          "SELECT callback_id, run_id FROM delegate_callbacks WHERE wake_status = 'pending' ORDER BY created_at_ms, callback_id",
+        )
+        .all() as Array<{ callback_id: string; run_id: string }>
+    ).map((row) => ({ callbackId: row.callback_id, parentRunId: row.run_id }));
+  }
+
+  markDelegateParentWoken(
+    input: {
+      callbackId: string;
+      wakeupId: string;
+      generation: string;
+      messageId: string;
+      providerAcceptedAtMs: number;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): void {
+    if (capability !== workflowGovernedPersistenceCapability)
+      throw new Error('delegate wakeup persistence requires coordinator capability');
+    this.#database
+      .prepare(
+        "UPDATE delegate_callbacks SET wakeup_id = ?, wake_generation = ?, wake_message_id = ?, wake_provider_accepted_at_ms = ? WHERE callback_id = ? AND wake_status = 'pending'",
+      )
+      .run(
+        input.wakeupId,
+        input.generation,
+        input.messageId,
+        input.providerAcceptedAtMs,
+        input.callbackId,
+      );
+  }
+
+  importWorkflowLineage(
+    input: {
+      request: unknown;
+      ownerId: string;
+      operationId: string;
+      nowMs: number;
+      testFault?: (boundary: 'after_journal' | 'after_ledger') => void;
+    },
+    capability?: symbol,
+  ): RunRecord {
+    if (capability !== workflowGovernedPersistenceCapability)
+      throw new Error('lineage import requires coordinator capability');
+    const request = lineageImportSchema.parse(input.request);
+    return this.#database.transaction(() => {
+      const existing = this.#database
+        .prepare('SELECT request_json FROM workflow_lineage_imports WHERE target_run_id = ?')
+        .get(request.targetRunId) as { request_json: string } | undefined;
+      if (existing !== undefined) {
+        if (existing.request_json !== JSON.stringify(request))
+          throw new Error('lineage import identity collision');
+        return this.getRun(request.targetRunId)!;
+      }
+      const source = this.getRun(request.sourceRunId);
+      const target = this.getRun(request.targetRunId);
+      if (source?.state !== 'cancelled' || target?.state !== 'approved' || target.version !== 0)
+        throw new Error('lineage import run state mismatch');
+      const targetContract = this.#contractForRun(request.targetRunId);
+      const sourceContract = this.#contractForRun(request.sourceRunId);
+      const targetContractDigest = `sha256:${createHash('sha256')
+        .update(JSON.stringify(targetContract))
+        .digest('hex')}`;
+      if (
+        targetContract.workspaceId !== this.#workspaceForRun(request.sourceRunId) ||
+        sourceContract.featureId !== targetContract.featureId ||
+        sourceContract.contractVersion !== targetContract.contractVersion ||
+        sourceContract.policyDigest !== targetContract.policyDigest ||
+        targetContract.policyDigest !== request.policyDigest ||
+        targetContractDigest !== request.contractDigest ||
+        !targetContract.tasks.some(
+          (task) =>
+            task.id === request.targetTaskId &&
+            task.allowedOperations.includes('workflow.lineage_import'),
+        ) ||
+        !sourceContract.tasks.some((task) => task.id === request.sourceTaskId) ||
+        request.sourceTaskId !== request.targetTaskId ||
+        request.ref !== `refs/heads/task/${request.targetTaskId}`
+      ) {
+        throw new Error('lineage import contract or task binding mismatch');
+      }
+      const activeApproval = this.#database
+        .prepare(
+          `SELECT 1 FROM plan_approvals WHERE run_id = ? AND status = 'active'
+           AND contract_version = ? AND policy_digest = ? AND material_digest = ? LIMIT 1`,
+        )
+        .get(
+          request.targetRunId,
+          targetContract.contractVersion,
+          request.policyDigest,
+          request.materialDigest,
+        );
+      if (activeApproval === undefined)
+        throw new Error('lineage target lacks active material approval');
+      const latestCritic = this.#database
+        .prepare(
+          `SELECT id, verdict FROM critic_reviews WHERE run_id = ?
+           ORDER BY created_at_ms DESC, id DESC LIMIT 1`,
+        )
+        .get(request.targetRunId) as { id: string; verdict: string } | undefined;
+      if (latestCritic?.verdict !== 'approved')
+        throw new Error('lineage target lacks latest approved critic review');
+      const findings = this.#database
+        .prepare('SELECT COUNT(*) AS count FROM critic_findings WHERE review_id = ?')
+        .get(latestCritic.id) as { count: number };
+      if (findings.count !== 0) throw new Error('lineage target critic review has findings');
+      const activeSourceLease = this.#database
+        .prepare(
+          `SELECT 1 FROM leases WHERE resource_type = 'run' AND resource_id = ?
+           AND expires_at_ms > ? LIMIT 1`,
+        )
+        .get(request.sourceRunId, input.nowMs);
+      if (activeSourceLease !== undefined) throw new Error('lineage source run is not fenced');
+      const prepared = this.#database
+        .prepare(
+          "SELECT 1 FROM delivery_operations WHERE run_id = ? AND status = 'prepared' LIMIT 1",
+        )
+        .get(request.sourceRunId);
+      if (prepared !== undefined) throw new Error('lineage source has prepared operations');
+      this.#assertResourceLease(
+        'workspace',
+        this.#workspaceForRun(request.targetRunId),
+        input.ownerId,
+        request.workspaceLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'run',
+        request.targetRunId,
+        input.ownerId,
+        request.runLeaseEpoch,
+        input.nowMs,
+      );
+      this.#assertResourceLease(
+        'task',
+        request.targetTaskId,
+        input.ownerId,
+        request.taskLeaseEpoch,
+        input.nowMs,
+      );
+      this.#database
+        .prepare(
+          `INSERT INTO workflow_lineage_imports (target_run_id, source_run_id, operation_id, request_json, created_at_ms) VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(
+          request.targetRunId,
+          request.sourceRunId,
+          input.operationId,
+          JSON.stringify(request),
+          input.nowMs,
+        );
+      input.testFault?.('after_journal');
+      this.#database
+        .prepare(
+          `INSERT INTO lineage_approved_heads (workspace_id, run_id, task_id, ref, head_sha, tree_sha, artifact_digest, operation_id, created_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          this.#workspaceForRun(request.targetRunId),
+          request.targetRunId,
+          request.targetTaskId,
+          request.ref,
+          request.headSha,
+          request.treeSha,
+          request.implementationArtifactDigest,
+          input.operationId,
+          input.nowMs,
+        );
+      input.testFault?.('after_ledger');
+      const changed = this.#database
+        .prepare(
+          "UPDATE runs SET state = 'pipeline', version = 1, updated_at_ms = ? WHERE id = ? AND state = 'approved' AND version = 0",
+        )
+        .run(input.nowMs, request.targetRunId);
+      if (changed.changes !== 1) throw new Error('lineage import run compare-and-swap failed');
+      return this.getRun(request.targetRunId)!;
+    })();
+  }
+
+  /** Explicit approved-lineage fixture; unavailable to production orchestration. */
+  seedLineageApprovalForTest(input: {
+    runId: string;
+    materialDigest: string;
+    nowMs: number;
+  }): void {
+    if (process.env.NODE_ENV !== 'test') throw new Error('test lineage fixture is unavailable');
+    const contract = this.#contractForRun(input.runId);
+    this.#database.transaction(() => {
+      this.#database
+        .prepare(
+          `INSERT INTO critic_reviews
+           (id, run_id, planner_id, critic_id, contract_version, policy_digest, material_digest,
+            verdict, summary, evidence_json, human_decision_json, created_at_ms)
+           VALUES (?, ?, 'planner', 'critic', ?, ?, ?, 'approved', 'zero findings', '[]', 'null', ?)`,
+        )
+        .run(
+          `lineage-review:${input.runId}`,
+          input.runId,
+          contract.contractVersion,
+          contract.policyDigest,
+          input.materialDigest,
+          input.nowMs,
+        );
+      this.#database
+        .prepare(
+          `INSERT INTO plan_approvals
+           (id, run_id, approver_id, contract_version, policy_digest, material_digest, status,
+            approved_at_ms, invalidated_at_ms, invalidation_reason, evidence_json)
+           VALUES (?, ?, 'owner', ?, ?, ?, 'active', ?, NULL, NULL, '[]')`,
+        )
+        .run(
+          `lineage-approval:${input.runId}`,
+          input.runId,
+          contract.contractVersion,
+          contract.policyDigest,
+          input.materialDigest,
+          input.nowMs,
+        );
+    })();
+  }
+
   assertRunUsesContract(runId: string, contract: ExecutionContract): void {
     const stored = this.#contractForRun(runId);
     if (JSON.stringify(stored) !== JSON.stringify(contract)) {
       throw new Error('workflow run does not use the approved execution contract');
     }
+  }
+
+  getExecutionContract(runId: string): ExecutionContract {
+    return this.#contractForRun(runId);
   }
 
   recordFeatureDeliveryRequiredIntent(
@@ -1864,21 +2825,13 @@ export class WorkflowStore {
         );
       }
       const activeRecovery = this.#activeRecovery(input.runId);
-      if (input.from === 'recovering' && activeRecovery === undefined) {
-        throw new Error('recovering run has no durable recovery target');
-      }
-      if (
-        input.from === 'recovering' &&
-        input.transitionContext.recoveryTarget !== activeRecovery?.recovery_target
-      ) {
-        throw new Error('requested recovery target differs from the durable recovery target');
-      }
-      const recoveryTarget =
-        input.from === 'recovering'
-          ? activeRecovery!.recovery_target
-          : input.transitionContext.recoveryTarget;
+      const recoveryTarget = this.#transitionRecoveryTarget(input, activeRecovery);
       validateTransition(input.from, input.to, {
         ...input.transitionContext,
+        approval:
+          input.from === 'approval_waiting'
+            ? this.#durableApprovalContext(input.runId, input.expectedRunVersion, input.nowMs)
+            : undefined,
         recoveryTarget,
         mergeVerified: run.mergeVerified,
         currentContractVersion: approved.contract_version,
@@ -1888,126 +2841,13 @@ export class WorkflowStore {
         actorWorkspaceLeaseEpoch: input.transitionContext.workspaceLeaseEpoch,
         actorTaskLeaseEpoch: input.transitionContext.taskLeaseEpoch,
       });
-      if (input.from === 'finalizing' && input.to === 'closed' && !run.mergeVerified) {
-        throw new Error('finalization requires persisted merge verification');
-      }
-      if (input.from === 'finalizing' && input.to === 'closed') {
-        throw new Error('feature closure requires the durable finalization coordinator');
-      }
-      if (
-        input.from === 'finalizing' &&
-        input.to === 'finalizing' &&
-        (!['beads.task_close', 'beads.dolt_push'].includes(input.operation) ||
-          input.transitionContext.closeoutLeaseEpoch === undefined)
-      ) {
-        throw new Error('finalizing self-transition requires a fenced closeout operation');
-      }
-      let recoveryInterruptedTransitionId: string | undefined;
-      if (input.to === 'recovering') {
-        const preparedMerge = this.#database
-          .prepare(
-            `SELECT 1 FROM delivery_operations
-             WHERE run_id = ? AND status = 'prepared'
-               AND (kind = 'github.merge' OR kind LIKE 'feature.github.%') LIMIT 1`,
-          )
-          .get(input.runId);
-        if (preparedMerge !== undefined) {
-          throw new Error('prepared merge must be reconciled before recovery');
-        }
-        const arguments_ = input.externalArguments as Record<string, unknown> | null;
-        const interruptedTransitionId = arguments_?.interruptedTransitionId;
-        const evidenceDigests = arguments_?.evidenceDigests;
-        if (
-          typeof interruptedTransitionId !== 'string' ||
-          interruptedTransitionId.length === 0 ||
-          !Array.isArray(evidenceDigests) ||
-          evidenceDigests.length === 0 ||
-          !evidenceDigests.every(
-            (digest) => typeof digest === 'string' && /^sha256:[a-f0-9]{64}$/u.test(digest),
-          )
-        ) {
-          throw new Error('recovery entry requires interrupted-transition evidence');
-        }
-        const interrupted = this.getTransition(interruptedTransitionId);
-        const latestTransition = this.getLatestCommittedTransitionInto(input.runId, input.from);
-        const mergePredecessor =
-          input.from === 'finalizing' && run.mergeVerified
-            ? (this.getCommittedFeatureDeliveryAttestation(input.runId) ??
-              this.getCommittedMergeAttestation(input.runId))
-            : undefined;
-        const transitionIsCurrent =
-          interrupted !== undefined &&
-          interrupted.runId === input.runId &&
-          interrupted.status === 'committed' &&
-          interrupted.to === input.from &&
-          interrupted.expectedRunVersion + 2 === input.expectedRunVersion &&
-          latestTransition?.id === interruptedTransitionId;
-        const mergeIsCurrent =
-          latestTransition === undefined &&
-          mergePredecessor?.id === interruptedTransitionId &&
-          mergePredecessor.status === 'committed';
-        if (!transitionIsCurrent && !mergeIsCurrent) {
-          throw new Error('recovery interrupted transition is not the committed run predecessor');
-        }
-        if (mergeIsCurrent && mergePredecessor?.kind === 'feature.github.merge') {
-          const featureRequest = mergePredecessor.request as Record<string, unknown>;
-          const featureResult = mergePredecessor.result as Record<string, unknown> | null;
-          const approvedFeature = featureDeliveryContractSchema.parse(
-            this.getApprovedFeatureDeliveryContract(input.runId),
-          );
-          const featureContractDigest = deriveFeatureDeliveryContractDigest(approvedFeature);
-          const featureAttestationDigest = `sha256:${createHash('sha256')
-            .update(serializeDurableJson(featureResult))
-            .digest('hex')}`;
-          if (
-            arguments_?.featureContractDigest !== featureContractDigest ||
-            arguments_?.featureDeliveryAttestationDigest !== featureAttestationDigest ||
-            featureRequest.featureContractDigest !== featureContractDigest ||
-            featureRequest.headSha !== approvedFeature.authority.headSha ||
-            featureRequest.base !== approvedFeature.authority.base ||
-            featureRequest.mergeMethod !== 'squash' ||
-            featureRequest.adminBypass !== false ||
-            featureResult?.headSha !== featureRequest.headSha ||
-            featureResult.base !== featureRequest.base ||
-            featureResult.mergeMethod !== featureRequest.mergeMethod
-          ) {
-            throw new Error('finalizing recovery feature-delivery predecessor binding is stale');
-          }
-        }
-        recoveryInterruptedTransitionId = interruptedTransitionId;
-        const authoritativeRoles = [
-          'workflow_orchestrator',
-          'planner',
-          'plan_critic',
-          'human_approver',
-          'implementation_worker',
-          'code_reviewer',
-          'test_runner',
-          'qa_evaluator',
-          'feature_evaluator',
-        ];
-        if (
-          evidenceDigests.some(
-            (digest) =>
-              !this.hasRecoveryEvidenceBinding({
-                digest,
-                workspaceId: approved.workspace_id,
-                runId: input.runId,
-                contractVersion: input.contractVersion,
-                policyDigest: input.policyDigest,
-                allowedProducerRoles: authoritativeRoles,
-                taskId: typeof arguments_?.taskId === 'string' ? arguments_.taskId : undefined,
-                minCreatedAtMs: interrupted?.nowMs ?? mergePredecessor!.updatedAtMs,
-                interruptedTransitionId,
-              }),
-          )
-        ) {
-          throw new Error('recovery evidence is not bound to the interrupted run');
-        }
-        if (activeRecovery !== undefined) {
-          throw new Error('run already has an active recovery target');
-        }
-      }
+      this.#assertFinalizingTransition(input, run);
+      const recoveryInterruptedTransitionId = this.#validateRecoveryEntry(
+        input,
+        run,
+        approved.workspace_id,
+        activeRecovery !== undefined,
+      );
       if (run.version !== input.expectedRunVersion || run.state !== input.from) {
         throw new Error('run compare-and-swap failed');
       }
@@ -2111,6 +2951,38 @@ export class WorkflowStore {
       if (ownerId !== transition.leaseOwnerId || leaseEpoch !== transition.leaseEpoch) {
         throw new Error('transition fencing token changed');
       }
+      if (transition.from === 'approval_waiting') {
+        const contract = this.#contractForRun(transition.runId);
+        validateTransition(transition.from, transition.to, {
+          ...transition.transitionContext,
+          currentContractVersion: contract.contractVersion,
+          requestedContractVersion: transition.contractVersion,
+          currentPolicyDigest: contract.policyDigest,
+          requestedPolicyDigest: transition.policyDigest,
+          actorWorkspaceLeaseEpoch: transition.transitionContext.workspaceLeaseEpoch,
+          actorTaskLeaseEpoch: transition.transitionContext.taskLeaseEpoch,
+          approval: this.#durableApprovalContext(
+            transition.runId,
+            transition.expectedRunVersion,
+            nowMs,
+          ),
+        });
+        const wait = this.getApprovalWaitContext(transition.runId)!;
+        if (transition.to !== 'recovering') {
+          this.#database
+            .prepare(
+              "UPDATE approval_wait_contexts SET status = 'resumed', updated_at_ms = ? WHERE event_id = ?",
+            )
+            .run(nowMs, wait.eventId);
+        }
+        if (transition.to === wait.resumeTarget) {
+          this.#database
+            .prepare(
+              "UPDATE approval_notifications SET state = 'resumed', updated_at_ms = ? WHERE event_id = ? AND state = 'resume_pending'",
+            )
+            .run(nowMs, wait.eventId);
+        }
+      }
       this.#database
         .prepare(
           `UPDATE transitions SET status = 'committed', result_json = ?, updated_at_ms = ?
@@ -2137,6 +3009,13 @@ export class WorkflowStore {
         );
       if (runUpdate.changes !== 1) throw new Error('transition run commit failed');
       if (transition.from === 'recovering') {
+        if (transition.to === 'approval_waiting') {
+          this.#database
+            .prepare(
+              "UPDATE approval_wait_contexts SET run_version = ?, updated_at_ms = ? WHERE run_id = ? AND status = 'waiting'",
+            )
+            .run(transition.expectedRunVersion + 2, nowMs, transition.runId);
+        }
         this.#database
           .prepare(
             `UPDATE recovery_records SET resumed_at_ms = ?, terminal_outcome = 'resumed'
@@ -2150,6 +3029,68 @@ export class WorkflowStore {
       }
       return this.getTransition(transitionId)!;
     })();
+  }
+
+  #durableApprovalContext(
+    runId: string,
+    version: number,
+    nowMs: number,
+  ): NonNullable<TransitionContext['approval']> {
+    const wait = this.#database
+      .prepare(
+        "SELECT * FROM approval_wait_contexts WHERE run_id = ? AND run_version = ? AND status = 'waiting'",
+      )
+      .get(runId, version) as
+      | {
+          predecessor_state: WorkflowState;
+          resume_target_state: WorkflowState;
+          event_id: string;
+          deadline_ms: number;
+          recipient_identity: string;
+        }
+      | undefined;
+    if (wait === undefined)
+      throw new Error('approval waiting transition requires durable approval context');
+    const notification = this.#database
+      .prepare('SELECT * FROM approval_notifications WHERE event_id = ?')
+      .get(wait.event_id) as
+      | {
+          state: string;
+          responder_identity: string | null;
+          response_evidence_digest: string | null;
+          human_accepted_at_ms: number | null;
+          generation: string | null;
+          message_id: string | null;
+          provider_accepted_at_ms: number | null;
+        }
+      | undefined;
+    const event = this.getApprovalNotification(wait.event_id)?.event;
+    const materialApproved =
+      event !== undefined &&
+      this.#database
+        .prepare(
+          "SELECT 1 FROM plan_approvals WHERE run_id = ? AND status = 'active' AND contract_version = ? AND policy_digest = ? AND material_digest = ?",
+        )
+        .get(runId, event.contractVersion, event.policyDigest, event.materialDigest) !== undefined;
+    return {
+      predecessor: wait.predecessor_state,
+      resumeTarget: wait.resume_target_state,
+      deadlineElapsed: nowMs >= wait.deadline_ms,
+      authenticatedApproval:
+        materialApproved &&
+        notification?.responder_identity === wait.recipient_identity &&
+        notification.response_evidence_digest !== null &&
+        notification.human_accepted_at_ms !== null &&
+        notification.human_accepted_at_ms <= nowMs &&
+        notification.human_accepted_at_ms < wait.deadline_ms,
+      resumeDeliveryAcknowledged:
+        notification?.state === 'resume_pending' &&
+        Boolean(notification.generation) &&
+        Boolean(notification.message_id) &&
+        notification.provider_accepted_at_ms !== null &&
+        notification.provider_accepted_at_ms <= nowMs &&
+        notification.provider_accepted_at_ms < wait.deadline_ms,
+    };
   }
 
   escalateTransition(
@@ -2290,6 +3231,7 @@ export class WorkflowStore {
     workspaceId: string;
     runId: string;
     taskId: string;
+    attemptNumber?: number;
     role: string;
     mode: SchedulerExecutionRecord['mode'];
     deadlineMs: number;
@@ -2305,6 +3247,8 @@ export class WorkflowStore {
     const nowMs = input.nowMs ?? Date.now();
     if (input.deadlineMs <= nowMs) throw new Error('specialist deadline has elapsed');
     return this.#database.transaction(() => {
+      if (!runAcceptsWork(this.#database, input.runId))
+        throw new Error('scheduler run is cancelled');
       this.#assertResourceLease(
         'workspace',
         input.workspaceId,
@@ -2340,18 +3284,19 @@ export class WorkflowStore {
       this.#database
         .prepare(
           `INSERT INTO scheduler_executions
-           (id, workspace_id, run_id, task_id, role, mode, status, deadline_ms, owner_id,
+           (id, workspace_id, run_id, task_id, attempt_number, role, mode, status, deadline_ms, owner_id,
             workspace_lease_epoch, run_lease_epoch, task_lease_epoch, process_identity,
             credential_lease_id, credential_status, credential_broker_generation, packet_json,
             result_json, created_at_ms,
             updated_at_ms)
-           VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, NULL, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, NULL, ?, ?)`,
         )
         .run(
           input.id,
           input.workspaceId,
           input.runId,
           input.taskId,
+          input.attemptNumber ?? 1,
           input.role,
           input.mode,
           input.deadlineMs,
@@ -2494,13 +3439,19 @@ export class WorkflowStore {
     runLeaseEpoch: number;
     taskLeaseEpoch: number;
     result: unknown;
+    callback?: unknown;
     nowMs?: number;
   }): SchedulerExecutionRecord {
     const nowMs = input.nowMs ?? Date.now();
     return this.#database.transaction(() => {
       const execution = this.getSchedulerExecution(input.id);
       if (execution === undefined) throw new Error('scheduler execution not found');
-      if (execution.status !== 'active') return execution;
+      if (execution.status !== 'active') {
+        if (execution.status === 'completed' && input.callback !== undefined) {
+          this.#recordSchedulerTerminalCallback(input, nowMs);
+        }
+        return execution;
+      }
       this.#assertResourceLease(
         'workspace',
         execution.workspaceId,
@@ -2536,6 +3487,12 @@ export class WorkflowStore {
            WHERE id = ? AND status = 'active'`,
         )
         .run(input.status, JSON.stringify(input.result), nowMs, input.id);
+      if (input.status === 'completed') {
+        enqueueContinuation(this.#database, input.id, execution.runId, nowMs);
+        if (input.callback !== undefined) {
+          this.#recordSchedulerTerminalCallback(input, nowMs);
+        }
+      }
       return this.getSchedulerExecution(input.id)!;
     })();
   }
@@ -3019,6 +3976,7 @@ export class WorkflowStore {
       throw new Error('delivery operations require the internal delivery broker capability');
     }
     return this.#database.transaction(() => {
+      assertBootstrapDeliveryPolicy(this.#database, input.runId, input.request);
       const contract = this.#contractForRun(input.runId);
       if (
         contract.workspaceId !== input.workspaceId ||
@@ -3027,44 +3985,33 @@ export class WorkflowStore {
       ) {
         throw new Error('delivery operation contract, policy, or workspace is stale');
       }
-      if (input.kind.startsWith('feature.github.')) {
-        const request = input.request as Record<string, unknown>;
-        const featureContractVersion = request.featureContractVersion;
-        const featureContractDigest = request.featureContractDigest;
-        if (
-          typeof featureContractVersion !== 'number' ||
-          typeof featureContractDigest !== 'string'
-        ) {
-          throw new Error('feature delivery operation lacks approved contract identity');
-        }
-        const activeApproval = this.#database
-          .prepare(
-            `SELECT 1 FROM feature_delivery_contracts AS contracts
-             JOIN feature_delivery_approvals AS approvals
-               ON approvals.run_id = contracts.run_id
-              AND approvals.feature_contract_version = contracts.feature_contract_version
-              AND approvals.feature_contract_digest = contracts.contract_digest
-             WHERE contracts.run_id = ? AND contracts.feature_contract_version = ?
-               AND contracts.contract_digest = ? AND approvals.policy_digest = ?
-               AND approvals.status = 'active' AND approvals.approver_role = 'human_approver'
-             LIMIT 1`,
-          )
-          .get(input.runId, featureContractVersion, featureContractDigest, input.policyDigest);
-        if (activeApproval === undefined) {
-          throw new Error('feature delivery operation lacks active approved authority');
-        }
-      }
+      this.#assertPreparedFeatureDeliveryAuthority(input);
       const preparedTransition = this.#database
         .prepare(`SELECT 1 FROM transitions WHERE run_id = ? AND status = 'prepared' LIMIT 1`)
         .get(input.runId);
       if (preparedTransition !== undefined) {
         throw new Error('delivery operation cannot race a prepared workflow transition');
       }
-      if (
-        this.getAuthorizedRunTask(input.runId, input.taskId, workflowDeliveryMutationCapability) ===
-        undefined
-      ) {
+      const authorizedTask = this.getAuthorizedRunTask(
+        input.runId,
+        input.taskId,
+        workflowDeliveryMutationCapability,
+      );
+      if (authorizedTask === undefined) {
         throw new Error('delivery operation task is outside the contract');
+      }
+      const governedAuthority: Readonly<Record<string, string>> = {
+        'beads.task_note_update': 'beads.mutate',
+        'github.review_threads_observe': 'github.read',
+        'github.review_thread_reply': 'github.deliver',
+        'github.review_thread_resolve': 'github.deliver',
+      };
+      const requiredAuthority = governedAuthority[input.kind];
+      if (
+        requiredAuthority !== undefined &&
+        !authorizedTask.allowedOperations.includes(requiredAuthority)
+      ) {
+        throw new Error('governed operation exceeds task authority');
       }
       const replay = this.#database
         .prepare('SELECT * FROM delivery_operations WHERE request_digest = ?')
@@ -3114,8 +4061,8 @@ export class WorkflowStore {
           `INSERT INTO delivery_operations
            (id, workspace_id, run_id, task_id, kind, actor_role, request_digest, request_json, status,
             owner_id, workspace_lease_epoch, run_lease_epoch, task_lease_epoch, result_json,
-            created_at_ms, updated_at_ms)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?, NULL, ?, ?)`,
+            merge_observation_status, created_at_ms, updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?, ?, NULL, ?, ?, ?)`,
         )
         .run(
           input.id,
@@ -3130,6 +4077,7 @@ export class WorkflowStore {
           input.workspaceLeaseEpoch,
           input.runLeaseEpoch,
           input.taskLeaseEpoch,
+          input.kind === 'github.merge' ? 'prepared_unobserved' : null,
           input.nowMs,
           input.nowMs,
         );
@@ -3232,6 +4180,7 @@ export class WorkflowStore {
       if (operation.status === 'committed') return operation;
       if (operation.status !== 'prepared')
         throw new Error('delivery operation cannot be committed');
+      assertBootstrapDeliveryPolicy(this.#database, operation.runId, operation.request);
       this.#assertDeliveryOperationLeases(operation, input, input.clock());
       this.#assertDeliveryRunState(operation.runId, operation.kind);
       input.assertExternalState();
@@ -3244,12 +4193,215 @@ export class WorkflowStore {
            WHERE id = ? AND status = 'prepared'`,
         )
         .run(serializeDurableJson(input.result), verifiedAtMs, input.id);
+      this.#commitReviewDisposition(operation, input.result, verifiedAtMs);
       this.#commitDeliveryLineage(operation, input.result, verifiedAtMs);
       if (operation.kind === 'github.merge') {
         this.#commitVerifiedMerge(operation, input.result, verifiedAtMs);
       }
       return this.getDeliveryOperation(input.id)!;
     })();
+  }
+
+  verifyAndPersistMergeObservation(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      observation: unknown;
+      observationDigest: string;
+      nowMs: number;
+    },
+    capability?: symbol,
+  ): DeliveryOperationRecord {
+    if (capability !== workflowDeliveryMutationCapability) {
+      throw new Error('merge observation requires the internal delivery broker capability');
+    }
+    return this.#database.transaction(() => {
+      const operation = this.getDeliveryOperation(input.id);
+      if (operation?.kind !== 'github.merge') {
+        throw new Error('merge operation not found');
+      }
+      if (operation.mergeObservationStatus === 'prepared_verified') {
+        if (
+          operation.verifiedObservationDigest !== input.observationDigest ||
+          operation.verifiedObservationJson !== serializeDurableJson(input.observation)
+        ) {
+          throw new Error('verified merge observation is immutable');
+        }
+        return operation;
+      }
+      if (
+        operation.status !== 'prepared' ||
+        operation.mergeObservationStatus !== 'prepared_unobserved'
+      ) {
+        throw new Error('merge observation cannot be persisted in the current state');
+      }
+      this.#assertDeliveryOperationLeases(operation, input, input.nowMs);
+      this.#assertDeliveryRunState(operation.runId, operation.kind);
+      const request = operation.request as Record<string, unknown>;
+      const observation = input.observation as Record<string, unknown> | null;
+      if (
+        observation === null ||
+        observation.repository !== request.repository ||
+        observation.pullRequestNumber !== request.pullRequestNumber ||
+        observation.headSha !== request.headSha ||
+        observation.base !== request.base ||
+        observation.protectionDigest !== request.protectionDigest ||
+        observation.reviewDecision !== request.reviewDecision ||
+        !Array.isArray(observation.requiredChecks) ||
+        JSON.stringify([...observation.requiredChecks].sort(compareCodeUnits)) !==
+          JSON.stringify([...(request.requiredChecks as string[])].sort(compareCodeUnits)) ||
+        typeof observation.reviewEventIdentity !== 'string' ||
+        !Array.isArray(observation.threads)
+      ) {
+        throw new Error('provider merge observation does not match the request');
+      }
+      const checks = observation.checks as Record<string, unknown> | null;
+      if (
+        checks === null ||
+        typeof checks !== 'object' ||
+        JSON.stringify(Object.keys(checks).sort(compareCodeUnits)) !==
+          JSON.stringify([...(request.requiredChecks as string[])].sort(compareCodeUnits)) ||
+        Object.keys(checks).some((check) => checks[check] !== 'success')
+      ) {
+        throw new Error('provider merge observation has unsuccessful checks');
+      }
+      for (const value of observation.threads) {
+        const thread = value as Record<string, unknown>;
+        if (
+          thread.isResolved !== true ||
+          thread.headSha !== request.headSha ||
+          thread.reviewEventIdentity !== observation.reviewEventIdentity ||
+          typeof thread.id !== 'string' ||
+          typeof thread.acceptedDispositionDigest !== 'string'
+        ) {
+          throw new Error('provider merge observation contains an unresolved or stale thread');
+        }
+        const disposition = this.#database
+          .prepare(
+            `SELECT 1 FROM review_thread_dispositions
+             WHERE repository = ? AND pull_request_number = ? AND thread_id = ? AND head_sha = ?
+               AND review_event_identity = ? AND disposition_digest = ? AND resolved = 1 LIMIT 1`,
+          )
+          .get(
+            request.repository,
+            request.pullRequestNumber,
+            thread.id,
+            request.headSha,
+            observation.reviewEventIdentity,
+            thread.acceptedDispositionDigest,
+          );
+        if (disposition === undefined) {
+          throw new Error('provider thread lacks a matching durable disposition');
+        }
+      }
+      const serialized = serializeDurableJson(input.observation);
+      const computed = `sha256:${createHash('sha256').update(serialized).digest('hex')}`;
+      if (computed !== input.observationDigest)
+        throw new Error('merge observation digest mismatch');
+      const updated = this.#database
+        .prepare(
+          `UPDATE delivery_operations
+           SET merge_observation_status = 'prepared_verified', verified_observation_json = ?,
+               verified_observation_digest = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'prepared'
+             AND merge_observation_status = 'prepared_unobserved'
+             AND verified_observation_digest IS NULL`,
+        )
+        .run(serialized, input.observationDigest, input.nowMs, input.id);
+      if (updated.changes !== 1) throw new Error('merge observation compare-and-swap failed');
+      return this.getDeliveryOperation(input.id)!;
+    })();
+  }
+
+  #commitReviewDisposition(
+    operation: DeliveryOperationRecord,
+    result: unknown,
+    verifiedAtMs: number,
+  ): void {
+    const request = operation.request as Record<string, unknown>;
+    const response = result as Record<string, unknown> | null;
+    if (operation.kind === 'github.review_thread_reply') {
+      if (typeof response?.messageId !== 'string' || response.messageId.length === 0) {
+        throw new Error('review disposition reply lacks provider message identity');
+      }
+      const identity = {
+        disposition: request.disposition,
+        reviewerAgentId: request.reviewerAgentId,
+        evidenceDigests: request.evidenceDigests,
+        headSha: request.headSha,
+        reviewEventIdentity: request.reviewEventIdentity,
+      };
+      if (
+        !Array.isArray(request.evidenceDigests) ||
+        request.evidenceDigests.some(
+          (digest) =>
+            typeof digest !== 'string' ||
+            this.#database
+              .prepare(
+                `SELECT 1 FROM secure_evidence WHERE digest = ? AND run_id = ? AND task_id = ?
+                 AND producer = ? AND head_sha = ? AND deleted_at_ms IS NULL LIMIT 1`,
+              )
+              .get(
+                digest,
+                operation.runId,
+                operation.taskId,
+                request.reviewerAgentId,
+                request.headSha,
+              ) === undefined,
+        )
+      ) {
+        throw new Error('review disposition evidence is not independently bound');
+      }
+      const dispositionDigest = `sha256:${createHash('sha256')
+        .update(JSON.stringify(identity))
+        .digest('hex')}`;
+      this.#database
+        .prepare(
+          `INSERT INTO review_thread_dispositions
+           (repository, pull_request_number, thread_id, head_sha, review_event_identity,
+            disposition_digest, disposition, reviewer_identity, evidence_json, reply_message_id,
+            resolved, created_at_ms, updated_at_ms)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        )
+        .run(
+          request.repository,
+          request.pullRequestNumber,
+          request.threadId,
+          request.headSha,
+          request.reviewEventIdentity,
+          dispositionDigest,
+          request.disposition,
+          request.reviewerAgentId,
+          JSON.stringify(request.evidenceDigests),
+          response.messageId,
+          verifiedAtMs,
+          verifiedAtMs,
+        );
+    } else if (operation.kind === 'github.review_thread_resolve') {
+      if (response?.resolved !== true && response?.isResolved !== true)
+        throw new Error('review thread resolve lacks provider attestation');
+      const updated = this.#database
+        .prepare(
+          `UPDATE review_thread_dispositions SET resolved = 1, updated_at_ms = ?
+           WHERE repository = ? AND pull_request_number = ? AND thread_id = ? AND head_sha = ?
+             AND review_event_identity = ? AND disposition_digest = ? AND reply_message_id = ?
+             AND resolved = 0`,
+        )
+        .run(
+          verifiedAtMs,
+          request.repository,
+          request.pullRequestNumber,
+          request.threadId,
+          request.headSha,
+          request.reviewEventIdentity,
+          request.acceptedDispositionDigest,
+          request.replyMessageId,
+        );
+      if (updated.changes !== 1) throw new Error('accepted review disposition binding is stale');
+    }
   }
 
   #commitVerifiedMerge(
@@ -3387,6 +4539,34 @@ export class WorkflowStore {
         );
       return this.getDeliveryOperation(input.id)!;
     })();
+  }
+
+  /** Synchronous dispatch is serialized with takeover/cancellation by SQLite's writer lock. */
+  guardGovernedMutation(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      clock: () => number;
+      initiate: () => Promise<unknown>;
+    },
+    capability?: symbol,
+  ): Promise<unknown> {
+    if (capability !== workflowDeliveryMutationCapability)
+      throw new Error('governed mutation requires broker capability');
+    let pending!: Promise<unknown>;
+    this.#database
+      .transaction(() => {
+        const operation = this.getDeliveryOperation(input.id);
+        if (operation?.status !== 'prepared') throw new Error('governed operation is not prepared');
+        this.#assertDeliveryOperationLeases(operation, input, input.clock());
+        this.#assertDeliveryRunState(operation.runId, operation.kind);
+        pending = input.initiate();
+      })
+      .immediate();
+    return pending;
   }
 
   #assertDeliveryOperationLeases(
@@ -3768,6 +4948,10 @@ export class WorkflowStore {
       'github.pr': ['pipeline', 'waiting', 'delivery'],
       'github.checks': ['pipeline', 'waiting', 'delivery'],
       'github.merge': ['delivery'],
+      'beads.task_note_update': ['pipeline', 'delivery', 'finalizing'],
+      'github.review_threads_observe': ['pipeline', 'delivery', 'finalizing'],
+      'github.review_thread_reply': ['pipeline', 'delivery', 'finalizing'],
+      'github.review_thread_resolve': ['pipeline', 'delivery', 'finalizing'],
       'feature.github.pr': ['finalizing'],
       'feature.github.checks': ['finalizing'],
       'feature.github.merge': ['finalizing'],
@@ -4928,6 +6112,7 @@ export class WorkflowStore {
         'repair_planning',
         'pipeline',
         'waiting',
+        'approval_waiting',
         'delivery',
         'finalizing',
         'recovering',
@@ -5022,11 +6207,11 @@ export class WorkflowStore {
         input.runLeaseEpoch,
         input.nowMs,
       );
-      const durableIncomplete: string[] = [];
+      const durableIncomplete = fenceRunWork(this.#database, input.runId, input.nowMs);
       const blockers = [
         [
           'active-specialists',
-          `SELECT 1 FROM scheduler_executions WHERE run_id = ? AND status = 'active' LIMIT 1`,
+          `SELECT 1 FROM scheduler_executions WHERE run_id = ? AND (status = 'active' OR credential_status NOT IN ('pending','revoked')) LIMIT 1`,
         ],
         [
           'prepared-transitions',
@@ -6297,6 +7482,272 @@ export class WorkflowStore {
     }
   }
 
+  #assertDelegateTerminalResult(
+    execution: SchedulerExecutionRecord,
+    callback: DelegateCallback,
+  ): void {
+    const terminal = specialistTerminalResult(execution.result);
+    if (terminal === undefined)
+      throw new Error('delegate callback requires a validated terminal result');
+    if (
+      (terminal.status === 'blocked' && callback.terminalStatus !== 'blocked') ||
+      (terminal.status === 'needs_repair' &&
+        ['continue', 'complete'].includes(callback.terminalStatus))
+    ) {
+      throw new Error('delegate callback contradicts the validated terminal result');
+    }
+  }
+
+  #recordSchedulerTerminalCallback(
+    input: Parameters<WorkflowStore['finishSchedulerExecution']>[0],
+    nowMs: number,
+  ): void {
+    const callback = delegateCallbackSchema.parse(input.callback);
+    if (callback.delegationId !== input.id) throw new Error('terminal callback execution mismatch');
+    this.recordDelegateCallbackAndTransition(
+      { callback, target: delegateCallbackTarget(callback), ownerId: input.ownerId, nowMs },
+      workflowGovernedPersistenceCapability,
+    );
+  }
+
+  #assertPreparedFeatureDeliveryAuthority(input: PrepareDeliveryOperationInput): void {
+    if (input.kind.startsWith('feature.github.')) {
+      const request = input.request as Record<string, unknown>;
+      const featureContractVersion = request.featureContractVersion;
+      const featureContractDigest = request.featureContractDigest;
+      if (typeof featureContractVersion !== 'number' || typeof featureContractDigest !== 'string') {
+        throw new TypeError('feature delivery operation lacks approved contract identity');
+      }
+      const activeApproval = this.#database
+        .prepare(
+          `SELECT 1 FROM feature_delivery_contracts AS contracts
+           JOIN feature_delivery_approvals AS approvals
+             ON approvals.run_id = contracts.run_id
+            AND approvals.feature_contract_version = contracts.feature_contract_version
+            AND approvals.feature_contract_digest = contracts.contract_digest
+           WHERE contracts.run_id = ? AND contracts.feature_contract_version = ?
+             AND contracts.contract_digest = ? AND approvals.policy_digest = ?
+             AND approvals.status = 'active' AND approvals.approver_role = 'human_approver'
+           LIMIT 1`,
+        )
+        .get(input.runId, featureContractVersion, featureContractDigest, input.policyDigest);
+      if (activeApproval === undefined) {
+        throw new Error('feature delivery operation lacks active approved authority');
+      }
+    }
+  }
+
+  #migrateSchedulerColumns(): void {
+    const schedulerColumns = this.#database
+      .prepare('PRAGMA table_info(scheduler_executions)')
+      .all() as Array<{ name: string }>;
+    if (!schedulerColumns.some((column) => column.name === 'attempt_number')) {
+      this.#database.exec(
+        'ALTER TABLE scheduler_executions ADD COLUMN attempt_number INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'process_identity')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN process_identity TEXT NOT NULL
+         DEFAULT 'unknown:legacy-execution'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_lease_id')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_lease_id TEXT NOT NULL
+         DEFAULT 'credential:legacy-execution'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_status')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_status TEXT NOT NULL
+         DEFAULT 'legacy_quarantined'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_broker_generation')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_broker_generation TEXT`,
+      );
+    }
+  }
+
+  #transitionRecoveryTarget(
+    input: PrepareTransitionInput,
+    activeRecovery: { recovery_target: WorkflowState } | undefined,
+  ): WorkflowState | undefined {
+    if (input.from === 'recovering' && activeRecovery === undefined) {
+      throw new Error('recovering run has no durable recovery target');
+    }
+    if (
+      input.from === 'recovering' &&
+      input.transitionContext.recoveryTarget !== activeRecovery?.recovery_target
+    ) {
+      throw new Error('requested recovery target differs from the durable recovery target');
+    }
+    return input.from === 'recovering'
+      ? activeRecovery!.recovery_target
+      : input.transitionContext.recoveryTarget;
+  }
+
+  #assertFinalizingTransition(input: PrepareTransitionInput, run: RunRecord): void {
+    if (input.from === 'finalizing' && input.to === 'closed' && !run.mergeVerified) {
+      throw new Error('finalization requires persisted merge verification');
+    }
+    if (input.from === 'finalizing' && input.to === 'closed') {
+      throw new Error('feature closure requires the durable finalization coordinator');
+    }
+    if (
+      input.from === 'finalizing' &&
+      input.to === 'finalizing' &&
+      (!['beads.task_close', 'beads.dolt_push'].includes(input.operation) ||
+        input.transitionContext.closeoutLeaseEpoch === undefined)
+    ) {
+      throw new Error('finalizing self-transition requires a fenced closeout operation');
+    }
+  }
+
+  #validateRecoveryEntry(
+    input: PrepareTransitionInput,
+    run: RunRecord,
+    workspaceId: string,
+    hasActiveRecovery: boolean,
+  ): string | undefined {
+    if (input.to !== 'recovering') return undefined;
+    const preparedMerge = this.#database
+      .prepare(
+        `SELECT 1 FROM delivery_operations
+         WHERE run_id = ? AND status = 'prepared'
+           AND (kind = 'github.merge' OR kind LIKE 'feature.github.%') LIMIT 1`,
+      )
+      .get(input.runId);
+    if (preparedMerge !== undefined) {
+      throw new Error('prepared merge must be reconciled before recovery');
+    }
+    const arguments_ = input.externalArguments as Record<string, unknown> | null;
+    const interruptedTransitionId = arguments_?.interruptedTransitionId;
+    const evidenceDigests = arguments_?.evidenceDigests;
+    if (
+      typeof interruptedTransitionId !== 'string' ||
+      interruptedTransitionId.length === 0 ||
+      !Array.isArray(evidenceDigests) ||
+      evidenceDigests.length === 0 ||
+      !evidenceDigests.every(
+        (digest) => typeof digest === 'string' && /^sha256:[a-f0-9]{64}$/u.test(digest),
+      )
+    ) {
+      throw new Error('recovery entry requires interrupted-transition evidence');
+    }
+    const interrupted = this.getTransition(interruptedTransitionId);
+    const latestTransition = this.getLatestCommittedTransitionInto(input.runId, input.from);
+    const mergePredecessor =
+      input.from === 'finalizing' && run.mergeVerified
+        ? (this.getCommittedFeatureDeliveryAttestation(input.runId) ??
+          this.getCommittedMergeAttestation(input.runId))
+        : undefined;
+    const transitionIsCurrent =
+      interrupted?.runId === input.runId &&
+      interrupted.status === 'committed' &&
+      interrupted.to === input.from &&
+      interrupted.expectedRunVersion + 2 === input.expectedRunVersion &&
+      latestTransition?.id === interruptedTransitionId;
+    const mergeIsCurrent =
+      latestTransition === undefined &&
+      mergePredecessor?.id === interruptedTransitionId &&
+      mergePredecessor.status === 'committed';
+    if (!transitionIsCurrent && !mergeIsCurrent) {
+      throw new Error('recovery interrupted transition is not the committed run predecessor');
+    }
+    if (mergeIsCurrent && mergePredecessor?.kind === 'feature.github.merge') {
+      this.#assertRecoveryFeaturePredecessor(input, mergePredecessor, arguments_);
+    }
+    const authoritativeRoles = [
+      'workflow_orchestrator',
+      'planner',
+      'plan_critic',
+      'human_approver',
+      'implementation_worker',
+      'code_reviewer',
+      'test_runner',
+      'qa_evaluator',
+      'feature_evaluator',
+    ];
+    if (
+      evidenceDigests.some(
+        (digest) =>
+          !this.hasRecoveryEvidenceBinding({
+            digest,
+            workspaceId,
+            runId: input.runId,
+            contractVersion: input.contractVersion,
+            policyDigest: input.policyDigest,
+            allowedProducerRoles: authoritativeRoles,
+            taskId: typeof arguments_?.taskId === 'string' ? arguments_.taskId : undefined,
+            minCreatedAtMs: interrupted?.nowMs ?? mergePredecessor!.updatedAtMs,
+            interruptedTransitionId,
+          }),
+      )
+    ) {
+      throw new Error('recovery evidence is not bound to the interrupted run');
+    }
+    if (hasActiveRecovery) {
+      throw new Error('run already has an active recovery target');
+    }
+    return interruptedTransitionId;
+  }
+
+  #assertRecoveryFeaturePredecessor(
+    input: PrepareTransitionInput,
+    mergePredecessor: DeliveryOperationRecord,
+    arguments_: Record<string, unknown> | null,
+  ): void {
+    const featureRequest = mergePredecessor.request as Record<string, unknown>;
+    const featureResult = mergePredecessor.result as Record<string, unknown> | null;
+    const approvedFeature = featureDeliveryContractSchema.parse(
+      this.getApprovedFeatureDeliveryContract(input.runId),
+    );
+    const featureContractDigest = deriveFeatureDeliveryContractDigest(approvedFeature);
+    const featureAttestationDigest = `sha256:${createHash('sha256')
+      .update(serializeDurableJson(featureResult))
+      .digest('hex')}`;
+    if (
+      arguments_?.featureContractDigest !== featureContractDigest ||
+      arguments_?.featureDeliveryAttestationDigest !== featureAttestationDigest ||
+      featureRequest.featureContractDigest !== featureContractDigest ||
+      featureRequest.headSha !== approvedFeature.authority.headSha ||
+      featureRequest.base !== approvedFeature.authority.base ||
+      featureRequest.mergeMethod !== 'squash' ||
+      featureRequest.adminBypass !== false ||
+      featureResult?.headSha !== featureRequest.headSha ||
+      featureResult.base !== featureRequest.base ||
+      featureResult.mergeMethod !== featureRequest.mergeMethod
+    ) {
+      throw new Error('finalizing recovery feature-delivery predecessor binding is stale');
+    }
+  }
+
+  #migrateFeatureApprovalColumns(): void {
+    const featureApprovalColumns = this.#database
+      .prepare('PRAGMA table_info(feature_delivery_approvals)')
+      .all() as Array<{ name: string }>;
+    if (!featureApprovalColumns.some((column) => column.name === 'review_id')) {
+      this.#database.exec(
+        `ALTER TABLE feature_delivery_approvals ADD COLUMN review_id TEXT NOT NULL
+         DEFAULT 'legacy-unbound-review'`,
+      );
+    }
+    if (!featureApprovalColumns.some((column) => column.name === 'task_id')) {
+      this.#database.exec(
+        `ALTER TABLE feature_delivery_approvals ADD COLUMN task_id TEXT NOT NULL
+         DEFAULT 'legacy-unbound-task'`,
+      );
+    }
+    if (!featureApprovalColumns.some((column) => column.name === 'evidence_json')) {
+      this.#database.exec(
+        `ALTER TABLE feature_delivery_approvals ADD COLUMN evidence_json TEXT NOT NULL DEFAULT '[]'`,
+      );
+    }
+  }
+
   #migrate(): void {
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -6433,6 +7884,10 @@ export class WorkflowStore {
         expected_external_state_json TEXT NOT NULL,
         external_arguments_json TEXT NOT NULL,
         result_json TEXT,
+        verified_observation_json TEXT,
+        verified_observation_digest TEXT,
+        merge_observation_status TEXT
+          CHECK(merge_observation_status IN ('prepared_unobserved', 'prepared_verified')),
         created_at_ms INTEGER NOT NULL,
         updated_at_ms INTEGER NOT NULL
       );
@@ -6639,6 +8094,7 @@ export class WorkflowStore {
         workspace_id TEXT NOT NULL,
         run_id TEXT NOT NULL REFERENCES runs(id),
         task_id TEXT NOT NULL,
+        attempt_number INTEGER NOT NULL DEFAULT 1,
         role TEXT NOT NULL,
         mode TEXT NOT NULL CHECK(mode IN ('read_only', 'mutating')),
         status TEXT NOT NULL CHECK(status IN ('active', 'completed', 'cancelled', 'escalated')),
@@ -6737,13 +8193,113 @@ export class WorkflowStore {
         created_at_ms INTEGER NOT NULL,
         UNIQUE(run_id, check_id)
       );
+      CREATE TABLE IF NOT EXISTS approval_notifications (
+        event_id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), task_id TEXT NOT NULL,
+        event_json TEXT NOT NULL, state TEXT NOT NULL, generation TEXT, message_id TEXT,
+        provider_accepted_at_ms INTEGER, responder_identity TEXT, response_evidence_digest TEXT,
+        human_accepted_at_ms INTEGER, attempt_count INTEGER NOT NULL DEFAULT 0,
+        failure_purpose TEXT CHECK(failure_purpose IN ('approval', 'resume')),
+        created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS cancellation_work_fences (
+        run_id TEXT PRIMARY KEY REFERENCES runs(id), fenced_at_ms INTEGER NOT NULL, details_json TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS approval_wait_contexts (
+        run_id TEXT NOT NULL REFERENCES runs(id), task_id TEXT NOT NULL,
+        predecessor_state TEXT NOT NULL, resume_target_state TEXT NOT NULL,
+        event_id TEXT PRIMARY KEY, recipient_identity TEXT NOT NULL, phase TEXT NOT NULL,
+        deadline_ms INTEGER NOT NULL, status TEXT NOT NULL CHECK(status IN ('waiting', 'resumed')),
+        created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL, run_version INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS review_thread_dispositions (
+        repository TEXT NOT NULL, pull_request_number INTEGER NOT NULL, thread_id TEXT NOT NULL,
+        head_sha TEXT NOT NULL, review_event_identity TEXT NOT NULL,
+        disposition_digest TEXT NOT NULL UNIQUE, disposition TEXT NOT NULL,
+        reviewer_identity TEXT NOT NULL, evidence_json TEXT NOT NULL, reply_message_id TEXT NOT NULL,
+        resolved INTEGER NOT NULL CHECK(resolved IN (0, 1)), created_at_ms INTEGER NOT NULL,
+        updated_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(repository, pull_request_number, thread_id, head_sha, review_event_identity)
+      );
+      CREATE TABLE IF NOT EXISTS delegate_callbacks (
+        callback_id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), task_id TEXT NOT NULL,
+        callback_json TEXT NOT NULL, target_state TEXT NOT NULL, parent_version INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK(status = 'committed'), wake_status TEXT NOT NULL DEFAULT 'pending'
+          CHECK(wake_status IN ('pending', 'woken')), wakeup_id TEXT, wake_generation TEXT,
+        wake_message_id TEXT, wake_provider_accepted_at_ms INTEGER, woke_at_ms INTEGER,
+        created_at_ms INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS workflow_lineage_imports (
+        target_run_id TEXT PRIMARY KEY REFERENCES runs(id), source_run_id TEXT NOT NULL REFERENCES runs(id),
+        operation_id TEXT NOT NULL UNIQUE, request_json TEXT NOT NULL, created_at_ms INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS lineage_approved_heads (
+        workspace_id TEXT NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), task_id TEXT NOT NULL,
+        ref TEXT NOT NULL, head_sha TEXT NOT NULL, tree_sha TEXT NOT NULL, artifact_digest TEXT NOT NULL,
+        operation_id TEXT NOT NULL REFERENCES workflow_lineage_imports(operation_id), created_at_ms INTEGER NOT NULL,
+        PRIMARY KEY(workspace_id, run_id, task_id, ref)
+      );
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (1, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (2, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (3, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (8, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (9, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (10, unixepoch() * 1000);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (11, unixepoch() * 1000);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (12, unixepoch() * 1000);
     `);
+    initializeContinuationSchema(this.#database);
+    const approvalWaitColumns = this.#database
+      .prepare('PRAGMA table_info(approval_wait_contexts)')
+      .all() as Array<{ name: string }>;
+    if (!approvalWaitColumns.some((column) => column.name === 'run_version')) {
+      this.#database
+        .transaction(() => {
+          this.#database
+            .exec(`ALTER TABLE approval_wait_contexts RENAME TO approval_wait_contexts_legacy;
+          CREATE TABLE approval_wait_contexts (
+            run_id TEXT NOT NULL REFERENCES runs(id), task_id TEXT NOT NULL,
+            predecessor_state TEXT NOT NULL, resume_target_state TEXT NOT NULL,
+            event_id TEXT PRIMARY KEY, recipient_identity TEXT NOT NULL, phase TEXT NOT NULL,
+            deadline_ms INTEGER NOT NULL, status TEXT NOT NULL CHECK(status IN ('waiting', 'resumed')),
+            created_at_ms INTEGER NOT NULL, updated_at_ms INTEGER NOT NULL, run_version INTEGER NOT NULL);
+          INSERT INTO approval_wait_contexts SELECT w.*, COALESCE(
+            (SELECT parent_version FROM delegate_callbacks c WHERE json_extract(c.callback_json, '$.approvalIntent.eventId') = w.event_id),
+            (SELECT expected_run_version FROM transitions t WHERE t.run_id = w.run_id AND t.from_state = 'approval_waiting' AND t.status = 'prepared'),
+            (SELECT version FROM runs WHERE id = w.run_id)) FROM approval_wait_contexts_legacy w;
+          UPDATE approval_wait_contexts SET status = 'waiting' WHERE run_id IN (SELECT id FROM runs WHERE state = 'approval_waiting');
+          UPDATE approval_notifications SET state = 'resume_pending' WHERE state = 'resumed' AND event_id IN (SELECT event_id FROM approval_wait_contexts WHERE status = 'waiting');
+          DROP TABLE approval_wait_contexts_legacy;`);
+        })
+        .immediate();
+    }
+    this.#database
+      .exec(`CREATE UNIQUE INDEX IF NOT EXISTS approval_wait_current ON approval_wait_contexts(run_id) WHERE status = 'waiting';
+      CREATE UNIQUE INDEX IF NOT EXISTS approval_wait_generation ON approval_wait_contexts(run_id, run_version);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (15, unixepoch() * 1000);`);
+    const deliveryColumns = this.#database
+      .prepare('PRAGMA table_info(delivery_operations)')
+      .all() as Array<{ name: string }>;
+    if (!deliveryColumns.some((column) => column.name === 'verified_observation_json')) {
+      this.#database.exec(
+        'ALTER TABLE delivery_operations ADD COLUMN verified_observation_json TEXT',
+      );
+    }
+    if (!deliveryColumns.some((column) => column.name === 'verified_observation_digest')) {
+      this.#database.exec(
+        'ALTER TABLE delivery_operations ADD COLUMN verified_observation_digest TEXT',
+      );
+    }
+    if (!deliveryColumns.some((column) => column.name === 'merge_observation_status')) {
+      this.#database.exec(
+        'ALTER TABLE delivery_operations ADD COLUMN merge_observation_status TEXT',
+      );
+      this.#database
+        .prepare(
+          `UPDATE delivery_operations SET merge_observation_status = 'prepared_unobserved'
+           WHERE kind = 'github.merge' AND status = 'prepared'`,
+        )
+        .run();
+    }
     const transitionColumns = this.#database
       .prepare('PRAGMA table_info(transitions)')
       .all() as Array<{
@@ -6778,52 +8334,8 @@ export class WorkflowStore {
          CHECK (terminal_outcome IN ('resumed', 'escalated'))`,
       );
     }
-    const schedulerColumns = this.#database
-      .prepare('PRAGMA table_info(scheduler_executions)')
-      .all() as Array<{ name: string }>;
-    if (!schedulerColumns.some((column) => column.name === 'process_identity')) {
-      this.#database.exec(
-        `ALTER TABLE scheduler_executions ADD COLUMN process_identity TEXT NOT NULL
-         DEFAULT 'unknown:legacy-execution'`,
-      );
-    }
-    if (!schedulerColumns.some((column) => column.name === 'credential_lease_id')) {
-      this.#database.exec(
-        `ALTER TABLE scheduler_executions ADD COLUMN credential_lease_id TEXT NOT NULL
-         DEFAULT 'credential:legacy-execution'`,
-      );
-    }
-    if (!schedulerColumns.some((column) => column.name === 'credential_status')) {
-      this.#database.exec(
-        `ALTER TABLE scheduler_executions ADD COLUMN credential_status TEXT NOT NULL
-         DEFAULT 'legacy_quarantined'`,
-      );
-    }
-    if (!schedulerColumns.some((column) => column.name === 'credential_broker_generation')) {
-      this.#database.exec(
-        `ALTER TABLE scheduler_executions ADD COLUMN credential_broker_generation TEXT`,
-      );
-    }
-    const featureApprovalColumns = this.#database
-      .prepare('PRAGMA table_info(feature_delivery_approvals)')
-      .all() as Array<{ name: string }>;
-    if (!featureApprovalColumns.some((column) => column.name === 'review_id')) {
-      this.#database.exec(
-        `ALTER TABLE feature_delivery_approvals ADD COLUMN review_id TEXT NOT NULL
-         DEFAULT 'legacy-unbound-review'`,
-      );
-    }
-    if (!featureApprovalColumns.some((column) => column.name === 'task_id')) {
-      this.#database.exec(
-        `ALTER TABLE feature_delivery_approvals ADD COLUMN task_id TEXT NOT NULL
-         DEFAULT 'legacy-unbound-task'`,
-      );
-    }
-    if (!featureApprovalColumns.some((column) => column.name === 'evidence_json')) {
-      this.#database.exec(
-        `ALTER TABLE feature_delivery_approvals ADD COLUMN evidence_json TEXT NOT NULL DEFAULT '[]'`,
-      );
-    }
+    this.#migrateSchedulerColumns();
+    this.#migrateFeatureApprovalColumns();
     const featureIntentColumns = this.#database
       .prepare('PRAGMA table_info(feature_delivery_required_intents)')
       .all() as Array<{ name: string }>;

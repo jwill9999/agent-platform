@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import Database from 'better-sqlite3';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PilotConcurrencyController,
@@ -738,10 +738,25 @@ if (command === 'conformance') {
     first.store.close();
   });
 
-  it('interrupts timed-out specialists and records durable escalation', async () => {
+  it.each([
+    { name: 'interrupts timed-out specialists and records durable escalation', settles: true },
+    { name: 'retains timed-out specialist work when cancellation cannot settle', settles: false },
+  ])('$name', async ({ settles }) => {
     let clock = 1000;
     let cancelled = false;
     let rejectStart: ((error: Error) => void) | undefined;
+    let signalStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    let signalCleanup!: () => void;
+    const cleanupStarted = new Promise<void>((resolve) => {
+      signalCleanup = resolve;
+    });
+    let releaseCleanup!: () => void;
+    const cleanupAllowed = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
     const executor: SpecialistProcessExecutor = async (_executable, args) => {
       if (args[0] === 'stop') {
         cancelled = true;
@@ -750,13 +765,18 @@ if (command === 'conformance') {
         return { stdout: '', stderr: '' };
       }
       if (args[0] === 'inspect') return { stdout: 'false\n', stderr: '' };
-      if (args[0] === 'rm') return { stdout: '', stderr: '' };
+      if (args[0] === 'rm') {
+        signalCleanup();
+        if (!settles) await cleanupAllowed;
+        return { stdout: '', stderr: '' };
+      }
       if (args[0] === 'create') return { stdout: 'container-id\n', stderr: '' };
       return new Promise<never>((_resolve, reject) => {
         rejectStart = reject;
+        signalStarted();
       });
     };
-    const { store, orchestrator } = await setup('scheduling', {
+    const { store, orchestrator, launcher } = await setup('scheduling', {
       executor,
       clock: () => clock,
     });
@@ -767,18 +787,64 @@ if (command === 'conformance') {
       taskId: 'schedule-feature.1',
       evidence,
     });
-    await expect(
-      orchestrator.launchTask({
+    // Advance the reservation deadline only once start is pending. Real workspace preparation
+    // and cleanup can exceed the fixture's 5/20ms timers under load; neither is the behavior
+    // under test. Keep the settlement budget frozen while the actual async cleanup completes.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const launched = orchestrator.launchTask({
         packet,
         workspaceLeaseEpoch,
         runLeaseEpoch,
         claimTransitionId: 'claim-timeout-transition',
         deadlineMs: 1005,
-      }),
-    ).rejects.toThrow('timed out');
-    expect(cancelled).toBe(true);
-    expect(store.listActiveSchedulerExecutions(contract.workspaceId)).toEqual([]);
-    store.close();
+      });
+      const rejected = expect(launched).rejects.toThrow('timed out');
+      await started;
+      const [execution] = store.listActiveSchedulerExecutions(contract.workspaceId);
+      expect(execution).toBeDefined();
+      expect(cancelled).toBe(false);
+      clock = 1005;
+      await vi.advanceTimersByTimeAsync(5);
+      if (!settles) {
+        await cleanupStarted;
+        // The fixture deliberately holds cleanup pending: expiring the unchanged 20ms
+        // settlement budget must retain active work even though its credential is revoked.
+        await vi.advanceTimersByTimeAsync(20);
+      }
+      await rejected;
+      expect(cancelled).toBe(true);
+      if (settles) {
+        expect(store.listActiveSchedulerExecutions(contract.workspaceId)).toEqual([]);
+        expect(store.getSchedulerExecution(execution!.id)).toMatchObject({
+          status: 'escalated',
+          credentialStatus: 'revoked',
+          result: { reason: 'specialist_deadline_elapsed', cancellationFailed: false },
+        });
+      } else {
+        expect(store.listActiveSchedulerExecutions(contract.workspaceId)).toMatchObject([
+          { id: execution!.id, status: 'active', credentialStatus: 'revoked' },
+        ]);
+        releaseCleanup();
+        await expect(
+          launcher.waitForSettlement({
+            id: execution!.id,
+            role: packet.assignedRole,
+            mode: 'mutating',
+            deadlineMs: 1005,
+            cancelled: true,
+          }),
+        ).resolves.toBe(true);
+        // Late cleanup alone must not fabricate a terminal scheduler receipt.
+        expect(store.getSchedulerExecution(execution!.id)?.status).toBe('active');
+      }
+      expect(store.getRun(packet.runId)?.state).toBe('escalated');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      releaseCleanup();
+      vi.useRealTimers();
+      store.close();
+    }
   });
 
   it('rejects completion when leases expire while the specialist runs', async () => {
@@ -1216,6 +1282,8 @@ if (command === 'conformance') {
     const databasePath = join(first.root, 'workflow.sqlite');
     const legacy = new Database(databasePath);
     legacy.exec(`
+      DROP TABLE continuation_actions;
+      DROP TABLE continuation_jobs;
       DROP INDEX IF EXISTS scheduler_executions_workspace_status;
       ALTER TABLE scheduler_executions RENAME TO scheduler_executions_current;
       CREATE TABLE scheduler_executions (

@@ -1,102 +1,110 @@
 # Session handoff
 
-**Purpose:** short rolling handoff for the next agent or developer. Keep this file current, concise,
-and actionable.
+**Purpose:** short rolling handoff. Keep below 160 lines; replace stale state, retain only recent
+iterations, and put detailed requirements in task specs. Older history:
+[session-archive-2026-05.md](session-archive-2026-05.md).
 
-## Maintenance Rules
+## Last updated
 
-- Maximum target length: 160 lines.
-- Keep only the current state, the last 3-5 meaningful iterations, and the next prioritized actions.
-- Archive older detail before adding new detail. Current archive:
-  [session-archive-2026-05.md](session-archive-2026-05.md).
-- Do not paste long logs, full PR histories, or old task narratives here.
-- Each session update should replace stale content, not append indefinitely.
+- Date: 2026-09-07.
+- Active implementation: `agent-platform-multi-agent.repair.4`, in the repair4 worktree.
+- Specification and detailed broker handoff:
+  [repair4 task](docs/tasks/agent-platform-multi-agent.repair.4.md).
+- Runtime operating instructions: [continuations](docs/workflow-control-continuations.md).
+- This is a local handoff, not a commit/push receipt, Beads snapshot, or pilot-completion claim.
 
-## Last Updated
+## Implemented foundation
 
-- **Date:** 2026-08-31
-- **Session:** Completed `.10` pilot repair and independent review; preparing exact delivery approval.
-- **Branch:** `task/agent-platform-multi-agent.10`
-- **Parent tip:** `.9` at `6bec3b6`.
-- **Current tip:** `.10` repair commit `afeddf6`; this handoff update will create the final task tip.
-- **Pull request:** Planning PR #251 is merged; the cumulative `.10` PR is not yet opened.
+- `.1`–`.4`: contracts, normative lifecycle, isolation, journal/leases/reconciliation, plan approval.
+- `.5`–`.7`: single-writer Beads orchestration, revocable specialist credentials, bounded repair,
+  exact-tree Git/CAS delivery brokers, protected GitHub operations and durable waits.
+- `.8`–`.10`: secure evidence, exact-head evaluation, bounded repair children, cancellation and
+  finalization, separate immutable task-to-feature and feature-to-staging authority.
+- Recovery and repair4 preserve superseded runs and heads as historical evidence, not transferable
+  delivery approval. Current live GitHub/Beads status was not re-observed in this handoff.
 
-## Completed Implementation
+## Latest reviewed slices
 
-- `.1`: versioned execution contracts and normative workflow state machine.
-- `.2`: process-bound authorization and real Docker malicious-specialist isolation proof.
-- `.3`: durable SQLite state, fenced leases, sagas, evidence, reconciliation, CLI, and read-only MCP.
-- `.4`: planner/critic workflow, material-bound findings and dispositions, approval, and invalidation.
-- `.5`: single-writer Beads scheduler and orchestrator:
-  - persists scheduler intent before authoritative Beads claim and admits only dependency-ready work;
-  - enforces one mutating specialist or at most four isolated read-only specialists;
-  - launches Docker specialists with create/start fencing, cancellation, timeout, and restart cleanup;
-  - uses generation-pinned revoke-wins credentials, broker-owned TTL cleanup, durable CAS, and legacy
-    active-lease quarantine;
-  - reconciles crashed executions independently so one cleanup failure cannot suppress later work;
-  - requires clean-tree, immutable-base, stable exact-head evidence before brokered Beads close.
-- `.6`: typed repair sources and deterministic producer/owner routing; atomic task/finding budgets;
-  canonical hypothesis and monotonic evidence-change detection; durable idempotent escalation; strict
-  Git-backed repair acceptance; accepted-result recovery.
-- `.7`: fenced durable Git/ref and GitHub delivery sagas; exact-tree commits and CAS pushes; current
-  and published head lineage; exact PR/check/protected-merge validation; immutable merge attestation;
-  takeover-safe durable pipeline waits; frozen, captured production dispatch chain.
-- `.8`: transactional content-addressed secure-evidence BLOBs; fail-closed redaction and residual
-  credential scanning; exact-head criterion evaluation and immutable acceptance bindings;
-  contract-bounded repair children with concrete captured Beads/Git adapters, accepted predecessor
-  lineage, and atomic attempt-derived remaining budgets.
-- `.9`: merge-atomic finalizing; persisted exact-head acceptance reports; fenced Beads epic/Dolt
-  closeout; exact recovery predecessors including the merge boundary; restart-safe waits and
-  cancellation; bounded cleanup/fence timeouts; sealed official mutation brokers and ports; durable
-  cancellation recovery enumeration; multi-reference evidence preservation.
-- `.10` repair: separate immutable task-to-feature and feature-to-staging authorities; authenticated
-  pre-merge staging intent; feature-specific critic and owner approval; exact integrated-head and
-  protection binding; durable PR/check/merge recovery; staging-attestation finalization.
+- Repair4 adds governed note/review-thread operations, notification/approval state, normative callback
+  mappings, durable continuations, and typed lineage persistence.
+- Durable phase jobs atomically consume callbacks, bind exact run/material/head/identity, fence
+  claim/recovery/completion, and reject substituted producer, role, or head evidence.
+- Concrete standalone runtime composes the credential broker, Docker launcher, journal and vault;
+  renews leases during execution; and ingests structured results and validated callbacks.
+- Explicitly authorized read-only verification/review can reach task acceptance. Acceptance checks
+  every approved criterion, findings, risks and status/transition consistency. The actual prompt,
+  scheduler packet and input evidence share an execution/head/owner/fence-bound envelope.
+- Coordinator reports two independent review passes for phase jobs and two for the final runtime
+  candidate. Those reviews are code evidence, not proof of external deployment or a live Codex pilot.
 
-## Review and Verification
+## Bootstrap correction candidate awaiting independent review
 
-- Independent critic review iterated through concurrency, restart, diff-integrity, capability, and
-  credential-race findings; the final pass reports no actionable findings.
-- `.5` gates passed: typecheck, lint, 112 tests, and the separately executed real Docker isolation
-  test. The final `.5` critic pass reported no actionable findings.
-- `.6` has 28 focused repair-loop tests and 140 package tests passing. Its final independent critic
-  pass reported no actionable findings after reviewing the trusted Git-diff hardening.
-- `.7` has 35 focused delivery tests and 175 package tests passing (plus one skipped Docker test in the
-  normal run); the Docker isolation test passed separately. Its final independent critic pass found
-  no actionable findings after adversarial recovery, lineage, wait, and method-replacement review.
-- `.8` has 207 package tests passing plus one intentional Docker-isolation skip. Monorepo formatting,
-  typecheck, lint, documentation lint, and tests pass; the Sonar secrets scan passes. Six independent
-  critic passes closed entropy, BLOB integrity, adapter authority, lineage, lifecycle, retention,
-  quota, retry-budget, and crash-recovery findings; the final pass reports no actionable findings.
-- `.9` has 223 package tests passing plus one intentional Docker-isolation skip. Monorepo formatting,
-  typecheck, lint, documentation lint, and dependency-cycle checks pass. Repeated independent review
-  closed finalization ordering, merge/cancellation races, recovery identity, clock/fence, timeout,
-  wait binding, repair-child lineage, cross-store broker, and mutation-port replacement findings;
-  the final pass reports `PASS`.
-- `.10` has 271 workflow-control tests passing plus one intentional isolation skip. Full monorepo
-  format, lint, typecheck, build, tests, docs, and dependency-cycle gates pass; one unrelated API test
-  run returned two transient 403s and both the isolated rerun and complete rerun passed. Seven critic
-  rounds closed two-boundary authority, approval, evidence, prototype, transaction, and recovery
-  findings; the final pass reports `PASS`.
-- SonarQube hotspot `AZ4YM2i11EaT2bQAPFS4` is `REVIEWED / FIXED`; zero hotspots remain.
-- Sonar's installed agentic CLI reached its server-side endpoint for `.7` but returned an explicit
-  `403`; the documented local fallback gates are the completion evidence for this task.
+- Concrete Git-only `BootstrapCoordinator` now binds a strict stored full policy to exact approval,
+  keeps canonical original workspace authority separate from the approved repair4 source, observes
+  the existing ref through lawful transitions, atomically establishes its initial head ledger,
+  commits/pushes the exact reviewed tree and records secure `implementation_artifact_ready` evidence.
+- `bootstrap-preflight` is read-only even on an old journal: no migration, Git object/index writes,
+  remote or Beads calls. Mutating APIs require actual exact approval and pinned reviewed adapters.
+- Cancellation transactionally fences queued continuation/phase/approval work and rejects new
+  claims. Started execution/credentials/prepared effects and inflight transports must be observed
+  settled; lost notification acknowledgements use observation-only recovery during cancellation.
+- New tests cross real executable subprocesses and temporary worktree/bare-remote Git boundaries.
+  Their approvals/adapters are fixtures, not live provider or credential conformance.
 
-## Current State
+## Current local gates
 
-- Epic `agent-platform-multi-agent` remains open; `.1`-`.9` and repair child `.repair.1` are closed and
-  Dolt-synced. `.10` remains in progress until protected delivery and final closeout complete.
-- The exact v1 task-to-feature contract is machine-valid with material digest
-  `sha256:affc3fadf66acc056898c59e190e22c413699684e154ae00c90e54643911e83d`.
-- No GitHub delivery mutation has occurred. The staging intent must be derived from the final task SHA
-  and explicitly approved before push/PR; the feature contract is instantiated and separately
-  approved only after the task-to-feature squash merge reveals the integrated head.
+All commands ran for the bootstrap correction in the repair4 worktree on 2026-09-07 and exited 0:
 
-## Next
+- `pnpm build`
+- `pnpm typecheck`
+- `pnpm lint`
+- `LANGCHAIN_TRACING_V2=false LANGSMITH_TRACING=false pnpm test` — full recursive run passed;
+  workflow-control 424 passed, one opt-in Docker isolation test skipped.
+- `pnpm format:check`
+- `pnpm docs:lint` — Markdown and local relative-link checks passed.
+- `pnpm deps:check-cycles` — no cycles after fixing the new bootstrap journal's type-import cycle;
+  77 unresolved imports were skipped by the checker.
 
-1. Commit this handoff, derive the exact pre-merge staging-intent digest from the final task SHA, and
-   obtain explicit owner approval for the v1 contract plus intent.
-2. Push `.10`, open the squash PR to `feature/multi-agent-orchestration`, and require all hosted gates.
-3. Derive, critique, and obtain owner approval for the exact post-merge feature-delivery contract;
-   then squash the protected PR to `staging` after every required check passes.
-4. Close `.10` and the epic, push Dolt, and finalize the acceptance report without promoting `main`.
+Runtime tests cross a real child-process boundary with fixture transports. They are not actual
+Docker/Codex conformance. Current hosted checks, Sonar/IDE Problems, and an actual standalone pilot
+must be evidenced separately; prior historical results do not certify this candidate.
+
+Bootstrap correction package `build`, `typecheck`, `lint`, and `test` also passed after the dependency
+fix; 424 tests passed, one opt-in Docker isolation test skipped. Terminal quality gates pass. Current
+Sonar/IDE Problems evidence is unverified: no candidate code was uploaded under the no-network-write
+scope, and no IDE Problems reader was available. Do not call the complete delivery gate satisfied.
+
+## Read-only runtime observation
+
+- Bootstrap run `bootstrap-agent-platform-multi-agent.repair.4-20260906`: `approved`, version 0,
+  active owner approval. No transitions, delivery operations, scheduler executions or cancellation
+  records for that run. Predecessor run is cancelled; observed old leases were expired.
+- Live journal remains schema version 10. It was opened only read-only with `query_only = ON`.
+- Approved workspace digest refers to the original checkout, not repair4. Task-level operations do
+  not grant Git commit/push; only top-level authority/prose mention them. Do not edit that immutable
+  contract or treat prose as a bypass. There is no bootstrap approved-head ledger.
+- `session.md` is outside the bootstrap contract's `docs` / `packages/workflow-control` allowed paths.
+  Do not include this local handoff in a brokered bootstrap commit without explicit path authority.
+
+## Remaining integration and safe next action
+
+1. Resolve contract/workspace/task-level commit/push authority with fresh review and approval. Preserve
+   the existing journal and candidate. No direct Git or Beads write is authorized by this handoff.
+2. Review the concrete bootstrap composition and prepare the final full policy: exact source/canonical
+   realpaths/common Git directory, ref/initial head, full candidate manifest/tree/diff, remote CAS,
+   real author, unchanged full Beads snapshot, exact test/review producers and evidence. Supply pinned
+   owner-only read/remote adapter executables and narrow credentials. The implementation exists;
+   actual immutable approval, runtime provisioning and live migration authorization do not.
+   Historical runtime scripts contain repair3-specific CAS/tree code and no-op cleanup callbacks;
+   they are not trusted repair4 execution or cleanup adapters and must not be rerun.
+3. Resolve revised-contract lineage compatibility: current import demands matching source/target
+   policy digest/version, and its separate ledger is not yet consumed by existing delivery gates.
+4. For standalone execution, provide the real revocable credential broker, pinned image, constrained
+   network, non-root identity and approved phase-role config. Implementation artifact import and
+   coordinator receipts remain missing; unsupported phases stop visibly, never report fake success.
+5. Only after actual task-only commit/push and exact artifact attestation, terminalize the bootstrap
+   with `planned_authority_handoff`, prove cleanup/fencing and unchanged in-progress Beads, then obtain
+   fresh approval for the distinct delivery run. Perform exact lineage import before external pilot
+   operations. Do not open a PR, notify, mutate Beads/threads or merge under bootstrap authority.
+6. Require all seven hosted feature-boundary checks and current exact-head review/owner intent before
+   delivery to `feature/multi-agent-orchestration`. Staging needs a separate later contract; never main.

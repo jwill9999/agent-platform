@@ -1,6 +1,7 @@
 export {
   EXECUTION_CONTRACT_VERSION,
   agentResultSchema,
+  assertAgentResultAccepted,
   assertTaskPacketWithinContract,
   evidenceReferenceSchema,
   executionContractSchema,
@@ -18,6 +19,57 @@ export {
   type WorkflowOperation,
   type WorkflowRole,
 } from './contracts.js';
+export {
+  DELEGATE_CALLBACK_TARGETS,
+  ApprovalNotificationCoordinator,
+  DelegateCallbackCoordinator,
+  createParentWakePortForTest,
+  GovernedOperationBroker,
+  approvalNotificationSchema,
+  approvalNotificationStateSchema,
+  assertProductionGovernedPort,
+  assertZeroUnresolvedThreads,
+  createProductionApprovalNotificationPort,
+  beadsTaskNoteUpdateSchema,
+  delegateCallbackSchema,
+  delegateCallbackTarget,
+  delegateTerminalStatusSchema,
+  digestGovernedValue,
+  githubReviewThreadReplySchema,
+  githubReviewThreadResolveSchema,
+  githubReviewThreadsObserveSchema,
+  governedExternalRequestSchema,
+  lineageImportSchema,
+  validateApprovalNotificationTransition,
+  type ApprovalNotification,
+  type ApprovalNotificationTransportClient,
+  type ApprovalNotificationJournal,
+  type ApprovalNotificationPort,
+  type ApprovalNotificationRecord,
+  type ApprovalNotificationState,
+  type BeadsTaskWithNotesSnapshot,
+  type DelegateCallback,
+  type DelegateCallbackStore,
+  type ParentWakePort,
+  type DelegateTerminalStatus,
+  type GovernedExternalRequest,
+  type GovernedJournalRecord,
+  type GovernedJournalStatus,
+  type GovernedMutationPort,
+  type GovernedOperationJournal,
+  type NarrowBeadsNotesClient,
+  type NarrowGitHubReviewClient,
+  type NarrowGovernedExternalClient,
+  type ReviewThreadSnapshot,
+} from './governedOperations.js';
+export {
+  createWorkflowStoreApprovalNotificationJournal,
+  createWorkflowStoreDelegateCallbackStore,
+  importWorkflowLineage,
+  createTrustedLineageObservationPortForTest,
+  type TrustedLineageObservationPort,
+} from './governedPersistence.js';
+export { createTrustedGovernedExternalPort } from './trustedGovernedComposition.js';
 export {
   FEATURE_DELIVERY_CONTRACT_VERSION,
   deriveFeatureDeliveryContractDigest,
@@ -138,6 +190,7 @@ export {
   createTaskRefRequestSchema,
   deliveryRequestSchema,
   deriveDeliveryRequestDigest,
+  createWorkflowStoreGovernedJournal,
   exactTreeCommitRequestSchema,
   githubChecksRequestSchema,
   githubMergeRequestSchema,
@@ -201,6 +254,7 @@ export {
   type TransitionRecord,
   type TransitionStatus,
   type WorkflowControlPaths,
+  type DelegateCallbackDispositionRecord,
 } from './storage.js';
 export {
   WorkflowCancellationCoordinator,
@@ -270,3 +324,49 @@ export {
   type TransitionContext,
   type WorkflowState,
 } from './stateMachine.js';
+export {
+  ContinuationJournal,
+  type ContinuationJob,
+  type ContinuationAction,
+} from './continuationJournal.js';
+export {
+  PhaseJobJournal,
+  PHASE_JOB_DISPATCH,
+  executePhaseActionSchema,
+  phaseActionForCallback,
+  type ExecutePhaseAction,
+  type PhaseJob,
+} from './phaseJobs.js';
+export {
+  StandalonePhaseRuntime,
+  phaseRuntimeConfigSchema,
+  readPhaseRuntimeConfig,
+  type PhaseRuntimeConfig,
+} from './phaseRuntime.js';
+export {
+  specialistInputEnvelopeSchema,
+  specialistExecutionDigest,
+  type SpecialistInputEnvelope,
+} from './specialistInput.js';
+export {
+  ContinuationWorker,
+  createProcessParentExecutionHost,
+  createCommandParentExecutionHost,
+  assertDesktopHostConformance,
+  type AsyncParentExecutionHost,
+  type ContinuationWorkerOptions,
+} from './continuationWorker.js';
+export {
+  ContinuationNotificationDispatcher,
+  JsonlContinuationNotificationSink,
+  type ContinuationEvent,
+  type ContinuationNotificationSink,
+} from './continuationNotifications.js';
+export { BootstrapCoordinator, bootstrapPreflight, type BootstrapFault } from './bootstrap.js';
+export {
+  bootstrapPolicySchema,
+  implementationArtifactReadySchema,
+  bootstrapDigest,
+  observeBootstrapCandidate,
+  type BootstrapPolicy,
+} from './bootstrapPolicy.js';

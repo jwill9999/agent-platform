@@ -6,6 +6,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 
 import type { ExternalObservation } from './reconciliation.js';
 import { registerProductionDeliveryPort } from './deliveryPortCapability.js';
+import { assertBootstrapCandidate, type BootstrapPolicy } from './bootstrapPolicy.js';
 import type {
   DeliveryMutationPort,
   DeliveryRequest,
@@ -14,6 +15,13 @@ import type {
 import type { GitHubDeliveryPort } from './githubDeliveryPort.js';
 
 type GitDeliveryRequest = Extract<DeliveryRequest, { kind: `git.${string}` }>;
+const bootstrapGitCapability = Symbol('bootstrapGitCapability');
+
+function compareCodeUnits(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
 
 export interface BrokeredRemoteRefClient {
   observeRef(input: {
@@ -70,6 +78,14 @@ function parseChangedPaths(output: Buffer): string[] {
 
 export class LocalGitDeliveryPort implements DeliveryMutationPort {
   readonly #workspaceRoot: string;
+  readonly #sourceRoot: string;
+  readonly #bootstrap:
+    | {
+        policy: BootstrapPolicy;
+        assertAuthority: () => void;
+        withMutation: <T>(operation: () => T) => T;
+      }
+    | undefined;
   readonly #remoteName: string;
   readonly #observeRemoteRef: BrokeredRemoteRefClient['observeRef'];
   readonly #pushRemoteRef: BrokeredRemoteRefClient['pushCas'];
@@ -81,20 +97,27 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
     remoteName: string;
     remote: BrokeredRemoteRefClient;
     gitBinary?: string;
+    bootstrap?: {
+      policy: BootstrapPolicy;
+      assertAuthority: () => void;
+      withMutation: <T>(operation: () => T) => T;
+    };
   }) {
     this.#workspaceRoot = realpathSync(input.workspaceRoot);
+    this.#bootstrap = input.bootstrap;
+    this.#sourceRoot = input.bootstrap?.policy.sourceRoot ?? this.#workspaceRoot;
     this.#remoteName = input.remoteName;
     this.#observeRemoteRef = input.remote.observeRef.bind(input.remote);
     this.#pushRemoteRef = input.remote.pushCas.bind(input.remote);
     this.#gitBinary = input.gitBinary ?? (process.platform === 'win32' ? 'git' : '/usr/bin/git');
     const topLevel = realpathSync(this.#git(['rev-parse', '--show-toplevel']).trim());
-    if (topLevel !== this.#workspaceRoot) {
+    if (topLevel !== this.#sourceRoot) {
       throw new Error('Git delivery workspace is not the canonical repository top-level');
     }
     const commonDir = this.#git(['rev-parse', '--git-common-dir']).trim();
     this.#gitCommonDir = isAbsolute(commonDir)
       ? realpathSync(commonDir)
-      : realpathSync(resolve(this.#workspaceRoot, commonDir));
+      : realpathSync(resolve(this.#sourceRoot, commonDir));
   }
 
   static create(input: {
@@ -115,6 +138,36 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       throw new Error('test Git delivery configuration is unavailable outside the test runtime');
     }
     return new LocalGitDeliveryPort(input);
+  }
+
+  /** Internal bootstrap composition: no GitHub client or authority is introduced. */
+  static createBootstrap(
+    input: {
+      policy: BootstrapPolicy;
+      remote: BrokeredRemoteRefClient;
+      assertAuthority: () => void;
+      withMutation: <T>(operation: () => T) => T;
+    },
+    capability: symbol,
+  ): ProductionDeliveryMutationPort {
+    if (capability !== bootstrapGitCapability)
+      throw new Error('bootstrap Git composition capability required');
+    const git = new LocalGitDeliveryPort({
+      workspaceRoot: input.policy.canonicalRoot,
+      remoteName: input.policy.remoteName,
+      remote: input.remote,
+      bootstrap: {
+        policy: input.policy,
+        assertAuthority: input.assertAuthority,
+        withMutation: input.withMutation,
+      },
+    });
+    return registerProductionDeliveryPort({
+      workspaceRoot: input.policy.canonicalRoot,
+      repository: input.policy.repository,
+      observe: git.observe.bind(git),
+      mutate: git.mutate.bind(git),
+    });
   }
 
   get workspaceRoot(): string {
@@ -141,6 +194,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
   }
 
   async observe(request: DeliveryRequest): Promise<ExternalObservation> {
+    this.#assertBootstrap(request);
     this.#assertNoReplacementMetadata();
     if (!request.kind.startsWith('git.'))
       throw new Error('local Git port received a GitHub request');
@@ -188,6 +242,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
   }
 
   async mutate(request: DeliveryRequest): Promise<unknown> {
+    this.#assertBootstrap(request);
     this.#assertNoReplacementMetadata();
     if (!request.kind.startsWith('git.'))
       throw new Error('local Git port received a GitHub request');
@@ -216,6 +271,12 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
   }
 
   #createExactCommit(request: Extract<GitDeliveryRequest, { kind: 'git.commit' }>): unknown {
+    return this.#bootstrap === undefined
+      ? this.#createExactCommitLocked(request)
+      : this.#bootstrap.withMutation(() => this.#createExactCommitLocked(request));
+  }
+
+  #createExactCommitLocked(request: Extract<GitDeliveryRequest, { kind: 'git.commit' }>): unknown {
     if (this.#readRef(request.ref) !== request.parentSha) {
       throw new Error('task ref changed before exact-tree commit');
     }
@@ -239,11 +300,13 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
         GIT_COMMITTER_EMAIL: request.authorEmail,
         GIT_COMMITTER_DATE: `${request.authoredAtUnix} +0000`,
       };
+      this.#assertBootstrap(request);
       const commitSha = this.#git(
         ['commit-tree', treeSha, '-p', request.parentSha],
         identityEnvironment,
         `${request.message}\n`,
       ).trim();
+      this.#assertBootstrap(request);
       this.#git(['update-ref', request.ref, commitSha, request.parentSha]);
       this.#assertExactCommit(request, commitSha);
       return { ref: request.ref, sha: commitSha, treeSha };
@@ -342,8 +405,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       '--name-status',
       '-z',
       '-r',
-      '--find-renames',
-      '--find-copies',
+      ...(this.#bootstrap === undefined ? ['--find-renames', '--find-copies'] : ['--no-renames']),
       parentSha,
       treeSha,
     ]);
@@ -368,6 +430,44 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       }
       throw error;
     }
+  }
+
+  #assertBootstrap(request: DeliveryRequest): void {
+    if (this.#bootstrap === undefined) return;
+    const { policy, assertAuthority } = this.#bootstrap;
+    assertAuthority();
+    if (
+      !['git.commit', 'git.push'].includes(request.kind) ||
+      request.repository !== policy.repository ||
+      !('ref' in request) ||
+      request.ref !== policy.ref
+    )
+      throw new Error('bootstrap Git-only request rejected');
+    if (
+      request.kind === 'git.commit' &&
+      (request.parentSha !== policy.initialHeadSha ||
+        request.treeSha !== policy.treeSha ||
+        request.diffDigest !== policy.diffDigest ||
+        JSON.stringify([...request.changedFiles].sort(compareCodeUnits)) !==
+          JSON.stringify(policy.manifest.map((item) => item.path)) ||
+        request.authorName !== policy.author.name ||
+        request.authorEmail !== policy.author.email ||
+        request.authoredAtUnix !== policy.author.authoredAtUnix ||
+        request.message !== policy.author.message)
+    )
+      throw new Error('bootstrap commit differs from approved policy');
+    if (request.kind === 'git.push' && request.expectedRemoteSha !== policy.expectedRemoteSha)
+      throw new Error('bootstrap push differs from approved remote precondition');
+    const head = this.#readRef(policy.ref);
+    if (head === null) throw new Error('bootstrap task ref is absent');
+    if (request.kind === 'git.commit' && head !== policy.initialHeadSha)
+      this.#assertExactCommit(request, head);
+    if (request.kind === 'git.push' && head !== request.newSha)
+      throw new Error('bootstrap push head changed');
+    assertBootstrapCandidate(policy, head);
+    // Authority may expire while candidate/Git/Beads observations block.
+    // The supplied authority check ends with a fresh fence read.
+    assertAuthority();
   }
 
   #git(args: readonly string[], extraEnvironment: NodeJS.ProcessEnv = {}, input?: string): string {
@@ -396,7 +496,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
         ...args,
       ],
       {
-        cwd: this.#workspaceRoot,
+        cwd: this.#sourceRoot,
         env: {
           PATH: process.env.PATH,
           LANG: 'C',
@@ -416,6 +516,16 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       },
     );
   }
+}
+
+/** Package-internal construction; not exported from the public package index. */
+export function createProductionBootstrapGitPort(input: {
+  policy: BootstrapPolicy;
+  remote: BrokeredRemoteRefClient;
+  assertAuthority: () => void;
+  withMutation: <T>(operation: () => T) => T;
+}): ProductionDeliveryMutationPort {
+  return LocalGitDeliveryPort.createBootstrap(input, bootstrapGitCapability);
 }
 
 export class CompositeDeliveryMutationPort implements ProductionDeliveryMutationPort {

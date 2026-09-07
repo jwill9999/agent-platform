@@ -36,6 +36,7 @@ describe('validateTransition', () => {
       for (const to of destinations) {
         const context: TransitionContext = {
           ...currentContext,
+          recoveryTarget: to === 'recovering' ? (from as WorkflowState) : undefined,
           finalizationVerified: from === 'finalizing' && to === 'closed',
           wait:
             from === 'waiting'
@@ -44,6 +45,25 @@ describe('validateTransition', () => {
                   nextPollAt: '2026-08-31T10:05:00.000Z',
                   absoluteWaitDeadline: '2026-08-31T11:00:00.000Z',
                   matchingEventReceived: false,
+                }
+              : undefined,
+          approval:
+            from === 'approval_waiting'
+              ? {
+                  predecessor:
+                    to === 'task_accepted' || to === 'repair'
+                      ? 'task_review'
+                      : to === 'pipeline'
+                        ? 'feature_evaluation'
+                        : to === 'implementing'
+                          ? 'repair_planning'
+                          : to === 'delivery' || to === 'repair_planning'
+                            ? 'pipeline'
+                            : 'finalizing',
+                  resumeTarget: to,
+                  authenticatedApproval: true,
+                  resumeDeliveryAcknowledged: true,
+                  deadlineElapsed: to === 'escalated',
                 }
               : undefined,
         };

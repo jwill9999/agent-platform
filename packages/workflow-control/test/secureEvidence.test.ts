@@ -288,6 +288,19 @@ describe('SecureEvidenceVault', () => {
     expect(store.sumLiveSecureEvidenceBytes('run-evidence')).toBeLessThanOrEqual(140);
   });
 
+  it.each(['/root/progression_critic_astra', '/root/bootstrap_verification_astra'])(
+    'does not exempt bootstrap producer identifiers from ordinary evidence scanning: %s',
+    async (producer) => {
+      const { vault, store } = await setup();
+      try {
+        await expect(vault.record(input(producer))).rejects.toThrow('residual secret scanning');
+        expect(store.sumLiveSecureEvidenceBytes('run-evidence')).toBe(0);
+      } finally {
+        store.close();
+      }
+    },
+  );
+
   it('rejects a producer role forged against the authenticated process capability', async () => {
     const root = await mkdtemp(join(tmpdir(), 'secure-evidence-capability-'));
     roots.push(root);

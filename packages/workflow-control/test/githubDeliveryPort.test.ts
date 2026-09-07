@@ -16,10 +16,33 @@ const workspaceId = `sha256:${'b'.repeat(64)}`;
 const protectionDigest = `sha256:${'c'.repeat(64)}`;
 const headSha = '2'.repeat(40);
 
+function mergeObservation(
+  snapshot: GitHubPullRequestSnapshot,
+  request: Extract<DeliveryRequest, { kind: 'github.merge' }>,
+) {
+  return {
+    repository: snapshot.repository,
+    pullRequestNumber: snapshot.number,
+    headSha: snapshot.headSha,
+    base: snapshot.base,
+    protectionDigest: snapshot.protectionDigest,
+    reviewDecision: snapshot.reviewDecision,
+    requiredChecks: [...request.requiredChecks],
+    checks: snapshot.checks,
+    reviewEventIdentity: snapshot.latestReviewEventIdentity,
+    threads: snapshot.reviewThreads,
+  };
+}
+
+function valueDigest(value: unknown): string {
+  return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
+}
+
 class MemoryGitHubClient implements NarrowGitHubDeliveryClient {
   snapshot: GitHubPullRequestSnapshot | null = null;
   creates = 0;
   merges = 0;
+  beforeCompareAndMerge: (() => void) | undefined;
 
   async findPullRequest(): Promise<GitHubPullRequestSnapshot | null> {
     return this.snapshot;
@@ -36,16 +59,23 @@ class MemoryGitHubClient implements NarrowGitHubDeliveryClient {
     });
   }
 
-  async mergePullRequest(
-    request: Extract<DeliveryRequest, { kind: 'github.merge' }>,
+  async compareAndMergePullRequest(
+    request: Extract<DeliveryRequest, { kind: 'github.merge' }> & {
+      expectedReviewEventIdentity: string;
+      verifiedObservationDigest: string;
+    },
   ): Promise<void> {
+    this.beforeCompareAndMerge?.();
     if (this.snapshot === null) throw new Error('PR disappeared');
+    const currentObservationDigest = valueDigest(mergeObservation(this.snapshot, request));
     if (
       this.snapshot.headSha !== request.headSha ||
       this.snapshot.base !== request.base ||
       this.snapshot.protectionDigest !== request.protectionDigest ||
       this.snapshot.reviewDecision !== 'approved' ||
-      request.requiredChecks.some((check) => this.snapshot?.checks[check] !== 'success')
+      request.requiredChecks.some((check) => this.snapshot?.checks[check] !== 'success') ||
+      this.snapshot.latestReviewEventIdentity !== request.expectedReviewEventIdentity ||
+      request.verifiedObservationDigest !== currentObservationDigest
     ) {
       throw new Error('conditional merge precondition changed');
     }
@@ -86,6 +116,8 @@ function snapshot(override: Partial<GitHubPullRequestSnapshot> = {}): GitHubPull
     mergeMethod: null,
     mergeSha: null,
     eventIdentity: 'event-open',
+    latestReviewEventIdentity: 'review-event-open',
+    reviewThreads: [],
     mergeAttestation: null,
     ...override,
   };
@@ -119,9 +151,21 @@ function mergeRequest(): Extract<DeliveryRequest, { kind: 'github.merge' }> {
 }
 
 describe('GitHubDeliveryPort', () => {
+  it('rejects public or prototype-forged construction as trusted production composition', () => {
+    const client = new MemoryGitHubClient();
+    expect(
+      () =>
+        new GitHubDeliveryPort(
+          client,
+          'example/repository',
+          Symbol('attacker-bootstrap-capability'),
+        ),
+    ).toThrow('package bootstrap capability');
+  });
+
   it('creates one exact PR and observes an idempotent replay', async () => {
     const client = new MemoryGitHubClient();
-    const port = new GitHubDeliveryPort(client, 'example/repository');
+    const port = GitHubDeliveryPort.createForTest(client, 'example/repository');
     const body = 'Approved delivery evidence';
     const request: DeliveryRequest = {
       ...binding(),
@@ -143,7 +187,7 @@ describe('GitHubDeliveryPort', () => {
   it('returns exact check observations without exposing a mutation path', async () => {
     const client = new MemoryGitHubClient();
     client.snapshot = snapshot({ checks: { test: 'success', review: 'pending' } });
-    const port = new GitHubDeliveryPort(client, 'example/repository');
+    const port = GitHubDeliveryPort.createForTest(client, 'example/repository');
     const request: DeliveryRequest = {
       ...binding(),
       kind: 'github.checks',
@@ -171,7 +215,7 @@ describe('GitHubDeliveryPort', () => {
   ])('rejects merge when GitHub reports %s', async (_name, override) => {
     const client = new MemoryGitHubClient();
     client.snapshot = snapshot(override);
-    const port = new GitHubDeliveryPort(client, 'example/repository');
+    const port = GitHubDeliveryPort.createForTest(client, 'example/repository');
 
     await expect(port.observe(mergeRequest())).resolves.toMatchObject({ kind: 'conflict' });
     expect(client.merges).toBe(0);
@@ -180,19 +224,22 @@ describe('GitHubDeliveryPort', () => {
   it('conditionally merges and recognizes the exact merged result', async () => {
     const client = new MemoryGitHubClient();
     client.snapshot = snapshot();
-    const port = new GitHubDeliveryPort(client, 'example/repository');
+    const port = GitHubDeliveryPort.createForTest(client, 'example/repository');
     const request = mergeRequest();
     let redirected = false;
     client.findPullRequest = async () => {
       redirected = true;
       return null;
     };
-    client.mergePullRequest = async () => {
+    client.compareAndMergePullRequest = async () => {
       redirected = true;
     };
 
     await expect(port.observe(request)).resolves.toMatchObject({ kind: 'unchanged' });
-    await port.mutate(request);
+    await port.mutate(request, {
+      reviewEventIdentity: 'review-event-open',
+      verifiedObservationDigest: valueDigest(mergeObservation(snapshot(), request)),
+    });
     expect(redirected).toBe(false);
     if (client.snapshot === null) throw new Error('expected merged snapshot');
     const mergedSnapshot = client.snapshot;
@@ -215,6 +262,24 @@ describe('GitHubDeliveryPort', () => {
       client.snapshot = { ...mergedSnapshot, ...identityChange };
       await expect(port.observe(request)).resolves.toMatchObject({ kind: 'conflict' });
     }
+  });
+
+  it('fails the atomic compare-and-merge when review state changes inside mutation', async () => {
+    const client = new MemoryGitHubClient();
+    client.snapshot = snapshot();
+    client.beforeCompareAndMerge = () => {
+      if (client.snapshot !== null) {
+        client.snapshot = { ...client.snapshot, latestReviewEventIdentity: 'late-review-event' };
+      }
+    };
+    const port = GitHubDeliveryPort.createForTest(client, 'example/repository');
+    await expect(
+      port.mutate(mergeRequest(), {
+        reviewEventIdentity: 'review-event-open',
+        verifiedObservationDigest: valueDigest(mergeObservation(snapshot(), mergeRequest())),
+      }),
+    ).rejects.toThrow('conditional merge precondition changed');
+    expect(client.merges).toBe(0);
   });
 });
 

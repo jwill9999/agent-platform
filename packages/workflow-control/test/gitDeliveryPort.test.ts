@@ -140,13 +140,13 @@ describe('LocalGitDeliveryPort', () => {
       async createPullRequest() {
         throw new Error('not used');
       },
-      async mergePullRequest() {
+      async compareAndMergePullRequest() {
         throw new Error('not used');
       },
     };
     const composite = CompositeDeliveryMutationPort.create(
       port,
-      new GitHubDeliveryPort(githubClient, 'example/repository'),
+      GitHubDeliveryPort.createForTest(githubClient, 'example/repository'),
     );
     let redirected = false;
     (port as unknown as { mutate: typeof port.mutate }).mutate = async () => {

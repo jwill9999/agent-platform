@@ -12,6 +12,7 @@ import {
 } from './contracts.js';
 import type { ExternalObservation } from './reconciliation.js';
 import { isProductionDeliveryPort } from './deliveryPortCapability.js';
+import type { GovernedJournalRecord, GovernedOperationJournal } from './governedOperations.js';
 import {
   workflowDeliveryMutationCapability,
   type AuthorizedRunTask,
@@ -152,7 +153,13 @@ export interface DeliveryFence {
 
 export interface DeliveryMutationPort {
   observe(request: DeliveryRequest): Promise<ExternalObservation>;
-  mutate(request: DeliveryRequest): Promise<unknown>;
+  mutate(
+    request: DeliveryRequest,
+    verifiedMergePrecondition?: {
+      reviewEventIdentity: string;
+      verifiedObservationDigest: string;
+    },
+  ): Promise<unknown>;
 }
 
 export interface ProductionDeliveryMutationPort extends DeliveryMutationPort {
@@ -186,6 +193,7 @@ export type PipelineObservationDecision =
 
 export type DeliveryFaultBoundary =
   | 'after_prepare'
+  | 'after_verified_observation'
   | 'before_mutation'
   | 'after_mutation'
   | 'before_commit'
@@ -218,6 +226,102 @@ function correspondingAuthority(kind: DeliveryRequest['kind']): WorkflowOperatio
   if (kind === 'git.push') return 'git.push';
   if (kind === 'github.checks') return 'github.read';
   return 'github.deliver';
+}
+
+/** Binds the governed broker to the same SQLite delivery journal and lease checks as Git/GitHub. */
+export function createWorkflowStoreGovernedJournal(
+  store: WorkflowStore,
+  clock: () => number = Date.now,
+): GovernedOperationJournal {
+  const asGoverned = (operation: DeliveryOperationRecord): GovernedJournalRecord => ({
+    id: operation.id,
+    requestDigest: operation.requestDigest,
+    request: operation.request as GovernedJournalRecord['request'],
+    status: operation.status,
+    result: operation.result,
+  });
+  return {
+    guard(id, fence, initiate) {
+      return store.guardGovernedMutation(
+        { id, ...fence, initiate, clock },
+        workflowDeliveryMutationCapability,
+      );
+    },
+    adopt(id, fence) {
+      return asGoverned(
+        store.adoptPreparedDeliveryOperation(
+          { id, ...fence, nowMs: clock() },
+          workflowDeliveryMutationCapability,
+        ),
+      );
+    },
+    prepare(record) {
+      const request = record.request;
+      return asGoverned(
+        store.prepareDeliveryOperation(
+          {
+            id: record.id,
+            workspaceId: request.workspaceId,
+            runId: request.runId,
+            taskId: request.taskId,
+            kind: request.kind,
+            actorRole: request.actorRole,
+            requestDigest: record.requestDigest,
+            request,
+            contractVersion: request.contractVersion,
+            policyDigest: request.policyDigest,
+            ownerId: request.ownerId,
+            workspaceLeaseEpoch: request.workspaceLeaseEpoch,
+            runLeaseEpoch: request.runLeaseEpoch,
+            taskLeaseEpoch: request.taskLeaseEpoch,
+            nowMs: clock(),
+          },
+          workflowDeliveryMutationCapability,
+        ),
+      );
+    },
+    get(id) {
+      const operation = store.getDeliveryOperation(id);
+      return operation === undefined ? undefined : asGoverned(operation);
+    },
+    commit(id, _expectedStatus, result) {
+      const operation = store.getDeliveryOperation(id);
+      if (operation === undefined) throw new Error('governed operation not found');
+      return asGoverned(
+        store.commitDeliveryOperation(
+          {
+            id,
+            ownerId: operation.ownerId,
+            workspaceLeaseEpoch: operation.workspaceLeaseEpoch,
+            runLeaseEpoch: operation.runLeaseEpoch,
+            taskLeaseEpoch: operation.taskLeaseEpoch,
+            result,
+            assertExternalState: () => undefined,
+            clock,
+          },
+          workflowDeliveryMutationCapability,
+        ),
+      );
+    },
+    escalate(id, _expectedStatus, result) {
+      const operation = store.getDeliveryOperation(id);
+      if (operation === undefined) throw new Error('governed operation not found');
+      return asGoverned(
+        store.escalateDeliveryOperation(
+          {
+            id,
+            ownerId: operation.ownerId,
+            workspaceLeaseEpoch: operation.workspaceLeaseEpoch,
+            runLeaseEpoch: operation.runLeaseEpoch,
+            taskLeaseEpoch: operation.taskLeaseEpoch,
+            result,
+            nowMs: clock(),
+          },
+          workflowDeliveryMutationCapability,
+        ),
+      );
+    },
+  };
 }
 
 function sameOrderedSet(actual: readonly string[], expected: readonly string[]): boolean {
@@ -435,6 +539,9 @@ export class DurableDeliveryBroker {
     this.#assertOperationFence(operation, fence);
     this.#assertReady(operation, fence);
     this.#fault('after_prepare', operation);
+    if (request.kind === 'github.merge') {
+      return this.#executeProviderAttestedMerge(request, operation, fence);
+    }
     const before = await this.#port.observe(request);
     if (before.kind === 'conflict') return this.#escalate(operation, fence, before.result);
     if (before.kind === 'unchanged') {
@@ -487,104 +594,7 @@ export class DurableDeliveryBroker {
           workflowDeliveryMutationCapability,
         );
         this.#fault('after_adoption', operation);
-        if (operation.resultJson !== null) {
-          operations.push(
-            this.#escalate(operation, input.fence, {
-              reason: 'prepared_delivery_journal_contains_result',
-            }),
-          );
-          continue;
-        }
-        let persistedRequest: unknown;
-        try {
-          persistedRequest = JSON.parse(operation.requestJson) as unknown;
-        } catch {
-          operations.push(
-            this.#escalate(operation, input.fence, { reason: 'delivery_journal_request_invalid' }),
-          );
-          continue;
-        }
-        if (
-          deriveDeliveryRequestDigest(persistedRequest) !== operation.requestDigest ||
-          operation.id !== operation.requestDigest
-        ) {
-          operations.push(
-            this.#escalate(operation, input.fence, { reason: 'delivery_journal_digest_mismatch' }),
-          );
-          continue;
-        }
-        const parsed = deliveryRequestSchema.safeParse(persistedRequest);
-        if (!parsed.success) {
-          operations.push(
-            this.#escalate(operation, input.fence, { reason: 'delivery_journal_request_invalid' }),
-          );
-          continue;
-        }
-        const request = parsed.data;
-        if (request.runId !== input.runId) {
-          operations.push(
-            this.#escalate(operation, input.fence, { reason: 'delivery_journal_run_mismatch' }),
-          );
-          continue;
-        }
-        assertRequestWithinContract(
-          this.#contract,
-          request,
-          this.#policy,
-          this.#store.getAuthorizedRunTask(
-            request.runId,
-            request.taskId,
-            workflowDeliveryMutationCapability,
-          ),
-        );
-        let observed = await this.#port.observe(request);
-        if (observed.kind === 'conflict') {
-          operations.push(this.#escalate(operation, input.fence, observed.result));
-          continue;
-        }
-        if (observed.kind === 'unchanged') {
-          this.#assertReady(operation, input.fence);
-          observed = await this.#port.observe(request);
-          if (observed.kind === 'conflict') {
-            operations.push(this.#escalate(operation, input.fence, observed.result));
-            continue;
-          }
-          if (observed.kind === 'unchanged') {
-            this.#assertReady(operation, input.fence);
-            await this.#port.mutate(request);
-            this.#fault('after_replay_mutation', operation);
-          }
-        }
-        const after = await this.#port.observe(request);
-        if (after.kind !== 'expected') {
-          if (after.kind === 'conflict') {
-            operations.push(this.#escalate(operation, input.fence, after.result));
-            continue;
-          }
-          throw new Error('replayed delivery mutation remains ambiguous');
-        }
-        let durableResult: unknown;
-        try {
-          durableResult = normalizeDurableResult(after.result);
-        } catch {
-          operations.push(
-            this.#escalate(operation, input.fence, {
-              reason: 'delivery_port_result_not_json',
-            }),
-          );
-          continue;
-        }
-        operation = this.#store.commitDeliveryOperation(
-          {
-            id: operation.id,
-            ...input.fence,
-            result: durableResult,
-            assertExternalState: () => undefined,
-            clock: this.#clock,
-          },
-          workflowDeliveryMutationCapability,
-        );
-        operations.push(operation);
+        operations.push(await this.#reconcileOperation(operation, input.runId, input.fence));
       } catch (error) {
         errors.push({
           operationId: operation?.id ?? prepared.id,
@@ -593,6 +603,92 @@ export class DurableDeliveryBroker {
       }
     }
     return { operations, errors };
+  }
+
+  async #reconcileOperation(
+    operation: DeliveryOperationRecord,
+    runId: string,
+    fence: DeliveryFence,
+  ): Promise<DeliveryOperationRecord> {
+    if (operation.resultJson !== null) {
+      return this.#escalate(operation, fence, {
+        reason: 'prepared_delivery_journal_contains_result',
+      });
+    }
+    let persistedRequest: unknown;
+    try {
+      persistedRequest = JSON.parse(operation.requestJson) as unknown;
+    } catch {
+      return this.#escalate(operation, fence, { reason: 'delivery_journal_request_invalid' });
+    }
+    if (
+      deriveDeliveryRequestDigest(persistedRequest) !== operation.requestDigest ||
+      operation.id !== operation.requestDigest
+    ) {
+      return this.#escalate(operation, fence, { reason: 'delivery_journal_digest_mismatch' });
+    }
+    const parsed = deliveryRequestSchema.safeParse(persistedRequest);
+    if (!parsed.success) {
+      return this.#escalate(operation, fence, { reason: 'delivery_journal_request_invalid' });
+    }
+    const request = parsed.data;
+    if (request.runId !== runId) {
+      return this.#escalate(operation, fence, { reason: 'delivery_journal_run_mismatch' });
+    }
+    assertRequestWithinContract(
+      this.#contract,
+      request,
+      this.#policy,
+      this.#store.getAuthorizedRunTask(
+        request.runId,
+        request.taskId,
+        workflowDeliveryMutationCapability,
+      ),
+    );
+    if (request.kind === 'github.merge') {
+      return this.#executeProviderAttestedMerge(request, operation, fence);
+    }
+    return this.#replayMutation(request, operation, fence);
+  }
+
+  async #replayMutation(
+    request: DeliveryRequest,
+    operation: DeliveryOperationRecord,
+    fence: DeliveryFence,
+  ): Promise<DeliveryOperationRecord> {
+    let observed = await this.#port.observe(request);
+    if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
+    if (observed.kind === 'unchanged') {
+      this.#assertReady(operation, fence);
+      observed = await this.#port.observe(request);
+      if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
+      if (observed.kind === 'unchanged') {
+        this.#assertReady(operation, fence);
+        await this.#port.mutate(request);
+        this.#fault('after_replay_mutation', operation);
+      }
+    }
+    const after = await this.#port.observe(request);
+    if (after.kind !== 'expected') {
+      if (after.kind === 'conflict') return this.#escalate(operation, fence, after.result);
+      throw new Error('replayed delivery mutation remains ambiguous');
+    }
+    let durableResult: unknown;
+    try {
+      durableResult = normalizeDurableResult(after.result);
+    } catch {
+      return this.#escalate(operation, fence, { reason: 'delivery_port_result_not_json' });
+    }
+    return this.#store.commitDeliveryOperation(
+      {
+        id: operation.id,
+        ...fence,
+        result: durableResult,
+        assertExternalState: () => undefined,
+        clock: this.#clock,
+      },
+      workflowDeliveryMutationCapability,
+    );
   }
 
   recordPipelineObservation(input: {
@@ -792,6 +888,98 @@ export class DurableDeliveryBroker {
       this.#clock(),
       workflowDeliveryMutationCapability,
     );
+  }
+
+  async #executeProviderAttestedMerge(
+    request: Extract<DeliveryRequest, { kind: 'github.merge' }>,
+    initialOperation: DeliveryOperationRecord,
+    fence: DeliveryFence,
+  ): Promise<DeliveryOperationRecord> {
+    let operation = initialOperation;
+    let observed = await this.#port.observe(request);
+    if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
+    if (observed.kind === 'expected') {
+      if (operation.verifiedObservationDigest === null) {
+        return this.#escalate(operation, fence, {
+          reason: 'merge_result_without_verified_precondition',
+        });
+      }
+      return this.#commitObservedResult(operation, fence, observed.result);
+    }
+    const observedResult = normalizeDurableResult(observed.result);
+    const observedDigest = deriveDeliveryRequestDigest(observedResult);
+    if (operation.verifiedObservationDigest === null) {
+      operation = this.#store.verifyAndPersistMergeObservation(
+        {
+          id: operation.id,
+          ...fence,
+          observation: observedResult,
+          observationDigest: observedDigest,
+          nowMs: this.#clock(),
+        },
+        workflowDeliveryMutationCapability,
+      );
+      this.#fault('after_verified_observation', operation);
+    } else if (
+      operation.verifiedObservationDigest !== observedDigest ||
+      operation.verifiedObservationJson !== JSON.stringify(observedResult)
+    ) {
+      return this.#escalate(operation, fence, {
+        reason: 'provider_merge_observation_changed_before_mutation',
+      });
+    }
+    this.#assertReady(operation, fence);
+    observed = await this.#port.observe(request);
+    if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
+    if (observed.kind === 'expected') {
+      return this.#commitObservedResult(operation, fence, observed.result);
+    }
+    const immediateResult = normalizeDurableResult(observed.result);
+    if (deriveDeliveryRequestDigest(immediateResult) !== operation.verifiedObservationDigest) {
+      return this.#escalate(operation, fence, {
+        reason: 'provider_merge_observation_changed_before_mutation',
+        observed: immediateResult,
+      });
+    }
+    this.#assertReady(operation, fence);
+    this.#fault('before_mutation', operation);
+    await this.#port.mutate(request, {
+      reviewEventIdentity: String(
+        (operation.verifiedObservation as { reviewEventIdentity: unknown }).reviewEventIdentity,
+      ),
+      verifiedObservationDigest: operation.verifiedObservationDigest!,
+    });
+    this.#fault('after_mutation', operation);
+    const after = await this.#port.observe(request);
+    if (after.kind === 'conflict') return this.#escalate(operation, fence, after.result);
+    if (after.kind !== 'expected') throw new Error('delivery merge result remains ambiguous');
+    return this.#commitObservedResult(operation, fence, after.result);
+  }
+
+  #commitObservedResult(
+    operation: DeliveryOperationRecord,
+    fence: DeliveryFence,
+    result: unknown,
+  ): DeliveryOperationRecord {
+    let durableResult: unknown;
+    try {
+      durableResult = normalizeDurableResult(result);
+    } catch {
+      return this.#escalate(operation, fence, { reason: 'delivery_port_result_not_json' });
+    }
+    this.#fault('before_commit', operation);
+    const committed = this.#store.commitDeliveryOperation(
+      {
+        id: operation.id,
+        ...fence,
+        result: durableResult,
+        assertExternalState: () => undefined,
+        clock: this.#clock,
+      },
+      workflowDeliveryMutationCapability,
+    );
+    this.#fault('after_commit', committed);
+    return committed;
   }
 
   #assertOperationFence(operation: DeliveryOperationRecord, fence: DeliveryFence): void {
