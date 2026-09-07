@@ -1,7 +1,8 @@
 # Bug: Isolate Git hook environment from temporary-repository tests
 
 **Beads issue:** `agent-platform-hook-isolation`  
-**Spec file:** `docs/tasks/agent-platform-hook-isolation.md`  
+**Spec file:** `docs/tasks/agent-platform-hook-isolation.md`
+
 **Priority:** P2; follow-up, implementation not started.
 
 The Beads description must begin with `Spec: docs/tasks/agent-platform-hook-isolation.md`.

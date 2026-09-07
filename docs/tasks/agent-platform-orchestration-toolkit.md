@@ -1,7 +1,8 @@
 # Epic: Investigate a reusable orchestration toolkit
 
 **Beads issue:** `agent-platform-orchestration-toolkit`  
-**Spec file:** `docs/tasks/agent-platform-orchestration-toolkit.md`  
+**Spec file:** `docs/tasks/agent-platform-orchestration-toolkit.md`
+
 **Priority:** P3 backlog; research only after current delivery and pilot learning.  
 **Status:** Proposed; owner refinement is required before implementation children.
 
