@@ -403,6 +403,7 @@ describe('pinned production bootstrap subprocess adapters', () => {
     const target = join(f.workspace, 'escaped');
     for (const path of [
       `${f.workspace}/../escaped`,
+      `${f.workspace}/./escaped`,
       join(alias, 'escaped'),
       `${f.root}/bad\nname`,
       'relative-deployment',
@@ -411,6 +412,32 @@ describe('pinned production bootstrap subprocess adapters', () => {
     }
     expect(existsSync(target)).toBe(false);
     expect(existsSync(join(f.root, 'escaped'))).toBe(false);
+  });
+
+  it('uses canonical nested destinations and never follows an existing destination symlink', () => {
+    const f = fixture();
+    const parent = join(f.workspace, 'bundles');
+    mkdirSync(parent);
+    const destination = join(parent, 'reviewed');
+    const adapters = buildBootstrapAdapters(f.config, destination, {
+      deploymentRoot: f.workspace,
+    });
+    expect(realpathSync(destination)).toBe(destination);
+    expect(adapters.remoteBinary).toBe(join(destination, 'bootstrap-remote.mjs'));
+    expect(adapters.beadsReadBinary).toBe(join(destination, 'bootstrap-beads.mjs'));
+    expect(pin(adapters.remoteBinary).digest).toBe(adapters.remoteBinaryDigest);
+    expect(pin(adapters.beadsReadBinary).digest).toBe(adapters.beadsReadBinaryDigest);
+
+    const outside = join(f.root, 'outside');
+    mkdirSync(outside);
+    const alias = join(parent, 'alias');
+    symlinkSync(outside, alias);
+    expect(() =>
+      buildBootstrapAdapters(f.config, alias, { deploymentRoot: f.workspace }),
+    ).toThrow();
+    expect(realpathSync(alias)).toBe(outside);
+    expect(existsSync(join(outside, 'bootstrap-remote.mjs'))).toBe(false);
+    expect(existsSync(join(outside, 'bootstrap-beads.mjs'))).toBe(false);
   });
 
   it('confines deployment to the default or explicitly trusted root', () => {

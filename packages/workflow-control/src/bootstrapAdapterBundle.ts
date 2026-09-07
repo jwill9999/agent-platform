@@ -10,7 +10,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -66,14 +66,6 @@ export function buildBootstrapAdapters(
     !statSync(deploymentRoot).isDirectory()
   )
     throw new Error('bootstrap adapter deployment root is not canonical');
-  const destination = relative(deploymentRoot, outputDirectory);
-  if (
-    destination === '' ||
-    destination === '..' ||
-    destination.startsWith(`..${sep}`) ||
-    isAbsolute(destination)
-  )
-    throw new Error('bootstrap adapter deployment must remain inside its trusted root');
   const runtime = readFileSync(
     new URL('../dist/bootstrapAdapterRuntime.js', import.meta.url),
     'utf8',
@@ -87,10 +79,13 @@ export function buildBootstrapAdapters(
   )
     throw new Error('bootstrap runtime contains an unpinned module dependency');
   assertCanonicalBuildPath(outputDirectory);
-  mkdirSync(outputDirectory, { mode: 0o700 }); // Existing destinations fail; never overwrite a reviewed bundle.
-  const directory = realpathSync(outputDirectory);
-  if (directory !== outputDirectory)
-    throw new Error('bootstrap adapter deployment directory changed');
+  // The new leaf cannot be realpathed yet; resolve its existing parent before containment validation.
+  const destination = join(realpathSync(dirname(outputDirectory)), basename(outputDirectory));
+  if (!destination.startsWith(deploymentRoot + sep))
+    throw new Error('bootstrap adapter deployment must remain inside its trusted root');
+  mkdirSync(destination, { mode: 0o700 }); // Existing destinations fail; never overwrite a reviewed bundle.
+  const directory = realpathSync(destination);
+  if (directory !== destination) throw new Error('bootstrap adapter deployment directory changed');
   const files = Object.fromEntries(
     (['beads', 'remote'] as const).map((channel) => {
       const path = join(directory, `bootstrap-${channel}.mjs`);
