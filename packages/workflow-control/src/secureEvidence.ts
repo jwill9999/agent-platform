@@ -332,7 +332,9 @@ export class SecureEvidenceVault {
         capability: input.capability,
       },
       'workflow_orchestrator',
-      [value.kind, policy.ref, policy.treeSha],
+      // Evidence equality above binds these identifiers to the stored approved policy.
+      // This exempts only the entropy heuristic; direct secret redaction/scanning still applies.
+      [value.kind, policy.ref, policy.treeSha, ...policy.evidence.map((item) => item.producer)],
     );
     if (result.reference.digest !== bootstrapDigest(value))
       throw new Error('bootstrap attestation was redacted');

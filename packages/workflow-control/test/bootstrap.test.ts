@@ -31,6 +31,8 @@ import {
   type ExecutionContract,
 } from '../src/contracts.js';
 import { ContentAddressedArtifactStore, JournaledArtifactRecorder } from '../src/artifacts.js';
+import { ProcessCapabilityBroker } from '../src/authorization.js';
+import { SecureEvidenceVault } from '../src/secureEvidence.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -486,7 +488,10 @@ describe('approved bootstrap task artifact production composition', () => {
     coordinator.close();
   });
   it('crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases', async () => {
-    const f = await fixture();
+    const f = await fixture((policy) => {
+      policy.evidence[0]!.producer = '/root/bootstrap_verification_astra';
+      policy.evidence[1]!.producer = '/root/progression_critic_astra';
+    });
     expect(bootstrapPreflight(f.database, 'bootstrap-run', f.policy).mutations).toBe(false);
     const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
     const evidence = await coordinator.commitAndPush();
@@ -501,6 +506,15 @@ describe('approved bootstrap task artifact production composition', () => {
     expect(result.retainedEvidence[0]?.digest).toBe(evidence.digest);
     coordinator.close();
     const raw = new Database(f.database);
+    const attestation = raw.prepare('SELECT attestation_json FROM bootstrap_artifacts').get() as {
+      attestation_json: string;
+    };
+    expect(JSON.parse(attestation.attestation_json).evidence).toEqual(f.policy.evidence);
+    expect(
+      raw
+        .prepare('SELECT redaction_count FROM secure_evidence WHERE digest=?')
+        .get(evidence.digest),
+    ).toEqual({ redaction_count: 0 });
     expect(
       raw.prepare('SELECT 1 FROM leases WHERE expires_at_ms>?').get(Date.now()),
     ).toBeUndefined();
@@ -519,6 +533,102 @@ describe('approved bootstrap task artifact production composition', () => {
     ).toEqual({ n: 1 });
     raw.close();
   });
+  it.each(['changed', 'additional'] as const)(
+    'rejects %s producer identifiers before bootstrap evidence persistence',
+    async (substitution) => {
+      const f = await fixture((policy) => {
+        policy.evidence[0]!.producer = '/root/bootstrap_verification_astra';
+        policy.evidence[1]!.producer = '/root/progression_critic_astra';
+      });
+      const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
+      coordinator.adopt();
+      const store = new WorkflowStore(f.database);
+      const capabilities = new ProcessCapabilityBroker(() => undefined);
+      const process = { pid: 42, startTimeMs: 100, executableDigest: digest('fixture-process') };
+      const handle = capabilities.issue({
+        workspaceId: f.contract.workspaceId,
+        runId: 'bootstrap-run',
+        role: 'workflow_orchestrator',
+        contractVersion: 1,
+        policyDigest: f.contract.policyDigest,
+        operations: ['artifact.write'],
+        allowedPaths: f.policy.allowedPaths,
+        expiresAtMs: Date.now() + 60_000,
+        process,
+      });
+      const evidence = structuredClone(f.policy.evidence);
+      const unbound = '/root/unapproved_bootstrap_reviewer';
+      if (substitution === 'changed') evidence[0]!.producer = unbound;
+      else evidence.push({ ...evidence[1]!, producer: unbound });
+      try {
+        const vault = new SecureEvidenceVault({
+          store,
+          contract: f.contract,
+          capabilityBroker: capabilities,
+        });
+        await expect(
+          vault.recordBootstrapAttestation({
+            attestation: {
+              kind: 'implementation_artifact_ready',
+              runId: 'bootstrap-run',
+              taskId: f.policy.taskId,
+              contractDigest: bootstrapDigest(f.contract),
+              policyDigest: f.contract.policyDigest,
+              materialDigest: deriveContractMaterialDigest(f.contract),
+              ref: f.policy.ref,
+              headSha: f.policy.initialHeadSha,
+              treeSha: f.policy.treeSha,
+              beadsSnapshotDigest: bootstrapDigest(f.policy.beadsSnapshot),
+              evidence,
+            },
+            capability: { token: handle.token, observedProcess: process },
+          }),
+        ).rejects.toThrow('differs from stored approved policy');
+        expect(store.sumLiveSecureEvidenceBytes('bootstrap-run')).toBe(0);
+      } finally {
+        capabilities.revoke(handle.token);
+        store.close();
+        coordinator.close();
+      }
+    },
+  );
+  it.each(['github', 'openai'] as const)(
+    'still rejects direct %s secret patterns inside an approved bootstrap producer',
+    async (kind) => {
+      const secret =
+        kind === 'github'
+          ? ['ghp', 'a1B2c3D4e5F6g7H8i9J0k1L2'].join('_')
+          : ['sk', 'a1B2c3D4e5F6g7H8i9J0'].join('-');
+      const f = await fixture((policy) => {
+        policy.evidence[0]!.producer = `/root/${secret}`;
+      });
+      const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
+      try {
+        await expect(coordinator.commitAndPush()).rejects.toThrow(
+          'bootstrap attestation was redacted',
+        );
+        const raw = new Database(f.database);
+        try {
+          expect(
+            raw.prepare('SELECT attestation_digest,status FROM bootstrap_artifacts').get(),
+          ).toEqual({ attestation_digest: null, status: 'adopted' });
+          expect(
+            raw.prepare('SELECT 1 FROM secure_evidence WHERE accepted_at_ms IS NOT NULL').get(),
+          ).toBeUndefined();
+          const blobs = raw.prepare('SELECT content FROM secure_evidence_blobs').all() as Array<{
+            content: Buffer;
+          }>;
+          expect(blobs).toHaveLength(1);
+          expect(blobs[0]!.content.toString()).not.toContain(secret);
+          expect(blobs[0]!.content.toString()).toContain('[REDACTED]');
+        } finally {
+          raw.close();
+        }
+      } finally {
+        coordinator.close();
+      }
+    },
+  );
   it.each([
     'after_task_observation',
     'after_candidate_adoption',
