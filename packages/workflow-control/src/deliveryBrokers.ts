@@ -594,110 +594,7 @@ export class DurableDeliveryBroker {
           workflowDeliveryMutationCapability,
         );
         this.#fault('after_adoption', operation);
-        if (operation.resultJson !== null) {
-          operations.push(
-            this.#escalate(operation, input.fence, {
-              reason: 'prepared_delivery_journal_contains_result',
-            }),
-          );
-          continue;
-        }
-        let persistedRequest: unknown;
-        try {
-          persistedRequest = JSON.parse(operation.requestJson) as unknown;
-        } catch {
-          operations.push(
-            this.#escalate(operation, input.fence, { reason: 'delivery_journal_request_invalid' }),
-          );
-          continue;
-        }
-        if (
-          deriveDeliveryRequestDigest(persistedRequest) !== operation.requestDigest ||
-          operation.id !== operation.requestDigest
-        ) {
-          operations.push(
-            this.#escalate(operation, input.fence, { reason: 'delivery_journal_digest_mismatch' }),
-          );
-          continue;
-        }
-        const parsed = deliveryRequestSchema.safeParse(persistedRequest);
-        if (!parsed.success) {
-          operations.push(
-            this.#escalate(operation, input.fence, { reason: 'delivery_journal_request_invalid' }),
-          );
-          continue;
-        }
-        const request = parsed.data;
-        if (request.runId !== input.runId) {
-          operations.push(
-            this.#escalate(operation, input.fence, { reason: 'delivery_journal_run_mismatch' }),
-          );
-          continue;
-        }
-        assertRequestWithinContract(
-          this.#contract,
-          request,
-          this.#policy,
-          this.#store.getAuthorizedRunTask(
-            request.runId,
-            request.taskId,
-            workflowDeliveryMutationCapability,
-          ),
-        );
-        if (request.kind === 'github.merge') {
-          operations.push(
-            await this.#executeProviderAttestedMerge(request, operation, input.fence),
-          );
-          continue;
-        }
-        let observed = await this.#port.observe(request);
-        if (observed.kind === 'conflict') {
-          operations.push(this.#escalate(operation, input.fence, observed.result));
-          continue;
-        }
-        if (observed.kind === 'unchanged') {
-          this.#assertReady(operation, input.fence);
-          observed = await this.#port.observe(request);
-          if (observed.kind === 'conflict') {
-            operations.push(this.#escalate(operation, input.fence, observed.result));
-            continue;
-          }
-          if (observed.kind === 'unchanged') {
-            this.#assertReady(operation, input.fence);
-            await this.#port.mutate(request);
-            this.#fault('after_replay_mutation', operation);
-          }
-        }
-        const after = await this.#port.observe(request);
-        if (after.kind !== 'expected') {
-          if (after.kind === 'conflict') {
-            operations.push(this.#escalate(operation, input.fence, after.result));
-            continue;
-          }
-          throw new Error('replayed delivery mutation remains ambiguous');
-        }
-        let durableResult: unknown;
-        try {
-          durableResult = normalizeDurableResult(after.result);
-        } catch {
-          operations.push(
-            this.#escalate(operation, input.fence, {
-              reason: 'delivery_port_result_not_json',
-            }),
-          );
-          continue;
-        }
-        operation = this.#store.commitDeliveryOperation(
-          {
-            id: operation.id,
-            ...input.fence,
-            result: durableResult,
-            assertExternalState: () => undefined,
-            clock: this.#clock,
-          },
-          workflowDeliveryMutationCapability,
-        );
-        operations.push(operation);
+        operations.push(await this.#reconcileOperation(operation, input.runId, input.fence));
       } catch (error) {
         errors.push({
           operationId: operation?.id ?? prepared.id,
@@ -706,6 +603,92 @@ export class DurableDeliveryBroker {
       }
     }
     return { operations, errors };
+  }
+
+  async #reconcileOperation(
+    operation: DeliveryOperationRecord,
+    runId: string,
+    fence: DeliveryFence,
+  ): Promise<DeliveryOperationRecord> {
+    if (operation.resultJson !== null) {
+      return this.#escalate(operation, fence, {
+        reason: 'prepared_delivery_journal_contains_result',
+      });
+    }
+    let persistedRequest: unknown;
+    try {
+      persistedRequest = JSON.parse(operation.requestJson) as unknown;
+    } catch {
+      return this.#escalate(operation, fence, { reason: 'delivery_journal_request_invalid' });
+    }
+    if (
+      deriveDeliveryRequestDigest(persistedRequest) !== operation.requestDigest ||
+      operation.id !== operation.requestDigest
+    ) {
+      return this.#escalate(operation, fence, { reason: 'delivery_journal_digest_mismatch' });
+    }
+    const parsed = deliveryRequestSchema.safeParse(persistedRequest);
+    if (!parsed.success) {
+      return this.#escalate(operation, fence, { reason: 'delivery_journal_request_invalid' });
+    }
+    const request = parsed.data;
+    if (request.runId !== runId) {
+      return this.#escalate(operation, fence, { reason: 'delivery_journal_run_mismatch' });
+    }
+    assertRequestWithinContract(
+      this.#contract,
+      request,
+      this.#policy,
+      this.#store.getAuthorizedRunTask(
+        request.runId,
+        request.taskId,
+        workflowDeliveryMutationCapability,
+      ),
+    );
+    if (request.kind === 'github.merge') {
+      return this.#executeProviderAttestedMerge(request, operation, fence);
+    }
+    return this.#replayMutation(request, operation, fence);
+  }
+
+  async #replayMutation(
+    request: DeliveryRequest,
+    operation: DeliveryOperationRecord,
+    fence: DeliveryFence,
+  ): Promise<DeliveryOperationRecord> {
+    let observed = await this.#port.observe(request);
+    if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
+    if (observed.kind === 'unchanged') {
+      this.#assertReady(operation, fence);
+      observed = await this.#port.observe(request);
+      if (observed.kind === 'conflict') return this.#escalate(operation, fence, observed.result);
+      if (observed.kind === 'unchanged') {
+        this.#assertReady(operation, fence);
+        await this.#port.mutate(request);
+        this.#fault('after_replay_mutation', operation);
+      }
+    }
+    const after = await this.#port.observe(request);
+    if (after.kind !== 'expected') {
+      if (after.kind === 'conflict') return this.#escalate(operation, fence, after.result);
+      throw new Error('replayed delivery mutation remains ambiguous');
+    }
+    let durableResult: unknown;
+    try {
+      durableResult = normalizeDurableResult(after.result);
+    } catch {
+      return this.#escalate(operation, fence, { reason: 'delivery_port_result_not_json' });
+    }
+    return this.#store.commitDeliveryOperation(
+      {
+        id: operation.id,
+        ...fence,
+        result: durableResult,
+        assertExternalState: () => undefined,
+        clock: this.#clock,
+      },
+      workflowDeliveryMutationCapability,
+    );
   }
 
   recordPipelineObservation(input: {

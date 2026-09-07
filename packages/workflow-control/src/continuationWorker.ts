@@ -133,15 +133,7 @@ export class ContinuationWorker {
         controller.signal,
       );
       this.journal.reconcileDeadlines(this.clock(), this.#options.deadlineMs);
-      const current = this.journal.get(job.id);
-      if (
-        current?.status === 'blocked' ||
-        current?.lease_epoch !== job.lease_epoch ||
-        (current?.status !== 'consumed' &&
-          (current?.lease_owner !== job.lease_owner || current.lease_until_ms <= this.clock()))
-      ) {
-        throw new Error('continuation supervisor fence rejected before host dispatch');
-      }
+      this.#assertDispatchFence(job);
       const result =
         observation.status === 'missing'
           ? await this.#withinDeadline(this.host.start(job, controller.signal), controller.signal)
@@ -164,6 +156,18 @@ export class ContinuationWorker {
       // Response loss is ambiguous: retain the lease and reconcile the same execution identity.
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  #assertDispatchFence(job: ContinuationJob): void {
+    const current = this.journal.get(job.id);
+    if (
+      current?.status === 'blocked' ||
+      current?.lease_epoch !== job.lease_epoch ||
+      (current?.status !== 'consumed' &&
+        (current?.lease_owner !== job.lease_owner || current.lease_until_ms <= this.clock()))
+    ) {
+      throw new Error('continuation supervisor fence rejected before host dispatch');
     }
   }
 

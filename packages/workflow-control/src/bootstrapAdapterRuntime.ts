@@ -153,7 +153,7 @@ export function validateBootstrapAdapterConfig(input: unknown): BootstrapAdapter
     typeof config.beadsProjectId !== 'string' ||
     !/^[a-f0-9-]{36}$/u.test(config.beadsProjectId) ||
     typeof config.beadsDatabase !== 'string' ||
-    !/^[A-Za-z0-9_]+$/u.test(config.beadsDatabase)
+    !/^\w+$/u.test(config.beadsDatabase)
   )
     reject();
   if (realpathSync(join(config.workspaceRoot as string, '.git')) !== config.gitCommonDirectory)
@@ -169,19 +169,23 @@ export function validateBootstrapAdapterConfig(input: unknown): BootstrapAdapter
   }
   for (const pin of [config.node, config.git, config.beads]) assertBootstrapExecutablePin(pin);
   const parsed = config as unknown as BootstrapAdapterConfig;
-  // Git launches these helpers through its exec directory; symlink replacement cannot escape pins.
-  for (const name of ['git', 'git-pack-objects', 'git-upload-pack', 'git-receive-pack'])
-    if (realpathSync(join(parsed.gitExecPath, name)) !== parsed.git.path) reject();
-  if (
-    parsed.https !== null &&
-    realpathSync(join(parsed.gitExecPath, 'git-remote-https')) !== parsed.https.remoteHelper.path
-  )
-    reject();
+  assertGitHelperPins(parsed);
   return parsed;
 }
 
+function assertGitHelperPins(config: BootstrapAdapterConfig): void {
+  // Git launches these helpers through its exec directory; symlink replacement cannot escape pins.
+  for (const name of ['git', 'git-pack-objects', 'git-upload-pack', 'git-receive-pack'])
+    if (realpathSync(join(config.gitExecPath, name)) !== config.git.path) reject();
+  if (
+    config.https !== null &&
+    realpathSync(join(config.gitExecPath, 'git-remote-https')) !== config.https.remoteHelper.path
+  )
+    reject();
+}
+
 function quoteShell(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
+  return `'${value.replaceAll("'", String.raw`'\''`)}'`;
 }
 
 function assertRequest(
@@ -214,6 +218,38 @@ function assertRequest(
   )
     reject();
   return request;
+}
+
+type AdapterExecute = (binary: string, args: string[], cwd: string) => string;
+
+function readBeadsSnapshot(config: BootstrapAdapterConfig, execute: AdapterExecute): unknown {
+  const flags = ['--readonly', '--sandbox', '--dolt-auto-commit=off', '--json'];
+  const context = object(
+    JSON.parse(execute(config.beads.path, [...flags, 'context'], config.workspaceRoot)),
+  );
+  if (
+    context.repo_root !== config.workspaceRoot ||
+    context.cwd_repo_root !== config.workspaceRoot ||
+    context.beads_dir !== join(config.workspaceRoot, '.beads') ||
+    context.is_redirected !== false ||
+    context.is_worktree !== false ||
+    context.backend !== 'dolt' ||
+    context.dolt_mode !== 'embedded' ||
+    context.project_id !== config.beadsProjectId ||
+    context.database !== config.beadsDatabase
+  )
+    reject();
+  const records: unknown = JSON.parse(
+    execute(
+      config.beads.path,
+      [...flags, 'show', '--long', `--id=${config.taskId}`],
+      config.workspaceRoot,
+    ),
+  );
+  if (!Array.isArray(records) || records.length !== 1) reject();
+  const snapshot = object(records[0]);
+  if (snapshot.id !== config.taskId || snapshot.status !== 'in_progress') reject();
+  return snapshot; // Preserve the whole official CLI snapshot; never project fields into MCP shape.
 }
 
 /** No arbitrary commands or inherited environment. All subprocess failures are redacted. */
@@ -255,35 +291,7 @@ export function runBootstrapAdapter(
       return reject();
     }
   };
-  if (channel === 'beads') {
-    const flags = ['--readonly', '--sandbox', '--dolt-auto-commit=off', '--json'];
-    const context = object(
-      JSON.parse(execute(config.beads.path, [...flags, 'context'], config.workspaceRoot)),
-    );
-    if (
-      context.repo_root !== config.workspaceRoot ||
-      context.cwd_repo_root !== config.workspaceRoot ||
-      context.beads_dir !== join(config.workspaceRoot, '.beads') ||
-      context.is_redirected !== false ||
-      context.is_worktree !== false ||
-      context.backend !== 'dolt' ||
-      context.dolt_mode !== 'embedded' ||
-      context.project_id !== config.beadsProjectId ||
-      context.database !== config.beadsDatabase
-    )
-      reject();
-    const records: unknown = JSON.parse(
-      execute(
-        config.beads.path,
-        [...flags, 'show', '--long', `--id=${config.taskId}`],
-        config.workspaceRoot,
-      ),
-    );
-    if (!Array.isArray(records) || records.length !== 1) reject();
-    const snapshot = object(records[0]);
-    if (snapshot.id !== config.taskId || snapshot.status !== 'in_progress') reject();
-    return snapshot; // Preserve the whole official CLI snapshot; never project fields into MCP shape.
-  }
+  if (channel === 'beads') return readBeadsSnapshot(config, execute);
   const directory = mkdtempSync(join(tmpdir(), 'bootstrap-remote-'));
   try {
     const privateExec = join(directory, 'exec');

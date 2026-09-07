@@ -1,10 +1,11 @@
 import { workflowGovernedPersistenceCapability, type WorkflowStore } from './storage.js';
 import { isProductionBeadsPort } from './beadsPortCapability.js';
 import { OfficialBeadsDoltPort } from './reconciliation.js';
-import type { ApprovalNotificationJournal, DelegateCallbackStore } from './governedOperations.js';
 import {
   digestGovernedValue,
   lineageImportSchema,
+  type ApprovalNotificationJournal,
+  type DelegateCallbackStore,
   type LineageImport,
 } from './governedOperations.js';
 

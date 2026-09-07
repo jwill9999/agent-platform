@@ -9,6 +9,14 @@ import { evidenceReferenceSchema, relativePathSchema } from './contracts.js';
 const sha = z.string().regex(/^[a-f0-9]{40}$/u);
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const absolute = z.string().refine(isAbsolute, 'absolute path required');
+
+// Preserve the existing UTF-16 path order used by reviewed manifests and diff digests.
+function comparePaths(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 const bootstrapEvidenceSchema = evidenceReferenceSchema
   .extend({
     producer: z.string().min(1),
@@ -98,7 +106,10 @@ export const bootstrapPolicySchema = z
         code: z.ZodIssueCode.custom,
         message: 'bootstrap requires explicit test and independent review evidence',
       });
-    if (new Set(paths).size !== paths.length || paths.join('\0') !== [...paths].sort().join('\0'))
+    if (
+      new Set(paths).size !== paths.length ||
+      paths.join('\0') !== [...paths].sort(comparePaths).join('\0')
+    )
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'manifest must have unique sorted paths',
@@ -210,6 +221,8 @@ interface TreeFile {
   digest: string;
 }
 function objectHash(kind: string, content: Buffer): string {
+  // Git's SHA-1 object format requires this exact header and digest for blob/tree identity.
+  // Approval integrity is separately bound by SHA-256 policy, manifest and diff digests.
   return createHash('sha1').update(`${kind} ${content.length}\0`).update(content).digest('hex');
 }
 function treeHash(files: TreeFile[], prefix = ''): string {
@@ -276,7 +289,7 @@ export function observeBootstrapCandidate(
         .split('\0')
         .filter(Boolean),
     ),
-  ].sort();
+  ].sort(comparePaths);
   const files: TreeFile[] = [];
   for (const path of names) {
     relativePathSchema.parse(path);
@@ -295,7 +308,7 @@ export function observeBootstrapCandidate(
   }
   const current = new Map(files.map((file) => [file.path, file]));
   const changed = [...new Set([...initial.keys(), ...current.keys()])]
-    .sort()
+    .sort(comparePaths)
     .filter(
       (path) =>
         initial.get(path)?.oid !== current.get(path)?.oid ||
@@ -308,7 +321,12 @@ export function observeBootstrapCandidate(
   }));
   const rawDiff = Buffer.from(
     changed
-      .map((path) => `${!initial.has(path) ? 'A' : !current.has(path) ? 'D' : 'M'}\0${path}\0`)
+      .map((path) => {
+        let status = 'M';
+        if (!initial.has(path)) status = 'A';
+        else if (!current.has(path)) status = 'D';
+        return `${status}\0${path}\0`;
+      })
       .join(''),
   );
   return {

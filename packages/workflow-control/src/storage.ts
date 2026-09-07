@@ -163,7 +163,7 @@ export interface DeliveryOperationRecord {
   taskLeaseEpoch: number;
   result: unknown | null;
   resultJson: string | null;
-  verifiedObservation: unknown | null;
+  verifiedObservation: unknown;
   verifiedObservationJson: string | null;
   verifiedObservationDigest: string | null;
   mergeObservationStatus: 'prepared_unobserved' | 'prepared_verified' | null;
@@ -497,6 +497,15 @@ function parseJson(value: string | null): unknown | null {
   return value === null ? null : (JSON.parse(value) as unknown);
 }
 
+// Canonical check ordering must use UTF-16 code units, independent of the host locale.
+function compareCodeUnits(left: string, right: string): number {
+  const leftString = `${left}`;
+  const rightString = `${right}`;
+  if (leftString < rightString) return -1;
+  if (leftString > rightString) return 1;
+  return 0;
+}
+
 function serializeDurableJson(value: unknown): string {
   let serialized: string | undefined;
   try {
@@ -621,7 +630,7 @@ function deliveryOperationFromRow(row: DeliveryOperationRow): DeliveryOperationR
       result = undefined;
     }
   }
-  let verifiedObservation: unknown | null = null;
+  let verifiedObservation: unknown = null;
   if (row.verified_observation_json !== null) {
     try {
       verifiedObservation = JSON.parse(row.verified_observation_json) as unknown;
@@ -1182,16 +1191,7 @@ export class WorkflowStore {
         ) {
           throw new Error('delegate callback lacks immutable scheduler authorization');
         }
-        const terminal = specialistTerminalResult(execution.result);
-        if (terminal === undefined)
-          throw new Error('delegate callback requires a validated terminal result');
-        if (
-          (terminal.status === 'blocked' && callback.terminalStatus !== 'blocked') ||
-          (terminal.status === 'needs_repair' &&
-            ['continue', 'complete'].includes(callback.terminalStatus))
-        ) {
-          throw new Error('delegate callback contradicts the validated terminal result');
-        }
+        this.#assertDelegateTerminalResult(execution, callback);
         const approval = this.#database
           .prepare(
             `SELECT 1 FROM plan_approvals WHERE run_id = ? AND status = 'active'
@@ -2825,19 +2825,7 @@ export class WorkflowStore {
         );
       }
       const activeRecovery = this.#activeRecovery(input.runId);
-      if (input.from === 'recovering' && activeRecovery === undefined) {
-        throw new Error('recovering run has no durable recovery target');
-      }
-      if (
-        input.from === 'recovering' &&
-        input.transitionContext.recoveryTarget !== activeRecovery?.recovery_target
-      ) {
-        throw new Error('requested recovery target differs from the durable recovery target');
-      }
-      const recoveryTarget =
-        input.from === 'recovering'
-          ? activeRecovery!.recovery_target
-          : input.transitionContext.recoveryTarget;
+      const recoveryTarget = this.#transitionRecoveryTarget(input, activeRecovery);
       validateTransition(input.from, input.to, {
         ...input.transitionContext,
         approval:
@@ -2853,126 +2841,13 @@ export class WorkflowStore {
         actorWorkspaceLeaseEpoch: input.transitionContext.workspaceLeaseEpoch,
         actorTaskLeaseEpoch: input.transitionContext.taskLeaseEpoch,
       });
-      if (input.from === 'finalizing' && input.to === 'closed' && !run.mergeVerified) {
-        throw new Error('finalization requires persisted merge verification');
-      }
-      if (input.from === 'finalizing' && input.to === 'closed') {
-        throw new Error('feature closure requires the durable finalization coordinator');
-      }
-      if (
-        input.from === 'finalizing' &&
-        input.to === 'finalizing' &&
-        (!['beads.task_close', 'beads.dolt_push'].includes(input.operation) ||
-          input.transitionContext.closeoutLeaseEpoch === undefined)
-      ) {
-        throw new Error('finalizing self-transition requires a fenced closeout operation');
-      }
-      let recoveryInterruptedTransitionId: string | undefined;
-      if (input.to === 'recovering') {
-        const preparedMerge = this.#database
-          .prepare(
-            `SELECT 1 FROM delivery_operations
-             WHERE run_id = ? AND status = 'prepared'
-               AND (kind = 'github.merge' OR kind LIKE 'feature.github.%') LIMIT 1`,
-          )
-          .get(input.runId);
-        if (preparedMerge !== undefined) {
-          throw new Error('prepared merge must be reconciled before recovery');
-        }
-        const arguments_ = input.externalArguments as Record<string, unknown> | null;
-        const interruptedTransitionId = arguments_?.interruptedTransitionId;
-        const evidenceDigests = arguments_?.evidenceDigests;
-        if (
-          typeof interruptedTransitionId !== 'string' ||
-          interruptedTransitionId.length === 0 ||
-          !Array.isArray(evidenceDigests) ||
-          evidenceDigests.length === 0 ||
-          !evidenceDigests.every(
-            (digest) => typeof digest === 'string' && /^sha256:[a-f0-9]{64}$/u.test(digest),
-          )
-        ) {
-          throw new Error('recovery entry requires interrupted-transition evidence');
-        }
-        const interrupted = this.getTransition(interruptedTransitionId);
-        const latestTransition = this.getLatestCommittedTransitionInto(input.runId, input.from);
-        const mergePredecessor =
-          input.from === 'finalizing' && run.mergeVerified
-            ? (this.getCommittedFeatureDeliveryAttestation(input.runId) ??
-              this.getCommittedMergeAttestation(input.runId))
-            : undefined;
-        const transitionIsCurrent =
-          interrupted !== undefined &&
-          interrupted.runId === input.runId &&
-          interrupted.status === 'committed' &&
-          interrupted.to === input.from &&
-          interrupted.expectedRunVersion + 2 === input.expectedRunVersion &&
-          latestTransition?.id === interruptedTransitionId;
-        const mergeIsCurrent =
-          latestTransition === undefined &&
-          mergePredecessor?.id === interruptedTransitionId &&
-          mergePredecessor.status === 'committed';
-        if (!transitionIsCurrent && !mergeIsCurrent) {
-          throw new Error('recovery interrupted transition is not the committed run predecessor');
-        }
-        if (mergeIsCurrent && mergePredecessor?.kind === 'feature.github.merge') {
-          const featureRequest = mergePredecessor.request as Record<string, unknown>;
-          const featureResult = mergePredecessor.result as Record<string, unknown> | null;
-          const approvedFeature = featureDeliveryContractSchema.parse(
-            this.getApprovedFeatureDeliveryContract(input.runId),
-          );
-          const featureContractDigest = deriveFeatureDeliveryContractDigest(approvedFeature);
-          const featureAttestationDigest = `sha256:${createHash('sha256')
-            .update(serializeDurableJson(featureResult))
-            .digest('hex')}`;
-          if (
-            arguments_?.featureContractDigest !== featureContractDigest ||
-            arguments_?.featureDeliveryAttestationDigest !== featureAttestationDigest ||
-            featureRequest.featureContractDigest !== featureContractDigest ||
-            featureRequest.headSha !== approvedFeature.authority.headSha ||
-            featureRequest.base !== approvedFeature.authority.base ||
-            featureRequest.mergeMethod !== 'squash' ||
-            featureRequest.adminBypass !== false ||
-            featureResult?.headSha !== featureRequest.headSha ||
-            featureResult.base !== featureRequest.base ||
-            featureResult.mergeMethod !== featureRequest.mergeMethod
-          ) {
-            throw new Error('finalizing recovery feature-delivery predecessor binding is stale');
-          }
-        }
-        recoveryInterruptedTransitionId = interruptedTransitionId;
-        const authoritativeRoles = [
-          'workflow_orchestrator',
-          'planner',
-          'plan_critic',
-          'human_approver',
-          'implementation_worker',
-          'code_reviewer',
-          'test_runner',
-          'qa_evaluator',
-          'feature_evaluator',
-        ];
-        if (
-          evidenceDigests.some(
-            (digest) =>
-              !this.hasRecoveryEvidenceBinding({
-                digest,
-                workspaceId: approved.workspace_id,
-                runId: input.runId,
-                contractVersion: input.contractVersion,
-                policyDigest: input.policyDigest,
-                allowedProducerRoles: authoritativeRoles,
-                taskId: typeof arguments_?.taskId === 'string' ? arguments_.taskId : undefined,
-                minCreatedAtMs: interrupted?.nowMs ?? mergePredecessor!.updatedAtMs,
-                interruptedTransitionId,
-              }),
-          )
-        ) {
-          throw new Error('recovery evidence is not bound to the interrupted run');
-        }
-        if (activeRecovery !== undefined) {
-          throw new Error('run already has an active recovery target');
-        }
-      }
+      this.#assertFinalizingTransition(input, run);
+      const recoveryInterruptedTransitionId = this.#validateRecoveryEntry(
+        input,
+        run,
+        approved.workspace_id,
+        activeRecovery !== undefined,
+      );
       if (run.version !== input.expectedRunVersion || run.state !== input.from) {
         throw new Error('run compare-and-swap failed');
       }
@@ -3203,8 +3078,7 @@ export class WorkflowStore {
       deadlineElapsed: nowMs >= wait.deadline_ms,
       authenticatedApproval:
         materialApproved &&
-        notification !== undefined &&
-        notification.responder_identity === wait.recipient_identity &&
+        notification?.responder_identity === wait.recipient_identity &&
         notification.response_evidence_digest !== null &&
         notification.human_accepted_at_ms !== null &&
         notification.human_accepted_at_ms <= nowMs &&
@@ -3574,13 +3448,7 @@ export class WorkflowStore {
       if (execution === undefined) throw new Error('scheduler execution not found');
       if (execution.status !== 'active') {
         if (execution.status === 'completed' && input.callback !== undefined) {
-          const callback = delegateCallbackSchema.parse(input.callback);
-          if (callback.delegationId !== input.id)
-            throw new Error('terminal callback execution mismatch');
-          this.recordDelegateCallbackAndTransition(
-            { callback, target: delegateCallbackTarget(callback), ownerId: input.ownerId, nowMs },
-            workflowGovernedPersistenceCapability,
-          );
+          this.#recordSchedulerTerminalCallback(input, nowMs);
         }
         return execution;
       }
@@ -3622,13 +3490,7 @@ export class WorkflowStore {
       if (input.status === 'completed') {
         enqueueContinuation(this.#database, input.id, execution.runId, nowMs);
         if (input.callback !== undefined) {
-          const callback = delegateCallbackSchema.parse(input.callback);
-          if (callback.delegationId !== input.id)
-            throw new Error('terminal callback execution mismatch');
-          this.recordDelegateCallbackAndTransition(
-            { callback, target: delegateCallbackTarget(callback), ownerId: input.ownerId, nowMs },
-            workflowGovernedPersistenceCapability,
-          );
+          this.#recordSchedulerTerminalCallback(input, nowMs);
         }
       }
       return this.getSchedulerExecution(input.id)!;
@@ -4123,33 +3985,7 @@ export class WorkflowStore {
       ) {
         throw new Error('delivery operation contract, policy, or workspace is stale');
       }
-      if (input.kind.startsWith('feature.github.')) {
-        const request = input.request as Record<string, unknown>;
-        const featureContractVersion = request.featureContractVersion;
-        const featureContractDigest = request.featureContractDigest;
-        if (
-          typeof featureContractVersion !== 'number' ||
-          typeof featureContractDigest !== 'string'
-        ) {
-          throw new Error('feature delivery operation lacks approved contract identity');
-        }
-        const activeApproval = this.#database
-          .prepare(
-            `SELECT 1 FROM feature_delivery_contracts AS contracts
-             JOIN feature_delivery_approvals AS approvals
-               ON approvals.run_id = contracts.run_id
-              AND approvals.feature_contract_version = contracts.feature_contract_version
-              AND approvals.feature_contract_digest = contracts.contract_digest
-             WHERE contracts.run_id = ? AND contracts.feature_contract_version = ?
-               AND contracts.contract_digest = ? AND approvals.policy_digest = ?
-               AND approvals.status = 'active' AND approvals.approver_role = 'human_approver'
-             LIMIT 1`,
-          )
-          .get(input.runId, featureContractVersion, featureContractDigest, input.policyDigest);
-        if (activeApproval === undefined) {
-          throw new Error('feature delivery operation lacks active approved authority');
-        }
-      }
+      this.#assertPreparedFeatureDeliveryAuthority(input);
       const preparedTransition = this.#database
         .prepare(`SELECT 1 FROM transitions WHERE run_id = ? AND status = 'prepared' LIMIT 1`)
         .get(input.runId);
@@ -4384,7 +4220,7 @@ export class WorkflowStore {
     }
     return this.#database.transaction(() => {
       const operation = this.getDeliveryOperation(input.id);
-      if (operation === undefined || operation.kind !== 'github.merge') {
+      if (operation?.kind !== 'github.merge') {
         throw new Error('merge operation not found');
       }
       if (operation.mergeObservationStatus === 'prepared_verified') {
@@ -4415,8 +4251,8 @@ export class WorkflowStore {
         observation.protectionDigest !== request.protectionDigest ||
         observation.reviewDecision !== request.reviewDecision ||
         !Array.isArray(observation.requiredChecks) ||
-        JSON.stringify([...observation.requiredChecks].sort()) !==
-          JSON.stringify([...(request.requiredChecks as string[])].sort()) ||
+        JSON.stringify([...observation.requiredChecks].sort(compareCodeUnits)) !==
+          JSON.stringify([...(request.requiredChecks as string[])].sort(compareCodeUnits)) ||
         typeof observation.reviewEventIdentity !== 'string' ||
         !Array.isArray(observation.threads)
       ) {
@@ -4426,8 +4262,8 @@ export class WorkflowStore {
       if (
         checks === null ||
         typeof checks !== 'object' ||
-        JSON.stringify(Object.keys(checks).sort()) !==
-          JSON.stringify([...(request.requiredChecks as string[])].sort()) ||
+        JSON.stringify(Object.keys(checks).sort(compareCodeUnits)) !==
+          JSON.stringify([...(request.requiredChecks as string[])].sort(compareCodeUnits)) ||
         Object.keys(checks).some((check) => checks[check] !== 'success')
       ) {
         throw new Error('provider merge observation has unsuccessful checks');
@@ -7646,6 +7482,273 @@ export class WorkflowStore {
     }
   }
 
+  #assertDelegateTerminalResult(
+    execution: SchedulerExecutionRecord,
+    callback: DelegateCallback,
+  ): void {
+    const terminal = specialistTerminalResult(execution.result);
+    if (terminal === undefined)
+      throw new Error('delegate callback requires a validated terminal result');
+    if (
+      (terminal.status === 'blocked' && callback.terminalStatus !== 'blocked') ||
+      (terminal.status === 'needs_repair' &&
+        ['continue', 'complete'].includes(callback.terminalStatus))
+    ) {
+      throw new Error('delegate callback contradicts the validated terminal result');
+    }
+  }
+
+  #recordSchedulerTerminalCallback(
+    input: Parameters<WorkflowStore['finishSchedulerExecution']>[0],
+    nowMs: number,
+  ): void {
+    const callback = delegateCallbackSchema.parse(input.callback);
+    if (callback.delegationId !== input.id) throw new Error('terminal callback execution mismatch');
+    this.recordDelegateCallbackAndTransition(
+      { callback, target: delegateCallbackTarget(callback), ownerId: input.ownerId, nowMs },
+      workflowGovernedPersistenceCapability,
+    );
+  }
+
+  #assertPreparedFeatureDeliveryAuthority(input: PrepareDeliveryOperationInput): void {
+    if (input.kind.startsWith('feature.github.')) {
+      const request = input.request as Record<string, unknown>;
+      const featureContractVersion = request.featureContractVersion;
+      const featureContractDigest = request.featureContractDigest;
+      if (typeof featureContractVersion !== 'number' || typeof featureContractDigest !== 'string') {
+        throw new Error('feature delivery operation lacks approved contract identity');
+      }
+      const activeApproval = this.#database
+        .prepare(
+          `SELECT 1 FROM feature_delivery_contracts AS contracts
+           JOIN feature_delivery_approvals AS approvals
+             ON approvals.run_id = contracts.run_id
+            AND approvals.feature_contract_version = contracts.feature_contract_version
+            AND approvals.feature_contract_digest = contracts.contract_digest
+           WHERE contracts.run_id = ? AND contracts.feature_contract_version = ?
+             AND contracts.contract_digest = ? AND approvals.policy_digest = ?
+             AND approvals.status = 'active' AND approvals.approver_role = 'human_approver'
+           LIMIT 1`,
+        )
+        .get(input.runId, featureContractVersion, featureContractDigest, input.policyDigest);
+      if (activeApproval === undefined) {
+        throw new Error('feature delivery operation lacks active approved authority');
+      }
+    }
+  }
+
+  #migrateSchedulerColumns(): void {
+    const schedulerColumns = this.#database
+      .prepare('PRAGMA table_info(scheduler_executions)')
+      .all() as Array<{ name: string }>;
+    if (!schedulerColumns.some((column) => column.name === 'attempt_number')) {
+      this.#database.exec(
+        'ALTER TABLE scheduler_executions ADD COLUMN attempt_number INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'process_identity')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN process_identity TEXT NOT NULL
+         DEFAULT 'unknown:legacy-execution'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_lease_id')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_lease_id TEXT NOT NULL
+         DEFAULT 'credential:legacy-execution'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_status')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_status TEXT NOT NULL
+         DEFAULT 'legacy_quarantined'`,
+      );
+    }
+    if (!schedulerColumns.some((column) => column.name === 'credential_broker_generation')) {
+      this.#database.exec(
+        `ALTER TABLE scheduler_executions ADD COLUMN credential_broker_generation TEXT`,
+      );
+    }
+  }
+
+  #transitionRecoveryTarget(
+    input: PrepareTransitionInput,
+    activeRecovery: { recovery_target: WorkflowState } | undefined,
+  ): WorkflowState | undefined {
+    if (input.from === 'recovering' && activeRecovery === undefined) {
+      throw new Error('recovering run has no durable recovery target');
+    }
+    if (
+      input.from === 'recovering' &&
+      input.transitionContext.recoveryTarget !== activeRecovery?.recovery_target
+    ) {
+      throw new Error('requested recovery target differs from the durable recovery target');
+    }
+    return input.from === 'recovering'
+      ? activeRecovery!.recovery_target
+      : input.transitionContext.recoveryTarget;
+  }
+
+  #assertFinalizingTransition(input: PrepareTransitionInput, run: RunRecord): void {
+    if (input.from === 'finalizing' && input.to === 'closed' && !run.mergeVerified) {
+      throw new Error('finalization requires persisted merge verification');
+    }
+    if (input.from === 'finalizing' && input.to === 'closed') {
+      throw new Error('feature closure requires the durable finalization coordinator');
+    }
+    if (
+      input.from === 'finalizing' &&
+      input.to === 'finalizing' &&
+      (!['beads.task_close', 'beads.dolt_push'].includes(input.operation) ||
+        input.transitionContext.closeoutLeaseEpoch === undefined)
+    ) {
+      throw new Error('finalizing self-transition requires a fenced closeout operation');
+    }
+  }
+
+  #validateRecoveryEntry(
+    input: PrepareTransitionInput,
+    run: RunRecord,
+    workspaceId: string,
+    hasActiveRecovery: boolean,
+  ): string | undefined {
+    if (input.to !== 'recovering') return undefined;
+    const preparedMerge = this.#database
+      .prepare(
+        `SELECT 1 FROM delivery_operations
+         WHERE run_id = ? AND status = 'prepared'
+           AND (kind = 'github.merge' OR kind LIKE 'feature.github.%') LIMIT 1`,
+      )
+      .get(input.runId);
+    if (preparedMerge !== undefined) {
+      throw new Error('prepared merge must be reconciled before recovery');
+    }
+    const arguments_ = input.externalArguments as Record<string, unknown> | null;
+    const interruptedTransitionId = arguments_?.interruptedTransitionId;
+    const evidenceDigests = arguments_?.evidenceDigests;
+    if (
+      typeof interruptedTransitionId !== 'string' ||
+      interruptedTransitionId.length === 0 ||
+      !Array.isArray(evidenceDigests) ||
+      evidenceDigests.length === 0 ||
+      !evidenceDigests.every(
+        (digest) => typeof digest === 'string' && /^sha256:[a-f0-9]{64}$/u.test(digest),
+      )
+    ) {
+      throw new Error('recovery entry requires interrupted-transition evidence');
+    }
+    const interrupted = this.getTransition(interruptedTransitionId);
+    const latestTransition = this.getLatestCommittedTransitionInto(input.runId, input.from);
+    const mergePredecessor =
+      input.from === 'finalizing' && run.mergeVerified
+        ? (this.getCommittedFeatureDeliveryAttestation(input.runId) ??
+          this.getCommittedMergeAttestation(input.runId))
+        : undefined;
+    const transitionIsCurrent =
+      interrupted !== undefined &&
+      interrupted.runId === input.runId &&
+      interrupted.status === 'committed' &&
+      interrupted.to === input.from &&
+      interrupted.expectedRunVersion + 2 === input.expectedRunVersion &&
+      latestTransition?.id === interruptedTransitionId;
+    const mergeIsCurrent =
+      latestTransition === undefined &&
+      mergePredecessor?.id === interruptedTransitionId &&
+      mergePredecessor.status === 'committed';
+    if (!transitionIsCurrent && !mergeIsCurrent) {
+      throw new Error('recovery interrupted transition is not the committed run predecessor');
+    }
+    if (mergeIsCurrent && mergePredecessor?.kind === 'feature.github.merge') {
+      this.#assertRecoveryFeaturePredecessor(input, mergePredecessor, arguments_);
+    }
+    const authoritativeRoles = [
+      'workflow_orchestrator',
+      'planner',
+      'plan_critic',
+      'human_approver',
+      'implementation_worker',
+      'code_reviewer',
+      'test_runner',
+      'qa_evaluator',
+      'feature_evaluator',
+    ];
+    if (
+      evidenceDigests.some(
+        (digest) =>
+          !this.hasRecoveryEvidenceBinding({
+            digest,
+            workspaceId,
+            runId: input.runId,
+            contractVersion: input.contractVersion,
+            policyDigest: input.policyDigest,
+            allowedProducerRoles: authoritativeRoles,
+            taskId: typeof arguments_?.taskId === 'string' ? arguments_.taskId : undefined,
+            minCreatedAtMs: interrupted?.nowMs ?? mergePredecessor!.updatedAtMs,
+            interruptedTransitionId,
+          }),
+      )
+    ) {
+      throw new Error('recovery evidence is not bound to the interrupted run');
+    }
+    if (hasActiveRecovery) {
+      throw new Error('run already has an active recovery target');
+    }
+    return interruptedTransitionId;
+  }
+
+  #assertRecoveryFeaturePredecessor(
+    input: PrepareTransitionInput,
+    mergePredecessor: DeliveryOperationRecord,
+    arguments_: Record<string, unknown> | null,
+  ): void {
+    const featureRequest = mergePredecessor.request as Record<string, unknown>;
+    const featureResult = mergePredecessor.result as Record<string, unknown> | null;
+    const approvedFeature = featureDeliveryContractSchema.parse(
+      this.getApprovedFeatureDeliveryContract(input.runId),
+    );
+    const featureContractDigest = deriveFeatureDeliveryContractDigest(approvedFeature);
+    const featureAttestationDigest = `sha256:${createHash('sha256')
+      .update(serializeDurableJson(featureResult))
+      .digest('hex')}`;
+    if (
+      arguments_?.featureContractDigest !== featureContractDigest ||
+      arguments_?.featureDeliveryAttestationDigest !== featureAttestationDigest ||
+      featureRequest.featureContractDigest !== featureContractDigest ||
+      featureRequest.headSha !== approvedFeature.authority.headSha ||
+      featureRequest.base !== approvedFeature.authority.base ||
+      featureRequest.mergeMethod !== 'squash' ||
+      featureRequest.adminBypass !== false ||
+      featureResult?.headSha !== featureRequest.headSha ||
+      featureResult.base !== featureRequest.base ||
+      featureResult.mergeMethod !== featureRequest.mergeMethod
+    ) {
+      throw new Error('finalizing recovery feature-delivery predecessor binding is stale');
+    }
+  }
+
+  #migrateFeatureApprovalColumns(): void {
+    const featureApprovalColumns = this.#database
+      .prepare('PRAGMA table_info(feature_delivery_approvals)')
+      .all() as Array<{ name: string }>;
+    if (!featureApprovalColumns.some((column) => column.name === 'review_id')) {
+      this.#database.exec(
+        `ALTER TABLE feature_delivery_approvals ADD COLUMN review_id TEXT NOT NULL
+         DEFAULT 'legacy-unbound-review'`,
+      );
+    }
+    if (!featureApprovalColumns.some((column) => column.name === 'task_id')) {
+      this.#database.exec(
+        `ALTER TABLE feature_delivery_approvals ADD COLUMN task_id TEXT NOT NULL
+         DEFAULT 'legacy-unbound-task'`,
+      );
+    }
+    if (!featureApprovalColumns.some((column) => column.name === 'evidence_json')) {
+      this.#database.exec(
+        `ALTER TABLE feature_delivery_approvals ADD COLUMN evidence_json TEXT NOT NULL DEFAULT '[]'`,
+      );
+    }
+  }
+
   #migrate(): void {
     this.#database.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -8232,57 +8335,8 @@ export class WorkflowStore {
          CHECK (terminal_outcome IN ('resumed', 'escalated'))`,
       );
     }
-    const schedulerColumns = this.#database
-      .prepare('PRAGMA table_info(scheduler_executions)')
-      .all() as Array<{ name: string }>;
-    if (!schedulerColumns.some((column) => column.name === 'attempt_number')) {
-      this.#database.exec(
-        'ALTER TABLE scheduler_executions ADD COLUMN attempt_number INTEGER NOT NULL DEFAULT 1',
-      );
-    }
-    if (!schedulerColumns.some((column) => column.name === 'process_identity')) {
-      this.#database.exec(
-        `ALTER TABLE scheduler_executions ADD COLUMN process_identity TEXT NOT NULL
-         DEFAULT 'unknown:legacy-execution'`,
-      );
-    }
-    if (!schedulerColumns.some((column) => column.name === 'credential_lease_id')) {
-      this.#database.exec(
-        `ALTER TABLE scheduler_executions ADD COLUMN credential_lease_id TEXT NOT NULL
-         DEFAULT 'credential:legacy-execution'`,
-      );
-    }
-    if (!schedulerColumns.some((column) => column.name === 'credential_status')) {
-      this.#database.exec(
-        `ALTER TABLE scheduler_executions ADD COLUMN credential_status TEXT NOT NULL
-         DEFAULT 'legacy_quarantined'`,
-      );
-    }
-    if (!schedulerColumns.some((column) => column.name === 'credential_broker_generation')) {
-      this.#database.exec(
-        `ALTER TABLE scheduler_executions ADD COLUMN credential_broker_generation TEXT`,
-      );
-    }
-    const featureApprovalColumns = this.#database
-      .prepare('PRAGMA table_info(feature_delivery_approvals)')
-      .all() as Array<{ name: string }>;
-    if (!featureApprovalColumns.some((column) => column.name === 'review_id')) {
-      this.#database.exec(
-        `ALTER TABLE feature_delivery_approvals ADD COLUMN review_id TEXT NOT NULL
-         DEFAULT 'legacy-unbound-review'`,
-      );
-    }
-    if (!featureApprovalColumns.some((column) => column.name === 'task_id')) {
-      this.#database.exec(
-        `ALTER TABLE feature_delivery_approvals ADD COLUMN task_id TEXT NOT NULL
-         DEFAULT 'legacy-unbound-task'`,
-      );
-    }
-    if (!featureApprovalColumns.some((column) => column.name === 'evidence_json')) {
-      this.#database.exec(
-        `ALTER TABLE feature_delivery_approvals ADD COLUMN evidence_json TEXT NOT NULL DEFAULT '[]'`,
-      );
-    }
+    this.#migrateSchedulerColumns();
+    this.#migrateFeatureApprovalColumns();
     const featureIntentColumns = this.#database
       .prepare('PRAGMA table_info(feature_delivery_required_intents)')
       .all() as Array<{ name: string }>;

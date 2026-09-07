@@ -1,17 +1,21 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildBootstrapAdapters } from '../src/bootstrapAdapterBundle.js';
 import {
@@ -23,7 +27,21 @@ const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-const node = realpathSync(process.execPath);
+const hostNode = realpathSync(process.execPath);
+const hostNodeMode = statSync(hostNode).mode;
+let node = hostNode;
+let interpreterRoot: string | undefined;
+beforeAll(() => {
+  // Hosted toolcache binaries need not satisfy deployment ownership/mode rules.
+  // Pin an owner-only fixture copy; never chmod the runner's shared installation.
+  interpreterRoot = realpathSync(mkdtempSync(join(tmpdir(), 'bootstrap-interpreter-test-')));
+  node = join(interpreterRoot, 'node');
+  copyFileSync(hostNode, node);
+  chmodSync(node, 0o700);
+});
+afterAll(() => {
+  if (interpreterRoot !== undefined) rmSync(interpreterRoot, { recursive: true, force: true });
+});
 const execPath = realpathSync(
   execFileSync('/usr/bin/git', ['--exec-path'], { encoding: 'utf8' }).trim(),
 );
@@ -147,6 +165,25 @@ else process.stdout.write(JSON.stringify(behavior==='wrong-task'?[{id:'other',st
 }
 
 describe('pinned production bootstrap subprocess adapters', () => {
+  it('uses a private owner-only interpreter without changing the runner installation', () => {
+    expect(node).not.toBe(hostNode);
+    expect(pin(node).digest).toBe(pin(hostNode).digest);
+    expect(statSync(node).mode & 0o777).toBe(0o700);
+    expect(statSync(node).uid).toBe(process.getuid?.());
+    expect(statSync(hostNode).mode).toBe(hostNodeMode);
+  });
+
+  it.each([0o775, 0o707])('rejects a writable pinned dependency (mode=%s)', (mode) => {
+    const f = fixture();
+    chmodSync(f.beads, mode);
+    expect(() => validateBootstrapAdapterConfig(f.config)).toThrow();
+    expect(
+      f.invoke('beads', { kind: 'beads.read', workspaceRoot: f.workspace, taskId: 'adapter.task' })
+        .status,
+    ).toBe(1);
+    expect(existsSync(f.log)).toBe(false);
+  });
+
   it('reads one complete official snapshot using only readonly sandbox CLI commands and allowlisted environment', () => {
     const f = fixture();
     const result = f.invoke('beads', {
@@ -351,5 +388,51 @@ describe('pinned production bootstrap subprocess adapters', () => {
       validateBootstrapAdapterConfig({ ...f.config, remoteUrl: 'ext::sh arbitrary' }),
     ).toThrow();
     expect(() => validateBootstrapAdapterConfig({ ...f.config, ref: 'refs/heads/main' })).toThrow();
+  });
+
+  it('rejects traversal and symlinked deployment parents before creating a bundle', () => {
+    const f = fixture();
+    const alias = join(f.root, 'alias');
+    symlinkSync(f.workspace, alias);
+    const target = join(f.workspace, 'escaped');
+    for (const path of [
+      `${f.workspace}/../escaped`,
+      join(alias, 'escaped'),
+      `${f.root}/bad\nname`,
+      'relative-deployment',
+    ]) {
+      expect(() => buildBootstrapAdapters(f.config, path)).toThrow();
+    }
+    expect(existsSync(target)).toBe(false);
+    expect(existsSync(join(f.root, 'escaped'))).toBe(false);
+  });
+
+  it('validates CLI config files and rejects symlinks and relative escapes', () => {
+    const f = fixture();
+    const config = join(f.root, 'config.json');
+    writeFileSync(config, JSON.stringify(f.config));
+    const alias = join(f.root, 'config-alias.json');
+    symlinkSync(config, alias);
+    const output = join(f.root, 'cli-deployment');
+    const script = realpathSync(new URL('../dist/bootstrapAdapterBundle.js', import.meta.url));
+    for (const input of [alias, '../config.json', f.workspace]) {
+      const result = spawnSync(node, [script, input, output], {
+        cwd: f.workspace,
+        encoding: 'utf8',
+        timeout: 10_000,
+      });
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(existsSync(output)).toBe(false);
+    }
+    const result = spawnSync(node, [script, 'config.json', output], {
+      cwd: f.root,
+      encoding: 'utf8',
+      timeout: 10_000,
+    });
+    expect(result.status).toBe(0);
+    const adapters = JSON.parse(result.stdout);
+    expect(adapters.remoteBinary).toBe(join(output, 'bootstrap-remote.mjs'));
+    expect(pin(adapters.remoteBinary).digest).toBe(adapters.remoteBinaryDigest);
   });
 });

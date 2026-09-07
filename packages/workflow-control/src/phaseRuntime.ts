@@ -14,6 +14,7 @@ import {
 import {
   assertAgentResultAccepted,
   assertTaskPacketWithinContract,
+  type AgentResult,
   type ExecutionContract,
   type TaskPacket,
 } from './contracts.js';
@@ -66,6 +67,31 @@ interface ResourceFences {
   workspace: number;
   run: number;
   task: number;
+}
+
+function phaseTerminalStatus(
+  terminal: AgentResult,
+  packet: TaskPacket,
+  phase: ExecutePhaseAction['phase'],
+): DelegateCallback['terminalStatus'] {
+  if (
+    terminal.status === 'blocked' ||
+    terminal.recommendedTransition === 'escalate' ||
+    terminal.changedFiles.length > 0 ||
+    terminal.remainingRisks.length > 0
+  ) {
+    return 'blocked';
+  }
+  try {
+    assertAgentResultAccepted(
+      terminal,
+      packet.acceptanceCriteria,
+      phase === 'task_review' ? 'integrate' : 'continue',
+    );
+    return 'continue';
+  } catch {
+    return 'repair';
+  }
 }
 
 /** Long-lived trusted supervisor. Only its fresh isolated launcher can execute specialists.
@@ -339,8 +365,8 @@ export class StandalonePhaseRuntime {
             await this.#launcher.cancel(reservation);
             if (this.#store.getSchedulerExecution(reservation.id) !== undefined)
               await this.#launcher.revokeCredential(reservation.id);
-          })().catch((failure: unknown) => {
-            heartbeatError = failure;
+          })().catch((cancellationError: unknown) => {
+            heartbeatError = cancellationError;
           });
         }
       },
@@ -435,26 +461,7 @@ export class StandalonePhaseRuntime {
       });
       if (resultEvidence.reference.digest !== digestGovernedValue(result))
         throw new Error('phase_result_evidence_redacted');
-      let terminalStatus: DelegateCallback['terminalStatus'];
-      if (
-        terminal.status === 'blocked' ||
-        terminal.recommendedTransition === 'escalate' ||
-        terminal.changedFiles.length > 0 ||
-        terminal.remainingRisks.length > 0
-      ) {
-        terminalStatus = 'blocked';
-      } else {
-        try {
-          assertAgentResultAccepted(
-            terminal,
-            packet.acceptanceCriteria,
-            action.phase === 'task_review' ? 'integrate' : 'continue',
-          );
-          terminalStatus = 'continue';
-        } catch {
-          terminalStatus = 'repair';
-        }
-      }
+      const terminalStatus = phaseTerminalStatus(terminal, packet, action.phase);
       const identity = {
         kind: 'workflow.delegate_callback' as const,
         workspaceId: action.workspaceId,
@@ -497,23 +504,7 @@ export class StandalonePhaseRuntime {
       );
       return true;
     } catch (error) {
-      await this.#launcher.cancel(reservation);
-      if (this.#store.getSchedulerExecution(reservation.id) !== undefined)
-        await this.#launcher.revokeCredential(reservation.id);
-      if (!(await this.#launcher.waitForSettlement(reservation)))
-        throw new Error('phase_specialist_settlement_unconfirmed');
-      const execution = this.#store.getSchedulerExecution(reservation.id);
-      if (execution?.status === 'active')
-        this.#store.finishSchedulerExecution({
-          id: reservation.id,
-          status: 'escalated',
-          ownerId: this.#owner,
-          workspaceLeaseEpoch: fences.workspace,
-          runLeaseEpoch: fences.run,
-          taskLeaseEpoch: fences.task,
-          result: { reason: String(error) },
-        });
-      this.#journal.block(job, String(error), Date.now());
+      await this.#failExecution(job, reservation, fences, error);
       return false;
     } finally {
       clearInterval(heartbeat);
@@ -521,6 +512,31 @@ export class StandalonePhaseRuntime {
       this.#reservation = undefined;
       if (token !== undefined) this.#capabilities.revoke(token);
     }
+  }
+
+  async #failExecution(
+    job: PhaseJob,
+    reservation: DockerSpecialistReservation,
+    fences: ResourceFences,
+    error: unknown,
+  ): Promise<void> {
+    await this.#launcher.cancel(reservation);
+    if (this.#store.getSchedulerExecution(reservation.id) !== undefined)
+      await this.#launcher.revokeCredential(reservation.id);
+    if (!(await this.#launcher.waitForSettlement(reservation)))
+      throw new Error('phase_specialist_settlement_unconfirmed');
+    const execution = this.#store.getSchedulerExecution(reservation.id);
+    if (execution?.status === 'active')
+      this.#store.finishSchedulerExecution({
+        id: reservation.id,
+        status: 'escalated',
+        ownerId: this.#owner,
+        workspaceLeaseEpoch: fences.workspace,
+        runLeaseEpoch: fences.run,
+        taskLeaseEpoch: fences.task,
+        result: { reason: String(error) },
+      });
+    this.#journal.block(job, String(error), Date.now());
   }
 
   async #recover(job: PhaseJob): Promise<void> {

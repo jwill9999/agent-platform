@@ -588,7 +588,7 @@ export interface GovernedJournalRecord {
   requestDigest: string;
   request: GovernedExternalRequest;
   status: GovernedJournalStatus;
-  result: unknown | null;
+  result: unknown;
 }
 
 /** Durable storage boundary. Implementations must CAS on id and immutable request digest. */
@@ -871,7 +871,7 @@ export class ApprovalNotificationCoordinator {
   async deliver(eventInput: unknown): Promise<ApprovalNotificationRecord> {
     const event = approvalNotificationSchema.parse(eventInput);
     if (event.expiresAtMs <= this.clock()) throw new Error('approval notification expired');
-    let record = this.journal.prepare(event);
+    const record = this.journal.prepare(event);
     if (
       record.state === 'delivered' ||
       record.state === 'approved' ||
@@ -883,7 +883,7 @@ export class ApprovalNotificationCoordinator {
       throw new Error('resume delivery failure cannot re-enter approval delivery');
     }
     if (record.state === 'prepared' || record.state === 'delivery_failed') {
-      record = this.journal.compareAndSwap({
+      this.journal.compareAndSwap({
         eventId: event.eventId,
         from: record.state,
         to: 'delivery_pending',

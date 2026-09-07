@@ -250,6 +250,11 @@ describe('durable continuation watchdog', () => {
     finish();
     await started;
     await worker.stop();
+    expect(journal.get('specialist:child')).toMatchObject({
+      status: 'accepted',
+      attempts: 1,
+      last_attempt_at_ms: 1000,
+    });
     journal.close();
     store.close();
   });

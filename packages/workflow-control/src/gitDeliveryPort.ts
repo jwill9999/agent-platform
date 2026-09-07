@@ -17,6 +17,12 @@ import type { GitHubDeliveryPort } from './githubDeliveryPort.js';
 type GitDeliveryRequest = Extract<DeliveryRequest, { kind: `git.${string}` }>;
 const bootstrapGitCapability = Symbol('bootstrapGitCapability');
 
+function compareCodeUnits(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
 export interface BrokeredRemoteRefClient {
   observeRef(input: {
     workspaceRoot: string;
@@ -442,7 +448,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       (request.parentSha !== policy.initialHeadSha ||
         request.treeSha !== policy.treeSha ||
         request.diffDigest !== policy.diffDigest ||
-        JSON.stringify([...request.changedFiles].sort()) !==
+        JSON.stringify([...request.changedFiles].sort(compareCodeUnits)) !==
           JSON.stringify(policy.manifest.map((item) => item.path)) ||
         request.authorName !== policy.author.name ||
         request.authorEmail !== policy.author.email ||
