@@ -107,7 +107,104 @@ function input(content: string) {
   };
 }
 
+async function storedText(vault: SecureEvidenceVault, digest: string): Promise<string> {
+  return Buffer.from(
+    await vault.read({
+      digest,
+      runId: 'run-evidence',
+      taskId: 'secure-evidence.8',
+      actorRole: 'workflow_orchestrator',
+    }),
+  ).toString('utf8');
+}
+
 describe('SecureEvidenceVault', () => {
+  it.each(['', 'RSA ', 'EC ', 'DSA ', 'OPENSSH ', 'PGP '])(
+    'redacts complete %sprivate keys without changing surrounding evidence',
+    async (label) => {
+      const { vault, store } = await setup();
+      try {
+        const result = await vault.record(
+          input(
+            `before -----BEGIN ${label}PRIVATE KEY-----\nsecret\n-----END ${label}PRIVATE KEY----- after`,
+          ),
+        );
+        expect(await storedText(vault, result.reference.digest)).toBe('before [REDACTED] after');
+        expect(result.record.redactionCount).toBe(1);
+      } finally {
+        store.close();
+      }
+    },
+  );
+
+  it('preserves mixed-label, nested-header, multiple-block, and redactor ordering behavior', async () => {
+    const { vault, store } = await setup();
+    try {
+      const first =
+        '-----BEGIN RSA PRIVATE KEY-----\nsk-abcdefghijklmnop\n-----END EC PRIVATE KEY-----';
+      const second =
+        '-----BEGIN PRIVATE KEY-----\n-----BEGIN DSA PRIVATE KEY-----END PGP PRIVATE KEY-----';
+      const result = await vault.record(input(`before ${first} between ${second} after`));
+      expect(await storedText(vault, result.reference.digest)).toBe(
+        'before [REDACTED] between [REDACTED] after',
+      );
+      // The token redactor still precedes private-key redaction, including tokens inside a key.
+      expect(result.record.redactionCount).toBe(3);
+    } finally {
+      store.close();
+    }
+  });
+
+  it.each(['text/plain', 'application/json', 'application/x-ndjson'])(
+    'redacts unterminated key material in %s evidence',
+    async (mediaType) => {
+      const { vault, store } = await setup();
+      try {
+        const raw = 'before -----BEGIN PRIVATE KEY-----\nsecret tail';
+        const content = mediaType === 'text/plain' ? raw : JSON.stringify({ value: raw });
+        const result = await vault.record({ ...input(content), mediaType });
+        const expected = 'before [REDACTED]';
+        expect(await storedText(vault, result.reference.digest)).toBe(
+          mediaType === 'text/plain' ? expected : JSON.stringify({ value: expected }),
+        );
+        expect(result.record.redactionCount).toBe(1);
+      } finally {
+        store.close();
+      }
+    },
+  );
+
+  it('handles repeated unterminated headers near the evidence size limit', async () => {
+    const maxBytes = 1024 * 1024;
+    const { vault, store } = await setup(maxBytes, maxBytes);
+    try {
+      const content = `before -----BEGIN PRIVATE KEY-----${'-----BEGIN DSA PRIVATE KEY-----'.repeat(30_000)}`;
+      expect(Buffer.byteLength(content)).toBeLessThan(maxBytes);
+      const started = performance.now();
+      const result = await vault.record(input(content));
+      expect(performance.now() - started).toBeLessThan(2000);
+      expect(await storedText(vault, result.reference.digest)).toBe('before [REDACTED]');
+      expect(result.record.redactionCount).toBe(1);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('rejects binary evidence containing an unterminated private key', async () => {
+    const { vault, store } = await setup();
+    try {
+      await expect(
+        vault.record({
+          ...input('RIFFxxxxWEBP-----BEGIN PRIVATE KEY-----\nsecret tail'),
+          mediaType: 'image/webp',
+        }),
+      ).rejects.toThrow('secret-like');
+      expect(store.sumLiveSecureEvidenceBytes('run-evidence')).toBe(0);
+    } finally {
+      store.close();
+    }
+  });
+
   it('redacts before persistence, binds metadata, and enforces role reads', async () => {
     const { vault } = await setup();
     const result = await vault.record(input('token=ghp_123456789012345678901234567890'));
