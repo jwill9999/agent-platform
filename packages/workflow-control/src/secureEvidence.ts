@@ -40,12 +40,13 @@ const textMediaTypes = new Set([
   'text/markdown',
   'text/plain',
 ]);
+const privateKeyBeginPattern = /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/gu;
 const directSecretPatterns = [
   /\bsk-[A-Za-z0-9_-]{12,}\b/gu,
   /\bgh[pousr]_[A-Za-z0-9]{20,}\b/gu,
   /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/gu,
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu,
-  /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/gu,
+  privateKeyBeginPattern,
   /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/-]{12,}={0,2}\b/giu,
   /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:]+:[^\s/@]{8,}@/giu,
   /\bxox[baprs]-[A-Za-z0-9-]{24,}\b/gu,
@@ -81,10 +82,36 @@ export interface SecureEvidenceResult {
   record: SecureEvidenceRecord;
 }
 
+function redactPrivateKeys(input: string): { value: string; count: number } {
+  const beginPattern = new RegExp(privateKeyBeginPattern);
+  const endPattern = /-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/gu;
+  const parts: string[] = [];
+  let offset = 0;
+  let count = 0;
+  // Delimiter searches consume disjoint spans, including a single scan for a missing footer.
+  for (let begin = beginPattern.exec(input); begin !== null; begin = beginPattern.exec(input)) {
+    endPattern.lastIndex = beginPattern.lastIndex;
+    const end = endPattern.exec(input);
+    parts.push(input.slice(offset, begin.index), '[REDACTED]');
+    count += 1;
+    // An unterminated key is still secret: conservatively redact the remaining input.
+    offset = end === null ? input.length : endPattern.lastIndex;
+    beginPattern.lastIndex = offset;
+  }
+  parts.push(input.slice(offset));
+  return { value: parts.join(''), count };
+}
+
 function redactText(input: string): { value: string; count: number } {
   let value = input;
   let count = 0;
   for (const pattern of directSecretPatterns) {
+    if (pattern === privateKeyBeginPattern) {
+      const redacted = redactPrivateKeys(value);
+      value = redacted.value;
+      count += redacted.count;
+      continue;
+    }
     value = value.replace(pattern, () => {
       count += 1;
       return '[REDACTED]';
