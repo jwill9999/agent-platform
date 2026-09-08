@@ -1,0 +1,134 @@
+# Pilot zero: orchestration integration assessment
+
+**Beads:** `agent-platform-pilot-zero`  
+**Parent:** `agent-platform-multi-agent`  
+**Status:** Proposed plan; implementation and autonomous activation are not approved.  
+**Assessment date:** 2026-09-08
+
+## Objective and authority
+
+Prove a human idea can become a reviewed plan, approved managed execution, and verified delivery.
+Record supervised bridging separately from runtime-driven progress. This task authorizes assessment
+and documentation only, not deployment, credential issuance, runtime migration, application edits,
+PR merge, or production promotion. Beads remains the issue and finding lifecycle authority.
+
+The owner explicitly requested documenting findings during planning. This is supervised authoring,
+not evidence that the read-only planning skill persisted a draft autonomously. The canonical local
+journal was inspected read-only: its four recorded runs were cancelled. No new run was started.
+
+## Requirements and proposed implementation sequence
+
+1. Define a planner-to-authoring handoff and an explicit approved-plan start/resume interface.
+   Persist exact contract, policy, evidence, run identity and authenticated approval; reject stale
+   material. Repeated start must observe the same run or report a conflict, never duplicate it.
+2. Complete trusted implementation output import. Accept only execution-bound, allowlisted changes
+   from an isolated worker; reject traversal, symlinks, secret material, changed baseline, and foreign
+   execution evidence. Reconcile interrupted import without double application.
+3. Compose each declared phase with its authorized executor. Add typed coordinator receipts for
+   task acceptance, repair, evaluation, pipeline, delivery and finalization. A queued phase or generic
+   transition is not evidence of execution. Preserve the existing brokers and permissions.
+4. Connect the existing notification outbox to an explicitly selected human-visible channel.
+   Transport acceptance is not human approval. Authentication, delivery confirmation, retries,
+   cancellation and failure reporting must remain distinct. Channel choice is unresolved.
+5. Exercise the complete path in isolated runs, then approve a separate real-feature pilot.
+
+Use the standalone runner as the proposed first execution boundary. Do not claim desktop chat
+resumption; adding that adapter is a separate scope decision. Model credential service, immutable
+specialist image, restricted network and real provider clients must pass readiness checks before
+live execution. Failed readiness creates an actionable blocker, not a manual bypass.
+
+## Phase triggers and evidence
+
+| Completed condition                                   | Expected next action                          | Required proof                                                           |
+| ----------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------ |
+| Human requirements clarified                          | Planner emits draft and authoring handoff     | Specification, task graph, acceptance criteria and source references     |
+| Draft validates                                       | Distinct critic reviews exact material        | Structured digest-bound review and finding dispositions                  |
+| Critic passes                                         | Explicit owner approval request               | Visible request naming scope, destination and required response          |
+| Authenticated approval recorded                       | Start or resume the approved run              | Same-material approval, readiness checks and durable run identity        |
+| Worker settles and credential revocation is confirmed | Import output and enqueue verification        | Exact execution/head evidence, committed callback and phase job          |
+| Verification passes                                   | Enqueue independent code review               | Accepted test evidence for the same candidate                            |
+| Verification or review finds a defect                 | Bounded repair then re-verification           | Finding, repair attempt and new-head evidence; no inherited green result |
+| Task acceptance commits                               | Schedule next ready task or integrate         | Refreshed authoritative Beads dependencies and brokered close            |
+| CI and review gates pass                              | Request or exercise bounded delivery approval | Exact PR/head, current checks, resolved dispositions and approval        |
+| Staging merge is verified                             | Finalize and sync                             | Merge attestation, task/feature closeout, observed Dolt sync and report  |
+
+A committed callback feeds a durable continuation; the coordinator consumes it into a phase job.
+The executor must claim, start and complete that job with authoritative evidence. The watchdog
+reconciles missed signals independently of conversation turns. Delivery of a notification alone
+does not advance the workflow. Documented defaults are 1-second polling, 30-second overdue reporting,
+10 host attempts and a 300-second continuation deadline; readiness must check actual configuration.
+These bounds do not imply a five-minute limit for feature implementation or hosted CI.
+
+## Findings register
+
+These are assessment findings under this Beads task, not separate implementation tickets yet.
+Source inspection is evidence of code shape, not live conformance.
+
+| ID    | Finding and source                                                                                                                 | Disposition / recovery proposal                                                                               |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| PZ-01 | Planning is read-only, with no authoring owner: `.agents/skills/feature-planning/SKILL.md`                                         | Define a narrow supervised authoring handoff, then govern activation separately                               |
+| PZ-02 | MCP exposes only status/preview; CLI has no general approved-feature start: `packages/workflow-control/src/mcpServer.ts`, `cli.ts` | Add or document a supported trusted composition; never substitute raw DB edits                                |
+| PZ-03 | Standalone implementation throws `phase_artifact_import_unavailable`: `packages/workflow-control/src/phaseRuntime.ts`              | Implement trusted output import and regression tests                                                          |
+| PZ-04 | Coordinator completion throws `phase coordinator completion authority unavailable`: `packages/workflow-control/src/phaseJobs.ts`   | Define typed receipt adapters for every coordinator phase                                                     |
+| PZ-05 | Default notifications are JSONL; native chat delivery is explicitly absent: `docs/workflow-control-continuations.md`               | Select and prove a visible channel before unattended use                                                      |
+| PZ-06 | Desktop conformance unconditionally fails: `packages/workflow-control/src/continuationWorker.ts`                                   | Keep desktop claim blocked; evaluate standalone independently                                                 |
+| PZ-07 | ADR-0004 disallows built-in critics when global mutation-capable tools are exposed                                                 | Use a conformant isolated critic; this session exposes such tools, so no built-in critic was launched         |
+| PZ-08 | Pilot spec references deleted task/feature lineage and assumes epic closeout: `docs/tasks/agent-platform-multi-agent.10.md`        | Replace stale lineage in a newly reviewed contract; do not close the orchestration epic on pilot-zero success |
+| PZ-09 | Live credential service, provider composition and isolated execution are not verified by this assessment                           | Inventory capabilities read-only; run explicitly approved conformance before activation                       |
+
+## Reproducibility and test strategy
+
+Record each scenario as passed, failed, not exercised or blocked, with input contract digest,
+source revision, runtime/image/config identity, execution IDs, event sequence, evidence digests,
+elapsed time, retries and intervention count. Never include credentials. Initial scenario results
+are **not exercised**: this assessment has not launched a runtime or run acceptance tests.
+
+- Repeat the ordinary approved-plan flow in two fresh isolated journals/workspaces. Both must
+  produce equivalent allowed transitions and final outcomes without user nudges.
+- Seed a plan omission and a worker/test failure in fixtures. Verify critique and repair rather
+  than publishing a known defect or weakening a gate.
+- Drop the completion signal; the independent watchdog must discover it, progress or visibly block
+  within the configured deadline. Repeat callback and acknowledgement delivery without duplicate
+  effects. Record actual next-phase start, not merely notification receipt.
+- Interrupt after output import, callback commit, provider mutation and Beads/Dolt effects.
+  Resume under a new lease; observe completed effects before retry and reject stale owners.
+- Supply wrong role, run, head, evidence, revoked credential and changed approval material. Each
+  must fail closed without an unauthorized mutation.
+- Disconnect the visible notification channel, then restore it. Test retry/observation, duplicate
+  suppression and authenticated approval; a silent file write cannot satisfy human visibility.
+- Exercise task acceptance, final evaluation, pending/failing CI, new review comments, protected
+  staging delivery and closeout. Production/main are out of scope.
+- Run build, typecheck, lint, formatting, relevant unit/integration and fault-injection tests, Sonar
+  or the documented diagnostics fallback, and exact-head hosted checks for implementation changes.
+  Application browser/Electron coverage is not replaced by workflow process tests; use a later
+  application feature for that coverage. Live host/isolation tests must be distinguished from fixtures.
+
+For each intervention, record: timestamp, prior phase, expected trigger, observed result, actor,
+manual action, reason, affected evidence and recovery verification. Zero required manual bridging
+is necessary for an autonomous claim; normal approved human decisions are not bridging failures.
+
+## Dependency order and delivery
+
+This assessment is a child of the existing orchestration epic. No implementation children are created
+before refinement and approval. Proposed implementation ordering is authoring/activation contract,
+implementation import, phase/coordinator composition, visible transport, then integrated conformance.
+Transport and provider feasibility must be investigated before committing to implementation scope.
+Update Beads dependency edges only when that refined graph is approved.
+
+Documentation uses `task/pilot-zero-assessment` from `feature/pilot-zero-assessment`, based on staging.
+Any implementation uses a separately approved branch chain and exact delivery policy. Staging delivery
+requires its declared gates and approval; main is excluded. Handoff hygiene is the subsequent real
+feature pilot, not part of this assessment's implementation scope.
+
+## Definition of done and sign-off
+
+Assessment completion requires an evidence-backed proposal, scenario matrix, documented dispositions,
+a valid execution contract once actual policy/branch/check bindings are resolved, a distinct compliant
+critic review and explicit owner approval for implementation. Until then the proposal is not an
+executable or approved contract. A syntactically valid placeholder would not satisfy this gate.
+
+Current next gate: resolve isolated critic availability and visible notification channel selection.
+No critic pass, runtime conformance, automated progression or feature completion is claimed.
+Implementation, live pilot acceptance and orchestration epic closure remain separate gates.
+
+Owner: Jason Williams. Independent reviewer: not yet assigned through a compliant launcher.
