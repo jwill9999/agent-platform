@@ -15,7 +15,11 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { stagePreapprovalMaterial, type PreapprovalMaterial } from '../src/preapprovalMaterial.js';
+import {
+  stagePreapprovalMaterial,
+  type PreapprovalMaterial,
+  type PreapprovalMaterialEntry,
+} from '../src/index.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -61,6 +65,26 @@ function expectFailedStageCleanedUp(operation: () => unknown): void {
 }
 
 describe('stagePreapprovalMaterial', () => {
+  it('preserves locale-independent UTF-16 manifest ordering through the public API', () => {
+    const expectedOrder = [
+      '!first.ts',
+      '-dash.ts',
+      'Z.ts',
+      '_under.ts',
+      'a.ts',
+      'Ω.ts',
+      '中.ts',
+      '𐀀.ts',
+      '\uE000.ts',
+    ];
+    for (const path of expectedOrder) source(path);
+    const first = stage([...expectedOrder].reverse());
+    const entries: readonly PreapprovalMaterialEntry[] = first.manifest;
+    expect(entries.map((entry) => entry.path)).toEqual(expectedOrder);
+    const second = stage(expectedOrder, first.manifestDigest);
+    expect(second.manifestDigest).toEqual(first.manifestDigest);
+  });
+
   it('stages only enumerated bytes privately, with stable ordering and an expected digest', () => {
     const binary = Buffer.from([0, 255, 10, 128]);
     source('nested/b.bin', binary);

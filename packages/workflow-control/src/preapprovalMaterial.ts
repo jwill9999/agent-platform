@@ -95,7 +95,12 @@ function validatePaths(paths: readonly string[]): string[] {
     if (unique.has(key)) throw new Error('preapproval material paths contain duplicates');
     unique.add(key);
   }
-  return [...paths].sort();
+  // Preserve UTF-16 code-unit ordering independently of the host's locale.
+  return [...paths].sort((left, right) => {
+    if (left < right) return -1;
+    if (left > right) return 1;
+    return 0;
+  });
 }
 
 function assertRoot(root: string): void {

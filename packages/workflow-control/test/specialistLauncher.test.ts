@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildDockerSpecialistLaunch,
@@ -12,11 +12,36 @@ import {
 
 const cleanup: string[] = [];
 
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...actual, writeFile: vi.fn(actual.writeFile), mkdtemp: vi.fn(actual.mkdtemp) };
+});
+const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+
 afterEach(async () => {
+  vi.mocked(writeFile).mockImplementation(actualFs.writeFile);
+  vi.clearAllMocks();
   await Promise.all(cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
 describe('specialist launcher', () => {
+  it('removes private staging when auth placeholder creation fails', async () => {
+    const source = await mkdtemp(join(tmpdir(), 'workflow-source-'));
+    cleanup.push(source);
+    await writeFile(join(source, 'safe.txt'), 'private fixture');
+    vi.mocked(writeFile).mockImplementation(async (path, data, options) => {
+      if (String(path).endsWith('/auth.json')) throw new Error('fixture write failure');
+      return actualFs.writeFile(path, data, options);
+    });
+    await expect(prepareSpecialistWorkspace(source, ['safe.txt'])).rejects.toThrow(
+      'fixture write failure',
+    );
+    const staged = await vi.mocked(mkdtemp).mock.results.at(-1)?.value;
+    expect(staged).toContain('workflow-specialist-');
+    cleanup.push(staged);
+    await expect(stat(staged)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readFile(join(source, 'safe.txt'), 'utf8')).resolves.toBe('private fixture');
+  });
   it('copies source into a private workspace without credential or repository-control surfaces', async () => {
     const source = await mkdtemp(join(tmpdir(), 'workflow-source-'));
     cleanup.push(source);

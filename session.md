@@ -59,6 +59,11 @@ mountpoint; 53 focused tests and four real offline Docker probes pass, with fina
 No model credentials were used. Next: minimal preapproval entry point using existing
 helpers, dedicated auth, verified egress, exact evidence and bounded cleanup. Do not replace brokers.
 Sonar snippet initialization failed; local fallback checks apply, hosted gates remain required.
+PR #259 targets feature/pilot-zero-assessment. Its initial hosted tests, Docker, browser/desktop
+E2E and Sourcery passed; Sonar reported complexity and implicit sorting. Follow-up fixes preserve
+manifest ordering, simplify mount validation, clean staging on preparation failure and export the
+material helper. Supervised independent review passed; fresh hosted verification remains pending.
+The pilot-zero-progress-and-ci heartbeat checks for actionable progress every ten minutes.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
 pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.

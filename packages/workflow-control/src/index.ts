@@ -364,6 +364,11 @@ export {
 } from './continuationNotifications.js';
 export { BootstrapCoordinator, bootstrapPreflight, type BootstrapFault } from './bootstrap.js';
 export {
+  stagePreapprovalMaterial,
+  type PreapprovalMaterial,
+  type PreapprovalMaterialEntry,
+} from './preapprovalMaterial.js';
+export {
   bootstrapPolicySchema,
   implementationArtifactReadySchema,
   bootstrapDigest,

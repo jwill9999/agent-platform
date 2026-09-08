@@ -65,6 +65,19 @@ export async function prepareSpecialistWorkspace(
   if (allowedSourcePaths.length === 0) throw new Error('specialist source paths must not be empty');
   const canonicalSource = await realpath(sourceRoot);
   const stagingParent = await mkdtemp(join(tmpdir(), 'workflow-specialist-'));
+  try {
+    return await populateSpecialistWorkspace(canonicalSource, allowedSourcePaths, stagingParent);
+  } catch (error) {
+    await rm(stagingParent, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function populateSpecialistWorkspace(
+  canonicalSource: string,
+  allowedSourcePaths: readonly string[],
+  stagingParent: string,
+): Promise<SpecialistWorkspace> {
   const root = join(stagingParent, 'workspace');
   const codexHome = join(stagingParent, 'codex-home');
   await mkdir(root, { recursive: true, mode: 0o700 });
@@ -104,6 +117,18 @@ export async function prepareSpecialistWorkspace(
   // The real authentication file is mounted read-only over this empty, non-secret placeholder.
   await writeFile(join(codexHome, 'auth.json'), '{}\n', { mode: 0o600, flag: 'wx' });
   return { root, codexHome };
+}
+
+function assertPrivateMounts(mounts: readonly string[], stagingRoot: string): void {
+  for (const mount of mounts) {
+    const hostPath = mount.slice(0, mount.indexOf(':'));
+    if (!isInside(hostPath, stagingRoot)) {
+      throw new Error('specialist mount escapes its private staging directory');
+    }
+    if (FORBIDDEN_NAMES.has(basename(hostPath)) || hostPath === '/var/run/docker.sock') {
+      throw new Error('specialist mount exposes a forbidden host surface');
+    }
+  }
 }
 
 export async function buildDockerSpecialistLaunch(
@@ -157,15 +182,7 @@ export async function buildDockerSpecialistLaunch(
     `${authFile}:/codex-home/auth.json:ro`,
     `${promptFile}:/run/specialist/prompt.txt:ro`,
   ];
-  for (const mount of mounts) {
-    const hostPath = mount.slice(0, mount.indexOf(':'));
-    if (!isInside(hostPath, stagingRoot)) {
-      throw new Error('specialist mount escapes its private staging directory');
-    }
-    if (FORBIDDEN_NAMES.has(basename(hostPath)) || hostPath === '/var/run/docker.sock') {
-      throw new Error('specialist mount exposes a forbidden host surface');
-    }
-  }
+  assertPrivateMounts(mounts, stagingRoot);
 
   const args = [
     'run',
