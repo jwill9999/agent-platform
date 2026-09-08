@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-08: PR259 merged four prerequisite repairs; bounded container lifecycle repair is underway.
+2026-09-08: PR259 merged four prerequisite repairs; lifecycle publication caught a SQLite completion race.
 
 ## Verified delivery
 
@@ -66,8 +66,14 @@ material helper. Supervised independent review passed; fresh hosted verification
 The pilot-zero-progress-and-ci heartbeat checks for actionable progress every ten minutes.
 PR259 subsequently merged at 68e7856c59fb35bb47bbb10b1b3c4e2d7dee34f8 after owner approval:
 11 executed hosted checks passed; staging-only macOS VM was skipped. Children .1-.4 are closed.
-Current segment: task/pilot-zero-container-lifecycle, Beads pilot-zero.5. Its worker implements
-bounded create/start/remove/inspect with explicit cleanup uncertainty; parent coordinates review.
+Current segment: task/pilot-zero-container-lifecycle, Beads pilot-zero.5. Commit c00fbd3 contains
+reviewed bounded create/start/remove/inspect with explicit cleanup uncertainty. Seven real offline
+Docker probes passed. The push did not succeed: the normal package gate caught database locking
+in specialist completion under concurrent coordinators (581 passed, one failed, seven skipped).
+Subtask .5.1 reproduced SQLITE_BUSY_SNAPSHOT deterministically and corrected writer reservation
+and post-reservation default clock sampling. Independent review passed with no remaining findings;
+the final full package run passed 585 tests (seven separately exercised opt-in Docker skips).
+Typecheck, lint, formatting and diff checks pass. Publication and hosted gates are next.
 The heartbeat is active again under the owner's instruction to continue through fixable blockers.
 No active autonomous journal run exists. Supervised coordination is not proof of runtime handoff.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;

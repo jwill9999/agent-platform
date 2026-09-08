@@ -2,15 +2,17 @@
 
 **Beads:** `agent-platform-pilot-zero`  
 **Parent:** `agent-platform-multi-agent`  
-**Status:** Proposed plan; implementation and autonomous activation are not approved.  
+**Status:** Owner-authorized supervised integration repair; autonomous activation remains unapproved.
+
 **Assessment date:** 2026-09-08
 
 ## Objective and authority
 
 Prove a human idea can become a reviewed plan, approved managed execution, and verified delivery.
-Record supervised bridging separately from runtime-driven progress. This task authorizes assessment
-and documentation only, not deployment, credential issuance, runtime migration, application edits,
-PR merge, or production promotion. Beads remains the issue and finding lifecycle authority.
+Record supervised bridging separately from runtime-driven progress. The original assessment-only
+scope was extended by the owner to iterative supervised integration repairs, tests, review and
+publication. This does not authorize credential issuance, live runtime activation or protected
+merges without their required approval. Beads remains the issue and finding lifecycle authority.
 
 The owner explicitly requested documenting findings during planning. This is supervised authoring,
 not evidence that the read-only planning skill persisted a draft autonomously. The canonical local
@@ -248,6 +250,12 @@ test. Agent callbacks, parent processing and human notifications during this rep
 coverage until a real isolated execution demonstrably triggers the package's continuation path.
 
 ### Next runtime integration boundaries
+
+The .5 container lifecycle candidate passed supervised source review and offline Docker probes.
+Its normal pre-push package gate then exposed a concurrent SQLite completion failure. Subtask
+.5.1 reproduces and repairs that transaction boundary before publication. The original error
+message alone does not distinguish ordinary writer contention from a stale WAL snapshot.
+Neither a passing retry nor a hook bypass is accepted as a fix.
 
 The independent source audit distinguishes two remaining implementation boundaries:
 
