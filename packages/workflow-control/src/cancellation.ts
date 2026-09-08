@@ -178,7 +178,7 @@ export class WorkflowCancellationCoordinator {
                 cancellationId: record.id,
                 stopDeadlineMs: record.stopDeadlineMs,
               }),
-              remainingMs,
+              record.stopDeadlineMs,
               { stopped: false, incomplete: ['stop-owned-work-timeout'] },
             ),
             this.#boundedCleanup(
@@ -186,7 +186,7 @@ export class WorkflowCancellationCoordinator {
                 runId: record.runId,
                 cancellationId: record.id,
               }),
-              remainingMs,
+              record.stopDeadlineMs,
               { incomplete: ['cleanup-prepared-effects-timeout'] },
             ),
           ]);
@@ -205,13 +205,18 @@ export class WorkflowCancellationCoordinator {
     return completed;
   }
 
-  async #boundedCleanup<T>(operation: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  async #boundedCleanup<T>(operation: Promise<T>, deadlineMs: number, fallback: T): Promise<T> {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([
         operation,
         new Promise<T>((resolve) => {
-          timeout = setTimeout(() => resolve(fallback), timeoutMs);
+          const checkDeadline = (): void => {
+            const remainingMs = deadlineMs - this.#clock();
+            if (remainingMs <= 0) resolve(fallback);
+            else timeout = setTimeout(checkDeadline, remainingMs);
+          };
+          checkDeadline();
         }),
       ]);
     } finally {

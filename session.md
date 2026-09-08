@@ -79,3 +79,11 @@ No active autonomous journal run exists. Supervised coordination is not proof of
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
 pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.
+
+## PR260 CI follow-up
+
+The e444317 launch-provenance repair passed Sonar and review but CI caught cancellation returning
+requested after an early timer wake. Subtask .5.3 reproduced the clock/timer discrepancy and now
+rechecks the absolute durable deadline. No deadline extension, fabricated timestamp or cleanup retry.
+Eight cancellation tests and independent source review pass; exact-branch package/hosted gates are
+required before integration. This repair is isolated from the subsequent output/settlement work.
