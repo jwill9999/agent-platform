@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-08: supervised Astra critique drove four bounded repairs; isolated model runner remains incomplete.
+2026-09-08: PR259 merged four prerequisite repairs; bounded container lifecycle repair is underway.
 
 ## Verified delivery
 
@@ -64,6 +64,12 @@ E2E and Sourcery passed; Sonar reported complexity and implicit sorting. Follow-
 manifest ordering, simplify mount validation, clean staging on preparation failure and export the
 material helper. Supervised independent review passed; fresh hosted verification remains pending.
 The pilot-zero-progress-and-ci heartbeat checks for actionable progress every ten minutes.
+PR259 subsequently merged at 68e7856c59fb35bb47bbb10b1b3c4e2d7dee34f8 after owner approval:
+11 executed hosted checks passed; staging-only macOS VM was skipped. Children .1-.4 are closed.
+Current segment: task/pilot-zero-container-lifecycle, Beads pilot-zero.5. Its worker implements
+bounded create/start/remove/inspect with explicit cleanup uncertainty; parent coordinates review.
+The heartbeat is active again under the owner's instruction to continue through fixable blockers.
+No active autonomous journal run exists. Supervised coordination is not proof of runtime handoff.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
 pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.
