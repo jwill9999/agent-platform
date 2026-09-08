@@ -3442,59 +3442,68 @@ export class WorkflowStore {
     callback?: unknown;
     nowMs?: number;
   }): SchedulerExecutionRecord {
-    const nowMs = input.nowMs ?? Date.now();
-    return this.#database.transaction(() => {
-      const execution = this.getSchedulerExecution(input.id);
-      if (execution === undefined) throw new Error('scheduler execution not found');
-      if (execution.status !== 'active') {
-        if (execution.status === 'completed' && input.callback !== undefined) {
-          this.#recordSchedulerTerminalCallback(input, nowMs);
+    return this.#database
+      .transaction(() => {
+        const nowMs = input.nowMs ?? Date.now();
+        const execution = this.getSchedulerExecution(input.id);
+        if (execution === undefined) throw new Error('scheduler execution not found');
+        if (execution.status !== 'active') {
+          if (execution.status === 'completed' && input.callback !== undefined) {
+            this.#recordSchedulerTerminalCallback(input, nowMs);
+          }
+          return execution;
         }
-        return execution;
-      }
-      this.#assertResourceLease(
-        'workspace',
-        execution.workspaceId,
-        input.ownerId,
-        input.workspaceLeaseEpoch,
-        nowMs,
-      );
-      this.#assertResourceLease('run', execution.runId, input.ownerId, input.runLeaseEpoch, nowMs);
-      this.#assertResourceLease(
-        'task',
-        execution.taskId,
-        input.ownerId,
-        input.taskLeaseEpoch,
-        nowMs,
-      );
-      if (execution.ownerId !== input.ownerId) throw new Error('scheduler execution owner changed');
-      if (
-        execution.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
-        execution.runLeaseEpoch !== input.runLeaseEpoch ||
-        execution.taskLeaseEpoch !== input.taskLeaseEpoch
-      ) {
-        throw new Error('scheduler execution fencing token changed');
-      }
-      if (execution.credentialStatus !== 'revoked') {
-        throw new Error('scheduler execution cannot finish before credential revocation');
-      }
-      if (input.status === 'completed' && execution.deadlineMs <= nowMs) {
-        throw new Error('specialist reservation timed out');
-      }
-      this.#database
-        .prepare(
-          `UPDATE scheduler_executions SET status = ?, result_json = ?, updated_at_ms = ?
+        this.#assertResourceLease(
+          'workspace',
+          execution.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          nowMs,
+        );
+        this.#assertResourceLease(
+          'run',
+          execution.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          nowMs,
+        );
+        this.#assertResourceLease(
+          'task',
+          execution.taskId,
+          input.ownerId,
+          input.taskLeaseEpoch,
+          nowMs,
+        );
+        if (execution.ownerId !== input.ownerId)
+          throw new Error('scheduler execution owner changed');
+        if (
+          execution.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+          execution.runLeaseEpoch !== input.runLeaseEpoch ||
+          execution.taskLeaseEpoch !== input.taskLeaseEpoch
+        ) {
+          throw new Error('scheduler execution fencing token changed');
+        }
+        if (execution.credentialStatus !== 'revoked') {
+          throw new Error('scheduler execution cannot finish before credential revocation');
+        }
+        if (input.status === 'completed' && execution.deadlineMs <= nowMs) {
+          throw new Error('specialist reservation timed out');
+        }
+        this.#database
+          .prepare(
+            `UPDATE scheduler_executions SET status = ?, result_json = ?, updated_at_ms = ?
            WHERE id = ? AND status = 'active'`,
-        )
-        .run(input.status, JSON.stringify(input.result), nowMs, input.id);
-      if (input.status === 'completed') {
-        enqueueContinuation(this.#database, input.id, execution.runId, nowMs);
-        if (input.callback !== undefined) {
-          this.#recordSchedulerTerminalCallback(input, nowMs);
+          )
+          .run(input.status, JSON.stringify(input.result), nowMs, input.id);
+        if (input.status === 'completed') {
+          enqueueContinuation(this.#database, input.id, execution.runId, nowMs);
+          if (input.callback !== undefined) {
+            this.#recordSchedulerTerminalCallback(input, nowMs);
+          }
         }
-      }
-      return this.getSchedulerExecution(input.id)!;
-    })();
+        return this.getSchedulerExecution(input.id)!;
+      })
+      .immediate();
   }
 
   getSchedulerExecution(id: string): SchedulerExecutionRecord | undefined {

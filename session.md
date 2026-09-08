@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-08: supervised Astra critique drove four bounded repairs; isolated model runner remains incomplete.
+2026-09-08: PR259 merged four prerequisite repairs; lifecycle publication caught a SQLite completion race.
 
 ## Verified delivery
 
@@ -64,6 +64,29 @@ E2E and Sourcery passed; Sonar reported complexity and implicit sorting. Follow-
 manifest ordering, simplify mount validation, clean staging on preparation failure and export the
 material helper. Supervised independent review passed; fresh hosted verification remains pending.
 The pilot-zero-progress-and-ci heartbeat checks for actionable progress every ten minutes.
+PR259 subsequently merged at 68e7856c59fb35bb47bbb10b1b3c4e2d7dee34f8 after owner approval:
+11 executed hosted checks passed; staging-only macOS VM was skipped. Children .1-.4 are closed.
+Current segment: task/pilot-zero-container-lifecycle, Beads pilot-zero.5. Commit c00fbd3 contains
+reviewed bounded create/start/remove/inspect with explicit cleanup uncertainty. Seven real offline
+Docker probes passed. The push did not succeed: the normal package gate caught database locking
+in specialist completion under concurrent coordinators (581 passed, one failed, seven skipped).
+Subtask .5.1 reproduced SQLITE_BUSY_SNAPSHOT deterministically and corrected writer reservation
+and post-reservation default clock sampling. Independent review passed with no remaining findings;
+the final full package run passed 585 tests (seven separately exercised opt-in Docker skips).
+Typecheck, lint, formatting and diff checks pass. PR260 is open at
+5f95bcac608473d43d0a622c81cee5189730cfca after the normal hook passed again; hosted gates run now.
+Conditional feature-merge approval was requested separately and has not yet been received.
+PR260 initially passed every executed check, but a review thread identified a generated-launch
+precondition gap. Subtask .5.2 enforces immutable builder provenance before Docker spawning; its
+independent review and real probes passed, and commit e444317 is pushed with a documented resolved
+thread. Fresh hosted checks are required. The final combined local gate passed 652 tests (seven
+separately exercised Docker skips), including .6. No remotely reachable escape was established.
+Current development branch is chained task/pilot-zero-output-manifest for .6 read-only candidate
+validation. Its 59 focused tests, 23 runtime tests and independent review passed. Its source changes
+do not enable imports or remove the phase guard. Dedicated model
+authentication was requested securely; absent that, live model acceptance remains blocked.
+The heartbeat is active again under the owner's instruction to continue through fixable blockers.
+No active autonomous journal run exists. Supervised coordination is not proof of runtime handoff.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
 pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.
