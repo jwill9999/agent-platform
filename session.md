@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-08: pilot-zero prerequisite tests run; stale compiled CLI rebuilt; isolated critic still blocked.
+2026-09-08: supervised Astra critique corrected scope; two bounded pilot-zero repairs in verification.
 
 ## Verified delivery
 
@@ -50,9 +50,13 @@ were observed cancelled. Preserve unrelated .beads/interactions.jsonl changes.
 
 Real Docker isolation passed; launcher/runtime tests passed 28/28 after rebuilding stale dist;
 progression tests passed 33/33; typecheck and lint passed. These are not live model conformance.
-Next: resolve the real revocable credential-service prerequisite for an ADR-compliant isolated
-critic, then finalize exact contract/policy/check bindings. Prefer autonomous technical decisions
-and fix-forward within scope; no silent bypass of isolation or protected delivery gates.
+The user directed continued progress after the proposed supervised bootstrap review exception.
+Astra critic found active-run revocation was incorrectly treated as universal preapproval need.
+Supervised review is not isolated runtime acceptance. Tasks pilot-zero.1 (build before default tests)
+and pilot-zero.2 (read-only planner/critic mount and sandbox) are in progress on chained task branches;
+current tip is task/pilot-zero-readonly-review. Next: minimal preapproval entry point using existing
+helpers, dedicated auth, verified egress, exact evidence and bounded cleanup. Do not replace brokers.
+Sonar snippet initialization failed; local fallback checks apply, hosted gates remain required.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
 pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.

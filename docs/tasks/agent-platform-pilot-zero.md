@@ -180,3 +180,33 @@ This exposes a bootstrap review dependency: the compliant reviewer needs that en
 can independently review its construction. Do not silently relax the isolation rule or describe a
 built-in reviewer as equivalent. Resolving this policy/service prerequisite is distinct from fixing
 the now-resolved stale local build. No model specialist or autonomous feature run was launched.
+
+## Supervised critique and corrected recovery scope
+
+The owner subsequently directed iterative progress after the proposed supervised bootstrap exception.
+A built-in Astra reviewer (`pilot_zero_critic`) was launched with no authorized mutations. This is an
+explicit supervised intervention, not ADR-compliant isolated-runtime acceptance or formal contract
+approval. Its source review challenged the assessment and produced these dispositions:
+
+- Correct PZ-09: generation-pinned credential revocation is required by the active-run launcher,
+  but is not automatically a requirement of every preapproval review. Dedicated model-only
+  authentication and isolation remain required. Earlier claims of a universal service prerequisite
+  were too broad.
+- Correct PZ-02: credentials alone cannot activate a plan critic in the standalone runtime; it has
+  no preapproval critic phase. Investigate a capability-stripped planning session or a narrow
+  preapproval entry point using existing lower-level container helpers.
+- Additional finding: those helpers give planners/critics writable source and workspace-write.
+  `agent-platform-pilot-zero.2` restricts both planning roles at the mount and sandbox boundaries.
+- Reproducibility repair `agent-platform-pilot-zero.1` makes the ordinary package test build first.
+  The critic supports this, but it is not an isolated reviewer provisioning fix.
+
+The reviewer confirmed implementation import and coordinator completion gaps. It recommended not
+replacing existing brokers or building the full pipeline merely to obtain the first critique.
+Source review of both bounded changes returned no findings; runtime test results are separate.
+The new mount assertion initially failed on macOS `/var` versus `/private/var`; expectations now use
+the same canonical realpath as production. No production mount behavior was relaxed to pass tests.
+
+Sonar snippet analysis was attempted but server initialization timed out. Typecheck, lint and focused
+tests form the declared local fallback; hosted security checks still apply before delivery.
+The next review concerns a minimal preapproval entry point with real cleanup and exact-material
+binding. It must not claim credential or network conformance based on caller strings alone.

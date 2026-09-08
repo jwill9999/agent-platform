@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -78,6 +78,26 @@ describe('specialist launcher', () => {
     );
     expect(launch.args.join(' ')).not.toMatch(/(?:\.git|\.beads|docker\.sock|\.ssh|GITHUB_TOKEN)/u);
     expect(launch.environment).toEqual({});
+    const canonicalWorkspaceRoot = await realpath(workspaceRoot);
+    expect(launch.args).toContain(`${canonicalWorkspaceRoot}:/workspace:rw`);
+    expect(launch.args.at(-1)).toContain('--sandbox workspace-write');
+    for (const role of ['feature_planner', 'plan_critic']) {
+      const reviewer = await buildDockerSpecialistLaunch({
+        image: 'workflow-codex:local',
+        workspaceRoot,
+        codexHome,
+        authFile,
+        promptFile,
+        egressNetwork: 'workflow-model-egress',
+        role,
+        runId: 'preapproval-review',
+        containerUser: '501:20',
+      });
+      expect(reviewer.args).toContain(`${canonicalWorkspaceRoot}:/workspace:ro`);
+      expect(reviewer.args).not.toContain(`${canonicalWorkspaceRoot}:/workspace:rw`);
+      expect(reviewer.args.at(-1)).toContain('--sandbox read-only');
+      expect(reviewer.args.at(-1)).not.toContain('--sandbox workspace-write');
+    }
   });
 
   it('rejects declared source paths that resolve outside the repository', async () => {

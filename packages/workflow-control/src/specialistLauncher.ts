@@ -146,8 +146,9 @@ export async function buildDockerSpecialistLaunch(
     realpath(join(request.codexHome, 'config.toml')),
   ]);
   const stagingRoot = await realpath(resolve(workspaceRoot, '..'));
+  const readOnlySource = request.role === 'feature_planner' || request.role === 'plan_critic';
   const mounts = [
-    `${workspaceRoot}:/workspace:rw`,
+    `${workspaceRoot}:/workspace:${readOnlySource ? 'ro' : 'rw'}`,
     `${codexHome}:/codex-home:rw`,
     `${configFile}:/codex-home/config.toml:ro`,
     `${authFile}:/codex-home/auth.json:ro`,
@@ -198,7 +199,7 @@ export async function buildDockerSpecialistLaunch(
     request.image,
     'sh',
     '-c',
-    'exec codex exec --json --sandbox workspace-write --skip-git-repo-check -C /workspace - < /run/specialist/prompt.txt',
+    `exec codex exec --json --sandbox ${readOnlySource ? 'read-only' : 'workspace-write'} --skip-git-repo-check -C /workspace - < /run/specialist/prompt.txt`,
   );
   return { dockerBinary: '/usr/local/bin/docker', args, environment: {} };
 }
