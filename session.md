@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-07: staging delivery complete; Beads reconciled for supervised pilot and follow-ups.
+2026-09-08: supervised Astra critique drove four bounded repairs; isolated model runner remains incomplete.
 
 ## Verified delivery
 
@@ -41,7 +41,29 @@ Secure-evidence focused tests: 26 passed after the timing-assertion adjustment.
 Independent critique, build, typecheck, lint and formatting passed. The final staging check set
 cleared the original CodeQL alert with no new alerts.
 
-Reconcile acceptance evidence and refine the supervised operational pilot; track notification,
-progression and recovery snags as they occur. Hook repair is separate. Documentation/backlog capture
-is pushed on task/orchestration-toolkit-backlog, not yet integrated into staging; its proposed
-feature parent is feature/orchestration-toolkit-backlog. Do not imply this handoff is already merged.
+Historical documentation capture is already in staging. Current assessment work is on
+task/pilot-zero-assessment, based on feature/pilot-zero-assessment from staging.
+Beads agent-platform-pilot-zero is in progress; its spec records nine integration findings,
+phase triggers, reproducibility tests and a proposed recovery sequence. No executable contract or
+independent critic approval is claimed. No new workflow run exists; four canonical journal runs
+were observed cancelled. Preserve unrelated .beads/interactions.jsonl changes.
+
+Real Docker isolation passed; launcher/runtime tests passed 28/28 after rebuilding stale dist;
+progression tests passed 33/33; typecheck and lint passed. These are not live model conformance.
+The user directed continued progress after the proposed supervised bootstrap review exception.
+Astra critic found active-run revocation was incorrectly treated as universal preapproval need.
+Supervised review is not isolated runtime acceptance. Tasks pilot-zero.1 (build before default tests)
+and pilot-zero.2 (read-only planner/critic mount and sandbox) are in progress on chained task branches;
+current tip is task/pilot-zero-mountpoint. Tasks .3/.4 add exact-file staging and an empty nested-auth
+mountpoint; 53 focused tests and four real offline Docker probes pass, with final source review pass.
+No model credentials were used. Next: minimal preapproval entry point using existing
+helpers, dedicated auth, verified egress, exact evidence and bounded cleanup. Do not replace brokers.
+Sonar snippet initialization failed; local fallback checks apply, hosted gates remain required.
+PR #259 targets feature/pilot-zero-assessment. Its initial hosted tests, Docker, browser/desktop
+E2E and Sourcery passed; Sonar reported complexity and implicit sorting. Follow-up fixes preserve
+manifest ordering, simplify mount validation, clean staging on preparation failure and export the
+material helper. Supervised independent review passed; fresh hosted verification remains pending.
+The pilot-zero-progress-and-ci heartbeat checks for actionable progress every ten minutes.
+The standalone runtime rejects implementation and coordinator completion remains unsupported;
+desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
+pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.

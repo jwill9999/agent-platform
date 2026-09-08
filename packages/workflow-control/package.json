@@ -20,7 +20,7 @@
     "build:bootstrap-adapters": "pnpm build && node dist/bootstrapAdapterBundle.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run",
+    "test": "pnpm build && vitest run",
     "test:progression": "pnpm build && vitest run test/continuationWorker.test.ts test/continuationProcess.test.ts test/continuationNotifications.test.ts",
     "test:standalone-runtime": "pnpm build && vitest run test/phaseJobs.test.ts test/phaseRuntime.test.ts",
     "test:standalone-conformance": "pnpm build && node dist/cli.js standalone-conformance",
