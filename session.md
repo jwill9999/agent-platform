@@ -73,7 +73,18 @@ in specialist completion under concurrent coordinators (581 passed, one failed, 
 Subtask .5.1 reproduced SQLITE_BUSY_SNAPSHOT deterministically and corrected writer reservation
 and post-reservation default clock sampling. Independent review passed with no remaining findings;
 the final full package run passed 585 tests (seven separately exercised opt-in Docker skips).
-Typecheck, lint, formatting and diff checks pass. Publication and hosted gates are next.
+Typecheck, lint, formatting and diff checks pass. PR260 is open at
+5f95bcac608473d43d0a622c81cee5189730cfca after the normal hook passed again; hosted gates run now.
+Conditional feature-merge approval was requested separately and has not yet been received.
+PR260 initially passed every executed check, but a review thread identified a generated-launch
+precondition gap. Subtask .5.2 enforces immutable builder provenance before Docker spawning; its
+independent review and real probes passed, and commit e444317 is pushed with a documented resolved
+thread. Fresh hosted checks are required. The final combined local gate passed 652 tests (seven
+separately exercised Docker skips), including .6. No remotely reachable escape was established.
+Current development branch is chained task/pilot-zero-output-manifest for .6 read-only candidate
+validation. Its 59 focused tests, 23 runtime tests and independent review passed. Its source changes
+do not enable imports or remove the phase guard. Dedicated model
+authentication was requested securely; absent that, live model acceptance remains blocked.
 The heartbeat is active again under the owner's instruction to continue through fixable blockers.
 No active autonomous journal run exists. Supervised coordination is not proof of runtime handoff.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
