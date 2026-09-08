@@ -210,3 +210,21 @@ Sonar snippet analysis was attempted but server initialization timed out. Typech
 tests form the declared local fallback; hosted security checks still apply before delivery.
 The next review concerns a minimal preapproval entry point with real cleanup and exact-material
 binding. It must not claim credential or network conformance based on caller strings alone.
+
+### Completed supervised repair iterations
+
+The independent critic approved the bounded source changes for tasks .1 through .4, not the entire
+runner. Task .3 adds exact-file staging with 48 focused tests. Task .4 fixes a real Docker Desktop
+nested-auth mount failure with an empty owner-only destination placeholder. The real container
+probe initially could not start; after the fix it starts without any real credentials.
+
+The critic found the new write-denial test could pass from ordinary file permissions and its cleanup
+was not guaranteed on timeout. Corrections add a harmless writable fixture, worker positive control,
+named-container cleanup, and a 30-second test budget covering the 15-second execution plus 10-second
+cleanup bounds. A second review pass returned no findings. All four real offline Docker probes and
+53 combined material/launcher tests pass; typecheck and lint pass. The full package pre-push suite
+for .1/.2 passed 488 tests with one separately exercised opt-in isolation test skipped.
+
+These transitions were coordinated by the parent in this conversation after subagent completion,
+not by the package. Record that manual bridging as unproven autonomous coverage. No future model
+authentication, image identity, network restrictions or active-run approval was inferred.

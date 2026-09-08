@@ -35,6 +35,7 @@ describe('specialist launcher', () => {
     const config = await readFile(join(workspace.codexHome, 'config.toml'), 'utf8');
     expect(config).not.toContain('mcp_servers');
     expect(config).toContain('approval_policy = "never"');
+    await expect(readFile(join(workspace.codexHome, 'auth.json'), 'utf8')).resolves.toBe('{}\n');
   });
 
   it('builds a hardened codex exec container invocation with only private mounts', async () => {

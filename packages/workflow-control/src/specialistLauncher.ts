@@ -100,6 +100,9 @@ export async function prepareSpecialistWorkspace(
     ].join('\n'),
     { mode: 0o600 },
   );
+  // Docker Desktop needs the nested file mount destination to exist in the mounted home.
+  // The real authentication file is mounted read-only over this empty, non-secret placeholder.
+  await writeFile(join(codexHome, 'auth.json'), '{}\n', { mode: 0o600, flag: 'wx' });
   return { root, codexHome };
 }
 

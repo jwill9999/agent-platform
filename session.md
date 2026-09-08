@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-08: supervised Astra critique corrected scope; two bounded pilot-zero repairs in verification.
+2026-09-08: supervised Astra critique drove four bounded repairs; isolated model runner remains incomplete.
 
 ## Verified delivery
 
@@ -54,7 +54,9 @@ The user directed continued progress after the proposed supervised bootstrap rev
 Astra critic found active-run revocation was incorrectly treated as universal preapproval need.
 Supervised review is not isolated runtime acceptance. Tasks pilot-zero.1 (build before default tests)
 and pilot-zero.2 (read-only planner/critic mount and sandbox) are in progress on chained task branches;
-current tip is task/pilot-zero-readonly-review. Next: minimal preapproval entry point using existing
+current tip is task/pilot-zero-mountpoint. Tasks .3/.4 add exact-file staging and an empty nested-auth
+mountpoint; 53 focused tests and four real offline Docker probes pass, with final source review pass.
+No model credentials were used. Next: minimal preapproval entry point using existing
 helpers, dedicated auth, verified egress, exact evidence and bounded cleanup. Do not replace brokers.
 Sonar snippet initialization failed; local fallback checks apply, hosted gates remain required.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
