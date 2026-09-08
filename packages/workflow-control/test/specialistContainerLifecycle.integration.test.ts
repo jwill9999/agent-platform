@@ -1,12 +1,15 @@
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   executeSpecialistContainerLifecycle,
-  type DockerSpecialistLaunch,
+  buildDockerSpecialistLaunch,
   type SpecialistContainerLifecycleResult,
 } from '../src/index.js';
 
@@ -131,12 +134,13 @@ async function withProbe(
     startedAt: number;
   }) => Promise<void>,
 ): Promise<void> {
+  const fixture = await probe(script);
   const owner = actualCrypto.randomUUID();
   vi.mocked(randomUUID).mockReturnValueOnce(owner);
   const identity = { name: `workflow-lifecycle-${owner}`, owner };
   const controller = new AbortController();
   const startedAt = Date.now();
-  const pending = executeSpecialistContainerLifecycle(probe(script), {
+  const pending = executeSpecialistContainerLifecycle(fixture.launch, {
     timeoutMs,
     createTimeoutMs: 5000,
     cleanupTimeoutMs: 5000,
@@ -159,37 +163,49 @@ async function withProbe(
       cleanupFailure = error;
       if (originalFailure instanceof Error && originalFailure.cause === undefined)
         originalFailure.cause = error;
+    } finally {
+      // Retain fixture mounts when late-create recovery is uncertain.
+      if (result?.cleanupConfirmed === true)
+        await rm(fixture.stagingRoot, { recursive: true, force: true });
     }
   }
   if (cleanupFailure !== undefined) throw cleanupFailure;
 }
 
-function probe(script: string): DockerSpecialistLaunch {
-  return {
-    dockerBinary: docker,
-    environment: {},
-    args: [
-      'run',
-      '--rm',
-      '--read-only',
-      '--network',
-      'none',
-      '--cap-drop',
-      'ALL',
-      '--security-opt',
-      'no-new-privileges',
-      '--pids-limit',
-      '32',
-      '--memory',
-      '128m',
-      '--cpus',
-      '1',
+async function probe(script: string) {
+  const stagingRoot = await mkdtemp(join(tmpdir(), 'lifecycle-offline-'));
+  try {
+    const workspaceRoot = join(stagingRoot, 'workspace');
+    const codexHome = join(stagingRoot, 'codex-home');
+    const authFile = join(stagingRoot, 'auth.json');
+    const promptFile = join(stagingRoot, 'prompt.txt');
+    await mkdir(workspaceRoot, { mode: 0o755 });
+    await mkdir(codexHome, { mode: 0o755 });
+    await writeFile(join(codexHome, 'config.toml'), '# offline fixture\n', { mode: 0o644 });
+    await writeFile(join(codexHome, 'auth.json'), '{}\n', { mode: 0o644 });
+    await writeFile(authFile, '{}\n', { mode: 0o644 });
+    await writeFile(promptFile, 'offline fixture\n', { mode: 0o644 });
+    await writeFile(join(workspaceRoot, 'probe.js'), script, { mode: 0o644 });
+    await writeFile(join(workspaceRoot, 'codex'), '#!/bin/sh\nexec node /workspace/probe.js\n', {
+      mode: 0o755,
+    });
+    const launch = await buildDockerSpecialistLaunch({
       image,
-      'node',
-      '-e',
-      script,
-    ],
-  };
+      workspaceRoot,
+      codexHome,
+      authFile,
+      promptFile,
+      egressNetwork: 'none',
+      containerUser: '1000:1000',
+      role: 'feature_planner',
+      runId: 'offline-probe',
+      extraEnvironment: { PATH: '/workspace:/usr/local/bin:/usr/bin:/bin' },
+    });
+    return { launch, stagingRoot };
+  } catch (error) {
+    await rm(stagingRoot, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 async function independentlyConfirmAbsence(

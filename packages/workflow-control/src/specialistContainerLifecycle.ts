@@ -1,7 +1,10 @@
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
-import type { DockerSpecialistLaunch } from './specialistLauncher.js';
+import {
+  generatedDockerSpecialistLaunch,
+  type DockerSpecialistLaunch,
+} from './specialistLauncher.js';
 
 const dockerBinary = '/usr/local/bin/docker';
 const ownerLabel = 'io.agent-platform.specialist-lifecycle';
@@ -299,7 +302,7 @@ export async function executeSpecialistContainerLifecycle(
   const outputLimit = boundedInteger(options.maxOutputBytes ?? 1024 * 1024, 4 * 1024 * 1024);
   const owner = randomUUID();
   const name = `workflow-lifecycle-${owner}`;
-  const args = createArguments(launch, name, owner);
+  const args = createArguments(generatedDockerSpecialistLaunch(launch), name, owner);
   const recovery: SpecialistContainerLifecycleResult['recovery'] = {
     containerName: name,
     ownershipLabel: `${ownerLabel}=${owner}`,

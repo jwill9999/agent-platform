@@ -4,10 +4,17 @@ import {
   type ExecFileOptions,
   type ExecFileException,
 } from 'node:child_process';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { executeSpecialistContainerLifecycle, type DockerSpecialistLaunch } from '../src/index.js';
+import {
+  buildDockerSpecialistLaunch,
+  executeSpecialistContainerLifecycle,
+  type DockerSpecialistLaunch,
+} from '../src/index.js';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -15,23 +22,37 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 const id = 'a'.repeat(64);
-const launch: DockerSpecialistLaunch = {
-  dockerBinary: '/usr/local/bin/docker',
-  environment: {},
-  args: [
-    'run',
-    '--rm',
-    '--name',
-    'previous-name',
-    '--read-only',
-    '--network',
-    'none',
-    'fixture-image',
-    'node',
-    '-e',
-    'fixture',
-  ],
-};
+let launch: DockerSpecialistLaunch;
+let stagingRoot: string;
+const executionId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+beforeAll(async () => {
+  stagingRoot = await mkdtemp(join(tmpdir(), 'lifecycle-unit-'));
+  const workspaceRoot = join(stagingRoot, 'workspace');
+  const codexHome = join(stagingRoot, 'codex-home');
+  const authFile = join(stagingRoot, 'auth.json');
+  const promptFile = join(stagingRoot, 'prompt.txt');
+  await mkdir(workspaceRoot);
+  await mkdir(codexHome);
+  await writeFile(join(codexHome, 'config.toml'), '');
+  await writeFile(authFile, '{}');
+  await writeFile(promptFile, 'offline fixture');
+  launch = await buildDockerSpecialistLaunch({
+    image: 'fixture-image',
+    workspaceRoot,
+    codexHome,
+    authFile,
+    promptFile,
+    role: 'implementation_worker',
+    runId: 'fixture',
+    containerUser: '1000:1000',
+    egressNetwork: 'none',
+    executionId,
+    extraEnvironment: { FIXTURE: '--rm --name command-value' },
+  });
+});
+afterAll(async () => {
+  if (stagingRoot !== undefined) await rm(stagingRoot, { recursive: true, force: true });
+});
 interface Call {
   binary: string;
   args: string[];
@@ -125,7 +146,7 @@ describe('executeSpecialistContainerLifecycle', () => {
       'container',
     ]);
     expect(calls[0]!.args).not.toContain('--rm');
-    expect(calls[0]!.args).not.toContain('previous-name');
+    expect(calls[0]!.args).not.toContain(`workflow-specialist-${executionId}`);
     expect(calls[1]!.args).toEqual(['start', '--attach', id]);
     expect(calls[3]!.args).toEqual(['container', 'rm', '--force', id]);
     for (const call of calls) {
@@ -138,10 +159,59 @@ describe('executeSpecialistContainerLifecycle', () => {
     expect(launch.args[1]).toBe('--rm');
   });
 
-  it('does not strip lifecycle-looking arguments from the image command', async () => {
-    const commandLaunch = { ...launch, args: [...launch.args, '--rm', '--name', 'command-value'] };
-    await executeSpecialistContainerLifecycle(commandLaunch, { timeoutMs: 1000 });
-    expect(calls[0]!.args.slice(-3)).toEqual(['--rm', '--name', 'command-value']);
+  it('preserves generated command and lifecycle-looking environment values', async () => {
+    await executeSpecialistContainerLifecycle(launch, { timeoutMs: 1000 });
+    expect(calls[0]!.args.slice(-4)).toEqual(launch.args.slice(-4));
+    expect(calls[0]!.args).toContain('FIXTURE=--rm --name command-value');
+  });
+
+  it.each(['shallow', 'deep', 'prototype'])(
+    'rejects a %s clone before any subprocess',
+    async (kind) => {
+      const clone =
+        kind === 'shallow'
+          ? { ...launch }
+          : kind === 'deep'
+            ? structuredClone(launch)
+            : (Object.create(launch) as DockerSpecialistLaunch);
+      await expect(executeSpecialistContainerLifecycle(clone, { timeoutMs: 1000 })).rejects.toThrow(
+        'generated launch',
+      );
+      expect(calls).toHaveLength(0);
+    },
+  );
+
+  it.each([
+    ['run', '--network', 'host', 'image'],
+    ['run', '--user', '0:0', 'image'],
+    ['run', '--volume', '/:/host:rw', 'image'],
+    ['run', 'image'],
+  ])('rejects fabricated launch policy %# before any subprocess', async (...args) => {
+    await expect(
+      executeSpecialistContainerLifecycle(
+        { dockerBinary: '/usr/local/bin/docker', environment: {}, args },
+        { timeoutMs: 1000 },
+      ),
+    ).rejects.toThrow('generated launch');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('deeply freezes generated launch policy against substitution before and during dispatch', async () => {
+    const original = structuredClone(launch);
+    const mutate = () => {
+      expect(Reflect.set(launch, 'dockerBinary', '/untrusted/docker')).toBe(false);
+      expect(Reflect.set(launch, 'args', ['run', '--privileged', 'image'])).toBe(false);
+      expect(Reflect.set(launch, 'environment', { SECRET: 'fixture' })).toBe(false);
+      expect(Reflect.set(launch.args, '1', '--privileged')).toBe(false);
+      expect(Reflect.set(launch.environment, 'SECRET', 'fixture')).toBe(false);
+    };
+    mutate();
+    respond = (call) => ({ ...defaultResponse(call), before: mutate });
+    expect((await executeSpecialistContainerLifecycle(launch, { timeoutMs: 1000 })).status).toBe(
+      'completed',
+    );
+    expect(launch).toEqual(original);
+    expect(calls[0]!.args).not.toContain('--privileged');
   });
 
   it.each([
@@ -159,7 +229,7 @@ describe('executeSpecialistContainerLifecycle', () => {
         { ...launch, args: ['run', option, 'value', 'image'] },
         { timeoutMs: 1000 },
       ),
-    ).rejects.toThrow('option');
+    ).rejects.toThrow('generated launch');
     expect(calls).toHaveLength(0);
   });
 
@@ -184,13 +254,13 @@ describe('executeSpecialistContainerLifecycle', () => {
         { ...launch, dockerBinary: '/untrusted/docker' },
         { timeoutMs: 1000 },
       ),
-    ).rejects.toThrow('fixed');
+    ).rejects.toThrow('generated launch');
     await expect(
       executeSpecialistContainerLifecycle(
         { ...launch, environment: { SECRET: 'fixture' } },
         { timeoutMs: 1000 },
       ),
-    ).rejects.toThrow('fixed');
+    ).rejects.toThrow('generated launch');
     for (const timeoutMs of [0, -1, NaN, Infinity, 120001])
       await expect(executeSpecialistContainerLifecycle(launch, { timeoutMs })).rejects.toThrow(
         'limit',

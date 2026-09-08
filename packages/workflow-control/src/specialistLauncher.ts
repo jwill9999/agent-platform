@@ -27,6 +27,17 @@ export interface DockerSpecialistLaunch {
   environment: Record<string, string>;
 }
 
+const generatedLaunches = new WeakMap<DockerSpecialistLaunch, DockerSpecialistLaunch>();
+
+/** Internal read-only lookup; only the builder can establish launch provenance. */
+export function generatedDockerSpecialistLaunch(
+  launch: DockerSpecialistLaunch,
+): DockerSpecialistLaunch {
+  const snapshot = generatedLaunches.get(launch);
+  if (snapshot === undefined) throw new Error('specialist lifecycle requires a generated launch');
+  return snapshot;
+}
+
 export interface SpecialistExecutionResult {
   events: unknown[];
   stderr: string;
@@ -221,7 +232,14 @@ export async function buildDockerSpecialistLaunch(
     '-c',
     `exec codex exec --json --sandbox ${readOnlySource ? 'read-only' : 'workspace-write'} --skip-git-repo-check -C /workspace - < /run/specialist/prompt.txt`,
   );
-  return { dockerBinary: '/usr/local/bin/docker', args, environment: {} };
+  // This proves generated Docker policy, not private staging provenance. Trusted composition
+  // must supply dedicated staging roots; untrusted/model input must never choose host paths.
+  const launch = { dockerBinary: '/usr/local/bin/docker', args, environment: {} };
+  Object.freeze(launch.args);
+  Object.freeze(launch.environment);
+  Object.freeze(launch);
+  generatedLaunches.set(launch, launch);
+  return launch;
 }
 
 const defaultExecutor: SpecialistProcessExecutor = async (executable, args, options) => {
