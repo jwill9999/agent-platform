@@ -155,3 +155,28 @@ observable local interface as a provisional technical recommendation, not a clai
 external messaging or production authority. Review disagreements are reconciled by agents using
 evidence; only irreducible authority or product decisions require owner input. Independent review
 and required security gates still precede protected delivery, even in a fix-forward workflow.
+
+## Iteration evidence: local prerequisite verification
+
+2026-09-08: the real Docker isolation probe passed (one test). It demonstrated the permitted file
+was visible and host control/credential paths were absent in a non-root, network-disabled container.
+This is not model execution or restricted online egress conformance.
+
+The first direct launcher/runtime test run passed 27 of 28 tests. Its CLI prerequisite assertion
+loaded an old `dist/cli.js` supporting only migrate/status. Running the package build corrected
+that local generated-artifact mismatch; the same 28 tests then passed. No source patch or weakened
+assertion was needed. Reproduction must use build-before-test, as the documented runtime script does.
+The dedicated progression suite passed all 33 tests, including real parent processes, missed wakeup
+handling and an accepted host execution that never starts. Typecheck and lint passed.
+
+The remaining launch dependency is a real revocable model credential service. The repository search
+finds the command-backed client in `specialistLauncher.ts` and fixture services in tests, not a
+production implementation. Deleting an authentication file is not revocation, and copying primary
+desktop credentials into a container would violate the declared boundary. A verified external
+service or a reviewed implementation of that security boundary is needed. The installed host CLI
+reports 0.30.0; it is not evidence of a provisioned, pinned specialist image.
+
+This exposes a bootstrap review dependency: the compliant reviewer needs that environment before it
+can independently review its construction. Do not silently relax the isolation rule or describe a
+built-in reviewer as equivalent. Resolving this policy/service prerequisite is distinct from fixing
+the now-resolved stale local build. No model specialist or autonomous feature run was launched.

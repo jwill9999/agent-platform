@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-08: pilot-zero integration assessment drafted; no implementation or runtime activated.
+2026-09-08: pilot-zero prerequisite tests run; stale compiled CLI rebuilt; isolated critic still blocked.
 
 ## Verified delivery
 
@@ -48,8 +48,11 @@ phase triggers, reproducibility tests and a proposed recovery sequence. No execu
 independent critic approval is claimed. No new workflow run exists; four canonical journal runs
 were observed cancelled. Preserve unrelated .beads/interactions.jsonl changes.
 
-Next: establish an ADR-compliant isolated critic route and choose a human-visible notification
-channel, then finalize exact contract/policy/check bindings for critique and owner approval.
+Real Docker isolation passed; launcher/runtime tests passed 28/28 after rebuilding stale dist;
+progression tests passed 33/33; typecheck and lint passed. These are not live model conformance.
+Next: resolve the real revocable credential-service prerequisite for an ADR-compliant isolated
+critic, then finalize exact contract/policy/check bindings. Prefer autonomous technical decisions
+and fix-forward within scope; no silent bypass of isolation or protected delivery gates.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
 pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.
