@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-07: staging delivery complete; Beads reconciled for supervised pilot and follow-ups.
+2026-09-08: pilot-zero integration assessment drafted; no implementation or runtime activated.
 
 ## Verified delivery
 
@@ -41,7 +41,15 @@ Secure-evidence focused tests: 26 passed after the timing-assertion adjustment.
 Independent critique, build, typecheck, lint and formatting passed. The final staging check set
 cleared the original CodeQL alert with no new alerts.
 
-Reconcile acceptance evidence and refine the supervised operational pilot; track notification,
-progression and recovery snags as they occur. Hook repair is separate. Documentation/backlog capture
-is pushed on task/orchestration-toolkit-backlog, not yet integrated into staging; its proposed
-feature parent is feature/orchestration-toolkit-backlog. Do not imply this handoff is already merged.
+Historical documentation capture is already in staging. Current assessment work is on
+task/pilot-zero-assessment, based on feature/pilot-zero-assessment from staging.
+Beads agent-platform-pilot-zero is in progress; its spec records nine integration findings,
+phase triggers, reproducibility tests and a proposed recovery sequence. No executable contract or
+independent critic approval is claimed. No new workflow run exists; four canonical journal runs
+were observed cancelled. Preserve unrelated .beads/interactions.jsonl changes.
+
+Next: establish an ADR-compliant isolated critic route and choose a human-visible notification
+channel, then finalize exact contract/policy/check bindings for critique and owner approval.
+The standalone runtime rejects implementation and coordinator completion remains unsupported;
+desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
+pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.
