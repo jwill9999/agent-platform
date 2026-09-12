@@ -75,9 +75,8 @@ and post-reservation default clock sampling. Independent review passed with no r
 the final full package run passed 585 tests (seven separately exercised opt-in Docker skips).
 PR260 merged into feature/pilot-zero-assessment as 1c3c384, including the SQLite completion,
 immutable launch-provenance, cancellation deadline and hook-isolation repairs.
-PR261 remains the output-only segment on task/pilot-zero-output-manifest for .6 read-only candidate
-validation. Reconciliation is committed as 6973146 after independent source review; publication and
-fresh hosted verification remain pending.
+PR261 output-only validation merged into the feature branch at a079cce after owner approval,
+all ten executed hosted checks passed, and the newly triggered Sourcery review passed without threads.
 Its prior 59 focused tests, 23 runtime tests and independent review passed. Its source changes
 do not enable imports or remove the phase guard. Primary settlement work stays on the separate
 task/pilot-zero-active-settlement branch and is not included in PR261.
@@ -86,8 +85,9 @@ blocked.
 The heartbeat is active again under the owner's instruction to continue through fixable blockers.
 Settlement implementation is committed separately as 84d1a50. Independent review passed, thirty
 focused tests and both real offline Docker success/cancellation probes passed after fixing the exact
-lowercase missing-object diagnostic. The pre-reconciliation full suite passed 682 tests with nine
-opt-in Docker skips. Reconciled-branch checks and publication remain pending. Docker is running;
+lowercase missing-object diagnostic. PR262 at 4ae8319 passed 687 local tests and all nine executed
+draft hosted checks. It is now being reconciled after PR261 integration; fresh checks and readiness
+review remain required before its conditionally approved feature-only merge. Docker is running;
 Beads synchronization succeeded. Duplicate cancellation edits are preserved in a named recovery
 stash and now arrive through the merged feature history, not a duplicate settlement commit.
 Main and staging are unchanged. Live model execution and autonomous acceptance remain unproved.
