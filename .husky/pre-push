@@ -6,6 +6,13 @@ REMOTE_REF=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "origin/
 CHANGED_PKGS=$(git diff --name-only "$REMOTE_REF"...HEAD 2>/dev/null | \
   grep -oE '^(packages/[^/]+|apps/[^/]+)' | sort -u)
 
+# Git exports repository-local variables to hooks. Once discovery is complete,
+# do not let those variables redirect checks' temporary Git repositories here.
+HOOK_GIT_LOCAL_NAMES=$(git rev-parse --local-env-vars) || exit 1
+for HOOK_GIT_LOCAL_NAME in $HOOK_GIT_LOCAL_NAMES; do
+  unset "$HOOK_GIT_LOCAL_NAME"
+done
+
 if [ -z "$CHANGED_PKGS" ]; then
   echo "[pre-push] No package changes detected, skipping checks."
   exit 0

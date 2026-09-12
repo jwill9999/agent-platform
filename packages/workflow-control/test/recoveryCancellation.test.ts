@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
 import {
@@ -459,6 +459,69 @@ describe('WorkflowCancellationCoordinator', () => {
     await expect(coordinator.cancel(request)).resolves.toMatchObject({ status: 'escalated' });
     expect(fixture.store.getRun('run-recovery')?.state).toBe('escalated');
     fixture.store.close();
+  });
+
+  it('rechecks the durable clock when cleanup timers wake before the deadline', async () => {
+    const fixture = await createStore('implementing');
+    const ownerId = 'owner-early-timer';
+    let nowMs = 1000;
+    const workspaceLeaseEpoch = fixture.store.acquireLease(
+      'workspace',
+      workspaceId,
+      ownerId,
+      2000,
+      nowMs,
+    ).epoch;
+    const runLeaseEpoch = fixture.store.acquireLease(
+      'run',
+      'run-recovery',
+      ownerId,
+      2000,
+      nowMs,
+    ).epoch;
+    const coordinator = WorkflowCancellationCoordinator.createForTest({
+      store: fixture.store,
+      contract,
+      port: OfficialCancellationCleanupPort.createForTest(new HangingCleanupPort()),
+      clock: () => nowMs,
+    });
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const cancellation = coordinator
+        .cancel({
+          id: 'cancel-early-timer',
+          runId: 'run-recovery',
+          requestedBy: 'operator',
+          reason: 'timer wake is not deadline evidence',
+          stopDeadlineMs: 1025,
+          retainedEvidence: [fixture.evidence],
+          ownerId,
+          workspaceLeaseEpoch,
+          runLeaseEpoch,
+        })
+        .then((record) => {
+          settled = true;
+          return record;
+        });
+      nowMs = 1024;
+      await vi.advanceTimersByTimeAsync(25);
+      expect(settled).toBe(false);
+      expect(fixture.store.getWorkflowCancellation('run-recovery')?.status).toBe('requested');
+      nowMs = 1025;
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(cancellation).resolves.toMatchObject({
+        status: 'escalated',
+        incompleteCleanup: expect.arrayContaining([
+          'stop-owned-work-timeout',
+          'cleanup-prepared-effects-timeout',
+        ]),
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      fixture.store.close();
+    }
   });
 
   it('bounds hanging cleanup calls by the durable stop deadline', async () => {
