@@ -369,6 +369,11 @@ export {
   type PreapprovalMaterialEntry,
 } from './preapprovalMaterial.js';
 export {
+  executeSpecialistContainerLifecycle,
+  type SpecialistContainerLifecycleOptions,
+  type SpecialistContainerLifecycleResult,
+} from './specialistContainerLifecycle.js';
+export {
   bootstrapPolicySchema,
   implementationArtifactReadySchema,
   bootstrapDigest,

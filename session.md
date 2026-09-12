@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-08: supervised Astra critique drove four bounded repairs; isolated model runner remains incomplete.
+2026-09-08: PR259 merged four prerequisite repairs; lifecycle publication caught a SQLite completion race.
 
 ## Verified delivery
 
@@ -64,6 +64,30 @@ E2E and Sourcery passed; Sonar reported complexity and implicit sorting. Follow-
 manifest ordering, simplify mount validation, clean staging on preparation failure and export the
 material helper. Supervised independent review passed; fresh hosted verification remains pending.
 The pilot-zero-progress-and-ci heartbeat checks for actionable progress every ten minutes.
+PR259 subsequently merged at 68e7856c59fb35bb47bbb10b1b3c4e2d7dee34f8 after owner approval:
+11 executed hosted checks passed; staging-only macOS VM was skipped. Children .1-.4 are closed.
+Current segment: task/pilot-zero-container-lifecycle, Beads pilot-zero.5. Commit c00fbd3 contains
+reviewed bounded create/start/remove/inspect with explicit cleanup uncertainty. Seven real offline
+Docker probes passed. The push did not succeed: the normal package gate caught database locking
+in specialist completion under concurrent coordinators (581 passed, one failed, seven skipped).
+Subtask .5.1 reproduced SQLITE_BUSY_SNAPSHOT deterministically and corrected writer reservation
+and post-reservation default clock sampling. Independent review passed with no remaining findings;
+the final full package run passed 585 tests (seven separately exercised opt-in Docker skips).
+Typecheck, lint, formatting and diff checks pass. Publication and hosted gates are next.
+The heartbeat is active again under the owner's instruction to continue through fixable blockers.
+September 12: hook-isolation repair now clears Git-local environment after package discovery.
+Independent source review found no actionable issues; parent reran all 12 hook/cancellation tests
+successfully. Required checks remain enabled. Publication and fresh hosted verification remain
+pending; primary settlement work is separate and is not included in this repair segment.
+No active autonomous journal run exists. Supervised coordination is not proof of runtime handoff.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
 pilot after integration readiness. Do not treat manual assessment/documentation as autonomous proof.
+
+## PR260 CI follow-up
+
+The e444317 launch-provenance repair passed Sonar and review but CI caught cancellation returning
+requested after an early timer wake. Subtask .5.3 reproduced the clock/timer discrepancy and now
+rechecks the absolute durable deadline. No deadline extension, fabricated timestamp or cleanup retry.
+Eight cancellation tests and independent source review pass; exact-branch package/hosted gates are
+required before integration. This repair is isolated from the subsequent output/settlement work.

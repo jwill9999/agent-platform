@@ -2,15 +2,17 @@
 
 **Beads:** `agent-platform-pilot-zero`  
 **Parent:** `agent-platform-multi-agent`  
-**Status:** Proposed plan; implementation and autonomous activation are not approved.  
+**Status:** Owner-authorized supervised integration repair; autonomous activation remains unapproved.
+
 **Assessment date:** 2026-09-08
 
 ## Objective and authority
 
 Prove a human idea can become a reviewed plan, approved managed execution, and verified delivery.
-Record supervised bridging separately from runtime-driven progress. This task authorizes assessment
-and documentation only, not deployment, credential issuance, runtime migration, application edits,
-PR merge, or production promotion. Beads remains the issue and finding lifecycle authority.
+Record supervised bridging separately from runtime-driven progress. The original assessment-only
+scope was extended by the owner to iterative supervised integration repairs, tests, review and
+publication. This does not authorize credential issuance, live runtime activation or protected
+merges without their required approval. Beads remains the issue and finding lifecycle authority.
 
 The owner explicitly requested documenting findings during planning. This is supervised authoring,
 not evidence that the read-only planning skill persisted a draft autonomously. The canonical local
@@ -228,3 +230,53 @@ for .1/.2 passed 488 tests with one separately exercised opt-in isolation test s
 These transitions were coordinated by the parent in this conversation after subagent completion,
 not by the package. Record that manual bridging as unproven autonomous coverage. No future model
 authentication, image identity, network restrictions or active-run approval was inferred.
+
+### Continued owner-directed iteration after PR259
+
+PR259 merged the four prerequisite tasks into the feature branch with all 11 executed checks green.
+The owner directed further iterative supervised fixes, not a pause after integration. Task .5 adds
+bounded container lifecycle handling: killing an attached Docker client alone cannot establish that
+the specialist stopped. A distinct source reviewer and real offline probes remain required.
+
+Live inventory found no dedicated specialist image or verified restricted-egress network. A
+network-disabled probe of the available API image found no `codex` executable. No primary model
+authentication was copied or inspected. These observations identify provisioning work, not proof
+that credentials alone solve the runtime. The next composition must verify the actual mounted
+material, distinguish execution failure from cleanup uncertainty, and never issue formal workflow
+receipts from model-echoed identifiers or injected test transports.
+
+The ten-minute Codex heartbeat is a supervised fallback, not the workflow-control watchdog under
+test. Agent callbacks, parent processing and human notifications during this repair remain manual
+coverage until a real isolated execution demonstrably triggers the package's continuation path.
+
+### Next runtime integration boundaries
+
+The .5 container lifecycle candidate passed supervised source review and offline Docker probes.
+Its normal pre-push package gate then exposed a concurrent SQLite completion failure. Subtask
+.5.1 reproduces and repairs that transaction boundary before publication. The original error
+message alone does not distinguish ordinary writer contention from a stale WAL snapshot.
+Neither a passing retry nor a hook bypass is accepted as a fix.
+
+The independent source audit distinguishes two remaining implementation boundaries:
+
+- Implementation import: the retained specialist workspace is not yet a trusted repository change.
+  Observe an execution-bound output manifest (including explicit deletions and modes), validate its
+  allowed paths and baseline, then import and commit through the existing fenced Git broker. The
+  callback must use the resulting authoritative head, not the input head or model-declared files.
+- Coordinator completion: current phase receipts describe specialist executions. Add a distinct
+  typed receipt, initially for task acceptance, resolved against committed broker records and exact
+  job/fence/head identity. Do not fabricate a specialist execution for coordinator work.
+
+Reuse the existing delivery broker, exact-tree Git commit port, task acceptance orchestrator and
+continuation journal. Their existence alone does not prove the integrations. Required proof is a
+real isolated fixture change, observed import, brokered commit, and automatically started verification
+at the new head. Replay at import/commit/callback boundaries must cause one effect and one continuation.
+Foreign output, pending credential revocation, stale baseline and unauthorized paths must prevent
+import. Drop a completion wakeup and prove a separate watchdog process advances without a chat turn.
+
+Online provisioning must be treated separately from offline lifecycle tests. Official
+[non-interactive Codex documentation](https://learn.chatgpt.com/docs/non-interactive-mode) supports
+JSONL execution and explicit sandbox settings; it does not attest our image, network or credentials.
+The [authentication guidance](https://learn.chatgpt.com/docs/auth) distinguishes dedicated automation
+authentication from the primary user's cached login. Do not silently copy that login or switch the
+owner to API billing as a repair shortcut.
