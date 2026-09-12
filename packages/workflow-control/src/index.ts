@@ -374,6 +374,17 @@ export {
   type SpecialistContainerLifecycleResult,
 } from './specialistContainerLifecycle.js';
 export {
+  captureSpecialistOutputBaseline,
+  observeSpecialistOutput,
+  verifySpecialistOutput,
+  type SpecialistOutputBinding,
+  type SpecialistOutputGrant,
+  type SpecialistOutputEntry,
+  type SpecialistOutputChange,
+  type SpecialistOutputBaseline,
+  type SpecialistOutputCandidate,
+} from './specialistOutputManifest.js';
+export {
   bootstrapPolicySchema,
   implementationArtifactReadySchema,
   bootstrapDigest,

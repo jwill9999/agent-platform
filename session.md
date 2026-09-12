@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-09-08: PR259 merged four prerequisite repairs; lifecycle publication caught a SQLite completion race.
+2026-09-13: PR260 merged; PR261 output-manifest reconciliation is under local review.
 
 ## Verified delivery
 
@@ -28,8 +28,8 @@ Repair4 publication is verified, but exact bootstrap artifact/terminalization ac
 an evidence audit. Preserve historical approvals and terminal runs; do not relabel manual PR work
 as brokered attestations.
 
-The local hook isolation bug is tracked as agent-platform-hook-isolation. The proposed patch at
-/private/tmp/repair4-hook-env.DrIB2a/pre-push-isolation.patch remains unapplied.
+The local hook isolation bug is tracked as agent-platform-hook-isolation. Its repair clears Git-local
+environment after package discovery and was included in the merged PR260 segment.
 Future reuse/package/init/doctor investigation is P3 agent-platform-orchestration-toolkit, blocked
 on multi-agent pilot learning. No package implementation or release is authorized.
 The orchestration-repair-progress monitor is paused after completed staging delivery.
@@ -73,12 +73,17 @@ in specialist completion under concurrent coordinators (581 passed, one failed, 
 Subtask .5.1 reproduced SQLITE_BUSY_SNAPSHOT deterministically and corrected writer reservation
 and post-reservation default clock sampling. Independent review passed with no remaining findings;
 the final full package run passed 585 tests (seven separately exercised opt-in Docker skips).
-Typecheck, lint, formatting and diff checks pass. Publication and hosted gates are next.
+PR260 merged into feature/pilot-zero-assessment as 1c3c384, including the SQLite completion,
+immutable launch-provenance, cancellation deadline and hook-isolation repairs.
+PR261 remains the output-only segment on task/pilot-zero-output-manifest for .6 read-only candidate
+validation. It is being reconciled with the feature branch in a separate clean worktree; local checks,
+independent review, publication and fresh hosted verification are pending for that merge result.
+Its prior 59 focused tests, 23 runtime tests and independent review passed. Its source changes
+do not enable imports or remove the phase guard. Primary settlement work stays on the separate
+task/pilot-zero-active-settlement branch and is not included in PR261.
+Dedicated model authentication was requested securely; absent that, live model acceptance remains
+blocked.
 The heartbeat is active again under the owner's instruction to continue through fixable blockers.
-September 12: hook-isolation repair now clears Git-local environment after package discovery.
-Independent source review found no actionable issues; parent reran all 12 hook/cancellation tests
-successfully. Required checks remain enabled. Publication and fresh hosted verification remain
-pending; primary settlement work is separate and is not included in this repair segment.
 No active autonomous journal run exists. Supervised coordination is not proof of runtime handoff.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
@@ -89,5 +94,5 @@ pilot after integration readiness. Do not treat manual assessment/documentation 
 The e444317 launch-provenance repair passed Sonar and review but CI caught cancellation returning
 requested after an early timer wake. Subtask .5.3 reproduced the clock/timer discrepancy and now
 rechecks the absolute durable deadline. No deadline extension, fabricated timestamp or cleanup retry.
-Eight cancellation tests and independent source review pass; exact-branch package/hosted gates are
-required before integration. This repair is isolated from the subsequent output/settlement work.
+Eight cancellation tests and independent source review passed; the repair is included in merged
+PR260. This repair is isolated from the subsequent output/settlement work.
