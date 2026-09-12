@@ -171,13 +171,16 @@ export class StandalonePhaseRuntime {
           .update(await readFile(process.execPath))
           .digest('hex')}`,
       };
+      const owner = `phase-runtime:${randomUUID()}`;
       return new StandalonePhaseRuntime({
         store,
         journal,
         config,
-        owner: `phase-runtime:${randomUUID()}`,
+        owner,
         process: processIdentity,
         launcher: DockerIsolatedSpecialistLauncher.create({
+          store,
+          ownerId: owner,
           sourceRoot,
           image: config.image,
           credentialBroker: broker,

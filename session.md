@@ -85,7 +85,25 @@ Current development branch is chained task/pilot-zero-output-manifest for .6 rea
 validation. Its 59 focused tests, 23 runtime tests and independent review passed. Its source changes
 do not enable imports or remove the phase guard. Dedicated model
 authentication was requested securely; absent that, live model acceptance remains blocked.
+.6 is pushed at a57c086 in draft PR261, stacked on PR260; both await exact-head hosted gates and
+integration authority. Development continues on task/pilot-zero-active-settlement for .7. Technical
+plan critique passed after adding capacity-release, never-dispatched, positive recovery and stale-
+owner invariants. Separate workers own production settlement and existing fixture updates. No
+implementation import or H0-to-H1 callback receipt exists yet; those guards remain intentional.
 The heartbeat is active again under the owner's instruction to continue through fixable blockers.
+September 12 recovery: isolated CI worktree holds cancellation commit 7a8759c and reviewed hook
+repair 787647c. The fresh full segment suite passes 598 tests with seven opt-in Docker skips;
+normal push succeeded and PR260 now points to 787647c; the hook repeated all 598 tests successfully.
+Hook remains enabled and sanitizes Git-local variables. Primary .7 settlement fixtures were corrected;
+independent source review passed and full suite passed 679 tests, with nine opt-in Docker skips.
+Neither configured Docker daemon socket is available for real settlement
+probes. Beads notes are updated locally, but SSH remote synchronization timed out. GitHub HTTPS
+access is working. Owner subsequently approved PR260 feature-only merge: merged at
+1c3c3840ce160cd40e66c639016263de677e66e4 after all ten executed checks passed and all threads
+were resolved. Main and staging refs remain unchanged. PR261 requires separate reconciliation.
+Docker Desktop is now running and Beads synchronization succeeded. Actual .7 success/cancel
+probes exposed a lowercase Docker missing-object diagnostic mismatch; Astra is repairing exact
+identity matching and regressions. Runtime acceptance is still pending, not waived.
 No active autonomous journal run exists. Supervised coordination is not proof of runtime handoff.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
