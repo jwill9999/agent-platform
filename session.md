@@ -75,6 +75,10 @@ and post-reservation default clock sampling. Independent review passed with no r
 the final full package run passed 585 tests (seven separately exercised opt-in Docker skips).
 Typecheck, lint, formatting and diff checks pass. Publication and hosted gates are next.
 The heartbeat is active again under the owner's instruction to continue through fixable blockers.
+September 12: hook-isolation repair now clears Git-local environment after package discovery.
+Independent source review found no actionable issues; parent reran all 12 hook/cancellation tests
+successfully. Required checks remain enabled. Publication and fresh hosted verification remain
+pending; primary settlement work is separate and is not included in this repair segment.
 No active autonomous journal run exists. Supervised coordination is not proof of runtime handoff.
 The standalone runtime rejects implementation and coordinator completion remains unsupported;
 desktop resumption is explicitly unsupported. Handoff hygiene follows as a separate real-feature
