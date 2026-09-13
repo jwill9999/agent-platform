@@ -249,13 +249,22 @@ The ten-minute Codex heartbeat is a supervised fallback, not the workflow-contro
 test. Agent callbacks, parent processing and human notifications during this repair remain manual
 coverage until a real isolated execution demonstrably triggers the package's continuation path.
 
-### Next runtime integration boundaries
+### Historical lifecycle blocker and next runtime integration boundaries
 
 The .5 container lifecycle candidate passed supervised source review and offline Docker probes.
 Its normal pre-push package gate then exposed a concurrent SQLite completion failure. Subtask
 .5.1 reproduces and repairs that transaction boundary before publication. The original error
 message alone does not distinguish ordinary writer contention from a stale WAL snapshot.
 Neither a passing retry nor a hook bypass is accepted as a fix.
+
+Closeout update, 2026-09-13: the lifecycle blocker and subsequent provenance, cancellation and hook
+repairs are resolved in merged PR260. Output-only validation merged in PR261; active settlement
+merged in PR262. Children .1–.7 and .5.1–.5.3 are closed and synced. Feature head is
+`746073e5605faf3fe219b8bd78547d7ed7e6adfe`; staging promotion is a separate approved, gated delivery.
+PR262 passed 687 package tests and nine executed hosted checks, plus two separately run real offline
+settlement probes. Independent reviews passed; Sourcery was unavailable due to its weekly budget,
+not a passing review. The implementation boundaries below remain outstanding, so this parent stays
+open. See [current handoff](../../session.md) and delivery task `agent-platform-pilot-zero-delivery-handoff`.
 
 The independent source audit distinguishes two remaining implementation boundaries:
 
