@@ -10,7 +10,13 @@ import {
   specialistExecutionDigest,
   type SpecialistInputEnvelope,
 } from './specialistInput.js';
-import { WorkflowStore, workflowCredentialJournalCapability } from './storage.js';
+import {
+  WorkflowStore,
+  workflowCredentialJournalCapability,
+  workflowContainerJournalCapability,
+  type SchedulerContainerAuthority,
+  type SchedulerContainerRecord,
+} from './storage.js';
 
 const FORBIDDEN_NAMES = new Set(['.git', '.beads', '.ssh']);
 const FORBIDDEN_ENVIRONMENT = /(?:TOKEN|SECRET|PASSWORD|KEY|CREDENTIAL|DOCKER|SSH|GITHUB|GH_)/iu;
@@ -561,6 +567,8 @@ export class RevocableSpecialistCredentialBroker {
 }
 
 export interface DockerSpecialistLauncherOptions {
+  store: WorkflowStore;
+  ownerId: string;
   sourceRoot: string;
   image: string;
   credentialBroker: RevocableSpecialistCredentialBroker;
@@ -586,6 +594,8 @@ export class DockerIsolatedSpecialistLauncher {
   readonly #containerLocks = new Map<string, Promise<void>>();
 
   private constructor(options: DockerSpecialistLauncherOptions) {
+    if (!(options.store instanceof WorkflowStore) || options.ownerId.trim() === '')
+      throw new Error('specialist launcher requires a store and owner');
     if (!(options.credentialBroker instanceof RevocableSpecialistCredentialBroker)) {
       throw new Error('specialist launcher requires a revocable credential broker');
     }
@@ -655,19 +665,21 @@ export class DockerIsolatedSpecialistLauncher {
     reservation: DockerSpecialistReservation,
     envelope?: SpecialistInputEnvelope,
   ): Promise<SpecialistExecutionResult> {
-    const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
-    const workspace = await prepareSpecialistWorkspace(
-      this.#options.sourceRoot,
-      packet.allowedPaths,
-    );
-    const stagingRoot = resolve(workspace.root, '..');
-    const promptFile = join(stagingRoot, 'task-packet.json');
-    const containerName = `workflow-specialist-${reservation.id}`;
+    const authority = this.#authority(reservation.id);
+    let stagingRoot: string | undefined;
     let retainWorkspace = false;
-    let credentialLease: SpecialistCredentialLease | undefined;
-    let credentialRevoked = false;
+    let output: SpecialistExecutionResult | undefined;
+    let launchError: unknown;
     try {
-      credentialLease = await this.#options.credentialBroker.issue(
+      this.#assertCanStart(reservation);
+      const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
+      const workspace = await prepareSpecialistWorkspace(
+        this.#options.sourceRoot,
+        packet.allowedPaths,
+      );
+      stagingRoot = resolve(workspace.root, '..');
+      const promptFile = join(stagingRoot, 'task-packet.json');
+      const credentialLease = await this.#options.credentialBroker.issue(
         stagingRoot,
         reservation.id,
         credentialBrokerGeneration,
@@ -685,70 +697,109 @@ export class DockerIsolatedSpecialistLauncher {
         containerUser: this.#options.containerUser,
         executionId: reservation.id,
       });
-      if (this.#cancelled.has(reservation.id)) {
-        throw new Error('specialist launch was cancelled before container start');
-      }
-      const executor = this.#options.executor ?? defaultExecutor;
+      this.#assertCanStart(reservation);
       const createArgs = [
         'create',
-        ...launch.args.slice(1).filter((argument) => argument !== '--rm'),
+        '--label',
+        `io.agent-platform.specialist-execution=${reservation.id}`,
+        ...launch.args.slice(2),
       ];
-      await executor(launch.dockerBinary, createArgs, {
-        env: launch.environment,
-        timeout: 60_000,
-        maxBuffer: 64 * 1024,
-      });
+      this.#advance(authority, 'not_dispatched', 'create_pending');
+      this.#assertCanStart(reservation);
+      const created = await this.#docker(
+        createArgs,
+        Math.min(60_000, reservation.deadlineMs - this.#clock()),
+      );
+      const containerId = created.stdout.trim();
+      if (!/^[a-f0-9]{64}$/u.test(containerId))
+        throw new Error('specialist create acknowledgement is invalid');
+      this.#advance(authority, 'create_pending', 'acknowledged', containerId);
+      if ((await this.#inspectOwned(this.#state(reservation.id), containerId)) === undefined)
+        throw new Error('specialist acknowledged container is absent before start');
       let started: Promise<{ stdout: string; stderr: string }> | undefined;
       await this.#withContainerLock(reservation.id, () => {
-        if (this.#cancelled.has(reservation.id)) {
-          throw new Error('specialist launch was cancelled before container start');
-        }
-        started = executor(launch.dockerBinary, ['start', '--attach', containerName], {
-          env: launch.environment,
-          timeout: Math.max(1, reservation.deadlineMs - this.#clock()),
-          maxBuffer: this.#options.maxOutputBytes ?? 4 * 1024 * 1024,
-        });
+        this.#assertCanStart(reservation);
+        // Revalidate fences immediately before dispatch without another asynchronous gap.
+        this.#assertAuthority(authority);
+        started = this.#docker(
+          ['start', '--attach', containerId],
+          reservation.deadlineMs - this.#clock(),
+          this.#options.maxOutputBytes ?? 4 * 1024 * 1024,
+        );
       });
       const result = await started!;
+      this.#assertCanStart(reservation);
+      const observed = await this.#inspectOwned(this.#state(reservation.id), containerId);
+      if (
+        observed === undefined ||
+        observed.running ||
+        observed.status !== 'exited' ||
+        observed.exitCode !== 0
+      )
+        throw new Error('specialist exit was not confirmed');
       const parsed = parseSpecialistExecutionResult(result.stdout, result.stderr);
+      await this.#settle(authority);
       await this.#options.credentialBroker.revoke(reservation.id);
-      credentialRevoked = true;
+      this.#assertAuthority(authority);
+      if (!this.#settled(reservation.id))
+        throw new Error('specialist settlement remains unconfirmed');
       await Promise.all([
         rm(credentialLease.authFile, { force: true }),
         rm(promptFile, { force: true }),
         rm(workspace.codexHome, { recursive: true, force: true }),
       ]);
       retainWorkspace = true;
-      return { ...parsed, retainedWorkspaceRoot: workspace.root };
-    } finally {
-      await this.#removeContainer(containerName);
-      if (credentialLease !== undefined && !credentialRevoked) {
-        await this.#options.credentialBroker.revoke(reservation.id).catch(() => undefined);
-      }
-      this.#cancelled.delete(reservation.id);
-      if (!retainWorkspace) await rm(stagingRoot, { recursive: true, force: true });
+      output = { ...parsed, retainedWorkspaceRoot: workspace.root };
+    } catch (error) {
+      launchError = error;
     }
+    // Cleanup and revocation are independent security operations, even when one fails.
+    const cleanup = await Promise.allSettled([
+      this.#settle(authority),
+      this.#options.credentialBroker.revoke(reservation.id),
+    ]);
+    if (output !== undefined) {
+      try {
+        this.#assertCanStart(reservation);
+        this.#assertAuthority(authority);
+      } catch (error) {
+        output = undefined;
+        retainWorkspace = false;
+        launchError = error;
+      }
+    }
+    this.#cancelled.delete(reservation.id);
+    if (!retainWorkspace && stagingRoot !== undefined && this.#settled(reservation.id))
+      await rm(stagingRoot, { recursive: true, force: true });
+    if (cleanup.some((result) => result.status === 'rejected') || !this.#settled(reservation.id))
+      throw new Error(
+        `specialist settlement unconfirmed; retain staging for docker:workflow-specialist-${reservation.id}`,
+        { cause: launchError },
+      );
+    if (output === undefined) throw launchError;
+    return output;
   }
 
   async cancel(reservation: DockerSpecialistReservation): Promise<void> {
     this.#cancelled.add(reservation.id);
-    await this.#withContainerLock(reservation.id, () =>
-      this.#stopIfPresent(this.processIdentity(reservation)),
-    );
+    await this.#boundedSettlement(this.#authority(reservation.id));
   }
 
   async cancelProcessIdentity(processIdentity: string): Promise<void> {
-    const prefix = 'docker:';
+    const prefix = 'docker:workflow-specialist-';
     if (!processIdentity.startsWith(prefix)) throw new Error('unsupported specialist process');
-    await this.#stopIfPresent(processIdentity);
+    const id = processIdentity.slice(prefix.length);
+    if (this.#options.store.getSchedulerExecution(id)?.processIdentity !== processIdentity)
+      throw new Error('specialist recovery identity changed');
+    await this.#boundedSettlement(this.#authority(id));
   }
 
   async waitForSettlement(reservation: DockerSpecialistReservation): Promise<boolean> {
     const settlement = this.#settlements.get(reservation.id);
-    if (settlement === undefined) return true;
+    if (settlement === undefined) return this.#settled(reservation.id);
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const settled = await Promise.race([
-      settlement.then(() => true),
+      settlement.then(() => this.#settled(reservation.id)),
       new Promise<false>((resolve) => {
         timeout = setTimeout(() => resolve(false), this.#options.cancellationSettleMs ?? 15_000);
       }),
@@ -757,39 +808,157 @@ export class DockerIsolatedSpecialistLauncher {
     return settled;
   }
 
-  async #stopIfPresent(processIdentity: string): Promise<void> {
-    const name = processIdentity.slice('docker:'.length);
+  #docker(args: string[], timeout = 10_000, maxBuffer = 64 * 1024) {
     const executor = this.#options.executor ?? defaultExecutor;
-    await executor('/usr/local/bin/docker', ['stop', '--time', '10', name], {
+    return executor('/usr/local/bin/docker', args, {
       env: {},
-      timeout: 15_000,
-      maxBuffer: 64 * 1024,
-    }).catch(() => undefined);
-    let state: { stdout: string; stderr: string } | undefined;
-    try {
-      state = await executor(
-        '/usr/local/bin/docker',
-        ['inspect', '-f', '{{.State.Running}}', name],
-        {
-          env: {},
-          timeout: 5_000,
-          maxBuffer: 64 * 1024,
-        },
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/(?:no such object|no such container)/iu.test(message)) throw error;
-    }
-    if (state?.stdout.trim() === 'true') throw new Error('specialist container remains running');
+      timeout: Math.max(1, timeout),
+      maxBuffer,
+    });
   }
 
-  async #removeContainer(name: string): Promise<void> {
-    const executor = this.#options.executor ?? defaultExecutor;
-    await executor('/usr/local/bin/docker', ['rm', '--force', name], {
-      env: {},
-      timeout: 10_000,
-      maxBuffer: 64 * 1024,
-    }).catch(() => undefined);
+  #authority(id: string): SchedulerContainerAuthority {
+    const execution = this.#options.store.getSchedulerExecution(id);
+    if (execution === undefined || execution.ownerId !== this.#options.ownerId)
+      throw new Error('specialist execution owner changed');
+    return execution;
+  }
+
+  #assertAuthority(authority: SchedulerContainerAuthority): void {
+    const current = this.#authority(authority.id);
+    if (
+      current.workspaceLeaseEpoch !== authority.workspaceLeaseEpoch ||
+      current.runLeaseEpoch !== authority.runLeaseEpoch ||
+      current.taskLeaseEpoch !== authority.taskLeaseEpoch
+    )
+      throw new Error('specialist execution fence changed');
+    const execution = this.#options.store.getSchedulerExecution(authority.id)!;
+    for (const [kind, id, epoch] of [
+      ['workspace', execution.workspaceId, authority.workspaceLeaseEpoch],
+      ['run', execution.runId, authority.runLeaseEpoch],
+      ['task', execution.taskId, authority.taskLeaseEpoch],
+    ] as const)
+      this.#options.store.assertResourceLease(kind, id, authority.ownerId, epoch, this.#clock());
+  }
+
+  #state(id: string): SchedulerContainerRecord {
+    const state = this.#options.store.getSchedulerContainer(id);
+    if (state === undefined) throw new Error('specialist lifecycle is unknown; recovery required');
+    return state;
+  }
+
+  #advance(
+    authority: SchedulerContainerAuthority,
+    from: SchedulerContainerRecord['status'],
+    to: SchedulerContainerRecord['status'],
+    containerId?: string,
+  ) {
+    return this.#options.store.advanceSchedulerContainer(
+      { execution: authority, from, to, containerId },
+      workflowContainerJournalCapability,
+      this.#clock,
+    );
+  }
+
+  #settled(id: string): boolean {
+    const state = this.#options.store.getSchedulerContainer(id);
+    return (
+      state !== undefined &&
+      (state.status === 'not_dispatched' || state.status === 'removal_confirmed') &&
+      this.#options.store.getSchedulerExecution(id)?.credentialStatus === 'revoked'
+    );
+  }
+
+  #assertCanStart(reservation: DockerSpecialistReservation): void {
+    if (this.#cancelled.has(reservation.id))
+      throw new Error('specialist launch was cancelled before container start');
+    if (this.#clock() >= reservation.deadlineMs)
+      throw new Error('specialist reservation timed out');
+  }
+
+  async #inspectOwned(
+    state: SchedulerContainerRecord,
+    identity: string,
+  ): Promise<{ id: string; running: boolean; status: string; exitCode: number } | undefined> {
+    let stdout: string;
+    try {
+      const format =
+        '{"id":{{json .Id}},"name":{{json .Name}},"owner":{{json (index .Config.Labels "io.agent-platform.specialist-execution")}},"status":{{json .State.Status}},"running":{{json .State.Running}},"exitCode":{{json .State.ExitCode}}}';
+      stdout = (await this.#docker(['inspect', '--format', format, identity], 5000)).stdout;
+    } catch (error) {
+      const failure = error as { code?: unknown; stderr?: unknown };
+      if (
+        failure.code === 1 &&
+        typeof failure.stderr === 'string' &&
+        [
+          `Error response from daemon: No such container: ${identity}`,
+          `Error: No such object: ${identity}`,
+          `error: no such object: ${identity}`,
+        ].includes(failure.stderr.trim())
+      )
+        return undefined;
+      throw new Error('specialist container inspection failed');
+    }
+    const observed = JSON.parse(stdout) as Record<string, unknown>;
+    if (
+      typeof observed.id !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(observed.id) ||
+      (state.containerId !== null && observed.id !== state.containerId) ||
+      observed.name !== `/${state.name}` ||
+      observed.owner !== state.ownerLabel ||
+      typeof observed.running !== 'boolean' ||
+      typeof observed.status !== 'string' ||
+      !Number.isSafeInteger(observed.exitCode) ||
+      (observed.exitCode as number) < 0
+    )
+      throw new Error('specialist container ownership is unconfirmed');
+    return observed as { id: string; running: boolean; status: string; exitCode: number };
+  }
+
+  async #settle(authority: SchedulerContainerAuthority): Promise<void> {
+    return this.#withContainerLock(authority.id, () => this.#settleOwned(authority));
+  }
+
+  async #boundedSettlement(authority: SchedulerContainerAuthority): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        Promise.allSettled([
+          this.#settle(authority),
+          this.#options.credentialBroker.revoke(authority.id),
+        ]).then((results) => {
+          const failed = results.find((result) => result.status === 'rejected');
+          if (failed?.status === 'rejected') throw failed.reason;
+        }),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('specialist settlement wait timed out')),
+            this.#options.cancellationSettleMs ?? 15_000,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
+
+  async #settleOwned(authority: SchedulerContainerAuthority): Promise<void> {
+    let state = this.#state(authority.id);
+    if (state.status === 'not_dispatched' || state.status === 'removal_confirmed') return;
+    const identity = state.containerId ?? state.name;
+    const observed = await this.#inspectOwned(state, identity);
+    if (state.status === 'create_pending') {
+      if (observed === undefined) throw new Error('specialist create remains ambiguous');
+      // Positive owned observation reconciles the lost acknowledgement; absence never does.
+      state = this.#advance(authority, 'create_pending', 'acknowledged', observed.id);
+    }
+    if (observed !== undefined) {
+      // Security cleanup may proceed with pinned ownership even after a lease expires.
+      await this.#docker(['rm', '--force', state.containerId!]).catch(() => undefined);
+      if ((await this.#inspectOwned(state, state.containerId!)) !== undefined)
+        throw new Error('specialist container removal is unconfirmed');
+    }
+    this.#advance(authority, 'acknowledged', 'removal_confirmed', state.containerId!);
   }
 
   async #withContainerLock<T>(id: string, operation: () => Promise<T> | T): Promise<T> {
