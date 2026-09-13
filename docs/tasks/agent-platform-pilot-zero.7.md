@@ -78,9 +78,12 @@ identity matching. Real Docker 29.5.3 probes initially failed because generic in
 missing-object diagnostic. The bounded fix accepts only the exact diagnostic with exit code 1 and
 the expected identity; regression cases reject different identities, exit codes and extra output.
 Thirty focused tests and both real offline success/cancellation probes passed after the fix.
-The earlier full package run passed 679 tests; final reconciled-branch and hosted checks remain
-required. Sonar snippet initialization was unavailable; build, typecheck, touched lint and formatting
-passed as the local fallback. This evidence does not establish live model or autonomous operation.
+The final reconciled package run passed 687 tests with nine opt-in Docker skips; both real settlement
+probes above ran separately. Build, typecheck, lint and formatting passed. PR262 merged at
+`746073e5605faf3fe219b8bd78547d7ed7e6adfe` after all nine executed hosted checks passed, including
+Sonar; the staging-only VM job was skipped. Independent reviews passed. Sourcery could not review
+because its weekly budget was exhausted; no Sourcery pass is claimed. The task is closed in Beads.
+This evidence does not establish live model or autonomous operation.
 
 ## Following integration
 
