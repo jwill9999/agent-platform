@@ -24,6 +24,8 @@ import {
   type OfficialBeadsDoltClient,
   type SpecialistProcessExecutor,
 } from '../src/index.js';
+import { workflowContainerJournalCapability } from '../src/storage.js';
+import { schedulerDockerFixture } from './schedulerDockerFixture.js';
 
 const roots: string[] = [];
 const digest = `sha256:${'a'.repeat(64)}`;
@@ -162,35 +164,39 @@ async function setup(
     JournaledBeadsDoltBroker.createForTest(store, port, undefined, options.clock ?? (() => 1000)),
     port,
   );
-  const executor: SpecialistProcessExecutor =
+  const transport = schedulerDockerFixture(
     options.executor ??
-    (async (executable, args) => {
-      if (executable === 'git' && args[0] === 'rev-parse') {
-        return { stdout: `${'a'.repeat(40)}\n`, stderr: '' };
-      }
-      if (executable === 'git' && args[0] === 'diff') {
-        return { stdout: 'packages/workflow-control/src/orchestrator.ts\n', stderr: '' };
-      }
-      if (executable === 'git') return { stdout: '', stderr: '' };
-      if (args[0] === 'stop' || args[0] === 'rm') return { stdout: '', stderr: '' };
-      if (args[0] === 'inspect') return { stdout: 'false\n', stderr: '' };
-      if (executable === '/usr/local/bin/docker') {
-        if (args[0] === 'create') {
-          const workspaceMount = args.find((argument) => argument.endsWith(':/workspace:rw'))!;
-          const mountedRoot = workspaceMount.slice(0, -':/workspace:rw'.length);
-          await writeFile(
-            join(mountedRoot, 'packages/workflow-control/source.ts'),
-            'export const retained = true;\n',
-          );
-          return { stdout: 'container-id\n', stderr: '' };
+      (async (executable, args) => {
+        if (executable === 'git' && args[0] === 'rev-parse') {
+          return { stdout: `${'a'.repeat(40)}\n`, stderr: '' };
         }
-        return args[0] === 'start'
-          ? { stdout: '{"type":"result","status":"launched"}\n', stderr: '' }
-          : { stdout: 'container-id\n', stderr: '' };
-      }
-      return { stdout: 'passed\n', stderr: '' };
-    });
+        if (executable === 'git' && args[0] === 'diff') {
+          return { stdout: 'packages/workflow-control/src/orchestrator.ts\n', stderr: '' };
+        }
+        if (executable === 'git') return { stdout: '', stderr: '' };
+        if (args[0] === 'stop' || args[0] === 'rm') return { stdout: '', stderr: '' };
+        if (args[0] === 'inspect') return { stdout: 'false\n', stderr: '' };
+        if (executable === '/usr/local/bin/docker') {
+          if (args[0] === 'create') {
+            const workspaceMount = args.find((argument) => argument.endsWith(':/workspace:rw'))!;
+            const mountedRoot = workspaceMount.slice(0, -':/workspace:rw'.length);
+            await writeFile(
+              join(mountedRoot, 'packages/workflow-control/source.ts'),
+              'export const retained = true;\n',
+            );
+            return { stdout: 'container-id\n', stderr: '' };
+          }
+          return args[0] === 'start'
+            ? { stdout: '{"type":"result","status":"launched"}\n', stderr: '' }
+            : { stdout: 'container-id\n', stderr: '' };
+        }
+        return { stdout: 'passed\n', stderr: '' };
+      }),
+  );
+  const executor = transport.executor;
   const launcher = DockerIsolatedSpecialistLauncher.createForTest({
+    store,
+    ownerId: 'owner-1',
     sourceRoot,
     image: 'workflow-codex:test',
     credentialBroker,
@@ -216,6 +222,7 @@ async function setup(
       }),
   });
   return {
+    transport,
     root,
     sourceRoot,
     authFile,
@@ -758,14 +765,10 @@ if (command === 'conformance') {
       releaseCleanup = resolve;
     });
     const executor: SpecialistProcessExecutor = async (_executable, args) => {
-      if (args[0] === 'stop') {
+      if (args[0] === 'rm') {
         cancelled = true;
         clock = 1005;
-        rejectStart?.(new Error('container stopped'));
-        return { stdout: '', stderr: '' };
-      }
-      if (args[0] === 'inspect') return { stdout: 'false\n', stderr: '' };
-      if (args[0] === 'rm') {
+        rejectStart?.(new Error('container removed'));
         signalCleanup();
         if (!settles) await cleanupAllowed;
         return { stdout: '', stderr: '' };
@@ -808,8 +811,9 @@ if (command === 'conformance') {
       await vi.advanceTimersByTimeAsync(5);
       if (!settles) {
         await cleanupStarted;
-        // The fixture deliberately holds cleanup pending: expiring the unchanged 20ms
-        // settlement budget must retain active work even though its credential is revoked.
+        // The fixture holds removal pending. Expire cancel's bounded wait, then the
+        // separate settlement wait; neither may release capacity without confirmation.
+        await vi.advanceTimersByTimeAsync(20);
         await vi.advanceTimersByTimeAsync(20);
       }
       await rejected;
@@ -999,7 +1003,7 @@ if (command === 'conformance') {
     first.store.close();
   });
 
-  it('stops persisted specialist identity and escalates the run exactly once after restart', async () => {
+  it('removes the owned persisted container and escalates the run exactly once after restart', async () => {
     const first = await setup('scheduling');
     const workspaceLeaseEpoch = first.orchestrator.acquireWorkspace(100, 1000);
     const runLeaseEpoch = first.orchestrator.acquireRun('run-schedule', 100, 1000);
@@ -1052,6 +1056,21 @@ if (command === 'conformance') {
       packet,
       nowMs: 1000,
     });
+    const removed: string[] = [];
+    const transport = schedulerDockerFixture(async (_executable, args) => {
+      if (args[0] === 'rm') removed.push(args.at(-1)!);
+      return { stdout: '', stderr: '' };
+    });
+    const containerId = transport.register(executionId);
+    const execution = first.store.getSchedulerExecution(executionId)!;
+    first.store.advanceSchedulerContainer(
+      { execution, from: 'not_dispatched', to: 'create_pending', nowMs: 1000 },
+      workflowContainerJournalCapability,
+    );
+    first.store.advanceSchedulerContainer(
+      { execution, from: 'create_pending', to: 'acknowledged', containerId, nowMs: 1000 },
+      workflowContainerJournalCapability,
+    );
     const crashFixture = new Database(join(first.root, 'workflow.sqlite'));
     crashFixture
       .prepare(
@@ -1103,12 +1122,9 @@ if (command === 'conformance') {
       JournaledBeadsDoltBroker.createForTest(store, port, undefined, () => 1100),
       port,
     );
-    const stopped: string[] = [];
-    const executor: SpecialistProcessExecutor = async (_executable, args) => {
-      if (args[0] === 'stop') stopped.push(args.at(-1)!);
-      return { stdout: '', stderr: '' };
-    };
     const launcher = DockerIsolatedSpecialistLauncher.createForTest({
+      store,
+      ownerId: 'owner-2',
       sourceRoot: first.sourceRoot,
       image: 'workflow-codex:test',
       credentialBroker: RevocableSpecialistCredentialBroker.createForTest({
@@ -1124,7 +1140,7 @@ if (command === 'conformance') {
       }),
       egressNetwork: 'workflow-model-egress',
       containerUser: '501:20',
-      executor,
+      executor: transport.executor,
       clock: () => 1100,
     });
     const integrationGate = LocalExactHeadIntegrationGate.createForTest({
@@ -1153,7 +1169,8 @@ if (command === 'conformance') {
         taskLeaseTtlMs: 100,
       }),
     ).toEqual([expect.objectContaining({ id: executionId, status: 'escalated' })]);
-    expect(stopped).toEqual([`workflow-specialist-${executionId}`]);
+    expect(removed).toEqual([containerId]);
+    expect(store.getSchedulerContainer(executionId)?.status).toBe('removal_confirmed');
     expect(store.getRun(packet.runId)?.state).toBe('escalated');
     expect(store.getSchedulerExecution(executionId)?.credentialStatus).toBe('revoked');
     expect(
@@ -1229,7 +1246,17 @@ if (command === 'conformance') {
       contract,
       store: first.store,
       closer,
-      launcher: first.launcher,
+      launcher: DockerIsolatedSpecialistLauncher.createForTest({
+        store: first.store,
+        ownerId: 'owner-2',
+        sourceRoot: first.sourceRoot,
+        image: 'workflow-codex:test',
+        credentialBroker: first.credentialBroker,
+        egressNetwork: 'workflow-model-egress',
+        containerUser: '501:20',
+        executor: first.transport.executor,
+        clock: () => 1100,
+      }),
       integrationGate: first.integrationGate,
       ownerId: 'owner-2',
       clock: () => 1100,
@@ -1282,6 +1309,7 @@ if (command === 'conformance') {
     const databasePath = join(first.root, 'workflow.sqlite');
     const legacy = new Database(databasePath);
     legacy.exec(`
+      DROP TABLE scheduler_containers;
       DROP TABLE continuation_actions;
       DROP TABLE continuation_jobs;
       DROP INDEX IF EXISTS scheduler_executions_workspace_status;

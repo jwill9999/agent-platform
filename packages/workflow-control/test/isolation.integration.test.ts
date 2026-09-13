@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,7 +7,7 @@ import { promisify } from 'node:util';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { prepareSpecialistWorkspace } from '../src/index.js';
+import { buildDockerSpecialistLaunch, prepareSpecialistWorkspace } from '../src/index.js';
 
 const run = promisify(execFile);
 const roots: string[] = [];
@@ -17,6 +18,81 @@ afterAll(async () => {
 });
 
 integration('malicious specialist feasibility', () => {
+  it.each(['feature_planner', 'plan_critic', 'implementation_worker'])(
+    'starts the generated %s mounts and enforces the source write mode',
+    async (role) => {
+      const source = await mkdtemp(join(tmpdir(), 'workflow-review-source-'));
+      roots.push(source);
+      await writeFile(join(source, 'allowed.txt'), 'original');
+      const specialist = await prepareSpecialistWorkspace(source, ['allowed.txt']);
+      const privateRoot = join(specialist.root, '..');
+      roots.push(privateRoot);
+      const authFile = join(privateRoot, 'fixture-auth.json');
+      const promptFile = join(privateRoot, 'fixture-prompt.txt');
+      await writeFile(authFile, '{}');
+      await writeFile(promptFile, 'offline filesystem probe only');
+      // Fixture-only permissions also allow a non-root probe when the test host runs as root.
+      await chmod(specialist.root, 0o755);
+      await chmod(specialist.codexHome, 0o755);
+      await chmod(join(specialist.root, 'allowed.txt'), 0o666);
+      await chmod(join(specialist.codexHome, 'config.toml'), 0o644);
+      await chmod(authFile, 0o644);
+      await chmod(promptFile, 0o644);
+      const executionId = randomUUID();
+      const launch = await buildDockerSpecialistLaunch({
+        image: process.env.WORKFLOW_DOCKER_IMAGE ?? 'agent-platform-api:latest',
+        workspaceRoot: specialist.root,
+        codexHome: specialist.codexHome,
+        authFile,
+        promptFile,
+        egressNetwork: 'none',
+        role,
+        runId: 'offline-review-probe',
+        executionId,
+        containerUser: `${process.getuid?.() || 1000}:${process.getgid?.() || 1000}`,
+      });
+      // Exercise every generated mount with a fixed offline Node probe, not a model session.
+      const args = launch.args.slice(0, -3);
+      args.push(
+        'node',
+        '-e',
+        String.raw`
+        const fs = require('node:fs');
+        let denied = false;
+        try { fs.writeFileSync('/workspace/allowed.txt', 'changed'); }
+        catch (error) { denied = ['EROFS', 'EACCES', 'EPERM'].includes(error.code); }
+        process.stdout.write(JSON.stringify({
+          denied, content: fs.readFileSync('/workspace/allowed.txt', 'utf8'),
+          auth: JSON.parse(fs.readFileSync('/codex-home/auth.json', 'utf8'))
+        }));
+      `,
+      );
+      try {
+        const { stdout } = await run(launch.dockerBinary, args, {
+          env: {},
+          timeout: 15_000,
+          maxBuffer: 4096,
+        });
+        const denied = role !== 'implementation_worker';
+        expect(JSON.parse(stdout)).toEqual({
+          denied,
+          content: denied ? 'original' : 'changed',
+          auth: {},
+        });
+      } finally {
+        await run(launch.dockerBinary, ['rm', '--force', `workflow-specialist-${executionId}`], {
+          env: {},
+          timeout: 10_000,
+          maxBuffer: 4096,
+        }).catch((error: unknown) => {
+          if (!(error instanceof Error) || !/no such (?:container|object)/iu.test(error.message))
+            throw error;
+        });
+      }
+    },
+    30_000,
+  );
+
   it('cannot observe host control, credential, repository, or broker surfaces', async () => {
     const source = await mkdtemp(join(tmpdir(), 'workflow-malicious-source-'));
     roots.push(source);

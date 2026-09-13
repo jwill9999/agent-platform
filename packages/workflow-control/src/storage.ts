@@ -101,6 +101,19 @@ export type SchedulerCredentialStatus =
   | 'legacy_quarantined';
 
 export const workflowCredentialJournalCapability = Symbol('workflowCredentialJournalCapability');
+export const workflowContainerJournalCapability = Symbol('workflowContainerJournalCapability');
+
+export interface SchedulerContainerRecord {
+  executionId: string;
+  name: string;
+  ownerLabel: string;
+  status: 'not_dispatched' | 'create_pending' | 'acknowledged' | 'removal_confirmed';
+  containerId: string | null;
+}
+export type SchedulerContainerAuthority = Pick<
+  SchedulerExecutionRecord,
+  'id' | 'ownerId' | 'workspaceLeaseEpoch' | 'runLeaseEpoch' | 'taskLeaseEpoch'
+>;
 export const workflowRepairMutationCapability = Symbol('workflowRepairMutationCapability');
 export const workflowDeliveryMutationCapability = Symbol('workflowDeliveryMutationCapability');
 export const workflowFeatureDeliveryApprovalCapability = Symbol(
@@ -1390,6 +1403,14 @@ export class WorkflowStore {
           input.nowMs,
           input.nowMs,
         );
+      // This fixture never dispatches a container; do not fabricate daemon observations.
+      this.#database
+        .prepare(
+          `INSERT INTO scheduler_containers
+        (execution_id, name, owner_label, status, container_id)
+        VALUES (?, ?, ?, 'not_dispatched', NULL)`,
+        )
+        .run(input.delegationId, `workflow-specialist-${input.delegationId}`, input.delegationId);
       const evidence = [
         [inputArtifactDigest, input.inputProducerIdentity, 'workflow_orchestrator'],
         [resultArtifactDigest, input.delegateAgentId, input.delegateRole],
@@ -3310,8 +3331,102 @@ export class WorkflowStore {
           nowMs,
           nowMs,
         );
+      this.#database
+        .prepare(
+          `INSERT INTO scheduler_containers
+        (execution_id, name, owner_label, status, container_id)
+        VALUES (?, ?, ?, 'not_dispatched', NULL)`,
+        )
+        .run(input.id, `workflow-specialist-${input.id}`, input.id);
       return this.getSchedulerExecution(input.id)!;
     })();
+  }
+
+  getSchedulerContainer(id: string): SchedulerContainerRecord | undefined {
+    return this.#database
+      .prepare(
+        `SELECT execution_id AS executionId, name,
+      owner_label AS ownerLabel, status, container_id AS containerId
+      FROM scheduler_containers WHERE execution_id = ?`,
+      )
+      .get(id) as SchedulerContainerRecord | undefined;
+  }
+
+  advanceSchedulerContainer(
+    input: {
+      execution: SchedulerContainerAuthority;
+      from: SchedulerContainerRecord['status'];
+      to: SchedulerContainerRecord['status'];
+      containerId?: string;
+      nowMs?: number;
+    },
+    capability?: symbol,
+    clock: () => number = Date.now,
+  ): SchedulerContainerRecord {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('container journal mutation requires launcher capability');
+    return this.#database
+      .transaction(() => {
+        const execution = this.getSchedulerExecution(input.execution.id);
+        const now = input.nowMs ?? clock();
+        if (execution === undefined || execution.status !== 'active')
+          throw new Error('active scheduler execution required for container transition');
+        for (const key of [
+          'ownerId',
+          'workspaceLeaseEpoch',
+          'runLeaseEpoch',
+          'taskLeaseEpoch',
+        ] as const)
+          if (execution[key] !== input.execution[key])
+            throw new Error('container execution fence changed');
+        this.#assertResourceLease(
+          'workspace',
+          execution.workspaceId,
+          execution.ownerId,
+          execution.workspaceLeaseEpoch,
+          now,
+        );
+        this.#assertResourceLease(
+          'run',
+          execution.runId,
+          execution.ownerId,
+          execution.runLeaseEpoch,
+          now,
+        );
+        this.#assertResourceLease(
+          'task',
+          execution.taskId,
+          execution.ownerId,
+          execution.taskLeaseEpoch,
+          now,
+        );
+        const state = this.getSchedulerContainer(execution.id);
+        if (state === undefined || execution.processIdentity !== `docker:${state.name}`)
+          throw new Error('container lifecycle identity is unknown');
+        if (state.status !== input.from)
+          throw new Error('container lifecycle transition was replayed');
+        const valid =
+          (input.from === 'not_dispatched' && input.to === 'create_pending') ||
+          (input.from === 'create_pending' && input.to === 'acknowledged') ||
+          (input.from === 'acknowledged' && input.to === 'removal_confirmed');
+        if (!valid) throw new Error('container lifecycle transition is forbidden');
+        if (input.to === 'create_pending' && now >= execution.deadlineMs)
+          throw new Error('specialist reservation timed out before container dispatch');
+        const id = input.containerId ?? state.containerId;
+        if (
+          input.to === 'create_pending' ? id !== null : id === null || !/^[a-f0-9]{64}$/u.test(id)
+        )
+          throw new Error('container lifecycle ID is invalid');
+        if (state.containerId !== null && id !== state.containerId)
+          throw new Error('container lifecycle ID changed');
+        this.#database
+          .prepare(
+            `UPDATE scheduler_containers SET status = ?, container_id = ? WHERE execution_id = ?`,
+          )
+          .run(input.to, id, execution.id);
+        return this.getSchedulerContainer(execution.id)!;
+      })
+      .immediate();
   }
 
   bindSchedulerCredentialGeneration(
@@ -3442,59 +3557,74 @@ export class WorkflowStore {
     callback?: unknown;
     nowMs?: number;
   }): SchedulerExecutionRecord {
-    const nowMs = input.nowMs ?? Date.now();
-    return this.#database.transaction(() => {
-      const execution = this.getSchedulerExecution(input.id);
-      if (execution === undefined) throw new Error('scheduler execution not found');
-      if (execution.status !== 'active') {
-        if (execution.status === 'completed' && input.callback !== undefined) {
-          this.#recordSchedulerTerminalCallback(input, nowMs);
+    return this.#database
+      .transaction(() => {
+        const nowMs = input.nowMs ?? Date.now();
+        const execution = this.getSchedulerExecution(input.id);
+        if (execution === undefined) throw new Error('scheduler execution not found');
+        if (execution.status !== 'active') {
+          if (execution.status === 'completed' && input.callback !== undefined) {
+            this.#recordSchedulerTerminalCallback(input, nowMs);
+          }
+          return execution;
         }
-        return execution;
-      }
-      this.#assertResourceLease(
-        'workspace',
-        execution.workspaceId,
-        input.ownerId,
-        input.workspaceLeaseEpoch,
-        nowMs,
-      );
-      this.#assertResourceLease('run', execution.runId, input.ownerId, input.runLeaseEpoch, nowMs);
-      this.#assertResourceLease(
-        'task',
-        execution.taskId,
-        input.ownerId,
-        input.taskLeaseEpoch,
-        nowMs,
-      );
-      if (execution.ownerId !== input.ownerId) throw new Error('scheduler execution owner changed');
-      if (
-        execution.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
-        execution.runLeaseEpoch !== input.runLeaseEpoch ||
-        execution.taskLeaseEpoch !== input.taskLeaseEpoch
-      ) {
-        throw new Error('scheduler execution fencing token changed');
-      }
-      if (execution.credentialStatus !== 'revoked') {
-        throw new Error('scheduler execution cannot finish before credential revocation');
-      }
-      if (input.status === 'completed' && execution.deadlineMs <= nowMs) {
-        throw new Error('specialist reservation timed out');
-      }
-      this.#database
-        .prepare(
-          `UPDATE scheduler_executions SET status = ?, result_json = ?, updated_at_ms = ?
-           WHERE id = ? AND status = 'active'`,
+        this.#assertResourceLease(
+          'workspace',
+          execution.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          nowMs,
+        );
+        this.#assertResourceLease(
+          'run',
+          execution.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          nowMs,
+        );
+        this.#assertResourceLease(
+          'task',
+          execution.taskId,
+          input.ownerId,
+          input.taskLeaseEpoch,
+          nowMs,
+        );
+        if (execution.ownerId !== input.ownerId)
+          throw new Error('scheduler execution owner changed');
+        if (
+          execution.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+          execution.runLeaseEpoch !== input.runLeaseEpoch ||
+          execution.taskLeaseEpoch !== input.taskLeaseEpoch
+        ) {
+          throw new Error('scheduler execution fencing token changed');
+        }
+        if (execution.credentialStatus !== 'revoked') {
+          throw new Error('scheduler execution cannot finish before credential revocation');
+        }
+        const container = this.getSchedulerContainer(execution.id);
+        if (
+          container === undefined ||
+          !['not_dispatched', 'removal_confirmed'].includes(container.status)
         )
-        .run(input.status, JSON.stringify(input.result), nowMs, input.id);
-      if (input.status === 'completed') {
-        enqueueContinuation(this.#database, input.id, execution.runId, nowMs);
-        if (input.callback !== undefined) {
-          this.#recordSchedulerTerminalCallback(input, nowMs);
+          throw new Error('scheduler execution cannot finish before container settlement');
+        if (input.status === 'completed' && execution.deadlineMs <= nowMs) {
+          throw new Error('specialist reservation timed out');
         }
-      }
-      return this.getSchedulerExecution(input.id)!;
-    })();
+        this.#database
+          .prepare(
+            `UPDATE scheduler_executions SET status = ?, result_json = ?, updated_at_ms = ?
+           WHERE id = ? AND status = 'active'`,
+          )
+          .run(input.status, JSON.stringify(input.result), nowMs, input.id);
+        if (input.status === 'completed') {
+          enqueueContinuation(this.#database, input.id, execution.runId, nowMs);
+          if (input.callback !== undefined) {
+            this.#recordSchedulerTerminalCallback(input, nowMs);
+          }
+        }
+        return this.getSchedulerExecution(input.id)!;
+      })
+      .immediate();
   }
 
   getSchedulerExecution(id: string): SchedulerExecutionRecord | undefined {
@@ -8118,6 +8248,15 @@ export class WorkflowStore {
       );
       CREATE INDEX IF NOT EXISTS scheduler_executions_workspace_status
         ON scheduler_executions(workspace_id, status, mode);
+      CREATE TABLE IF NOT EXISTS scheduler_containers (
+        execution_id TEXT PRIMARY KEY REFERENCES scheduler_executions(id),
+        name TEXT NOT NULL UNIQUE,
+        owner_label TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL CHECK(status IN ('not_dispatched', 'create_pending', 'acknowledged', 'removal_confirmed')),
+        container_id TEXT,
+        CHECK((status IN ('not_dispatched', 'create_pending') AND container_id IS NULL)
+          OR (status IN ('acknowledged', 'removal_confirmed') AND length(container_id) = 64))
+      );
       CREATE TABLE IF NOT EXISTS repair_dispatches (
         id TEXT PRIMARY KEY,
         run_id TEXT NOT NULL REFERENCES runs(id),
@@ -8246,6 +8385,7 @@ export class WorkflowStore {
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (10, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (11, unixepoch() * 1000);
       INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (12, unixepoch() * 1000);
+      INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (16, unixepoch() * 1000);
     `);
     initializeContinuationSchema(this.#database);
     const approvalWaitColumns = this.#database

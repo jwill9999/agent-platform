@@ -20,7 +20,8 @@ import {
   RevocableSpecialistCredentialBroker,
 } from '../src/specialistLauncher.js';
 import { continuationFixture, terminalResult } from './continuationFixture.js';
-import { WorkflowStore } from '../src/storage.js';
+import { WorkflowStore, workflowContainerJournalCapability } from '../src/storage.js';
+import { schedulerDockerFixture } from './schedulerDockerFixture.js';
 import {
   specialistInputEnvelopeSchema,
   type SpecialistInputEnvelope,
@@ -119,61 +120,68 @@ async function setup(
   const launches: string[][] = [];
   const prompts: SpecialistInputEnvelope[] = [];
   const staging: string[] = [];
-  const makeLauncher = (store: WorkflowStore) =>
+  const transports: ReturnType<typeof schedulerDockerFixture>[] = [];
+  const makeLauncher = (store: WorkflowStore, ownerId = 'owner') =>
     DockerIsolatedSpecialistLauncher.createForTest({
+      store,
+      ownerId,
       sourceRoot,
       image: 'fixture@sha256:' + 'a'.repeat(64),
       credentialBroker: credentialBroker(store),
       egressNetwork: 'fixture-egress',
       containerUser: '501:20',
-      executor: async (_binary, args, settings) => {
-        expect(settings.env).toEqual({});
-        launches.push([...args]);
-        if (args[0] === 'create') {
-          const mount = args.find((arg) => arg.endsWith(':/workspace:rw'))!;
-          staging.push(dirname(mount.slice(0, -':/workspace:rw'.length)));
-          const promptMount = args.find((arg) => arg.endsWith(':/run/specialist/prompt.txt:ro'))!;
-          prompts.push(
-            specialistInputEnvelopeSchema.parse(
-              JSON.parse(
-                await readFile(
-                  promptMount.slice(0, -':/run/specialist/prompt.txt:ro'.length),
-                  'utf8',
+      executor: (() => {
+        const transport = schedulerDockerFixture(async (_binary, args, settings) => {
+          expect(settings.env).toEqual({});
+          launches.push([...args]);
+          if (args[0] === 'create') {
+            const mount = args.find((arg) => arg.endsWith(':/workspace:rw'))!;
+            staging.push(dirname(mount.slice(0, -':/workspace:rw'.length)));
+            const promptMount = args.find((arg) => arg.endsWith(':/run/specialist/prompt.txt:ro'))!;
+            prompts.push(
+              specialistInputEnvelopeSchema.parse(
+                JSON.parse(
+                  await readFile(
+                    promptMount.slice(0, -':/run/specialist/prompt.txt:ro'.length),
+                    'utf8',
+                  ),
                 ),
               ),
-            ),
-          );
-          return { stdout: 'fixture-container', stderr: '' };
-        }
-        if (args[0] === 'start') {
-          // Real child transport, with fixture terminal data; this is NOT real Docker/Codex conformance.
-          return execute(
-            process.execPath,
-            [
-              '-e',
-              'setTimeout(() => process.stdout.write(process.argv[1]), Number(process.argv[2]))',
-              JSON.stringify({
-                type: 'item.completed',
-                item: {
-                  type: 'agent_message',
-                  text: JSON.stringify(
-                    options.result ?? {
-                      ...terminalResult,
-                      recommendedTransition:
-                        prompts.at(-1)?.task.assignedRole === 'code_reviewer'
-                          ? 'integrate'
-                          : 'continue',
-                    },
-                  ),
-                },
-              }),
-              String(options.delayMs ?? 0),
-            ],
-            { env: {}, timeout: 5000 },
-          );
-        }
-        return { stdout: 'false', stderr: '' };
-      },
+            );
+            return { stdout: 'fixture-container', stderr: '' };
+          }
+          if (args[0] === 'start') {
+            // Real child transport, with fixture terminal data; this is NOT real Docker/Codex conformance.
+            return execute(
+              process.execPath,
+              [
+                '-e',
+                'setTimeout(() => process.stdout.write(process.argv[1]), Number(process.argv[2]))',
+                JSON.stringify({
+                  type: 'item.completed',
+                  item: {
+                    type: 'agent_message',
+                    text: JSON.stringify(
+                      options.result ?? {
+                        ...terminalResult,
+                        recommendedTransition:
+                          prompts.at(-1)?.task.assignedRole === 'code_reviewer'
+                            ? 'integrate'
+                            : 'continue',
+                      },
+                    ),
+                  },
+                }),
+                String(options.delayMs ?? 0),
+              ],
+              { env: {}, timeout: 5000 },
+            );
+          }
+          return { stdout: 'false', stderr: '' };
+        });
+        transports.push(transport);
+        return transport.executor;
+      })(),
     });
   const launcher = makeLauncher(f.store);
   const config = readPhaseRuntimeConfig({
@@ -220,6 +228,7 @@ async function setup(
     launcher,
     prompts,
     makeLauncher,
+    transports,
   };
 }
 
@@ -362,7 +371,7 @@ describe('standalone phase runtime production orchestration with fixture launche
       const replacement = StandalonePhaseRuntime.createForTest({
         store,
         journal,
-        launcher: f.makeLauncher(store),
+        launcher: f.makeLauncher(store, owner),
         config: f.config,
         owner,
         process: {
@@ -467,7 +476,7 @@ describe('standalone phase runtime production orchestration with fixture launche
     expect(await f.runtime.runOnce()).toBe(false);
     expect(f.journal.list()[0]?.status).toBe('blocked');
     expect([...f.credentials.values()]).toEqual(['revoked']);
-    expect(f.launches.some((args) => args[0] === 'stop')).toBe(true);
+    expect(f.launches.some((args) => args[0] === 'rm')).toBe(true);
   });
 
   it('never dispatches started work again after a restart without an execution record', async () => {
@@ -480,7 +489,7 @@ describe('standalone phase runtime production orchestration with fixture launche
     expect(f.launches).toEqual([]);
   });
 
-  it('recovers an interrupted scheduler by stopping, observing, and revoking before terminal bookkeeping', async () => {
+  it('recovers an interrupted scheduler by removing, observing, and revoking before terminal bookkeeping', async () => {
     const f = await setup();
     const past = Date.now() - 100;
     const claim = f.journal.claim('lost', 1, past)!;
@@ -501,11 +510,22 @@ describe('standalone phase runtime production orchestration with fixture launche
       credentialLeaseId: `specialist:${started.execution_id}`,
       packet: { fixture: true },
     });
+    const execution = f.store.getSchedulerExecution(started.execution_id!)!;
+    const containerId = f.transports[0]!.register(execution.id);
+    f.store.advanceSchedulerContainer(
+      { execution, from: 'not_dispatched', to: 'create_pending' },
+      workflowContainerJournalCapability,
+    );
+    f.store.advanceSchedulerContainer(
+      { execution, from: 'create_pending', to: 'acknowledged', containerId },
+      workflowContainerJournalCapability,
+    );
     expect(await f.runtime.runOnce()).toBe(false);
     expect(f.store.getSchedulerExecution(started.execution_id!)?.status).toBe('escalated');
     expect(f.store.getSchedulerExecution(started.execution_id!)?.credentialStatus).toBe('revoked');
-    expect(f.launches.map((args) => args[0])).toContain('stop');
-    expect(f.launches.map((args) => args[0])).toContain('inspect');
+    expect(f.launches).toContainEqual(['rm', '--force', containerId]);
+    expect(f.transports[0]!.calls.map((args) => args[0])).toContain('inspect');
+    expect(f.store.getSchedulerContainer(execution.id)?.status).toBe('removal_confirmed');
     expect(f.launches.map((args) => args[0])).not.toContain('start');
     expect(f.journal.get(started.id)?.status).toBe('blocked');
   });

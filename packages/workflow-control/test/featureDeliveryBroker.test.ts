@@ -32,6 +32,7 @@ import {
   type FeatureDeliveryRequest,
   type OfficialBeadsDoltClient,
 } from '../src/index.js';
+import { schedulerDockerFixture } from './schedulerDockerFixture.js';
 
 const roots: string[] = [];
 const workspaceId = `sha256:${'b'.repeat(64)}`;
@@ -325,12 +326,14 @@ async function createRecoveryOrchestrator(input: {
     conformance: async () => 'feature-recovery-test',
   });
   const launcher = DockerIsolatedSpecialistLauncher.createForTest({
+    store: input.store,
+    ownerId: input.ownerId,
     sourceRoot,
     image: 'workflow-codex:test',
     credentialBroker,
     egressNetwork: 'workflow-model-egress',
     containerUser: '501:20',
-    executor: async () => ({ stdout: '', stderr: '' }),
+    executor: schedulerDockerFixture(async () => ({ stdout: '', stderr: '' })).executor,
     clock: () => input.nowMs,
   });
   const client: OfficialBeadsDoltClient = {

@@ -364,6 +364,27 @@ export {
 } from './continuationNotifications.js';
 export { BootstrapCoordinator, bootstrapPreflight, type BootstrapFault } from './bootstrap.js';
 export {
+  stagePreapprovalMaterial,
+  type PreapprovalMaterial,
+  type PreapprovalMaterialEntry,
+} from './preapprovalMaterial.js';
+export {
+  executeSpecialistContainerLifecycle,
+  type SpecialistContainerLifecycleOptions,
+  type SpecialistContainerLifecycleResult,
+} from './specialistContainerLifecycle.js';
+export {
+  captureSpecialistOutputBaseline,
+  observeSpecialistOutput,
+  verifySpecialistOutput,
+  type SpecialistOutputBinding,
+  type SpecialistOutputGrant,
+  type SpecialistOutputEntry,
+  type SpecialistOutputChange,
+  type SpecialistOutputBaseline,
+  type SpecialistOutputCandidate,
+} from './specialistOutputManifest.js';
+export {
   bootstrapPolicySchema,
   implementationArtifactReadySchema,
   bootstrapDigest,
