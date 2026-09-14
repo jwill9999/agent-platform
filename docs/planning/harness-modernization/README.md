@@ -36,3 +36,5 @@ Modernization tasks F0–F3 contain expanded assessment specifications. The [orc
 ## Assessment draft
 
 [SDK modernization source assessment](sdk-assessment.md) is drafted with current registry/source evidence and awaits independent critique. Its orchestration section records the observed parent handoff failure; it is not autonomous workflow acceptance.
+
+The [SDK assessment critic review](reviews/sdk-assessment-critic-review.md) records the owner-authorized supervised review, corrections and passing recheck. The assessment is ready for owner review; compatibility experiments and implementation remain unapproved.
