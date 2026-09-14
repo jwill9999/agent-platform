@@ -59,3 +59,7 @@ The `pilot-zero-progress-and-ci` heartbeat follows approved documentation/stagin
 must stop monitoring that delivery after completion. The older `orchestration-repair-progress`
 monitor is paused. Reconcile Beads and GitHub before acting; no active managed run was reported at
 the last audit. This delivery uses supervised manual coordination, not broker receipts.
+
+## September 15: continuation diagnostic observation
+
+The owner requested documentation of the assessment continuation stall and the evidence needed for future diagnosis. See [orchestration field evaluation](docs/reviews/orchestration-field-evaluation.md). Root cause remains unknown; active heartbeat configuration does not prove delivery. No assessment managed run was launched. Future repair work remains under the existing pilot assessment; no implementation is authorized by this note. Modernization assessment drafts remain pending independent critic review.
