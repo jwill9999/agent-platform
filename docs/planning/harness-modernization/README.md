@@ -32,3 +32,7 @@ Only authored analysis is included. Downloaded third-party documentation excerpt
 ## Current focused preparation
 
 Modernization tasks F0–F3 contain expanded assessment specifications. The [orchestration observation protocol](orchestration-observation.md) reuses staged pilot/evaluation documentation to capture snags without implying autonomous acceptance. No additional workstream or live pilot is authorized.
+
+## Assessment draft
+
+[SDK modernization source assessment](sdk-assessment.md) is drafted with current registry/source evidence and awaits independent critique. Its orchestration section records the observed parent handoff failure; it is not autonomous workflow acceptance.
