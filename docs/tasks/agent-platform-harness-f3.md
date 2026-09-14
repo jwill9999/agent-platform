@@ -40,3 +40,15 @@ Upstream work and required quality gates pass; exact evidence and reviewed decis
 This is an unassigned planning record. Implementation branch parent and segment-tip designation must be specified in its approved execution contract before work. Follow feature/task chained branches; intermediate tasks require exact-head checks and declared integration evidence, segment tips additionally require merged PR/hosted gates. No main promotion is authorized.
 
 Reviewer/owner sign-off: pending. Evidence: pending. Effort: 0.5–1 provisional person-days.
+
+## Focused decision contract — planning revision
+
+Use F0–F2 evidence to recommend one order: upgrade current runtime first; migrate directly while retiring replaced SDK responsibilities; or narrowly staged coexistence with a dated removal criterion. Apply must-pass provider/configuration, streaming, tool/permission/approval and Electron requirements before comparing effort. Where evidence is blocked, state whether the decision is provisional and what cannot proceed.
+
+Record chosen mutually compatible pinned set, rejected alternative and reason, adaptation estimate including discarded work, native instrumentation versus application-specific spans, and migration/rollback sequence. Keep connected-local execution with explicit recovery; do not add Agent Server or unattended scheduling to satisfy deferred needs. Re-estimate R1 before it is authorized. This epic selects a path; it does not implement R1 or reopen the visibility workstream.
+
+Return a concise owner decision with evidence links and remaining choices. Owner approval of the concrete migration is required before dependent implementation. If comparison does not establish savings, recommend the smaller supported upgrade or a bounded follow-up rather than force LangChain adoption. Do not close the review gate or mark the epic complete from this document alone.
+
+## Orchestration observation during assessment
+
+Use the [orchestration observation protocol](../planning/harness-modernization/orchestration-observation.md). Record snags as Beads findings with evidence and observed execution mode; supervised assistant work is not an autonomous pilot. New repairs require separately scoped authorization.

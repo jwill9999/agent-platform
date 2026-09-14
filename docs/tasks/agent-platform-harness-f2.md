@@ -40,3 +40,15 @@ Upstream work and required quality gates pass; exact evidence and reviewed decis
 This is an unassigned planning record. Implementation branch parent and segment-tip designation must be specified in its approved execution contract before work. Follow feature/task chained branches; intermediate tasks require exact-head checks and declared integration evidence, segment tips additionally require merged PR/hosted gates. No main promotion is authorized.
 
 Reviewer/owner sign-off: pending. Evidence: pending. Effort: 2–4 provisional person-days.
+
+## Focused replacement experiment contract — planning revision
+
+After F1, compare the two viable routes on the same bounded journey: configured agent receives a request, invokes an authorized deterministic tool, reports its result, handles a controlled provider/tool error and surfaces an approval wait. Reuse existing security/application services. Do not expand into persistent recovery, knowledge ingestion, product delegation or background scheduling. If one route fails F1 materially, document why the experiment narrows rather than build a knowingly unusable route.
+
+Keep fixtures outside production code until the migration decision. Enumerate generic loop/provider code replaceable, application policy retained, new adapter code required, and planner/critic/sensor/DoD behaviors retained or explicitly out of experiment scope. Count adaptation and maintenance responsibilities as well as changed lines; fewer lines alone are not a decision rule. Identify any preliminary SDK upgrade discarded by direct framework adoption.
+
+Acceptance evidence compares preserved behavior, adapter effort, token/call usage when known, latency observations and migration risks on the same conditions. Unknowns remain unknown. Summarization, critic and fallback calls must be counted if enabled; do not enable extra paid features merely to enrich a comparison. No benchmark performance claim from a single uncontrolled run. Deliver a recommendation input and rollback boundaries, not a product migration.
+
+## Orchestration observation during assessment
+
+Use the [orchestration observation protocol](../planning/harness-modernization/orchestration-observation.md). Record snags as Beads findings with evidence and observed execution mode; supervised assistant work is not an autonomous pilot. New repairs require separately scoped authorization.

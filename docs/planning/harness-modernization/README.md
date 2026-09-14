@@ -28,3 +28,7 @@ Their specifications are in [the task directory](../../tasks/README.md). Approva
 The `archive/` directory preserves the initial brief, earlier resolution plan, review outcome and old backlog audit. `reviews/critic-review.md` is the first critique; `reviews/review-scorecard.md` accompanies it. Later findings and recorded owner decisions take precedence. Framework versions and local code observations are dated snapshots, not claims of current compatibility.
 
 Only authored analysis is included. Downloaded third-party documentation excerpts and raw Beads JSON snapshots are not copied into the repository. `provenance.json` records original source hashes; relative links were normalized for repository use, so the copies are not byte-identical originals. Original local research remains intact.
+
+## Current focused preparation
+
+Modernization tasks F0–F3 contain expanded assessment specifications. The [orchestration observation protocol](orchestration-observation.md) reuses staged pilot/evaluation documentation to capture snags without implying autonomous acceptance. No additional workstream or live pilot is authorized.

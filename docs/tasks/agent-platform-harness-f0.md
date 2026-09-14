@@ -40,3 +40,17 @@ Upstream work and required quality gates pass; exact evidence and reviewed decis
 This is an unassigned planning record. Implementation branch parent and segment-tip designation must be specified in its approved execution contract before work. Follow feature/task chained branches; intermediate tasks require exact-head checks and declared integration evidence, segment tips additionally require merged PR/hosted gates. No main promotion is authorized.
 
 Reviewer/owner sign-off: pending. Evidence: pending. Effort: 1–2 provisional person-days.
+
+## Focused assessment contract — planning revision
+
+Produce a dated inventory from package manifests AND lockfile for AI SDK, providers, LangChain/Graph, Zod, telemetry, Node and Electron/native dependencies. For each record installed version, candidate version, engine/peer range, official migration source, retained/replaced role and known uncertainty. A release being recent is not evidence it is mutually compatible or supported; record the published support evidence or mark unknown.
+
+Compare exactly two primary routes: upgrade the existing AI SDK-based runtime; adopt supported LangChain providers/loop and retire replaced SDK responsibilities. Treat coexistence as a bounded transitional variant, with removal criteria. Use the current implementation as behavioral baseline, not the mandatory target. Include Ollama native versus OpenAI-compatible URL semantics. Do not build an SDK-to-framework bridge merely to avoid evaluating migration.
+
+Deliver the candidate matrix, preserved-behavior checklist, potential duplicated upgrade work, proposed experiment order and revised effort range. Research is read-only against product source; output only specs/decision evidence. No package installation, model call, framework migration or full telemetry design occurs in this task without separately extended authority. Stop after two viable candidates or evidence that one is infeasible; do not broaden to unrelated frameworks. Record unresolved parity checks for F1 rather than claiming validation.
+
+Evidence sources: packages/model-router/src/providers.ts, packages/harness/package.json, pnpm-lock.yaml, packages/harness/src/nodes/llmReason.ts and toolDispatch.ts, apps/desktop/package.json; use official TypeScript migration/support documentation. The inventory must refresh the actual accepted baseline rather than copy historical version numbers from research.
+
+## Orchestration observation during assessment
+
+Use the [orchestration observation protocol](../planning/harness-modernization/orchestration-observation.md). Record snags as Beads findings with evidence and observed execution mode; supervised assistant work is not an autonomous pilot. New repairs require separately scoped authorization.
