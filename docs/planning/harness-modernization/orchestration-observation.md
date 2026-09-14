@@ -23,3 +23,7 @@ This planning session is supervised assistant authoring. No new managed orchestr
 When a separately approved real workflow uses the feature, evaluate completion rate, successful next-phase transitions, unplanned interventions, retries, recoveries, blocked reasons, latency and token/cost coverage against the frozen criteria. Distinguish successful authorized human approvals from unplanned rescue. Preserve not-exercised cases explicitly.
 
 An end-to-end acceptance run, seeded failure/repair and interruption scenarios remain governed by the existing pilot specification and exact approved contract. Modernization can provide observations, but cannot close the pilot solely because planning or CI succeeded. Summarize accumulated findings for owner review before changing orchestration policy or expanding scope.
+
+## Separate long-term field evaluation
+
+The owner clarified that ongoing real-use feedback is separate from modernization. Use [Project orchestration field evaluation](../../reviews/orchestration-field-evaluation.md) as the general guide for recording incidents, manual interventions and later repair feedback. This modernization-specific protocol is only an application of that process, not the owner of the evaluation programme.
