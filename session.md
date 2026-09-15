@@ -8,6 +8,8 @@ What happened: baseline proposal v3 now includes context, cancellation/retry/lim
 
 Current state: branch `jwill9999/harness-baseline-plan`; Beads `agent-platform-harness-baseline-plan` remains open for owner review. Prior workflow evaluation PR remains unmerged. Historical snapshots below are not current status.
 
+Backlog update: 18 Beads tasks now track shared mapping and all 17 matrix areas, with verified prerequisite edges and individual specs. Status and pause checkpoints remain in Beads; no test implementation started.
+
 Next: review the matrix and first slice with the owner; after implementation approval, map existing coverage and resolve the provider-fixture seam before building sequential journeys. Migration value also requires a bounded candidate comparison; baseline correctness alone does not prove savings.
 
 ## Verified snapshot — 2026-09-13

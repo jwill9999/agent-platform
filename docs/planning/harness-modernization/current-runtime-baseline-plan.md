@@ -125,3 +125,30 @@ Review the first scorecard with the owner. Decide whether enough evidence exists
 ## Acceptance of the planning deliverable
 
 The plan names the decision, current evidence, first journey, mock boundary, evidence schema, sequential scope, uncertainty and stop conditions. Owner review is required before implementation of this next baseline slice. This document is a planning proposal, not a validated workflow-control execution contract or authorization for a managed launch.
+
+## Durable Beads work breakdown
+
+The owner authorized backlog creation for gradual work over the coming weeks. There are 17 matrix-area tasks plus one shared coverage/fixture feasibility task, all under the existing modernization epic. Beads is the status authority; this table is a navigation and suggested-order index, not a second status board. No task is marked tested or complete by creation.
+
+| Suggested order | Area | Task specification                                                                                                            |
+| --------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1               | MAP  | [Map existing baseline coverage and resolve provider fixture feasibility](../../tasks/agent-platform-harness-baseline-map.md) |
+| 2               | T2   | [Assess core tool adequacy and agent tool exposure](../../tasks/agent-platform-harness-baseline-t2.md)                        |
+| 3               | X6   | [Verify provider streams tool results errors and usage](../../tasks/agent-platform-harness-baseline-x6.md)                    |
+| 4               | T1   | [Verify common coding tasks through the real model-to-tool loop](../../tasks/agent-platform-harness-baseline-t1.md)           |
+| 5               | P1   | [Verify human approval and denial through the real reasoning path](../../tasks/agent-platform-harness-baseline-p1.md)         |
+| 6               | P2   | [Verify Ask Automatic and Block policy behavior](../../tasks/agent-platform-harness-baseline-p2.md)                           |
+| 7               | P3   | [Verify approval identity replay and argument boundaries](../../tasks/agent-platform-harness-baseline-p3.md)                  |
+| 8               | P4   | [Verify permission scope and hard execution restrictions](../../tasks/agent-platform-harness-baseline-p4.md)                  |
+| 9               | X5   | [Verify persisted approval resume and interrupted state](../../tasks/agent-platform-harness-baseline-x5.md)                   |
+| 10              | X4   | [Verify plan-driven execution and unfinished steps](../../tasks/agent-platform-harness-baseline-x4.md)                        |
+| 11              | C1   | [Verify critic revision acceptance and visible feedback](../../tasks/agent-platform-harness-baseline-c1.md)                   |
+| 12              | C2   | [Evaluate critic failures fallback and iteration limits](../../tasks/agent-platform-harness-baseline-c2.md)                   |
+| 13              | C3   | [Verify completion criteria revision and terminal outcomes](../../tasks/agent-platform-harness-baseline-c3.md)                |
+| 14              | C4   | [Investigate missing critic feedback across backend and UI](../../tasks/agent-platform-harness-baseline-c4.md)                |
+| 15              | X1   | [Verify context selection isolation and context limits](../../tasks/agent-platform-harness-baseline-x1.md)                    |
+| 16              | X2   | [Verify cancellation and reporting of completed effects](../../tasks/agent-platform-harness-baseline-x2.md)                   |
+| 17              | X3   | [Verify retries execution limits and duplicate-effect handling](../../tasks/agent-platform-harness-baseline-x3.md)            |
+| 18              | X7   | [Map and verify migration-affected auxiliary model calls](../../tasks/agent-platform-harness-baseline-x7.md)                  |
+
+The shared mapping task depends on the existing baseline-plan review gate; each area task depends on that mapping task. Owner review of an implementation slice remains required even after prerequisites complete. Execute one task at a time to control token use. X7 is conditional on migration impact; existing sufficient evidence may satisfy a row without new tests. The first review should select mapping and the provider/tool slice, not authorize the entire backlog.
