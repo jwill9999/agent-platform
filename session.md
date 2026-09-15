@@ -4,7 +4,7 @@ Last updated: September 15, 2026 — expanded current-runtime evidence planning.
 
 ## Latest planning handoff
 
-What happened: baseline proposal v2 now defines tooling adequacy, approval policy and override boundaries, critic/completion failure cases and UI feedback evidence. See [baseline plan](docs/planning/harness-modernization/current-runtime-baseline-plan.md). Direct Markdown lint, formatting and repository relative-link checks passed. No new tests or product code were implemented.
+What happened: baseline proposal v3 now includes context, cancellation/retry/limits, planning, persistence/resume, streaming and conditional auxiliary-call coverage mapping, alongside tooling adequacy, approval policy and override boundaries, critic/completion failure cases and UI feedback evidence. See [baseline plan](docs/planning/harness-modernization/current-runtime-baseline-plan.md). Direct Markdown lint, formatting and repository relative-link checks passed. No new tests or product code were implemented.
 
 Current state: branch `jwill9999/harness-baseline-plan`; Beads `agent-platform-harness-baseline-plan` remains open for owner review. Prior workflow evaluation PR remains unmerged. Historical snapshots below are not current status.
 

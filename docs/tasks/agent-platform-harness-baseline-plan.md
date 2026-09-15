@@ -33,7 +33,7 @@ The provider fixture seam and chosen tool are proposed, not implemented or appro
 
 ## Expanded acceptance families
 
-The [version 2 matrix](../planning/harness-modernization/current-runtime-baseline-plan.md#decision-evidence-matrix-added-after-owner-review) maps T1–T2 tooling, P1–P4 permission controls, and C1–C4 critic/completion to required backend evidence and test layers. These are proposed checks, not implemented tests or verified results.
+The [version 3 matrix](../planning/harness-modernization/current-runtime-baseline-plan.md#decision-evidence-matrix-added-after-owner-review) maps T1–T2 tooling, P1–P4 permission controls, and C1–C4 critic/completion to required backend evidence and test layers. The additional X1–X7 inventory covers context, cancellation, retry/limits, plan-driven execution, persistence/resume, provider streams/usage, and affected auxiliary calls. Each row must map exact existing assertions and mocks before missing tests are proposed. These are proposed checks, not implemented tests or verified results.
 
 ```gherkin
 Feature: Policy and evaluation evidence
