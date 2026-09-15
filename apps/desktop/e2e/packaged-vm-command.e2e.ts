@@ -24,6 +24,10 @@ const GIT_BINARY = '/usr/bin/git';
 const HOST_ONLY_CANARY_ENV = 'HOST_ONLY_CANARY';
 const HOST_ONLY_CANARY_VALUE = ['host', 'only', 'packaged', 'vm', 'e2e', 'canary'].join('-');
 const VM_E2E_MARKER_COMMAND = 'pwd';
+const JOURNEY_COMMAND = "printf 'approved change\\n' >> journey.txt";
+const JOURNEY_BEFORE = 'original content\n';
+const JOURNEY_AFTER = `${JOURNEY_BEFORE}approved change\n`;
+const JOURNEY_FINAL = 'Evaluation turn finished';
 const E2E_SECRETS_MASTER_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 type VmFixtureHealth = 'ready' | 'failed';
@@ -110,6 +114,229 @@ test.describe('packaged Electron macOS VM command runner', () => {
   });
 });
 
+for (const decision of ['approve', 'reject'] as const) {
+  test(`Project Chat disposable edit: ${decision} with backend evidence`, async () => {
+    const fixture = await createVmFixture({ health: 'ready' });
+    const file = join(fixture.projectDir, 'journey.txt');
+    writeFileSync(file, JOURNEY_BEFORE);
+    let app: ElectronApplication | undefined;
+    let approval: ApprovalEvidence | undefined;
+    let audits: AuditEvidence[] = [];
+    const streams: Array<{ status: number; events: unknown[] }> = [];
+    const captures: Promise<void>[] = [];
+    const milestones: Array<{ event: string; at: string }> = [];
+    const mark = (event: string) => milestones.push({ event, at: new Date().toISOString() });
+    let tracing = false;
+    try {
+      app = await launchVmFixture(fixture, { command: JOURNEY_COMMAND, finalText: JOURNEY_FINAL });
+      await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
+      tracing = true;
+      const page = await app.firstWindow();
+      page.on('response', (response) => {
+        if (!response.headers()['content-type']?.includes('application/x-ndjson')) return;
+        captures.push(
+          response
+            .text()
+            .then((body) => {
+              const events = body
+                .split('\n')
+                .filter(Boolean)
+                .map((line) => {
+                  try {
+                    return JSON.parse(line) as unknown;
+                  } catch {
+                    return { type: 'unparsed_event' };
+                  }
+                });
+              streams.push({ status: response.status(), events });
+            })
+            .catch(() => {
+              streams.push({ status: response.status(), events: [{ type: 'capture_failed' }] });
+            }),
+        );
+      });
+      await openProject(page);
+      if (fixture.realVmRuntimeDir) startRealVmRunner(fixture);
+      await sendChatMessage(page, '/init');
+      await expect(page.getByRole('button', { name: 'Approve instructions' })).toBeVisible();
+      await page.getByRole('button', { name: 'Approve instructions' }).click();
+      await expect(page.getByText('Project instructions approved').last()).toBeVisible();
+      mark('project_onboarding_approved');
+      await sendChatMessage(page, 'Append one line saying approved change to journey.txt.');
+      const card = page.getByTestId('approval-card').last();
+      await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+      expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
+      const pending = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests');
+      approval = pending.find((row) => row.toolName === 'sys_bash');
+      expect(approval?.status).toBe('pending');
+      mark('approval_pending_file_unchanged');
+      await card
+        .getByRole('button', { name: decision === 'approve' ? 'Approve' : 'Deny', exact: true })
+        .click();
+      await expect(card).toContainText(
+        decision === 'approve' ? 'Approved action completed' : 'Denied',
+        { timeout: 20_000 },
+      );
+      await Promise.all(captures);
+      approval = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
+        (row) => row.id === approval?.id,
+      );
+      audits = (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
+        (row) => row.sessionId === approval?.sessionId && row.toolName === 'sys_bash',
+      );
+      expect(approval?.status).toBe(decision === 'approve' ? 'approved' : 'rejected');
+      expect(approval?.resumedAtMs).toEqual(expect.any(Number));
+      expect(readFileSync(file, 'utf8')).toBe(
+        decision === 'approve' ? JOURNEY_AFTER : JOURNEY_BEFORE,
+      );
+      const successes = audits.filter((row) => row.status === 'success');
+      expect(successes).toHaveLength(decision === 'approve' ? 1 : 0);
+      if (decision === 'reject') expect(audits.some((row) => row.status === 'denied')).toBe(true);
+      await Promise.all(captures);
+      const events = streams.flatMap((stream) => stream.events);
+      const hasEvent = (type: string, code?: string) =>
+        events.some((event) => {
+          if (typeof event !== 'object' || event === null) return false;
+          const row = event as { type?: string; code?: string };
+          return row.type === type && (code === undefined || row.code === code);
+        });
+      expect(hasEvent('approval_required')).toBe(true);
+      expect(
+        hasEvent(
+          decision === 'approve' ? 'tool_result' : 'error',
+          decision === 'reject' ? 'APPROVAL_REJECTED' : undefined,
+        ),
+      ).toBe(true);
+      await expect
+        .poll(
+          () =>
+            readBackendEvents(fixture).filter((row) => row.sessionId === approval?.sessionId)
+              .length,
+        )
+        .toBeGreaterThan(0);
+      mark('turn_settled_file_and_audit_verified');
+    } finally {
+      // Snapshot durable evidence even when a UI assertion fails; never repair or manufacture it.
+      approval =
+        (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests').catch(() => [])).find(
+          (row) => row.toolName === 'sys_bash',
+        ) ?? approval;
+      audits = (
+        await readEvidence<AuditEvidence>(fixture, 'tool-executions').catch(() => audits)
+      ).filter((row) => row.toolName === 'sys_bash');
+      if (app && tracing) {
+        const tracePath = test.info().outputPath('journey-trace.zip');
+        await app.context().tracing.stop({ path: tracePath });
+        await test
+          .info()
+          .attach('journey-browser-trace', { path: tracePath, contentType: 'application/zip' });
+      }
+      await app?.close();
+      await Promise.all(captures);
+      stopRealVmRunner(fixture);
+      if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+      try {
+        const backendEvents = readBackendEvents(fixture);
+        const evaluation = {
+          decision,
+          passed: milestones.some(
+            (entry) => entry.event === 'turn_settled_file_and_audit_verified',
+          ),
+          executionMode: fixture.realVmRuntimeDir
+            ? 'deterministic-model-real-vm'
+            : 'deterministic-model-fixture-runner',
+          before: JOURNEY_BEFORE,
+          after: existsSync(file) ? readFileSync(file, 'utf8') : null,
+          approval,
+          audits,
+          milestones,
+          backendEvents,
+          streams,
+          limitations: [
+            'Model reasoning node is deterministic; evaluator nodes are disabled by existing E2E mode.',
+            'Default runner is a fixed-command test double, not VM isolation evidence.',
+            'Internal harness graph trace is not exported as a complete durable span timeline.',
+            'Resume may use a new run identifier; approval/session identifiers link the phases.',
+          ],
+        };
+        await test.info().attach('journey-evaluation', {
+          body: Buffer.from(
+            JSON.stringify(evaluation, null, 2).replaceAll(fixture.tempRoot, '<disposable-root>'),
+          ),
+          contentType: 'application/json',
+        });
+        await test.info().attach('journey-summary', {
+          body: Buffer.from(
+            [
+              `# Project Chat ${decision} evaluation`,
+              `Result: ${evaluation.passed ? 'PASS' : 'FAIL — inspect evidence and Playwright trace'}`,
+              `Mode: ${evaluation.executionMode}`,
+              `Backend events captured: ${backendEvents.length}`,
+              `Durable approval: ${approval?.status ?? 'unavailable'}`,
+              `Tool audit records: ${audits.length}`,
+              ...evaluation.limitations,
+            ].join('\n\n'),
+          ),
+          contentType: 'text/markdown',
+        });
+      } finally {
+        rmSync(fixture.tempRoot, { recursive: true, force: true });
+      }
+    }
+  });
+}
+
+type ApprovalEvidence = {
+  id: string;
+  sessionId: string;
+  runId: string;
+  toolName: string;
+  status: string;
+  resumedAtMs?: number | null;
+};
+type AuditEvidence = { id: string; sessionId: string; toolName: string; status: string };
+
+async function readEvidence<T>(fixture: VmFixture, resource: string): Promise<T[]> {
+  const response = await fetch(`http://127.0.0.1:${fixture.backendPort}/v1/${resource}?limit=100`, {
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`Evidence request failed: ${response.status}`);
+  return ((await response.json()) as { data: T[] }).data;
+}
+
+function readBackendEvents(fixture: VmFixture) {
+  const file = join(fixture.runtimeDir, 'logs', 'backend.stdout.log');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .flatMap((line) => {
+      try {
+        const row = JSON.parse(line) as {
+          ts?: string;
+          level?: string;
+          service?: string;
+          correlationId?: string;
+          event?: { kind?: string; sessionId?: string; runId?: string; toolId?: string };
+        };
+        if (!row.event) return [];
+        return [
+          {
+            at: row.ts,
+            level: row.level,
+            service: row.service,
+            correlationId: row.correlationId,
+            kind: row.event.kind,
+            sessionId: row.event.sessionId,
+            runId: row.event.runId,
+            toolId: row.event.toolId,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    });
+}
+
 async function createVmFixture(options: { health: VmFixtureHealth }): Promise<VmFixture> {
   const tempRoot = mkdtempSync(join(tmpdir(), 'agent-platform-electron-vm-e2e-'));
   const runtimeDir = join(tempRoot, 'runtime');
@@ -165,7 +392,7 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
 
 async function launchVmFixture(
   fixture: VmFixture,
-  options: { finalText?: string } = {},
+  options: { finalText?: string; command?: string } = {},
 ): Promise<ElectronApplication> {
   return electron.launch({
     cwd: desktopDir,
@@ -180,16 +407,17 @@ async function launchVmFixture(
       AGENT_PLATFORM_DESKTOP_RENDERER_PORT: String(fixture.rendererPort),
       AGENT_PLATFORM_DESKTOP_RESOURCES_DIR: fixture.resourcesDir,
       AGENT_PLATFORM_DESKTOP_RUNTIME_DIR: fixture.runtimeDir,
+      AGENT_PLATFORM_DESKTOP_LOG_DIR: join(fixture.runtimeDir, 'logs'),
       AGENT_PLATFORM_DESKTOP_TEMP_DIR: join(fixture.runtimeDir, 'tmp'),
       AGENT_PLATFORM_DESKTOP_TEST_PROJECT_DIRS: JSON.stringify([fixture.projectDir]),
       AGENT_PLATFORM_E2E_MOCK_LLM_FINAL_TEXT: options.finalText ?? 'VM command complete',
       AGENT_PLATFORM_E2E_MOCK_LLM_TOOL_CALL_JSON: JSON.stringify({
         name: 'sys_bash',
-        args: { command: VM_E2E_MARKER_COMMAND },
+        args: { command: options.command ?? VM_E2E_MARKER_COMMAND },
       }),
       SECRETS_MASTER_KEY: E2E_SECRETS_MASTER_KEY,
       [HOST_ONLY_CANARY_ENV]: HOST_ONLY_CANARY_VALUE,
-      CI: process.env.CI,
+      ...(process.env.CI ? { CI: process.env.CI } : {}),
     },
   });
 }
@@ -272,6 +500,11 @@ function writePackagedVmResources(resourcesDir: string, health: VmFixtureHealth)
       health === 'failed' ? 'if (true) {' : 'if (false) {',
       "  console.log(JSON.stringify({ ok: false, mode: 'macos-vm', state: 'unavailable', message: 'E2E VM unavailable' }));",
       '  process.exit(0);',
+      '}',
+      `if (args[0] === 'exec' && command === ${JSON.stringify(JOURNEY_COMMAND.replace('journey.txt', '/workspace/journey.txt'))}) {`,
+      "  const fs = require('node:fs');",
+      "  const path = require('node:path');",
+      "  fs.appendFileSync(path.join(option('--workspace'), 'journey.txt'), 'approved change\\n');",
       '}',
       'console.log(JSON.stringify({',
       '  ok: true,',
