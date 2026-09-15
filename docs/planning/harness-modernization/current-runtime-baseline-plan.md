@@ -42,7 +42,7 @@ First resolve how the production code can be directed to that fixture using exis
 
 For shell actions, the existing fixed-command VM fixture can continue to isolate the external execution boundary. Label it clearly; it must not stand in for the real model-to-tool transformation under assessment. An actual native file tool may reduce fixture scope if its policy and behavior meet the selected journey. Choose the tool explicitly in the implementation specification.
 
-Default mode may include critic/DoD calls. Inventory these before scripting the provider: either provide deterministic valid responses to keep those nodes active, or explicitly identify them as out of the first slice and avoid claiming their coverage. Never silently inherit evaluator-disabling E2E mode.
+Assessment correction: the current ordinary chat route explicitly omits critic/DoD nodes, independently of E2E overrides. Preserve that actual runtime in the first slice; do not claim evaluator coverage. See the completed coverage assessment below before implementing C1–C4.
 
 ## Later slices, only after first-slice review
 
@@ -160,3 +160,7 @@ When a testing task is authorized for execution, a small, directly related produ
 Changes to architecture, dependencies, permission semantics, broader behavior or unrelated components require a linked repair task and owner review before implementation. If the expected behavior is unclear, record the ambiguity rather than choosing a new product policy implicitly. In particular, changing critic failure acceptance or approval overrides is not automatically a small correctness fix merely because the code diff is short.
 
 This rule does not launch the backlog, authorize paid model calls or approve migration. The shared coverage/fixture mapping task remains read-only; implementation still starts with a reviewed slice. For an approved testing task, do not pause solely to request separate permission for a repair that meets the small-fix boundary above. At a pause, record whether the defect is reproduced, repaired and verified, or deferred to a linked task. Assessment completion must not conceal an unresolved runtime defect.
+
+## Completed first assessment
+
+Owner authorized the shared coverage/fixture assessment. The [coverage report](../../reviews/current-runtime-coverage-assessment.md) maps all 17 areas, records 273 passing selected tests and confirms a local provider seam without production changes. It corrects earlier assumptions: ordinary chat explicitly excludes critic/DoD, and the sampled Automatic write policy still asks. First implementation slice remains awaiting owner review.

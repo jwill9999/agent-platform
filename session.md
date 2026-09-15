@@ -1,8 +1,12 @@
 # Session handoff
 
-Last updated: September 15, 2026 — expanded current-runtime evidence planning.
+Last updated: September 15, 2026 — completed authorized coverage and fixture assessment.
 
-## Latest planning handoff
+## Latest assessment handoff
+
+Shared mapping completed: [coverage report](docs/reviews/current-runtime-coverage-assessment.md). All 17 areas mapped; 273 selected tests and local provider/reasoning transport probe passed. Ordinary chat excludes critic/DoD; Automatic still asks for the sampled shell write. No product or reusable test changes. Next: owner review of the bounded X6/T1/P1 composed journey; all implementation tasks remain queued.
+
+## Historical planning handoff
 
 Owner-agreed repair rule: within an approved testing task, reproduce and preserve the failing test, fix a small directly related defect restoring established behavior, then rerun gates and retain before/after evidence. Broader architecture/dependency/permission or behavior changes need linked repair tasks and review. Planning/mapping remains read-only.
 
