@@ -4,7 +4,7 @@ Beads: `agent-platform-harness-baseline-plan`; parent: `agent-platform-harness-m
 
 ## Requirements
 
-Prepare a decision-focused plan for verifying custom harness behavior before comparing migration routes. Map existing tests and mocks; identify the minimum missing model-to-tool, planning/completion and execution-control journeys. Planning only.
+Prepare a decision-focused plan for verifying custom harness behavior before comparing migration routes. Map existing tests and mocks; identify the minimum missing model-to-tool, planning/completion and execution-control journeys. Include tool adequacy/exposure, Ask/Automatic/Block policy precedence, scoped human overrides and replay protection, plus critic/DoD failures and missing UI feedback. Planning only.
 
 ## Plan and dependency order
 
@@ -30,6 +30,31 @@ Feature: Current runtime model-to-tool evidence
 ```
 
 The provider fixture seam and chosen tool are proposed, not implemented or approved. Detailed integration cases supplement these UI scenarios where appropriate.
+
+## Expanded acceptance families
+
+The [version 2 matrix](../planning/harness-modernization/current-runtime-baseline-plan.md#decision-evidence-matrix-added-after-owner-review) maps T1–T2 tooling, P1–P4 permission controls, and C1–C4 critic/completion to required backend evidence and test layers. These are proposed checks, not implemented tests or verified results.
+
+```gherkin
+Feature: Policy and evaluation evidence
+  Scenario: Apply a selected execution policy
+    Given an isolated project and a known categorized action
+    When I select Ask, Automatic or Block through settings
+    Then execution and prompts follow the documented effective policy
+    And saved settings, audit records and file outcomes agree
+    And unrelated permissions remain unchanged
+  Scenario: Revise an answer after critic feedback
+    Given controlled external model responses and real evaluator nodes
+    When the critic requests revision and later accepts
+    Then the agent receives the feedback and produces a revised answer
+    And the visible verdict agrees with backend evidence
+  Scenario: Evaluation cannot establish completion
+    When evaluation fails or exhausts its configured limit
+    Then the evidence report distinguishes unavailable review from successful review
+    And records any misleading runtime or UI outcome as a finding
+```
+
+Missing UI feedback is an owner-reported observation awaiting reproduction. Security edge cases belong mainly in backend integration tests. Tool-choice quality requires a separately authorized live-model evaluation; deterministic execution tests do not prove it.
 
 ## Verification and definition of done
 
