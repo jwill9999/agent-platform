@@ -16,7 +16,7 @@ Source: [baseline matrix](../planning/harness-modernization/current-runtime-base
 
 Depends on `agent-platform-harness-baseline-map`. Suggested execution position: 7 of 18; order is a scheduling preference, not a claim that all areas technically depend on each other. Shared prerequisite completion does not grant implementation authorization. Review the chosen slice and any production seam first.
 
-Inspect current source and tests before changing anything. Reuse existing helpers and evidence rather than duplicating them. Add the smallest missing test at the lowest useful layer. Preserve the real custom code under assessment and substitute only declared external boundaries. Use isolated data; no external paid calls. Link a reproduced product defect to separate scoped work instead of quietly broadening the task.
+Inspect current source and tests before changing anything. Reuse existing helpers and evidence rather than duplicating them. Add the smallest missing test at the lowest useful layer. Preserve the real custom code under assessment and substitute only declared external boundaries. Use isolated data; no external paid calls. Apply the agreed defect repair rule: preserve a failing regression test, make a small directly related fix restoring established behavior, and rerun relevant gates within the approved task. Broader changes require a linked repair task and owner review.
 
 ## Tests and verification
 
@@ -24,7 +24,7 @@ Record exact commands and named assertions during coverage mapping. Integration 
 
 ## Definition of done
 
-Existing assertions and mock boundaries mapped; missing coverage added only within reviewed scope; reproducible command, source revision, sanitized evidence and limitations recorded. Runtime outcome is separate from task completion. Relevant quality gates pass for changed tests. Reproduced defects linked to scoped follow-up work; no unsupported pass or silent skip.
+Existing assertions and mock boundaries mapped; missing coverage added only within reviewed scope; reproducible command, source revision, sanitized evidence and limitations recorded. Runtime outcome is separate from task completion. Relevant quality gates pass for changed tests. Reproduced defects either repaired and verified within the agreed boundary or linked to scoped follow-up work; no unsupported pass or silent skip.
 
 ## Resume checkpoint and budget discipline
 
@@ -35,3 +35,7 @@ Open means not started, in progress means actively claimed, and closed means the
 ## Authorization
 
 Owner authorized creation of this backlog. Test implementation and product fixes remain subject to slice review. No original modernization gate is closed by this task creation.
+
+## Agreed defect repair boundary
+
+See the [owner-agreed repair rule](../planning/harness-modernization/current-runtime-baseline-plan.md#defect-repair-rule-agreed-with-the-owner). During an approved testing task, a small fix restoring established intended behavior can accompany the test without a separate approval request. Preserve failure evidence and the regression test, record cause and minimal fix, and rerun relevant checks. Architecture, dependency, public-contract, permission-policy or broader behavior changes require a linked repair task and owner review. Unclear expected behavior is a decision to surface, not implied repair authority. Planning and coverage-mapping tasks remain read-only; backlog execution is not authorized by this rule.

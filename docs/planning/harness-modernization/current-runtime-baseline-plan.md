@@ -152,3 +152,11 @@ The owner authorized backlog creation for gradual work over the coming weeks. Th
 | 18              | X7   | [Map and verify migration-affected auxiliary model calls](../../tasks/agent-platform-harness-baseline-x7.md)                  |
 
 The shared mapping task depends on the existing baseline-plan review gate; each area task depends on that mapping task. Owner review of an implementation slice remains required even after prerequisites complete. Execute one task at a time to control token use. X7 is conditional on migration impact; existing sufficient evidence may satisfy a row without new tests. The first review should select mapping and the provider/tool slice, not authorize the entire backlog.
+
+## Defect repair rule agreed with the owner
+
+When a testing task is authorized for execution, a small, directly related product fix may be completed within that task if it restores established intended behavior without changing architecture, dependencies, public contracts or approval/security policy. First reproduce the defect and preserve the failing regression test, then make the minimal repair and run the relevant test and repository quality gates. Record the original failure, root cause, changed behavior, source revision and passing evidence. Keep fixture/test defects distinct from product defects.
+
+Changes to architecture, dependencies, permission semantics, broader behavior or unrelated components require a linked repair task and owner review before implementation. If the expected behavior is unclear, record the ambiguity rather than choosing a new product policy implicitly. In particular, changing critic failure acceptance or approval overrides is not automatically a small correctness fix merely because the code diff is short.
+
+This rule does not launch the backlog, authorize paid model calls or approve migration. The shared coverage/fixture mapping task remains read-only; implementation still starts with a reviewed slice. For an approved testing task, do not pause solely to request separate permission for a repair that meets the small-fix boundary above. At a pause, record whether the defect is reproduced, repaired and verified, or deferred to a linked task. Assessment completion must not conceal an unresolved runtime defect.
