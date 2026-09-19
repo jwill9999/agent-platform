@@ -39,3 +39,36 @@ Owner authorized creation of this backlog. Test implementation and product fixes
 ## Agreed defect repair boundary
 
 See the [owner-agreed repair rule](../planning/harness-modernization/current-runtime-baseline-plan.md#defect-repair-rule-agreed-with-the-owner). During an approved testing task, a small fix restoring established intended behavior can accompany the test without a separate approval request. Preserve failure evidence and the regression test, record cause and minimal fix, and rerun relevant checks. Architecture, dependency, public-contract, permission-policy or broader behavior changes require a linked repair task and owner review. Unclear expected behavior is a decision to surface, not implied repair authority. Planning and coverage-mapping tasks remain read-only; backlog execution is not authorized by this rule.
+
+## Authorized first journey — 19 September 2026
+
+Owner requested implementation of current-runtime tests before considering a stack restructure.
+This slice owns the provider HTTP fixture and reuses T1/P1 approval/file assertions. Keep X6 open
+for remaining streaming/error/usage permutations. No package migration or paid model calls.
+
+### Gherkin E2E Strategy
+
+```gherkin
+Feature: Current provider-to-tool Project Chat baseline
+  Background:
+    Given an isolated desktop Project and real application backend
+    And a loopback HTTP provider fixture through the real SDK and reasoning node
+    And a fixed command-runner fixture with no real VM isolation claim
+  Scenario: Approve one requested edit
+    When I request an edit and approve it in Project Chat
+    Then the file is unchanged while approval is pending
+    And the file changes exactly once after approval
+    And UI completion agrees with durable approval and tool audit records
+    And the provider receives the tool result under the original tool call ID
+  Scenario: Deny one requested edit
+    When I request an edit and deny it in Project Chat
+    Then the UI and durable record show denial
+    And the file stays unchanged after the turn settles
+    And no successful tool execution is recorded
+    And provider and stream evidence show the actual rejection path
+```
+
+Capture provider HTTP requests, response streams, backend events, approval/audit and file state,
+plus an Electron trace on pass and failure. Unexpected provider requests fail the fixture. Existing
+critic/DoD wiring is preserved. The model response and VM runner remain controlled boundaries;
+this proves application integration rather than live model quality or real VM operation.

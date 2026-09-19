@@ -93,3 +93,14 @@ Owner authorized the bounded Project Chat evaluation and a targeted Playwright q
 ## Current-runtime baseline planning
 
 Owner requested a plan for evidence-driven workflow coverage before migration decisions. See [baseline proposal](docs/planning/harness-modernization/current-runtime-baseline-plan.md), tracked by `agent-platform-harness-baseline-plan`. Planning only; no new journey implementation is authorized. First uncertainty is a provider-boundary fixture route that retains the real reasoning/SDK path without inventing saved baseURL propagation. Prior test/skill changes remain in draft PR265 with nine executed checks passed and no merge.
+
+## 19 September: current-runtime tests before stack comparison
+
+Owner prioritized current-functionality evidence before considering restructure. PR265 is merged
+into feature/harness-backlog-review at f2b306e. This task branch includes the earlier baseline
+planning/coverage documents and adds the approved X6/T1/P1 provider-backed approve/deny family.
+See docs/reviews/current-runtime-provider-journey.md for results and limitations. Six shared Electron
+scenarios and 112 desktop unit tests passed, plus build/scoped lint/explicit E2E typecheck. No product
+code or dependencies changed. X6 remains in progress for delivery and its wider untested cases;
+other baseline tasks remain open. Package comparison has not started. Work is supervised, no durable
+autonomous execution run is claimed. Preserve unrelated root-checkout Beads changes.
