@@ -192,11 +192,11 @@ export function WorkspaceDashboard() {
           </div>
           <div className="divide-y divide-border">
             {!executionPolicy && (
-              <p role="status" className="px-4 py-3 text-sm text-muted-foreground">
+              <output className="block px-4 py-3 text-sm text-muted-foreground">
                 {loading
                   ? 'Loading execution policy…'
                   : 'Execution policy unavailable. Refresh to retry.'}
-              </p>
+              </output>
             )}
             {executionPolicy &&
               policyRows.map((row) => (
