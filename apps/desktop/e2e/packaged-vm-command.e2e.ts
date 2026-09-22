@@ -442,6 +442,204 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
   });
 }
 
+for (const { policy, unavailableFiles } of [
+  { policy: 'ask', unavailableFiles: false },
+  { policy: 'auto', unavailableFiles: false },
+  { policy: 'block', unavailableFiles: false },
+  { policy: 'block', unavailableFiles: true },
+] as const) {
+  test(`Project Chat workspace write policy: ${policy} with ${unavailableFiles ? 'unavailable file listing' : 'persisted backend effects'}`, async () => {
+    const fixture = await createVmFixture({ health: 'ready' });
+    const file = join(fixture.projectDir, 'journey.txt');
+    writeFileSync(file, JOURNEY_BEFORE);
+    const provider = await startJourneyProvider(JOURNEY_COMMAND, JOURNEY_FINAL);
+    let app: ElectronApplication | undefined;
+    let tracing = false;
+    let passed = false;
+    let savedPolicy: unknown;
+    let approvals: ApprovalEvidence[] = [];
+    let audits: AuditEvidence[] = [];
+    let messages: Array<{ role: string; content: string }> = [];
+    const readPolicy = async () => {
+      const res = await fetch(`http://127.0.0.1:${fixture.backendPort}/v1/settings`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      expect(res.ok).toBe(true);
+      const body = (await res.json()) as { data: { executionPolicy: { workspaceWrite: string } } };
+      return body.data.executionPolicy;
+    };
+    try {
+      app = await launchVmFixture(fixture, {
+        providerURL: provider.baseURL,
+        // A file cannot contain workspace directories: exercise the real API failure path.
+        workspaceRoot: unavailableFiles ? join(file, 'workspace') : undefined,
+      });
+      await expect
+        .poll(
+          async () => {
+            try {
+              return (await fetch(`http://127.0.0.1:${fixture.backendPort}/health/ready`)).ok;
+            } catch {
+              return false;
+            }
+          },
+          { timeout: 20_000 },
+        )
+        .toBe(true);
+      const configs = await readEvidence<{ id: string }>(fixture, 'model-configs');
+      expect(configs).toHaveLength(1);
+      const configured = await fetch(
+        `http://127.0.0.1:${fixture.backendPort}/v1/model-configs/${configs[0]!.id}`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ provider: 'ollama', model: JOURNEY_MODEL }),
+        },
+      );
+      expect(configured.ok).toBe(true);
+      await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
+      tracing = true;
+      const page = await app.firstWindow();
+      await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeVisible();
+      await page.waitForLoadState('networkidle');
+      await page.goto(`http://127.0.0.1:${fixture.rendererPort}/settings/workspace`);
+      const selector = page.getByRole('combobox', { name: /Workspace writes/ });
+      await expect(selector).toBeVisible();
+      // Force a real settings mutation even when the requested mode is the default.
+      await selector.selectOption(policy === 'ask' ? 'block' : 'ask');
+      await expect
+        .poll(async () => (await readPolicy()).workspaceWrite)
+        .toBe(policy === 'ask' ? 'block' : 'ask');
+      await expect(selector).toBeEnabled();
+      await selector.selectOption(policy);
+      await expect.poll(async () => (await readPolicy()).workspaceWrite).toBe(policy);
+      await page.reload();
+      await expect(selector).toHaveValue(policy);
+      savedPolicy = await readPolicy();
+      await page.goto(`http://127.0.0.1:${fixture.rendererPort}/`);
+      await openProject(page);
+      if (fixture.realVmRuntimeDir) startRealVmRunner(fixture);
+      await sendChatMessage(page, '/init');
+      await page.getByRole('button', { name: 'Approve instructions' }).click();
+      await expect(page.getByText('Project instructions approved').last()).toBeVisible();
+      await sendChatMessage(page, 'Append one line saying approved change to journey.txt.');
+      if (policy !== 'block') {
+        const card = page.getByTestId('approval-card');
+        await expect(card).toHaveCount(1);
+        await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+        expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
+        approvals = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests');
+        expect(approvals).toHaveLength(1);
+        expect(approvals[0]?.status).toBe('pending');
+        expect(provider.requests).toHaveLength(1);
+        await card.getByRole('button', { name: 'Approve', exact: true }).click();
+        await expect(card).toContainText('Approved action completed');
+      }
+      await expect(page.getByText(JOURNEY_FINAL).last()).toBeVisible();
+      await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
+      expect(provider.errors).toEqual([]);
+      expect(provider.requests).toHaveLength(2);
+      expect(provider.attempts.map((attempt) => attempt.status)).toEqual([200, 200]);
+      approvals = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests');
+      audits = (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
+        (row) => row.toolName === 'sys_bash',
+      );
+      expect(audits.filter((row) => row.status === 'success')).toHaveLength(
+        policy === 'block' ? 0 : 1,
+      );
+      expect(readFileSync(file, 'utf8')).toBe(policy === 'block' ? JOURNEY_BEFORE : JOURNEY_AFTER);
+      if (policy === 'block') {
+        expect(approvals).toHaveLength(0);
+        await expect(page.getByTestId('approval-card')).toHaveCount(0);
+        expect(audits.filter((row) => row.status === 'denied')).toHaveLength(1);
+      } else {
+        expect(approvals).toHaveLength(1);
+        expect(approvals[0]?.status).toBe('approved');
+        expect(approvals[0]?.resumedAtMs).toEqual(expect.any(Number));
+      }
+      const result = provider.requests[1]?.messages.find(
+        (m) => m.role === 'tool' && m.tool_call_id === JOURNEY_CALL_ID,
+      );
+      expect(JSON.stringify(result?.content)).toContain(
+        policy === 'block' ? 'COMMAND_POLICY_DENIED' : 'The command completed successfully.',
+      );
+      const sessionId = audits[0]?.sessionId;
+      expect(sessionId).toEqual(expect.any(String));
+      messages = await readEvidence(fixture, `sessions/${sessionId}/messages`);
+      expect(
+        messages.filter((m) => m.role === 'assistant' && m.content === JOURNEY_FINAL),
+      ).toHaveLength(1);
+      await expect
+        .poll(
+          () =>
+            readBackendEvents(fixture).filter(
+              (row) => row.sessionId === sessionId && row.kind === 'task_end',
+            ).length,
+        )
+        .toBe(policy === 'block' ? 1 : 2);
+      if (policy === 'block') {
+        const activity = await openToolActivity(page);
+        await expect(activity).toContainText('Denied');
+      }
+      passed = true;
+    } finally {
+      approvals = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests').catch(
+        () => approvals,
+      );
+      audits = (
+        await readEvidence<AuditEvidence>(fixture, 'tool-executions').catch(() => audits)
+      ).filter((row) => row.toolName === 'sys_bash');
+      savedPolicy = await readPolicy().catch(() => savedPolicy);
+      try {
+        if (app && tracing) {
+          const trace = test.info().outputPath('policy-trace.zip');
+          await app.context().tracing.stop({ path: trace });
+          await test
+            .info()
+            .attach('policy-browser-trace', { path: trace, contentType: 'application/zip' });
+        }
+      } finally {
+        await app?.close();
+        await provider.close();
+        stopRealVmRunner(fixture);
+        if (fixture.heartbeatTimer) clearInterval(fixture.heartbeatTimer);
+        try {
+          const evidence = {
+            policy,
+            unavailableFiles,
+            savedPolicy,
+            passed,
+            approvals,
+            audits,
+            messages,
+            before: JOURNEY_BEFORE,
+            after: readFileSync(file, 'utf8'),
+            providerRequests: provider.requests,
+            providerErrors: provider.errors,
+            backendEvents: readBackendEvents(fixture),
+            sourceRevision: execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
+              cwd: repoRoot,
+              encoding: 'utf8',
+            }).trim(),
+            limitations: [
+              'External HTTP provider and fixed-command runner fixtures; no live-model or real VM claim.',
+              'Only workspace-write policy for a high-risk shell append is covered; Auto does not override its explicit approval requirement.',
+            ],
+          };
+          const path = test.info().outputPath('policy-evaluation.json');
+          writeFileSync(
+            path,
+            JSON.stringify(evidence, null, 2).replaceAll(fixture.tempRoot, '<disposable-root>'),
+          );
+          await test.info().attach('policy-evaluation', { path, contentType: 'application/json' });
+        } finally {
+          rmSync(fixture.tempRoot, { recursive: true, force: true });
+        }
+      }
+    }
+  });
+}
+
 type ApprovalEvidence = {
   id: string;
   sessionId: string;
@@ -548,13 +746,19 @@ async function createVmFixture(options: { health: VmFixtureHealth }): Promise<Vm
 
 async function launchVmFixture(
   fixture: VmFixture,
-  options: { finalText?: string; command?: string; providerURL?: string } = {},
+  options: {
+    finalText?: string;
+    command?: string;
+    providerURL?: string;
+    workspaceRoot?: string;
+  } = {},
 ): Promise<ElectronApplication> {
   return electron.launch({
     cwd: desktopDir,
     args: ['.'],
     env: {
       ...process.env,
+      WORKSPACE_ROOT: options.workspaceRoot ?? join(fixture.tempRoot, 'workspace'),
       AGENT_OPENAI_API_KEY: 'sk-test-key',
       AGENT_PLATFORM_DESKTOP_BACKEND: 'managed',
       AGENT_PLATFORM_DESKTOP_BACKEND_PORT: String(fixture.backendPort),

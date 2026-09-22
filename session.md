@@ -1,4 +1,33 @@
-# Session handoff — September 22, 2026: recovery baseline continuation
+# Session handoff — September 23, 2026: permission baseline findings
+
+Owner approved the planning boundary, then separately authorized remaining baseline tests only.
+Application changes remain outside this tranche. Current branch: `task/mvp-baseline-permissions`,
+from the integrated harness baseline. The planning proposal remains in its separate draft PR #269;
+its nine executed checks passed, packaged macOS staging test skipped as designed.
+
+Four new Electron permission scenarios exercise Ask/Auto/Block and a real file-listing error.
+Two product findings: saved policy appears as Ask after reload when file listing fails, and blocked
+shell work retains Running activity after the backend denied it and the turn finished. Preserve
+both unsatisfied regression assertions; do not silently skip or reinterpret them as success.
+Repair proposal: `agent-platform-permission-ui-consistency` (open P1). P2 remains in progress.
+See [permission evidence](docs/reviews/current-runtime-permission-baseline.md) for boundaries and
+commands. Production code and dependencies are unchanged. No staging/main promotion.
+
+Use isolated workspace roots for normal fixtures. Apple Git license remains unaccepted: use the
+bundled Git for fixture project initialization and repository operations. Existing gitTools unit
+fixtures hardcode Apple Git and cannot run successfully here; do not change them in this slice.
+The accidental broader harness unit invocation produced 614 passes and 12 Git-license failures;
+focused policy tests use `pnpm --filter @agent-platform/harness exec vitest run ...`.
+
+Next: review the recorded permission defects with the owner, finish wider P2 coverage, then continue
+cancellation/retry/recovery evidence in the agreed sequence. Product fixes need separate approval.
+Refresh the draft planning contract's task-spec hashes and independent critique before any broader
+implementation approval, because the P2 spec has now been refined. Keep the global gate open.
+Preserve unrelated root worktree changes (`.beads/interactions.jsonl`, `.vscode/mcp.json`).
+
+---
+
+## Historical handoff — September 22, 2026: recovery baseline continuation
 
 Owner requested continued frontend/backend journeys and a login adequacy check. Work is on
 `task/harness-recovery-baseline`, chained from `task/harness-provider-journey` at `5d3b876`;
