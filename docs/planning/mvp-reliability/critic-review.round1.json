@@ -1,0 +1,60 @@
+{
+  "reviewId": "mvp-plan-critic-20260923-01",
+  "runId": "mvp-reliability-proposal",
+  "plannerId": "mvp-planner",
+  "criticId": "mvp-plan-critic",
+  "contractVersion": 1,
+  "policyDigest": "sha256:211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1",
+  "materialDigest": "sha256:a452d80ff002514746b82cca6ef0b0bb405b0d24a356435a9c8a1c963e870440",
+  "verdict": "correction_required",
+  "summary": "The bounded sequence, conservative effect recovery, scoped approval prerequisite and feature-only delivery policy are coherent. Correct the missing Project Chat host authority and bind externally defined V1 requirements into the canonical contract before approval. Read-only review, not execution authorization.",
+  "evidence": [
+    {
+      "digest": "sha256:57d0e9f0c2468646eb171693a2795ff26b18fa61dc0805b15e8757aefa70cd5b",
+      "sizeBytes": 21120,
+      "mediaType": "application/json",
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:d6a2989873e4ba48e6befc8aa3d4306ad1e611242253e00b26cf9897b06b14b0",
+      "sizeBytes": 11803,
+      "mediaType": "text/plain",
+      "kind": "artifact"
+    }
+  ],
+  "findings": [
+    {
+      "id": "MVP-CRIT-001",
+      "severity": "high",
+      "summary": "Permitted paths omit apps/web/app/page.tsx, which owns selectedMode, sessionId, useHarnessChat and chat props. The new Stop and local panel need this integration host; current task, contract and repair boundaries exclude it.",
+      "requirement": "STOP-1, UI-1 and UI-3: session-and-run-scoped Stop and status for the selected Project conversation.",
+      "evidence": [
+        {
+          "digest": "sha256:57d0e9f0c2468646eb171693a2795ff26b18fa61dc0805b15e8757aefa70cd5b",
+          "sizeBytes": 21120,
+          "mediaType": "application/json",
+          "kind": "artifact"
+        }
+      ],
+      "proposedCorrection": "Add apps/web/app/page.tsx to relevant task, contract and repair allowed paths. Include it and components/chat/chat.tsx in evidence; leave separate IDE surface out of scope.",
+      "requiresHumanDecision": false
+    },
+    {
+      "id": "MVP-CRIT-002",
+      "severity": "high",
+      "summary": "Precise V1 retention/read-model/persistence requirements reside in mutable plan.md. The canonical contract digest does not include linked files, so material prose edits can leave approval unchanged.",
+      "requirement": "V1 foundation and material-change approval invalidation.",
+      "evidence": [
+        {
+          "digest": "sha256:d6a2989873e4ba48e6befc8aa3d4306ad1e611242253e00b26cf9897b06b14b0",
+          "sizeBytes": 11803,
+          "mediaType": "text/plain",
+          "kind": "artifact"
+        }
+      ],
+      "proposedCorrection": "Inline normative requirements or bind immutable specification digests in the contract and validate before execution. Regenerate digest/manifest and obtain fresh critique.",
+      "requiresHumanDecision": false
+    }
+  ],
+  "humanDecision": null
+}

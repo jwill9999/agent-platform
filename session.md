@@ -1,5 +1,26 @@
 # Session handoff — September 22, 2026: recovery baseline continuation
 
+## September 23: proposed MVP reliability plan
+
+Owner requested tasks, requirements and a later briefing; explicitly accepted including a smaller
+local in-app status panel independent of external dashboards. Planning only, not implementation.
+The [MVP plan](docs/planning/mvp-reliability/plan.md) and version-one proposed contract are on
+`task/mvp-reliability-plan`, based on merged harness feature `6b4d03e`. The documentation-access
+feature is separately merged. Neither feature is promoted to staging.
+
+Created planning issue `agent-platform-mvp-reliability-plan` and four unassigned, review-gated children:
+`agent-platform-harness-r3.cancel`, `agent-platform-harness-r3.reconcile`,
+`agent-platform-harness-v4.local`, `agent-platform-harness-v5.mvp`. Reuse existing baseline P2/X2/X3/X5
+and V1; V1 spec has a proposed refinement. Parent specs/history/status/blockers retained. New edges
+and parent relationships read back successfully. No old task is closed or superseded.
+
+Contract schema and document binding validation pass. Independent critique approved after two
+corrections (Project Chat host path and immutable normative-document bindings). Owner implementation
+approval and scoped Beads readiness reconciliation remain pending.
+Runtime code and dependency files are unchanged. Documentation PR integration remains feature-only;
+staging and production are separate decisions. Current task remains planning in progress until
+its declared review/delivery gates are met. New implementation tasks are not claimed or active.
+
 Owner requested continued frontend/backend journeys and a login adequacy check. Work is on
 `task/harness-recovery-baseline`, chained from `task/harness-provider-journey` at `5d3b876`;
 PR #266 remains open against `feature/harness-backlog-review`.
