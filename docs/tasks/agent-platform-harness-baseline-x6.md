@@ -1,0 +1,74 @@
+# Verify provider streams tool results errors and usage
+
+Beads: `agent-platform-harness-baseline-x6`. Parent: `agent-platform-harness-modernization`.
+
+## Requirements
+
+Matrix X6: Are provider messages, tool results, streaming errors and usage handled correctly?
+
+[Provider tests](../../packages/model-router/test/providers.test.ts), [reasoning tests](../../packages/harness/test/llmReason.test.ts)
+
+Reuse first-slice real provider/SDK round trip; integration adds fragmented stream, invalid arguments, provider failure and interrupted stream where coverage is missing. Correlate call/result identity, terminal event and persisted answer; prevent false success. Compare usage to fixture values only, not actual billing. One protocol does not certify all providers.
+
+Source: [baseline matrix](../planning/harness-modernization/current-runtime-baseline-plan.md). This spec is a bounded backlog item, not a validated managed execution contract.
+
+## Implementation plan and dependency order
+
+Depends on `agent-platform-harness-baseline-map`. Suggested execution position: 3 of 18; order is a scheduling preference, not a claim that all areas technically depend on each other. Shared prerequisite completion does not grant implementation authorization. Review the chosen slice and any production seam first.
+
+Inspect current source and tests before changing anything. Reuse existing helpers and evidence rather than duplicating them. Add the smallest missing test at the lowest useful layer. Preserve the real custom code under assessment and substitute only declared external boundaries. Use isolated data; no external paid calls. Apply the agreed defect repair rule: preserve a failing regression test, make a small directly related fix restoring established behavior, and rerun relevant gates within the approved task. Broader changes require a linked repair task and owner review.
+
+## Tests and verification
+
+Record exact commands and named assertions during coverage mapping. Integration permutations complement representative Electron Playwright journeys. For user-facing coverage, refine the applicable Gherkin scenarios from the [planning spec](agent-platform-harness-baseline-plan.md) before implementation; declare real versus fixture boundaries and independent backend postconditions. A page rendering pass is not backend execution evidence.
+
+## Definition of done
+
+Existing assertions and mock boundaries mapped; missing coverage added only within reviewed scope; reproducible command, source revision, sanitized evidence and limitations recorded. Runtime outcome is separate from task completion. Relevant quality gates pass for changed tests. Reproduced defects either repaired and verified within the agreed boundary or linked to scoped follow-up work; no unsupported pass or silent skip.
+
+## Resume checkpoint and budget discipline
+
+At every pause, update this Beads issue with: coverage mapped; tests reused/added; last command and result; artifact and revision; unresolved finding; next executable step; remaining scope/estimate. Record token usage only if available, never invent a per-task number. Work one task at a time and stop at the agreed slice boundary. No calendar deadline or continuous background run is implied.
+
+Open means not started, in progress means actively claimed, and closed means the stated evidence deliverable is complete. A reproduced defect can be a completed assessment with a linked repair task; it is not a runtime pass. Blocked or missing evidence stays explicit. An unaffected conditional area can be scoped out only with recorded rationale and owner review.
+
+## Authorization
+
+Owner authorized creation of this backlog. Test implementation and product fixes remain subject to slice review. No original modernization gate is closed by this task creation.
+
+## Agreed defect repair boundary
+
+See the [owner-agreed repair rule](../planning/harness-modernization/current-runtime-baseline-plan.md#defect-repair-rule-agreed-with-the-owner). During an approved testing task, a small fix restoring established intended behavior can accompany the test without a separate approval request. Preserve failure evidence and the regression test, record cause and minimal fix, and rerun relevant checks. Architecture, dependency, public-contract, permission-policy or broader behavior changes require a linked repair task and owner review. Unclear expected behavior is a decision to surface, not implied repair authority. Planning and coverage-mapping tasks remain read-only; backlog execution is not authorized by this rule.
+
+## Authorized first journey — 19 September 2026
+
+Owner requested implementation of current-runtime tests before considering a stack restructure.
+This slice owns the provider HTTP fixture and reuses T1/P1 approval/file assertions. Keep X6 open
+for remaining streaming/error/usage permutations. No package migration or paid model calls.
+
+### Gherkin E2E Strategy
+
+```gherkin
+Feature: Current provider-to-tool Project Chat baseline
+  Background:
+    Given an isolated desktop Project and real application backend
+    And a loopback HTTP provider fixture through the real SDK and reasoning node
+    And a fixed command-runner fixture with no real VM isolation claim
+  Scenario: Approve one requested edit
+    When I request an edit and approve it in Project Chat
+    Then the file is unchanged while approval is pending
+    And the file changes exactly once after approval
+    And UI completion agrees with durable approval and tool audit records
+    And the provider receives the tool result under the original tool call ID
+  Scenario: Deny one requested edit
+    When I request an edit and deny it in Project Chat
+    Then the UI and durable record show denial
+    And the file stays unchanged after the turn settles
+    And no successful tool execution is recorded
+    And provider and stream evidence show the actual rejection path
+```
+
+Capture provider HTTP requests, response streams, backend events, approval/audit and file state,
+plus an Electron trace on pass and failure. Unexpected provider requests fail the fixture. Existing
+critic/DoD wiring is preserved. The model response and VM runner remain controlled boundaries;
+this proves application integration rather than live model quality or real VM operation.
