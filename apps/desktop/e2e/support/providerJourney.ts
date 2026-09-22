@@ -18,9 +18,14 @@ export type ProviderRequest = {
 };
 
 /** Only the external provider is scripted; no reasoning/graph/approval code is replaced. */
-export async function startJourneyProvider(command: string, finalText: string) {
+export async function startJourneyProvider(
+  command: string,
+  finalText: string,
+  options: { failFirst?: boolean } = {},
+) {
   const requests: ProviderRequest[] = [];
   const errors: string[] = [];
+  const attempts: Array<{ status: number; model: string }> = [];
   const server = createServer((req, res) => {
     void (async () => {
       try {
@@ -33,6 +38,13 @@ export async function startJourneyProvider(command: string, finalText: string) {
           if (raw.length > 250_000) throw new Error('Provider request exceeds fixture bound');
         }
         const body = JSON.parse(raw) as ProviderRequest;
+        if (options.failFirst && attempts.length === 0) {
+          attempts.push({ status: 503, model: body.model });
+          res.writeHead(503, { 'content-type': 'application/json', 'retry-after': '0' });
+          res.end(JSON.stringify({ error: { message: 'Fixture temporarily unavailable' } }));
+          return;
+        }
+        attempts.push({ status: 200, model: body.model });
         requests.push(body);
         if (requests.length > 2 || body.model !== JOURNEY_MODEL || !body.stream) {
           throw new Error('Unexpected provider request count, model or streaming mode');
@@ -101,6 +113,7 @@ export async function startJourneyProvider(command: string, finalText: string) {
   return {
     baseURL: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
     requests,
+    attempts,
     errors,
     close: async () => {
       server.closeAllConnections();

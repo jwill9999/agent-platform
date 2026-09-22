@@ -39,3 +39,34 @@ Owner authorized creation of this backlog. Test implementation and product fixes
 ## Agreed defect repair boundary
 
 See the [owner-agreed repair rule](../planning/harness-modernization/current-runtime-baseline-plan.md#defect-repair-rule-agreed-with-the-owner). During an approved testing task, a small fix restoring established intended behavior can accompany the test without a separate approval request. Preserve failure evidence and the regression test, record cause and minimal fix, and rerun relevant checks. Architecture, dependency, public-contract, permission-policy or broader behavior changes require a linked repair task and owner review. Unclear expected behavior is a decision to surface, not implied repair authority. Planning and coverage-mapping tasks remain read-only; backlog execution is not authorized by this rule.
+
+## Gherkin E2E Strategy — September 22 continuation
+
+The owner requested continued frontend/backend baseline tests. This slice extends the existing
+provider HTTP journey with reload recovery and duplicate resume checks. The real Electron UI,
+API, SQLite, provider factory, SDK parser, harness and approval service remain intact. Only the
+external model HTTP responses and fixed-command VM runner are fixtures; no paid calls.
+
+```gherkin
+Feature: Recover a pending Project approval without repeating its effect
+  Scenario Outline: Reload before deciding a pending action
+    Given an isolated Project has a pending request to append one line
+    And its file has not changed
+    When I reload the desktop renderer
+    Then the same pending approval is available in the same conversation
+    When I <decision> the action
+    Then its durable decision and final answer match the visible outcome
+    And the file contains <effects> additional lines
+    When two clients repeat the completed resume request
+    Then neither request starts another provider call or file effect
+
+    Examples:
+      | decision | effects |
+      | approve  | 1       |
+      | deny     | 0       |
+```
+
+Capture the original approval/session identity, restored UI, stream settlement, durable decision,
+audit rows, messages, provider request count, duplicate responses, before/after file and trace.
+Concurrent retries after completion do not prove racing resumes before completion. Renderer reload
+does not prove backend process restart recovery. Missing recovery is a recorded failure, not a skip.

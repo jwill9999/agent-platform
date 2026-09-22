@@ -1,3 +1,31 @@
+# Session handoff — September 22, 2026: recovery baseline continuation
+
+Owner requested continued frontend/backend journeys and a login adequacy check. Work is on
+`task/harness-recovery-baseline`, chained from `task/harness-provider-journey` at `5d3b876`;
+PR #266 remains open against `feature/harness-backlog-review`.
+
+Added reload-and-approve, reload-and-deny, and transient provider HTTP 503 recovery scenarios.
+Reload scenarios verify two concurrent retries of a completed resume do not change file, audit,
+messages or provider count. All edit journeys now check paired lifecycle events with distinct
+original/resumed run identifiers and matching per-run correlation identifiers.
+
+Evidence and limitations: [recovery baseline report](docs/reviews/current-runtime-recovery-baseline.md).
+Real Electron/UI/API/SQLite/harness/provider SDK; HTTP model and fixed-command VM runner fixtures.
+No dependency or production behavior changes. Local build, explicit E2E TypeScript and ESLint pass;
+53 API and 93 harness focused tests pass. All nine Electron scenarios pass locally; hosted quality results are authoritative on the final PR head. Local Sonar/Problems tools
+are unavailable; use hosted Sonar plus normal CI as the completion gate.
+
+Beads X5/X3 remain partial. Next gaps: simultaneous first resumes, backend restart, ambiguous
+post-effect retries, permission settings permutations and frontend cancellation. Project Chat has
+no Stop control. Login is absent by the locked single-user/no-auth MVP design; the owner was asked
+whether they meant sign-in or logging. Do not add authentication or broad monitoring by inference.
+
+No main/staging promotion. Preserve root worktree's unrelated `.beads/interactions.jsonl` and
+untracked `.vscode/mcp.json`. Use bundled Git on this machine (Apple Git license blocked) and Node24
+with the Homebrew pnpm. Canonical Beads root is `/Users/letuscode/projects/agent-platform`.
+
+---
+
 # Session handoff
 
 Last updated: September 15, 2026 — completed authorized coverage and fixture assessment.

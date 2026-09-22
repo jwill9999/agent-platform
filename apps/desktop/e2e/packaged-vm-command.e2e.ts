@@ -116,20 +116,34 @@ test.describe('packaged Electron macOS VM command runner', () => {
 });
 
 const journeyCases = (['node-double', 'provider-http'] as const).flatMap((reasoning) =>
-  (['approve', 'reject'] as const).map((decision) => ({ reasoning, decision })),
+  (['approve', 'reject'] as const).flatMap((decision) =>
+    (reasoning === 'provider-http' ? [false, true] : [false]).map((reload) => ({
+      reasoning,
+      decision,
+      reload,
+      failFirst: false,
+    })),
+  ),
 );
-for (const { reasoning, decision } of journeyCases) {
-  test(`Project Chat disposable edit: ${decision} with backend evidence (${reasoning})`, async () => {
+journeyCases.push({
+  reasoning: 'provider-http',
+  decision: 'approve',
+  reload: false,
+  failFirst: true,
+});
+for (const { reasoning, decision, reload, failFirst } of journeyCases) {
+  test(`Project Chat disposable edit: ${decision} with backend evidence (${reasoning}${reload ? ', reload recovery' : ''}${failFirst ? ', transient retry' : ''})`, async () => {
     const fixture = await createVmFixture({ health: 'ready' });
     const file = join(fixture.projectDir, 'journey.txt');
     writeFileSync(file, JOURNEY_BEFORE);
     const provider =
       reasoning === 'provider-http'
-        ? await startJourneyProvider(JOURNEY_COMMAND, JOURNEY_FINAL)
+        ? await startJourneyProvider(JOURNEY_COMMAND, JOURNEY_FINAL, { failFirst })
         : undefined;
     let app: ElectronApplication | undefined;
     let approval: ApprovalEvidence | undefined;
     let audits: AuditEvidence[] = [];
+    const duplicateResumes: Array<{ status: number; body: unknown }> = [];
     let messages: Array<{ role: string; content: string }> = [];
     const streams: Array<{ status: number; events: unknown[] }> = [];
     const captures: Promise<void>[] = [];
@@ -212,6 +226,18 @@ for (const { reasoning, decision } of journeyCases) {
         expect(provider.requests[0]?.messages.some((m) => m.role === 'tool')).toBe(false);
       }
       mark('approval_pending_file_unchanged');
+      if (reload) {
+        await Promise.all(captures);
+        await page.reload();
+        await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+        const restored = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
+          (row) => row.id === approval?.id,
+        );
+        expect(restored).toEqual(approval);
+        expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
+        expect(provider?.requests).toHaveLength(1);
+        mark('pending_approval_restored_after_reload');
+      }
       await card
         .getByRole('button', { name: decision === 'approve' ? 'Approve' : 'Deny', exact: true })
         .click();
@@ -252,12 +278,33 @@ for (const { reasoning, decision } of journeyCases) {
       await expect
         .poll(
           () =>
-            readBackendEvents(fixture).filter((row) => row.sessionId === approval?.sessionId)
-              .length,
+            readBackendEvents(fixture).filter(
+              (row) => row.sessionId === approval?.sessionId && row.kind === 'task_end',
+            ).length,
         )
-        .toBeGreaterThan(0);
+        .toBe(2);
+      const lifecycle = readBackendEvents(fixture).filter(
+        (row) => row.sessionId === approval?.sessionId,
+      );
+      const starts = lifecycle.filter((row) => row.kind === 'task_start');
+      expect(starts).toHaveLength(2);
+      expect(new Set(starts.map((row) => row.runId)).size).toBe(2);
+      for (const start of starts) {
+        expect(start.runId).toEqual(expect.any(String));
+        expect(start.correlationId).toEqual(expect.any(String));
+        const ends = lifecycle.filter(
+          (row) => row.kind === 'task_end' && row.runId === start.runId,
+        );
+        expect(ends).toHaveLength(1);
+        expect(ends[0]?.correlationId).toBe(start.correlationId);
+        expect(Number.isFinite(Date.parse(start.at ?? ''))).toBe(true);
+        expect(Date.parse(ends[0]?.at ?? '')).toBeGreaterThanOrEqual(Date.parse(start.at!));
+      }
       if (provider) {
         expect(provider.errors).toEqual([]);
+        expect(provider.attempts.map((attempt) => attempt.status)).toEqual(
+          failFirst ? [503, 200, 200] : [200, 200],
+        );
         expect(provider.requests).toHaveLength(2);
         const result = provider.requests[1]?.messages.find(
           (m) => m.role === 'tool' && m.tool_call_id === JOURNEY_CALL_ID,
@@ -274,6 +321,39 @@ for (const { reasoning, decision } of journeyCases) {
         expect(JSON.stringify(result?.content)).toContain(
           decision === 'reject' ? 'APPROVAL_REJECTED' : 'The command completed successfully.',
         );
+      }
+      if (reload) {
+        const messagesBefore = messages;
+        const auditsBefore = audits;
+        await Promise.all(
+          [0, 1].map(async () => {
+            const response = await fetch(
+              `http://127.0.0.1:${fixture.backendPort}/v1/sessions/${approval!.sessionId}/resume`,
+              {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ approvalRequestId: approval!.id }),
+                signal: AbortSignal.timeout(5_000),
+              },
+            );
+            const body = (await response.json()) as { data?: ApprovalEvidence };
+            duplicateResumes.push({ status: response.status, body });
+            expect(response.status).toBe(200);
+            expect(body.data?.id).toBe(approval!.id);
+            expect(body.data?.resumedAtMs).toBe(approval!.resumedAtMs);
+          }),
+        );
+        messages = await readEvidence(fixture, `sessions/${approval!.sessionId}/messages`);
+        audits = (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
+          (row) => row.sessionId === approval!.sessionId && row.toolName === 'sys_bash',
+        );
+        expect(messages).toEqual(messagesBefore);
+        expect(audits).toEqual(auditsBefore);
+        expect(provider?.requests).toHaveLength(2);
+        expect(readFileSync(file, 'utf8')).toBe(
+          decision === 'approve' ? JOURNEY_AFTER : JOURNEY_BEFORE,
+        );
+        mark('duplicate_completed_resumes_no_new_effect');
       }
       mark('turn_settled_file_and_audit_verified');
     } finally {
@@ -302,12 +382,16 @@ for (const { reasoning, decision } of journeyCases) {
         const evaluation = {
           decision,
           reasoning,
+          reload,
+          duplicateResumes,
           sourceRevision: execFileSync(GIT_BINARY, ['rev-parse', 'HEAD'], {
             cwd: repoRoot,
             encoding: 'utf8',
           }).trim(),
           providerRequests: provider?.requests,
           providerErrors: provider?.errors,
+          providerAttempts: provider?.attempts,
+          failFirst,
           messages,
           passed: milestones.some(
             (entry) => entry.event === 'turn_settled_file_and_audit_verified',

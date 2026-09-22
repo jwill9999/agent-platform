@@ -39,3 +39,26 @@ Owner authorized creation of this backlog. Test implementation and product fixes
 ## Agreed defect repair boundary
 
 See the [owner-agreed repair rule](../planning/harness-modernization/current-runtime-baseline-plan.md#defect-repair-rule-agreed-with-the-owner). During an approved testing task, a small fix restoring established intended behavior can accompany the test without a separate approval request. Preserve failure evidence and the regression test, record cause and minimal fix, and rerun relevant checks. Architecture, dependency, public-contract, permission-policy or broader behavior changes require a linked repair task and owner review. Unclear expected behavior is a decision to surface, not implied repair authority. Planning and coverage-mapping tasks remain read-only; backlog execution is not authorized by this rule.
+
+## Gherkin E2E Strategy — September 22 provider retry slice
+
+The owner requested continued baseline testing. Exercise one transient HTTP 503 before a model
+response through the real Electron UI, API, provider adapter, SDK, harness and SQLite. Script only
+the external provider and fixed-command runner. Preserve the current retry policy.
+
+```gherkin
+Feature: Recover from a transient provider failure before a tool effect
+  Scenario: The provider succeeds after one unavailable response
+    Given the provider returns HTTP 503 for the first request before returning any tool call
+    When I request a Project file edit
+    Then the normal approval appears and the file is unchanged
+    When I approve the action
+    Then exactly one line is appended and exactly one success audit exists
+    And exactly one final answer is saved and visible
+    And the provider received three requests including the failed attempt
+```
+
+Evidence includes attempted HTTP statuses, successful request payloads, approval/session identity,
+stream events, backend lifecycle metadata, durable messages/audits and before/after file state.
+This covers a failure before any effect. Ambiguous tool outcomes, exhausted retry budgets and
+execution limits remain separate baseline cases; this result must not be generalized to them.
