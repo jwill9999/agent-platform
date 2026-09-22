@@ -17,6 +17,9 @@ with hosted checks pending at this checkpoint.
 See [permission report](docs/reviews/current-runtime-permission-baseline.md) for final validation.
 Hosted review also requested a native output element for loading status and removal of duplicate
 provider setup in the Electron tests; both were addressed without changing policy assertions.
+Sourcery passed but reported a real follow-up: failed listing appeared empty. The existing error
+scenario now asserts unavailable listing/count after reload and Refresh; the UI distinguishes it
+from a successfully loaded empty workspace. See report for retained before/after evidence.
 No dependency/stack changes. The separate planning proposal still needs its updated spec hashes and
 independent critique reconciled before broader implementation approval.
 

@@ -35,6 +35,7 @@ Scenario: File-listing errors do not misstate saved permission policy
   And the workspace file listing fails
   When I reload Settings
   Then the displayed policy remains Block and matches the backend
+  And the file list reports unavailable rather than empty, including after Refresh
 
 Scenario: Blocked work has a terminal visible state
   Given Workspace writes is saved as Block

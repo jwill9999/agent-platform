@@ -120,3 +120,18 @@ skipped to hide this environment limitation. The separate 53 focused policy/disp
 
 Local composed repair gate: **PASS**. Complete hosted gate: pending at this documentation checkpoint.
 The repair issue remains in progress until feature integration; broader baseline work is not closed.
+
+## Review follow-up: unavailable file listings
+
+Sourcery completed successfully but reported one substantive finding: a file-listing error still
+rendered the empty-workspace message and a zero-file count. Its green check was not an approval
+without findings. The strengthened existing Electron failure scenario reproduced the missing
+unavailable message before the correction; evidence is in `.agent-platform/permission-listing-before-results`.
+The UI now shows an unavailable listing and unavailable count, reserving the empty state for a
+successfully loaded empty listing. The regression checks reload and Refresh while persisted Block
+remains visible. This is within the approved state-consistency repair; enforcement is unchanged.
+
+The review follow-up passed all four permission journeys after a fresh frontend build, plus a
+focused rerun that waits for the Refresh request's actual HTTP 500 before checking the unavailable
+state and saved Block. Artifacts: `.agent-platform/permission-listing-after-results` and
+`permission-listing-refresh-results`. Lint passed; hosted checks must rerun for this follow-up.

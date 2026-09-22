@@ -469,6 +469,19 @@ for (const { policy, unavailableFiles } of [
       await expect.poll(async () => (await readPolicy()).workspaceWrite).toBe(policy);
       await page.reload();
       await expect(selector).toHaveValue(policy);
+      if (unavailableFiles) {
+        await expect(page.getByText('File listing unavailable. Refresh to retry.')).toBeVisible();
+        await expect(page.getByText('No workspace files yet')).toHaveCount(0);
+        await expect(page.getByText('0 files', { exact: true })).toHaveCount(0);
+        const refreshedListing = page.waitForResponse((response) =>
+          response.url().endsWith('/api/v1/workspace/files'),
+        );
+        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        expect((await refreshedListing).status()).toBe(500);
+        await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+        await expect(page.getByText('File listing unavailable. Refresh to retry.')).toBeVisible();
+        await expect(selector).toHaveValue(policy);
+      }
       savedPolicy = await readPolicy();
       await page.goto(`http://127.0.0.1:${fixture.rendererPort}/`);
       await openProject(page);

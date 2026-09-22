@@ -257,7 +257,9 @@ export function WorkspaceDashboard() {
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <h2 className="font-medium text-foreground">Files</h2>
             <Badge variant="outline">
-              {rows.filter((row) => row.kind === 'file').length} files
+              {loading && 'Loading'}
+              {!loading && !data && 'Unavailable'}
+              {!loading && data && `${rows.filter((row) => row.kind === 'file').length} files`}
             </Badge>
           </div>
 
@@ -267,7 +269,13 @@ export function WorkspaceDashboard() {
             </div>
           )}
 
-          {!loading && rows.length === 0 && (
+          {!loading && !data && (
+            <output className="flex items-center justify-center h-56 text-sm text-muted-foreground">
+              File listing unavailable. Refresh to retry.
+            </output>
+          )}
+
+          {!loading && data && rows.length === 0 && (
             <div className="flex flex-col items-center justify-center h-56 text-center">
               <Folder className="h-12 w-12 text-muted-foreground/50 mb-4" />
               <h3 className="font-medium text-foreground mb-1">No workspace files yet</h3>
