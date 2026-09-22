@@ -156,31 +156,7 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
         finalText: JOURNEY_FINAL,
         providerURL: provider?.baseURL,
       });
-      if (provider) {
-        await expect
-          .poll(
-            async () => {
-              try {
-                return (await fetch(`http://127.0.0.1:${fixture.backendPort}/health/ready`)).ok;
-              } catch {
-                return false;
-              }
-            },
-            { timeout: 20000 },
-          )
-          .toBe(true);
-        const configs = await readEvidence<{ id: string }>(fixture, 'model-configs');
-        expect(configs).toHaveLength(1);
-        const configured = await fetch(
-          `http://127.0.0.1:${fixture.backendPort}/v1/model-configs/${configs[0]!.id}`,
-          {
-            method: 'PUT',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ provider: 'ollama', model: JOURNEY_MODEL }),
-          },
-        );
-        expect(configured.ok).toBe(true);
-      }
+      if (provider) await configureJourneyModel(fixture);
       await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
       tracing = true;
       const page = await app.firstWindow();
@@ -474,29 +450,7 @@ for (const { policy, unavailableFiles } of [
         // A file cannot contain workspace directories: exercise the real API failure path.
         workspaceRoot: unavailableFiles ? join(file, 'workspace') : undefined,
       });
-      await expect
-        .poll(
-          async () => {
-            try {
-              return (await fetch(`http://127.0.0.1:${fixture.backendPort}/health/ready`)).ok;
-            } catch {
-              return false;
-            }
-          },
-          { timeout: 20_000 },
-        )
-        .toBe(true);
-      const configs = await readEvidence<{ id: string }>(fixture, 'model-configs');
-      expect(configs).toHaveLength(1);
-      const configured = await fetch(
-        `http://127.0.0.1:${fixture.backendPort}/v1/model-configs/${configs[0]!.id}`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ provider: 'ollama', model: JOURNEY_MODEL }),
-        },
-      );
-      expect(configured.ok).toBe(true);
+      await configureJourneyModel(fixture);
       await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
       tracing = true;
       const page = await app.firstWindow();
@@ -649,6 +603,32 @@ type ApprovalEvidence = {
   resumedAtMs?: number | null;
 };
 type AuditEvidence = { id: string; sessionId: string; toolName: string; status: string };
+
+async function configureJourneyModel(fixture: VmFixture): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        try {
+          return (await fetch(`http://127.0.0.1:${fixture.backendPort}/health/ready`)).ok;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+  const configs = await readEvidence<{ id: string }>(fixture, 'model-configs');
+  expect(configs).toHaveLength(1);
+  const configured = await fetch(
+    `http://127.0.0.1:${fixture.backendPort}/v1/model-configs/${configs[0]!.id}`,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'ollama', model: JOURNEY_MODEL }),
+    },
+  );
+  expect(configured.ok).toBe(true);
+}
 
 async function readEvidence<T>(fixture: VmFixture, resource: string): Promise<T[]> {
   const response = await fetch(`http://127.0.0.1:${fixture.backendPort}/v1/${resource}?limit=100`, {

@@ -15,6 +15,8 @@ again at committed repair revision `3eb57cd` after an isolated rerun. Build/lint
 12 Apple Git license failures; hosted CI must cover that complete suite. Changes are pushed,
 with hosted checks pending at this checkpoint.
 See [permission report](docs/reviews/current-runtime-permission-baseline.md) for final validation.
+Hosted review also requested a native output element for loading status and removal of duplicate
+provider setup in the Electron tests; both were addressed without changing policy assertions.
 No dependency/stack changes. The separate planning proposal still needs its updated spec hashes and
 independent critique reconciled before broader implementation approval.
 
