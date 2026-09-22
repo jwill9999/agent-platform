@@ -101,3 +101,22 @@ policy-denied error and the existing denied audit is preserved. Approval precede
 
 The original two failing Electron assertions are retained. A focused dispatch unit assertion also
 checks the emitted denial while verifying no native execution or approval request occurs.
+
+## Post-repair validation
+
+Implementation commit `3eb57cd`: **13/13 selected Electron journeys pass**, including both original
+failures. After the test-startup wait was changed from network-idle to initial-page load to address
+Sonar, **4/4 permission journeys passed again at the committed revision** in an isolated rerun.
+Evidence: `.agent-platform/permission-fix-results` and `permission-fix-isolated-results`, each with
+matching HTML report. A verification run overlapping the push hook's rebuild had one backend startup
+timeout (3/4 passed); its artifacts remain in `permission-fix-committed-results`. The isolated rerun
+resolved that uncertainty without another application change.
+
+Full build, touched-file ESLint, explicit E2E TypeScript, 187 frontend tests, and 614 harness tests
+excluding the known Apple Git file passed. The push hook also passed affected builds/typechecks but
+failed on the same 12 hardcoded Apple Git license tests. The branch was pushed with that local hook
+bypassed after these checks; hosted CI must cover the complete suite. No test source was weakened or
+skipped to hide this environment limitation. The separate 53 focused policy/dispatch tests passed.
+
+Local composed repair gate: **PASS**. Complete hosted gate: pending at this documentation checkpoint.
+The repair issue remains in progress until feature integration; broader baseline work is not closed.

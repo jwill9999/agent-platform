@@ -9,6 +9,11 @@ policy blocks execution, preserving existing model error, audit and no-execution
 Both original composed regressions remain intact. Unit coverage now verifies denied emission without
 execution and initial settings rendering without fabricated defaults. The wider P2 and cancellation,
 retry/recovery baseline remain open. The repair issue stays in progress until the feature PR integrates.
+Local validation: all 13 selected Electron scenarios passed, and all four permission cases passed
+again at committed repair revision `3eb57cd` after an isolated rerun. Build/lint/type checks,
+187 frontend and 614 available harness tests pass. Push hook was bypassed only after its known
+12 Apple Git license failures; hosted CI must cover that complete suite. Changes are pushed,
+with hosted checks pending at this checkpoint.
 See [permission report](docs/reviews/current-runtime-permission-baseline.md) for final validation.
 No dependency/stack changes. The separate planning proposal still needs its updated spec hashes and
 independent critique reconciled before broader implementation approval.
