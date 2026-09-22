@@ -3,6 +3,10 @@
 Owner requested continued frontend/backend journeys and a login adequacy check. Work is on
 `task/harness-recovery-baseline`, chained from `task/harness-provider-journey` at `5d3b876`;
 PR #266 remains open against `feature/harness-backlog-review`.
+The cumulative continuation is [PR #268](https://github.com/jwill9999/agent-platform/pull/268).
+Test code commit `b12d148`; all three new journeys also passed at that exact commit.
+Beads changes are synced. Hosted gates are running; initial documentation lint found a duplicate
+top-level handoff heading, corrected here.
 
 Added reload-and-approve, reload-and-deny, and transient provider HTTP 503 recovery scenarios.
 Reload scenarios verify two concurrent retries of a completed resume do not change file, audit,
@@ -26,15 +30,15 @@ with the Homebrew pnpm. Canonical Beads root is `/Users/letuscode/projects/agent
 
 ---
 
-# Session handoff
+## Session handoff
 
 Last updated: September 15, 2026 — completed authorized coverage and fixture assessment.
 
-## Latest assessment handoff
+### Latest assessment handoff
 
 Shared mapping completed: [coverage report](docs/reviews/current-runtime-coverage-assessment.md). All 17 areas mapped; 273 selected tests and local provider/reasoning transport probe passed. Ordinary chat excludes critic/DoD; Automatic still asks for the sampled shell write. No product or reusable test changes. Next: owner review of the bounded X6/T1/P1 composed journey; all implementation tasks remain queued.
 
-## Historical planning handoff
+### Historical planning handoff
 
 Owner-agreed repair rule: within an approved testing task, reproduce and preserve the failing test, fix a small directly related defect restoring established behavior, then rerun gates and retain before/after evidence. Broader architecture/dependency/permission or behavior changes need linked repair tasks and review. Planning/mapping remains read-only.
 
@@ -46,7 +50,7 @@ Backlog update: 18 Beads tasks now track shared mapping and all 17 matrix areas,
 
 Next: review the matrix and first slice with the owner; after implementation approval, map existing coverage and resolve the provider-fixture seam before building sequential journeys. Migration value also requires a bounded candidate comparison; baseline correctness alone does not prove savings.
 
-## Verified snapshot — 2026-09-13
+### Verified snapshot — 2026-09-13
 
 Pilot-zero prerequisite, lifecycle, output-validation and active-settlement repairs are delivered to
 `feature/pilot-zero-assessment` at `746073e5605faf3fe219b8bd78547d7ed7e6adfe`.
@@ -61,7 +65,7 @@ The owner approved documentation cleanup and feature-to-staging promotion condit
 checks and review clearance. Production/main promotion is not authorized. Read GitHub and Beads
 for later promotion evidence; this snapshot is not a claim of staging delivery.
 
-## Verification and task state
+### Verification and task state
 
 PR260 includes the SQLite writer reservation, immutable launch provenance, cancellation deadline
 and local hook isolation repairs. PR261 adds output validation only, not repository import.
@@ -81,7 +85,7 @@ Beads children `agent-platform-pilot-zero.1` through `.7`, including `.5.1`–`.
 remain open. Current delivery tracking is `agent-platform-pilot-zero-delivery-handoff`.
 The reusable toolkit investigation remains a separate low-priority backlog epic.
 
-## Remaining orchestration acceptance
+### Remaining orchestration acceptance
 
 Read [pilot-zero assessment](docs/tasks/agent-platform-pilot-zero.md) before resuming implementation.
 The remaining path needs an execution-bound baseline and settled-output handle, immutable output
@@ -94,7 +98,7 @@ unattended execution. Desktop host resumption remains unsupported. Supervised su
 and the ten-minute heartbeat are fallback mechanisms, not proof of the managed runtime.
 Do not fabricate receipts, relabel old approvals or close the parent epic on staging delivery alone.
 
-## Workspace and continuation
+### Workspace and continuation
 
 The primary checkout retains unrelated `.beads/interactions.jsonl` changes; preserve them.
 Duplicate historical cancellation edits are retained in a named recovery stash. Older recovery
@@ -106,23 +110,23 @@ must stop monitoring that delivery after completion. The older `orchestration-re
 monitor is paused. Reconcile Beads and GitHub before acting; no active managed run was reported at
 the last audit. This delivery uses supervised manual coordination, not broker receipts.
 
-## September 15: continuation diagnostic observation
+### September 15: continuation diagnostic observation
 
 The owner requested documentation of the assessment continuation stall and the evidence needed for future diagnosis. See [orchestration field evaluation](docs/reviews/orchestration-field-evaluation.md). Root cause remains unknown; active heartbeat configuration does not prove delivery. No assessment managed run was launched. Future repair work remains under the existing pilot assessment; no implementation is authorized by this note. Modernization assessment drafts remain pending independent critic review.
 
-## September 15: modernization assessment ready for owner review
+### September 15: modernization assessment ready for owner review
 
 The [source assessment](docs/planning/harness-modernization/sdk-assessment.md) and its [independent critic record](docs/planning/harness-modernization/reviews/sdk-assessment-critic-review.md) are ready for joint review. The owner authorized a one-off supervised critic exception; its initial findings were corrected and focused recheck passed. This is not managed-orchestration acceptance. F0 and the joint review gate remain open; no packages, paid experiments or product implementation are authorized. The assessment self-check can pause at this owner-review boundary.
 
-## Disposable workflow evaluation and testing skill
+### Disposable workflow evaluation and testing skill
 
 Owner authorized the bounded Project Chat evaluation and a targeted Playwright quality-gate skill improvement. See [evaluation](docs/reviews/project-chat-journey-evaluation.md) and [task spec](docs/tasks/agent-platform-workflow-journey-evaluation.md). Approved/denied edit scenarios and adjacent command scenarios passed locally with deterministic model/VM fixtures; file and durable backend checks are independent of UI messages. Installed skill and repository copy are synchronized. Beads task remains open for PR/hosted integration review; no staging/main merge or framework migration authorized.
 
-## Current-runtime baseline planning
+### Current-runtime baseline planning
 
 Owner requested a plan for evidence-driven workflow coverage before migration decisions. See [baseline proposal](docs/planning/harness-modernization/current-runtime-baseline-plan.md), tracked by `agent-platform-harness-baseline-plan`. Planning only; no new journey implementation is authorized. First uncertainty is a provider-boundary fixture route that retains the real reasoning/SDK path without inventing saved baseURL propagation. Prior test/skill changes remain in draft PR265 with nine executed checks passed and no merge.
 
-## 19 September: current-runtime tests before stack comparison
+### 19 September: current-runtime tests before stack comparison
 
 Owner prioritized current-functionality evidence before considering restructure. PR265 is merged
 into feature/harness-backlog-review at f2b306e. This task branch includes the earlier baseline
