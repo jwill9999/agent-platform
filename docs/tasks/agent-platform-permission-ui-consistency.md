@@ -1,6 +1,6 @@
 # Keep permission UI consistent with backend state
 
-Beads: `agent-platform-permission-ui-consistency`. Priority: P1. Status: open; repair not authorized.
+Beads: `agent-platform-permission-ui-consistency`. Priority: P1. Status: in progress; owner authorized both repairs on September 23, 2026.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ The baseline permission journeys reproduced two independent presentation defects
 
 ## Implementation plan
 
-First review and authorize the repair boundary. Inspect WorkspaceDashboard's combined load and the
+The owner explicitly approved this repair boundary after reviewing both reproduced failures. Inspect WorkspaceDashboard's combined load and the
 shell-policy denied path in toolDispatch. Make narrowly scoped UI/state-delivery corrections; do not
 change policy precedence, permit Auto to bypass explicit approval, or add dashboards. Preserve both
 failing Electron regressions from the baseline test branch and verify before/after evidence.
@@ -25,8 +25,7 @@ failing Electron regressions from the baseline test branch and verify before/aft
 
 Finding originates in `agent-platform-harness-baseline-p2`; the assessment remains in progress.
 This is a linked follow-up, not a completion blocker on collecting further baseline evidence. No hard
-Beads scheduling edge is required. A separate owner repair decision is required before application
-changes. Coordinate with the proposed local status panel to avoid duplicate work.
+Beads scheduling edge is required. The owner granted the separate repair decision on September 23. Coordinate with the proposed local status panel to avoid duplicate work.
 
 ## Tests and verification
 
@@ -54,5 +53,4 @@ type, lint, build and composed journeys, including Ask/Auto and existing approva
 
 Both regressions pass with accurate UI state; backend enforcement and approval precedence are
 unchanged. Required local and hosted quality gates pass, evidence is recorded, and the approved
-feature-branch PR is integrated. No staging promotion is implied. Until then this is an open repair
-proposal, not completed functionality.
+feature-branch PR is integrated. No staging promotion is implied. Until the feature PR is integrated this remains in progress.

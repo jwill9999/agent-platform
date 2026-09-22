@@ -1,4 +1,21 @@
-# Session handoff — September 23, 2026: permission baseline findings
+# Session handoff — September 23, 2026: authorized permission UI repair
+
+The owner explicitly approved fixing both reproduced permission-display defects. Changes are on the
+existing `task/mvp-baseline-permissions` / PR270 branch. No merge or staging promotion is authorized.
+Workspace Settings now keeps successful backend policy reads despite file-listing errors and shows
+loading/unavailable instead of assumed defaults. The harness emits a denied tool result when shell
+policy blocks execution, preserving existing model error, audit and no-execution behaviour.
+
+Both original composed regressions remain intact. Unit coverage now verifies denied emission without
+execution and initial settings rendering without fabricated defaults. The wider P2 and cancellation,
+retry/recovery baseline remain open. The repair issue stays in progress until the feature PR integrates.
+See [permission report](docs/reviews/current-runtime-permission-baseline.md) for final validation.
+No dependency/stack changes. The separate planning proposal still needs its updated spec hashes and
+independent critique reconciled before broader implementation approval.
+
+---
+
+## Historical checkpoint — permission baseline findings
 
 Owner approved the planning boundary, then separately authorized remaining baseline tests only.
 Application changes remain outside this tranche. Current branch: `task/mvp-baseline-permissions`,

@@ -501,7 +501,7 @@ for (const { policy, unavailableFiles } of [
       tracing = true;
       const page = await app.firstWindow();
       await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeVisible();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('load');
       await page.goto(`http://127.0.0.1:${fixture.rendererPort}/settings/workspace`);
       const selector = page.getByRole('combobox', { name: /Workspace writes/ });
       await expect(selector).toBeVisible();

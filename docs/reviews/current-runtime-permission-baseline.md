@@ -1,9 +1,9 @@
 # Current-runtime permission baseline
 
-September 23, 2026. Owner authorized remaining baseline tests only. No application or dependency
-changes. Base: `6b4d03e91ac0d2b1f6d765c5b4c5b108fb5bad59` on the harness feature branch.
+September 23, 2026. Initial assessment was tests-only; the owner subsequently authorized the two
+application repairs described below. Dependencies are unchanged. Base: `6b4d03e91ac0d2b1f6d765c5b4c5b108fb5bad59` on the harness feature branch.
 
-## Findings
+## Initial findings before repair
 
 Ask and Auto-run persist through UI reload and require one approval for the sampled high-risk shell
 append. Each executes exactly once after approval. Auto prompting follows the existing explicit
@@ -19,7 +19,7 @@ prevents applying the successful settings response. A deterministic filesystem-e
 preserves this case without mocking application APIs.
 
 Both findings are tracked in [permission UI consistency](../tasks/agent-platform-permission-ui-consistency.md).
-Application repairs need separate authorization. The baseline task remains in progress; no failed
+At that checkpoint, application repairs required separate authorization. The baseline task remains in progress; no failed
 case is skipped or marked as an expected pass.
 
 ## Evidence boundary
@@ -70,7 +70,7 @@ This refinement changes a task spec whose contents are bound by the draft MVP pl
 Refresh its digest and independent critique before any full-tranche implementation approval. The
 existing planning approval is not being represented as approval of these application repairs.
 
-## Validation result
+## Initial validation before repair
 
 The complete selected Electron file ran 13 scenarios: **11 passed, 2 failed**. All nine existing
 scenarios and new Ask/Auto cases passed. The two failures are the retained product findings above.
@@ -89,3 +89,15 @@ and two product failures. Artifacts: `.agent-platform/permissions-committed-resu
 report. The push hook passed desktop build/typecheck, all 112 desktop unit tests and dependency-cycle
 checks. [Draft evidence PR](https://github.com/jwill9999/agent-platform/pull/270) is not merge-ready.
 Hosted checks were pending when this checkpoint was written; no hosted success is inferred.
+
+## Authorized repair
+
+The owner explicitly approved both fixes after reviewing the findings. Workspace Settings now
+applies successful settings independently of file-listing success, and displays an unavailable
+state instead of fabricated Ask defaults when settings cannot load. Refresh and policy edits cannot
+race through enabled controls while a load/save is pending. Shell-policy rejection now emits a
+structured denied tool result using the existing stream format; the model still receives its
+policy-denied error and the existing denied audit is preserved. Approval precedence is unchanged.
+
+The original two failing Electron assertions are retained. A focused dispatch unit assertion also
+checks the emitted denial while verifying no native execution or approval request occurs.
