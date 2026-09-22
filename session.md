@@ -2,7 +2,10 @@
 
 Owner approved the planning boundary, then separately authorized remaining baseline tests only.
 Application changes remain outside this tranche. Current branch: `task/mvp-baseline-permissions`,
-from the integrated harness baseline. The planning proposal remains in its separate draft PR #269;
+from the integrated harness baseline. Tests and evidence are pushed in [draft PR #270](https://github.com/jwill9999/agent-platform/pull/270).
+Test commit `b86db9d` reproduced two passes/two failures; the whole selected file had 11 passes/two failures.
+Desktop build/typecheck and 112 desktop unit tests passed on push. The gate remains FAIL.
+The planning proposal remains in its separate draft PR #269;
 its nine executed checks passed, packaged macOS staging test skipped as designed.
 
 Four new Electron permission scenarios exercise Ask/Auto/Block and a real file-listing error.

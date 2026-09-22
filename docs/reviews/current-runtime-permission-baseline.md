@@ -83,3 +83,9 @@ requires license acceptance. That environment limitation is separate from the tw
 Local Sonar/IDE Problems tools are unavailable; hosted Sonar and CI remain pending for this branch.
 Full repository build had passed before these test-only changes; the push hook also checks the
 affected desktop package.
+
+Committed verification at `b86db9d`: all four new scenarios reran, reproducing the same two passes
+and two product failures. Artifacts: `.agent-platform/permissions-committed-results` and matching
+report. The push hook passed desktop build/typecheck, all 112 desktop unit tests and dependency-cycle
+checks. [Draft evidence PR](https://github.com/jwill9999/agent-platform/pull/270) is not merge-ready.
+Hosted checks were pending when this checkpoint was written; no hosted success is inferred.
