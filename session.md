@@ -59,3 +59,10 @@ The `pilot-zero-progress-and-ci` heartbeat follows approved documentation/stagin
 must stop monitoring that delivery after completion. The older `orchestration-repair-progress`
 monitor is paused. Reconcile Beads and GitHub before acting; no active managed run was reported at
 the last audit. This delivery uses supervised manual coordination, not broker receipts.
+
+## 22 September: agent documentation access
+
+Added project Codex LangChain documentation MCP and shared guidance for current AI SDK documentation:
+official agent index, search and targeted Markdown pages, checked against installed package versions.
+Live endpoints and TOML verified. No dependencies, application behavior or baseline-test priorities
+changed. VS Code's existing MCP file and local Beads interaction changes are retained separately.

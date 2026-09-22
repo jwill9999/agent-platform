@@ -236,6 +236,29 @@ See `decisions.md` for the full locked decision table and ADRs in [docs/adr/](ad
 
 ---
 
+## Current AI library documentation
+
+For AI SDK work, use the installed `vercel:ai-sdk` skill's documentation lookup guidance and
+check resolved versions of `ai` and `@ai-sdk/*` in `pnpm-lock.yaml` before choosing APIs.
+Use bundled package docs/source when available to establish installed-version behavior.
+
+- Official agent index: <https://ai-sdk.dev/llms.txt>.
+- Search: <https://ai-sdk.dev/api/search-docs?q=streamText> (replace the query with the topic).
+- Fetch targeted documentation URLs returned by search with `.md` appended.
+- Reference index: <https://ai-sdk.dev/docs/reference.md>.
+
+Fetch these sources when needed rather than retaining a stale copy of the entire docs bundle.
+Latest documentation can describe a newer major version: distinguish current-version fixes from
+upgrade proposals and use version-matched documentation/source for existing behavior. Documentation
+access does not authorize dependency installation/upgrades, provider changes or stack migration.
+Preserve the current baseline-testing priority and existing approval boundaries.
+
+The project Codex configuration also exposes the LangChain documentation MCP as `langchain_docs`.
+Use it for LangChain/LangGraph documentation when connected. AI SDK documentation is accessed directly
+through the official URLs above; no Vercel deployment/account MCP connection is required.
+
+---
+
 ## SonarQube / Problems Completion Gate
 
 **Strict.** If any code file is changed, a quality gate is mandatory before completion.
