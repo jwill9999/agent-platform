@@ -5,6 +5,9 @@ description: Independently review a repository execution contract and return evi
 
 # Plan critique
 
+Use the [documentation skill](../documentation/SKILL.md) and its canonical folder guide for artifact
+locations, publication responsibility and cross-document consistency.
+
 Remain read-only and independent from the planner. Do not edit the contract, dispose findings, approve
 on behalf of the owner, or mutate Beads, Git, GitHub, or workflow state.
 

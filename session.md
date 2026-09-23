@@ -1,5 +1,8 @@
 # Skill preparation handoff — 24 September 2026
 
+Created the owner-requested documentation skill and docs/README.md folder/authority guide.
+Planning, critique and implementation now link it. Existing documents were not relocated.
+
 Updated existing plan-critique and planning handoff: independent critique is mandatory for direct
 and managed plans; compliant-launch limitations are explicit. No live critic or pilot launched.
 

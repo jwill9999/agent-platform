@@ -5,6 +5,9 @@ description: Draft or revise complete Agent Platform planning material, task spe
 
 # Feature planning
 
+Use the [documentation skill](../documentation/SKILL.md) and its canonical folder guide for artifact
+locations, publication responsibility and cross-document consistency.
+
 Produce a complete proposed handoff for implementation. Remain read-only: do not approve the plan or
 mutate repository, Beads or workflow state. An authorized coordinator publishes the drafts below.
 Planning/publication approval does not authorize application implementation or a live workflow.

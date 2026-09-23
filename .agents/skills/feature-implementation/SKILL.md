@@ -5,6 +5,9 @@ description: Begin or continue Agent Platform feature or task implementation fro
 
 # Feature implementation
 
+Use the [documentation skill](../documentation/SKILL.md) and its canonical folder guide for artifact
+locations, publication responsibility and cross-document consistency.
+
 This is the handoff from planning to execution. Use before implementing a feature, repair, or planned
 test slice; explanations and ordinary read-only inspection do not require an execution workflow.
 
