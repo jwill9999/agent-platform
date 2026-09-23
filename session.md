@@ -8,6 +8,12 @@ The permission approval wait was intentional. Runtime readiness still needs inve
 approval rules remain unchanged. Further owner questions should extend this review and the existing
 Beads pilot assessment before any activation or repair decision.
 
+The owner subsequently requested adding the skill/discoverability recommendation and distinct new-run
+versus existing-run paths. These are now recorded in the review, including read-only state lookup,
+separate runtime-health checks, no-run versus failed-lookup handling, and explicit fallback decisions.
+Routing rules are proposed; confidence scoring is unvalidated. No skill, runtime, approval or policy
+change is implemented. Return to the owner for further review questions after this documentation update.
+
 The direct-file repair remains pushed in PR271. All ten executed hosted checks passed at `3d7c44b`;
 one separate Git merge-resolver test passed on retry. Human review/merge remains separate.
 This handoff change is documentation only and does not claim new runtime verification.

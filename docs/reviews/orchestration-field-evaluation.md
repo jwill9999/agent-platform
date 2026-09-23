@@ -115,8 +115,57 @@ Managed execution requires the persisted approval and runnable state plus an exp
 launcher start. A ready Beads task, merged planning document, conversational approval or green CI
 alone does not demonstrate that those steps occurred.
 
+#### Proposed orchestration skill and discoverable entrypoint
+
+The owner requested that the review include a dedicated orchestration skill. In the inspected
+checkout, planning and critique skills are discoverable, but there is no dedicated skill explaining
+when and how to start managed execution. The workflow-control package has runtime entrypoints;
+its existing MCP server exposes only read-only status and prepared-transition inspection, not a
+workflow launch operation. No workflow-control execution tool is exposed in this session. These are
+availability observations, not proof that a configured runtime can execute the next task.
+
+The proposed skill should describe task eligibility, readiness checks, the supported start/resume
+entrypoint, approval boundaries, progress evidence and explicit blocker/fallback reporting. It should
+reference canonical contracts and policy rather than duplicate them. Discovery of a skill improves
+agent awareness but does not prove invocation, automatic routing, connectivity or runtime readiness.
+Code must continue enforcing authorization; a skill cannot grant capabilities or bypass approval.
+The review should identify both the agent-facing procedure and the technical integration needed to
+make orchestration the default for eligible work, with visible exceptions.
+
+Prefer explicit routing rules for clear cases. Task classification or confidence estimates may help
+with ambiguous cases, but must not override eligibility, readiness or approval requirements. No
+probability threshold has been chosen or validated. The task categories and any scoring evaluation
+remain review questions rather than adopted operating policy.
+
+#### Separate starting a new workflow from resuming one
+
+Deciding whether a task belongs in orchestration must not depend on an existing run record. A task
+that has never entered orchestration may have no relevant persisted state. The proposed procedure is:
+
+1. Assess task eligibility and existing authority using the request, project rules and reviewed
+   scope. Do not treat an absent run as an instruction to use direct execution.
+2. Through a supported read-only interface, look for a relevant run bound to the same workspace and
+   task scope. Distinguish a confirmed absence from an unavailable or failed status lookup; unknown
+   status must not cause a duplicate run.
+3. If a relevant run exists, inspect its phase, approval/material binding, expected next transition,
+   blockers and terminal/interrupted state before deciding whether it can resume. A stored record is
+   not proof that its worker or coordinator is alive: check runtime health and ownership separately.
+   A completed or incompatible historical run must not be blindly resumed.
+4. If no relevant run exists, assess the prerequisites and approved material needed to create one,
+   then use the supported creation/launch path only within existing authority. Missing approval or
+   runtime support produces an explicit blocker; it is not permission for silent manual fallback.
+5. Record the selected start/resume path and its outcome. Where supervised fallback is permitted,
+   state that mode and the reason explicitly and preserve the observation for this review.
+
+A status lookup supports recovery and duplicate prevention; it is not the activation trigger.
+“No relevant run” means assess starting one, not orchestration is unnecessary. New-run creation,
+existing-run recovery and runtime health need distinct evidence. This proposed procedure does not
+claim those paths have been exercised or activate them now.
+
 #### Questions retained for the orchestration review
 
+- How should a discoverable skill and supported entrypoint expose eligibility, readiness and
+  separate start/resume paths without conflating absent state with unavailable infrastructure?
 - Which existing entrypoint should own this checkpoint, and how is its decision recorded so it
   cannot be silently skipped on a resumed session?
 - Which launch prerequisites are actually satisfied in the current environment, and which are
