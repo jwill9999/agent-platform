@@ -1,6 +1,8 @@
 # Skill preparation handoff — 24 September 2026
 
 Created orchestration and feature-implementation skills; reviewed existing planning/critique.
+Subsequently updated feature-planning under explicit owner authorization with required artifacts,
+publication, test feasibility, connected frontend/backend evidence, completion gates and exact handoff.
 Owner authorized this bounded work, with joint review afterwards. No live pilot or runtime repair.
 See [skill readiness review](docs/reviews/orchestration-skill-readiness.md).
 New Beads prerequisite chain is recorded with specifications and blocking dependencies.

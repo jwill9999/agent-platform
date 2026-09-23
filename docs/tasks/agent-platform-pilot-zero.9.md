@@ -6,11 +6,11 @@
 
 ## Requirements
 
-Assess feature-planning and plan-critique against the workflow contract and pilot requirements: objective, task graph, exact source, permissions, roles, delivery, checks, retry/spend bounds, evidence and approval binding. This task reviews existing skills; it does not edit them.
+Assess feature-planning and plan-critique against the workflow contract and pilot requirements: objective, task graph, exact source, permissions, roles, delivery, checks, retry/spend bounds, evidence and approval binding. The owner subsequently authorized updating feature-planning with documentation, verification and handoff requirements. Plan-critique remains review-only.
 
 ## Allowed boundary
 
-Read .agents/skills/feature-planning, .agents/skills/plan-critique, related contracts/docs and Beads specs. Write only review evidence and session handoff.
+Read .agents/skills/feature-planning, .agents/skills/plan-critique, related contracts/docs and Beads specs. Write feature-planning/SKILL.md, review evidence, this spec and session handoff within the authorized revision.
 
 ## Implementation plan
 
@@ -38,7 +38,7 @@ No paid benchmark, live specialist launch or fault injection is authorized by th
 
 ## Definition of done
 
-Review report names each confirmed gap or explains adequate coverage, with source evidence, impact and proposed bounded correction. Skill/runtime gaps are distinguished; no skill change or execution approval is implied.
+Review report names each confirmed gap or explains adequate coverage, with source evidence, impact and proposed bounded correction. Skill/runtime gaps are distinguished; the authorized planning-skill revision is validated; no runtime execution approval is implied.
 
 All upstream tasks and any subsequently recorded required blockers must satisfy their declared
 completion conditions. Record exact evidence/source, review and checks; preserve findings and

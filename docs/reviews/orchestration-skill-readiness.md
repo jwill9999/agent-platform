@@ -7,7 +7,8 @@ The new skills are repository files, not just proposals. No runtime or applicati
 
 - Created [orchestration](../../.agents/skills/orchestration/SKILL.md).
 - Created [feature implementation](../../.agents/skills/feature-implementation/SKILL.md).
-- Reviewed existing planning and critique skills; left their source unchanged.
+- Reviewed planning and critique; subsequently revised feature-planning with explicit owner authorization.
+- Plan-critique source remains unchanged.
 - Owner approval covers this bounded manual skill preparation on the current task branch into the
   harness review feature. It does not approve a live pilot, paid calls, runtime repair or merge.
 - Beads prerequisites are tasks `.8`, `.9`, `.skills-gate`, `.10`, `.11`, `.12`, `.13` under
@@ -72,3 +73,19 @@ formal acceptance and the live pilot remain gated on appropriate review and runt
 Record future findings in the [field evaluation](orchestration-field-evaluation.md) and follow the
 [staged assessment](orchestration-staged-assessment.md). Skills guide the route; they do not enforce
 permissions, automatically activate a workflow or resolve the runtime limitations.
+
+## Planning revision after owner discussion
+
+The owner authorized implementing the identified gaps in feature-planning. It now specifies an artifact
+manifest and locations, task/template links, authorized coordinator publication and read-back,
+requirement-level test scenarios, independent backend-effect assertions, fixture boundaries, test
+feasibility, task and feature integration gates, actual-result reporting and exact approved handoff.
+Earlier planning-gap findings above describe the pre-revision state. A separate documentation skill
+has not been created; the planning skill links the existing authoritative rules directly.
+
+Author walkthrough: a multi-task user-facing feature now requires task specs and linked scenarios,
+plus an owned final integration check. A mocked UI response cannot establish backend success; an
+unavailable required environment blocks readiness, and skipped required journeys block sign-off.
+Read-only planning returns drafts for an authorized publisher; missing approval persistence or a
+conformant critic is reported rather than invented. These are static procedure checks, not live
+agent behavior or independent critique.
