@@ -425,6 +425,7 @@ for (const { policy, unavailableFiles, action } of [
   { policy: 'block', unavailableFiles: true, action: 'shell-write' },
   { policy: 'ask', unavailableFiles: false, action: 'direct-write' },
   { policy: 'auto', unavailableFiles: false, action: 'direct-write' },
+  { policy: 'ask', unavailableFiles: false, action: 'direct-revoked' },
   { policy: 'block', unavailableFiles: false, action: 'direct-write' },
   { policy: 'block', unavailableFiles: false, action: 'direct-read' },
   { policy: 'block', unavailableFiles: false, action: 'network' },
@@ -433,10 +434,11 @@ for (const { policy, unavailableFiles, action } of [
     const fixture = await createVmFixture({ health: 'ready' });
     const file = join(fixture.projectDir, 'journey.txt');
     writeFileSync(file, JOURNEY_BEFORE);
-    const directWrite = action === 'direct-write';
+    const revoked = action === 'direct-revoked';
+    const directWrite = action === 'direct-write' || revoked;
     const readOnly = action === 'direct-read';
-    const denied = policy === 'block' && !readOnly;
-    const needsApproval = !denied && !readOnly && !(directWrite && policy === 'auto');
+    const denied = (policy === 'block' && !readOnly) || revoked;
+    const needsApproval = revoked || (!denied && !readOnly && !(directWrite && policy === 'auto'));
     const policyKey = action === 'network' ? 'network' : 'workspaceWrite';
     const toolName = directWrite ? 'sys_write_file' : readOnly ? 'sys_read_file' : 'sys_bash';
     const toolArgs = directWrite
@@ -526,8 +528,19 @@ for (const { policy, unavailableFiles, action } of [
         expect(approvals).toHaveLength(1);
         expect(approvals[0]?.status).toBe('pending');
         expect(provider.requests).toHaveLength(1);
+        if (revoked) {
+          const chatURL = page.url();
+          await page.goto(`http://127.0.0.1:${fixture.rendererPort}/settings/workspace`);
+          await selector.selectOption('block');
+          await expect.poll(async () => (await readPolicy()).workspaceWrite).toBe('block');
+          await page.reload();
+          await expect(selector).toHaveValue('block');
+          await page.goto(chatURL);
+          await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
+          expect(readFileSync(file, 'utf8')).toBe(JOURNEY_BEFORE);
+        }
         await card.getByRole('button', { name: 'Approve', exact: true }).click();
-        await expect(card).toContainText('Approved action completed');
+        if (!revoked) await expect(card).toContainText('Approved action completed');
       }
       await expect(page.getByText(JOURNEY_FINAL).last()).toBeVisible();
       await expect(page.getByPlaceholder('Ask about this Project...')).toBeEnabled();
@@ -540,10 +553,10 @@ for (const { policy, unavailableFiles, action } of [
       );
       expect(audits.filter((row) => row.status === 'success')).toHaveLength(denied ? 0 : 1);
       expect(readFileSync(file, 'utf8')).toBe(denied || readOnly ? JOURNEY_BEFORE : JOURNEY_AFTER);
-      if (denied) {
+      if (denied) expect(audits.filter((row) => row.status === 'denied')).toHaveLength(1);
+      if (denied && !revoked) {
         expect(approvals).toHaveLength(0);
         await expect(page.getByTestId('approval-card')).toHaveCount(0);
-        expect(audits.filter((row) => row.status === 'denied')).toHaveLength(1);
       } else if (needsApproval) {
         expect(approvals).toHaveLength(1);
         expect(approvals[0]?.status).toBe('approved');

@@ -1,10 +1,10 @@
-# Remaining permission baseline: direct files and categories
+# Permission baseline and approved direct-file repair
 
 Owner authorized continuation after PR269 merged. Source base: c1ed389. This is a bounded P2
 assessment, not activation of the broader MVP implementation contract. Existing normative specs
 remain unchanged. Beads: agent-platform-harness-baseline-p2.
 
-## Coverage and expected outcomes
+## Initial assessment scope and expected outcomes
 
 Reuse the four existing workspace shell-write journeys. Add direct file write Ask/Auto/Block and a
 read-only control under Block, plus a network Block representative. Complement these with all shell
@@ -51,7 +51,7 @@ approvals, audits, provider tool results, backend lifecycle, and before/after fi
 mismatch remains a failed assertion, not an expected pass. Category classifier tests alone do not
 establish backend enforcement. Execution outcomes and remaining scope will be added after running.
 
-## Initial execution result
+## Initial execution result (before repair)
 
 Nine composed permission journeys ran: **7 passed, 2 failed**. All four existing shell-write cases,
 direct Auto write, direct read under Block and network-command Block passed. Direct Ask and Block
@@ -85,7 +85,7 @@ Use Node 24 and current build outputs. External model requests are restricted to
 fixture. Linux hosted Electron runs use the existing Xvfb job. No real network call is needed by the
 network-denial case. Keep the initial artifacts when rerunning from a committed source.
 
-## Committed confirmation and delivery
+## Committed confirmation before repair
 
 At test revision `7771375`, all nine permission journeys reran after the build checks completed:
 **7 passed, 2 failed**, reproducing the same direct Ask and Block outcomes. Evidence is retained in
@@ -98,3 +98,34 @@ and 12 existing Git tests failed because Apple Git requires Xcode-license accept
 was bypassed for publication after recording that limitation; hosted checks remain required and the
 known composed failures keep this draft unmergeable by the project quality gate. E2E TypeScript,
 touched-file lint, formatting, Markdown and relative links passed. No failure is hidden or waived.
+
+## Approved repair and verification
+
+The owner explicitly approved direct-mutation enforcement on September 23. Workspace writes now
+covers the existing dispatcher write-tool inventory: write, append, copy, create-directory,
+download and coding_apply_patch. Patch previews remain read-only; the patch tool has no standalone
+move/delete operation. Block is checked before approved-resume bypass. Ask uses durable approval;
+Auto preserves risk/explicit approval and existing path, allowlist and onboarding controls. Settings
+helper text now describes direct file changes as well as commands. API resume already loads current
+settings; no API, schema, dependency or authentication change was needed.
+
+```gherkin
+Scenario: A pending approval cannot override a newly selected Block policy
+  Given a direct write is waiting for approval under Ask and its file is unchanged
+  When the operator changes Workspace writes to Block in Settings and reloads
+  And returns to the pending request and approves it
+  Then the resumed call is denied using the current saved policy
+  And the file is unchanged and a denied audit and tool result are recorded
+```
+
+All ten composed permission journeys pass after repair, including the original Ask/Block failures
+and the new policy-change-before-resume case. The approval decision is recorded as approved/resumed,
+while execution is separately recorded as denied. Evidence: `.agent-platform/direct-file-repair-results`
+and matching HTML report, with policy JSON and browser traces. The original failing evidence is retained.
+
+Focused policy/dispatcher tests: 98 pass, including all six tools across Ask/Auto/Block, approved
+resumption, Block on resumption, missing-settings default and stricter controls. Full harness suite:
+667 pass and 12 existing Git tests blocked by Apple Xcode-license acceptance. Web unit tests: 187 pass.
+Full build, repository typecheck, touched-file lint and explicit Electron test typecheck pass.
+The broader Electron regression run and hosted checks are still pending; this is not yet a merge
+recommendation. P2 remains partial and cancellation/retry/recovery assessment remains open.

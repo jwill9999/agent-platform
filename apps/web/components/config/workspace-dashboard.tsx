@@ -121,7 +121,8 @@ export function WorkspaceDashboard() {
     {
       id: 'workspaceWrite',
       label: 'Workspace writes',
-      description: 'Commands that create, edit, move, or remove Project files.',
+      description:
+        'Direct file changes and commands that create, edit, move, or remove Project files.',
       value: executionPolicy?.workspaceWrite,
       values: POLICY_OPTIONS,
     },

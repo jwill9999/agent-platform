@@ -1,3 +1,19 @@
+# Session handoff — approved direct-file permission repair
+
+Owner approved extending Workspace writes to direct mutation tools. Repair on
+`task/permission-category-baseline`, PR271 into `feature/harness-backlog-review`.
+Beads `agent-platform-direct-file-policy` is in progress; P2 remains partial.
+
+All ten composed permission journeys pass, including the original Ask/Block regressions and a new
+Ask-to-Block change while approval waits. Block prevents the effect even after the old approval is
+accepted. Six direct mutation tools are covered by dispatcher policy tests; stricter controls remain.
+98 focused tests, 187 web tests, build/typecheck/touched-file lint pass. Full harness: 667 pass,
+12 existing Apple Git/Xcode-license failures. Broader desktop and hosted validation pending.
+No merge or staging/main promotion is authorized. Review evidence is in
+`docs/reviews/current-runtime-permission-category-baseline.md`.
+
+## Historical baseline checkpoint
+
 # Session handoff — remaining permission baseline finding
 
 Owner authorized continuing baseline testing after merging planning PR269. Current task:
