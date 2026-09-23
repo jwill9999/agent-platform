@@ -57,7 +57,9 @@ classification. Git mutation, arbitrary connected tools and network-only tools r
 policies. A download is included because it writes a destination file; its URL protections remain.
 
 Allowed repair paths: harness dispatcher and its focused tests, Workspace settings description and
-tests, existing Electron/provider fixtures, this task spec, review evidence and session handoff.
+tests, existing Electron/provider fixtures and API chat integration fixtures, this task spec, review
+evidence and session handoff. API path-mapping tests must explicitly permit writes when testing file
+execution rather than approval.
 No dependency, database, authentication or workflow-contract change. Ask without settings defaults
 conservatively to approval; Auto still consults metadata. Block is checked before approved-resume
 bypass, and fresh API resume context must read the current settings. Add a UI journey changing Ask

@@ -127,5 +127,11 @@ Focused policy/dispatcher tests: 98 pass, including all six tools across Ask/Aut
 resumption, Block on resumption, missing-settings default and stricter controls. Full harness suite:
 667 pass and 12 existing Git tests blocked by Apple Xcode-license acceptance. Web unit tests: 187 pass.
 Full build, repository typecheck, touched-file lint and explicit Electron test typecheck pass.
-The broader Electron regression run and hosted checks are still pending; this is not yet a merge
-recommendation. P2 remains partial and cancellation/retry/recovery assessment remains open.
+At committed repair revision `314589d`, all **19 selected Electron journeys pass**, including
+approval, denial, reload recovery and transient retry controls. Evidence:
+`.agent-platform/direct-file-repair-committed-results` and matching report. API chat integration:
+39 pass after making Auto explicit in two existing path-mapping/access tests. The full API run also
+encountered 44 existing Project Git setup failures from the same Xcode-license limitation.
+Markdown and relative links pass. Sonar/IDE tools are unavailable locally; terminal checks are the
+fallback and hosted SonarCloud/review checks remain required. Hosted validation is pending; this is
+not yet a merge recommendation. P2 remains partial and cancellation/retry/recovery assessment remains open.
