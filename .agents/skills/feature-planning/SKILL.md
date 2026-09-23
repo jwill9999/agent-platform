@@ -36,6 +36,20 @@ host, test data/reset strategy, provider access, credentials availability withou
 runner requirements and permitted cost. Record missing prerequisites and their owning tasks. Do not
 claim implementation readiness when a required verification environment has no feasible provision.
 
+## Task identity and branch naming
+
+Accept the owner's task title, description or external reference as the starting point; they need not
+know a Beads ID or Git branch. Search existing Beads records and linked plans before proposing new
+work. Resolve the intended feature and task from evidence. If multiple records fit and context does
+not distinguish them, ask the human rather than selecting by filename, recency or current checkout.
+
+Keep readable titles alongside stable Beads IDs. For new feature plans propose a descriptive filename
+based on the agreed feature name; task specifications retain the required Beads-ID filename. Record
+an explicit mapping in the feature manifest: feature/task title, Beads ID, spec path, verification-plan
+links, repository/worktree, task branch, parent branch and integration destination. Reuse recorded
+branches; proposed names are not evidence that branches exist. Preserve repository chaining rules.
+Show this mapping to the owner with the plan so implementation does not have to infer task identity.
+
 ## Required planning outputs and locations
 
 Return drafts with explicit intended paths and task links. Use existing feature locations when

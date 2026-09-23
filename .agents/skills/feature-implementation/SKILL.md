@@ -11,6 +11,22 @@ locations, publication responsibility and cross-document consistency.
 This is the handoff from planning to execution. Use before implementing a feature, repair, or planned
 test slice; explanations and ordinary read-only inspection do not require an execution workflow.
 
+## Select and announce the task
+
+Resolve the owner's supplied task name, description, ID or branch against Beads and the approved
+plan's task-to-spec/branch mapping. The current checkout or a similarly named file is not sufficient
+proof of task identity. Read the matched record, its dependencies and existing claim before work;
+do not overwrite another worker's claim. If no task was named, follow the approved ready-task sequence
+only when it clearly determines the next authorized task. Otherwise ask a focused selection question.
+
+Before changing files, state the selected readable task title and Beads ID, the specification link,
+repository/worktree, task branch and integration destination, plus why it is next. In voice, describe
+the task naturally and show exact IDs, paths and branches visually. This is an announcement, not a
+new approval request when scope is already authorized. Stop to clarify mismatched identity, missing
+branch mapping or ambiguous candidates; never invent an association or silently switch tasks.
+
+## Execute the approved handoff
+
 1. Read [shared instructions](../../../docs/agent-instructions-shared.md), the relevant Beads task/spec,
    and the approved plan. Resolve objective, acceptance criteria, non-goals, dependencies, source and
    branch, allowed files/actions, roles, tests, retry/budget limits and delivery boundary. Inspect the

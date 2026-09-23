@@ -1,5 +1,8 @@
 # Skill preparation handoff — 24 September 2026
 
+Owner-approved naming clarification added: planning maps readable task titles to Beads IDs, specs
+and branches; implementation resolves ambiguity and announces the selected task/branch before edits.
+
 Created the owner-requested documentation skill and docs/README.md folder/authority guide.
 Planning, critique and implementation now link it. Existing documents were not relocated.
 
