@@ -135,3 +135,12 @@ encountered 44 existing Project Git setup failures from the same Xcode-license l
 Markdown and relative links pass. Sonar/IDE tools are unavailable locally; terminal checks are the
 fallback and hosted SonarCloud/review checks remain required. Hosted validation is pending; this is
 not yet a merge recommendation. P2 remains partial and cancellation/retry/recovery assessment remains open.
+
+## Repair publication
+
+Repair `314589d` and test/evidence follow-up `c549855` are pushed to PR271, now ready for review.
+Normal pre-push checks passed affected builds/typechecks, dependency-cycle checks, 112 desktop and
+187 web unit tests. The hook again stopped on the same 12 Apple Git/Xcode-license harness failures;
+publication bypassed that local hook only after recording the limitation. Hosted tests are not waived.
+Beads repair and P2 state have been synchronized to the remote; both remain in progress pending
+reviewed integration and the remaining baseline respectively. Nothing is merged or promoted.

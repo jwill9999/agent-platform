@@ -11,6 +11,9 @@ accepted. Six direct mutation tools are covered by dispatcher policy tests; stri
 12 existing Apple Git/Xcode-license failures. All 19 selected Electron journeys pass at `314589d`.
 All 39 API chat integration tests pass after two path tests explicitly enable Auto; 44 unrelated
 Project Git API cases also hit the Xcode-license limitation. Docs/links pass. Hosted checks pending.
+Repair and test updates are pushed (`314589d`, `c549855`); PR271 is ready for review and hosted checks
+are running. Normal pre-push stopped on the recorded 12 Apple Git-license tests; publication used
+HUSKY=0 after affected builds/types, 112 desktop and 187 web unit tests passed. Beads sync succeeded.
 No merge or staging/main promotion is authorized. Review evidence is in
 `docs/reviews/current-runtime-permission-category-baseline.md`.
 
