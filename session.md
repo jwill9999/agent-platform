@@ -17,6 +17,10 @@ Validation: workflow-control built from current source; schema, digest and evide
 Markdown passes excluding ignored generated `.agent-platform` Playwright reports (the broad docs
 command includes their pre-existing lint errors); relative-link and diff checks pass. No new runtime
 code or tests were changed relative to the integrated feature. Hosted checks are tracked in PR269.
+The merge-triggered local push hook passed affected builds/typechecks and dependency-cycle checks;
+614 harness tests passed, but 12 existing Git tests hit the known unaccepted Apple Xcode license.
+The planning diff against the integrated feature is documentation only. The push hook is bypassed
+for publication after recording this limitation; hosted checks remain required, not assumed green.
 
 ## Previous pause checkpoint (historical)
 
