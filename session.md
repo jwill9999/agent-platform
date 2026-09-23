@@ -1,5 +1,8 @@
 # Skill preparation handoff — 24 September 2026
 
+Updated existing plan-critique and planning handoff: independent critique is mandatory for direct
+and managed plans; compliant-launch limitations are explicit. No live critic or pilot launched.
+
 Created orchestration and feature-implementation skills; reviewed existing planning/critique.
 Subsequently updated feature-planning under explicit owner authorization with required artifacts,
 publication, test feasibility, connected frontend/backend evidence, completion gates and exact handoff.

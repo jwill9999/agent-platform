@@ -89,3 +89,12 @@ unavailable required environment blocks readiness, and skipped required journeys
 Read-only planning returns drafts for an authorized publisher; missing approval persistence or a
 conformant critic is reported rather than invented. These are static procedure checks, not live
 agent behavior or independent critique.
+
+## Independent critique clarification
+
+The owner authorized updating the existing plan-critique skill rather than creating a duplicate.
+Both planning and critique now require a distinct critic for direct and managed execution plans.
+The critique checklist covers the full document and verification handoff. Delivery follows explicit
+owner authority; the prior implicit staging wording was removed. Missing compliant reviewer launch
+remains an explicit blocker, not an exemption. No reviewer was launched by this documentation change.
+This supersedes the earlier statement that plan-critique source remained unchanged.

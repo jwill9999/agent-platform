@@ -6,11 +6,11 @@
 
 ## Requirements
 
-Assess feature-planning and plan-critique against the workflow contract and pilot requirements: objective, task graph, exact source, permissions, roles, delivery, checks, retry/spend bounds, evidence and approval binding. The owner subsequently authorized updating feature-planning with documentation, verification and handoff requirements. Plan-critique remains review-only.
+Assess feature-planning and plan-critique against the workflow contract and pilot requirements: objective, task graph, exact source, permissions, roles, delivery, checks, retry/spend bounds, evidence and approval binding. The owner subsequently authorized updating feature-planning with documentation, verification and handoff requirements. The owner also authorized revising plan-critique to require independent review on both execution routes and describe compliant-launch blockers.
 
 ## Allowed boundary
 
-Read .agents/skills/feature-planning, .agents/skills/plan-critique, related contracts/docs and Beads specs. Write feature-planning/SKILL.md, review evidence, this spec and session handoff within the authorized revision.
+Read .agents/skills/feature-planning, .agents/skills/plan-critique, related contracts/docs and Beads specs. Write feature-planning/SKILL.md, plan-critique/SKILL.md, review evidence, this spec and session handoff within the authorized revision.
 
 ## Implementation plan
 

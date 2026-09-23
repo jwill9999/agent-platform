@@ -86,7 +86,9 @@ required coverage must be explicit and reviewed, never silently marked not appli
    operations, delivery and gates consistently with all drafts. Do not invent evidence or permissions.
 2. Validate through a supported workflow-control validation path. If unavailable, identify the missing
    interface; manual inspection is not machine validation or approval.
-3. Submit the contract and complete document manifest to a distinct critic using
+3. Require independent critique for both orchestrated and explicitly permitted direct implementation;
+   no active orchestration run is needed for this review obligation. Submit the contract and complete
+   document manifest to a distinct critic using
    [plan critique](../plan-critique/SKILL.md) through a permitted reviewer path. Check documentation
    completeness, traceability, feasibility and test/sign-off gates as well as contract authority.
    Record every finding and disposition; unresolved findings or missing review block final readiness.
