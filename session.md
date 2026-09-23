@@ -1,4 +1,20 @@
-# Session handoff — approved direct-file permission repair
+# Session handoff — orchestration review observation
+
+The owner paused the proposed standing repair authorization and requested documentation of why
+orchestration was not used and what should trigger its use. Added the September 23 observation and
+proposed task-start readiness checkpoint to `docs/reviews/orchestration-field-evaluation.md`.
+The actual omission was an explicit execution-mode decision; no managed launch failure was reproduced.
+The permission approval wait was intentional. Runtime readiness still needs investigation; existing
+approval rules remain unchanged. Further owner questions should extend this review and the existing
+Beads pilot assessment before any activation or repair decision.
+
+The direct-file repair remains pushed in PR271. All ten executed hosted checks passed at `3d7c44b`;
+one separate Git merge-resolver test passed on retry. Human review/merge remains separate.
+This handoff change is documentation only and does not claim new runtime verification.
+
+## Earlier repair publication checkpoint
+
+## Session handoff — approved direct-file permission repair
 
 Owner approved extending Workspace writes to direct mutation tools. Repair on
 `task/permission-category-baseline`, PR271 into `feature/harness-backlog-review`.

@@ -63,3 +63,68 @@ Correlate events using task, run, turn, parent/child, trigger and attempt identi
 The project journal covers project-controlled execution. Codex scheduling and host turn delivery belong to the host application: project events cannot prove those occurred. Collect supported host diagnostics where available and report unavailable evidence as **unknown**, not a successful delivery or a confirmed missed trigger. Do not fabricate host events from elapsed time. A watchdog must record its own checks and failures; it cannot prove its own health while unable to run.
 
 For a future authorized repair, evaluate controlled cases covering an undelivered trigger, a received trigger with no turn start, a resumed turn with missing state, a completed specialist with no coordinator advancement, and a turn ending with unfinished authorized work. Include an intentional approval wait as a non-failure case. Evidence should identify the boundary, show manual interventions, and demonstrate bounded recovery without duplicate execution or bypassed approval. These are proposed acceptance scenarios, not tests already run or new implementation tasks.
+
+### September 23, 2026: permission repair bypassed the orchestration readiness decision
+
+- **Context:** The owner authorized continued baseline tests and then explicitly approved extending
+  Workspace writes to direct file mutations. The repair and verification were delivered through a
+  supervised primary-agent workflow in [the direct-file permission repair](https://github.com/jwill9999/agent-platform/pull/271).
+  Reviewed source: `3d7c44b`; [permission evidence](current-runtime-permission-category-baseline.md).
+- **Expected:** At the transition from approved task scope to execution, assess whether the existing
+  orchestration system can run that scope. Either establish a managed run or surface its concrete
+  readiness/authorization blockers and identify any supervised fallback. The owner expected real-use
+  blockers to feed this review.
+- **Observed and confidence:** No explicit orchestration readiness decision or managed launch was
+  recorded for this repair. The primary agent implemented, verified and published it manually.
+  This establishes a missed workflow-selection checkpoint, not a reproduced scheduler, callback or
+  continuation failure. Passing product tests and CI are not managed-orchestration acceptance.
+- **Why it was not used:** The immediate observed reason is that the primary continued on the manual
+  path without surfacing the selection decision. A runtime launch was not attempted, so no specific
+  runtime prerequisite can be claimed as the actual cause. The exact readiness of the intended
+  launch environment still needs assessment; older pilot limitations are leads, not fresh failures.
+- **Approval boundary:** The pause for owner approval was deliberate because permission semantics
+  changed. It was not evidence of a missed continuation. The later proposal for standing repair
+  authorization was not approved and cannot explain the earlier manual execution. Existing approval
+  rules remain unchanged.
+- **Impact and intervention:** The product repair is verified, but this work produced no proof of
+  managed specialist handoff, approval notification or automatic continuation after approval. The
+  owner raised the missing orchestration use and requested this review entry. Duration and delay
+  attributable to the missing checkpoint are unknown.
+- **Outcome and tracking:** Observation recorded against the existing `agent-platform-pilot-zero`
+  assessment; parent remains in progress. No new runtime defect, acceptance result or orchestration
+  repair is asserted. Additional owner questions can extend this entry and its linked Beads record.
+
+#### Proposed trigger for orchestration assessment
+
+At the start of an owner-authorized task, and when its scope changes materially, the primary agent
+should perform an explicit orchestration readiness assessment before choosing execution mode.
+This is a proposed workflow checkpoint for review, not a new authorization rule or automatic launch.
+
+The assessment should establish:
+
+1. Whether the exact task scope has a reviewed execution contract and recorded approval bound to its
+   current material, including permitted roles, files, operations and delivery destination.
+2. Whether the configured runtime can execute the required phases, with verified isolation,
+   credentials, result import, coordination and approval/continuation support for that run.
+3. The decision: managed execution with a durable run reference, or the specific blocker and an
+   explicitly identified supervised fallback within existing authority. If fallback authority is
+   unclear, surface that decision before mutating work begins; do not silently broaden approval.
+
+Task approval is the trigger to assess readiness; it is not itself the technical launch event.
+Managed execution requires the persisted approval and runnable state plus an explicit coordinator/
+launcher start. A ready Beads task, merged planning document, conversational approval or green CI
+alone does not demonstrate that those steps occurred.
+
+#### Questions retained for the orchestration review
+
+- Which existing entrypoint should own this checkpoint, and how is its decision recorded so it
+  cannot be silently skipped on a resumed session?
+- Which launch prerequisites are actually satisfied in the current environment, and which are
+  missing, unsupported or simply not yet exercised?
+- What user-visible event distinguishes waiting for legitimate approval from failed notification,
+  failed receipt or failure to continue after approval?
+- Can the next bounded, approved baseline task provide real orchestration evidence without changing
+  permission rules or claiming unattended capabilities that have not been demonstrated?
+
+The next step is readiness investigation and owner review of these findings. This entry does not
+activate orchestration, authorize specialist launches, approve standing repairs, or promote code.
