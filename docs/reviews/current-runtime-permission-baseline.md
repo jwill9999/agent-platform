@@ -3,6 +3,21 @@
 September 23, 2026. Initial assessment was tests-only; the owner subsequently authorized the two
 application repairs described below. Dependencies are unchanged. Base: `6b4d03e91ac0d2b1f6d765c5b4c5b108fb5bad59` on the harness feature branch.
 
+## Current integrated outcome
+
+The owner merged [PR270](https://github.com/jwill9999/agent-platform/pull/270) into
+`feature/harness-backlog-review` on September 23. Final repair source: `93799833958151e01b1981086a8afd6a04bd63b7`.
+All ten executed hosted checks passed, including full verification, browser and Electron journeys,
+SonarCloud and Sourcery. Hosted Electron reported 22 passed. Sourcery approved the follow-up and its
+finding is resolved; Sonar reported zero unresolved findings. The staging-only packaged macOS VM
+check was skipped and is not covered by this result.
+
+The repair task is closed after integration. P2 remains in progress for wider permission coverage;
+cancellation, retry and recovery gaps remain open. The sections below retain the failure and repair
+chronology: their pending-check, draft and not-merge-ready statements describe earlier checkpoints,
+not current status. The earlier statement that no product code changed describes only the initial
+assessment. The final corrections preserve permission precedence and have regression evidence.
+
 ## Initial findings before repair
 
 Ask and Auto-run persist through UI reload and require one approval for the sampled high-risk shell

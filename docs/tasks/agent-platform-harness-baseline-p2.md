@@ -85,3 +85,16 @@ Scenario: A file-listing error must not misrepresent saved permission settings
 
 Use a regular disposable file as the workspace root parent to cause a real filesystem error; do not
 mock the settings or file-listing API. Preserve the failing expectation as a tracked product finding.
+
+## Current checkpoint after integrated repair
+
+The owner separately authorized the two application repairs and review follow-up after the initial
+tests-only assessment. PR270 is merged; `agent-platform-permission-ui-consistency` is closed.
+The sampled shell-write cases and failed-listing reload/Refresh regression pass with no change to
+permission precedence. All ten executed hosted checks passed; packaged macOS VM validation remains
+separate. See the [current evidence](../reviews/current-runtime-permission-baseline.md).
+
+The tests-only wording above records the initial authorization boundary. P2 remains in progress;
+broader policy categories and direct file tools still need coverage. The proposed MVP contract now
+rebinds this specification during reconciliation; its earlier digest/critique cannot authorize
+execution of the refreshed proposal. No global gate or wider baseline is closed by this checkpoint.

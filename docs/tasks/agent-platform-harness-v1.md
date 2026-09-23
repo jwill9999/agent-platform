@@ -40,3 +40,28 @@ Upstream work and required quality gates pass; exact evidence and reviewed decis
 This is an unassigned planning record. Implementation branch parent and segment-tip designation must be specified in its approved execution contract before work. Follow feature/task chained branches; intermediate tasks require exact-head checks and declared integration evidence, segment tips additionally require merged PR/hosted gates. No main promotion is authorized.
 
 Reviewer/owner sign-off: pending. Evidence: pending. Effort: 1–2 provisional person-days.
+
+## Proposed current-stack MVP refinement — September 23
+
+The [MVP plan](../planning/mvp-reliability/plan.md#minimal-state-and-event-foundation-proposed-v1-refinement)
+adds precise local persistence, state/freshness, redaction, retention, diagnostic read API and failure
+requirements for owner review. It preserves all prior requirements and the existing review blocker.
+Implementation is not activated; the older broad modernization plan is not approved by this appendix.
+
+Downstream proposed children additionally include `agent-platform-harness-r3.cancel`,
+`agent-platform-harness-r3.reconcile`, and `agent-platform-harness-v4.local`.
+
+### Gherkin E2E Strategy
+
+```gherkin
+Feature: Truthful local run state
+  Scenario: Approval waiting survives a reload
+    Then UI and the persisted read model agree on the waiting state and identifiers
+  Scenario: Backend restarts without a terminal result
+    Then previous active work is interrupted or unknown until reconciled
+    And no action restarts automatically
+  Scenario: Optional telemetry is unavailable
+    Then execution policy is unchanged and missing diagnostics are visible
+  Scenario: Mandatory intent storage fails
+    Then a side-effecting action is not dispatched
+```
