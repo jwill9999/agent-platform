@@ -1,10 +1,8 @@
 # MVP reliability and basic visibility proposal
 
 Status: proposed implementation plan, not approved for execution. September 23, 2026.
-Owner approved the planning boundary and smaller in-app status panel, then separately authorized
-baseline tests and the bounded permission repairs now merged in PR270. The owner has authorized
-this plan reconciliation and independent review. Broader implementation remains unapproved.
-Beads remains the scheduling authority; no new runtime implementation agents are assigned.
+Owner authorized drafting and backlog refinement; explicitly agreed to include a smaller in-app
+status panel. No implementation agents have been assigned. Beads remains the scheduling authority.
 
 ## Recommended decision
 
@@ -14,12 +12,10 @@ that state in the existing chat UI. Verify the composed journey before consideri
 
 The goal is trustworthy connected-local operation: users can tell what is happening, stop further
 work, and inspect an uncertain result without the app accidentally repeating a side effect.
-The prior recovery baseline established reload approve/deny, completed-resume replay and a single
-pre-effect provider failure. The integrated permission repair adds representative Ask/Auto/Block
-shell-write journeys and truthful reload/denied/unavailable displays; all ten executed hosted checks
-passed at its final source, including 22 Electron tests. These results do not prove all policy
-categories, direct file tools, first-resume races, backend restart, ambiguous tool outcomes or Stop.
-External model HTTP and command-runner boundaries are fixtures; packaged macOS VM testing was skipped.
+No claim that all existing functionality is broken: the merged baseline passed 18 hosted desktop
+scenarios and browser checks. Its new evidence covered reload approve/deny, completed-resume replay,
+and a single pre-effect provider failure. It did not prove first-resume races, backend restart,
+ambiguous tool outcomes or a Stop control.
 
 ## Existing tasks and proposed sequence
 
@@ -49,26 +45,6 @@ before converting the draft into a runnable managed plan.
 The contract gives a sequential Git order to bound simultaneous work; additional ordering between
 otherwise independent baseline rows is scheduling preference, not a new Beads blocker. Existing
 baseline specs retain their own broader completion criteria. Do not duplicate already-passing tests.
-
-## Reconciled baseline and authorization checkpoint
-
-The permission UI repair (`agent-platform-permission-ui-consistency`, PR270) is merged and closed.
-Saved policy now survives listing errors, denied shell actions have terminal visible output, and
-failed listings show unavailable rather than empty/zero files. Enforcement and approval precedence
-are unchanged. The sampled high-risk append requires one approval for both Ask and Auto, while
-Block has zero approvals and no file effect. This is not a claim about every Auto category.
-
-P2 remains in progress for broader categories/direct file tools. X2 cancellation remains open;
-X3 retry and X5 recovery remain partial. Reuse passing journeys rather than duplicate them.
-The completed repair is evidence, not a new unfinished contract task or permission to reopen product
-scope. The proposed sequence above applies to the remaining work.
-
-The owner's earlier planning-boundary approval is historical evidence of intent, not execution
-approval for this refreshed material digest. The global review gate stays open, existing blockers
-remain, and no task activation or broader runtime authorization results from reconciliation.
-Independent review validates consistency; a later owner decision still governs execution and merge.
-Prior exact review artifacts are retained in `review-pre-reconciliation/`; the current manifest and
-final review bind the revised proposal. The unchanged policy digest remains separately validated.
 
 ## Minimal state and event foundation: proposed V1 refinement
 
@@ -115,7 +91,7 @@ state and readable diagnostics do not wait for them.
 
 ## Evidence, delivery and estimated effort
 
-Source baseline: feature/harness-backlog-review at `cb373f348a9bdaadf5193ee6d9e641c84eed7116`.
+Source baseline: feature/harness-backlog-review at `6b4d03e91ac0d2b1f6d765c5b4c5b108fb5bad59`.
 The documentation feature merged separately; combining either feature with staging is outside this
 plan. Production paths are permitted only by a later approved implementation contract. This planning
 PR contains documentation and proposed JSON only, on `task/mvp-reliability-plan` to the existing
@@ -137,7 +113,6 @@ infrastructure retries; never weaken assertions to meet a budget or silently exp
 
 ## Source anchors and current findings
 
-- [Integrated permission baseline](../../reviews/current-runtime-permission-baseline.md): repaired regressions, final checks and remaining P2 scope.
 - [Merged recovery baseline](../../reviews/current-runtime-recovery-baseline.md): precise fixture boundaries and gaps.
 - `apps/web/components/chat/chat-input.tsx`: no current user Stop control.
 - `apps/web/hooks/use-harness-chat.ts`: current send/resume UI and pending-approval reload.

@@ -39,3 +39,62 @@ Owner authorized creation of this backlog. Test implementation and product fixes
 ## Agreed defect repair boundary
 
 See the [owner-agreed repair rule](../planning/harness-modernization/current-runtime-baseline-plan.md#defect-repair-rule-agreed-with-the-owner). During an approved testing task, a small fix restoring established intended behavior can accompany the test without a separate approval request. Preserve failure evidence and the regression test, record cause and minimal fix, and rerun relevant checks. Architecture, dependency, public-contract, permission-policy or broader behavior changes require a linked repair task and owner review. Unclear expected behavior is a decision to surface, not implied repair authority. Planning and coverage-mapping tasks remain read-only; backlog execution is not authorized by this rule.
+
+## Gherkin E2E Strategy — September 23 authorized tests
+
+The owner approved execution of remaining baseline tests only. No application or policy changes.
+Use isolated Electron app data, a real managed backend/SQLite and the existing external HTTP provider
+and fixed-command runner fixtures. Change Workspace writes through the real settings UI, reload it
+and independently read persisted settings before the same Project shell append request in each case.
+
+```gherkin
+Feature: Workspace write policy precedence
+  Scenario Outline: Save a policy and request the same shell write
+    Given I select <policy> for Workspace writes in Settings
+    And the saved policy survives a reload and matches the backend record
+    When I ask to append one line to a disposable Project file
+    Then <approval> approval prompts appear
+    And before any approval the file remains unchanged
+    When the turn finishes after any required approval
+    Then there are <effects> appended lines and successful execution records
+
+    Examples:
+      | policy | approval | effects |
+      | Ask approval | 1 | 1 |
+      | Auto-run | 1 | 1 |
+      | Block | 0 | 0 |
+```
+
+Expected Auto-run prompting follows the existing explicit high-risk shell-redirection approval rule;
+this test does not assert that all tools or policy categories behave the same way. Block must settle
+with visible denial, no approval record and no file effect. Retain UI trace, selected/persisted policy,
+provider call count, session identity, durable approvals/audits and file before/after on pass or failure.
+Broader policy categories and direct file-tool behavior remain separate coverage. This spec refinement
+changes a document bound by the proposed MVP contract; refresh that proposal's digest/critique before
+any later full-tranche implementation approval. It does not activate that proposal.
+
+### File-listing failure regression
+
+```gherkin
+Scenario: A file-listing error must not misrepresent saved permission settings
+  Given the isolated workspace file listing fails because its root is unavailable
+  And I save Block for Workspace writes through Settings
+  When I reload Settings
+  Then Workspace writes still shows Block, matching the persisted backend record
+```
+
+Use a regular disposable file as the workspace root parent to cause a real filesystem error; do not
+mock the settings or file-listing API. Preserve the failing expectation as a tracked product finding.
+
+## Current checkpoint after integrated repair
+
+The owner separately authorized the two application repairs and review follow-up after the initial
+tests-only assessment. PR270 is merged; `agent-platform-permission-ui-consistency` is closed.
+The sampled shell-write cases and failed-listing reload/Refresh regression pass with no change to
+permission precedence. All ten executed hosted checks passed; packaged macOS VM validation remains
+separate. See the [current evidence](../reviews/current-runtime-permission-baseline.md).
+
+The tests-only wording above records the initial authorization boundary. P2 remains in progress;
+broader policy categories and direct file tools still need coverage. The proposed MVP contract now
+rebinds this specification during reconciliation; its earlier digest/critique cannot authorize
+execution of the refreshed proposal. No global gate or wider baseline is closed by this checkpoint.

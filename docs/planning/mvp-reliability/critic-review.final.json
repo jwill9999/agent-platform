@@ -1,35 +1,35 @@
 {
-  "reviewId": "mvp-plan-critic-20260923-02",
+  "reviewId": "mvp-plan-reconciliation-critic-20260923-01",
   "runId": "mvp-reliability-proposal",
   "plannerId": "mvp-planner",
-  "criticId": "mvp-plan-critic",
+  "criticId": "reconciliation-review",
   "contractVersion": 1,
   "policyDigest": "sha256:211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1",
-  "materialDigest": "sha256:d1df810c8290df06e97017747141aa7d3890ac49def506b8c015a5cbaec5b463",
+  "materialDigest": "sha256:ff4e32528590799682edd71aaf8c98a6a06f39e7a0f70b190ae5437ea1b9c291",
   "verdict": "approved",
-  "summary": "Independent second-pass review confirms both findings are corrected. MVP-CRIT-001: the exact Project Chat host is permitted globally, for Stop/reconciliation/panel tasks and for bounded repairs, with matching specifications and explicit exclusion of the separate IDE surface. MVP-CRIT-002: all 11 normative documents are SHA256-bound within canonical contract requirements; every binding matches current bytes, and mismatch explicitly blocks execution pending revision, critique and owner approval. Schema validation and canonical material digest verification passed; all 23 manifest entries match their recorded hashes and sizes. Comparison against the first-round contract found only the stated corrections, with dependency order, conservative cancellation/recovery behavior, quality gates and feature-only delivery unchanged. Approval covers this planning proposal only: owner execution approval, scoped Beads readiness reconciliation and document-hash preflight remain required. No runtime implementation or enforcement capability was verified.",
+  "summary": "Independent read-only review approves the reconciled planning proposal with zero findings. Current TypeScript source schemas were loaded through in-memory transpilation; execution-contract validation and canonical material digest verification passed. All 11 normative document bindings, all 28 manifest entries and the policy digest match current bytes. Comparison with the archived contract shows only the plan and P2 document hashes changed: task dependencies, authority containment, allowed paths and operations, Stop/recovery/status requirements, quality gates, retry limits and feature-only delivery remain unchanged. The revised plan and P2 specification distinguish completed owner-authorized testing and permission repairs from the unapproved broader implementation tranche. The permission report clearly identifies earlier failures and pending checks as historical. Live GitHub independently confirms PR270 merged into the stated feature baseline from the final repair source, all ten executed checks succeeded, Sourcery approved, and the staging packaged VM check was skipped. The remaining permission categories, cancellation, ambiguous retries, first-resume races and backend restart coverage remain explicitly incomplete. The global review gate stays open; no broader task activation, runtime implementation, staging promotion or merge authorization is implied by this review. Future execution still requires the stated scoped approval, Beads readiness reconciliation and normative document preflight.",
   "evidence": [
     {
-      "digest": "sha256:2e27de25bd33ad993c423449c0ab1ba5ddcab8c785eb74bb9538ef544b77cb3c",
+      "digest": "sha256:d9306eab196b066053c92d0953746b5b35feed0f4ce5b6f995c1d027ba080e40",
       "sizeBytes": 23272,
       "mediaType": "application/json",
       "kind": "artifact"
     },
     {
-      "digest": "sha256:4413abd356fd9895c9632b44712cf3b6769ef1235534da3dcbecea3b1746da85",
-      "sizeBytes": 12706,
+      "digest": "sha256:1fa975c78bb02efdf3f2f19e7b9ab66d681c85809aee9c950d06231b88bf10fc",
+      "sizeBytes": 14770,
       "mediaType": "text/plain",
       "kind": "artifact"
     },
     {
-      "digest": "sha256:31d6c63bbdac6fc2df3de87e1b91d619b45d1b2182c9eca65ff007fea737fcf1",
-      "sizeBytes": 62643,
+      "digest": "sha256:c63ecaec8b656c8fe08febaac1904b0919801533982cf65e5d23600265c63a95",
+      "sizeBytes": 7759,
       "mediaType": "text/plain",
       "kind": "artifact"
     },
     {
-      "digest": "sha256:73038ca29c621aea8ba08645a22abe3d43801b6313fe807dc225a20ce36d1304",
-      "sizeBytes": 9713,
+      "digest": "sha256:a611c0b3854cb6998b091857c09abc590a22825e0734d5ceb0564e45b9b6292b",
+      "sizeBytes": 10371,
       "mediaType": "text/plain",
       "kind": "artifact"
     },

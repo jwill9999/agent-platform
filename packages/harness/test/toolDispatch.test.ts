@@ -734,7 +734,9 @@ describe('toolDispatchNode', () => {
       logDenied,
       logPendingApproval: vi.fn(),
     } satisfies ToolAuditLogger;
+    const emit = vi.fn();
     const ctx: ToolDispatchContext = {
+      emitter: { emit },
       agent: makeAgent({ allowedToolIds: ['sys_bash'] }),
       mcpManager: makeMcpManager(),
       nativeToolExecutor: nativeExecutor,
@@ -753,6 +755,16 @@ describe('toolDispatchNode', () => {
       }),
     );
 
+    expect(emit).toHaveBeenCalledWith({
+      type: 'tool_result',
+      toolId: 'sys_bash',
+      data: {
+        ok: false,
+        error: 'COMMAND_POLICY_DENIED',
+        message: expect.stringContaining('Recursive removal commands are blocked'),
+        evidence: { status: 'denied' },
+      },
+    });
     expect(nativeExecutor).not.toHaveBeenCalled();
     expect(approvalRequests.create).not.toHaveBeenCalled();
     expect(logDenied).toHaveBeenCalledWith(

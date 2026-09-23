@@ -1,19 +1,19 @@
 {
-  "materialDigest": "sha256:ff4e32528590799682edd71aaf8c98a6a06f39e7a0f70b190ae5437ea1b9c291",
+  "materialDigest": "sha256:d1df810c8290df06e97017747141aa7d3890ac49def506b8c015a5cbaec5b463",
   "policyDigest": "sha256:211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1",
-  "sourceRevision": "cb373f348a9bdaadf5193ee6d9e641c84eed7116",
+  "sourceRevision": "6b4d03e91ac0d2b1f6d765c5b4c5b108fb5bad59",
   "entries": [
     {
       "path": "docs/planning/mvp-reliability/execution-contract.v1.json",
-      "digest": "sha256:d9306eab196b066053c92d0953746b5b35feed0f4ce5b6f995c1d027ba080e40",
+      "digest": "sha256:2e27de25bd33ad993c423449c0ab1ba5ddcab8c785eb74bb9538ef544b77cb3c",
       "sizeBytes": 23272,
       "mediaType": "application/json",
       "kind": "artifact"
     },
     {
       "path": "docs/planning/mvp-reliability/plan.md",
-      "digest": "sha256:1fa975c78bb02efdf3f2f19e7b9ab66d681c85809aee9c950d06231b88bf10fc",
-      "sizeBytes": 14770,
+      "digest": "sha256:4413abd356fd9895c9632b44712cf3b6769ef1235534da3dcbecea3b1746da85",
+      "sizeBytes": 12706,
       "mediaType": "text/plain",
       "kind": "artifact"
     },
@@ -68,8 +68,8 @@
     },
     {
       "path": "docs/tasks/agent-platform-harness-baseline-p2.md",
-      "digest": "sha256:c63ecaec8b656c8fe08febaac1904b0919801533982cf65e5d23600265c63a95",
-      "sizeBytes": 7759,
+      "digest": "sha256:6c6879af591e9cbe8be8440dc12ef575b21b2428f465ead37edf14013e37b8a3",
+      "sizeBytes": 4409,
       "mediaType": "text/plain",
       "kind": "artifact"
     },
@@ -161,41 +161,6 @@
       "path": "pnpm-lock.yaml",
       "digest": "sha256:838747d11ae81ecba6fc558b8b2b6a4dd2e4ca3df2e0844c9d8d7d08256394c5",
       "sizeBytes": 313942,
-      "mediaType": "text/plain",
-      "kind": "artifact"
-    },
-    {
-      "path": "docs/reviews/current-runtime-permission-baseline.md",
-      "digest": "sha256:a611c0b3854cb6998b091857c09abc590a22825e0734d5ceb0564e45b9b6292b",
-      "sizeBytes": 10371,
-      "mediaType": "text/plain",
-      "kind": "artifact"
-    },
-    {
-      "path": "docs/tasks/agent-platform-permission-ui-consistency.md",
-      "digest": "sha256:ab4d22b7f25b02e36a2861943e93d9aa61c90e1c11283df9e1a24086162ac812",
-      "sizeBytes": 3220,
-      "mediaType": "text/plain",
-      "kind": "artifact"
-    },
-    {
-      "path": "apps/desktop/e2e/packaged-vm-command.e2e.ts",
-      "digest": "sha256:8461bb9ad4333108c2bd72b1b940aa2a7bc67969b3edd24ada4a493482afd969",
-      "sizeBytes": 42692,
-      "mediaType": "text/plain",
-      "kind": "artifact"
-    },
-    {
-      "path": "apps/web/components/config/workspace-dashboard.tsx",
-      "digest": "sha256:e69a4002fb10e712245789f3f996349779c84194e3dc6f3fda4978604aa79f44",
-      "sizeBytes": 13549,
-      "mediaType": "text/plain",
-      "kind": "artifact"
-    },
-    {
-      "path": "packages/harness/src/nodes/toolDispatch.ts",
-      "digest": "sha256:80ff8797dc80d7c7b7d02e82e67bb21cdc5ec645a9b18cc70117e655aa1be3f0",
-      "sizeBytes": 47316,
       "mediaType": "text/plain",
       "kind": "artifact"
     }
