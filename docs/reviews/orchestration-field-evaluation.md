@@ -162,6 +162,31 @@ A status lookup supports recovery and duplicate prevention; it is not the activa
 existing-run recovery and runtime health need distinct evidence. This proposed procedure does not
 claim those paths have been exercised or activate them now.
 
+#### Future consideration: model selection by role and task complexity
+
+The owner requested recording this for possible future work, not implementing model routing now.
+The existing approved policy in [the orchestration epic](../tasks/agent-platform-multi-agent.md)
+is to inherit the parent model initially and benchmark before role-specific overrides. Repository
+agent definitions omit model and reasoning-effort overrides. The isolated specialist launcher writes
+its own minimal configuration and invokes execution without explicit model selection; that source
+observation does not establish which effective model runs or prove inheritance from the parent.
+
+A future evaluation could compare cheaper, smaller models for bounded routine tasks with stronger
+reasoning models for complex planning, diagnosis or review. Selection could consider both role and
+task difficulty; it should not assume that every task assigned to a given role has equal complexity.
+Any escalation after failed verification should be bounded and remain within approved authority and
+spend limits. No particular model, provider, price, scoring threshold or fallback is selected here.
+
+Before adopting such routing, establish the effective model/provider and reasoning configuration at
+launch, record what was actually used, and benchmark representative tasks against a common baseline.
+Compare verified quality, completion, latency, retries/escalations and total cost per accepted result,
+including failed attempts. Evaluate any proposal against the owner's agreed budget and require review
+before changing defaults or running paid experiments. Model strength or confidence never changes
+permissions, approval requirements or acceptance gates.
+
+Disposition: future review consideration only. No model assignment, dependency, provider integration,
+benchmark run or budget change is authorized by this note.
+
 #### Questions retained for the orchestration review
 
 - How should a discoverable skill and supported entrypoint expose eligibility, readiness and

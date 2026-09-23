@@ -14,6 +14,11 @@ separate runtime-health checks, no-run versus failed-lookup handling, and explic
 Routing rules are proposed; confidence scoring is unvalidated. No skill, runtime, approval or policy
 change is implemented. Return to the owner for further review questions after this documentation update.
 
+The owner also requested retaining model selection by role/task complexity as a future consideration.
+The review records current inheritance intent, unverified effective selection in the isolated launcher,
+and the need to benchmark quality, cost and retries before changes. No model routing, paid experiment
+or budget change is authorized. Further review discussion remains the next step.
+
 The direct-file repair remains pushed in PR271. All ten executed hosted checks passed at `3d7c44b`;
 one separate Git merge-resolver test passed on retry. Human review/merge remains separate.
 This handoff change is documentation only and does not claim new runtime verification.
