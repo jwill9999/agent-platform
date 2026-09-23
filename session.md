@@ -14,6 +14,11 @@ consistent write-mode enforcement across direct mutation tools. Permission-seman
 owner approval under the agreed repair boundary. P2 remains partial; do not merge this failing
 baseline evidence branch or activate broader MVP/staging work. Next decision: approve direct-tool
 coverage for Workspace writes, then implement a bounded repair with these regressions retained.
+Committed test revision `7771375` repeated the same 7 pass / 2 fail result. Draft PR271 contains
+the preserved regressions and follow-up; leave it unmerged. Committed artifacts are in
+`.agent-platform/permission-category-committed-results`. Hosted checks remain separate; the local
+push hook encountered 12 existing Xcode-license Git failures (630 harness tests pass), recorded in
+the report before bypassing it for draft publication.
 See `docs/reviews/current-runtime-permission-category-baseline.md` for evidence and limitations.
 
 ## Historical planning handoff

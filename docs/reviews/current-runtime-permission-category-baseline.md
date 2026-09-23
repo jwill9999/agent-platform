@@ -84,3 +84,17 @@ pnpm --filter @agent-platform/harness exec vitest run test/bashCommandPolicy.tes
 Use Node 24 and current build outputs. External model requests are restricted to the local provider
 fixture. Linux hosted Electron runs use the existing Xvfb job. No real network call is needed by the
 network-denial case. Keep the initial artifacts when rerunning from a committed source.
+
+## Committed confirmation and delivery
+
+At test revision `7771375`, all nine permission journeys reran after the build checks completed:
+**7 passed, 2 failed**, reproducing the same direct Ask and Block outcomes. Evidence is retained in
+`.agent-platform/permission-category-committed-results` and its matching report. The initial run is
+preserved separately. No production code changed between these runs.
+
+[Draft PR271](https://github.com/jwill9999/agent-platform/pull/271) publishes the tests and scoped
+follow-up. Local affected builds/typechecks and 112 desktop tests passed; 630 harness tests passed
+and 12 existing Git tests failed because Apple Git requires Xcode-license acceptance. The push hook
+was bypassed for publication after recording that limitation; hosted checks remain required and the
+known composed failures keep this draft unmergeable by the project quality gate. E2E TypeScript,
+touched-file lint, formatting, Markdown and relative links passed. No failure is hidden or waived.
