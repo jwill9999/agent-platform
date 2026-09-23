@@ -214,3 +214,12 @@ interventions and whether execution continued correctly. Distinguish legitimate 
 notification or continuation failures. Surface any problems in this review and the existing Beads
 assessment; use the evidence to decide whether specific rework is needed. This is an untested area,
 not a confirmed defect, redesign decision or authorization to launch a run or change permissions.
+
+#### Proposed single-task and two-task assessments
+
+The owner requested a staged real-use assessment: first complete one bounded task and review its
+outcome; if successful, approve a second pilot containing two dependent tasks and verify automatic
+progression between them. The [assessment protocol](orchestration-staged-assessment.md) records
+readiness, pass/fail criteria, evidence and intervention reporting. Both remain unexecuted. A blocked
+readiness check or failed pilot is useful evidence and must be surfaced; manual completion is not a
+managed pass. The two-task pilot is conditional on successful reviewed single-task evidence.

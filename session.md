@@ -23,6 +23,11 @@ Added the owner's September 24 testing-gap reminder: assess upfront approval acr
 handoffs and recovery, record unnecessary prompts or continuation problems, and base any rework on
 evidence. No run launch, permission change or confirmed defect is implied by this reminder.
 
+The owner requested a written staged assessment: readiness, one complete managed task, owner review,
+then a separately approved two-dependent-task pilot proving automatic progression. Protocol:
+`docs/reviews/orchestration-staged-assessment.md`. Both runs remain unexecuted; prerequisites, exact
+work selection and executable material must be resolved first. Manual bridging cannot count as a pass.
+
 The direct-file repair remains pushed in PR271. All ten executed hosted checks passed at `3d7c44b`;
 one separate Git merge-resolver test passed on retry. Human review/merge remains separate.
 This handoff change is documentation only and does not claim new runtime verification.
