@@ -223,3 +223,14 @@ progression between them. The [assessment protocol](orchestration-staged-assessm
 readiness, pass/fail criteria, evidence and intervention reporting. Both remain unexecuted. A blocked
 readiness check or failed pilot is useful evidence and must be surfaced; manual completion is not a
 managed pass. The two-task pilot is conditional on successful reviewed single-task evidence.
+
+#### Planning-skill evaluation reminder
+
+At the owner's request, assess the existing feature-planning skill while preparing the pilot. Record
+any missing requirements, ambiguous guidance, validation or critic-handoff gaps, and missing steps
+between the planning output and a runnable approved workflow. Capture expected versus observed
+behaviour, evidence, impact and any manual supplementation or intervention. Distinguish a skill gap
+from unavailable runtime infrastructure or an intentional approval boundary. Surface findings here
+and in the existing Beads assessment rather than silently filling gaps and treating the skill as
+complete. This reminder does not assert a defect or authorize changes to the skill; propose specific
+rework only when supported by the assessment.

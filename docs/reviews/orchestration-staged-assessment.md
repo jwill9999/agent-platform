@@ -143,6 +143,15 @@ review both task results and the intervening automatic transition before conside
 feature. Two tasks completed by separately prompting the primary agent are not a managed two-task
 pass. Success here does not certify all interruption/recovery cases or close the wider pilot.
 
+## Planning-skill observations
+
+Use the existing feature-planning skill when preparing the task-specific execution material. Record
+any gaps in that skill, its required inputs, validation, independent critique or activation handoff
+in the [field evaluation](orchestration-field-evaluation.md#planning-skill-evaluation-reminder) and
+existing Beads assessment. Preserve manual supplementation as an intervention; do not claim the skill
+provided a complete runnable handoff when missing steps were supplied outside it. Finding a gap does
+not by itself authorize a skill or runtime change.
+
 ## Present state
 
 Both assessments are documented but not executed. Next step: read-only readiness assessment and

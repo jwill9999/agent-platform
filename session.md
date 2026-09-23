@@ -28,6 +28,10 @@ then a separately approved two-dependent-task pilot proving automatic progressio
 `docs/reviews/orchestration-staged-assessment.md`. Both runs remain unexecuted; prerequisites, exact
 work selection and executable material must be resolved first. Manual bridging cannot count as a pass.
 
+The owner requested that gaps discovered while using the current planning skill be surfaced in the
+orchestration field evaluation and Beads, including manual supplementation needed for runnable material.
+This observation requirement is documented in both the field review and staged assessment protocol.
+
 The direct-file repair remains pushed in PR271. All ten executed hosted checks passed at `3d7c44b`;
 one separate Git merge-resolver test passed on retry. Human review/merge remains separate.
 This handoff change is documentation only and does not claim new runtime verification.
