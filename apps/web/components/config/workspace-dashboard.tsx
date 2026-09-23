@@ -35,16 +35,6 @@ function areaCount(area: WorkspaceAreaListing): number {
   return area.files.filter((file) => file.kind === 'file').length;
 }
 
-const DEFAULT_EXECUTION_POLICY: ExecutionPolicySettings = {
-  unknownToolPolicy: 'ask',
-  unknownCommandPolicy: 'ask',
-  workspaceWrite: 'ask',
-  packageInstall: 'ask',
-  network: 'ask',
-  gitMutation: 'ask',
-  container: 'ask',
-};
-
 const POLICY_OPTIONS: Array<{ value: ExecutionPolicyMode | 'ask' | 'block'; label: string }> = [
   { value: 'ask', label: 'Ask approval' },
   { value: 'block', label: 'Block' },
@@ -59,8 +49,7 @@ function policyLabel(value: string): string {
 
 export function WorkspaceDashboard() {
   const [data, setData] = useState<WorkspaceFilesResponse | undefined>();
-  const [executionPolicy, setExecutionPolicy] =
-    useState<ExecutionPolicySettings>(DEFAULT_EXECUTION_POLICY);
+  const [executionPolicy, setExecutionPolicy] = useState<ExecutionPolicySettings>();
   const [loading, setLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,18 +57,21 @@ export function WorkspaceDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const [files, settings] = await Promise.all([
-        apiGet<WorkspaceFilesResponse>(apiPath('workspace', 'files')),
-        apiGet<PlatformSettings>(apiPath('settings')),
-      ]);
-      setData(files);
-      setExecutionPolicy(settings?.executionPolicy ?? DEFAULT_EXECUTION_POLICY);
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
+    const [files, settings] = await Promise.allSettled([
+      apiGet<WorkspaceFilesResponse>(apiPath('workspace', 'files')),
+      apiGet<PlatformSettings>(apiPath('settings')),
+    ]);
+    setData(files.status === 'fulfilled' ? files.value : undefined);
+    setExecutionPolicy(
+      settings.status === 'fulfilled' ? settings.value?.executionPolicy : undefined,
+    );
+    const errors = [files, settings].flatMap((result) =>
+      result.status === 'rejected'
+        ? [result.reason instanceof ApiRequestError ? result.reason.message : String(result.reason)]
+        : [],
+    );
+    setError(errors.length ? errors.join(' ') : null);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -90,6 +82,7 @@ export function WorkspaceDashboard() {
 
   const updateExecutionPolicy = useCallback(
     async (patch: Partial<ExecutionPolicySettings>) => {
+      if (!executionPolicy) return;
       const previous = executionPolicy;
       const next = { ...previous, ...patch };
       setExecutionPolicy(next);
@@ -115,49 +108,49 @@ export function WorkspaceDashboard() {
       id: 'unknownCommandPolicy',
       label: 'Unknown commands',
       description: 'Commands that are not clearly read-only or destructive.',
-      value: executionPolicy.unknownCommandPolicy,
+      value: executionPolicy?.unknownCommandPolicy,
       values: POLICY_OPTIONS.filter((option) => option.value !== 'auto'),
     },
     {
       id: 'unknownToolPolicy',
       label: 'Unknown tools',
       description: 'Registered tools that are not auto-approved by the agent allowlist.',
-      value: executionPolicy.unknownToolPolicy,
+      value: executionPolicy?.unknownToolPolicy,
       values: POLICY_OPTIONS.filter((option) => option.value !== 'auto'),
     },
     {
       id: 'workspaceWrite',
       label: 'Workspace writes',
       description: 'Commands that create, edit, move, or remove Project files.',
-      value: executionPolicy.workspaceWrite,
+      value: executionPolicy?.workspaceWrite,
       values: POLICY_OPTIONS,
     },
     {
       id: 'packageInstall',
       label: 'Package and script commands',
       description: 'Package managers and project script execution.',
-      value: executionPolicy.packageInstall,
+      value: executionPolicy?.packageInstall,
       values: POLICY_OPTIONS,
     },
     {
       id: 'network',
       label: 'Network commands',
       description: 'Commands that access external hosts or services.',
-      value: executionPolicy.network,
+      value: executionPolicy?.network,
       values: POLICY_OPTIONS,
     },
     {
       id: 'gitMutation',
       label: 'Git mutations',
       description: 'Git commands that modify local or remote repository state.',
-      value: executionPolicy.gitMutation,
+      value: executionPolicy?.gitMutation,
       values: POLICY_OPTIONS,
     },
     {
       id: 'container',
       label: 'Container commands',
       description: 'Docker, container, and runtime orchestration commands.',
-      value: executionPolicy.container,
+      value: executionPolicy?.container,
       values: POLICY_OPTIONS,
     },
   ] as const;
@@ -171,7 +164,7 @@ export function WorkspaceDashboard() {
             Files available inside the agent workspace
           </p>
         </div>
-        <Button variant="outline" onClick={() => load()} disabled={loading}>
+        <Button variant="outline" onClick={() => load()} disabled={loading || settingsSaving}>
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -198,40 +191,50 @@ export function WorkspaceDashboard() {
             <Badge variant="outline">{settingsSaving ? 'Saving' : 'Workspace'}</Badge>
           </div>
           <div className="divide-y divide-border">
-            {policyRows.map((row) => (
-              <label
-                key={row.id}
-                className="grid gap-3 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_12rem]"
-              >
-                <span>
-                  <span className="font-medium text-foreground">{row.label}</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    {row.description}
-                  </span>
-                </span>
-                <select
-                  className="h-9 rounded-md border border-border bg-background px-2 text-sm"
-                  value={row.value}
-                  disabled={settingsSaving}
-                  onChange={(event) => {
-                    const value = event.target.value as ExecutionPolicySettings[typeof row.id];
-                    updateExecutionPolicy({
-                      [row.id]: value,
-                    } as Partial<ExecutionPolicySettings>).catch(() => {});
-                  }}
+            {!executionPolicy && (
+              <output className="block px-4 py-3 text-sm text-muted-foreground">
+                {loading
+                  ? 'Loading execution policy…'
+                  : 'Execution policy unavailable. Refresh to retry.'}
+              </output>
+            )}
+            {executionPolicy &&
+              policyRows.map((row) => (
+                <label
+                  key={row.id}
+                  className="grid gap-3 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_12rem]"
                 >
-                  {row.values.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
+                  <span>
+                    <span className="font-medium text-foreground">{row.label}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      {row.description}
+                    </span>
+                  </span>
+                  <select
+                    className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+                    value={row.value}
+                    disabled={settingsSaving || loading}
+                    onChange={(event) => {
+                      const value = event.target.value as ExecutionPolicySettings[typeof row.id];
+                      updateExecutionPolicy({
+                        [row.id]: value,
+                      } as Partial<ExecutionPolicySettings>).catch(() => {});
+                    }}
+                  >
+                    {row.values.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
           </div>
           <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
             Destructive host actions are always blocked. Current default:{' '}
-            {policyLabel(executionPolicy.unknownCommandPolicy)} for unknown commands.
+            {executionPolicy
+              ? `${policyLabel(executionPolicy.unknownCommandPolicy)} for unknown commands.`
+              : 'unavailable.'}
           </p>
         </section>
 
@@ -254,7 +257,9 @@ export function WorkspaceDashboard() {
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <h2 className="font-medium text-foreground">Files</h2>
             <Badge variant="outline">
-              {rows.filter((row) => row.kind === 'file').length} files
+              {loading && 'Loading'}
+              {!loading && !data && 'Unavailable'}
+              {!loading && data && `${rows.filter((row) => row.kind === 'file').length} files`}
             </Badge>
           </div>
 
@@ -264,7 +269,13 @@ export function WorkspaceDashboard() {
             </div>
           )}
 
-          {!loading && rows.length === 0 && (
+          {!loading && !data && (
+            <output className="flex items-center justify-center h-56 text-sm text-muted-foreground">
+              File listing unavailable. Refresh to retry.
+            </output>
+          )}
+
+          {!loading && data && rows.length === 0 && (
             <div className="flex flex-col items-center justify-center h-56 text-center">
               <Folder className="h-12 w-12 text-muted-foreground/50 mb-4" />
               <h3 className="font-medium text-foreground mb-1">No workspace files yet</h3>

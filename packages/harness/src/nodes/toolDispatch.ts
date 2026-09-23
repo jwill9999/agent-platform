@@ -1292,6 +1292,16 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           toolName: safeCall.name,
           content: outputToContent(safeCall.name, output),
         });
+        await emitToolOutput(ctx, {
+          type: 'tool_result',
+          toolId: safeCall.name,
+          data: {
+            ok: false,
+            error: 'COMMAND_POLICY_DENIED',
+            message: shellPolicy.reason,
+            evidence: { status: 'denied' },
+          },
+        });
         traceEvents.push({ type: 'tool_dispatch', toolId: safeCall.name, step, ok: false });
         continue;
       }

@@ -1,4 +1,63 @@
-# Session handoff — September 22, 2026: recovery baseline continuation
+# Session handoff — September 23, 2026: authorized permission UI repair
+
+The owner explicitly approved fixing both reproduced permission-display defects. Changes are on the
+existing `task/mvp-baseline-permissions` / PR270 branch. No merge or staging promotion is authorized.
+Workspace Settings now keeps successful backend policy reads despite file-listing errors and shows
+loading/unavailable instead of assumed defaults. The harness emits a denied tool result when shell
+policy blocks execution, preserving existing model error, audit and no-execution behaviour.
+
+Both original composed regressions remain intact. Unit coverage now verifies denied emission without
+execution and initial settings rendering without fabricated defaults. The wider P2 and cancellation,
+retry/recovery baseline remain open. The repair issue stays in progress until the feature PR integrates.
+Local validation: all 13 selected Electron scenarios passed, and all four permission cases passed
+again at committed repair revision `3eb57cd` after an isolated rerun. Build/lint/type checks,
+187 frontend and 614 available harness tests pass. Push hook was bypassed only after its known
+12 Apple Git license failures; hosted CI must cover that complete suite. Changes are pushed,
+with hosted checks pending at this checkpoint.
+See [permission report](docs/reviews/current-runtime-permission-baseline.md) for final validation.
+Hosted review also requested a native output element for loading status and removal of duplicate
+provider setup in the Electron tests; both were addressed without changing policy assertions.
+Sourcery passed but reported a real follow-up: failed listing appeared empty. The existing error
+scenario now asserts unavailable listing/count after reload and Refresh; the UI distinguishes it
+from a successfully loaded empty workspace. See report for retained before/after evidence.
+No dependency/stack changes. The separate planning proposal still needs its updated spec hashes and
+independent critique reconciled before broader implementation approval.
+
+---
+
+## Historical checkpoint — permission baseline findings
+
+Owner approved the planning boundary, then separately authorized remaining baseline tests only.
+Application changes remain outside this tranche. Current branch: `task/mvp-baseline-permissions`,
+from the integrated harness baseline. Tests and evidence are pushed in [draft PR #270](https://github.com/jwill9999/agent-platform/pull/270).
+Test commit `b86db9d` reproduced two passes/two failures; the whole selected file had 11 passes/two failures.
+Desktop build/typecheck and 112 desktop unit tests passed on push. The gate remains FAIL.
+The planning proposal remains in its separate draft PR #269;
+its nine executed checks passed, packaged macOS staging test skipped as designed.
+
+Four new Electron permission scenarios exercise Ask/Auto/Block and a real file-listing error.
+Two product findings: saved policy appears as Ask after reload when file listing fails, and blocked
+shell work retains Running activity after the backend denied it and the turn finished. Preserve
+both unsatisfied regression assertions; do not silently skip or reinterpret them as success.
+Repair proposal: `agent-platform-permission-ui-consistency` (open P1). P2 remains in progress.
+See [permission evidence](docs/reviews/current-runtime-permission-baseline.md) for boundaries and
+commands. Production code and dependencies are unchanged. No staging/main promotion.
+
+Use isolated workspace roots for normal fixtures. Apple Git license remains unaccepted: use the
+bundled Git for fixture project initialization and repository operations. Existing gitTools unit
+fixtures hardcode Apple Git and cannot run successfully here; do not change them in this slice.
+The accidental broader harness unit invocation produced 614 passes and 12 Git-license failures;
+focused policy tests use `pnpm --filter @agent-platform/harness exec vitest run ...`.
+
+Next: review the recorded permission defects with the owner, finish wider P2 coverage, then continue
+cancellation/retry/recovery evidence in the agreed sequence. Product fixes need separate approval.
+Refresh the draft planning contract's task-spec hashes and independent critique before any broader
+implementation approval, because the P2 spec has now been refined. Keep the global gate open.
+Preserve unrelated root worktree changes (`.beads/interactions.jsonl`, `.vscode/mcp.json`).
+
+---
+
+## Historical handoff — September 22, 2026: recovery baseline continuation
 
 Owner requested continued frontend/backend journeys and a login adequacy check. Work is on
 `task/harness-recovery-baseline`, chained from `task/harness-provider-journey` at `5d3b876`;
