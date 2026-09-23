@@ -234,3 +234,10 @@ from unavailable runtime infrastructure or an intentional approval boundary. Sur
 and in the existing Beads assessment rather than silently filling gaps and treating the skill as
 complete. This reminder does not assert a defect or authorize changes to the skill; propose specific
 rework only when supported by the assessment.
+
+## Skill preparation evidence — 24 September 2026
+
+The owner authorized creating the missing skills and reviewing the handoff before joint review.
+See the [skill readiness assessment](orchestration-skill-readiness.md) for the created files, existing
+skill gaps, source-level runtime limitations and outstanding independent behavioral review.
+This preparation used the explicitly authorized direct path; it is not a managed pilot result.
