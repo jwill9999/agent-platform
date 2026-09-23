@@ -202,3 +202,15 @@ benchmark run or budget change is authorized by this note.
 
 The next step is readiness investigation and owner review of these findings. This entry does not
 activate orchestration, authorize specialist launches, approve standing repairs, or promote code.
+
+#### Testing-gap reminder: upfront approval in real managed use
+
+Added September 24 at the owner's request. We have not yet demonstrated that an approved scope
+completes through a real managed workflow without unnecessary repeat approvals. During the next
+separately authorized real-use evaluation, check that approval remains correctly bound across
+specialist handoffs, interruption and recovery, and that renewed approval is requested only when
+required by changed/revoked authority or a genuine exception. Record prompts, their reasons, manual
+interventions and whether execution continued correctly. Distinguish legitimate approval waits from
+notification or continuation failures. Surface any problems in this review and the existing Beads
+assessment; use the evidence to decide whether specific rework is needed. This is an untested area,
+not a confirmed defect, redesign decision or authorization to launch a run or change permissions.

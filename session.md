@@ -19,6 +19,10 @@ The review records current inheritance intent, unverified effective selection in
 and the need to benchmark quality, cost and retries before changes. No model routing, paid experiment
 or budget change is authorized. Further review discussion remains the next step.
 
+Added the owner's September 24 testing-gap reminder: assess upfront approval across real managed
+handoffs and recovery, record unnecessary prompts or continuation problems, and base any rework on
+evidence. No run launch, permission change or confirmed defect is implied by this reminder.
+
 The direct-file repair remains pushed in PR271. All ten executed hosted checks passed at `3d7c44b`;
 one separate Git merge-resolver test passed on retry. Human review/merge remains separate.
 This handoff change is documentation only and does not claim new runtime verification.
