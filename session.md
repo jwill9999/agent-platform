@@ -1,4 +1,65 @@
-# Session handoff — September 22, 2026: recovery baseline continuation
+# Session handoff — September 23, 2026: paused after permission repairs
+
+The owner explicitly paused work. Resume from this checkpoint; the material below it is
+historical. No further execution or background continuation is scheduled by this handoff.
+Beads remains the task-state authority.
+
+## Completed and verified
+
+The owner approved the current-stack planning boundary, including a smaller local status
+panel, then separately authorized baseline testing and the two bounded permission repairs.
+The tests reproduced saved-policy reload and denied-tool display defects. Both were repaired.
+The Sourcery follow-up also now distinguishes unavailable file data from an empty workspace,
+with a regression that waits for the failed backend Refresh response.
+
+[Permission fixes PR270](https://github.com/jwill9999/agent-platform/pull/270) was merged by
+the owner into `feature/harness-backlog-review`; the fetched integration tip is `cb373f3`.
+Final reviewed repair revision: `93799833958151e01b1981086a8afd6a04bd63b7`.
+All ten executed hosted checks passed, including browser and Electron journeys, full verification,
+SonarCloud and Sourcery. Sourcery approved and its finding is resolved; Sonar reported no
+unresolved findings. Hosted Electron reported 22 passing tests. The staging-only packaged macOS
+VM check was skipped. Nothing has been promoted to staging or main.
+
+Local evidence includes 13 passing selected Electron journeys before the final listing correction,
+four passing permission journeys after it, and a focused passing Refresh rerun. Initial failing
+regressions and later passing artifacts are retained under `.agent-platform/permission*` in the
+workflow-evaluation worktree. These journeys compose the renderer, API, database and harness;
+the external model HTTP service and command runner are fixtures. They do not establish live-model
+or packaged VM isolation behavior. The integrated evidence report is
+`docs/reviews/current-runtime-permission-baseline.md` on the feature branch.
+
+## Current state and resume action
+
+[Planning PR269](https://github.com/jwill9999/agent-platform/pull/269) remains open and held.
+Its checked-out branch is `task/mvp-reliability-plan` in
+`/Users/letuscode/projects/agent-platform-workflow-evaluation`. This session-only update does not
+reconcile the plan or make it ready to merge. Its older source baseline and bound requirements
+still need to reflect the completed tests and repairs.
+
+The first action on return is to reconcile the planning branch with the updated feature branch,
+update the plan's evidence and task/spec references, refresh normative document hashes and the
+contract digest, then validate and obtain an independent consistency review. Preserve historical
+review snapshots. Brief the owner on the reconciled plan before treating it as ready for merge or
+seeking approval for a broader implementation slice.
+
+After that, continue the existing baseline work: remaining permission coverage, cancellation,
+retry and recovery scenarios. The wider permission baseline remains partial; sampled high-risk
+shell-write behavior is verified, while other categories and direct file tools remain to assess.
+Cancellation, concurrent resume, backend restart and uncertain post-effect retry gaps must remain
+explicit. The local status panel and broader cancellation/recovery features have not been built.
+There is no stack-restructure decision or broad runtime implementation approval.
+
+Beads records: close the integrated `agent-platform-permission-ui-consistency` repair; keep
+`agent-platform-harness-baseline-p2` and `agent-platform-mvp-reliability-plan` in progress with
+this pause recorded. Keep the global harness review gate and broader feature tasks unchanged.
+Use `/Users/letuscode/projects/agent-platform` as the Beads workspace root. Preserve unrelated
+root-worktree changes. Documentation access remains separately integrated in its feature branch.
+
+## Historical handoff material
+
+The following records describe earlier checkpoints and may contain superseded statuses.
+
+## September 22, 2026: recovery baseline continuation
 
 ## September 23: proposed MVP reliability plan
 
