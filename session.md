@@ -1,4 +1,24 @@
-# Session handoff — planning reconciliation complete
+# Session handoff — remaining permission baseline finding
+
+Owner authorized continuing baseline testing after merging planning PR269. Current task:
+`agent-platform-harness-baseline-p2`, branch `task/permission-category-baseline`, base `c1ed389`.
+Using real Electron/UI/API/SQLite/dispatcher/file execution with external provider and runner fixtures.
+
+Initial permission suite: 7 pass, 2 fail. Direct writes under Ask and Block execute without an
+approval and change the disposable file; shell controls remain correct. Direct Auto, read under
+Block and network Block pass. Nineteen category policy unit tests and E2E type/lint checks pass.
+Failing screenshots/JSON/traces were inspected and retained. No application changes made.
+
+Priority-one follow-up `agent-platform-direct-file-policy` records the scope decision and recommended
+consistent write-mode enforcement across direct mutation tools. Permission-semantic changes need
+owner approval under the agreed repair boundary. P2 remains partial; do not merge this failing
+baseline evidence branch or activate broader MVP/staging work. Next decision: approve direct-tool
+coverage for Workspace writes, then implement a bounded repair with these regressions retained.
+See `docs/reviews/current-runtime-permission-category-baseline.md` for evidence and limitations.
+
+## Historical planning handoff
+
+## Planning reconciliation complete
 
 The owner authorized resolving the planning PR conflicts, updating requirements/evidence/Beads,
 and independent subagent review without further input unless agreed scope changes. This authorizes

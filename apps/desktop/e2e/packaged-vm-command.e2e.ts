@@ -418,17 +418,35 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
   });
 }
 
-for (const { policy, unavailableFiles } of [
-  { policy: 'ask', unavailableFiles: false },
-  { policy: 'auto', unavailableFiles: false },
-  { policy: 'block', unavailableFiles: false },
-  { policy: 'block', unavailableFiles: true },
+for (const { policy, unavailableFiles, action } of [
+  { policy: 'ask', unavailableFiles: false, action: 'shell-write' },
+  { policy: 'auto', unavailableFiles: false, action: 'shell-write' },
+  { policy: 'block', unavailableFiles: false, action: 'shell-write' },
+  { policy: 'block', unavailableFiles: true, action: 'shell-write' },
+  { policy: 'ask', unavailableFiles: false, action: 'direct-write' },
+  { policy: 'auto', unavailableFiles: false, action: 'direct-write' },
+  { policy: 'block', unavailableFiles: false, action: 'direct-write' },
+  { policy: 'block', unavailableFiles: false, action: 'direct-read' },
+  { policy: 'block', unavailableFiles: false, action: 'network' },
 ] as const) {
-  test(`Project Chat workspace write policy: ${policy} with ${unavailableFiles ? 'unavailable file listing' : 'persisted backend effects'}`, async () => {
+  test(`Project Chat permission policy: ${action} ${policy} with ${unavailableFiles ? 'unavailable file listing' : 'persisted backend effects'}`, async () => {
     const fixture = await createVmFixture({ health: 'ready' });
     const file = join(fixture.projectDir, 'journey.txt');
     writeFileSync(file, JOURNEY_BEFORE);
-    const provider = await startJourneyProvider(JOURNEY_COMMAND, JOURNEY_FINAL);
+    const directWrite = action === 'direct-write';
+    const readOnly = action === 'direct-read';
+    const denied = policy === 'block' && !readOnly;
+    const needsApproval = !denied && !readOnly && !(directWrite && policy === 'auto');
+    const policyKey = action === 'network' ? 'network' : 'workspaceWrite';
+    const toolName = directWrite ? 'sys_write_file' : readOnly ? 'sys_read_file' : 'sys_bash';
+    const toolArgs = directWrite
+      ? { path: file, content: JOURNEY_AFTER }
+      : readOnly
+        ? { path: file }
+        : { command: action === 'network' ? 'curl https://example.invalid' : JOURNEY_COMMAND };
+    const provider = await startJourneyProvider(JOURNEY_COMMAND, JOURNEY_FINAL, {
+      toolCall: { name: toolName, args: toolArgs },
+    });
     let app: ElectronApplication | undefined;
     let tracing = false;
     let passed = false;
@@ -441,7 +459,7 @@ for (const { policy, unavailableFiles } of [
         signal: AbortSignal.timeout(5_000),
       });
       expect(res.ok).toBe(true);
-      const body = (await res.json()) as { data: { executionPolicy: { workspaceWrite: string } } };
+      const body = (await res.json()) as { data: { executionPolicy: Record<string, string> } };
       return body.data.executionPolicy;
     };
     try {
@@ -457,16 +475,18 @@ for (const { policy, unavailableFiles } of [
       await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeVisible();
       await page.waitForLoadState('load');
       await page.goto(`http://127.0.0.1:${fixture.rendererPort}/settings/workspace`);
-      const selector = page.getByRole('combobox', { name: /Workspace writes/ });
+      const selector = page.getByRole('combobox', {
+        name: action === 'network' ? /Network commands/ : /Workspace writes/,
+      });
       await expect(selector).toBeVisible();
       // Force a real settings mutation even when the requested mode is the default.
       await selector.selectOption(policy === 'ask' ? 'block' : 'ask');
       await expect
-        .poll(async () => (await readPolicy()).workspaceWrite)
+        .poll(async () => (await readPolicy())[policyKey])
         .toBe(policy === 'ask' ? 'block' : 'ask');
       await expect(selector).toBeEnabled();
       await selector.selectOption(policy);
-      await expect.poll(async () => (await readPolicy()).workspaceWrite).toBe(policy);
+      await expect.poll(async () => (await readPolicy())[policyKey]).toBe(policy);
       await page.reload();
       await expect(selector).toHaveValue(policy);
       if (unavailableFiles) {
@@ -489,8 +509,15 @@ for (const { policy, unavailableFiles } of [
       await sendChatMessage(page, '/init');
       await page.getByRole('button', { name: 'Approve instructions' }).click();
       await expect(page.getByText('Project instructions approved').last()).toBeVisible();
-      await sendChatMessage(page, 'Append one line saying approved change to journey.txt.');
-      if (policy !== 'block') {
+      await sendChatMessage(
+        page,
+        readOnly
+          ? 'Read journey.txt.'
+          : action === 'network'
+            ? 'Inspect the example endpoint.'
+            : 'Write the approved change to journey.txt.',
+      );
+      if (needsApproval) {
         const card = page.getByTestId('approval-card');
         await expect(card).toHaveCount(1);
         await expect(card.getByRole('button', { name: 'Approve', exact: true })).toBeVisible();
@@ -509,26 +536,33 @@ for (const { policy, unavailableFiles } of [
       expect(provider.attempts.map((attempt) => attempt.status)).toEqual([200, 200]);
       approvals = await readEvidence<ApprovalEvidence>(fixture, 'approval-requests');
       audits = (await readEvidence<AuditEvidence>(fixture, 'tool-executions')).filter(
-        (row) => row.toolName === 'sys_bash',
+        (row) => row.toolName === toolName,
       );
-      expect(audits.filter((row) => row.status === 'success')).toHaveLength(
-        policy === 'block' ? 0 : 1,
-      );
-      expect(readFileSync(file, 'utf8')).toBe(policy === 'block' ? JOURNEY_BEFORE : JOURNEY_AFTER);
-      if (policy === 'block') {
+      expect(audits.filter((row) => row.status === 'success')).toHaveLength(denied ? 0 : 1);
+      expect(readFileSync(file, 'utf8')).toBe(denied || readOnly ? JOURNEY_BEFORE : JOURNEY_AFTER);
+      if (denied) {
         expect(approvals).toHaveLength(0);
         await expect(page.getByTestId('approval-card')).toHaveCount(0);
         expect(audits.filter((row) => row.status === 'denied')).toHaveLength(1);
-      } else {
+      } else if (needsApproval) {
         expect(approvals).toHaveLength(1);
         expect(approvals[0]?.status).toBe('approved');
         expect(approvals[0]?.resumedAtMs).toEqual(expect.any(Number));
+      } else {
+        expect(approvals).toHaveLength(0);
+        await expect(page.getByTestId('approval-card')).toHaveCount(0);
       }
       const result = provider.requests[1]?.messages.find(
         (m) => m.role === 'tool' && m.tool_call_id === JOURNEY_CALL_ID,
       );
       expect(JSON.stringify(result?.content)).toContain(
-        policy === 'block' ? 'COMMAND_POLICY_DENIED' : 'The command completed successfully.',
+        denied
+          ? 'DENIED'
+          : readOnly
+            ? JOURNEY_BEFORE.trim()
+            : directWrite
+              ? 'written'
+              : 'The command completed successfully.',
       );
       const sessionId = audits[0]?.sessionId;
       expect(sessionId).toEqual(expect.any(String));
@@ -543,10 +577,13 @@ for (const { policy, unavailableFiles } of [
               (row) => row.sessionId === sessionId && row.kind === 'task_end',
             ).length,
         )
-        .toBe(policy === 'block' ? 1 : 2);
-      if (policy === 'block') {
+        .toBe(needsApproval ? 2 : 1);
+      if (denied) {
         const activity = await openToolActivity(page);
         await expect(activity).toContainText('Denied');
+      }
+      if (action === 'network') {
+        expect(existsSync(join(fixture.projectDir, '.runner-invocations'))).toBe(false);
       }
       passed = true;
     } finally {
@@ -555,7 +592,7 @@ for (const { policy, unavailableFiles } of [
       );
       audits = (
         await readEvidence<AuditEvidence>(fixture, 'tool-executions').catch(() => audits)
-      ).filter((row) => row.toolName === 'sys_bash');
+      ).filter((row) => row.toolName === toolName);
       savedPolicy = await readPolicy().catch(() => savedPolicy);
       try {
         if (app && tracing) {
@@ -573,6 +610,7 @@ for (const { policy, unavailableFiles } of [
         try {
           const evidence = {
             policy,
+            action,
             unavailableFiles,
             savedPolicy,
             passed,
@@ -590,7 +628,7 @@ for (const { policy, unavailableFiles } of [
             }).trim(),
             limitations: [
               'External HTTP provider and fixed-command runner fixtures; no live-model or real VM claim.',
-              'Only workspace-write policy for a high-risk shell append is covered; Auto does not override its explicit approval requirement.',
+              'Direct file modes test the write-policy scope; shell Auto retains explicit high-risk approval precedence.',
             ],
           };
           const path = test.info().outputPath('policy-evaluation.json');
@@ -872,6 +910,7 @@ function writePackagedVmResources(resourcesDir: string, health: VmFixtureHealth)
       "  const path = require('node:path');",
       "  fs.appendFileSync(path.join(option('--workspace'), 'journey.txt'), 'approved change\\n');",
       '}',
+      "if (args[0] === 'exec') require('node:fs').appendFileSync(require('node:path').join(option('--workspace'), '.runner-invocations'), command + '\\n');",
       'console.log(JSON.stringify({',
       '  ok: true,',
       "  mode: 'macos-vm',",
