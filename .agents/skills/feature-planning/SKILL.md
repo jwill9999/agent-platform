@@ -20,6 +20,13 @@ Resolve objective, requirements with stable identifiers, non-goals, testable acc
 task dependencies, exact source/branch, allowed paths/actions, roles, delivery destination, quality
 gates, retries, spend limits and escalation policy. Ask only for unresolved choices that materially
 change scope, behavior, authority, destination or policy. Preserve valid decisions already made.
+Before presenting the plan for agreement, review it for unresolved ambiguity, conflicting requirements
+and unsupported assumptions. If anything remains unclear after checking available evidence, ask the
+human in the loop a focused question explaining the uncertainty and its impact. Record the answer in
+the relevant requirements or decision record and update affected tasks and tests. Do not silently
+choose an interpretation, treat silence as agreement, or label the plan agreed while questions remain
+unresolved. Continue independent drafting where possible; wait for the answer before finalizing the
+affected scope. Preserve and reuse answers already provided rather than asking for repeated approval.
 
 Establish test feasibility before promising coverage: Docker/services, supported browser or desktop
 host, test data/reset strategy, provider access, credentials availability without reading secrets,
