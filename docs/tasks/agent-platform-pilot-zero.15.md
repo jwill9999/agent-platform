@@ -45,3 +45,12 @@ Live model review still needs an immutable Codex image, dedicated model authenti
 model-only egress. Configuration names alone do not prove network restriction. Missing prerequisites
 prevent claiming that formal review is operational. Existing primary credentials are not copied as a
 shortcut. The owner must not be told this is complete until the live path is qualified.
+
+## Account-backed reviewer follow-up
+
+Two live independent Codex reviews completed using the owner's approved existing account.
+See [the isolated review report](../workflow-control-supervised-review.md) for evidence and limits.
+Findings led to source-path, container settlement and Playwright checklist corrections. Actual
+session tool inventory and enforced tool denials remain unverified; these reviews do not yet
+qualify the restricted critic or authorize the orchestration pilot. Detailed-document approval
+binding is separately tracked in `agent-platform-pilot-zero.16`.

@@ -44,3 +44,12 @@ conformance, pilot success or autonomous acceptance is claimed.
 Static skill/Markdown/reference validation applies to this documentation change. The related Beads
 task remains in progress. Human review of this limitation and further bounded technical work precede
 claiming that formal plan critique is unblocked.
+
+## Account-backed reviewer follow-up
+
+Two live independent Codex reviews completed using the owner's approved existing account.
+See [the isolated review report](../workflow-control-supervised-review.md) for evidence and limits.
+Findings led to source-path, container settlement and Playwright checklist corrections. Actual
+session tool inventory and enforced tool denials remain unverified; these reviews do not yet
+qualify the restricted critic or authorize the orchestration pilot. Detailed-document approval
+binding is separately tracked in `agent-platform-pilot-zero.16`.

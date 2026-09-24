@@ -18,7 +18,7 @@ Resolve integration baseline and exact task with repository evidence. Build and 
 
 ## Dependency order
 
-Upstream blocking issues: `agent-platform-pilot-zero.12`.
+Upstream blocking issues: `agent-platform-pilot-zero.12`, `agent-platform-pilot-zero.16`.
 
 Downstream blocking issues: Live single-task assessment only after its separate execution authority is established.
 

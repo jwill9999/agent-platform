@@ -98,3 +98,12 @@ The critique checklist covers the full document and verification handoff. Delive
 owner authority; the prior implicit staging wording was removed. Missing compliant reviewer launch
 remains an explicit blocker, not an exemption. No reviewer was launched by this documentation change.
 This supersedes the earlier statement that plan-critique source remained unchanged.
+
+## Account-backed reviewer follow-up
+
+Two live independent Codex reviews completed using the owner's approved existing account.
+See [the isolated review report](../workflow-control-supervised-review.md) for evidence and limits.
+Findings led to source-path, container settlement and Playwright checklist corrections. Actual
+session tool inventory and enforced tool denials remain unverified; these reviews do not yet
+qualify the restricted critic or authorize the orchestration pilot. Detailed-document approval
+binding is separately tracked in `agent-platform-pilot-zero.16`.

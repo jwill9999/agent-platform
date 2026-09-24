@@ -1,4 +1,27 @@
-# Skill preparation handoff — 24 September 2026
+# Current handoff: account-backed reviewer qualification
+
+The existing Codex account is authorized and two live independent snapshot reviews completed.
+Reports and limitations: [isolated supervised review](docs/workflow-control-supervised-review.md).
+No tool calls were recorded, but actual tool inventory and enforced denial remain unverified;
+feature flags and model self-report do not satisfy this gate. Do not call formal critique unblocked.
+
+Source-path, container lifecycle/recovery metadata and Playwright checklist fixes are included.
+The detailed-document approval binding gap is tracked as `agent-platform-pilot-zero.16`, blocking
+pilot-plan task `.13`. No orchestration pilot, merge or staging promotion occurred.
+
+Next: establish host-observable tool inventory and negative capability tests, then repeat independent
+review against the resulting exact snapshot. Keep `.15` in progress pending qualification.
+
+## Verification
+
+Current Linux package run: 702 passed, 10 optional tests skipped. Build and lint pass; 15 focused
+reviewer tests pass. Earlier real Docker filesystem probes (4) and configuration probe (1) passed.
+Terminal quality checks pass; technical tool-isolation qualification remains blocked. Native Git
+licence and unavailable Sonar/Problems connectors are recorded limitations.
+
+## Earlier handoff (historical)
+
+## Skill preparation handoff — 24 September 2026
 
 Enforced reviewer entry point implemented in workflow-control with content-addressed snapshots and
 existing read-only Docker critic mounts. Offline isolation passed; live image/auth/egress setup remains

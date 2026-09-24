@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
@@ -64,4 +64,14 @@ it('rejects unbounded execution and unexpected configuration', () => {
   expect(
     supervisedReviewConfigSchema.safeParse({ ...config, timeoutMs: 1000, mcp_servers: {} }).success,
   ).toBe(false);
+});
+
+it('rejects innocent aliases to forbidden files and symlinked ancestors', async () => {
+  const root = await source();
+  await mkdir(join(root, '.codex'));
+  await writeFile(join(root, '.codex', 'config.toml'), 'sensitive');
+  await symlink(join(root, '.codex', 'config.toml'), join(root, 'innocent.md'));
+  await symlink(join(root, '.codex'), join(root, 'docs'));
+  await expect(prepareReviewSnapshot(root, ['innocent.md'])).rejects.toThrow('symlink');
+  await expect(prepareReviewSnapshot(root, ['docs/config.toml'])).rejects.toThrow('symlink');
 });

@@ -1,0 +1,134 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "69148992-407f-45c5-b3d8-1f81d2409342",
+  "materialDigest": "8cd12d9a065f166cb15013bdc10584db0603df55e69553ddd1ff1ce799b1b988",
+  "manifest": [
+    {
+      "path": ".agents/skills/documentation/SKILL.md",
+      "digest": "a3e7410e3cd3a8e9fc4bf6066a0c5fd7990f4c60246c4c017be0ada03f0075fd"
+    },
+    {
+      "path": ".agents/skills/feature-implementation/SKILL.md",
+      "digest": "1565a4919c819e5697385ac280f54aad6b78d994730f27320ad589163668bb37"
+    },
+    {
+      "path": ".agents/skills/feature-planning/SKILL.md",
+      "digest": "2cd309b63c9a086fcf2d7ab574288efecad89d115f994efb24e3762779edff52"
+    },
+    {
+      "path": ".agents/skills/orchestration/SKILL.md",
+      "digest": "7e97190e112784b1fba509335edc9066daf0bf55a550d04e758acf392fca771d"
+    },
+    {
+      "path": ".agents/skills/plan-critique/SKILL.md",
+      "digest": "17d3a1de5e7e6f3d07fdb2c21ae6f1bb05d5e41eca44dfe7520a79e93bcddbd9"
+    },
+    {
+      "path": ".agents/skills/playwright-quality-gate/SKILL.md",
+      "digest": "bbe5d403c6b3c166b5af63e946452bb8c877b0191c06bfe97b52e730203ada4d"
+    },
+    {
+      "path": "docs/README.md",
+      "digest": "57c70201a7835497c0cb1fcc0b1fae33aa8d74cf520bfff76b566489096603ec"
+    },
+    {
+      "path": "docs/adr/0004-codex-development-orchestration-control-plane.md",
+      "digest": "1c90f6d5ff79f5d27f5bb3d3376df012914901e2bb9737252ad9512a9cc9582c"
+    },
+    {
+      "path": "docs/agent-instructions-shared.md",
+      "digest": "211947ac88b85c9ac46a62ccd913ea2211ea64736d34837916cbc79ed0feb3f1"
+    },
+    {
+      "path": "docs/tasks/README.md",
+      "digest": "c013a084ff06ad5f00f7c84b2d0d357f3f7446399f3a439f17052fa3f379d002"
+    },
+    {
+      "path": "docs/tasks/_template.md",
+      "digest": "b981346a0ad0922edf9d0be3901a2ecc5acd76b8ec30a13917fa76763169a5f3"
+    },
+    {
+      "path": "docs/tasks/agent-platform-pilot-zero.16.md",
+      "digest": "d0fa63e9ee059fbe5608583521c6c86735a643f5f8df9f0d6c9afe4f3736d985"
+    },
+    {
+      "path": "docs/workflow-control-planning.md",
+      "digest": "610c5b3b7bed72230c6c06aecb40a945f6ec0786abec7e1258037278cc6bda48"
+    },
+    {
+      "path": "docs/workflow-control-security.md",
+      "digest": "72393fb277b52a1f49e947a0924075922c3c3f03f6455018fd021d3d4dd3aa3e"
+    },
+    {
+      "path": "docs/workflow-control-supervised-review.md",
+      "digest": "dd515e6bdb12292c7298d1b1a52204d138775fd43f8af3a24d1047c262551163"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "4352f833a4fd57cccc4d8f583b3e3e914418455c30507c8549591bbb74615834"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/reviewProxy.ts",
+      "digest": "ac53a7b70634f566520fd25355527dbb372b2b38c4d88d6c2e78972db7394c30"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "a26a4043857448cc758bf7301dbcd2891e362f1633ae42aaf9e45b650a2e30fa"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReview.ts",
+      "digest": "274d116dc2e5cb5f24f21323cbfc5b62bbdad650ca9029781f651fb7eefb7c50"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReviewCli.ts",
+      "digest": "b215e3398208780dac8501b0c5dd4a94e2b950a616f195a82b107d63394766f1"
+    },
+    {
+      "path": "packages/workflow-control/test/reviewProxy.test.ts",
+      "digest": "d03e1fe628a1458a938da692f0622cb583cda651348d10edda560d3487b7565a"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.integration.test.ts",
+      "digest": "da254056e690919e7a56b36957566719c8d96d07c718ebc5cf3de78291725d31"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.test.ts",
+      "digest": "2af618618c2159a192fb95e5f1596f2044127c1311d87aaab1c76fda51c6913e"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d0c8-6dea-7531-8926-e0cee6156ef9"
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "**Result: correction required.** Review bound to supplied material digest `8cd12d9a065f166cb15013bdc10584db0603df55e69553ddd1ff1ce799b1b988`. No tools or tests were invoked.\n\n1. **Medium \u2014 Uncertain container creation retains resources without reporting their recovery identity.**  \n   **Evidence:** `packages/workflow-control/src/supervisedReview.ts`, `executeSupervisedReview`; `packages/workflow-control/src/supervisedReviewCli.ts`, error handler. Manifest digests: `274d116dc2e5cb5f24f21323cbfc5b62bbdad650ca9029781f651fb7eefb7c50`, `b215e3398208780dac8501b0c5dd4a94e2b950a616f195a82b107d63394766f1`.  \n   Creation errors and invalid acknowledgements occur before the cleanup `try/finally`. Retaining staging is intentional, but the error does not reliably identify its path or execution ID; the CLI prints only `error.message`. An uncertain creation can therefore leave a container and copied credential without an actionable reconciliation record.  \n   **Correction:** Include the execution ID, container name, staging location and settlement status in a structured failure result. Preserve those details through the CLI without exposing credential contents.\n\n2. **Medium \u2014 The Playwright completion checklist still requires a task PR for intermediate tasks.**  \n   **Evidence:** `.agents/skills/playwright-quality-gate/SKILL.md`, \u201cDefinition Of Done Addendum\u201d: \u201cRequired CI Playwright jobs pass on the task PR.\u201d Digest: `bbe5d403c6b3c166b5af63e946452bb8c877b0191c06bfe97b52e730203ada4d`.  \n   The revised workflow correctly says intermediate tasks do not open separate PRs, but the mandatory checklist retains an unconditional task-PR requirement. An intermediate UI task cannot satisfy both rules literally.  \n   **Correction:** Make hosted PR checks conditional on segment-tip status; specify the intermediate task\u2019s declared local and integration gates separately.\n\n3. **Medium \u2014 Supplied tests do not verify the revised execution lifecycle.**  \n   **Evidence:** `packages/workflow-control/test/supervisedReview.test.ts` and `packages/workflow-control/test/supervisedReview.integration.test.ts`. Digests: `2af618618c2159a192fb95e5f1596f2044127c1311d87aaab1c76fda51c6913e`, `da254056e690919e7a56b36957566719c8d96d07c718ebc5cf3de78291725d31`.  \n   Neither supplied test file calls `executeSupervisedReview`. The integration probe invokes a modified launch directly. Consequently, the create-before-start fix, uncertain-create retention, start timeout, malformed output and removal-failure behavior have no regression coverage in the supplied evidence.  \n   **Correction:** Add lifecycle fault tests and retain results for the reviewed revision. Include confirmation that uncertain creation never dispatches `start`, and cleanup failure prevents a successful review result.\n\n4. **Medium \u2014 Feature flags do not establish the advertised absence of execution tools.**  \n   **Evidence:** `packages/workflow-control/test/supervisedReview.integration.test.ts`, test titled \u201cthe pinned Codex runtime disables account apps and execution tools\u201d; digest above.  \n   The probe inspects `codex features list`, not the tools exposed to an actual review session. It cannot establish that all execution, file-editing or delegation surfaces are unavailable. The supplied documentation already acknowledges that live qualification remains pending.  \n   **Correction:** Keep technical tool-isolation acceptance unresolved until evidence captures the actual session tool inventory and verifies prohibited capabilities are unavailable.\n\nThe requested-path ancestor checks address the supplied symlink-alias examples. The acknowledged-create sequence prevents this code from starting a reviewer after an unacknowledged creation. **External-document approval binding remains unimplemented**, explicitly tracked by task `.16`; the snapshot digest does not close that runtime gap.\n\nExposed tool categories in this review session: orchestration/composition, patching, image access/generation, goal-state management, time/waiting, user-input requests and agent collaboration. None were invoked. This report is neither human approval nor formal contract approval."
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 51877,
+          "cached_input_tokens": 8064,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1306,
+          "reasoning_output_tokens": 386
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

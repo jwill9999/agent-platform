@@ -96,6 +96,12 @@ revision, with logs/artifacts and remaining gaps. Required failed or unexecuted 
 completion; green unit tests cannot substitute for required E2E evidence. Any proposed change to
 required coverage must be explicit and reviewed, never silently marked not applicable.
 
+The current contract digest covers parsed contract fields, not the contents of externally linked
+specifications or test plans. Do not claim those documents are bound merely because links exist.
+Require a content-addressed manifest and a supported approval/handoff verification mechanism before
+claiming exact-document runtime enforcement. Until that mechanism is qualified, record the gap as a
+blocking prerequisite for a managed implementation handoff; do not fabricate an approval binding.
+
 ## Validate, critique, publish and hand off
 
 1. Produce execution-contract version `1` matching
