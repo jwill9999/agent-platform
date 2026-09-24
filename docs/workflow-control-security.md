@@ -2,7 +2,10 @@
 
 Active workflow-control runs launch every specialist as an external `codex exec` process in a
 dedicated container or VM. Built-in collaboration agents are permitted only while no privileged
-capability is active and the primary session exposes no mutation-capable tools.
+capability is active and the primary session exposes no mutation-capable tools, except for the
+owner-authorized supervised evidence-only review procedure in
+[ADR-0004](adr/0004-codex-development-orchestration-control-plane.md). That no-tool procedure is
+instruction-constrained and is not a substitute for enforced active-run isolation.
 
 ## Specialist workspace
 

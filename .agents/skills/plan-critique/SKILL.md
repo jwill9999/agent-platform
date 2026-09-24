@@ -23,7 +23,11 @@ linked task specifications, verification plan, source evidence and unresolved qu
 [specialist launch boundary](../../../docs/adr/0004-codex-development-orchestration-control-plane.md)
 when selecting the reviewer path. Built-in collaboration is permitted only under that boundary;
 calling a reviewer read-only in its prompt does not remove its exposed tools or grant isolation.
-During a managed run use the supported isolated specialist launcher.
+Outside an active managed run, the owner-authorized supervised evidence-only exception in ADR-0004
+allows a separate read-only critic to review supplied, revision-bound material without invoking any
+tools. Return missing-evidence requests to the coordinator. Label this procedural restriction honestly;
+it does not prove inherited tools are disabled. During a managed run use the supported isolated
+specialist launcher.
 
 If no compliant reviewer path is available, report independent critique as blocked, identify the
 missing capability and retain the draft for review. Do not silently skip the gate, invent a review,

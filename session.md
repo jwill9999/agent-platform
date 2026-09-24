@@ -1,5 +1,10 @@
 # Skill preparation handoff — 24 September 2026
 
+Owner-authorized supervised evidence-only critic route added to ADR-0004 and critique guidance.
+This is a no-tool procedural exception outside active managed runs, not enforced external-tool isolation.
+A separate critic returned findings on the supplied proposal. Broker-absence proof and formal
+acceptance remain unresolved; see docs/reviews/supervised-critique-route-assessment.md.
+
 Owner-approved naming clarification added: planning maps readable task titles to Beads IDs, specs
 and branches; implementation resolves ambiguity and announces the selected task/branch before edits.
 

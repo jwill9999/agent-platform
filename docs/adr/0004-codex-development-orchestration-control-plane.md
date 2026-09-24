@@ -59,9 +59,10 @@ security design.
 
 ### Specialist launch boundary
 
-Built-in Codex collaboration subagents may be used only during pre-approval planning before any
-privileged broker capability is established, or after it is revoked, and only when no global
-mutation-capable MCP/tool is exposed to the session. Once a broker capability exists, **every**
+Built-in Codex collaboration subagents normally require pre-approval planning before any privileged
+broker capability is established, or after it is revoked, and no global mutation-capable MCP/tool
+exposed to the session. The owner-authorized supervised evidence-only review exception below also
+applies outside an active managed run. Once a broker capability exists, **every**
 specialist role—including planners, critics, explorers, reviewers, workers, and test/QA agents—is
 launched by the workflow-control launcher as a non-interactive `codex exec` child process with:
 
@@ -81,6 +82,34 @@ system mutations. The autonomous pilot cannot start until a malicious-specialist
 proves it cannot read the primary `CODEX_HOME`, Beads database/write server, Git/GitHub credentials,
 broker socket/capability, or impersonate the orchestrator. If the connected Codex host cannot provide
 that isolation, the workflow remains planning/read-only and must not claim autonomous delivery.
+
+### Supervised evidence-only review exception
+
+On 24 September 2026 the owner authorized a bounded review route for planning, skills and feature
+implementation reviews outside managed execution. A coordinator may use a distinct read-only critic
+profile even when the parent session has write tools, subject to all of the following:
+
+- Confirm no active managed run or privileged broker capability owns the work. Check current run,
+  execution/credential and lease records, plus broker ownership/issuance evidence; cancelled runs
+  alone are insufficient. If broker capability state cannot be established, stop.
+- Supply a bounded snapshot of the proposed material and relevant source evidence, identified by
+  revision. Review committed implementation material where applicable; do not launch implementation.
+- The critic uses no tools, child agents, commands, filesystem or network operations. It returns
+  findings, evidence references and proposed corrections as text only. Missing evidence is a finding
+  or request to the coordinator, not permission to retrieve it independently.
+- The coordinator retains publication and correction responsibility. The critic cannot update Beads,
+  Git, approvals, workflow state or its own findings' dispositions. Revisions receive a fresh review.
+- Retain the review result, reviewer identity, exact material binding and any observed deviations.
+  A tool-use deviation invalidates this route's acceptance; halt and assess possible effects before retrying.
+  Do not claim conformance without evidence.
+- Label this supervised, instruction-constrained review. The read-only profile and no-tool procedure
+  do not establish that inherited external tools are technically unavailable. Do not claim sandbox
+  conformance, hostile-agent containment or autonomous acceptance from this exception.
+
+This exception enables an independent second opinion without granting mutation authority. It does
+not relax active-run specialist isolation, permit production actions, or replace the structured
+contract validation and persisted approval gates for a live managed run. When technically enforced
+absence of tool access is required, use the isolated launcher; this exception is insufficient.
 
 ### Alternatives considered
 
