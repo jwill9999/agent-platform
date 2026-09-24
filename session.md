@@ -1,5 +1,11 @@
 # Skill preparation handoff — 24 September 2026
 
+Enforced reviewer entry point implemented in workflow-control with content-addressed snapshots and
+existing read-only Docker critic mounts. Offline isolation passed; live image/auth/egress setup remains
+unconfigured. See docs/workflow-control-supervised-review.md. Do not claim live critique unblocked.
+Typecheck/build/lint/cycle checks pass; 691 Linux package tests pass across full and repaired-fixture
+runs, nine skipped. Four real Docker isolation probes pass. Native Git tests blocked by Xcode licence.
+
 Owner-authorized supervised evidence-only critic route added to ADR-0004 and critique guidance.
 This is a no-tool procedural exception outside active managed runs, not enforced external-tool isolation.
 A separate critic returned findings on the supplied proposal. Broker-absence proof and formal

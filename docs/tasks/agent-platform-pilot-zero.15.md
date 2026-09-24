@@ -32,3 +32,16 @@ isolation. Required review/integration evidence must precede final closure.
 Existing task/permission-category-baseline segment targets feature/harness-backlog-review. Owner
 approved bounded implementation; no merge or staging/main promotion. Publish review evidence and
 sync Beads. Formal workflow approval is not supplied by this task.
+
+## Subsequent owner authorization: enforced reviewer entry point
+
+Owner explicitly authorized filling the technical gap. Scope now includes supervisedReview.ts,
+supervisedReviewCli.ts, index exports and focused tests in workflow-control, plus corresponding
+guidance. The entry point prepares content-addressed private evidence, uses the existing isolated
+plan_critic container path, returns findings only and stops/removes its named container on completion
+or failure. This does not change active-run authorization or issue production credentials.
+
+Live model review still needs an immutable Codex image, dedicated model authentication and provisioned
+model-only egress. Configuration names alone do not prove network restriction. Missing prerequisites
+prevent claiming that formal review is operational. Existing primary credentials are not copied as a
+shortcut. The owner must not be told this is complete until the live path is qualified.

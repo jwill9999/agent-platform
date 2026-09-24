@@ -34,6 +34,11 @@ missing capability and retain the draft for review. Do not silently skip the gat
 or let the planner approve its own work. This skill defines the procedure; it does not install a
 reviewer launcher or authorize changes to isolation policy.
 
+For enforced standalone isolation, use the [supervised review entry point](../../../docs/workflow-control-supervised-review.md)
+only after its image, model-only authentication and egress prerequisites have been verified. It returns
+revision-bound review evidence, not automatic contract approval. The procedural exception does not
+satisfy a requirement for technically restricted access.
+
 ## Review scope and result
 
 Review the proposed contract and complete planning handoff against repository evidence and its stated
