@@ -1,4 +1,22 @@
-# Current handoff: restricted reviewer capability verification
+# Paused session handoff — 24 September 2026
+
+The owner explicitly paused work until returning tomorrow. Only this handoff update is authorized
+while paused; do not resume implementation, reviews, model calls or pilot execution automatically.
+
+## Resume location and delivery state
+
+- Worktree: `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+- Branch: `task/permission-category-baseline`; integration target: `feature/harness-backlog-review`.
+- Completed implementation commit: `a9b1003` (pushed). This handoff follows that commit.
+- Existing review: [permission baseline and reviewer changes](https://github.com/jwill9999/agent-platform/pull/271).
+  Refresh its checks and review state on return; local passing checks do not establish current hosted status.
+- Beads authority: `/Users/letuscode/projects/agent-platform`; last Dolt push succeeded.
+  Reviewer task `agent-platform-pilot-zero.15` remains in progress pending integration and broader acceptance.
+- Temporary reviewer containers and network gateway were removed. No review or pilot is running.
+  The pinned Docker image remains cached; provision the private gateway again before another live review.
+- Nothing merged into the feature branch, staging or main during this work.
+
+## Reviewer verification completed this session
 
 Owner authorized controlled permission tests. The actual pinned client initially allowed delegation;
 fixed with dedicated agent-disable and depth settings. Captured inventories and injected negative
@@ -23,7 +41,33 @@ qualified route and finishing the remaining planning/skill acceptance gates.
 effective-config probe passed separately. Six lifecycle tests, build, lint, Markdown and links pass.
 Native Apple Git licence and absent Sonar/Problems connectors remain recorded limitations.
 
-## Earlier handoff (historical)
+## Remaining work and agreed return sequence
+
+1. Review the verification report and completed changes together. Refresh Beads and the existing PR
+   before recommending integration. The successful standalone reviewer assessment does not approve
+   the whole skill suite, managed orchestration or a merge.
+2. Resolve the detailed-document approval binding gap in `agent-platform-pilot-zero.16`: execution
+   approval must identify the exact task specifications and verification documents, and reject stale
+   or changed material. This is recorded as a separate open task and blocks pilot plan `.13`.
+   Define/review its bounded implementation scope before making the broader contract/runtime changes.
+3. Complete the remaining skill-handoff acceptance and runtime prerequisites in `.12`, using the
+   verified critic route where appropriate. Keep any new findings linked to the existing evaluation.
+4. Prepare the exact single-task pilot plan in `.13` only after its prerequisites are satisfied:
+   selected task, source revision, permitted actions, tests, completion criteria, recovery limits and
+   reviewed document versions. Obtain the owner's bound execution approval before launching it.
+5. Run and assess one complete managed task. Only after reviewing that outcome, prepare the separate
+   two-dependent-task pilot to prove automatic progression without a manual restart.
+
+The wider MVP baseline still includes remaining permission, cancellation, retry and recovery journeys.
+They are future work, not coverage established by reviewer-isolation tests. Continue through existing
+Beads tasks rather than creating duplicates. Keep planning, implementation, merge and staging
+permissions separate; no standing authorization for broader repairs or promotion was added here.
+
+The next conversation should start with a short briefing on the verification result and open
+approval-binding task, then agree the next bounded work. Do not rerun completed checks without new
+changes or a specific unresolved concern.
+
+## Earlier handoff (historical; superseded where it conflicts with the current handoff)
 
 ## Skill preparation handoff — 24 September 2026
 
