@@ -391,3 +391,12 @@ export {
   observeBootstrapCandidate,
   type BootstrapPolicy,
 } from './bootstrapPolicy.js';
+
+export {
+  prepareReviewSnapshot,
+  prepareSupervisedReview,
+  executeSupervisedReview,
+  type ReviewSnapshot,
+  type SupervisedReviewRequest,
+  type PreparedSupervisedReview,
+} from './supervisedReview.js';

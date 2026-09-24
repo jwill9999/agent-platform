@@ -21,8 +21,9 @@ export type ProviderRequest = {
 export async function startJourneyProvider(
   command: string,
   finalText: string,
-  options: { failFirst?: boolean } = {},
+  options: { failFirst?: boolean; toolCall?: { name: string; args: Record<string, unknown> } } = {},
 ) {
+  const toolCall = options.toolCall ?? { name: 'sys_bash', args: { command } };
   const requests: ProviderRequest[] = [];
   const errors: string[] = [];
   const attempts: Array<{ status: number; model: string }> = [];
@@ -56,7 +57,7 @@ export async function startJourneyProvider(
         ) {
           throw new Error('Resume did not preserve the original tool-call identity');
         }
-        if (!resumed && !body.tools?.some((tool) => tool.function.name === 'sys_bash')) {
+        if (!resumed && !body.tools?.some((tool) => tool.function.name === toolCall.name)) {
           throw new Error('Real reasoning did not expose the expected tool');
         }
         res.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -76,7 +77,7 @@ export async function startJourneyProvider(
           emit({ content: finalText }, null);
         } else {
           // Split arguments across SSE frames to exercise the actual SDK stream parser.
-          const args = JSON.stringify({ command });
+          const args = JSON.stringify(toolCall.args);
           const middle = Math.floor(args.length / 2);
           emit(
             {
@@ -85,7 +86,7 @@ export async function startJourneyProvider(
                   index: 0,
                   id: JOURNEY_CALL_ID,
                   type: 'function',
-                  function: { name: 'sys_bash', arguments: args.slice(0, middle) },
+                  function: { name: toolCall.name, arguments: args.slice(0, middle) },
                 },
               ],
             },

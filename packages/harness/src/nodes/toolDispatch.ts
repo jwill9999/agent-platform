@@ -617,13 +617,38 @@ function browserUrlApprovalReason(call: ToolCallIntent): string | undefined {
   return decision.reasons.at(0) ?? 'Browser URL policy requires human approval.';
 }
 
-function shellCommandPolicyDecision(
+function executionPolicyDecision(
   ctx: ToolDispatchContext,
   call: ToolCallIntent,
-): ReturnType<typeof classifyBashCommand> | undefined {
-  if (call.name !== 'sys_bash') return undefined;
-  const command = typeof call.args.command === 'string' ? call.args.command : '';
-  return classifyBashCommand(command, { policy: ctx.executionPolicy });
+  toolMetadata: ContractTool | undefined,
+):
+  | ReturnType<typeof classifyBashCommand>
+  | { state: 'denied'; category: 'workspace_write'; code: string; reason: string }
+  | undefined {
+  if (call.name === 'sys_bash') {
+    const command = typeof call.args.command === 'string' ? call.args.command : '';
+    return classifyBashCommand(command, { policy: ctx.executionPolicy });
+  }
+  if (!WRITE_TOOL_IDS.has(call.name)) return undefined;
+  if (call.name === CODING_APPLY_PATCH_ID && call.args.dryRun === true) return undefined;
+  const mode = ctx.executionPolicy?.workspaceWrite ?? 'ask';
+  if (mode === 'auto') return undefined; // Metadata can still require stricter approval.
+  if (mode === 'block') {
+    return {
+      state: 'denied',
+      category: 'workspace_write',
+      code: 'workspace_write_blocked',
+      reason: 'Workspace writes are blocked by the selected permission setting.',
+    };
+  }
+  const metadataApproval = evaluateApprovalPolicy(toolMetadata);
+  return {
+    state: 'approval_required',
+    category: 'workspace_write',
+    riskTier: metadataApproval.riskTier ?? toolMetadata?.riskTier ?? 'high',
+    code: 'workspace_write_approval',
+    reason: metadataApproval.reason ?? 'Workspace writes require human approval.',
+  };
 }
 
 function onboardingWriteBlockReason(
@@ -1271,19 +1296,21 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
 
       const toolMetadata = resolveToolMetadata(safeCall, ctx);
-      const shellPolicy = shellCommandPolicyDecision(ctx, safeCall);
-      if (shellPolicy?.state === 'denied') {
+      const actionPolicy = executionPolicyDecision(ctx, safeCall, toolMetadata);
+      if (actionPolicy?.state === 'denied') {
+        const denialCode =
+          safeCall.name === 'sys_bash' ? 'COMMAND_POLICY_DENIED' : 'WORKSPACE_WRITE_POLICY_DENIED';
         const output: Output = {
           type: 'error',
-          code: 'COMMAND_POLICY_DENIED',
-          message: shellPolicy.reason,
+          code: denialCode,
+          message: actionPolicy.reason,
         };
         ctx.auditLog?.logDenied(
           safeCall.name,
           safeCall.args,
           ctx.agent.id,
           state.sessionId ?? '',
-          shellPolicy.reason,
+          actionPolicy.reason,
           toolMetadata?.riskTier ?? 'high',
         );
         toolMessages.push({
@@ -1297,8 +1324,8 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
           toolId: safeCall.name,
           data: {
             ok: false,
-            error: 'COMMAND_POLICY_DENIED',
-            message: shellPolicy.reason,
+            error: denialCode,
+            message: actionPolicy.reason,
             evidence: { status: 'denied' },
           },
         });
@@ -1371,22 +1398,22 @@ export function createToolDispatchNode(ctx: ToolDispatchContext) {
       }
 
       const approval =
-        shellPolicy?.state === 'approval_required'
+        actionPolicy?.state === 'approval_required'
           ? {
               required: true,
-              riskTier: shellPolicy.riskTier,
-              reason: shellPolicy.reason,
+              riskTier: actionPolicy.riskTier,
+              reason: actionPolicy.reason,
             }
           : evaluateApprovalPolicy(toolMetadata);
       if (approval.required && !approvedForResume) {
         const reason = approval.reason ?? 'Approval policy requires human review.';
         const riskTier: RiskTier = approval.riskTier ?? toolMetadata?.riskTier ?? 'high';
         const displayCall =
-          shellPolicy?.state === 'approval_required'
+          actionPolicy?.state === 'approval_required'
             ? {
                 ...call,
                 args: withPolicyArgs(call.args, {
-                  category: shellPolicy.category,
+                  category: actionPolicy.category,
                   decision: 'approval_required',
                   reason,
                   toolId: call.name,

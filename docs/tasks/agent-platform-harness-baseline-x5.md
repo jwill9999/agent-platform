@@ -70,3 +70,17 @@ Capture the original approval/session identity, restored UI, stream settlement, 
 audit rows, messages, provider request count, duplicate responses, before/after file and trace.
 Concurrent retries after completion do not prove racing resumes before completion. Renderer reload
 does not prove backend process restart recovery. Missing recovery is a recorded failure, not a skip.
+
+## Owner-authorized PR gate repair
+
+Owner explicitly requested assessment and repair of the existing PR's SonarCloud and desktop-E2E
+failures. Continue on `task/permission-category-baseline` into `feature/harness-backlog-review`; no
+merge or staging approval. This is supervised direct repair, not managed orchestration evidence.
+The managed pilot remains gated by its separate document-binding and approved-plan prerequisites.
+
+Scope: reviewer gateway/CLI/image and corresponding negative tests; desktop approval-journey
+evidence collection. Preserve permission semantics and backend/file assertions. Hosted evidence
+shows the rejected action made no file change and emitted APPROVAL_REJECTED, but the test asserted
+before the response capture settled. Await the required observable evidence; do not skip assertions
+or add arbitrary sleeps. Rebuild the reviewer image, rerun isolation probes and focused desktop
+journeys, then require the hosted desktop and Sonar gates to pass before recommending integration.

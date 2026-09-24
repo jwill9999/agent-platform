@@ -1,4 +1,203 @@
-# Session handoff — planning reconciliation complete
+# Active session: repair PR quality gates
+
+The owner resumed work and explicitly authorized assessment and repair of SonarCloud findings and
+the desktop-E2E failure. Continue the existing task branch; no merge/staging/pilot authorization.
+
+Current report: [PR gate repair](docs/reviews/pr271-gate-repair.md).
+The desktop failure is an asynchronous evidence-capture race; backend denial and unchanged file were
+already present in the failed artifact. Reviewer security findings are addressed by fixed gateway
+routes, bounded stdin configuration, absolute executable path and hardened image defaults/install.
+Local verification: 721 Linux package tests passed (13 optional skipped), four actual runtime/config
+probes passed, and nine repeated Electron rejection journeys passed. Independent isolated review
+found no confirmed regressions; its exact snapshot and limits are retained in the repair report.
+Build, typecheck and lint pass. Hosted gates must be refreshed after push.
+
+## Resume location and delivery state
+
+- Worktree: `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+- Branch: `task/permission-category-baseline`; integration target: `feature/harness-backlog-review`.
+- Completed implementation commit: `a9b1003` (pushed). This handoff follows that commit.
+- Existing review: [permission baseline and reviewer changes](https://github.com/jwill9999/agent-platform/pull/271).
+  Refresh its checks and review state on return; local passing checks do not establish current hosted status.
+- Beads authority: `/Users/letuscode/projects/agent-platform`; last Dolt push succeeded.
+  Reviewer task `agent-platform-pilot-zero.15` remains in progress pending integration and broader acceptance.
+- Temporary reviewer containers and network gateway were removed. No review or pilot is running.
+  The pinned Docker image remains cached; provision the private gateway again before another live review.
+- Nothing merged into the feature branch, staging or main during this work.
+
+## Reviewer verification completed this session
+
+Owner authorized controlled permission tests. The actual pinned client initially allowed delegation;
+fixed with dedicated agent-disable and depth settings. Captured inventories and injected negative
+calls now exercise enforcement. Docker boundary probes cover read-only evidence, excluded grants,
+network restrictions and real startup-failure cleanup. Normal account-backed review also completed.
+
+Assessment and evidence: [isolated reviewer](docs/workflow-control-supervised-review.md).
+Defects corrected: delegation configuration, empty-result success, Docker cleanup race, tunnel
+service-boundary weakness and response-stream reset handling. Fixed-endpoint account-backed review
+succeeds. The bounded standalone-review verification gate passes for the tested image/configuration.
+Independent feedback also improved complete inventory capture and cleanup regression coverage.
+Qualification applies only to this pinned standalone reviewer profile; managed orchestration,
+full skill acceptance, feature integration and owner approval remain separate.
+
+The detailed-document approval binding gap remains `agent-platform-pilot-zero.16`, blocking pilot
+plan `.13`. No merge, staging promotion or orchestration pilot occurred. Next is reviewing the
+qualified route and finishing the remaining planning/skill acceptance gates.
+
+## Current checks
+
+712 Linux package tests passed; 13 optional tests skipped. Three real capability probes and the
+effective-config probe passed separately. Six lifecycle tests, build, lint, Markdown and links pass.
+Native Apple Git licence and absent Sonar/Problems connectors remain recorded limitations.
+
+## Subsequent work after PR gates pass
+
+1. Review the verification report and completed changes together. Refresh Beads and the existing PR
+   before recommending integration. The successful standalone reviewer assessment does not approve
+   the whole skill suite, managed orchestration or a merge.
+2. Resolve the detailed-document approval binding gap in `agent-platform-pilot-zero.16`: execution
+   approval must identify the exact task specifications and verification documents, and reject stale
+   or changed material. This is recorded as a separate open task and blocks pilot plan `.13`.
+   Define/review its bounded implementation scope before making the broader contract/runtime changes.
+3. Complete the remaining skill-handoff acceptance and runtime prerequisites in `.12`, using the
+   verified critic route where appropriate. Keep any new findings linked to the existing evaluation.
+4. Prepare the exact single-task pilot plan in `.13` only after its prerequisites are satisfied:
+   selected task, source revision, permitted actions, tests, completion criteria, recovery limits and
+   reviewed document versions. Obtain the owner's bound execution approval before launching it.
+5. Run and assess one complete managed task. Only after reviewing that outcome, prepare the separate
+   two-dependent-task pilot to prove automatic progression without a manual restart.
+
+The wider MVP baseline still includes remaining permission, cancellation, retry and recovery journeys.
+They are future work, not coverage established by reviewer-isolation tests. Continue through existing
+Beads tasks rather than creating duplicates. Keep planning, implementation, merge and staging
+permissions separate; no standing authorization for broader repairs or promotion was added here.
+
+The next conversation should start with a short briefing on the verification result and open
+approval-binding task, then agree the next bounded work. Do not rerun completed checks without new
+changes or a specific unresolved concern.
+
+## Earlier handoff (historical; superseded where it conflicts with the current handoff)
+
+## Skill preparation handoff — 24 September 2026
+
+Enforced reviewer entry point implemented in workflow-control with content-addressed snapshots and
+existing read-only Docker critic mounts. Offline isolation passed; live image/auth/egress setup remains
+unconfigured. See docs/workflow-control-supervised-review.md. Do not claim live critique unblocked.
+Typecheck/build/lint/cycle checks pass; 691 Linux package tests pass across full and repaired-fixture
+runs, nine skipped. Four real Docker isolation probes pass. Native Git tests blocked by Xcode licence.
+
+Owner-authorized supervised evidence-only critic route added to ADR-0004 and critique guidance.
+This is a no-tool procedural exception outside active managed runs, not enforced external-tool isolation.
+A separate critic returned findings on the supplied proposal. Broker-absence proof and formal
+acceptance remain unresolved; see docs/reviews/supervised-critique-route-assessment.md.
+
+Owner-approved naming clarification added: planning maps readable task titles to Beads IDs, specs
+and branches; implementation resolves ambiguity and announces the selected task/branch before edits.
+
+Created the owner-requested documentation skill and docs/README.md folder/authority guide.
+Planning, critique and implementation now link it. Existing documents were not relocated.
+
+Updated existing plan-critique and planning handoff: independent critique is mandatory for direct
+and managed plans; compliant-launch limitations are explicit. No live critic or pilot launched.
+
+Created orchestration and feature-implementation skills; reviewed existing planning/critique.
+Subsequently updated feature-planning under explicit owner authorization with required artifacts,
+publication, test feasibility, connected frontend/backend evidence, completion gates and exact handoff.
+Owner also required unresolved ambiguity to be raised with the human before plan agreement; this is
+explicit, with recorded answers and no silent assumptions or treating silence as consent.
+Owner authorized this bounded work, with joint review afterwards. No live pilot or runtime repair.
+See [skill readiness review](docs/reviews/orchestration-skill-readiness.md).
+New Beads prerequisite chain is recorded with specifications and blocking dependencies.
+Skill validators, Markdown and relative-reference checks pass. No application code changed.
+Independent behavioral review and runtime qualification remain outstanding; no autonomous success claimed.
+
+## Session handoff — orchestration review observation
+
+The owner paused the proposed standing repair authorization and requested documentation of why
+orchestration was not used and what should trigger its use. Added the September 23 observation and
+proposed task-start readiness checkpoint to `docs/reviews/orchestration-field-evaluation.md`.
+The actual omission was an explicit execution-mode decision; no managed launch failure was reproduced.
+The permission approval wait was intentional. Runtime readiness still needs investigation; existing
+approval rules remain unchanged. Further owner questions should extend this review and the existing
+Beads pilot assessment before any activation or repair decision.
+
+The owner subsequently requested adding the skill/discoverability recommendation and distinct new-run
+versus existing-run paths. These are now recorded in the review, including read-only state lookup,
+separate runtime-health checks, no-run versus failed-lookup handling, and explicit fallback decisions.
+Routing rules are proposed; confidence scoring is unvalidated. No skill, runtime, approval or policy
+change is implemented. Return to the owner for further review questions after this documentation update.
+
+The owner also requested retaining model selection by role/task complexity as a future consideration.
+The review records current inheritance intent, unverified effective selection in the isolated launcher,
+and the need to benchmark quality, cost and retries before changes. No model routing, paid experiment
+or budget change is authorized. Further review discussion remains the next step.
+
+Added the owner's September 24 testing-gap reminder: assess upfront approval across real managed
+handoffs and recovery, record unnecessary prompts or continuation problems, and base any rework on
+evidence. No run launch, permission change or confirmed defect is implied by this reminder.
+
+The owner requested a written staged assessment: readiness, one complete managed task, owner review,
+then a separately approved two-dependent-task pilot proving automatic progression. Protocol:
+`docs/reviews/orchestration-staged-assessment.md`. Both runs remain unexecuted; prerequisites, exact
+work selection and executable material must be resolved first. Manual bridging cannot count as a pass.
+
+The owner requested that gaps discovered while using the current planning skill be surfaced in the
+orchestration field evaluation and Beads, including manual supplementation needed for runnable material.
+This observation requirement is documented in both the field review and staged assessment protocol.
+
+The direct-file repair remains pushed in PR271. All ten executed hosted checks passed at `3d7c44b`;
+one separate Git merge-resolver test passed on retry. Human review/merge remains separate.
+This handoff change is documentation only and does not claim new runtime verification.
+
+## Earlier repair publication checkpoint
+
+## Session handoff — approved direct-file permission repair
+
+Owner approved extending Workspace writes to direct mutation tools. Repair on
+`task/permission-category-baseline`, PR271 into `feature/harness-backlog-review`.
+Beads `agent-platform-direct-file-policy` is in progress; P2 remains partial.
+
+All ten composed permission journeys pass, including the original Ask/Block regressions and a new
+Ask-to-Block change while approval waits. Block prevents the effect even after the old approval is
+accepted. Six direct mutation tools are covered by dispatcher policy tests; stricter controls remain.
+98 focused tests, 187 web tests, build/typecheck/touched-file lint pass. Full harness: 667 pass,
+12 existing Apple Git/Xcode-license failures. All 19 selected Electron journeys pass at `314589d`.
+All 39 API chat integration tests pass after two path tests explicitly enable Auto; 44 unrelated
+Project Git API cases also hit the Xcode-license limitation. Docs/links pass. Hosted checks pending.
+Repair and test updates are pushed (`314589d`, `c549855`); PR271 is ready for review and hosted checks
+are running. Normal pre-push stopped on the recorded 12 Apple Git-license tests; publication used
+HUSKY=0 after affected builds/types, 112 desktop and 187 web unit tests passed. Beads sync succeeded.
+No merge or staging/main promotion is authorized. Review evidence is in
+`docs/reviews/current-runtime-permission-category-baseline.md`.
+
+## Historical baseline checkpoint
+
+## Session handoff — remaining permission baseline finding
+
+Owner authorized continuing baseline testing after merging planning PR269. Current task:
+`agent-platform-harness-baseline-p2`, branch `task/permission-category-baseline`, base `c1ed389`.
+Using real Electron/UI/API/SQLite/dispatcher/file execution with external provider and runner fixtures.
+
+Initial permission suite: 7 pass, 2 fail. Direct writes under Ask and Block execute without an
+approval and change the disposable file; shell controls remain correct. Direct Auto, read under
+Block and network Block pass. Nineteen category policy unit tests and E2E type/lint checks pass.
+Failing screenshots/JSON/traces were inspected and retained. No application changes made.
+
+Priority-one follow-up `agent-platform-direct-file-policy` records the scope decision and recommended
+consistent write-mode enforcement across direct mutation tools. Permission-semantic changes need
+owner approval under the agreed repair boundary. P2 remains partial; do not merge this failing
+baseline evidence branch or activate broader MVP/staging work. Next decision: approve direct-tool
+coverage for Workspace writes, then implement a bounded repair with these regressions retained.
+Committed test revision `7771375` repeated the same 7 pass / 2 fail result. Draft PR271 contains
+the preserved regressions and follow-up; leave it unmerged. Committed artifacts are in
+`.agent-platform/permission-category-committed-results`. Hosted checks remain separate; the local
+push hook encountered 12 existing Xcode-license Git failures (630 harness tests pass), recorded in
+the report before bypassing it for draft publication.
+See `docs/reviews/current-runtime-permission-category-baseline.md` for evidence and limitations.
+
+## Historical planning handoff
+
+## Planning reconciliation complete
 
 The owner authorized resolving the planning PR conflicts, updating requirements/evidence/Beads,
 and independent subagent review without further input unless agreed scope changes. This authorizes

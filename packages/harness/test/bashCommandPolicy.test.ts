@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { ExecutionPolicySettingsSchema } from '@agent-platform/contracts';
+
 import { classifyBashCommand } from '../src/security/bashCommandPolicy.js';
 
 describe('bash command policy', () => {
@@ -66,5 +68,39 @@ describe('bash command policy', () => {
         state: 'denied',
       });
     }
+  });
+});
+
+describe('saved command-category modes', () => {
+  const categories = [
+    { key: 'workspaceWrite', command: 'touch notes.md' },
+    { key: 'packageInstall', command: 'pnpm test' },
+    { key: 'network', command: 'curl https://example.invalid' },
+    { key: 'gitMutation', command: 'git add notes.md' },
+    { key: 'container', command: 'docker compose up' },
+  ] as const;
+  for (const { key, command } of categories) {
+    for (const mode of ['ask', 'auto', 'block'] as const) {
+      it(`${key} ${mode} preserves explicit approval precedence or denies`, () => {
+        const policy = ExecutionPolicySettingsSchema.parse({ [key]: mode });
+        expect(classifyBashCommand(command, { policy }).state).toBe(
+          mode === 'block' ? 'denied' : 'approval_required',
+        );
+        expect(classifyBashCommand('git status --short', { policy }).state).toBe('allowed');
+      });
+    }
+  }
+  it('unknown-command blocking cannot be overridden by category Auto settings', () => {
+    const policy = ExecutionPolicySettingsSchema.parse({
+      workspaceWrite: 'auto',
+      packageInstall: 'auto',
+      network: 'auto',
+      gitMutation: 'auto',
+      container: 'auto',
+      unknownCommandPolicy: 'block',
+    });
+    expect(classifyBashCommand('custom-script', { policy }).state).toBe('denied');
+    expect(classifyBashCommand('git status && git diff', { policy }).state).toBe('denied');
+    expect(classifyBashCommand('rm -rf disposable', { policy }).state).toBe('denied');
   });
 });

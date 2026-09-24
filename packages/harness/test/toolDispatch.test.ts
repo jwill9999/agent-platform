@@ -15,6 +15,7 @@ import type {
   Output,
   Tool as ContractTool,
 } from '@agent-platform/contracts';
+import { ExecutionPolicySettingsSchema } from '@agent-platform/contracts';
 import { createPluginDispatcher } from '@agent-platform/plugin-sdk';
 import type { McpSessionManager } from '@agent-platform/mcp-adapter';
 import type { NativeToolExecutor } from '../src/types.js';
@@ -108,6 +109,7 @@ function makeWorkspaceDispatchContext(options: {
     agent: makeAgent({ allowedToolIds: [options.toolId] }),
     mcpManager: makeMcpManager(),
     nativeToolExecutor: nativeExecutor,
+    executionPolicy: ExecutionPolicySettingsSchema.parse({ workspaceWrite: 'auto' }),
     pathJail: new PathJail([
       {
         label: 'workspace',
@@ -1701,5 +1703,146 @@ describe('toolDispatchNode', () => {
 
     expect(hostPath).toEqual([]);
     expect(dryRun).toEqual([]);
+  });
+});
+
+describe('direct workspace write permission enforcement', () => {
+  const writeTools = [
+    'sys_write_file',
+    'sys_append_file',
+    'sys_copy_file',
+    'sys_create_directory',
+    'sys_download_file',
+    'coding_apply_patch',
+  ];
+
+  function fixture(
+    tool: string,
+    mode: 'ask' | 'auto' | 'block' | undefined,
+    approved = false,
+    metadata?: Partial<ContractTool>,
+  ) {
+    const execute = vi
+      .fn()
+      .mockResolvedValue({ type: 'tool_result', toolId: tool, data: { ok: true } });
+    const create = vi.fn().mockResolvedValue(makeApprovalRequest({ toolName: tool }));
+    const emit = vi.fn();
+    const ctx: ToolDispatchContext = {
+      agent: makeAgent({ allowedToolIds: [tool] }),
+      mcpManager: makeMcpManager(),
+      nativeToolExecutor: execute,
+      approvalRequests: { create },
+      emitter: { emit },
+      executionPolicy: mode
+        ? ExecutionPolicySettingsSchema.parse({ workspaceWrite: mode })
+        : undefined,
+      approvedToolCallIds: new Set(approved ? ['write-call'] : []),
+      ...(metadata ? { tools: [makeTool({ id: tool, ...metadata })] } : {}),
+    };
+    const run = (args: Record<string, unknown> = { path: 'notes.md', content: 'change' }) =>
+      createToolDispatchNode(ctx)(
+        makeState({
+          sessionId: 'session-approval',
+          llmOutput: {
+            kind: 'tool_calls',
+            calls: [{ id: 'write-call', name: tool, args }],
+          },
+        }),
+      );
+    return { execute, create, emit, run, ctx };
+  }
+
+  for (const tool of writeTools) {
+    for (const mode of ['ask', 'auto', 'block'] as const) {
+      it(`${tool} enforces ${mode} before any native effect`, async () => {
+        const f = fixture(tool, mode);
+        await f.run();
+        expect(f.execute).toHaveBeenCalledTimes(mode === 'auto' ? 1 : 0);
+        expect(f.create).toHaveBeenCalledTimes(mode === 'ask' ? 1 : 0);
+        if (mode === 'ask')
+          expect(f.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              args: expect.objectContaining({
+                __policy: expect.objectContaining({ category: 'workspace_write' }),
+              }),
+            }),
+          );
+        if (mode === 'block')
+          expect(f.emit).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: 'tool_result',
+              toolId: tool,
+              data: expect.objectContaining({
+                ok: false,
+                error: 'WORKSPACE_WRITE_POLICY_DENIED',
+                evidence: { status: 'denied' },
+              }),
+            }),
+          );
+      });
+    }
+    it(`${tool} rechecks Block even for an approved resume`, async () => {
+      const f = fixture(tool, 'block', true);
+      await f.run();
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.create).not.toHaveBeenCalled();
+    });
+    it(`${tool} executes an approved Ask call without another approval`, async () => {
+      const f = fixture(tool, 'ask', true);
+      await f.run();
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      expect(f.create).not.toHaveBeenCalled();
+    });
+  }
+
+  it('defaults missing settings to Ask', async () => {
+    const f = fixture('sys_write_file', undefined);
+    await f.run();
+    expect(f.execute).not.toHaveBeenCalled();
+    expect(f.create).toHaveBeenCalledTimes(1);
+  });
+
+  for (const metadata of [
+    { riskTier: 'high' },
+    { riskTier: 'critical' },
+    { riskTier: 'medium', requiresApproval: true },
+  ] as const) {
+    it(`Auto preserves stricter metadata ${JSON.stringify(metadata)}`, async () => {
+      const f = fixture('sys_write_file', 'auto', false, metadata);
+      await f.run();
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.create).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  it('does not apply write blocking to direct reads or a patch preview', async () => {
+    for (const tool of ['sys_read_file', 'coding_apply_patch']) {
+      const f = fixture(tool, 'block');
+      await f.run({ path: 'notes.md', dryRun: true });
+      expect(f.execute).toHaveBeenCalledTimes(1);
+      expect(f.create).not.toHaveBeenCalled();
+    }
+  });
+
+  it('does not let Auto bypass onboarding', async () => {
+    const f = fixture('sys_write_file', 'auto', true);
+    f.ctx.projectAccessPolicy = { canWrite: false, writeBlockReason: 'onboarding_not_approved' };
+    await f.run();
+    expect(f.execute).not.toHaveBeenCalled();
+  });
+
+  it('does not let Auto bypass the path jail', async () => {
+    const f = fixture('sys_write_file', 'auto', true);
+    const dir = makeTmpDir();
+    try {
+      f.ctx.pathJail = new PathJail([
+        { label: 'workspace', hostPath: dir, permission: 'read_write' },
+      ]);
+      const r = await f.run({ path: '/outside-project/notes.md', content: 'change' });
+      expect(f.execute).not.toHaveBeenCalled();
+      expect(JSON.stringify(r.messages)).toContain('PATH_ACCESS_DENIED');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
