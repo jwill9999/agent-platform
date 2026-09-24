@@ -54,3 +54,12 @@ Findings led to source-path, container settlement and Playwright checklist corre
 session tool inventory and enforced tool denials remain unverified; these reviews do not yet
 qualify the restricted critic or authorize the orchestration pilot. Detailed-document approval
 binding is separately tracked in `agent-platform-pilot-zero.16`.
+
+## Controlled runtime capability follow-up
+
+The owner authorized actual capability capture and negative tests. The offline client fixture found
+and reproduced an enabled-delegation gap; the dedicated agent settings now disable it. Real container
+probes verify mutation, host-grant and network boundaries and failure cleanup. See the current
+[isolated reviewer assessment](../workflow-control-supervised-review.md) and its source/image-bound
+artifacts. This supersedes the earlier unverified tool-inventory status for the tested profile only.
+It does not close detailed-document approval binding or authorize a managed pilot or merge.

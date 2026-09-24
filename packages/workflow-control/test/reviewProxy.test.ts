@@ -32,18 +32,38 @@ async function request(payload: string) {
   });
 }
 it.each([
+  'chatgpt.com:443',
   'github.com:443',
   'chatgpt.com.evil.test:443',
   'chatgpt.com:80',
   '127.0.0.1:443',
   'user@chatgpt.com:443',
-])('denies non-model CONNECT target %s', async (target) => {
+])('denies every CONNECT tunnel including allowed-host authorities: %s', async (target) => {
   expect(await request(`CONNECT ${target} HTTP/1.1\r\nHost: ${target}\r\n\r\n`)).toBe(
     'HTTP/1.1 403 Forbidden',
   );
 });
 it('denies ordinary proxy requests', async () => {
   expect(await request('GET http://chatgpt.com/ HTTP/1.1\r\nHost: chatgpt.com\r\n\r\n')).toBe(
-    'HTTP/1.1 405 Method Not Allowed',
+    'HTTP/1.1 403 Forbidden',
   );
+});
+
+it.each([
+  '/responses/../other',
+  '/responses%2fother',
+  '//evil.test/responses',
+  '/backend-api/accounts',
+  '/models#fragment',
+])('denies unapproved application route %s', async (path) => {
+  expect(await request(`GET ${path} HTTP/1.1\r\nHost: model-proxy\r\n\r\n`)).toBe(
+    'HTTP/1.1 403 Forbidden',
+  );
+});
+it('denies protocol upgrades', async () => {
+  expect(
+    await request(
+      'GET /responses HTTP/1.1\r\nHost: model-proxy\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n',
+    ),
+  ).toBe('HTTP/1.1 403 Forbidden');
 });

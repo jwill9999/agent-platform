@@ -71,7 +71,7 @@ export async function prepareReviewSnapshot(
     if (manifest.length === 0) throw new Error('review evidence is empty');
     await writeFile(
       join(staged.codexHome, 'config.toml'),
-      'approval_policy = "never"\nsandbox_mode = "read-only"\nweb_search = "disabled"\n[features]\napps = false\nbrowser_use = false\nbrowser_use_external = false\ncomputer_use = false\nin_app_browser = false\nbrowser_use_full_cdp_access = false\nplugins = false\nremote_plugin = false\nskill_search = false\nskill_mcp_dependency_install = false\nmulti_agent = false\nshell_tool = false\nunified_exec = false\ncode_mode = false\ncode_mode_host = false\n',
+      'approval_policy = "never"\nsandbox_mode = "read-only"\nweb_search = "disabled"\n[agents]\nenabled = false\nmax_depth = 0\n[features]\napps = false\nbrowser_use = false\nbrowser_use_external = false\ncomputer_use = false\nin_app_browser = false\nbrowser_use_full_cdp_access = false\nplugins = false\nremote_plugin = false\nskill_search = false\nskill_mcp_dependency_install = false\nmulti_agent = false\nmulti_agent_v2 = false\ngoals = false\nimage_generation = false\nview_image = false\nsleep_tool = false\nshell_tool = false\nunified_exec = false\ncode_mode = false\ncode_mode_host = false\n',
       { mode: 0o600 },
     );
     return {
@@ -95,7 +95,7 @@ export interface SupervisedReviewRequest {
   /** Provisioned model-only egress network, not arbitrary outbound access. */
   egressNetwork: string;
   question: string;
-  /** Internal allowlisted CONNECT proxy, with no embedded credentials. */
+  /** Internal fixed-endpoint Codex application gateway, with no embedded credentials. */
   proxyUrl?: string;
 }
 
@@ -167,6 +167,19 @@ export async function prepareSupervisedReview(
       }),
       { mode: 0o600 },
     );
+    if (request.proxyUrl) {
+      const configFile = join(snapshot.codexHome, 'config.toml');
+      const existing = await readFile(configFile, 'utf8');
+      await writeFile(
+        configFile,
+        'model_provider = "restricted_review"\n' +
+          existing +
+          '\n[model_providers.restricted_review]\nname = "Restricted account review"\nwire_api = "responses"\nrequires_openai_auth = true\nsupports_websockets = false\nbase_url = ' +
+          JSON.stringify(request.proxyUrl) +
+          '\n',
+        { mode: 0o600 },
+      );
+    }
     const executionId = randomUUID();
     const launch = await buildDockerSpecialistLaunch({
       image: request.image,
@@ -178,15 +191,6 @@ export async function prepareSupervisedReview(
       role: 'plan_critic',
       runId: `supervised-review-${executionId}`,
       executionId,
-      ...(request.proxyUrl
-        ? {
-            extraEnvironment: {
-              HTTPS_PROXY: request.proxyUrl,
-              HTTP_PROXY: request.proxyUrl,
-              ALL_PROXY: request.proxyUrl,
-            },
-          }
-        : {}),
     });
     const prepared = { snapshot, launch, executionId };
     preparedReviews.set(prepared, { root: privateRoot, launch, executionId });
@@ -207,7 +211,7 @@ export async function executeSupervisedReview(
   preparedReviews.delete(prepared);
   // Create must be acknowledged before start; a timed-out create can never start a reviewer.
   // On uncertain create, keep staging for reconciliation rather than treating not-found as settled.
-  const args = [...trusted.launch.args];
+  const args = trusted.launch.args.filter((arg) => arg !== '--rm');
   args[0] = 'create';
   const runner = promisify(execFile);
   let containerId: string;
@@ -233,6 +237,25 @@ export async function executeSupervisedReview(
       .split('\n')
       .filter((line) => line.trim())
       .map((line) => JSON.parse(line) as unknown);
+    const records = events.filter(
+      (event): event is Record<string, unknown> => typeof event === 'object' && event !== null,
+    );
+    const completed = records.some((event) => event.type === 'turn.completed');
+    const message = records.some((event) => {
+      const item = event.item as { type?: string; text?: unknown } | undefined;
+      return (
+        event.type === 'item.completed' &&
+        item?.type === 'agent_message' &&
+        typeof item.text === 'string' &&
+        item.text.trim().length > 0
+      );
+    });
+    if (
+      !completed ||
+      !message ||
+      records.some((event) => event.type === 'turn.failed' || event.type === 'error')
+    )
+      throw new Error('review did not return a completed turn with review text');
     return { events, stderr: result.stderr };
   } finally {
     await stopAndRemoveReview(trusted, containerId);
@@ -243,10 +266,10 @@ async function stopAndRemoveReview(
   trusted: { root: string; launch: DockerSpecialistLaunch; executionId: string },
   containerId: string,
 ): Promise<void> {
-  // Once creation is acknowledged, --rm disappearance proves this identified container has ended.
+  // Explicit removal owns settlement; automatic removal is disabled to avoid a daemon cleanup race.
   try {
     await promisify(execFile)(trusted.launch.dockerBinary, ['rm', '--force', containerId], {
-      env: {},
+      env: trusted.launch.environment,
       timeout: 10_000,
       maxBuffer: 4096,
     });

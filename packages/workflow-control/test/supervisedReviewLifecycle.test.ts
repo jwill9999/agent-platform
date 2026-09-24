@@ -72,7 +72,12 @@ it('retains staging and rejects success when removal is not confirmed', async ()
   const review = await prepared();
   vi.mocked(execFile)
     .mockImplementationOnce(reply(null, '1'.repeat(64)))
-    .mockImplementationOnce(reply(null, '{"type":"turn.completed"}\n'))
+    .mockImplementationOnce(
+      reply(
+        null,
+        '{"type":"item.completed","item":{"type":"agent_message","text":"Review complete"}}\n{"type":"turn.completed"}\n',
+      ),
+    )
     .mockImplementationOnce(reply(new Error('daemon unavailable')));
   await expect(
     executeSupervisedReview(review, { timeoutMs: 1000, maxOutputBytes: 4096 }),
@@ -89,5 +94,34 @@ it('removes the container and staging when model output is malformed', async () 
     executeSupervisedReview(review, { timeoutMs: 1000, maxOutputBytes: 4096 }),
   ).rejects.toThrow();
   expect(vi.mocked(execFile).mock.calls[2]?.[1]).toEqual(['rm', '--force', '1'.repeat(64)]);
+  await expect(stat(review.snapshot.root)).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+it('rejects empty or incomplete review events even when the process exits successfully', async () => {
+  const review = await prepared();
+  vi.mocked(execFile)
+    .mockImplementationOnce(reply(null, '1'.repeat(64)))
+    .mockImplementationOnce(reply(null, '{"type":"turn.completed"}\n'))
+    .mockImplementationOnce(reply(null));
+  await expect(
+    executeSupervisedReview(review, { timeoutMs: 1000, maxOutputBytes: 4096 }),
+  ).rejects.toThrow('completed turn with review text');
+  await expect(stat(review.snapshot.root)).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+it('returns completed review only after successful container and staging cleanup', async () => {
+  const review = await prepared();
+  vi.mocked(execFile)
+    .mockImplementationOnce(reply(null, '1'.repeat(64)))
+    .mockImplementationOnce(
+      reply(
+        null,
+        '{"type":"item.completed","item":{"type":"agent_message","text":"Review complete"}}\n{"type":"turn.completed"}\n',
+      ),
+    )
+    .mockImplementationOnce(reply(null));
+  const result = await executeSupervisedReview(review, { timeoutMs: 1000, maxOutputBytes: 4096 });
+  expect(result.events).toHaveLength(2);
+  expect(vi.mocked(execFile).mock.calls[0]?.[1]).not.toContain('--rm');
   await expect(stat(review.snapshot.root)).rejects.toMatchObject({ code: 'ENOENT' });
 });

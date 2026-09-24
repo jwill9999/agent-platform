@@ -1,23 +1,27 @@
-# Current handoff: account-backed reviewer qualification
+# Current handoff: restricted reviewer capability verification
 
-The existing Codex account is authorized and two live independent snapshot reviews completed.
-Reports and limitations: [isolated supervised review](docs/workflow-control-supervised-review.md).
-No tool calls were recorded, but actual tool inventory and enforced denial remain unverified;
-feature flags and model self-report do not satisfy this gate. Do not call formal critique unblocked.
+Owner authorized controlled permission tests. The actual pinned client initially allowed delegation;
+fixed with dedicated agent-disable and depth settings. Captured inventories and injected negative
+calls now exercise enforcement. Docker boundary probes cover read-only evidence, excluded grants,
+network restrictions and real startup-failure cleanup. Normal account-backed review also completed.
 
-Source-path, container lifecycle/recovery metadata and Playwright checklist fixes are included.
-The detailed-document approval binding gap is tracked as `agent-platform-pilot-zero.16`, blocking
-pilot-plan task `.13`. No orchestration pilot, merge or staging promotion occurred.
+Assessment and evidence: [isolated reviewer](docs/workflow-control-supervised-review.md).
+Defects corrected: delegation configuration, empty-result success, Docker cleanup race, tunnel
+service-boundary weakness and response-stream reset handling. Fixed-endpoint account-backed review
+succeeds. The bounded standalone-review verification gate passes for the tested image/configuration.
+Independent feedback also improved complete inventory capture and cleanup regression coverage.
+Qualification applies only to this pinned standalone reviewer profile; managed orchestration,
+full skill acceptance, feature integration and owner approval remain separate.
 
-Next: establish host-observable tool inventory and negative capability tests, then repeat independent
-review against the resulting exact snapshot. Keep `.15` in progress pending qualification.
+The detailed-document approval binding gap remains `agent-platform-pilot-zero.16`, blocking pilot
+plan `.13`. No merge, staging promotion or orchestration pilot occurred. Next is reviewing the
+qualified route and finishing the remaining planning/skill acceptance gates.
 
-## Verification
+## Current checks
 
-Current Linux package run: 702 passed, 10 optional tests skipped. Build and lint pass; 15 focused
-reviewer tests pass. Earlier real Docker filesystem probes (4) and configuration probe (1) passed.
-Terminal quality checks pass; technical tool-isolation qualification remains blocked. Native Git
-licence and unavailable Sonar/Problems connectors are recorded limitations.
+712 Linux package tests passed; 13 optional tests skipped. Three real capability probes and the
+effective-config probe passed separately. Six lifecycle tests, build, lint, Markdown and links pass.
+Native Apple Git licence and absent Sonar/Problems connectors remain recorded limitations.
 
 ## Earlier handoff (historical)
 
