@@ -1,0 +1,50 @@
+{
+  "reviewId": "document-binding-round1",
+  "runId": "proposed-document-binding",
+  "plannerId": "coordinator-planner",
+  "criticId": "isolated-plan-critic-round1",
+  "contractVersion": 1,
+  "policyDigest": "sha256:7343dacd2a810a02bb3aefc6962ab568b075dfe31099fbe43be4de20998d5a9e",
+  "materialDigest": "sha256:c3b2346b2e0e00dd199754a137788133170f668a7cf80e2144210105c4947dcf",
+  "verdict": "correction_required",
+  "summary": "The proposed scope and integration-only, no-auto-merge boundary are clear. One recovery gap needs clarification before implementation: preserving denial across restart when invalidation cannot be persisted. This review is not implementation authorization or human approval.",
+  "evidence": [
+    {
+      "digest": "sha256:60dc70da3fee815b034cacb006b5e1bf6c8daceaa4e2207fa2e2fd285bde867f",
+      "mediaType": "text/markdown",
+      "sizeBytes": 14711,
+      "kind": "artifact"
+    },
+    {
+      "digest": "sha256:a5efa8790eff689d5c33883c4a5c8b8bb606b2e99faf534b50d86a89bfc27f3b",
+      "mediaType": "text/markdown",
+      "sizeBytes": 6849,
+      "kind": "artifact"
+    }
+  ],
+  "findings": [
+    {
+      "id": "DB-R1-01",
+      "severity": "high",
+      "summary": "docs/planning/approved-document-binding/plan.md requires permanent invalidation after a detected mismatch, but does not specify recovery when persisting that invalidation fails. A process can deny the current effect, terminate, and restart after the original document bytes are restored; its durable approval still appears active and byte verification then passes. docs/testing/approved-document-binding.md tests persistence failure, restart, and restored bytes separately, without requiring this combined sequence.",
+      "requirement": "DB-3, DB-4 and DB-6: detected mismatch must not regain authority through restored bytes or process restart.",
+      "evidence": [
+        {
+          "digest": "sha256:60dc70da3fee815b034cacb006b5e1bf6c8daceaa4e2207fa2e2fd285bde867f",
+          "mediaType": "text/markdown",
+          "sizeBytes": 14711,
+          "kind": "artifact"
+        },
+        {
+          "digest": "sha256:a5efa8790eff689d5c33883c4a5c8b8bb606b2e99faf534b50d86a89bfc27f3b",
+          "mediaType": "text/markdown",
+          "sizeBytes": 6849,
+          "kind": "artifact"
+        }
+      ],
+      "proposedCorrection": "Specify a restart-safe recovery protocol for failed invalidation persistence, including how startup recognizes an unresolved verification attempt and prevents reuse of the affected approval. Add a required combined fault test: detect changed bytes, fail invalidation persistence, terminate the process, restore the original bytes, reopen the journal, and attempt execution with the old approval and capability. Require denial and zero effects until explicit recovery establishes valid new authority. The missing evidence is the proposed durable recovery protocol and this combined test specification; implementation results are not expected during planning.",
+      "requiresHumanDecision": false
+    }
+  ],
+  "humanDecision": null
+}

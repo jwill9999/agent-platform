@@ -241,3 +241,15 @@ The owner authorized creating the missing skills and reviewing the handoff befor
 See the [skill readiness assessment](orchestration-skill-readiness.md) for the created files, existing
 skill gaps, source-level runtime limitations and outstanding independent behavioral review.
 This preparation used the explicitly authorized direct path; it is not a managed pilot result.
+
+## Document-approval planning assessment — 24 September 2026
+
+After PR271 merged, task `agent-platform-pilot-zero.16` received planning/critique authorization.
+The planning skill's explicit document and test requirements produced the
+[binding proposal](../planning/approved-document-binding/plan.md), task spec and connected verification
+plan. Current runtime does not bind linked document bytes; this remains a blocker, not fixed by hashes
+written in prose. Existing primitives support staging and content-addressed reads, but approval,
+resume and inherited paths require a shared enforcement design. Independent isolated critique also
+identified a failed-invalidation/restart gap; the proposed durable attempt/recovery protocol and
+compound tests address it at design level. [Review record](approved-document-binding-plan.md) retains
+findings and exact snapshot evidence. No managed pilot, implementation or new execution approval.

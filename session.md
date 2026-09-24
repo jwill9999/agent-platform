@@ -1,4 +1,23 @@
-# Active session: repair PR quality gates
+# Current session: document-approval binding plan
+
+PR271 is merged into `feature/harness-backlog-review` at `5e5f7f2bf66ca07410a5c83689230b0c3e25f609`.
+The owner authorized planning and independent critique of `agent-platform-pilot-zero.16`.
+Current branch: `task/approved-document-binding-plan`, based on that merged feature revision.
+
+Planning package: [approved-document binding](docs/planning/approved-document-binding/plan.md).
+The draft includes a typed document manifest, immutable snapshots, guarded approval/start/resume/
+delivery paths and compatibility handling. The first independent isolated critic found a restart
+hole after failed invalidation persistence; the revised plan requires durable verification intents
+and quarantine recovery, plus the combined fault test. The second isolated critique approved the revised plan with zero findings. Structured results and
+dispositions are in docs/reviews/approved-document-binding-plan.md.
+
+No runtime/application implementation or managed run has started. Next: owner review of the published planning PR and proposed decisions before implementation. `.13`
+remains blocked by `.16` and `.12`. Nothing is promoted to staging. Earlier session entries follow
+as historical evidence, not current PR status.
+
+---
+
+## Previous session: repair PR quality gates
 
 The owner resumed work and explicitly authorized assessment and repair of SonarCloud findings and
 the desktop-E2E failure. Continue the existing task branch; no merge/staging/pilot authorization.

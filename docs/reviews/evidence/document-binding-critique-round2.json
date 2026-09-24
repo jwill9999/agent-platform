@@ -1,0 +1,86 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "4f339e6f-67d5-480e-9fe5-e9acb45e94ef",
+  "materialDigest": "ef529c261533120f84243b838c3ebe8713060b897762a00afe125ac259dac964",
+  "manifest": [
+    {
+      "path": "docs/planning/approved-document-binding/evidence-manifest.json",
+      "digest": "b53af942df983e18a0ef94f273e5afa5779afb405c84e2422217bc4d9bf114e9"
+    },
+    {
+      "path": "docs/planning/approved-document-binding/execution-contract.v1.json",
+      "digest": "10da597749c1ed558da7b9c182b99c0d7d17699269cb532c9ac51817b1066e83"
+    },
+    {
+      "path": "docs/planning/approved-document-binding/plan.md",
+      "digest": "0eb57cb15418bfb56078767db226c1c4e38b47840f7310d406ea9d4d755aace8"
+    },
+    {
+      "path": "docs/reviews/evidence/document-binding-source-excerpts.txt",
+      "digest": "88df33f526a608e48b04b528aac8820c04266cc7bb653a2517facfa689725337"
+    },
+    {
+      "path": "docs/tasks/agent-platform-pilot-zero.16.md",
+      "digest": "7ed8ef3aafe61e082e5bd649254400f31f92936ae1541618620d7ded1df28a25"
+    },
+    {
+      "path": "docs/testing/approved-document-binding.md",
+      "digest": "86ba87f34604abf79ec0d382fcdebdc3b1d856ea05b670adf029f227661d4f27"
+    },
+    {
+      "path": "packages/workflow-control/src/artifacts.ts",
+      "digest": "3a8a054fbb791bf4e66657c3d2e16ad33ae76f812a85465ae97fdd0226d99dcd"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "4352f833a4fd57cccc4d8f583b3e3e914418455c30507c8549591bbb74615834"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/preapprovalMaterial.ts",
+      "digest": "86a8224ca31444ec90f3f7e1e0c460bb404efd336b096d0905798dee6b20da03"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d437-6877-79b0-8e73-e2ef9884f199"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "{\n  \"reviewId\": \"document-binding-round2\",\n  \"runId\": \"proposed-document-binding\",\n  \"plannerId\": \"coordinator-planner\",\n  \"criticId\": \"isolated-plan-critic-round2\",\n  \"contractVersion\": 1,\n  \"policyDigest\": \"sha256:7343dacd2a810a02bb3aefc6962ab568b075dfe31099fbe43be4de20998d5a9e\",\n  \"materialDigest\": \"sha256:0ec6f078ef119f50b0a8d0e032204897d9e39884209583be480597f4428069a1\",\n  \"verdict\": \"approved\",\n  \"summary\": \"No unresolved plan findings identified in the supplied plan, specification, verification material and source evidence. DB-R1-01 is addressed at the design level: a durably committed, fenced verification attempt precedes reads and effects; unresolved attempts prevent recovered authority, including after original bytes are restored; recovery requires explicit invalidation and fresh critique/approval. Required compound failure, restart, concurrency and migration tests cover that protocol. The plan also requires an exhaustive approval-consumer inventory and negative tests before completion. This verdict assesses the proposed design only; implementation and test results remain unproven. It grants no owner approval or implementation authority. Delivery remains a feature-branch review PR with human-controlled integration and no automatic merge or pilot execution.\",\n  \"evidence\": [\n    {\n      \"digest\": \"sha256:0eb57cb15418bfb56078767db226c1c4e38b47840f7310d406ea9d4d755aace8\",\n      \"mediaType\": \"text/markdown\",\n      \"sizeBytes\": 16374,\n      \"kind\": \"artifact\"\n    },\n    {\n      \"digest\": \"sha256:7ed8ef3aafe61e082e5bd649254400f31f92936ae1541618620d7ded1df28a25\",\n      \"mediaType\": \"text/markdown\",\n      \"sizeBytes\": 3609,\n      \"kind\": \"artifact\"\n    },\n    {\n      \"digest\": \"sha256:86ba87f34604abf79ec0d382fcdebdc3b1d856ea05b670adf029f227661d4f27\",\n      \"mediaType\": \"text/markdown\",\n      \"sizeBytes\": 7703,\n      \"kind\": \"artifact\"\n    }\n  ],\n  \"findings\": [],\n  \"humanDecision\": null\n}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 33184,
+          "cached_input_tokens": 0,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 788,
+          "reasoning_output_tokens": 232
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}
