@@ -63,3 +63,17 @@ probes verify mutation, host-grant and network boundaries and failure cleanup. S
 [isolated reviewer assessment](../workflow-control-supervised-review.md) and its source/image-bound
 artifacts. This supersedes the earlier unverified tool-inventory status for the tested profile only.
 It does not close detailed-document approval binding or authorize a managed pilot or merge.
+
+## Owner-authorized PR gate repair
+
+Owner explicitly requested assessment and repair of the existing PR's SonarCloud and desktop-E2E
+failures. Continue on `task/permission-category-baseline` into `feature/harness-backlog-review`; no
+merge or staging approval. This is supervised direct repair, not managed orchestration evidence.
+The managed pilot remains gated by its separate document-binding and approved-plan prerequisites.
+
+Scope: reviewer gateway/CLI/image and corresponding negative tests; desktop approval-journey
+evidence collection. Preserve permission semantics and backend/file assertions. Hosted evidence
+shows the rejected action made no file change and emitted APPROVAL_REJECTED, but the test asserted
+before the response capture settled. Await the required observable evidence; do not skip assertions
+or add arbitrary sleeps. Rebuild the reviewer image, rerun isolation probes and focused desktop
+journeys, then require the hosted desktop and Sonar gates to pass before recommending integration.

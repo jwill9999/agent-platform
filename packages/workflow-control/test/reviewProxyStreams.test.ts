@@ -55,3 +55,56 @@ it('contains an upstream response reset and keeps serving rejected routes', asyn
     vi.resetAllMocks();
   }
 });
+
+it.each([
+  { status: 200, expected: 200 },
+  { status: 302, expected: 502 },
+])(
+  'forwards fixed-endpoint success and refuses upstream redirect ($status)',
+  async ({ status, expected }) => {
+    const incoming = new PassThrough() as unknown as IncomingMessage;
+    incoming.statusCode = status;
+    incoming.headers = {
+      'content-type': 'application/json',
+      location: 'https://unapproved.example',
+    };
+    vi.mocked(httpsRequest).mockImplementation(((
+      _options: unknown,
+      callback: (response: IncomingMessage) => void,
+    ) => {
+      const outgoing = new PassThrough() as unknown as ClientRequest;
+      queueMicrotask(() => {
+        callback(incoming);
+        if (!incoming.destroyed) incoming.end('{"ok":true}');
+      });
+      return outgoing;
+    }) as typeof httpsRequest);
+    const server = createReviewProxy();
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('missing port');
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${address.port}/models?client_version=0.156.1`,
+        { redirect: 'manual', headers: { Host: 'unapproved.example' } },
+      );
+      expect(response.status).toBe(expected);
+      expect(response.headers.get('location')).toBeNull();
+      if (status === 200) expect(await response.json()).toEqual({ ok: true });
+      else await response.text();
+      expect(vi.mocked(httpsRequest).mock.calls[0]?.[0]).toMatchObject({
+        hostname: 'chatgpt.com',
+        servername: 'chatgpt.com',
+        path: '/backend-api/codex/models?client_version=0.156.1',
+      });
+      expect(
+        (vi.mocked(httpsRequest).mock.calls[0]?.[0] as { headers: Record<string, string> }).headers,
+      ).not.toHaveProperty('host');
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      vi.resetAllMocks();
+    }
+  },
+);

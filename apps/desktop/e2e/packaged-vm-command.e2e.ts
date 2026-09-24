@@ -221,6 +221,25 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
         decision === 'approve' ? 'Approved action completed' : 'Denied',
         { timeout: 20_000 },
       );
+      const hasEvent = (type: string, code?: string) =>
+        streams
+          .flatMap((stream) => stream.events)
+          .some((event) => {
+            if (typeof event !== 'object' || event === null) return false;
+            const row = event as { type?: string; code?: string };
+            return row.type === type && (code === undefined || row.code === code);
+          });
+      expect(hasEvent('approval_required')).toBe(true);
+      // The denial card updates before the resume response is received. Promise.all(captures)
+      // only covers responses already observed, so wait for the terminal stream evidence itself.
+      await expect
+        .poll(() =>
+          hasEvent(
+            decision === 'approve' ? 'tool_result' : 'error',
+            decision === 'reject' ? 'APPROVAL_REJECTED' : undefined,
+          ),
+        )
+        .toBe(true);
       await Promise.all(captures);
       approval = (await readEvidence<ApprovalEvidence>(fixture, 'approval-requests')).find(
         (row) => row.id === approval?.id,
@@ -237,20 +256,6 @@ for (const { reasoning, decision, reload, failFirst } of journeyCases) {
       expect(successes).toHaveLength(decision === 'approve' ? 1 : 0);
       if (decision === 'reject') expect(audits.some((row) => row.status === 'denied')).toBe(true);
       await Promise.all(captures);
-      const events = streams.flatMap((stream) => stream.events);
-      const hasEvent = (type: string, code?: string) =>
-        events.some((event) => {
-          if (typeof event !== 'object' || event === null) return false;
-          const row = event as { type?: string; code?: string };
-          return row.type === type && (code === undefined || row.code === code);
-        });
-      expect(hasEvent('approval_required')).toBe(true);
-      expect(
-        hasEvent(
-          decision === 'approve' ? 'tool_result' : 'error',
-          decision === 'reject' ? 'APPROVAL_REJECTED' : undefined,
-        ),
-      ).toBe(true);
       await expect
         .poll(
           () =>

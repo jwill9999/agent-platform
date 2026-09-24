@@ -1,7 +1,7 @@
 import { connect } from 'node:net';
 import { once } from 'node:events';
 import { afterEach, expect, it } from 'vitest';
-import { createReviewProxy } from '../src/reviewProxy.js';
+import { createReviewProxy, modelEndpoint } from '../src/reviewProxy.js';
 
 const servers: ReturnType<typeof createReviewProxy>[] = [];
 afterEach(async () => {
@@ -66,4 +66,24 @@ it('denies protocol upgrades', async () => {
       'GET /responses HTTP/1.1\r\nHost: model-proxy\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n',
     ),
   ).toBe('HTTP/1.1 403 Forbidden');
+});
+
+it.each([
+  '/models?client_version=1/../../accounts',
+  '/models?other=1',
+  '/models?client_version=1&other=2',
+  '/models?client_version=%2e%2e',
+  '/responses?path=/accounts',
+])('rejects unsupported or traversal-like query input %s', async (target) => {
+  expect(await request(`GET ${target} HTTP/1.1\r\nHost: gateway\r\n\r\n`)).toBe(
+    'HTTP/1.1 403 Forbidden',
+  );
+});
+
+it('maps supported model discovery and response routes to fixed upstream paths', () => {
+  expect(modelEndpoint('POST', '/responses')).toBe('/backend-api/codex/responses');
+  expect(modelEndpoint('GET', '/models?client_version=0.156.1')).toBe(
+    '/backend-api/codex/models?client_version=0.156.1',
+  );
+  expect(modelEndpoint('GET', '/responses')).toBeUndefined();
 });

@@ -18,18 +18,25 @@ const FORWARDED_HEADERS = new Set([
   'x-codex-beta-features',
 ]);
 
+export function modelEndpoint(
+  method: string | undefined,
+  target: string | undefined,
+): string | undefined {
+  if (method === 'POST' && target === '/responses') return '/backend-api/codex/responses';
+  if (method !== 'GET') return undefined;
+  if (target === '/models') return '/backend-api/codex/models';
+  const version = /^\/models\?client_version=([0-9A-Za-z._-]{1,64})$/u.exec(target ?? '')?.[1];
+  return version === undefined
+    ? undefined
+    : '/backend-api/codex/models?client_version=' + encodeURIComponent(version);
+}
+
 /** Fixed application gateway: no client-selected upstream, CONNECT, redirects or WebSockets. */
 export function createReviewProxy() {
   const server = createServer((request, response) => {
-    // Require origin-form URLs so a proxy URL, authority or traversal cannot select an upstream.
-    const match = /^\/(responses|models)(\?[^#]*)?$/u.exec(request.url ?? '');
-    if (
-      !match ||
-      !(
-        (match[1] === 'responses' && request.method === 'POST') ||
-        (match[1] === 'models' && request.method === 'GET')
-      )
-    ) {
+    // Select fixed upstream paths; accept only the model-discovery version query.
+    const path = modelEndpoint(request.method, request.url);
+    if (path === undefined) {
       response.writeHead(403);
       response.end();
       return;
@@ -44,7 +51,7 @@ export function createReviewProxy() {
         port: 443,
         servername: 'chatgpt.com',
         rejectUnauthorized: true,
-        path: `/backend-api/codex/${match[1]}${match[2] ?? ''}`,
+        path,
         method: request.method,
         headers,
         timeout: 180_000,

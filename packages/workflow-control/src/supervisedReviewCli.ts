@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
@@ -24,6 +23,21 @@ export const supervisedReviewConfigSchema = z
   })
   .strict();
 
+/** Coordinator supplies bounded JSON; the CLI never opens a model-selected config path. */
+export async function readReviewConfig(
+  input: AsyncIterable<Uint8Array | string>,
+): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of input) {
+    const bytes = Buffer.from(chunk);
+    size += bytes.length;
+    if (size > 1_000_000) throw new Error('review configuration exceeds input limit');
+    chunks.push(bytes);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+}
+
 export async function runSupervisedReview(config: unknown) {
   const parsed = supervisedReviewConfigSchema.parse(config);
   const prepared = await prepareSupervisedReview(parsed);
@@ -40,9 +54,9 @@ export async function runSupervisedReview(config: unknown) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
-    const configFile = process.argv[2];
-    if (!configFile) throw new Error('usage: supervised-review <trusted-config.json>');
-    const config: unknown = JSON.parse(await readFile(resolve(configFile), 'utf8'));
+    if (process.argv.length !== 2)
+      throw new Error('usage: supervised-review < trusted-config.json (JSON on stdin)');
+    const config = await readReviewConfig(process.stdin);
     process.stdout.write(`${JSON.stringify(await runSupervisedReview(config))}\n`);
   } catch (error) {
     process.stderr.write(

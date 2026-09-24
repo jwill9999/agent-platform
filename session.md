@@ -1,7 +1,16 @@
-# Paused session handoff — 24 September 2026
+# Active session: repair PR quality gates
 
-The owner explicitly paused work until returning tomorrow. Only this handoff update is authorized
-while paused; do not resume implementation, reviews, model calls or pilot execution automatically.
+The owner resumed work and explicitly authorized assessment and repair of SonarCloud findings and
+the desktop-E2E failure. Continue the existing task branch; no merge/staging/pilot authorization.
+
+Current report: [PR gate repair](docs/reviews/pr271-gate-repair.md).
+The desktop failure is an asynchronous evidence-capture race; backend denial and unchanged file were
+already present in the failed artifact. Reviewer security findings are addressed by fixed gateway
+routes, bounded stdin configuration, absolute executable path and hardened image defaults/install.
+Local verification: 721 Linux package tests passed (13 optional skipped), four actual runtime/config
+probes passed, and nine repeated Electron rejection journeys passed. Independent isolated review
+found no confirmed regressions; its exact snapshot and limits are retained in the repair report.
+Build, typecheck and lint pass. Hosted gates must be refreshed after push.
 
 ## Resume location and delivery state
 
@@ -41,7 +50,7 @@ qualified route and finishing the remaining planning/skill acceptance gates.
 effective-config probe passed separately. Six lifecycle tests, build, lint, Markdown and links pass.
 Native Apple Git licence and absent Sonar/Problems connectors remain recorded limitations.
 
-## Remaining work and agreed return sequence
+## Subsequent work after PR gates pass
 
 1. Review the verification report and completed changes together. Refresh Beads and the existing PR
    before recommending integration. The successful standalone reviewer assessment does not approve

@@ -9,7 +9,7 @@ Review events are untrusted output, never executed or interpreted as authorizati
 After building workflow-control, the coordinator may invoke:
 
 ```sh
-node packages/workflow-control/dist/supervisedReviewCli.js /absolute/path/to/trusted-config.json
+node packages/workflow-control/dist/supervisedReviewCli.js < /absolute/path/to/trusted-config.json
 ```
 
 The coordinator-owned config supplies sourceRoot, evidencePaths, immutable image digest,

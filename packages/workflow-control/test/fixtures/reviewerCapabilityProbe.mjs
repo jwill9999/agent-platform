@@ -100,7 +100,7 @@ const args = [
   'model_providers.inventory.stream_max_retries=0',
   'Read supplied evidence only.',
 ];
-const child = spawn('codex', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+const child = spawn('/usr/local/bin/codex', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 child.stdout.on('data', (d) => process.stderr.write(d));
 child.stderr.on('data', (d) => process.stderr.write(d));
 child.on('exit', () => {

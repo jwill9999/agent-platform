@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 
 import { prepareReviewSnapshot, prepareSupervisedReview } from '../src/supervisedReview.js';
-import { supervisedReviewConfigSchema } from '../src/supervisedReviewCli.js';
+import { supervisedReviewConfigSchema, readReviewConfig } from '../src/supervisedReviewCli.js';
 
 const cleanup: string[] = [];
 afterEach(async () => {
@@ -74,4 +74,15 @@ it('rejects innocent aliases to forbidden files and symlinked ancestors', async 
   await symlink(join(root, '.codex'), join(root, 'docs'));
   await expect(prepareReviewSnapshot(root, ['innocent.md'])).rejects.toThrow('symlink');
   await expect(prepareReviewSnapshot(root, ['docs/config.toml'])).rejects.toThrow('symlink');
+});
+
+it('reads coordinator JSON from stdin and rejects oversized or malformed input', async () => {
+  async function* input(...chunks: string[]) {
+    yield* chunks;
+  }
+  await expect(readReviewConfig(input('{"question":', '"review"}'))).resolves.toEqual({
+    question: 'review',
+  });
+  await expect(readReviewConfig(input('/arbitrary/config.json'))).rejects.toThrow();
+  await expect(readReviewConfig(input('x'.repeat(1_000_001)))).rejects.toThrow('input limit');
 });
