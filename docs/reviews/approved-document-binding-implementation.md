@@ -1,6 +1,6 @@
 # Approved-document binding implementation review
 
-Status: **repairs verified locally; independent recheck and hosted gates pending; draft, unmerged**.
+Status: **local gates pass; independent repair findings resolved; exact-head hosted gates govern merge readiness**.
 Task authority: Beads `agent-platform-pilot-zero.16`. The owner explicitly authorized completing the
 six unresolved findings. The [owner approval](approved-document-binding-owner-approval.json) binds
 the frozen planning material, which remains unchanged. Delivery is supervised direct implementation,
@@ -15,7 +15,7 @@ not managed orchestration. No staging or pilot was launched.
 | Supplied packet must match persisted scheduler input | Clone input, then compare the complete packet/envelope and reservation identity before credentials or workspace creation | Substitution denial with zero issue/create/start; actual launcher success/cancel |
 | Same-status terminal replay must reject conflicting results | Compare existing and supplied terminal result before replay adoption | Scheduler completion-contention suite |
 | Cleanup after approval loss | Cleanup-only bootstrap constructor verifies historical exact identity, disables execution, retains evidence and respects current leases | Reopen after invalidation, denied execution/live takeover, successful fenced cancellation |
-| Complete negative/runtime/crash coverage | Expanded admission matrix, actual Docker lifecycle, public coordinator/restart, process death and competing owners, publication faults and legacy cleanup | Verification matrix below; independent completeness assessment remains pending |
+| Complete negative/runtime/crash coverage | Expanded admission matrix, actual Docker lifecycle, public coordinator/restart, process death and competing owners, publication faults and legacy cleanup | Verification matrix below; reviewed repair chain and fixture limits retained |
 
 The [third independent review](evidence/approved-document-binding-code-review-round3.json) found
 additional gaps in taskless/imported-source resolution, credential dispatch, safe Git error reporting
@@ -38,22 +38,31 @@ effect initiation. Official adapter tests suspend claim/close/push observations 
 approval, cancellation or ownership, asserting zero subsequent writes. Real Git tests cover distinct
 canonical/task worktrees, changed/adopted document blobs and lease expiry during Git observations.
 Bootstrap shares the existing writer reservation, avoiding competing SQLite writers.
-Final independent follow-up is running against these changes.
+The [eighth review](evidence/approved-document-binding-code-review-round8.json) identified one
+remaining caller-fence race in transition recovery. Dispatch now compares the caller-held complete
+transition against the persisted record inside the writer reservation and passes that validated record
+to the adapter. Two-peer execution/recovery tests prove a successor adoption cannot lend authority
+to the old caller. The [ninth review](evidence/approved-document-binding-code-review-round9.json)
+approved this bounded correction with zero actionable findings. All 36 supplied snapshot files match
+the final implementation bytes. These reviews collectively close the identified repair findings;
+the last review alone is not a fresh whole-system audit or human approval.
 
 No earlier finding is treated as waived merely because the regression suite passed.
 
 ## Retained verification
 
-- Previous full Linux checkpoint: **868 passed, 17 optional skipped**, 46 test files passed, 5 skipped.
+- Full Linux package: **875 passed, 17 optional skipped**, 46 test files passed, 5 skipped.
 - Enabled document/container and actual launcher suites: **110 passed**, no skips. These separately
   execute the two document Docker cases and four launcher/coordinator cases skipped by default.
   Native path tests separately pass the unreadable-file case skipped by a root Linux runner.
 - Production TypeScript build/typecheck, separate launcher-test typecheck and zero-warning lint pass.
 - Latest focused delivery/transition suites: **60 passed**, including suspended Beads/Dolt effect
   cases; four real coordinator/launcher scenarios rerun and pass after the final dispatch repair.
-- Independent rounds four, six and seven are retained with their repair dispositions. Final full
-  regression and independent follow-up remain pending.
-- Monorepo typecheck and dependency-cycle checks pass locally. New-head hosted checks await publication. No merge recommendation yet.
+- Independent review rounds and dispositions are retained. No actionable finding remains in that
+  review chain. The final review is a bounded static recheck, not a test execution or pilot approval.
+- Monorepo typecheck, extended changed-test typecheck, workflow lint, formatting, Markdown/relative
+  links and dependency-cycle checks pass locally. Required hosted checks must pass at the exact PR
+  head before integration; their live result is authoritative on the linked pull request.
 
 [Machine-readable evidence](evidence/approved-document-binding-repair-verification.json) records
 commands, environment, source/test/compiled hashes and fixture limits. Retained output:
@@ -85,12 +94,13 @@ those cases prove refusal before authority/effects, not successful business tran
 positive module suites supply the ordinary transaction coverage. Docker launcher tests use a real
 container and deterministic executable with a fixture credential protocol. Owner/critic identities
 are synthetic in disposable test journals. No external GitHub/Beads mutations or live agent-model
-execution were part of these probes. This is not acceptance of an autonomous pilot or a complete
+execution were part of these probes. Narrow downstream service clients remain trusted integration
+interfaces; their absent production implementations are not proven by fixture counters. This is not acceptance of an autonomous pilot or a complete
 proof against a hostile host.
 
 ## Delivery boundary
 
 The cumulative [implementation request](https://github.com/jwill9999/agent-platform/pull/273) targets
-`feature/harness-backlog-review`. Keep it draft until independent findings and required hosted gates
-are resolved. Owner review/integration remains separate; Beads stays in progress until that boundary.
+`feature/harness-backlog-review`. The implementation is published for owner review; require green
+hosted checks at the exact head before integration. Owner review/integration remains separate; Beads stays in progress until that boundary.
 Staging-only packaged macOS VM testing and the future managed single-task pilot remain separate.

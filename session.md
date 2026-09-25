@@ -11,16 +11,18 @@ Docker is healthy. Owner explicitly authorized completing all six findings. Repa
 trusted source/current worktree resolution, durable snapshot denial, persisted packet identity,
 terminal result replay and cleanup-only bootstrap. Independent rounds3/4 surfaced additional
 initial-import and asynchronous repair-effect gaps; those are repaired with composed regressions.
-Latest complete pre-final checkpoint: Linux868 passed/17 optional skipped; enabled document/container
-suites110 passed. Round6 source/tree and durable cancellation repairs passed; round7 found Git
-lease expiry within adapter and Beads/Dolt post-observation dispatch gaps. Both repaired with new
-regressions (focused60 passed; four actual coordinator/launcher scenarios pass again). Final full
-regression and isolated round8 review running. Production source and test typechecks/lint pass.
-No readiness claim until independent and hosted gates finish.
+Final local verification: Linux875 passed/17 optional skipped; enabled document/container suites110
+passed. Build, monorepo typecheck, extended changed-test typecheck, workflow lint, formatting,
+Markdown/links and dependency cycles pass. Rounds6-8 surfaced delivery/source/cancellation,
+Git-expiry, Beads/Dolt dispatch and stale-caller adoption gaps; each is repaired with regressions.
+Final isolated round9 approves the last correction with zero actionable findings; all36 supplied
+snapshot hashes match. Full evidence and reviewed limitations are in the implementation report.
 
-Continue authorized work through final exact-snapshot critique and hosted checks; do not stop merely
-because a checkpoint passes. Draft PR273 remains unmerged targeting feature/harness-backlog-review.
-No staging or pilot authority. Beads .16 remains in progress; owner integration is required to close.
+PR273 remains unmerged targeting feature/harness-backlog-review. Check its exact-head hosted gates
+before owner integration; local success does not substitute for hosted browser/desktop checks.
+No staging or pilot authority. Beads .16 remains in progress until owner integration. After that,
+re-read Beads .13/.12 readiness and prepare the separately approved single-task orchestration pilot.
+These supervised repairs do not prove autonomous execution or absent downstream service adapters.
 
 ---
 
