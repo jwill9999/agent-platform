@@ -1,4 +1,61 @@
-# Current session: approved-document binding implementation
+# Current session: paused after feature integration — 25 September 2026
+
+The owner merged [Bind execution approval to reviewed document bytes](https://github.com/jwill9999/agent-platform/pull/273)
+into `feature/harness-backlog-review`. GitHub confirms merge commit
+`e54ce1537504954fb0ee875981f46e04910f9157`. Work is paused at the owner's request.
+No orchestration pilot, staging promotion or production change has occurred.
+This entry supersedes earlier status statements below.
+
+## Completed and verified
+
+- Approved-document binding repairs and all six original findings, plus concrete follow-up findings,
+  are implemented and integrated. Delivery was supervised direct work, not managed orchestration.
+- Isolated review rounds9 and10 approved the final fixes and quality cleanup with no actionable
+  findings. Reports and exact evidence are linked from the
+  [implementation report](docs/reviews/approved-document-binding-implementation.md).
+- All nine executed hosted checks passed at final task head
+  `52be8f558174a883cc9c9482c031c5c936992d4f`, including browser and desktop E2E,
+  full verification, Docker, SonarCloud, documentation, dependency cycles and security.
+  Sonar reported zero unresolved issues. Sourcery and the staging-only packaged macOS VM check
+  were skipped; independent isolated critique supplied the code review.
+- Local Linux regression: 875 passed, 17 optional skipped. Enabled document/container suites:
+  110 passed. Final two-file quality cleanup: 80 affected tests passed and separately reviewed.
+  These suites overlap; 110 does not mean 110 real-container cases.
+- Beads task `agent-platform-pilot-zero.16` can close after the verified owner integration.
+  Broader skill qualification and pilot acceptance remain separate.
+
+## Resume here
+
+Use `/Users/letuscode/projects/agent-platform-workflow-evaluation`; this handoff is saved on
+`task/approved-document-binding`. The handoff-only commit is after the merged PR and is not itself
+part of that merge. Beads authority remains `/Users/letuscode/projects/agent-platform`.
+Refresh live Beads and Git state before selecting the next task; start subsequent implementation
+from the integrated feature baseline, preserving this handoff.
+
+1. Brief the owner on the integrated baseline and refresh task dependencies. Do not repeat completed
+   checks without changed code or a specific unresolved concern.
+2. Finish `agent-platform-pilot-zero.12`, **Qualify the connected skill handoff and reconcile runtime
+   blockers**. It remains in progress: verify planning → independent critique → implementation →
+   orchestration handoffs, actual start/resume paths, runtime readiness and result return. Record
+   missing capabilities or manual interventions in the existing orchestration evaluation. The binding
+   repair does not establish full skill acceptance or complete external-service adapters.
+3. Once prerequisites are satisfied, prepare `agent-platform-pilot-zero.13`, **Prepare and review the
+   exact single-task orchestration pilot plan**. Select one remaining permission scenario and specify
+   source revision, task/spec/test document versions, permitted actions, limits, evidence and completion
+   criteria. Obtain independent critique and the owner's approval bound to that exact material.
+4. Only under that approved pilot scope, run one managed task to completion and review the evidence.
+   If readiness fails, record the blocker; do not silently substitute direct work and call it orchestration.
+5. After the single-task result is accepted, prepare the separate two-dependent-task pilot to prove
+   automatic progression, verification before the second task, and stopping on failure without manual nudges.
+
+The immediate next work is skill/runtime readiness and pilot planning, not launching the pilot.
+Broader permission, cancellation, retry and recovery coverage remains open. No new execution,
+merge or staging authorization is implied by this handoff. Temporary reviewer gateway/containers
+were removed; recreate the qualified reviewer environment when a new critique is needed.
+
+---
+
+# Previous session: approved-document binding implementation
 
 Owner authorized implementation of `agent-platform-pilot-zero.16`; approval is recorded against the
 reviewed planning material. This is supervised direct delivery, not managed orchestration.
