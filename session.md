@@ -50,6 +50,21 @@ from the integrated feature baseline, preserving this handoff.
 
 ## Feature branches and staging
 
+Live remote inventory checked on 25 September 2026: three feature branches, no open pull requests.
+Commit counts below describe Git history, not independent unshipped changes.
+
+| Feature branch | Verified position | Proposed next action |
+| --- | --- | --- |
+| `feature/agent-docs-access` | One commit ahead of staging; documentation access configuration and guidance. | Assess as a small separate staging candidate; compare shared guidance with harness changes and verify project documentation connections before promotion. |
+| `feature/harness-backlog-review` | Six commits ahead of staging; includes merged PR273, permission baselines, skills and reviewer/runtime repairs. | Preserve as the active integration baseline. Finish readiness assessment and scope its staging review, including combined browser/desktop and packaged VM gates. No staging readiness claimed. |
+| `feature/pilot-zero-assessment` | Already delivered to staging by PR264. Current branch and staging trees are identical despite divergent commit history from integration. | No additional content merge needed at this snapshot. Retain during the pause; review archival/deletion with the owner later. |
+
+Verified tips: documentation `8571d7d708499fb7a62f6750f8f192df192a219f`, harness
+`e54ce1537504954fb0ee875981f46e04910f9157`, prior pilot
+`cb969f851e24c59d5ad93768f00f9b5756f6b809`; staging
+`1be9301f6cbb8052f8d7eb56471fe50e35cbba4e`. Refresh this inventory on return.
+These are proposed dispositions, not approval to promote or delete branches.
+
 Leave existing feature branches intact during the pause. On return, prepare a separate staging
 integration assessment: inventory live branches, compare their changes and dependencies against
 staging, identify overlap and merge order, and define required combined and staging-specific checks
