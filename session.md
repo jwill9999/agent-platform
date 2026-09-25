@@ -27,7 +27,10 @@ This entry supersedes earlier status statements below.
 ## Saved reference context
 
 The owner supplied [The Anatomy of an Agent Harness](docs/planning/harness-modernization/agent-harness-article-reference.md).
-Its source link, summary and assessment prompts are saved for future discussion; no implementation
+Its source link, summary and assessment prompts are saved for future discussion. Owner direction:
+revisit partial feature/service gaps at refinement and pilot/delivery milestones, explicitly considering
+prebuilt capabilities behind clean-architecture adapters before bespoke work. The research index and
+reference note retain the review criteria; no calendar automation was requested. No implementation
 or pilot work resumed as part of saving this reference.
 
 ## Resume here

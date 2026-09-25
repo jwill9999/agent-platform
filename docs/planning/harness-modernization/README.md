@@ -45,3 +45,12 @@ The [current-runtime evidence baseline proposal](current-runtime-baseline-plan.m
 
 [The Anatomy of an Agent Harness — reference note](agent-harness-article-reference.md) records the
 owner-supplied LangChain article, a short summary and questions for future assessment.
+
+## Recurring gap and reuse review
+
+At feature refinement and significant pilot/delivery milestones, revisit the partial gap analysis
+and the [prebuilt-capability reference](agent-harness-article-reference.md#ongoing-review-principle--owner-direction-25-september-2026).
+Compare improving current code with adapter-based reuse before choosing bespoke work. Focus first
+on concepts, services and features; verify language/version compatibility and behavioral guarantees
+before adoption. Record decisions and follow-up in existing assessment material and Beads.
+No calendar-based automation or migration is authorized by this checkpoint.

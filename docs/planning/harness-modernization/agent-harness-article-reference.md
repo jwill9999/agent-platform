@@ -137,3 +137,31 @@ cancellation, uncertain-success retries, one-task completion, automatic two-task
 monitoring export. These are proposed evaluation criteria, not additional authorized implementation.
 Neither library marketing nor passing example code establishes that it can replace our current
 brokers, approved-document binding or end-to-end verification obligations.
+
+## Ongoing review principle — owner direction, 25 September 2026
+
+Keep these resources visible during continued service and feature gap assessment. Existing gap
+analysis is partial; build on its evidence and Beads records rather than restarting or treating
+unverified capabilities as absent. The primary lens is concepts, services, features and user value.
+Language and package compatibility are subsequent feasibility checks.
+
+For each material gap, explicitly compare existing implementation improvement, selective prebuilt
+library reuse and broader harness adoption. Prefer an adapter behind a service boundary where that
+can preserve clean architecture and shorten delivery. Replaceability is a design goal, not a claim
+of automatic plug-and-play compatibility: assess state ownership, permissions, cancellation,
+recovery, events, errors and operational dependencies as well as interface shape.
+
+Revisit this comparison at each feature-planning/refinement cycle and after each significant pilot
+or delivery milestone. Reassess sooner when runtime evidence exposes a gap, a relevant library
+capability changes, or bespoke implementation effort increases. This is a recurring review
+checkpoint; no calendar interval or automated monitoring has been agreed.
+
+For each review, record the date, capability, current evidence, relevant source/version, existing
+Beads issue, candidate reuse option, expected benefit, integration risks and decision or reason for
+deferral. Distinguish implemented-and-proven, implemented-but-unverified, missing and not-required.
+Refresh only the relevant documentation and tests. Keep existing priorities and approval boundaries;
+this direction does not authorize migration, installation or new implementation.
+
+Before selecting bespoke work, ask: can an available component close this gap sooner through an
+adapter while preserving our guarantees? Validate any candidate against the same connected journeys
+as the current service. Beads remains authoritative for follow-up work and scheduling.
