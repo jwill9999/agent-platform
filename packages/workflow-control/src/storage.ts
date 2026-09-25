@@ -7,6 +7,7 @@ import {
   verifyApprovedDocumentSnapshot,
   recordPlanningDocumentPublication,
   verifyDocumentBoundary,
+  verifyDeliveryDocumentSource,
   verifyDocumentsForApproval,
   recoverDocumentVerification,
   type DocumentBoundary,
@@ -728,6 +729,7 @@ export class WorkflowStore {
   readonly #database: Database.Database;
   // Only the synchronous, fenced dispatch transaction can cover its own inline commit.
   #documentGuardedOperation: string | undefined;
+  #documentGuardedAuthority: (() => void) | undefined;
 
   constructor(path: string) {
     this.#database = new Database(path);
@@ -753,6 +755,10 @@ export class WorkflowStore {
 
   verifyPlanningDocuments(input: DocumentBoundary) {
     return verifyDocumentBoundary(this.#database, input);
+  }
+
+  verifyDeliveryDocumentSource(input: DocumentBoundary) {
+    return verifyDeliveryDocumentSource(this.#database, input);
   }
 
   #documentAuthority(input: DocumentBoundary): () => void {
@@ -3728,6 +3734,60 @@ export class WorkflowStore {
     return updated.changes === 1;
   }
 
+  assertSchedulerAcceptsWork(id: string): void {
+    const execution = this.getSchedulerExecution(id);
+    if (!execution || !runAcceptsWork(this.#database, execution.runId))
+      throw new Error('specialist run is cancelled or closed');
+  }
+
+  /** Reserve only effect initiation; cleanup remains permitted after cancellation. */
+  dispatchSchedulerContainer<T>(
+    authority: SchedulerContainerAuthority,
+    expectedSourceRoot: string,
+    dispatch: () => T,
+    capability: typeof workflowContainerJournalCapability,
+    clock: () => number,
+  ): T {
+    if (capability !== workflowContainerJournalCapability)
+      throw new Error('container journal capability required');
+    const execution = this.getSchedulerExecution(authority.id);
+    if (!execution) throw new Error('specialist execution missing');
+    const assertDocuments = this.#documentAuthority({
+      runId: execution.runId,
+      taskId: execution.taskId,
+      ownerId: authority.ownerId,
+      runLeaseEpoch: authority.runLeaseEpoch,
+      expectedSourceRoot,
+      boundary: 'specialist.dispatch',
+      nowMs: clock(),
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        this.assertSchedulerAcceptsWork(authority.id);
+        const current = this.getSchedulerExecution(authority.id);
+        if (
+          current?.status !== 'active' ||
+          current.deadlineMs <= clock() ||
+          current.ownerId !== authority.ownerId ||
+          current.workspaceLeaseEpoch !== authority.workspaceLeaseEpoch ||
+          current.runLeaseEpoch !== authority.runLeaseEpoch ||
+          current.taskLeaseEpoch !== authority.taskLeaseEpoch
+        )
+          throw new Error('specialist execution authority changed');
+        for (const [kind, resourceId, epoch] of [
+          ['workspace', execution.workspaceId, authority.workspaceLeaseEpoch],
+          ['run', execution.runId, authority.runLeaseEpoch],
+          ['task', execution.taskId, authority.taskLeaseEpoch],
+        ] as const)
+          this.#assertResourceLease(kind, resourceId, authority.ownerId, epoch, clock());
+        const value = dispatch();
+        void Promise.resolve(value).catch(() => undefined);
+        return { value };
+      })
+      .immediate().value;
+  }
+
   dispatchSchedulerCredentialIssue<T>(
     id: string,
     dispatch: () => T,
@@ -3738,8 +3798,7 @@ export class WorkflowStore {
       throw new Error('credential journal capability required');
     const started = performance.now();
     const execution = this.getSchedulerExecution(id);
-    if (!execution || execution.status !== 'active')
-      throw new Error('credential execution is not active');
+    if (execution?.status !== 'active') throw new Error('credential execution is not active');
     const assertDocuments = this.#documentAuthority({
       runId: execution.runId,
       taskId: execution.taskId,
@@ -3751,6 +3810,7 @@ export class WorkflowStore {
     return this.#database
       .transaction(() => {
         assertDocuments();
+        this.assertSchedulerAcceptsWork(id);
         const dispatchTime = nowMs + Math.max(0, Math.floor(performance.now() - started));
         for (const [kind, resourceId, epoch] of [
           ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
@@ -4981,6 +5041,7 @@ export class WorkflowStore {
       runLeaseEpoch: number;
       taskLeaseEpoch: number;
       clock: () => number;
+      expectedSourceRoot?: string;
       initiate: () => Promise<unknown>;
     },
     capability?: symbol,
@@ -4993,6 +5054,7 @@ export class WorkflowStore {
       runId: guardedOperation.runId,
       taskId: guardedOperation.taskId,
       boundary: 'delivery.mutate',
+      expectedSourceRoot: input.expectedSourceRoot,
       ownerId: input.ownerId,
       runLeaseEpoch: input.runLeaseEpoch,
       nowMs: input.clock(),
@@ -5006,14 +5068,53 @@ export class WorkflowStore {
         this.#assertDeliveryOperationLeases(operation, input, input.clock());
         this.#assertDeliveryRunState(operation.runId, operation.kind);
         this.#documentGuardedOperation = input.id;
+        this.#documentGuardedAuthority = assertDocuments;
         try {
           pending = input.initiate();
         } finally {
           this.#documentGuardedOperation = undefined;
+          this.#documentGuardedAuthority = undefined;
         }
       })
       .immediate();
     return pending;
+  }
+
+  assertDeliveryMutationDispatch(
+    id: string,
+    fence: {
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+    },
+    nowMs: number,
+    capability: symbol,
+  ): void {
+    if (
+      capability !== workflowDeliveryMutationCapability ||
+      !this.#database.inTransaction ||
+      this.#documentGuardedOperation !== id ||
+      !this.#documentGuardedAuthority
+    )
+      throw new Error('delivery mutation reservation required');
+    this.#documentGuardedAuthority();
+    const operation = this.getDeliveryOperation(id);
+    if (operation?.status !== 'prepared') throw new Error('delivery mutation is not prepared');
+    this.#assertDeliveryOperationLeases(operation, fence, nowMs);
+    this.#assertDeliveryRunState(operation.runId, operation.kind);
+  }
+
+  /** Internal adapters may reuse, but never manufacture, the broker's active writer reservation. */
+  withinDeliveryMutation<T>(runId: string, operation: () => T, capability: symbol): T {
+    if (
+      capability !== workflowDeliveryMutationCapability ||
+      !this.#database.inTransaction ||
+      this.#documentGuardedOperation === undefined ||
+      this.getDeliveryOperation(this.#documentGuardedOperation)?.runId !== runId
+    )
+      throw new Error('delivery mutation reservation required');
+    return operation();
   }
 
   #assertDeliveryOperationLeases(
@@ -7460,8 +7561,7 @@ export class WorkflowStore {
         };
         const current = this.getRepairChildIntent(input.id);
         if (
-          !current ||
-          current.status !== 'prepared' ||
+          current?.status !== 'prepared' ||
           current.sequence !== this.countRepairChildIntents(current.runId)
         )
           throw new Error('repair-child dispatch position changed');
@@ -7982,6 +8082,49 @@ export class WorkflowStore {
 
   assertRunLease(runId: string, ownerId: string, epoch: number, nowMs = Date.now()): void {
     this.#assertLease(runId, ownerId, epoch, nowMs);
+  }
+
+  dispatchTransitionMutation<T>(
+    transition: TransitionRecord,
+    dispatch: (current: TransitionRecord) => T,
+    clock: () => number,
+  ): T {
+    if (transition?.status !== 'prepared') throw new Error('transition is not prepared');
+    const cleanup =
+      !transition.operation.startsWith('beads.') &&
+      ['cancelling', 'cancelled', 'escalated', 'recovering'].includes(transition.to);
+    const assertDocuments = cleanup
+      ? undefined
+      : this.#documentAuthority({
+          runId: transition.runId,
+          boundary: 'transition.dispatch',
+          ownerId: transition.leaseOwnerId,
+          runLeaseEpoch: transition.leaseEpoch,
+          nowMs: clock(),
+        });
+    return this.#database
+      .transaction(() => {
+        assertDocuments?.();
+        const current = this.getTransition(transition.id);
+        if (
+          current?.status !== 'prepared' ||
+          !isDeepStrictEqual(current, transition) ||
+          this.getRun(transition.runId)?.state !== transition.from
+        )
+          throw new Error('transition dispatch authority changed');
+        if (!cleanup && !runAcceptsWork(this.#database, transition.runId))
+          throw new Error('transition run is cancelled or closed');
+        this.assertTransitionLeases(
+          current,
+          transition.leaseOwnerId,
+          transition.leaseEpoch,
+          clock(),
+        );
+        const value = dispatch(current);
+        void Promise.resolve(value).catch(() => undefined);
+        return { value };
+      })
+      .immediate().value;
   }
 
   assertTransitionLeases(

@@ -249,8 +249,7 @@ export class BootstrapJournal {
         }
       | undefined;
     if (
-      !row ||
-      row.policy_json !== bootstrapJson(policy) ||
+      row?.policy_json !== bootstrapJson(policy) ||
       row.contract_digest !== bootstrapDigest(contract) ||
       contract.policyDigest !== bootstrapDigest(policy) ||
       !this.database

@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { deriveContractMaterialDigest } from '../src/planning.js';
 import { mkdir, realpath, writeFile } from 'node:fs/promises';
-import { dirname, resolve, join } from 'node:path';
+import { dirname, resolve, join, isAbsolute } from 'node:path';
 import { executionContractSchema, type ExecutionContract } from '../src/contracts.js';
 import { ContentAddressedArtifactStore } from '../src/artifacts.js';
 import { publishPlanningDocumentObjects } from '../src/planningDocuments.js';
@@ -26,8 +26,10 @@ export async function documentFixture(
     join(canonical, 'fixture-tests.md'),
     'Synthetic verification requirements for execution regression.\n',
   );
+  const executable = process.env.WORKFLOW_GIT_BINARY ?? '/usr/bin/git';
+  if (!isAbsolute(executable)) throw new Error('fixture git must be absolute');
   const git = (args: string[]) =>
-    execFileSync('git', ['-C', canonical, ...args], {
+    execFileSync(executable, ['-C', canonical, ...args], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {

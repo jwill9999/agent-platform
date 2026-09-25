@@ -696,8 +696,7 @@ export class DockerIsolatedSpecialistLauncher {
     try {
       const persisted = this.#options.store.getSchedulerExecution(reservation.id);
       if (
-        !persisted ||
-        persisted.status !== 'active' ||
+        persisted?.status !== 'active' ||
         persisted.runId !== packet.runId ||
         persisted.taskId !== packet.taskId ||
         persisted.role !== reservation.role ||
@@ -754,9 +753,12 @@ export class DockerIsolatedSpecialistLauncher {
       ];
       this.#advance(authority, 'not_dispatched', 'create_pending');
       this.#assertCanStart(reservation);
-      const created = await this.#docker(
-        createArgs,
-        Math.min(60_000, reservation.deadlineMs - this.#clock()),
+      const created = await this.#options.store.dispatchSchedulerContainer(
+        authority,
+        this.#options.sourceRoot,
+        () => this.#docker(createArgs, Math.min(60_000, reservation.deadlineMs - this.#clock())),
+        workflowContainerJournalCapability,
+        this.#clock,
       );
       const containerId = created.stdout.trim();
       if (!/^[a-f0-9]{64}$/u.test(containerId))
@@ -780,10 +782,17 @@ export class DockerIsolatedSpecialistLauncher {
         });
         // Revalidate fences immediately before dispatch without another asynchronous gap.
         this.#assertAuthority(authority);
-        started = this.#docker(
-          ['start', '--attach', containerId],
-          reservation.deadlineMs - this.#clock(),
-          this.#options.maxOutputBytes ?? 4 * 1024 * 1024,
+        started = this.#options.store.dispatchSchedulerContainer(
+          authority,
+          this.#options.sourceRoot,
+          () =>
+            this.#docker(
+              ['start', '--attach', containerId],
+              reservation.deadlineMs - this.#clock(),
+              this.#options.maxOutputBytes ?? 4 * 1024 * 1024,
+            ),
+          workflowContainerJournalCapability,
+          this.#clock,
         );
       });
       const result = await started!;
@@ -929,6 +938,7 @@ export class DockerIsolatedSpecialistLauncher {
   }
 
   #assertCanStart(reservation: DockerSpecialistReservation): void {
+    this.#options.store.assertSchedulerAcceptsWork(reservation.id);
     if (this.#cancelled.has(reservation.id))
       throw new Error('specialist launch was cancelled before container start');
     if (this.#clock() >= reservation.deadlineMs)

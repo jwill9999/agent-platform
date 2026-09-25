@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, isAbsolute } from 'node:path';
 import type { ExecutionContract } from './contracts.js';
 import { bootstrapDigest, bootstrapPolicySchema } from './bootstrapPolicy.js';
 
@@ -14,13 +14,15 @@ export interface DocumentSourceIdentity {
 
 function git(root: string, args: string[]): string {
   try {
-    return execFileSync('git', ['-C', root, ...args], {
+    const executable = process.env.WORKFLOW_GIT_BINARY ?? '/usr/bin/git';
+    if (!isAbsolute(executable)) throw new Error('document_git_executable_must_be_absolute');
+    return execFileSync(executable, ['-C', root, ...args], {
       encoding: 'utf8',
       timeout: 10_000,
       maxBuffer: 1024 * 1024,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
-        PATH: process.env.PATH,
+        PATH: '/usr/bin:/bin',
         HOME: process.env.HOME,
         GIT_CONFIG_NOSYSTEM: '1',
         GIT_CONFIG_GLOBAL: '/dev/null',

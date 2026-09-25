@@ -386,22 +386,26 @@ describe('approved bootstrap task artifact production composition', () => {
       let afterCommit = false;
       let expired = false;
       let pushes = 0;
-      const original = BootstrapJournal.prototype.withMutation;
-      vi.spyOn(BootstrapJournal.prototype, 'withMutation').mockImplementation(function (
-        this: BootstrapJournal,
+      const original = WorkflowStore.prototype.withinDeliveryMutation;
+      vi.spyOn(WorkflowStore.prototype, 'withinDeliveryMutation').mockImplementation(function (
+        this: WorkflowStore,
         runId,
-        policy,
-        fence,
         operation,
+        capability,
       ) {
-        return original.call(this, runId, policy, fence, () => {
-          insideMutation = true;
-          try {
-            return operation();
-          } finally {
-            insideMutation = false;
-          }
-        });
+        return original.call(
+          this,
+          runId,
+          () => {
+            insideMutation = true;
+            try {
+              return operation();
+            } finally {
+              insideMutation = false;
+            }
+          },
+          capability,
+        );
       });
       if (stage === 'adoption') {
         const advance = BootstrapJournal.prototype.advance;
@@ -519,7 +523,7 @@ describe('approved bootstrap task artifact production composition', () => {
     expired.close();
     const result = await cleanup.terminalize('fixture-owner');
     expect(result.status).toBe('cancelled');
-    expect(result.retainedEvidence[0]?.digest).toBe(evidence.digest);
+    expect(result.retainedEvidence[0]).toMatchObject({ digest: evidence.digest });
     cleanup.close();
   });
   it('crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases', async () => {
@@ -538,7 +542,7 @@ describe('approved bootstrap task artifact production composition', () => {
     expect(git(f.source, ['ls-tree', '-r', '--name-only', head])).not.toContain('owner-note');
     const result = await coordinator.terminalize('fixture-owner');
     expect(result.status).toBe('cancelled');
-    expect(result.retainedEvidence[0]?.digest).toBe(evidence.digest);
+    expect(result.retainedEvidence[0]).toMatchObject({ digest: evidence.digest });
     coordinator.close();
     const raw = new Database(f.database);
     const attestation = raw.prepare('SELECT attestation_json FROM bootstrap_artifacts').get() as {

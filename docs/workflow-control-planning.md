@@ -41,7 +41,10 @@ After contract/run creation, `WorkflowStore.recordPlanningDocumentPublication` v
 the source receipt. Publication verifies the real Git common directory, canonical workspace hash,
 approved repository remote and source commit ancestry. Bootstrap callers pass the exact approved
 `sourcePolicy` when using its authorized remote and source worktree. Normal callers use the approved
-GitHub repository remote. A source revision records provenance; normative bytes are bound separately
+GitHub repository remote. Git observations use `/usr/bin/git` by default; a trusted host operator
+may set `WORKFLOW_GIT_BINARY` to an explicit absolute executable path. Relative paths and ambient
+PATH-based executable selection are rejected. This override is host configuration, not worker input.
+A source revision records provenance; normative bytes are bound separately
 by the manifest and may be published before a subsequent code commit.
 
 The distinct critic and owner approval APIs still apply. Runtime consumers call
@@ -74,8 +77,13 @@ publication folder. Legacy receipts without source identity cannot authorize new
 
 Snapshot staging and validation occur within durable verification attempts. The launcher compares
 the full supplied packet/envelope with the persisted scheduler input before staging or capability
-issuance. Credential and repair-child effect dispatch recheck approval and leases within the writer
-transaction that initiates the operation. Cleanup/revocation remain possible after approval loss.
+issuance. Credential, container, repair-child, delivery and Beads/Dolt effect dispatch recheck
+approval, cancellation and leases within the writer transaction that initiates the operation.
+Git delivery uses the verified task worktree, validates normative blobs in created/adopted trees,
+and rechecks time-based leases immediately before each commit/ref/push effect. Bootstrap reuses
+that reservation rather than opening a competing writer. Cleanup/revocation remain possible after
+approval loss or cancellation. Narrow external clients must initiate the authorized operation before
+any asynchronous suspension; these guards do not attest an absent downstream client implementation.
 
 `BootstrapCoordinator.createForCleanup` verifies historical policy, contract and approval identity,
 then exposes only cancellation for an already-attested bootstrap. Its execution adapters throw.

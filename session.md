@@ -11,10 +11,12 @@ Docker is healthy. Owner explicitly authorized completing all six findings. Repa
 trusted source/current worktree resolution, durable snapshot denial, persisted packet identity,
 terminal result replay and cleanup-only bootstrap. Independent rounds3/4 surfaced additional
 initial-import and asynchronous repair-effect gaps; those are repaired with composed regressions.
-Full Linux regression: 857 passed/17 optional skipped. Four real Docker launcher/coordinator scenarios
-pass; combined enabled suites pass110. Final independent recheck is pending. Native material tests
-include unreadable-file denial. Monorepo typecheck, workflow lint and dependency-cycle checks pass.
-Sonar refactors address the preceding head's findings; new-head hosted gates remain required.
+Latest complete pre-final checkpoint: Linux868 passed/17 optional skipped; enabled document/container
+suites110 passed. Round6 source/tree and durable cancellation repairs passed; round7 found Git
+lease expiry within adapter and Beads/Dolt post-observation dispatch gaps. Both repaired with new
+regressions (focused60 passed; four actual coordinator/launcher scenarios pass again). Final full
+regression and isolated round8 review running. Production source and test typechecks/lint pass.
+No readiness claim until independent and hosted gates finish.
 
 Continue authorized work through final exact-snapshot critique and hosted checks; do not stop merely
 because a checkpoint passes. Draft PR273 remains unmerged targeting feature/harness-backlog-review.

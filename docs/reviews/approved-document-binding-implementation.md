@@ -27,17 +27,32 @@ withdraw approval or replace the lease and assert no later unauthorized effects.
 coordinator-to-actual-launcher/result/restart journey now runs separately for both normative documents.
 Dependency cycles are eliminated; Sonar-requested complexity refactors and explicit file-hash record
 formatting are included without changing authority semantics.
+The [sixth review](evidence/approved-document-binding-code-review-round6.json) identified ordinary
+delivery dispatch, source/tree divergence and durable launch cancellation gaps. Delivery now reserves
+the writer at dispatch, uses the verified task worktree and verifies normative Git blobs; credential
+and container dispatch check durable cancellation. The [seventh review](evidence/approved-document-binding-code-review-round7.json)
+confirmed the source and cancellation repairs, then found time-based Git lease expiry and the
+Beads/Dolt transition effect boundary. Git now invokes the active reservation's fresh fence check
+before each real effect. Transition execute/recovery verifies documents and reserves the writer at
+effect initiation. Official adapter tests suspend claim/close/push observations and change documents,
+approval, cancellation or ownership, asserting zero subsequent writes. Real Git tests cover distinct
+canonical/task worktrees, changed/adopted document blobs and lease expiry during Git observations.
+Bootstrap shares the existing writer reservation, avoiding competing SQLite writers.
+Final independent follow-up is running against these changes.
+
 No earlier finding is treated as waived merely because the regression suite passed.
 
 ## Retained verification
 
-- Full Linux package: **857 passed, 17 optional skipped**, 46 test files passed, 5 skipped.
+- Previous full Linux checkpoint: **868 passed, 17 optional skipped**, 46 test files passed, 5 skipped.
 - Enabled document/container and actual launcher suites: **110 passed**, no skips. These separately
   execute the two document Docker cases and four launcher/coordinator cases skipped by default.
   Native path tests separately pass the unreadable-file case skipped by a root Linux runner.
 - Production TypeScript build/typecheck, separate launcher-test typecheck and zero-warning lint pass.
-- Independent fourth review required initial-import and asynchronous per-effect repair fixes.
-  Both are implemented and tested; the final recheck is pending.
+- Latest focused delivery/transition suites: **60 passed**, including suspended Beads/Dolt effect
+  cases; four real coordinator/launcher scenarios rerun and pass after the final dispatch repair.
+- Independent rounds four, six and seven are retained with their repair dispositions. Final full
+  regression and independent follow-up remain pending.
 - Monorepo typecheck and dependency-cycle checks pass locally. New-head hosted checks await publication. No merge recommendation yet.
 
 [Machine-readable evidence](evidence/approved-document-binding-repair-verification.json) records

@@ -316,6 +316,22 @@ export function verifyDocumentBoundary(database: Database.Database, input: Docum
   return verifyBoundary(database, input, false);
 }
 
+export interface DeliveryDocumentSource {
+  sourceRoot: string;
+  manifest: PlanningDocuments;
+}
+
+export function verifyDeliveryDocumentSource(
+  database: Database.Database,
+  input: DocumentBoundary,
+): DeliveryDocumentSource {
+  let source!: DeliveryDocumentSource;
+  verifyBoundary(database, input, false, (current) => {
+    source = { sourceRoot: current.sourceRoot, manifest: current.manifest };
+  });
+  return source;
+}
+
 /** Publication check only; the approval coordinator must still validate critic and owner evidence. */
 export function verifyDocumentsForApproval(database: Database.Database, input: DocumentBoundary) {
   return verifyBoundary(database, input, true);

@@ -1,3 +1,4 @@
+import { workflowDeliveryMutationCapability } from './storage.js';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
@@ -329,7 +330,15 @@ export class BootstrapCoordinator {
     const fence = this.#fence();
     const contract = this.#journal.contract(this.runId);
     const withMutation = <T>(operation: () => T) =>
-      this.#journal.withMutation(this.runId, policy, fence, operation);
+      this.#store.withinDeliveryMutation(
+        this.runId,
+        () => {
+          this.#journal.assertApproved(this.runId, policy);
+          this.#journal.assertFence(this.runId, policy, fence, Date.now());
+          return operation();
+        },
+        workflowDeliveryMutationCapability,
+      );
     const port = createProductionBootstrapGitPort({
       policy,
       assertAuthority: () => this.#authority(fence),

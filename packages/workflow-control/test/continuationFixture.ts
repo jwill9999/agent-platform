@@ -159,5 +159,5 @@ export async function continuationFixture(
       nowMs,
       ...(withCallback ? { callback } : {}),
     });
-  return { root, database, store, callback, finish };
+  return { root, database, store, contract, callback, finish };
 }

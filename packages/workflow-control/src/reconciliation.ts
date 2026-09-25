@@ -73,7 +73,11 @@ export class JournaledMutationBroker {
         transition.leaseEpoch,
         this.#clock(),
       );
-      await this.#port.mutate(transition);
+      await this.#store.dispatchTransitionMutation(
+        transition,
+        (current) => this.#port.mutate(current),
+        this.#clock,
+      );
       this.#fault('after_external_mutation', transition);
     }
     const after = await this.#port.observe(transition);
@@ -174,7 +178,11 @@ export class JournaledMutationBroker {
           input.recoveryLeaseEpoch,
           this.#clock(),
         );
-        await this.#port.mutate(transition);
+        await this.#store.dispatchTransitionMutation(
+          transition,
+          (current) => this.#port.mutate(current),
+          this.#clock,
+        );
         const replayed = await this.#port.observe(transition);
         if (replayed.kind !== 'expected') {
           if (replayed.kind === 'conflict') {
