@@ -156,9 +156,15 @@ or delivery milestone. Reassess sooner when runtime evidence exposes a gap, a re
 capability changes, or bespoke implementation effort increases. This is a recurring review
 checkpoint; no calendar interval or automated monitoring has been agreed.
 
+Include discovery, not just reassessment of known gaps: scan relevant release notes and capability
+guides for new or evolving functionality, and consider user needs we have not yet identified.
+Record promising capabilities even when they have no existing backlog counterpart, explaining the
+potential user value and evidence needed. Classify them as investigate, trial, defer or not relevant;
+novelty alone is not a reason to adopt them. Create or refine Beads work only when follow-up is warranted.
+
 For each review, record the date, capability, current evidence, relevant source/version, existing
-Beads issue, candidate reuse option, expected benefit, integration risks and decision or reason for
-deferral. Distinguish implemented-and-proven, implemented-but-unverified, missing and not-required.
+Beads issue where applicable, candidate reuse option, expected benefit, integration risks and decision
+or reason for deferral. Distinguish implemented-and-proven, implemented-but-unverified, missing and not-required.
 Refresh only the relevant documentation and tests. Keep existing priorities and approval boundaries;
 this direction does not authorize migration, installation or new implementation.
 
