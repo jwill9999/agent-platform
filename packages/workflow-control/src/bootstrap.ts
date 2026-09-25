@@ -1,4 +1,3 @@
-import { workflowDeliveryMutationCapability } from './storage.js';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
@@ -12,7 +11,7 @@ import {
   type BootstrapPolicy,
 } from './bootstrapPolicy.js';
 import { BootstrapJournal } from './bootstrapJournal.js';
-import { WorkflowStore } from './storage.js';
+import { WorkflowStore, workflowDeliveryMutationCapability } from './storage.js';
 import { DurableDeliveryBroker, type DeliveryFence } from './deliveryBrokers.js';
 import { createProductionBootstrapGitPort } from './gitDeliveryPort.js';
 import { ProcessCapabilityBroker } from './authorization.js';

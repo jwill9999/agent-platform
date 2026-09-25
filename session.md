@@ -16,7 +16,9 @@ passed. Build, monorepo typecheck, extended changed-test typecheck, workflow lin
 Markdown/links and dependency cycles pass. Rounds6-8 surfaced delivery/source/cancellation,
 Git-expiry, Beads/Dolt dispatch and stale-caller adoption gaps; each is repaired with regressions.
 Final isolated round9 approves the last correction with zero actionable findings; all36 supplied
-snapshot hashes match. Full evidence and reviewed limitations are in the implementation report.
+snapshot hashes matched that checkpoint. Final Sonar two-file cleanup separately passes80 affected
+tests/build/lint and independent round10 review; full875/connected110 precede only that cleanup.
+Exact snapshots and reviewed limitations are retained in the implementation report.
 
 PR273 remains unmerged targeting feature/harness-backlog-review. Check its exact-head hosted gates
 before owner integration; local success does not substitute for hosted browser/desktop checks.

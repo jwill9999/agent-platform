@@ -248,22 +248,7 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
       this.#assertDocumentTree(
         gitRequest.kind === 'git.push' ? gitRequest.newSha : gitRequest.parentSha,
       );
-    if (gitRequest.kind === 'git.push') {
-      this.#assertSafeLocalConfig();
-      const remoteSha = await this.#observeRemoteRef({
-        workspaceRoot: this.#workspaceRoot,
-        repository: gitRequest.repository,
-        remoteName: this.#remoteName,
-        ref: gitRequest.ref,
-      });
-      if (remoteSha === gitRequest.newSha) {
-        return { kind: 'expected', result: { ref: gitRequest.ref, sha: remoteSha } };
-      }
-      if (remoteSha === gitRequest.expectedRemoteSha) {
-        return { kind: 'unchanged', result: { ref: gitRequest.ref, sha: remoteSha } };
-      }
-      return { kind: 'conflict', result: { ref: gitRequest.ref, sha: remoteSha } };
-    }
+    if (gitRequest.kind === 'git.push') return this.#observePush(gitRequest);
     const refSha = this.#readRef(gitRequest.ref);
     if (gitRequest.kind === 'git.create_ref') {
       if (refSha === gitRequest.parentSha) {
@@ -288,6 +273,25 @@ export class LocalGitDeliveryPort implements DeliveryMutationPort {
         result: { ref: gitRequest.ref, sha: refSha, reason: String(error) },
       };
     }
+  }
+
+  async #observePush(
+    request: Extract<GitDeliveryRequest, { kind: 'git.push' }>,
+  ): Promise<ExternalObservation> {
+    this.#assertSafeLocalConfig();
+    const remoteSha = await this.#observeRemoteRef({
+      workspaceRoot: this.#workspaceRoot,
+      repository: request.repository,
+      remoteName: this.#remoteName,
+      ref: request.ref,
+    });
+    if (remoteSha === request.newSha) {
+      return { kind: 'expected', result: { ref: request.ref, sha: remoteSha } };
+    }
+    if (remoteSha === request.expectedRemoteSha) {
+      return { kind: 'unchanged', result: { ref: request.ref, sha: remoteSha } };
+    }
+    return { kind: 'conflict', result: { ref: request.ref, sha: remoteSha } };
   }
 
   async mutate(

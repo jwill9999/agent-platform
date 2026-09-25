@@ -43,9 +43,17 @@ remaining caller-fence race in transition recovery. Dispatch now compares the ca
 transition against the persisted record inside the writer reservation and passes that validated record
 to the adapter. Two-peer execution/recovery tests prove a successor adoption cannot lend authority
 to the old caller. The [ninth review](evidence/approved-document-binding-code-review-round9.json)
-approved this bounded correction with zero actionable findings. All 36 supplied snapshot files match
-the final implementation bytes. These reviews collectively close the identified repair findings;
+approved this bounded correction with zero actionable findings. All 36 supplied snapshot files
+matched the implementation at that checkpoint. These reviews collectively close the identified repair findings;
 the last review alone is not a fresh whole-system audit or human approval.
+
+The final Sonar cleanup extracts the remote Git observation helper and consolidates a duplicate
+import. [Round ten](evidence/approved-document-binding-code-review-round10.json) independently
+approved that two-file delta without findings; all **80 affected tests** pass afterward, as do build
+and lint. [Its diff](evidence/approved-document-binding-quality-followup.diff) and
+[test output](evidence/approved-document-binding-quality-followup.log) are retained. Full875 and
+connected110 results precede only this behavior-preserving cleanup; their source hashes are retained
+separately from final hashes, and hosted verification covers the final head.
 
 No earlier finding is treated as waived merely because the regression suite passed.
 
