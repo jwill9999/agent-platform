@@ -1,3 +1,9 @@
+import { writeFileSync, existsSync, chmodSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { LocalGitDeliveryPort } from '../src/gitDeliveryPort.js';
+import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,7 +24,7 @@ import { workflowDeliveryMutationCapability } from '../src/storage.js';
 
 const roots: string[] = [];
 const policyDigest = `sha256:${'a'.repeat(64)}`;
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const parentSha = '1'.repeat(40);
 const headSha = '2'.repeat(40);
 
@@ -117,8 +123,11 @@ async function setup(input?: {
   roots.push(root);
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(contract, root);
+  workspaceId = contract.workspaceId;
   const contractId = store.createContract(contract, 1000);
   const run = store.createRunForTest(contractId, input?.state ?? 'implementing', 'run-delivery');
+  publishDocuments(store, 'run-delivery', true);
   const ownerId = 'delivery-owner';
   const fence = {
     ownerId,
@@ -302,6 +311,170 @@ const brokerPolicy = {
 } as const;
 
 describe('DurableDeliveryBroker', () => {
+  it.each(['none', 'documents', 'approval', 'lease', 'expiry', 'expiry-after-commit'] as const)(
+    'guards a real Git commit from the accepted task worktree with %s changed',
+    async (change) => {
+      const root = await mkdtemp(join(tmpdir(), 'real-delivery-'));
+      roots.push(root);
+      const source = join(root, 'document-source');
+      const taskRoot = join(root, 'task-worktree');
+      const bound = structuredClone(contract);
+      const publish = await documentFixture(bound, root);
+      const executable = process.env.WORKFLOW_GIT_BINARY ?? '/usr/bin/git';
+      const git = (cwd: string, args: string[]) => execFileSync(executable, args, { cwd });
+      const parent = git(source, ['rev-parse', 'HEAD']).toString().trim();
+      git(source, ['checkout', '-qb', 'canonical']);
+      git(source, ['worktree', 'add', taskRoot, 'task/delivery-feature.7']);
+      const database = join(root, 'workflow.sqlite');
+      const store = new WorkflowStore(database);
+      store.createRunForTest(store.createContract(bound), 'implementing', 'run-delivery');
+      publish(store, 'run-delivery', true);
+      const fence = {
+        ownerId: 'delivery-owner',
+        workspaceLeaseEpoch: store.acquireLease(
+          'workspace',
+          bound.workspaceId,
+          'delivery-owner',
+          60000,
+          1000,
+        ).epoch,
+        runLeaseEpoch: store.acquireLease('run', 'run-delivery', 'delivery-owner', 60000, 1000)
+          .epoch,
+        taskLeaseEpoch: store.acquireLease(
+          'task',
+          'delivery-feature.7',
+          'delivery-owner',
+          60000,
+          1000,
+        ).epoch,
+      };
+      let commitPhase = false;
+      const expiryMarker = join(root, 'lease-expired');
+      const wrapper = join(root, 'git-wrapper');
+      const gitLog = join(root, 'git-dispatches');
+      const expiryCommand = change === 'expiry-after-commit' ? 'commit-tree' : 'write-tree';
+      writeFileSync(
+        wrapper,
+        `#!/bin/sh\nprintf '%s\\n' "$*" >> '${gitLog}'\n'${executable}' "$@"\nresult=$?\ncase "$*" in *${expiryCommand}*) touch '${expiryMarker}' ;; esac\nexit "$result"\n`,
+      );
+
+      chmodSync(wrapper, 0o700);
+      const port = LocalGitDeliveryPort.createForTest({
+        workspaceRoot: source,
+        remoteName: 'origin',
+        gitBinary: change.startsWith('expiry') ? wrapper : executable,
+        remote: {
+          observeRef: async () => null,
+          pushCas: async () => {
+            throw new Error('not used');
+          },
+        },
+      });
+      const broker = DurableDeliveryBroker.createForTest({
+        store,
+        contract: bound,
+        port,
+        clock: () => (change.startsWith('expiry') && existsSync(expiryMarker) ? 61001 : 1000),
+        policy: {
+          authorName: 'Agent Platform',
+          authorEmail: 'agent@example.com',
+          approvedParentShas: { 'delivery-feature.7': parent },
+          approvedProtectionDigest: `sha256:${'e'.repeat(64)}`,
+        },
+        fault: (point) => {
+          if (
+            !commitPhase ||
+            point !== 'before_mutation' ||
+            change === 'none' ||
+            change.startsWith('expiry')
+          )
+            return;
+          if (change === 'documents') {
+            // Synchronous file replacement after the broker's last observation.
+            writeFileSync(join(taskRoot, 'fixture-spec.md'), 'changed after approval');
+          } else {
+            const peer = new Database(database);
+            if (change === 'approval')
+              peer.prepare("UPDATE plan_approvals SET status='invalidated'").run();
+            else peer.prepare("UPDATE leases SET owner_id='replacement',epoch=epoch+1").run();
+            peer.close();
+          }
+        },
+      });
+      await broker.execute(
+        { ...createRefRequest(), workspaceId: bound.workspaceId, parentSha: parent },
+        fence,
+      );
+      // Canonical worktree differs; the accepted task worktree remains the authority.
+      await writeFile(join(source, 'fixture-spec.md'), 'unapproved canonical content');
+      const changedPath = 'packages/workflow-control/added.ts';
+      await mkdir(join(taskRoot, 'packages/workflow-control'), { recursive: true });
+      await writeFile(join(taskRoot, changedPath), 'export const approved = true;\n');
+      git(taskRoot, ['add', '-A']);
+      const treeSha = git(taskRoot, ['write-tree']).toString().trim();
+      const diff = git(taskRoot, [
+        'diff-tree',
+        '--no-commit-id',
+        '--name-status',
+        '-z',
+        '-r',
+        '--find-renames',
+        '--find-copies',
+        parent,
+        treeSha,
+      ]);
+      const request = {
+        ...commitRequest(),
+        workspaceId: bound.workspaceId,
+        parentSha: parent,
+        treeSha,
+        diffDigest: `sha256:${createHash('sha256').update(diff).digest('hex')}`,
+        changedFiles: [changedPath],
+      };
+      commitPhase = true;
+      if (change === 'none') {
+        await expect(broker.execute(request, fence)).resolves.toMatchObject({
+          status: 'committed',
+        });
+        expect(git(taskRoot, ['show', 'HEAD:fixture-spec.md']).toString()).toBe(
+          'Synthetic requirements for execution regression.\n',
+        );
+      } else {
+        await expect(broker.execute(request, fence)).rejects.toThrow();
+        expect(git(taskRoot, ['rev-parse', 'HEAD']).toString().trim()).toBe(parent);
+        if (change.startsWith('expiry')) {
+          const commands = readFileSync(gitLog, 'utf8');
+          expect(commands).not.toContain('update-ref');
+          if (change === 'expiry') expect(commands).not.toContain('commit-tree');
+          else expect(commands).toContain('commit-tree');
+        }
+      }
+      store.close();
+    },
+  );
+
+  it.each(['approval', 'lease', 'cancellation'] as const)(
+    'denies delivery dispatch when %s changes at the last boundary',
+    async (change) => {
+      const f: Awaited<ReturnType<typeof setup>> = await setup({
+        fault: (point) => {
+          if (point !== 'before_mutation') return;
+          const peer = new Database(f.database);
+          if (change === 'approval')
+            peer.prepare("UPDATE plan_approvals SET status='invalidated'").run();
+          else if (change === 'lease')
+            peer.prepare("UPDATE leases SET owner_id='replacement', epoch=epoch+1").run();
+          else peer.prepare("UPDATE runs SET state='cancelling'").run();
+          peer.close();
+        },
+      });
+      await expect(f.broker.execute(createRefRequest(), f.fence)).rejects.toThrow();
+      expect(f.port.mutationCount).toBe(0);
+      expect(f.store.listPreparedDeliveryOperations(f.run.id)).toHaveLength(1);
+      f.store.close();
+    },
+  );
+
   async function setupMergePort(input?: {
     fault?: Parameters<typeof DurableDeliveryBroker.createForTest>[0]['fault'];
   }) {
@@ -533,6 +706,7 @@ describe('DurableDeliveryBroker', () => {
       status: 'committed',
     });
 
+    const ownedWorkspaceId = workspaceId;
     const unpublished = await setup({ state: 'pipeline' });
     unpublished.port.forcedObservation = {
       kind: 'expected',
@@ -542,6 +716,7 @@ describe('DurableDeliveryBroker', () => {
       'current published',
     );
 
+    workspaceId = ownedWorkspaceId;
     const ownedDatabase = new Database(owned.database);
     ownedDatabase.prepare("UPDATE runs SET state = 'pipeline' WHERE id = ?").run(owned.run.id);
     owned.port.forcedObservation = {
@@ -661,7 +836,7 @@ describe('DurableDeliveryBroker', () => {
     const times = [1000, 1000, 2001];
     const { broker, fence, port } = await setup({ clock: () => times.shift() ?? 2001 });
 
-    await expect(broker.execute(createRefRequest(), fence)).rejects.toThrow('stale or expired');
+    await expect(broker.execute(createRefRequest(), fence)).rejects.toThrow('document_lease_stale');
     expect(port.mutationCount).toBe(0);
   });
 
@@ -769,12 +944,14 @@ describe('DurableDeliveryBroker', () => {
     );
     expect(closed.port.mutationCount).toBe(0);
 
-    const active = await setup();
-    active.port.onMutate = () => {
-      const database = new Database(active.database);
-      database.prepare("UPDATE runs SET state = 'cancelled' WHERE id = ?").run(active.run.id);
-      database.close();
-    };
+    const active: Awaited<ReturnType<typeof setup>> = await setup({
+      fault: (boundary) => {
+        if (boundary !== 'after_mutation') return;
+        const database = new Database(active.database);
+        database.prepare("UPDATE runs SET state = 'cancelled' WHERE id = ?").run(active.run.id);
+        database.close();
+      },
+    });
     await expect(active.broker.execute(createRefRequest(), active.fence)).rejects.toThrow(
       'not allowed while run is cancelled',
     );

@@ -1,3 +1,7 @@
+import {
+  WorkflowCancellationCoordinator,
+  OfficialCancellationCleanupPort,
+} from '../src/cancellation.js';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -20,23 +24,26 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
-async function setup(deadlineMs = 301000) {
+async function setup(
+  deadlineMs = 301000,
+  hooks: { conformance?: () => Promise<void>; issued?: () => Promise<void> } = {},
+) {
   const fixture = await continuationFixture(1000);
   let now = 1000;
   const sourceRoot = join(fixture.root, 'source');
-  await mkdir(sourceRoot);
+  await mkdir(sourceRoot, { recursive: true });
   await writeFile(join(sourceRoot, 'safe.txt'), 'original');
   const original = fixture.store.getSchedulerExecution('child')!;
-  const execution = fixture.store.createSchedulerExecution({
-    ...original,
-    id: executionId,
-    processIdentity: `docker:workflow-specialist-${executionId}`,
-    credentialLeaseId: `specialist:${executionId}`,
-    deadlineMs,
+  const documentBinding = fixture.store.verifyPlanningDocuments({
+    runId: 'run',
+    taskId: 'task',
+    ownerId: 'owner',
+    runLeaseEpoch: 1,
+    boundary: 'fixture.packet',
     nowMs: now,
   });
-  const reservation = { id: executionId, role: 'code_reviewer', deadlineMs: execution.deadlineMs };
   const packet: TaskPacket = {
+    documentBinding,
     runId: 'run',
     taskId: 'task',
     contractVersion: 1,
@@ -46,9 +53,24 @@ async function setup(deadlineMs = 301000) {
     acceptanceCriteria: ['settled'],
     allowedPaths: ['safe.txt'],
     allowedOperations: ['workspace.read'],
-    retryBudget: { implementationAttempts: 1, findingAttempts: 1, infrastructureAttempts: 1 },
+    retryBudget: {
+      implementationAttempts: 1,
+      findingAttempts: 1,
+      infrastructureAttempts: 1,
+      waitDeadlineSeconds: 60,
+    },
     evidence: [],
   };
+  const execution = fixture.store.createSchedulerExecution({
+    ...original,
+    packet,
+    id: executionId,
+    processIdentity: `docker:workflow-specialist-${executionId}`,
+    credentialLeaseId: `specialist:${executionId}`,
+    deadlineMs,
+    nowMs: now,
+  });
+  const reservation = { id: executionId, role: 'code_reviewer', deadlineMs: execution.deadlineMs };
   let staged: string | undefined;
   let present = false;
   let revoked = false;
@@ -65,6 +87,7 @@ async function setup(deadlineMs = 301000) {
       staged = root;
       const authFile = join(root, 'auth.json');
       await writeFile(authFile, '{}');
+      await hooks.issued?.();
       return { authFile, leaseId, generation };
     },
     revoke: async () => {
@@ -73,7 +96,10 @@ async function setup(deadlineMs = 301000) {
       revoked = true;
     },
     observe: async () => (revoked ? 'revoked' : 'active'),
-    conformance: async () => 'fixture-generation',
+    conformance: async () => {
+      await hooks.conformance?.();
+      return 'fixture-generation';
+    },
   });
   const owned = () =>
     JSON.stringify({
@@ -133,6 +159,7 @@ async function setup(deadlineMs = 301000) {
     reservation,
     launcher,
     makeLauncher,
+    broker,
     calls,
     timeouts,
     owned,
@@ -180,6 +207,85 @@ async function setup(deadlineMs = 301000) {
 }
 
 describe('durable active specialist settlement', () => {
+  it.each(['conformance', 'issued', 'inspect'] as const)(
+    'honors durable cancellation during awaited %s before the next effect',
+    async (boundary) => {
+      const f = await setup(301000, {
+        conformance: boundary === 'conformance' ? () => cancel() : undefined,
+        issued: boundary === 'issued' ? () => cancel() : undefined,
+      });
+      const coordinator = WorkflowCancellationCoordinator.createForTest({
+        store: f.store,
+        contract: f.contract,
+        clock: () => 1000,
+        port: OfficialCancellationCleanupPort.createForTest({
+          stopOwnedWork: async () => ({ stopped: false, incomplete: ['active specialist'] }),
+          cleanupPreparedEffects: async () => ({ incomplete: [] }),
+        }),
+        fault: (point) => {
+          if (point === 'after_request_commit') throw new Error('durable stop recorded');
+        },
+      });
+      const cancel = async () => {
+        await expect(
+          coordinator.cancel({
+            id: 'durable-stop',
+            runId: 'run',
+            requestedBy: 'owner',
+            reason: 'stop during launch',
+            stopDeadlineMs: 2000,
+            retainedEvidence: [],
+            ownerId: 'owner',
+            workspaceLeaseEpoch: f.execution.workspaceLeaseEpoch,
+            runLeaseEpoch: f.execution.runLeaseEpoch,
+          }),
+        ).rejects.toThrow('durable stop recorded');
+      };
+      let stopped = false;
+      f.intercept(async (args) => {
+        if (boundary === 'inspect' && args[0] === 'inspect' && !stopped) {
+          stopped = true;
+          await cancel();
+        }
+        return undefined;
+      });
+      await expect(f.launcher.launch(f.packet, f.reservation)).rejects.toThrow(/cancelled|closed/);
+      expect(f.store.getWorkflowCancellation('run')?.status).toBe('requested');
+      expect(f.calls.some((call) => call[0] === 'start')).toBe(false);
+      if (boundary !== 'inspect') expect(f.calls.some((call) => call[0] === 'create')).toBe(false);
+      if (boundary === 'conformance') expect(f.staged).toBeUndefined();
+      else expect(f.revoked).toBe(true);
+    },
+  );
+
+  it.each(['invalidated', 'pending'])(
+    'denies credential issuance after snapshot authority becomes %s',
+    async (state) => {
+      const f = await setup();
+      const issue = vi.spyOn(f.broker, 'issue');
+      const stage = f.store.stageApprovedDocuments.bind(f.store);
+      vi.spyOn(f.store, 'stageApprovedDocuments').mockImplementation((input) => {
+        stage(input);
+        const db = new Database(f.database);
+        if (state === 'invalidated')
+          db.prepare("UPDATE plan_approvals SET status='invalidated'").run();
+        else
+          db.exec(`INSERT INTO planning_document_attempts
+        (id,run_id,task_id,approval_id,material_digest,manifest_digest,boundary,owner_id,run_lease_epoch,status,created_at_ms,deadline_ms)
+        SELECT 'peer-pending',run_id,task_id,approval_id,material_digest,manifest_digest,'peer','peer',NULL,'pending',1000,31000
+        FROM planning_document_attempts WHERE approval_id NOT LIKE 'candidate:%' LIMIT 1`);
+        db.close();
+      });
+      await expect(f.launcher.launch(f.packet, f.reservation)).rejects.toThrow(
+        state === 'invalidated' ? 'document_approval_required' : 'document_verification_unresolved',
+      );
+      // Entry was reached, but the effect provider never received an issue request.
+      expect(issue).toHaveBeenCalledOnce();
+      expect(f.staged).toBeUndefined();
+      expect(f.calls.some((call) => ['create', 'start'].includes(call[0]!))).toBe(false);
+    },
+  );
+
   it('pins identity, confirms removal/revocation and returns staged source with an unrestricted reservation deadline', async () => {
     const f = await setup();
     const result = (await f.launcher.launch(f.packet, f.reservation)) as {
@@ -483,8 +589,7 @@ describe('durable active specialist settlement', () => {
   );
 
   it('checks deadline again after create without starting an expired reservation', async () => {
-    const f = await setup();
-    f.reservation.deadlineMs = 1100;
+    const f = await setup(1100);
     f.intercept(async (args) => {
       if (args[0] === 'create') f.setNow(1100);
       return undefined;

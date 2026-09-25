@@ -1,0 +1,86 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "31723043-cb77-488c-8575-c4f29035ad76",
+  "materialDigest": "47ec2e7becb38046fa9eb273807746d944d077936c2a7c1fa48e39e66517d599",
+  "manifest": [
+    {
+      "path": "docs/planning/approved-document-binding/evidence-manifest.json",
+      "digest": "81c69cab9293f1b22d5af9c9660548d7639f85af83de1949425c697533b031d7"
+    },
+    {
+      "path": "docs/planning/approved-document-binding/execution-contract.v1.json",
+      "digest": "dd65a459812449ee8bb165d80e9e5c2966f0bab474bf4df7f72f1b6471b75b05"
+    },
+    {
+      "path": "docs/planning/approved-document-binding/plan.md",
+      "digest": "60dc70da3fee815b034cacb006b5e1bf6c8daceaa4e2207fa2e2fd285bde867f"
+    },
+    {
+      "path": "docs/reviews/evidence/document-binding-source-excerpts.txt",
+      "digest": "88df33f526a608e48b04b528aac8820c04266cc7bb653a2517facfa689725337"
+    },
+    {
+      "path": "docs/tasks/agent-platform-pilot-zero.16.md",
+      "digest": "c8bbbda40d25bb9cdd27c4c6837e4104fad93670d50cf30976abfec130583c79"
+    },
+    {
+      "path": "docs/testing/approved-document-binding.md",
+      "digest": "a5efa8790eff689d5c33883c4a5c8b8bb606b2e99faf534b50d86a89bfc27f3b"
+    },
+    {
+      "path": "packages/workflow-control/src/artifacts.ts",
+      "digest": "3a8a054fbb791bf4e66657c3d2e16ad33ae76f812a85465ae97fdd0226d99dcd"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "4352f833a4fd57cccc4d8f583b3e3e914418455c30507c8549591bbb74615834"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/preapprovalMaterial.ts",
+      "digest": "86a8224ca31444ec90f3f7e1e0c460bb404efd336b096d0905798dee6b20da03"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d435-c949-7363-920c-9d5efc7362dc"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "{\n  \"reviewId\": \"document-binding-round1\",\n  \"runId\": \"proposed-document-binding\",\n  \"plannerId\": \"coordinator-planner\",\n  \"criticId\": \"isolated-plan-critic-round1\",\n  \"contractVersion\": 1,\n  \"policyDigest\": \"sha256:7343dacd2a810a02bb3aefc6962ab568b075dfe31099fbe43be4de20998d5a9e\",\n  \"materialDigest\": \"sha256:c3b2346b2e0e00dd199754a137788133170f668a7cf80e2144210105c4947dcf\",\n  \"verdict\": \"correction_required\",\n  \"summary\": \"The proposed scope and integration-only, no-auto-merge boundary are clear. One recovery gap needs clarification before implementation: preserving denial across restart when invalidation cannot be persisted. This review is not implementation authorization or human approval.\",\n  \"evidence\": [\n    {\n      \"digest\": \"sha256:60dc70da3fee815b034cacb006b5e1bf6c8daceaa4e2207fa2e2fd285bde867f\",\n      \"mediaType\": \"text/markdown\",\n      \"sizeBytes\": 14711,\n      \"kind\": \"artifact\"\n    },\n    {\n      \"digest\": \"sha256:a5efa8790eff689d5c33883c4a5c8b8bb606b2e99faf534b50d86a89bfc27f3b\",\n      \"mediaType\": \"text/markdown\",\n      \"sizeBytes\": 6849,\n      \"kind\": \"artifact\"\n    }\n  ],\n  \"findings\": [\n    {\n      \"id\": \"DB-R1-01\",\n      \"severity\": \"high\",\n      \"summary\": \"docs/planning/approved-document-binding/plan.md requires permanent invalidation after a detected mismatch, but does not specify recovery when persisting that invalidation fails. A process can deny the current effect, terminate, and restart after the original document bytes are restored; its durable approval still appears active and byte verification then passes. docs/testing/approved-document-binding.md tests persistence failure, restart, and restored bytes separately, without requiring this combined sequence.\",\n      \"requirement\": \"DB-3, DB-4 and DB-6: detected mismatch must not regain authority through restored bytes or process restart.\",\n      \"evidence\": [\n        {\n          \"digest\": \"sha256:60dc70da3fee815b034cacb006b5e1bf6c8daceaa4e2207fa2e2fd285bde867f\",\n          \"mediaType\": \"text/markdown\",\n          \"sizeBytes\": 14711,\n          \"kind\": \"artifact\"\n        },\n        {\n          \"digest\": \"sha256:a5efa8790eff689d5c33883c4a5c8b8bb606b2e99faf534b50d86a89bfc27f3b\",\n          \"mediaType\": \"text/markdown\",\n          \"sizeBytes\": 6849,\n          \"kind\": \"artifact\"\n        }\n      ],\n      \"proposedCorrection\": \"Specify a restart-safe recovery protocol for failed invalidation persistence, including how startup recognizes an unresolved verification attempt and prevents reuse of the affected approval. Add a required combined fault test: detect changed bytes, fail invalidation persistence, terminate the process, restore the original bytes, reopen the journal, and attempt execution with the old approval and capability. Require denial and zero effects until explicit recovery establishes valid new authority. The missing evidence is the proposed durable recovery protocol and this combined test specification; implementation results are not expected during planning.\",\n      \"requiresHumanDecision\": false\n    }\n  ],\n  \"humanDecision\": null\n}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 32647,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1002,
+          "reasoning_output_tokens": 186
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

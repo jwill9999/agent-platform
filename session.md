@@ -1,4 +1,53 @@
-# Active session: repair PR quality gates
+# Current session: approved-document binding implementation
+
+Owner authorized implementation of `agent-platform-pilot-zero.16`; approval is recorded against the
+reviewed planning material. This is supervised direct delivery, not managed orchestration.
+Worktree: `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+Branch: `task/approved-document-binding`; target: `feature/harness-backlog-review`.
+
+Current evidence and remaining acceptance scope:
+[implementation checkpoint](docs/reviews/approved-document-binding-implementation.md).
+Docker is healthy. Owner explicitly authorized completing all six findings. Repairs now cover
+trusted source/current worktree resolution, durable snapshot denial, persisted packet identity,
+terminal result replay and cleanup-only bootstrap. Independent rounds3/4 surfaced additional
+initial-import and asynchronous repair-effect gaps; those are repaired with composed regressions.
+Final local verification: Linux875 passed/17 optional skipped; enabled document/container suites110
+passed. Build, monorepo typecheck, extended changed-test typecheck, workflow lint, formatting,
+Markdown/links and dependency cycles pass. Rounds6-8 surfaced delivery/source/cancellation,
+Git-expiry, Beads/Dolt dispatch and stale-caller adoption gaps; each is repaired with regressions.
+Final isolated round9 approves the last correction with zero actionable findings; all36 supplied
+snapshot hashes matched that checkpoint. Final Sonar two-file cleanup separately passes80 affected
+tests/build/lint and independent round10 review; full875/connected110 precede only that cleanup.
+Exact snapshots and reviewed limitations are retained in the implementation report.
+
+PR273 remains unmerged targeting feature/harness-backlog-review. Check its exact-head hosted gates
+before owner integration; local success does not substitute for hosted browser/desktop checks.
+No staging or pilot authority. Beads .16 remains in progress until owner integration. After that,
+re-read Beads .13/.12 readiness and prepare the separately approved single-task orchestration pilot.
+These supervised repairs do not prove autonomous execution or absent downstream service adapters.
+
+---
+
+## Previous session: document-approval binding plan
+
+PR271 is merged into `feature/harness-backlog-review` at `5e5f7f2bf66ca07410a5c83689230b0c3e25f609`.
+The owner authorized planning and independent critique of `agent-platform-pilot-zero.16`.
+Current branch: `task/approved-document-binding-plan`, based on that merged feature revision.
+
+Planning package: [approved-document binding](docs/planning/approved-document-binding/plan.md).
+The draft includes a typed document manifest, immutable snapshots, guarded approval/start/resume/
+delivery paths and compatibility handling. The first independent isolated critic found a restart
+hole after failed invalidation persistence; the revised plan requires durable verification intents
+and quarantine recovery, plus the combined fault test. The second isolated critique approved the revised plan with zero findings. Structured results and
+dispositions are in docs/reviews/approved-document-binding-plan.md.
+
+No runtime/application implementation or managed run has started. Next: owner review of the published planning PR and proposed decisions before implementation. `.13`
+remains blocked by `.16` and `.12`. Nothing is promoted to staging. Earlier session entries follow
+as historical evidence, not current PR status.
+
+---
+
+## Previous session: repair PR quality gates
 
 The owner resumed work and explicitly authorized assessment and repair of SonarCloud findings and
 the desktop-E2E failure. Continue the existing task branch; no merge/staging/pilot authorization.

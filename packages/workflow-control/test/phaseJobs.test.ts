@@ -1,4 +1,5 @@
-import { rm } from 'node:fs/promises';
+import { rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -591,4 +592,40 @@ describe('cancellation queue fencing', () => {
     ).toBe('cancelled');
     expect(f.phases.claimRecovery('other', 1000, f.now + 3000)).toBeUndefined();
   });
+});
+
+describe('approved documents at queue boundaries', () => {
+  it.each(
+    ['enqueue', 'claim', 'start'].flatMap((boundary) =>
+      ['changed', 'deleted', 'artifact'].map((fault) => ({ boundary, fault })),
+    ),
+  )(
+    'rejects $fault requirements before $boundary without starting work',
+    async ({ boundary, fault }) => {
+      const f = await fixture();
+      let job: PhaseJob | undefined;
+      if (boundary !== 'enqueue') f.consume();
+      if (boundary === 'start') job = f.phases.claim('supervisor', 60000, f.now)!;
+      if (fault === 'deleted') await rm(join(f.root, 'source', 'fixture-spec.md'));
+      else if (fault === 'artifact') {
+        const file = f.store.getExecutionContract('run')!.planningDocuments!.files[0]!;
+        const hash = file.digest.slice(7);
+        await writeFile(join(f.root, 'artifacts', hash.slice(0, 2), hash), 'changed object');
+      } else await writeFile(join(f.root, 'source', 'fixture-spec.md'), 'changed requirements');
+      if (boundary === 'enqueue') {
+        expect(() => f.consume()).toThrow('planning_documents_changed');
+        expect(f.phases.list()).toHaveLength(0);
+      } else if (boundary === 'claim') {
+        expect(f.phases.claim('supervisor', 60000, f.now)).toBeUndefined();
+        expect(f.phases.list()[0]?.status).toBe('blocked');
+      } else {
+        expect(() => f.phases.start(job!, f.now)).toThrow('planning_documents_changed');
+        expect(f.phases.get(job!.id)?.status).toBe('claimed');
+      }
+      expect(f.phases.list().some((item) => item.status === 'started')).toBe(false);
+      expect(
+        f.db.prepare("SELECT count(*) n FROM plan_approvals WHERE status='active'").get(),
+      ).toEqual({ n: 0 });
+    },
+  );
 });

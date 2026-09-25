@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "sourceRevision": "5e5f7f2bf66ca07410a5c83689230b0c3e25f609",
+  "status": "review inputs only; not runtime binding or approval",
+  "files": [
+    {
+      "path": "docs/planning/approved-document-binding/plan.md",
+      "digest": "sha256:0eb57cb15418bfb56078767db226c1c4e38b47840f7310d406ea9d4d755aace8",
+      "sizeBytes": 16374
+    },
+    {
+      "path": "docs/tasks/agent-platform-pilot-zero.16.md",
+      "digest": "sha256:7ed8ef3aafe61e082e5bd649254400f31f92936ae1541618620d7ded1df28a25",
+      "sizeBytes": 3609
+    },
+    {
+      "path": "docs/testing/approved-document-binding.md",
+      "digest": "sha256:86ba87f34604abf79ec0d382fcdebdc3b1d856ea05b670adf029f227661d4f27",
+      "sizeBytes": 7703
+    }
+  ]
+}

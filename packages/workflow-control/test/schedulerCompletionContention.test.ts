@@ -15,22 +15,32 @@ describe('scheduler completion writer reservation', () => {
     const peer = new Database(fixture.database, { timeout: 0 });
     const execution = fixture.store.getSchedulerExecution('child')!;
     let peerFailure: string | undefined;
-    const clock = vi
-      .spyOn(Date, 'now')
-      .mockReturnValue(122000)
-      .mockImplementationOnce(() => {
+    let documentsVerified = false;
+    let probedWriter = false;
+    const verifyDocuments = fixture.store.verifyPlanningDocuments.bind(fixture.store);
+    const verification = vi
+      .spyOn(fixture.store, 'verifyPlanningDocuments')
+      .mockImplementation((input) => {
+        const result = verifyDocuments(input);
+        documentsVerified = true;
+        return result;
+      });
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => {
+      // Publication verification has its own committed reservation; probe terminal settlement separately.
+      if (!documentsVerified) return 1000;
+      if (!probedWriter) {
+        probedWriter = true;
         try {
           peer
-            .prepare(
-              'UPDATE schema_migrations SET applied_at_ms = applied_at_ms + 1 WHERE version = 1',
-            )
+            .prepare('UPDATE schema_migrations SET applied_at_ms=applied_at_ms+1 WHERE version=1')
             .run();
         } catch (error) {
           peerFailure = sqliteCode(error);
           if (peerFailure !== 'SQLITE_BUSY') throw error;
         }
-        return 122000; // Leases valid at fixture time have now expired.
-      });
+      }
+      return 122000;
+    });
     try {
       expect(() =>
         fixture.store.finishSchedulerExecution({
@@ -50,6 +60,7 @@ describe('scheduler completion writer reservation', () => {
       expect(fixture.finish()).toMatchObject({ status: 'completed', result: terminalResult });
     } finally {
       clock.mockRestore();
+      verification.mockRestore();
       peer.close();
       fixture.store.close();
       await rm(fixture.root, { recursive: true, force: true });
@@ -63,6 +74,7 @@ describe('scheduler completion writer reservation', () => {
     let peerFailure: string | undefined;
     const firstRead = vi
       .spyOn(fixture.store, 'getSchedulerExecution')
+      .mockImplementationOnce(readExecution) // Preflight identity read before the document attempt.
       .mockImplementationOnce((id) => {
         const execution = readExecution(id); // Establish the actual SQLite read snapshot.
         try {
@@ -99,6 +111,10 @@ describe('scheduler completion writer reservation', () => {
       expect(beforeReplay.callbacks).toEqual({ count: 1 });
       expect(beforeReplay.continuations).toEqual({ count: 1 });
       expect(fixture.finish()).toEqual(completed);
+      expect(() =>
+        fixture.finish(true, { ...terminalResult, summary: 'conflicting replay' }),
+      ).toThrow('scheduler terminal replay result changed');
+      expect(fixture.store.getSchedulerExecution('child')).toEqual(completed);
       expect(peer.prepare('SELECT count(*) AS count FROM delegate_callbacks').get()).toEqual(
         beforeReplay.callbacks,
       );

@@ -24,3 +24,69 @@ The approval binds the human identity, contract version, policy digest, and a ca
 digest covering the full contract. Any scope, requirement, task, allowed path/operation, authority,
 repository, base, merge method, delivery destination, quality-gate, retry, or policy change invalidates
 the approval. The workflow returns to critique and explicit approval before execution can resume.
+
+## Detailed-document binding API (draft implementation)
+
+The implementation is under evaluation; the task remains open until its connected coverage and
+independent review findings are resolved. Do not use this API as evidence that the managed pilot is
+ready. See [current implementation evidence](reviews/approved-document-binding-implementation.md).
+
+A trusted publication coordinator calls `publishPlanningDocumentObjects` with an explicit canonical
+source root, workspace identity, repository, source revision, document paths, kinds and task IDs,
+and the content-addressed artifact store. The returned manifest is included in `planningDocuments`
+before the immutable execution contract is created. Each task must map to a specification and a
+verification document. Object publication alone grants no execution authority.
+
+After contract/run creation, `WorkflowStore.recordPlanningDocumentPublication` verifies and records
+the source receipt. Publication verifies the real Git common directory, canonical workspace hash,
+approved repository remote and source commit ancestry. Bootstrap callers pass the exact approved
+`sourcePolicy` when using its authorized remote and source worktree. Normal callers use the approved
+GitHub repository remote. Git observations use `/usr/bin/git` by default; a trusted host operator
+may set `WORKFLOW_GIT_BINARY` to an explicit absolute executable path. Relative paths and ambient
+PATH-based executable selection are rejected. This override is host configuration, not worker input.
+A source revision records provenance; normative bytes are bound separately
+by the manifest and may be published before a subsequent code commit.
+
+The distinct critic and owner approval APIs still apply. Runtime consumers call
+`verifyPlanningDocuments`, which resolves the persisted source/manifest, records a durable attempt,
+checks exact bytes and fails closed. The operator command is:
+
+```text
+workflow-control validate-documents <existing-database> <run-id> <task-id>
+```
+
+It returns structured `passed` and either `binding` or a safe `reason`; the process exits nonzero
+when blocked. It accepts no caller-selected document root and creates no approval. It is not a pure
+read: it records verification attempts and invalidates approvals after a mismatch. A returned binding
+is diagnostic evidence, not a reusable authorization token for later operations.
+
+The worker packet names `/run/approved-documents`; document bytes live below its `documents/` folder,
+with the packet/run/task/approval binding in `binding.json`. The launcher checks that actual tree
+before starting the container and supplies a read-only mount. Unchanged material survives restart
+without another owner prompt. Changed material requires a new immutable contract and fresh review.
+
+Explicit unresolved-attempt recovery requires a current run lease. It cannot recover an unexpired
+attempt unless its recorded run lease has been superseded. Unfenced approval/operator attempts have
+a bounded lifetime and cannot settle after it expires. Recovery invalidates authority; restoring the
+old bytes never reactivates it. The caller must still use existing role and ownership controls.
+
+Execution resolves each accepted task ref from the delivery, repair and imported-lineage ledgers
+against registered worktrees in that same repository. Taskless boundaries check every accepted task
+workspace. Missing, ambiguous or foreign worktrees fail closed; they do not silently reuse the original
+publication folder. Legacy receipts without source identity cannot authorize new execution.
+
+Snapshot staging and validation occur within durable verification attempts. The launcher compares
+the full supplied packet/envelope with the persisted scheduler input before staging or capability
+issuance. Credential, container, repair-child, delivery and Beads/Dolt effect dispatch recheck
+approval, cancellation and leases within the writer transaction that initiates the operation.
+Git delivery uses the verified task worktree, validates normative blobs in created/adopted trees,
+and rechecks time-based leases immediately before each commit/ref/push effect. Bootstrap reuses
+that reservation rather than opening a competing writer. Cleanup/revocation remain possible after
+approval loss or cancellation. Narrow external clients must initiate the authorized operation before
+any asynchronous suspension; these guards do not attest an absent downstream client implementation.
+
+`BootstrapCoordinator.createForCleanup` verifies historical policy, contract and approval identity,
+then exposes only cancellation for an already-attested bootstrap. Its execution adapters throw.
+It retains secure evidence and still honors live leases. This does not turn a historical approval
+into current execution authority. The implementation and retained tests still require independent
+acceptance; this API guide is not approval to launch a managed pilot.

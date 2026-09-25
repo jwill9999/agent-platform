@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -20,7 +21,7 @@ import {
 
 const roots: string[] = [];
 const policyDigest = `sha256:${'a'.repeat(64)}`;
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const taskHeadSha = '1'.repeat(40);
 const integratedHeadSha = '2'.repeat(40);
 const originOperationId = `sha256:${'c'.repeat(64)}`;
@@ -94,7 +95,7 @@ const executionContract: ExecutionContract = {
   },
   escalationPolicy: [],
 };
-const executionContractDigest = `sha256:${createHash('sha256')
+let executionContractDigest = `sha256:${createHash('sha256')
   .update(JSON.stringify(executionContract))
   .digest('hex')}`;
 const contract: FeatureDeliveryContract = {
@@ -137,8 +138,14 @@ async function setup(authenticateOverride?: FeatureDeliveryIdentityClient['authe
   const root = await mkdtemp(join(tmpdir(), 'feature-approval-'));
   roots.push(root);
   const store = new WorkflowStore(join(root, 'workflow.sqlite'));
+  const publishDocuments = await documentFixture(executionContract, root);
+  workspaceId = executionContract.workspaceId;
+  contract.workspaceId = workspaceId;
+  executionContractDigest = `sha256:${createHash('sha256').update(JSON.stringify(executionContract)).digest('hex')}`;
+  contract.executionContractDigest = executionContractDigest;
   const contractId = store.createContract(executionContract);
   store.createRun(contractId, 'integration', 'approval-run');
+  publishDocuments(store, 'approval-run', true);
   store.seedApprovedTaskHeadForTest({
     workspaceId,
     runId: 'approval-run',
@@ -275,7 +282,6 @@ function approvalInput() {
 
 describe('FeatureDeliveryApprovalBroker', () => {
   it('authenticates a canonical intent snapshot and ignores caller mutation after authentication starts', async () => {
-    const mutable = intentInput();
     let authenticatedDigest = '';
     const fixture = await setup(async (input) => {
       authenticatedDigest = input.materialDigest;
@@ -290,6 +296,7 @@ describe('FeatureDeliveryApprovalBroker', () => {
       });
       return { subjectId: 'owner-1', role: 'human_approver', materialDigest: input.materialDigest };
     });
+    const mutable = intentInput();
     const stored = await fixture.broker.declareRequiredIntent(mutable);
     expect(stored).toMatchObject({
       materialDigest: authenticatedDigest,

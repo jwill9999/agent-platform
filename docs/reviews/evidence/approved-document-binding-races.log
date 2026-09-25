@@ -1,0 +1,76 @@
+
+ RUN  v2.1.9 <worktree>/packages/workflow-control
+
+ ✓ test/featureEvaluation.test.ts (25 tests) 21136ms
+   ✓ ContractEvaluator > maps every criterion to secure exact-head evidence and freezes accepted evidence 625ms
+   ✓ ContractEvaluator > rejects incomplete, stale-head, and unauthorized-producer evidence 319ms
+   ✓ DurableRepairChildBroker > creates an in-envelope append-only repair child idempotently 1129ms
+   ✓ DurableRepairChildBroker > carries approved-head lineage and decremented retry authority into a second repair 1569ms
+   ✓ DurableRepairChildBroker > rejects a second child until its predecessor advances and is accepted and closed 1026ms
+   ✓ DurableRepairChildBroker > derives child authority from durable attempts and rejects an exhausted aggregate budget 1036ms
+   ✓ DurableRepairChildBroker > rejects repair count expansion before mutation 572ms
+   ✓ DurableRepairChildBroker > rejects repair path expansion before mutation 567ms
+   ✓ DurableRepairChildBroker > rejects repair role expansion before mutation 580ms
+   ✓ DurableRepairChildBroker > rejects repair authority expansion before mutation 584ms
+   ✓ DurableRepairChildBroker > rejects repair dependency expansion before mutation 577ms
+   ✓ DurableRepairChildBroker > rejects repair retry budget expansion before mutation 598ms
+   ✓ DurableRepairChildBroker > durably escalates conflicting external state without mutation 758ms
+   ✓ DurableRepairChildBroker > rechecks changed planning documents immediately before repair child mutation 1030ms
+   ✓ DurableRepairChildBroker > rechecks 'invalidate' authority after suspended 'child' observation in the official repair port 1234ms
+   ✓ DurableRepairChildBroker > rechecks 'takeover' authority after suspended 'child' observation in the official repair port 1328ms
+   ✓ DurableRepairChildBroker > rechecks 'invalidate' authority after suspended 'ref' observation in the official repair port 1265ms
+   ✓ DurableRepairChildBroker > rechecks 'takeover' authority after suspended 'ref' observation in the official repair port 1364ms
+   ✓ DurableRepairChildBroker > reconciles a crash after external mutation without duplicating the effect 2032ms
+   ✓ DurableRepairChildBroker > adopts a prepared intent after lease-owner rollover without duplicating the effect 1655ms
+   ✓ DurableRepairChildBroker > rejects a fabricated evaluation and a run outside repair_planning 1284ms
+ ✓ test/phaseJobs.test.ts (44 tests) 30748ms
+   ✓ standalone durable phase jobs > maps implementing/continue to task_verification without inventing a transition 480ms
+   ✓ standalone durable phase jobs > maps implementing/repair to task_verification without inventing a transition 441ms
+   ✓ standalone durable phase jobs > maps task_verification/continue to task_review without inventing a transition 421ms
+   ✓ standalone durable phase jobs > maps task_verification/repair to repair without inventing a transition 525ms
+   ✓ standalone durable phase jobs > maps task_review/continue to task_accepted without inventing a transition 437ms
+   ✓ standalone durable phase jobs > maps task_review/repair to repair without inventing a transition 415ms
+   ✓ standalone durable phase jobs > maps feature_evaluation/repair to repair_planning without inventing a transition 433ms
+   ✓ standalone durable phase jobs > maps repair_planning/continue to implementing without inventing a transition 430ms
+   ✓ standalone durable phase jobs > maps pipeline/continue to delivery without inventing a transition 428ms
+   ✓ standalone durable phase jobs > maps delivery/continue to finalizing without inventing a transition 428ms
+   ✓ standalone durable phase jobs > maps finalizing/complete to finalizing without inventing a transition 425ms
+   ✓ standalone durable phase jobs > atomically consumes a callback into exactly one job across duplicate consumption and restart 432ms
+   ✓ standalone durable phase jobs > rejects stale run at enqueue and leaves no partial action 427ms
+   ✓ standalone durable phase jobs > rejects stale head at enqueue and leaves no partial action 422ms
+   ✓ standalone durable phase jobs > rejects stale approval at enqueue and leaves no partial action 331ms
+   ✓ standalone durable phase jobs > rejects stale material at enqueue and leaves no partial action 329ms
+   ✓ standalone durable phase jobs > rejects stale policy at enqueue and leaves no partial action 341ms
+   ✓ standalone durable phase jobs > rejects substituted callback identity and phase 509ms
+   ✓ standalone durable phase jobs > allows only one claimer and fences stale workers after a pre-start crash 770ms
+   ✓ standalone durable phase jobs > revalidates authority at claim and start with a visible blocker for stale queued work 527ms
+   ✓ standalone durable phase jobs > rejects a head change between claim and start without a false phase-start event 611ms
+   ✓ standalone durable phase jobs > does not infer a head ledger or active callback authority when either is absent 730ms
+   ✓ standalone durable phase jobs > keeps started work beyond five seconds and requires recovery instead of duplicate launch 767ms
+   ✓ standalone durable phase jobs > requires execution-bound durable completion and fences late completion 881ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted head_sha without completing 1081ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer without completing 873ms
+   ✓ standalone durable phase jobs > rejects result evidence with substituted producer_role without completing 844ms
+   ✓ standalone durable phase jobs > rejects a previous implementation result even when it has valid generic evidence scope 910ms
+   ✓ standalone durable phase jobs > does not invent coordinator completion authority from a generic transition receipt 801ms
+   ✓ standalone durable phase jobs > production continuation queues runnable work and reports missing authority visibly 1438ms
+   ✓ standalone durable phase jobs > preserves approval and blocked outcomes without enqueueing specialist work 1071ms
+   ✓ cancellation queue fencing > keeps phase launch fenced after an incomplete cancellation deadline while allowing observation recovery 1166ms
+   ✓ cancellation queue fencing > atomically fences pending phase work and rejects cancellation-time enqueues/claims 780ms
+   ✓ cancellation queue fencing > atomically fences claimed phase work and rejects cancellation-time enqueues/claims 831ms
+   ✓ cancellation queue fencing > does not declare started phase execution stopped from a cleanup boolean alone 857ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'enqueue' without starting work 632ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'enqueue' without starting work 816ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'enqueue' without starting work 823ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'claim' without starting work 1039ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'claim' without starting work 942ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'claim' without starting work 894ms
+   ✓ approved documents at queue boundaries > rejects 'changed' requirements before 'start' without starting work 987ms
+   ✓ approved documents at queue boundaries > rejects 'deleted' requirements before 'start' without starting work 964ms
+   ✓ approved documents at queue boundaries > rejects 'artifact' requirements before 'start' without starting work 1060ms
+
+ Test Files  2 passed (2)
+      Tests  69 passed (69)
+   Start at  02:39:36
+   Duration  31.23s (transform 413ms, setup 0ms, collect 616ms, tests 51.88s, environment 0ms, prepare 95ms)
+

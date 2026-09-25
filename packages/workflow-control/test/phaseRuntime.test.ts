@@ -174,7 +174,7 @@ async function setup(
                 }),
                 String(options.delayMs ?? 0),
               ],
-              { env: {}, timeout: 5000 },
+              { env: {}, timeout: 15000 },
             );
           }
           return { stdout: 'false', stderr: '' };
@@ -191,7 +191,7 @@ async function setup(
     credentialBrokerBinary: '/fixture/credentials',
     egressNetwork: 'fixture-egress',
     containerUser: '501:20',
-    leaseTtlMs: 600,
+    leaseTtlMs: 5000,
   });
   const runtime = StandalonePhaseRuntime.createForTest({
     store: f.store,
@@ -385,7 +385,13 @@ describe('standalone phase runtime production orchestration with fixture launche
         expect(await replacement.runOnce()).toBe(true);
         expect(await replacement.runOnce()).toBe(false);
         const secondPrompt = f.prompts[1]!;
-        expect(secondPrompt.task).toEqual(firstPrompt.task);
+        expect(secondPrompt.task).toEqual({
+          ...firstPrompt.task,
+          documentBinding: {
+            ...firstPrompt.task.documentBinding,
+            approvalId: 'fixture:repair-child',
+          },
+        });
         expect(secondPrompt.binding.headSha).toBe(headSha);
         expect(secondPrompt.binding.ownerDigest).toBe(digestGovernedValue(owner));
         expect(digestGovernedValue(secondPrompt)).not.toBe(digestGovernedValue(firstPrompt));
@@ -448,10 +454,10 @@ describe('standalone phase runtime production orchestration with fixture launche
   });
 
   it('renews phase and resource leases across a specialist exceeding the initial TTL', async () => {
-    const f = await setup({ delayMs: 1000 });
+    const f = await setup({ delayMs: 6500 });
     expect(await f.runtime.runOnce()).toBe(true);
     expect(f.journal.list()[0]?.status).toBe('completed');
-  });
+  }, 15000);
 
   it.each([{ roles: false }, { sourceFailure: true }])(
     'fails missing role or source authority before launch: %j',

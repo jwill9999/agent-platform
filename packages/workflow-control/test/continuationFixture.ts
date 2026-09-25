@@ -1,3 +1,5 @@
+import { documentFixture } from './documentFixture.js';
+import { deriveContractMaterialDigest } from '../src/planning.js';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -75,11 +77,14 @@ export async function continuationFixture(
     },
     escalationPolicy: [],
   };
+  const publishDocuments = await documentFixture(contract, root, join(root, 'source'));
+  const materialDigest = deriveContractMaterialDigest(contract);
   const contractId = store.createContract(contract, nowMs);
   store.createRunForTest(contractId, 'task_review', 'run');
+  publishDocuments(store, 'run');
   const workspaceLeaseEpoch = store.acquireLease(
     'workspace',
-    digest,
+    contract.workspaceId,
     'owner',
     120_000,
     nowMs,
@@ -87,7 +92,7 @@ export async function continuationFixture(
   const runLeaseEpoch = store.acquireLease('run', 'run', 'owner', 120_000, nowMs).epoch;
   const taskLeaseEpoch = store.acquireLease('task', 'task', 'owner', 120_000, nowMs).epoch;
   const artifacts = store.seedDelegateCallbackAuthorizationForTest({
-    workspaceId: digest,
+    workspaceId: contract.workspaceId,
     runId: 'run',
     taskId: 'task',
     delegationId: 'child',
@@ -97,7 +102,7 @@ export async function continuationFixture(
     workspaceLeaseEpoch,
     runLeaseEpoch,
     taskLeaseEpoch,
-    materialDigest: digest,
+    materialDigest,
     headSha: 'a'.repeat(40),
     inputProducerIdentity: 'orchestrator',
     input: { task: 'fixture' },
@@ -112,7 +117,7 @@ export async function continuationFixture(
   db.close();
   const identity = {
     kind: 'workflow.delegate_callback' as const,
-    workspaceId: digest,
+    workspaceId: contract.workspaceId,
     parentRunId: 'run',
     parentTaskId: 'task',
     parentState: 'task_review' as const,
@@ -123,7 +128,7 @@ export async function continuationFixture(
     attemptNumber: 1,
     contractVersion: 1 as const,
     policyDigest: digest,
-    materialDigest: digest,
+    materialDigest,
     workspaceLeaseEpoch,
     parentRunLeaseEpoch: runLeaseEpoch,
     taskLeaseEpoch,
@@ -154,5 +159,5 @@ export async function continuationFixture(
       nowMs,
       ...(withCallback ? { callback } : {}),
     });
-  return { root, database, store, callback, finish };
+  return { root, database, store, contract, callback, finish };
 }

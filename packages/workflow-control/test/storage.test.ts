@@ -1,8 +1,11 @@
+import Database from 'better-sqlite3';
+import { writeFile } from 'node:fs/promises';
+import { documentFixture } from './documentFixture.js';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   JournaledBeadsDoltBroker,
@@ -73,12 +76,18 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-async function createStore(): Promise<{ store: WorkflowStore; input: PrepareTransitionInput }> {
+async function createStore(): Promise<{
+  root: string;
+  store: WorkflowStore;
+  input: PrepareTransitionInput;
+}> {
   const root = await mkdtemp(join(tmpdir(), 'workflow-store-'));
   roots.push(root);
   const store = new WorkflowStore(join(root, 'workflow.sqlite'));
+  const publishDocuments = await documentFixture(contract, root);
   const contractId = store.createContract(contract, 1000);
   const run = store.createRun(contractId, 'approved', 'run-1');
+  publishDocuments(store, 'run-1', true);
   const workspaceLease = store.acquireLease(
     'workspace',
     contract.workspaceId,
@@ -112,6 +121,7 @@ async function createStore(): Promise<{ store: WorkflowStore; input: PrepareTran
     expectedVersion: input.expectedRunVersion,
   });
   return {
+    root,
     store,
     input,
   };
@@ -251,7 +261,7 @@ describe('WorkflowStore', () => {
       ),
     ).toThrow('already has a prepared transition');
     expect(() => store.commitTransition(input.id, 'other', input.leaseEpoch, {})).toThrow(
-      'fencing token',
+      'document_lease_stale',
     );
     const committed = store.commitTransition(
       input.id,
@@ -283,7 +293,7 @@ describe('WorkflowStore', () => {
     expect(recovery.epoch).toBeGreaterThan(input.leaseEpoch);
     expect(() =>
       store.commitTransition(input.id, input.leaseOwnerId, input.leaseEpoch, {}),
-    ).toThrow('fencing token');
+    ).toThrow('document_lease_stale');
     expect(
       store.adoptPreparedTransition(input.id, recovery.ownerId, recovery.epoch, 1100, {
         workspaceLeaseEpoch: recoveryWorkspace.epoch,
@@ -375,6 +385,149 @@ describe('WorkflowStore', () => {
 });
 
 describe('JournaledMutationBroker recovery', () => {
+  it.each([false, true])(
+    'rejects a successor adoption immediately before dispatch (recovery=%s)',
+    async (recovery) => {
+      const { root, store, input } = await createStore();
+      const port = new FakeMutationPort();
+      const now = recovery ? 1100 : 1000;
+      if (recovery) store.prepareTransition(input);
+      const owner = recovery ? 'recovering-owner' : input.leaseOwnerId;
+      const workspace = store.acquireLease('workspace', contract.workspaceId, owner, 100, now);
+      const run = store.acquireLease('run', input.runId, owner, 100, now);
+      const dispatch = store.dispatchTransitionMutation.bind(store);
+      const spy = vi
+        .spyOn(store, 'dispatchTransitionMutation')
+        .mockImplementation((expected, effect, clock) => {
+          const peer = new WorkflowStore(join(root, 'workflow.sqlite'));
+          const successorTime = now + 100;
+          const nextWorkspace = peer.acquireLease(
+            'workspace',
+            contract.workspaceId,
+            'successor',
+            60000,
+            successorTime,
+          );
+          const nextRun = peer.acquireLease('run', input.runId, 'successor', 60000, successorTime);
+          peer.adoptPreparedTransition(input.id, 'successor', nextRun.epoch, successorTime, {
+            ...expected.transitionContext,
+            workspaceLeaseEpoch: nextWorkspace.epoch,
+          });
+          peer.close();
+          return dispatch(expected, effect, clock);
+        });
+      const broker = new JournaledMutationBroker(store, port, undefined, () => now);
+      const pending = recovery
+        ? broker.reconcilePrepared({
+            runId: input.runId,
+            recoveryOwnerId: owner,
+            recoveryLeaseEpoch: run.epoch,
+            recoveryWorkspaceLeaseEpoch: workspace.epoch,
+            currentContractVersion: 1,
+            currentPolicyDigest: digest,
+            nowMs: now,
+          })
+        : broker.execute(input);
+      await expect(pending).rejects.toThrow();
+      expect(spy).toHaveBeenCalledOnce();
+      expect(port.mutations).toBe(0);
+      expect(store.getTransition(input.id)?.leaseOwnerId).toBe('successor');
+      spy.mockRestore();
+      store.close();
+    },
+  );
+
+  it.each(['beads.task_claim', 'beads.task_close', 'beads.dolt_push'] as const)(
+    'guards %s after suspended observations in execution and recovery',
+    async (operation) => {
+      for (const recovery of [false, true])
+        for (const change of ['documents', 'approval', 'cancelled', 'lease']) {
+          const { root, store, input } = await createStore();
+          const request = withCanonicalKey(input, {
+            operation,
+            expectedExternalState: {
+              status:
+                operation === 'beads.task_claim'
+                  ? 'in_progress'
+                  : operation === 'beads.task_close'
+                    ? 'closed'
+                    : 'synced',
+            },
+            externalArguments: { taskId: 'feature-persistence.1', reason: 'accepted' },
+          });
+          const client = new FakeBeadsDoltClient();
+          if (operation === 'beads.task_close') client.issueStatus = 'in_progress';
+          let entered!: () => void;
+          const observing = new Promise<void>((resolve) => {
+            entered = resolve;
+          });
+          let release!: () => void;
+          const gate = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          client.readIssue = async () => {
+            entered();
+            await gate;
+            return { status: client.issueStatus, blockingDependencies: [] };
+          };
+          client.readDoltSync = async () => {
+            entered();
+            await gate;
+            return client.syncStatus;
+          };
+          const now = recovery ? 1100 : 1000;
+          const broker = JournaledBeadsDoltBroker.createForTest(
+            store,
+            OfficialBeadsDoltPort.createForTest(root, client),
+            undefined,
+            () => now,
+          );
+          let pending: Promise<unknown>;
+          if (recovery) {
+            store.prepareTransition(request);
+            const workspace = store.acquireLease(
+              'workspace',
+              contract.workspaceId,
+              'recovery',
+              60000,
+              now,
+            );
+            const run = store.acquireLease('run', input.runId, 'recovery', 60000, now);
+            pending = broker.reconcilePrepared({
+              runId: input.runId,
+              recoveryOwnerId: 'recovery',
+              recoveryLeaseEpoch: run.epoch,
+              recoveryWorkspaceLeaseEpoch: workspace.epoch,
+              currentContractVersion: 1,
+              currentPolicyDigest: digest,
+              nowMs: now,
+            });
+          } else pending = broker.execute(request);
+          const failure = expect(pending).rejects.toThrow();
+          await observing;
+          if (change === 'documents')
+            await writeFile(
+              join(root, 'document-source/fixture-spec.md'),
+              'changed while observing',
+            );
+          else {
+            const peer = new Database(join(root, 'workflow.sqlite'));
+            if (change === 'approval')
+              peer.prepare("UPDATE plan_approvals SET status='invalidated'").run();
+            if (change === 'cancelled') peer.prepare("UPDATE runs SET state='cancelling'").run();
+            if (change === 'lease')
+              peer.prepare("UPDATE leases SET owner_id='replacement',epoch=epoch+1").run();
+            peer.close();
+          }
+          release();
+          await failure;
+          expect(client.calls, `${operation}/${recovery}/${change}`).toEqual([]);
+          store.close();
+        }
+    },
+    30_000,
+  );
+
   it.each([
     'before_prepare',
     'after_prepare',
@@ -448,6 +601,7 @@ describe('JournaledMutationBroker recovery', () => {
 
   it('commits an externally applied close without repeating it and escalates contradictions', async () => {
     const first = await createStore();
+    first.store.acquireLease('run', first.input.runId, first.input.leaseOwnerId, 60_000, 1000);
     const applied = new FakeMutationPort();
     applied.state = 'expected';
     const broker = new JournaledMutationBroker(first.store, applied, undefined, () => 1000);
@@ -521,6 +675,8 @@ describe('JournaledMutationBroker recovery', () => {
     'brokers %s through the pinned official adapter',
     async (operation, before, after, call) => {
       const { store, input } = await createStore();
+      // This adapter test is not an expiry test; allow real document I/O under contention.
+      store.acquireLease('run', input.runId, input.leaseOwnerId, 60_000, 1000);
       const client = new FakeBeadsDoltClient();
       if (operation === 'beads.dolt_push') client.syncStatus = before;
       else client.issueStatus = before;

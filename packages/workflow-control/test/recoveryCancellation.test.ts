@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,7 +18,7 @@ import {
 } from '../src/index.js';
 
 const roots: string[] = [];
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const policyDigest = `sha256:${'a'.repeat(64)}`;
 const contract: ExecutionContract = {
   featureId: 'recovery-feature',
@@ -76,8 +77,11 @@ async function createStore(state: 'pipeline' | 'implementing') {
   roots.push(root);
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(contract, root);
+  workspaceId = contract.workspaceId;
   const contractId = store.createContract(contract, 100);
   store.createRunForTest(contractId, state, 'run-recovery');
+  publishDocuments(store, 'run-recovery', true);
   store.seedApprovedTaskHeadForTest({
     workspaceId,
     runId: 'run-recovery',

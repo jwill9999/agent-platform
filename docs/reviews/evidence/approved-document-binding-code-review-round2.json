@@ -1,0 +1,122 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "0e5d0bef-9417-450e-a21e-58577b424a70",
+  "materialDigest": "5a13eb10c20332832bc13c2f1831f9cd035eafb0fcd21594450dc1fb9b473700",
+  "manifest": [
+    {
+      "path": "docs/planning/approved-document-binding/plan.md",
+      "digest": "0eb57cb15418bfb56078767db226c1c4e38b47840f7310d406ea9d4d755aace8"
+    },
+    {
+      "path": "docs/testing/approved-document-binding.md",
+      "digest": "86ba87f34604abf79ec0d382fcdebdc3b1d856ea05b670adf029f227661d4f27"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrap.ts",
+      "digest": "28a14eb8234e3245ca77171d4f0f62ad769ac0ee11ffcbc025b44571f347851e"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapJournal.ts",
+      "digest": "250631b03e3c36ded997ce4109e17da004c6aa6753bd9efb6a398657721564a0"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "digest": "97abb9b0c2ac2866784a2acaeca087588b693dc8b7fed65339315e27729b6781"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "digest": "fb37eb1fea7ce855f2f760420ea231cbd10093b325892c6ddcae5bd67bfc62c6"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "digest": "360a1c9bf53a4ceac2be4413dec1492eff1ca1a7e282699aaa17bb3153d6a0dc"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "digest": "a2a1425e59eb586cf165618c39bf55596c5348cfc6f1d0a4010f5b587a4eff91"
+    },
+    {
+      "path": "packages/workflow-control/src/index.ts",
+      "digest": "b591ecffe8c6723a44be7e4761aacbd45d90eecb638320cc98fd0f1853349e4e"
+    },
+    {
+      "path": "packages/workflow-control/src/orchestrator.ts",
+      "digest": "9941c960a629546c61a4d985bb73d193ebdfc1fc70dc3c3afa06cfe8dd9af336"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "digest": "01cee704b97806247ccd364615ad1618335aa53e2769e1be39d6cbc1e442e67b"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "57e93aa558c25dbf451bf187292bfb0051b0961ff2287c978e745fb2e4ef38aa"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "digest": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/planningDocuments.ts",
+      "digest": "90f6f554e0396c9f825a2293b6a31e395c24b42229301d0137eac73ec269056a"
+    },
+    {
+      "path": "packages/workflow-control/src/preapprovalMaterial.ts",
+      "digest": "3bae6ba1d08c276f64ccfcfb81d620a7317ce7e23184e92180a8863ff3945bf7"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "76e2353de24c385c9275f33fcdd55987e166a6491c46a4e4ccc4a1a223f16b16"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "9f9872e55cf692d0cab5f43c14770a558b09a40bb0726a9d64b93581cb5a8168"
+    },
+    {
+      "path": "packages/workflow-control/test/documentApproval.test.ts",
+      "digest": "78fd2942ed56a09630fc5bbb0ccbb4eb183fc383bdce116480d35b2d296535a7"
+    },
+    {
+      "path": "packages/workflow-control/test/planningDocuments.test.ts",
+      "digest": "f48a57ef4a524bb2cc2f7db69e6c17c5691872e067f4ff7a18ad3e5f2285c0f9"
+    }
+  ],
+  "result": {
+    "events": [
+      {
+        "type": "thread.started",
+        "thread_id": "01a0d5fd-ed26-7853-b692-85c2ae3bc9b5"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_0",
+          "type": "error",
+          "message": "Code Mode is unavailable because code-mode host is disabled. Code mode will fail closed; enable `features.code_mode_host` and install `codex-code-mode-host`."
+        }
+      },
+      {
+        "type": "turn.started"
+      },
+      {
+        "type": "item.completed",
+        "item": {
+          "id": "item_1",
+          "type": "agent_message",
+          "text": "{\n  \"verdict\": \"changes_required\",\n  \"findings\": [\n    {\n      \"severity\": \"high\",\n      \"file\": \"packages/workflow-control/src/documentApproval.ts\",\n      \"line\": null,\n      \"reason\": \"Source provenance remains unverified. recordPlanningDocumentPublication accepts any canonical directory containing matching bytes without checking its workspace identity, repository or source revision. Subsequent verification reads that permanently recorded directory; it does not resolve the currently accepted task workspace. Delivery guards generally omit expectedSourceRoot. An unchanged publication directory can therefore conceal changed normative documents in the actual execution workspace.\",\n      \"proposedFix\": \"Resolve publication identity and the current task workspace through trusted durable runtime bindings. Verify repository/revision provenance during publication and check normative bytes in the accepted task workspace at every execution boundary.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"packages/workflow-control/src/documentApproval.ts\",\n      \"line\": null,\n      \"reason\": \"verifyApprovedDocumentSnapshot settles its verification attempt as verified before inspecting the actual snapshot. Snapshot tampering then produces only document_snapshot_binding_rejected, leaving approval active and no pending or invalidated attempt. Restoring the snapshot permits reuse of the same approval. Snapshot staging failures after the initial verification have the same durability gap. This violates DB-3/4/5's persistent denial requirement for detected mismatches.\",\n      \"proposedFix\": \"Include snapshot validation within the durable verification attempt. Settle success only after all relevant bytes and bindings pass; persist invalidation on detected mismatch and retain an unresolved attempt if settlement fails.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"packages/workflow-control/src/specialistLauncher.ts\",\n      \"line\": null,\n      \"reason\": \"The launcher does not compare its supplied packet with the reservation's durable scheduler packet. #authority and #assertCanStart validate the scheduler execution, while stageApprovedDocuments validates the separately supplied packet against document approval. launchBound checks executionDigest and reservation role but still does not compare the envelope with scheduler_executions.packet_json. Different packets can consequently supply the prompt and allowed source paths under an existing execution identity.\",\n      \"proposedFix\": \"Before staging, credential issuance and dispatch, compare the canonical supplied packet/envelope with the durable scheduler input, including run, task, role, document approval and execution bindings. Derive staging paths from that validated durable input.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"packages/workflow-control/src/storage.ts\",\n      \"line\": null,\n      \"reason\": \"finishSchedulerExecution still accepts a completed replay with a different input.result when status matches. For completed executions it returns the stored execution without comparing result bytes. If a callback is supplied, that callback is checked against the stored result, so a replay carrying a conflicting result and the original valid callback is also accepted. The terminal-status check fixes only status substitution.\",\n      \"proposedFix\": \"Reject terminal replays whose canonical result differs from the persisted result. Validate callback replay identity against the same immutable terminal receipt.\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \"packages/workflow-control/src/bootstrap.ts\",\n      \"line\": null,\n      \"reason\": \"terminalize still calls assertStored, which calls assertApproved and requires active approval before reaching cancellation. A document mismatch invalidates approval and therefore prevents this bootstrap cleanup/handoff path from running, contrary to DB-7.\",\n      \"proposedFix\": \"Use a cancellation-specific stored-policy and attestation identity check that permits invalidated or legacy approval records while retaining cancellation fencing and cleanup checks.\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"packages/workflow-control/test/documentApproval.test.ts\",\n      \"line\": null,\n      \"reason\": \"The supplied tests do not establish the required exhaustive connected enforcement. Most negative cases call the verifier directly. The optional Docker test builds mounts and executes a replacement command without traversing DockerIsolatedSpecialistLauncher lifecycle/start guards. The compound recovery test closes a store connection rather than terminating a process, and there is no demonstrated negative matrix across bootstrap, delivery dispatch, repair effects, lineage import and approval resume.\",\n      \"proposedFix\": \"Add the required consumer inventory and connected negative tests through actual production entry points, including process termination/reopen, concurrent owners, snapshot restoration after rejection, and zero-effect assertions. Make required Docker coverage a completion gate and retain execution evidence.\"\n    }\n  ],\n  \"coverageLimitations\": [\n    \"Static review of supplied evidence only; no commands, tests or mutations performed.\",\n    \"Line numbers are null because the supplied evidence has no numbered source references; findings identify exact functions.\",\n    \"Referenced delivery, Git, reconciliation, governed-composition, authorization and secure-evidence modules were not supplied. Their dispatch timing and remaining authority paths cannot be fully verified.\",\n    \"Snapshot checking before Docker start, pending-attempt recovery fencing, transient-contention handling and terminal-status replay rejection are present. Their presence does not establish complete connected correctness.\",\n    \"No execution report, exhaustive enforcement map, hosted-check results or immutable Docker image evidence was supplied.\",\n    \"This verdict is not owner approval.\"\n  ]\n}"
+        }
+      },
+      {
+        "type": "turn.completed",
+        "usage": {
+          "input_tokens": 165970,
+          "cached_input_tokens": 5888,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1442,
+          "reasoning_output_tokens": 373
+        }
+      }
+    ],
+    "stderr": ""
+  },
+  "formalApproval": false
+}

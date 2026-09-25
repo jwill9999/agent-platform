@@ -117,9 +117,11 @@ export interface RepairChildFence {
   taskLeaseEpoch: number;
 }
 
+export type RepairEffectDispatch = <T>(effect: () => Promise<T>) => Promise<T>;
+
 export interface RepairChildMutationPort {
   observe(request: RepairChildRequest): Promise<ExternalObservation>;
-  mutate(request: RepairChildRequest): Promise<unknown>;
+  mutate(request: RepairChildRequest, dispatch: RepairEffectDispatch): Promise<unknown>;
 }
 
 export interface OfficialRepairChildSnapshot {
@@ -246,7 +248,10 @@ function childMatches(
 export class OfficialRepairChildPort implements RepairChildMutationPort {
   readonly workspaceRoot: string;
   readonly observe: (request: RepairChildRequest) => Promise<ExternalObservation>;
-  readonly mutate: (request: RepairChildRequest) => Promise<unknown>;
+  readonly mutate: (
+    request: RepairChildRequest,
+    dispatch: RepairEffectDispatch,
+  ) => Promise<unknown>;
 
   private constructor(workspaceRoot: string, client: OfficialRepairChildClient) {
     this.workspaceRoot = realpathSync(workspaceRoot);
@@ -271,24 +276,26 @@ export class OfficialRepairChildPort implements RepairChildMutationPort {
       }
       return { kind: 'unchanged', result: { child, refSha } };
     };
-    this.mutate = async (request) => {
+    this.mutate = async (request, dispatch) => {
       const key = digest(request);
       const child = await readChild(this.workspaceRoot, request.id);
       if (child === null) {
-        await createChild(this.workspaceRoot, request, `${key}:beads`);
+        await dispatch(() => createChild(this.workspaceRoot, request, `${key}:beads`));
       } else if (!childMatches(child, expectedChildSnapshot(request))) {
         throw new Error('repair child changed before Beads mutation');
       }
       const ref = `refs/heads/task/${request.id}`;
       const refSha = await readTaskRef(this.workspaceRoot, ref);
       if (refSha === null) {
-        await createTaskRefCas({
-          workspaceRoot: this.workspaceRoot,
-          ref,
-          expectedOldSha: null,
-          newSha: request.branchParentSha,
-          idempotencyKey: `${key}:git`,
-        });
+        await dispatch(() =>
+          createTaskRefCas({
+            workspaceRoot: this.workspaceRoot,
+            ref,
+            expectedOldSha: null,
+            newSha: request.branchParentSha,
+            idempotencyKey: `${key}:git`,
+          }),
+        );
       } else if (refSha !== request.branchParentSha) {
         throw new Error('repair child ref changed before Git mutation');
       }
@@ -551,7 +558,18 @@ export class DurableRepairChildBroker {
         throw new Error('repair-child append-only position changed before mutation');
       }
       this.#fault('before_mutation', intent);
-      await this.#port.mutate(request);
+      await this.#store.dispatchRepairChildMutation(
+        { id: intent.id, ...fence, nowMs: this.#clock() },
+        () =>
+          this.#port.mutate(request, (effect) =>
+            this.#store.dispatchRepairChildMutation(
+              { id: intent.id, ...fence, nowMs: this.#clock() },
+              effect,
+              workflowEvaluationMutationCapability,
+            ),
+          ),
+        workflowEvaluationMutationCapability,
+      );
       this.#fault('after_mutation', intent);
     }
     observation = await this.#port.observe(request);

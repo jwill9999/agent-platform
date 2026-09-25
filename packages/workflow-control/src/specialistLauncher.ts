@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { cp, lstat, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { promisify } from 'node:util';
+import { promisify, isDeepStrictEqual } from 'node:util';
 
 import type { TaskPacket } from './contracts.js';
 import {
@@ -62,6 +62,7 @@ export interface SpecialistLaunchRequest {
   codexHome: string;
   authFile: string;
   promptFile: string;
+  approvedDocumentsRoot?: string;
   egressNetwork: string;
   role: string;
   runId: string;
@@ -81,7 +82,7 @@ export async function prepareSpecialistWorkspace(
 ): Promise<SpecialistWorkspace> {
   if (allowedSourcePaths.length === 0) throw new Error('specialist source paths must not be empty');
   const canonicalSource = await realpath(sourceRoot);
-  const stagingParent = await mkdtemp(join(tmpdir(), 'workflow-specialist-'));
+  const stagingParent = await realpath(await mkdtemp(join(tmpdir(), 'workflow-specialist-')));
   try {
     return await populateSpecialistWorkspace(canonicalSource, allowedSourcePaths, stagingParent);
   } catch (error) {
@@ -148,9 +149,7 @@ function assertPrivateMounts(mounts: readonly string[], stagingRoot: string): vo
   }
 }
 
-export async function buildDockerSpecialistLaunch(
-  request: SpecialistLaunchRequest,
-): Promise<DockerSpecialistLaunch> {
+function prepareLaunchEnvironment(request: SpecialistLaunchRequest) {
   for (const path of [
     request.workspaceRoot,
     request.codexHome,
@@ -183,6 +182,13 @@ export async function buildDockerSpecialistLaunch(
     );
   }
 
+  return { containerUser, environment };
+}
+
+export async function buildDockerSpecialistLaunch(
+  request: SpecialistLaunchRequest,
+): Promise<DockerSpecialistLaunch> {
+  const { containerUser, environment } = prepareLaunchEnvironment(request);
   const [workspaceRoot, codexHome, authFile, promptFile, configFile] = await Promise.all([
     realpath(request.workspaceRoot),
     realpath(request.codexHome),
@@ -199,6 +205,12 @@ export async function buildDockerSpecialistLaunch(
     `${authFile}:/codex-home/auth.json:ro`,
     `${promptFile}:/run/specialist/prompt.txt:ro`,
   ];
+  if (request.approvedDocumentsRoot !== undefined) {
+    const approvedRoot = await realpath(request.approvedDocumentsRoot);
+    if (approvedRoot === workspaceRoot || isInside(approvedRoot, workspaceRoot))
+      throw new Error('approved documents must be outside the writable workspace');
+    mounts.push(`${approvedRoot}:/run/approved-documents:ro`);
+  }
   assertPrivateMounts(mounts, stagingRoot);
 
   const args = [
@@ -453,6 +465,7 @@ export class RevocableSpecialistCredentialBroker {
     stagingRoot: string,
     executionId: string,
     generation: string,
+    nowMs = Date.now(),
   ): Promise<SpecialistCredentialLease> {
     const leaseId = this.leaseId(executionId);
     this.#store.bindSchedulerCredentialGeneration(
@@ -464,7 +477,12 @@ export class RevocableSpecialistCredentialBroker {
       workflowCredentialJournalCapability,
     );
     try {
-      const lease = await this.#issue(stagingRoot, executionId, leaseId, generation);
+      const lease = await this.#store.dispatchSchedulerCredentialIssue(
+        executionId,
+        () => this.#issue(stagingRoot, executionId, leaseId, generation),
+        workflowCredentialJournalCapability,
+        nowMs,
+      );
       if (lease.leaseId !== leaseId)
         throw new Error('credential broker changed the durable lease id');
       if (lease.generation !== generation)
@@ -650,7 +668,12 @@ export class DockerIsolatedSpecialistLauncher {
     reservation: DockerSpecialistReservation,
     envelope?: SpecialistInputEnvelope,
   ): Promise<unknown> {
-    const launched = this.#launch(packet, reservation, envelope);
+    const copiedEnvelope = envelope === undefined ? undefined : structuredClone(envelope);
+    const launched = this.#launch(
+      copiedEnvelope?.task ?? structuredClone(packet),
+      { ...reservation },
+      copiedEnvelope,
+    );
     const settlement = launched.then(
       () => undefined,
       () => undefined,
@@ -671,6 +694,16 @@ export class DockerIsolatedSpecialistLauncher {
     let output: SpecialistExecutionResult | undefined;
     let launchError: unknown;
     try {
+      const persisted = this.#options.store.getSchedulerExecution(reservation.id);
+      if (
+        persisted?.status !== 'active' ||
+        persisted.runId !== packet.runId ||
+        persisted.taskId !== packet.taskId ||
+        persisted.role !== reservation.role ||
+        persisted.deadlineMs !== reservation.deadlineMs ||
+        !isDeepStrictEqual(persisted.packet, envelope ?? packet)
+      )
+        throw new Error('specialist input differs from durable scheduler input');
       this.#assertCanStart(reservation);
       const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
       const workspace = await prepareSpecialistWorkspace(
@@ -679,10 +712,23 @@ export class DockerIsolatedSpecialistLauncher {
       );
       stagingRoot = resolve(workspace.root, '..');
       const promptFile = join(stagingRoot, 'task-packet.json');
+      const approvedDocumentsRoot = join(stagingRoot, 'approved-documents');
+      this.#options.store.stageApprovedDocuments({
+        runId: packet.runId,
+        taskId: packet.taskId,
+        packet,
+        ownerId: authority.ownerId,
+        runLeaseEpoch: authority.runLeaseEpoch,
+        boundary: 'specialist.snapshot',
+        sourceRoot: this.#options.sourceRoot,
+        destination: approvedDocumentsRoot,
+        nowMs: this.#clock(),
+      });
       const credentialLease = await this.#options.credentialBroker.issue(
         stagingRoot,
         reservation.id,
         credentialBrokerGeneration,
+        this.#clock(),
       );
       await writeFile(promptFile, `${JSON.stringify(envelope ?? packet)}\n`, { mode: 0o600 });
       const launch = await buildDockerSpecialistLaunch({
@@ -691,6 +737,7 @@ export class DockerIsolatedSpecialistLauncher {
         codexHome: workspace.codexHome,
         authFile: credentialLease.authFile,
         promptFile,
+        approvedDocumentsRoot,
         egressNetwork: this.#options.egressNetwork,
         role: reservation.role,
         runId: packet.runId,
@@ -706,9 +753,12 @@ export class DockerIsolatedSpecialistLauncher {
       ];
       this.#advance(authority, 'not_dispatched', 'create_pending');
       this.#assertCanStart(reservation);
-      const created = await this.#docker(
-        createArgs,
-        Math.min(60_000, reservation.deadlineMs - this.#clock()),
+      const created = await this.#options.store.dispatchSchedulerContainer(
+        authority,
+        this.#options.sourceRoot,
+        () => this.#docker(createArgs, Math.min(60_000, reservation.deadlineMs - this.#clock())),
+        workflowContainerJournalCapability,
+        this.#clock,
       );
       const containerId = created.stdout.trim();
       if (!/^[a-f0-9]{64}$/u.test(containerId))
@@ -719,12 +769,30 @@ export class DockerIsolatedSpecialistLauncher {
       let started: Promise<{ stdout: string; stderr: string }> | undefined;
       await this.#withContainerLock(reservation.id, () => {
         this.#assertCanStart(reservation);
+        this.#options.store.verifyApprovedDocumentSnapshot({
+          runId: packet.runId,
+          taskId: packet.taskId,
+          packet,
+          destination: approvedDocumentsRoot,
+          ownerId: authority.ownerId,
+          runLeaseEpoch: authority.runLeaseEpoch,
+          boundary: 'specialist.snapshot_start',
+          expectedSourceRoot: this.#options.sourceRoot,
+          nowMs: this.#clock(),
+        });
         // Revalidate fences immediately before dispatch without another asynchronous gap.
         this.#assertAuthority(authority);
-        started = this.#docker(
-          ['start', '--attach', containerId],
-          reservation.deadlineMs - this.#clock(),
-          this.#options.maxOutputBytes ?? 4 * 1024 * 1024,
+        started = this.#options.store.dispatchSchedulerContainer(
+          authority,
+          this.#options.sourceRoot,
+          () =>
+            this.#docker(
+              ['start', '--attach', containerId],
+              reservation.deadlineMs - this.#clock(),
+              this.#options.maxOutputBytes ?? 4 * 1024 * 1024,
+            ),
+          workflowContainerJournalCapability,
+          this.#clock,
         );
       });
       const result = await started!;
@@ -870,10 +938,22 @@ export class DockerIsolatedSpecialistLauncher {
   }
 
   #assertCanStart(reservation: DockerSpecialistReservation): void {
+    this.#options.store.assertSchedulerAcceptsWork(reservation.id);
     if (this.#cancelled.has(reservation.id))
       throw new Error('specialist launch was cancelled before container start');
     if (this.#clock() >= reservation.deadlineMs)
       throw new Error('specialist reservation timed out');
+    const authority = this.#authority(reservation.id);
+    const execution = this.#options.store.getSchedulerExecution(reservation.id)!;
+    this.#options.store.verifyPlanningDocuments({
+      runId: execution.runId,
+      taskId: execution.taskId,
+      ownerId: authority.ownerId,
+      runLeaseEpoch: authority.runLeaseEpoch,
+      boundary: 'specialist.lifecycle',
+      expectedSourceRoot: this.#options.sourceRoot,
+      nowMs: this.#clock(),
+    });
   }
 
   async #inspectOwned(

@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -64,6 +65,15 @@ async function fixture(changePolicy?: (policy: BootstrapPolicy) => void) {
   git(canonical, ['init', '-q']);
   mkdirSync(join(canonical, 'packages/workflow-control'), { recursive: true });
   writeFileSync(join(canonical, 'packages/workflow-control/value.txt'), 'before\n');
+  // Normative inputs belong to the starting tree, outside the implementation diff.
+  writeFileSync(
+    join(canonical, 'fixture-spec.md'),
+    'Synthetic requirements for execution regression.\n',
+  );
+  writeFileSync(
+    join(canonical, 'fixture-tests.md'),
+    'Synthetic verification requirements for execution regression.\n',
+  );
   git(canonical, ['add', '.']);
   git(canonical, ['commit', '-qm', 'base']);
   const initial = git(canonical, ['rev-parse', 'HEAD']);
@@ -218,11 +228,13 @@ async function fixture(changePolicy?: (policy: BootstrapPolicy) => void) {
   };
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(contract, root, source, policy);
   store.createRun(
     store.createContract(executionContractSchema.parse(contract)),
     'approved',
     'bootstrap-run',
   );
+  publishDocuments(store, 'bootstrap-run');
   const recorder = new JournaledArtifactRecorder(
     new ContentAddressedArtifactStore(join(root, 'artifacts')),
     store,
@@ -374,22 +386,26 @@ describe('approved bootstrap task artifact production composition', () => {
       let afterCommit = false;
       let expired = false;
       let pushes = 0;
-      const original = BootstrapJournal.prototype.withMutation;
-      vi.spyOn(BootstrapJournal.prototype, 'withMutation').mockImplementation(function (
-        this: BootstrapJournal,
+      const original = WorkflowStore.prototype.withinDeliveryMutation;
+      vi.spyOn(WorkflowStore.prototype, 'withinDeliveryMutation').mockImplementation(function (
+        this: WorkflowStore,
         runId,
-        policy,
-        fence,
         operation,
+        capability,
       ) {
-        return original.call(this, runId, policy, fence, () => {
-          insideMutation = true;
-          try {
-            return operation();
-          } finally {
-            insideMutation = false;
-          }
-        });
+        return original.call(
+          this,
+          runId,
+          () => {
+            insideMutation = true;
+            try {
+              return operation();
+            } finally {
+              insideMutation = false;
+            }
+          },
+          capability,
+        );
       });
       if (stage === 'adoption') {
         const advance = BootstrapJournal.prototype.advance;
@@ -487,6 +503,29 @@ describe('approved bootstrap task artifact production composition', () => {
     successor.close();
     coordinator.close();
   });
+  it('reopens cancellation after approval invalidation without allowing execution', async () => {
+    const f = await fixture();
+    const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
+    const evidence = await coordinator.commitAndPush();
+    coordinator.close();
+    const db = new Database(f.database);
+    db.prepare("UPDATE plan_approvals SET status='invalidated' WHERE run_id=?").run(
+      'bootstrap-run',
+    );
+    db.close();
+    writeFileSync(join(f.source, 'fixture-spec.md'), 'changed after approval');
+    const cleanup = BootstrapCoordinator.createForCleanup(f.database, 'bootstrap-run', f.policy);
+    expect(() => cleanup.adopt()).toThrow('cleanup cannot execute');
+    await expect(cleanup.commitAndPush()).rejects.toThrow('cleanup cannot execute');
+    await expect(cleanup.terminalize('fixture-owner')).rejects.toThrow('lease is held');
+    const expired = new Database(f.database);
+    expired.prepare('UPDATE leases SET expires_at_ms=0').run();
+    expired.close();
+    const result = await cleanup.terminalize('fixture-owner');
+    expect(result.status).toBe('cancelled');
+    expect(result.retainedEvidence[0]).toMatchObject({ digest: evidence.digest });
+    cleanup.close();
+  });
   it('crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases', async () => {
     const f = await fixture((policy) => {
       policy.evidence[0]!.producer = '/root/bootstrap_verification_astra';
@@ -503,7 +542,7 @@ describe('approved bootstrap task artifact production composition', () => {
     expect(git(f.source, ['ls-tree', '-r', '--name-only', head])).not.toContain('owner-note');
     const result = await coordinator.terminalize('fixture-owner');
     expect(result.status).toBe('cancelled');
-    expect(result.retainedEvidence[0]?.digest).toBe(evidence.digest);
+    expect(result.retainedEvidence[0]).toMatchObject({ digest: evidence.digest });
     coordinator.close();
     const raw = new Database(f.database);
     const attestation = raw.prepare('SELECT attestation_json FROM bootstrap_artifacts').get() as {
@@ -861,6 +900,13 @@ describe('approved bootstrap task artifact production composition', () => {
     const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
     coordinator.adopt();
     const store = new WorkflowStore(f.database);
+    const raw = new Database(f.database);
+    const lease = raw
+      .prepare(
+        "SELECT owner_id,epoch FROM leases WHERE resource_type='run' AND resource_id='bootstrap-run'",
+      )
+      .get() as { owner_id: string; epoch: number };
+    raw.close();
     expect(() =>
       store.prepareDeliveryOperation(
         {
@@ -884,9 +930,9 @@ describe('approved bootstrap task artifact production composition', () => {
           },
           contractVersion: 1,
           policyDigest: f.contract.policyDigest,
-          ownerId: 'invalid',
+          ownerId: lease.owner_id,
           workspaceLeaseEpoch: 1,
-          runLeaseEpoch: 1,
+          runLeaseEpoch: lease.epoch,
           taskLeaseEpoch: 1,
           nowMs: Date.now(),
         },

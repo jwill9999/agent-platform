@@ -1,3 +1,4 @@
+import { verifyDocumentBoundary, assertDocumentAuthority } from './documentApproval.js';
 import { createHash } from 'node:crypto';
 
 import Database from 'better-sqlite3';
@@ -233,24 +234,75 @@ export class PhaseJobJournal {
   claim(owner: string, ttlMs: number, nowMs: number, runId?: string): PhaseJob | undefined {
     if (!owner || !Number.isSafeInteger(ttlMs) || ttlMs <= 0)
       throw new Error('invalid phase lease');
-    return this.#database
-      .transaction(() => {
-        const jobs = this.#database
+    const jobs = this.#database
+      .prepare(
+        `SELECT * FROM phase_jobs
+      WHERE status IN ('pending','claimed') AND lease_until_ms <= ?
+      AND (? IS NULL OR run_id = ?) ORDER BY created_at_ms,id`,
+      )
+      .all(nowMs, runId ?? null, runId ?? null) as PhaseJob[];
+    for (const job of jobs) {
+      let verified: ReturnType<typeof verifyDocumentBoundary>;
+      try {
+        verified = verifyDocumentBoundary(this.#database, {
+          runId: job.run_id,
+          taskId: this.action(job).taskId,
+          boundary: 'phase.claim',
+          ownerId: owner,
+          nowMs,
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : '';
+        const code = (error as { code?: string })?.code;
+        if (
+          reason === 'document_verification_unresolved' ||
+          code === 'SQLITE_BUSY' ||
+          code === 'SQLITE_LOCKED'
+        )
+          continue;
+        if (
+          ![
+            'planning_documents_changed',
+            'document_approval_required',
+            'document_manifest_required',
+            'document_publication_missing',
+            'document_task_unknown',
+          ].includes(reason)
+        )
+          throw error;
+        this.#database
           .prepare(
-            `SELECT * FROM phase_jobs j
-        WHERE status IN ('pending', 'claimed') AND lease_until_ms <= ? AND (? IS NULL OR run_id = ?)
-        AND NOT EXISTS (SELECT 1 FROM phase_jobs p WHERE p.run_id = j.run_id AND p.id != j.id
-          AND (p.status = 'started' OR (p.status = 'claimed' AND p.lease_until_ms > ?)))
-        ORDER BY created_at_ms, id`,
+            `UPDATE phase_jobs SET status='blocked',failure_code='document_authority_unavailable'
+          WHERE id=? AND status IN ('pending','claimed') AND lease_until_ms<=?`,
           )
-          .all(nowMs, runId ?? null, runId ?? null, nowMs) as PhaseJob[];
-        for (const job of jobs) {
+          .run(job.id, nowMs);
+        continue;
+      }
+      const claimed = this.#database
+        .transaction(() => {
+          assertDocumentAuthority(this.#database, job.run_id, verified.approvalId);
+          const current = this.get(job.id);
+          if (
+            !current ||
+            !['pending', 'claimed'].includes(current.status) ||
+            current.lease_until_ms > nowMs
+          )
+            return undefined;
+          if (
+            this.#database
+              .prepare(
+                `SELECT 1 FROM phase_jobs WHERE run_id=? AND id!=?
+          AND (status='started' OR (status='claimed' AND lease_until_ms>?))`,
+              )
+              .get(job.run_id, job.id, nowMs)
+          )
+            return undefined;
           try {
-            assertPhaseJobAuthority(this.#database, this.action(job));
+            assertPhaseJobAuthority(this.#database, this.action(current));
           } catch (error) {
             this.#database
-              .prepare("UPDATE phase_jobs SET status = 'blocked', failure_code = ? WHERE id = ?")
-              .run(error instanceof Error ? error.message : String(error), job.id);
+              .prepare("UPDATE phase_jobs SET status='blocked',failure_code=? WHERE id=?")
+              .run(error instanceof Error ? error.message : 'phase_authority_stale', job.id);
             this.#event(
               job,
               'phase_blocked',
@@ -258,19 +310,20 @@ export class PhaseJobJournal {
               { reason: 'phase_authority_stale' },
               nowMs,
             );
-            continue;
+            return undefined;
           }
           this.#database
             .prepare(
-              `UPDATE phase_jobs SET status = 'claimed', lease_owner = ?,
-          lease_epoch = lease_epoch + 1, lease_until_ms = ? WHERE id = ?`,
+              `UPDATE phase_jobs SET status='claimed',lease_owner=?,
+          lease_epoch=lease_epoch+1,lease_until_ms=? WHERE id=?`,
             )
             .run(owner, nowMs + ttlMs, job.id);
           return this.get(job.id);
-        }
-        return undefined;
-      })
-      .immediate();
+        })
+        .immediate();
+      if (claimed) return claimed;
+    }
+    return undefined;
   }
 
   renew(job: PhaseJob, ttlMs: number, nowMs: number): void {
@@ -285,8 +338,16 @@ export class PhaseJobJournal {
   }
 
   start(job: PhaseJob, nowMs: number): PhaseJob {
+    const verified = verifyDocumentBoundary(this.#database, {
+      runId: job.run_id,
+      taskId: this.action(job).taskId,
+      boundary: 'phase.start',
+      ownerId: job.lease_owner ?? '',
+      nowMs,
+    });
     return this.#database
       .transaction(() => {
+        assertDocumentAuthority(this.#database, job.run_id, verified.approvalId);
         const current = this.get(job.id);
         if (current?.status !== 'claimed') throw new Error('phase job is not claimed');
         assertPhaseJobAuthority(this.#database, this.action(current));

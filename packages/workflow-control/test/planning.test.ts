@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -84,8 +85,10 @@ async function setup() {
   roots.push(root);
   const path = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(path);
+  const publishDocuments = await documentFixture(contract, root);
   const contractId = store.createContract(contract, 1000);
   store.createRun(contractId, 'planning', 'run-planning');
+  publishDocuments(store, 'run-planning');
   store.recordEvidence({
     digest: evidenceDigest,
     mediaType: 'application/json',
