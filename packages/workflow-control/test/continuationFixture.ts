@@ -84,7 +84,7 @@ export async function continuationFixture(
   publishDocuments(store, 'run');
   const workspaceLeaseEpoch = store.acquireLease(
     'workspace',
-    digest,
+    contract.workspaceId,
     'owner',
     120_000,
     nowMs,
@@ -92,7 +92,7 @@ export async function continuationFixture(
   const runLeaseEpoch = store.acquireLease('run', 'run', 'owner', 120_000, nowMs).epoch;
   const taskLeaseEpoch = store.acquireLease('task', 'task', 'owner', 120_000, nowMs).epoch;
   const artifacts = store.seedDelegateCallbackAuthorizationForTest({
-    workspaceId: digest,
+    workspaceId: contract.workspaceId,
     runId: 'run',
     taskId: 'task',
     delegationId: 'child',
@@ -117,7 +117,7 @@ export async function continuationFixture(
   db.close();
   const identity = {
     kind: 'workflow.delegate_callback' as const,
-    workspaceId: digest,
+    workspaceId: contract.workspaceId,
     parentRunId: 'run',
     parentTaskId: 'task',
     parentState: 'task_review' as const,

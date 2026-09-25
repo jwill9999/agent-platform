@@ -27,15 +27,6 @@ async function setup(deadlineMs = 301000) {
   await mkdir(sourceRoot, { recursive: true });
   await writeFile(join(sourceRoot, 'safe.txt'), 'original');
   const original = fixture.store.getSchedulerExecution('child')!;
-  const execution = fixture.store.createSchedulerExecution({
-    ...original,
-    id: executionId,
-    processIdentity: `docker:workflow-specialist-${executionId}`,
-    credentialLeaseId: `specialist:${executionId}`,
-    deadlineMs,
-    nowMs: now,
-  });
-  const reservation = { id: executionId, role: 'code_reviewer', deadlineMs: execution.deadlineMs };
   const documentBinding = fixture.store.verifyPlanningDocuments({
     runId: 'run',
     taskId: 'task',
@@ -55,9 +46,24 @@ async function setup(deadlineMs = 301000) {
     acceptanceCriteria: ['settled'],
     allowedPaths: ['safe.txt'],
     allowedOperations: ['workspace.read'],
-    retryBudget: { implementationAttempts: 1, findingAttempts: 1, infrastructureAttempts: 1 },
+    retryBudget: {
+      implementationAttempts: 1,
+      findingAttempts: 1,
+      infrastructureAttempts: 1,
+      waitDeadlineSeconds: 60,
+    },
     evidence: [],
   };
+  const execution = fixture.store.createSchedulerExecution({
+    ...original,
+    packet,
+    id: executionId,
+    processIdentity: `docker:workflow-specialist-${executionId}`,
+    credentialLeaseId: `specialist:${executionId}`,
+    deadlineMs,
+    nowMs: now,
+  });
+  const reservation = { id: executionId, role: 'code_reviewer', deadlineMs: execution.deadlineMs };
   let staged: string | undefined;
   let present = false;
   let revoked = false;
@@ -142,6 +148,7 @@ async function setup(deadlineMs = 301000) {
     reservation,
     launcher,
     makeLauncher,
+    broker,
     calls,
     timeouts,
     owned,
@@ -189,6 +196,34 @@ async function setup(deadlineMs = 301000) {
 }
 
 describe('durable active specialist settlement', () => {
+  it.each(['invalidated', 'pending'])(
+    'denies credential issuance after snapshot authority becomes %s',
+    async (state) => {
+      const f = await setup();
+      const issue = vi.spyOn(f.broker, 'issue');
+      const stage = f.store.stageApprovedDocuments.bind(f.store);
+      vi.spyOn(f.store, 'stageApprovedDocuments').mockImplementation((input) => {
+        stage(input);
+        const db = new Database(f.database);
+        if (state === 'invalidated')
+          db.prepare("UPDATE plan_approvals SET status='invalidated'").run();
+        else
+          db.exec(`INSERT INTO planning_document_attempts
+        (id,run_id,task_id,approval_id,material_digest,manifest_digest,boundary,owner_id,run_lease_epoch,status,created_at_ms,deadline_ms)
+        SELECT 'peer-pending',run_id,task_id,approval_id,material_digest,manifest_digest,'peer','peer',NULL,'pending',1000,31000
+        FROM planning_document_attempts WHERE approval_id NOT LIKE 'candidate:%' LIMIT 1`);
+        db.close();
+      });
+      await expect(f.launcher.launch(f.packet, f.reservation)).rejects.toThrow(
+        state === 'invalidated' ? 'document_approval_required' : 'document_verification_unresolved',
+      );
+      // Entry was reached, but the effect provider never received an issue request.
+      expect(issue).toHaveBeenCalledOnce();
+      expect(f.staged).toBeUndefined();
+      expect(f.calls.some((call) => ['create', 'start'].includes(call[0]!))).toBe(false);
+    },
+  );
+
   it('pins identity, confirms removal/revocation and returns staged source with an unrestricted reservation deadline', async () => {
     const f = await setup();
     const result = (await f.launcher.launch(f.packet, f.reservation)) as {
@@ -492,8 +527,7 @@ describe('durable active specialist settlement', () => {
   );
 
   it('checks deadline again after create without starting an expired reservation', async () => {
-    const f = await setup();
-    f.reservation.deadlineMs = 1100;
+    const f = await setup(1100);
     f.intercept(async (args) => {
       if (args[0] === 'create') f.setNow(1100);
       return undefined;

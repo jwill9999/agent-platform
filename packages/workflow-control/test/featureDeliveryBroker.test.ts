@@ -36,7 +36,7 @@ import {
 import { schedulerDockerFixture } from './schedulerDockerFixture.js';
 
 const roots: string[] = [];
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const policyDigest = `sha256:${'a'.repeat(64)}`;
 const taskHeadSha = '1'.repeat(40);
 const featureHeadSha = '2'.repeat(40);
@@ -237,6 +237,8 @@ async function setup(input?: {
   const databasePath = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(databasePath);
   const publishDocuments = await documentFixture(executionContract, root);
+  workspaceId = executionContract.workspaceId;
+  featureContract.workspaceId = workspaceId;
   featureContract.executionContractDigest = digest(executionContract);
   const contractId = store.createContract(executionContract, 1000);
   const run = store.createRun(contractId, 'finalizing', 'run-feature-delivery');
@@ -445,6 +447,8 @@ describe('DurableFeatureDeliveryBroker', () => {
     roots.push(root);
     const store = new WorkflowStore(join(root, 'workflow.sqlite'));
     const publishDocuments = await documentFixture(executionContract, root);
+    workspaceId = executionContract.workspaceId;
+    featureContract.workspaceId = workspaceId;
     featureContract.executionContractDigest = digest(executionContract);
     const contractId = store.createContract(executionContract, 900);
     const run = store.createRun(contractId, 'delivery', 'run-feature-delivery-e2e');
@@ -670,11 +674,11 @@ describe('DurableFeatureDeliveryBroker', () => {
   });
 
   it('rejects cross-contract replay even when repository and refs are unchanged', async () => {
+    const fixture = await setup();
     const secondContract = {
       ...featureContract,
       authority: { ...featureContract.authority, requiredChecks: ['build', 'test', 'review'] },
     };
-    const fixture = await setup();
     await fixture.broker.execute(mergeRequest(featureContract), fixture.fence);
     const replayBroker = DurableFeatureDeliveryBroker.createForTest({
       store: fixture.store,
@@ -759,13 +763,13 @@ describe('DurableFeatureDeliveryBroker', () => {
   ] as const)(
     'production recovery driver reconciles %s after restart',
     async (_label, kind, crashAt) => {
-      const request =
-        kind === 'pr' ? pullRequest() : kind === 'checks' ? checksRequest() : mergeRequest();
       const first = await setup({
         fault(boundary) {
           if (boundary === crashAt) throw new Error('seeded feature recovery crash');
         },
       });
+      const request =
+        kind === 'pr' ? pullRequest() : kind === 'checks' ? checksRequest() : mergeRequest();
       await expect(first.broker.execute(request, first.fence)).rejects.toThrow(
         'seeded feature recovery crash',
       );

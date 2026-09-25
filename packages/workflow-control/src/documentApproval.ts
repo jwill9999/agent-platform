@@ -1,3 +1,8 @@
+import {
+  establishDocumentSource,
+  resolveDocumentSource,
+  type DocumentSourceIdentity,
+} from './documentSources.js';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   readFileSync,
@@ -97,6 +102,13 @@ export function initializeDocumentApprovalSchema(database: Database.Database): v
       const columns = database.prepare('PRAGMA table_info(planning_document_attempts)').all() as {
         name: string;
       }[];
+      const publicationColumns = database
+        .prepare('PRAGMA table_info(planning_document_publications)')
+        .all() as { name: string }[];
+      if (!publicationColumns.some((column) => column.name === 'source_identity_json'))
+        database.exec(
+          'ALTER TABLE planning_document_publications ADD COLUMN source_identity_json TEXT',
+        );
       if (!columns.some((column) => column.name === 'deadline_ms'))
         database.exec(
           'ALTER TABLE planning_document_attempts ADD COLUMN deadline_ms INTEGER NOT NULL DEFAULT 0',
@@ -113,24 +125,31 @@ interface Binding {
   sourceRoot: string;
   policyDigest: string;
   taskIds: string[];
+  sourceIdentity: DocumentSourceIdentity;
 }
 
 function binding(database: Database.Database, runId: string): Binding {
   const row = database
     .prepare(
-      `SELECT c.id,c.body_json,p.manifest_digest,p.source_root
+      `SELECT c.id,c.body_json,p.manifest_digest,p.source_root,p.source_identity_json
     FROM runs r JOIN contracts c ON c.id=r.contract_id
     LEFT JOIN planning_document_publications p ON p.contract_id=c.id WHERE r.id=?`,
     )
     .get(runId) as
-    | { id: string; body_json: string; manifest_digest: string | null; source_root: string | null }
+    | {
+        id: string;
+        body_json: string;
+        manifest_digest: string | null;
+        source_root: string | null;
+        source_identity_json: string | null;
+      }
     | undefined;
   if (!row) throw new Error('document_run_missing');
   const contract = executionContractSchema.parse(JSON.parse(row.body_json));
   const manifest = contract.planningDocuments;
   if (!manifest) throw new Error('document_manifest_required');
   const manifestDigest = planningDocumentsDigest(manifest);
-  if (row.manifest_digest !== manifestDigest || !row.source_root)
+  if (row.manifest_digest !== manifestDigest || !row.source_root || !row.source_identity_json)
     throw new Error('document_publication_missing');
   return {
     policyDigest: contract.policyDigest,
@@ -140,6 +159,7 @@ function binding(database: Database.Database, runId: string): Binding {
     manifest,
     manifestDigest,
     sourceRoot: row.source_root,
+    sourceIdentity: JSON.parse(row.source_identity_json) as DocumentSourceIdentity,
   };
 }
 
@@ -174,6 +194,7 @@ export function recordPlanningDocumentPublication(
   input: {
     runId: string;
     sourceRoot: string;
+    sourcePolicy?: unknown;
     nowMs?: number;
   },
 ): void {
@@ -192,7 +213,15 @@ export function recordPlanningDocumentPublication(
   } catch {
     throw new Error('document_publication_source_unavailable');
   }
+  let sourceIdentity: DocumentSourceIdentity;
+  try {
+    sourceIdentity = establishDocumentSource(contract, sourceRoot, input.sourcePolicy);
+  } catch (error) {
+    if (error instanceof Error && /^document_[a-z_]+$/u.test(error.message)) throw error;
+    throw new Error('document_publication_source_rejected');
+  }
   const current: Binding = {
+    sourceIdentity,
     policyDigest: contract.policyDigest,
     taskIds: contract.tasks.map((task) => task.id),
     contractId: row.id,
@@ -210,16 +239,29 @@ export function recordPlanningDocumentPublication(
     .transaction(() => {
       const old = database
         .prepare(
-          'SELECT manifest_digest,source_root FROM planning_document_publications WHERE contract_id=?',
+          'SELECT manifest_digest,source_root,source_identity_json FROM planning_document_publications WHERE contract_id=?',
         )
-        .get(row.id) as { manifest_digest: string; source_root: string } | undefined;
-      if (old && (old.manifest_digest !== current.manifestDigest || old.source_root !== sourceRoot))
+        .get(row.id) as
+        | { manifest_digest: string; source_root: string; source_identity_json: string }
+        | undefined;
+      if (
+        old &&
+        (old.manifest_digest !== current.manifestDigest ||
+          old.source_root !== sourceRoot ||
+          old.source_identity_json !== JSON.stringify(sourceIdentity))
+      )
         throw new Error('document_publication_immutable');
       database
         .prepare(
-          'INSERT OR IGNORE INTO planning_document_publications(contract_id,manifest_digest,source_root,published_at_ms) VALUES(?,?,?,?)',
+          'INSERT OR IGNORE INTO planning_document_publications(contract_id,manifest_digest,source_root,published_at_ms,source_identity_json) VALUES(?,?,?,?,?)',
         )
-        .run(row.id, current.manifestDigest, sourceRoot, input.nowMs ?? Date.now());
+        .run(
+          row.id,
+          current.manifestDigest,
+          sourceRoot,
+          input.nowMs ?? Date.now(),
+          JSON.stringify(sourceIdentity),
+        );
     })
     .immediate();
 }
@@ -231,6 +273,8 @@ export interface DocumentBoundary {
   ownerId: string;
   runLeaseEpoch?: number;
   expectedSourceRoot?: string;
+  /** Additional incoming lineage source; strengthens rather than replaces current-source checks. */
+  additionalSourceRef?: string;
   nowMs?: number;
 }
 
@@ -277,10 +321,49 @@ export function verifyDocumentsForApproval(database: Database.Database, input: D
   return verifyBoundary(database, input, true);
 }
 
+function verifyCurrentSources(
+  database: Database.Database,
+  current: Binding,
+  input: DocumentBoundary,
+): void {
+  const accepted = database
+    .prepare(
+      `
+      SELECT task_id,ref FROM delivery_approved_heads WHERE run_id=?
+      UNION SELECT task_id,ref FROM repair_approved_heads WHERE run_id=?
+      UNION SELECT task_id,ref FROM lineage_approved_heads WHERE run_id=?`,
+    )
+    .all(input.runId, input.runId, input.runId) as { task_id: string; ref: string }[];
+  const relevant = accepted.filter(
+    (row) => input.taskId === undefined || row.task_id === input.taskId,
+  );
+  const byTask = new Map<string, string>();
+  for (const row of relevant) {
+    if (byTask.has(row.task_id) && byTask.get(row.task_id) !== row.ref)
+      throw new Error('document_task_workspace_ambiguous');
+    byTask.set(row.task_id, row.ref);
+  }
+  const publishedRoot = current.sourceRoot;
+  const refs: (string | undefined)[] =
+    byTask.size === 0 ? [undefined] : [...new Set(byTask.values())];
+  if (input.additionalSourceRef !== undefined && !refs.includes(input.additionalSourceRef))
+    refs.push(input.additionalSourceRef);
+  for (const ref of refs) {
+    current.sourceRoot = resolveDocumentSource(current.sourceIdentity, publishedRoot, ref);
+    if (
+      input.expectedSourceRoot !== undefined &&
+      realpathSync(input.expectedSourceRoot) !== current.sourceRoot
+    )
+      throw new Error('document_source_changed');
+    verifyBytes(database, current);
+  }
+}
+
 function verifyBoundary(
   database: Database.Database,
   input: DocumentBoundary,
   approvalCreation: boolean,
+  checkSnapshot?: (current: Binding, verified: NonNullable<TaskPacket['documentBinding']>) => void,
 ): {
   approvalId: string;
   snapshotPath: '/run/approved-documents';
@@ -343,14 +426,16 @@ function verifyBoundary(
         );
     })
     .immediate();
+  const verified = {
+    approvalId,
+    snapshotPath: '/run/approved-documents' as const,
+    materialDigest: current.materialDigest,
+    manifestDigest: current.manifestDigest,
+  };
   let valid = false;
   try {
-    if (
-      input.expectedSourceRoot !== undefined &&
-      realpathSync(input.expectedSourceRoot) !== current.sourceRoot
-    )
-      throw new Error('document_source_changed');
-    verifyBytes(database, current);
+    verifyCurrentSources(database, current, input);
+    checkSnapshot?.(current, verified);
     valid = true;
   } catch {
     /* Safe reason only; pending intent survives settlement failure. */
@@ -446,51 +531,69 @@ export function stageApprovedDocuments(
   database: Database.Database,
   input: DocumentBoundary & { packet: TaskPacket; sourceRoot: string; destination: string },
 ): void {
-  const verified = verifyDocumentBoundary(database, input);
+  const verified = verifyDocumentBoundary(database, {
+    ...input,
+    expectedSourceRoot: input.sourceRoot,
+  });
   const current = binding(database, input.runId);
-  let sourceRoot: string;
-  try {
-    sourceRoot = realpathSync(input.sourceRoot);
-  } catch {
-    throw new Error('document_snapshot_binding_rejected');
-  }
   if (
     input.packet.runId !== input.runId ||
     input.packet.taskId !== input.taskId ||
     input.packet.documentBinding?.approvalId !== verified.approvalId ||
     input.packet.documentBinding.materialDigest !== verified.materialDigest ||
-    input.packet.documentBinding.manifestDigest !== verified.manifestDigest ||
-    sourceRoot !== current.sourceRoot
+    input.packet.documentBinding.manifestDigest !== verified.manifestDigest
   )
     throw new Error('document_snapshot_binding_rejected');
-  mkdirSync(input.destination, { mode: 0o700 });
-  try {
-    for (const file of current.manifest.files) {
-      const hash = file.digest.slice(7);
-      const bytes = readFileSync(join(dirname(database.name), 'artifacts', hash.slice(0, 2), hash));
-      if (
-        bytes.length !== file.sizeBytes ||
-        createHash('sha256').update(bytes).digest('hex') !== hash
-      )
-        throw new Error('document_snapshot_object_changed');
-      const target = join(input.destination, 'documents', file.path);
-      mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
-      writeFileSync(target, bytes, { flag: 'wx', mode: 0o400 });
+  verifyBoundary(database, input, false, () => {
+    mkdirSync(input.destination, { mode: 0o700 });
+    try {
+      for (const file of current.manifest.files) {
+        const hash = file.digest.slice(7);
+        const bytes = readFileSync(
+          join(dirname(database.name), 'artifacts', hash.slice(0, 2), hash),
+        );
+        if (
+          bytes.length !== file.sizeBytes ||
+          createHash('sha256').update(bytes).digest('hex') !== hash
+        )
+          throw new Error('document_snapshot_object_changed');
+        const target = join(input.destination, 'documents', file.path);
+        mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+        writeFileSync(target, bytes, { flag: 'wx', mode: 0o400 });
+      }
+      writeFileSync(
+        join(input.destination, 'binding.json'),
+        JSON.stringify({
+          runId: input.runId,
+          taskId: input.taskId,
+          ...verified,
+          manifest: current.manifest,
+        }),
+        { flag: 'wx', mode: 0o400 },
+      );
+    } catch {
+      rmSync(input.destination, { recursive: true, force: true });
+      throw new Error('document_snapshot_failed');
     }
-    writeFileSync(
-      join(input.destination, 'binding.json'),
-      JSON.stringify({
-        runId: input.runId,
-        taskId: input.taskId,
-        ...verified,
-        manifest: current.manifest,
-      }),
-      { flag: 'wx', mode: 0o400 },
-    );
-  } catch {
-    rmSync(input.destination, { recursive: true, force: true });
-    throw new Error('document_snapshot_failed');
+  });
+}
+
+function verifySnapshotFile(
+  root: string,
+  path: string,
+  file: PlanningDocuments['files'][number] | undefined,
+  wantedBinding: string,
+): void {
+  const target = join(root, path);
+  const stat = lstatSync(target);
+  if (!stat.isFile()) throw new Error('type');
+  if (path === 'binding.json') {
+    if (readFileSync(target, 'utf8') !== wantedBinding) throw new Error('binding');
+    return;
   }
+  if (!file || stat.size !== file.sizeBytes) throw new Error('file');
+  if (`sha256:${createHash('sha256').update(readFileSync(target)).digest('hex')}` !== file.digest)
+    throw new Error('bytes');
 }
 
 /** Recheck the actual mount source immediately before dispatch, not only the object store. */
@@ -498,9 +601,7 @@ export function verifyApprovedDocumentSnapshot(
   database: Database.Database,
   input: DocumentBoundary & { packet: TaskPacket; destination: string },
 ): void {
-  const verified = verifyDocumentBoundary(database, input);
-  const current = binding(database, input.runId);
-  try {
+  verifyBoundary(database, input, false, (current, verified) => {
     if (
       realpathSync(input.destination) !== input.destination ||
       !lstatSync(input.destination).isDirectory()
@@ -526,30 +627,22 @@ export function verifyApprovedDocumentSnapshot(
           visit(path);
           continue;
         }
-        if (!stat.isFile()) throw new Error('type');
-        if (path === 'binding.json') {
-          const wanted = {
+        verifySnapshotFile(
+          input.destination,
+          path,
+          expected.get(path),
+          JSON.stringify({
             runId: input.runId,
             taskId: input.taskId,
             ...verified,
             manifest: current.manifest,
-          };
-          if (readFileSync(join(input.destination, path), 'utf8') !== JSON.stringify(wanted))
-            throw new Error('binding');
-        } else {
-          const file = expected.get(path);
-          if (!file || stat.size !== file.sizeBytes) throw new Error('file');
-          const bytes = readFileSync(join(input.destination, path));
-          if (`sha256:${createHash('sha256').update(bytes).digest('hex')}` !== file.digest)
-            throw new Error('bytes');
-        }
+          }),
+        );
         seen.add(path);
       }
     };
     visit('');
     if (!seen.has('binding.json') || [...expected.keys()].some((path) => !seen.has(path)))
       throw new Error('missing');
-  } catch {
-    throw new Error('document_snapshot_binding_rejected');
-  }
+  });
 }

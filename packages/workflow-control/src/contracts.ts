@@ -172,8 +172,9 @@ export const executionContractSchema = z
         }
       }
     }
-
-    const allowedContractPaths = contract.constraints.allowedPaths;
+  })
+  .superRefine((contract, context) => {
+    const taskIds = new Set(contract.tasks.map((task) => task.id));
     if (taskIds.size !== contract.tasks.length) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'task ids must be unique' });
     }
@@ -194,6 +195,11 @@ export const executionContractSchema = z
           });
         }
       }
+    }
+  })
+  .superRefine((contract, context) => {
+    const allowedContractPaths = contract.constraints.allowedPaths;
+    for (const [index, task] of contract.tasks.entries()) {
       for (const path of task.allowedPaths) {
         if (!allowedContractPaths.some((allowedPath) => isPathWithin(path, allowedPath))) {
           context.addIssue({
@@ -213,7 +219,8 @@ export const executionContractSchema = z
         }
       }
     }
-
+  })
+  .superRefine((contract, context) => {
     const visiting = new Set<string>();
     const visited = new Set<string>();
     const tasksById = new Map(contract.tasks.map((task) => [task.id, task]));

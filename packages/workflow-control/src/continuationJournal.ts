@@ -367,6 +367,22 @@ export class ContinuationJournal {
   }
 
   /** Next action and callback consumption share a transaction and a unique job identity. */
+  #assertApprovalConsumption(job: ContinuationJob, eventId: string): void {
+    const callback = delegateCallbackSchema.parse(JSON.parse(job.callback_json ?? 'null'));
+    if (callback.approvalIntent?.eventId !== eventId) {
+      throw new Error('continuation approval does not match durable callback');
+    }
+    const parent = this.#database
+      .prepare('SELECT state, version FROM runs WHERE id = ?')
+      .get(job.run_id) as { state: string; version: number };
+    if (
+      parent.state !== delegateCallbackTarget(callback) ||
+      parent.version !== callback.parentRunVersion + 1
+    ) {
+      throw new Error('continuation parent changed after callback');
+    }
+  }
+
   consume(
     id: string,
     executionId: string,
@@ -412,21 +428,8 @@ export class ContinuationJournal {
         ) {
           throw new Error('continuation consumption fence rejected');
         }
-        if (action.kind === 'approval_required') {
-          const callback = delegateCallbackSchema.parse(JSON.parse(job.callback_json ?? 'null'));
-          if (callback.approvalIntent?.eventId !== action.eventId) {
-            throw new Error('continuation approval does not match durable callback');
-          }
-          const parent = this.#database
-            .prepare('SELECT state, version FROM runs WHERE id = ?')
-            .get(job.run_id) as { state: string; version: number };
-          if (
-            parent.state !== delegateCallbackTarget(callback) ||
-            parent.version !== callback.parentRunVersion + 1
-          ) {
-            throw new Error('continuation parent changed after callback');
-          }
-        }
+        if (action.kind === 'approval_required')
+          this.#assertApprovalConsumption(job, action.eventId);
         if (action.kind === 'execute_phase') enqueuePhaseJob(this.#database, id, action, nowMs);
         this.#database
           .prepare(

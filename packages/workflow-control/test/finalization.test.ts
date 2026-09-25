@@ -30,7 +30,7 @@ import {
 
 const roots: string[] = [];
 const policyDigest = `sha256:${'a'.repeat(64)}`;
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const headSha = '2'.repeat(40);
 const mergeSha = '3'.repeat(40);
 const stagingMergeSha = '4'.repeat(40);
@@ -282,6 +282,8 @@ async function setup(options: { evaluate?: boolean; multipleEvidence?: boolean }
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
   const publishDocuments = await documentFixture(contract, root);
+  workspaceId = contract.workspaceId;
+  featureDeliveryContract.workspaceId = workspaceId;
   featureDeliveryContract.executionContractDigest = digest(contract);
   const contractId = store.createContract(contract, 100);
   store.createRun(contractId, 'task_accepted', 'run-closeout');

@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 
-import { ContentAddressedArtifactStore } from './artifacts.js';
 import { stagePreapprovalMaterial, validatePreapprovalPaths } from './preapprovalMaterial.js';
 
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
@@ -68,13 +67,18 @@ export const planningDocumentsSchema = z
 
 export type PlanningDocuments = z.infer<typeof planningDocumentsSchema>;
 
+function compareCanonicalStrings(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 export function canonicalPlanningDocuments(input: unknown): PlanningDocuments {
   const manifest = planningDocumentsSchema.parse(input);
   return {
     ...manifest,
     files: manifest.files
-      .map((entry) => ({ ...entry, taskIds: [...entry.taskIds].sort() }))
-      .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0)),
+      .map((entry) => ({ ...entry, taskIds: [...entry.taskIds].sort(compareCanonicalStrings) }))
+      .sort((left, right) => compareCanonicalStrings(left.path, right.path)),
   };
 }
 
@@ -95,7 +99,7 @@ export async function publishPlanningDocumentObjects(input: {
     kind: PlanningDocuments['files'][number]['kind'];
     taskIds: string[];
   }[];
-  artifacts: ContentAddressedArtifactStore;
+  artifacts: { put(bytes: Buffer): Promise<{ digest: string; sizeBytes: number }> };
 }): Promise<PlanningDocuments> {
   const stage = stagePreapprovalMaterial({
     sourceRoot: input.sourceRoot,

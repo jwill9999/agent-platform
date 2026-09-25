@@ -1,0 +1,4 @@
+
+> @agent-platform/workflow-control@0.0.0 lint <worktree>/packages/workflow-control
+> eslint . --max-warnings 0
+

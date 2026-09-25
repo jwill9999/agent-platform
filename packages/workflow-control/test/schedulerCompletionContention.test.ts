@@ -111,6 +111,10 @@ describe('scheduler completion writer reservation', () => {
       expect(beforeReplay.callbacks).toEqual({ count: 1 });
       expect(beforeReplay.continuations).toEqual({ count: 1 });
       expect(fixture.finish()).toEqual(completed);
+      expect(() =>
+        fixture.finish(true, { ...terminalResult, summary: 'conflicting replay' }),
+      ).toThrow('scheduler terminal replay result changed');
+      expect(fixture.store.getSchedulerExecution('child')).toEqual(completed);
       expect(peer.prepare('SELECT count(*) AS count FROM delegate_callbacks').get()).toEqual(
         beforeReplay.callbacks,
       );

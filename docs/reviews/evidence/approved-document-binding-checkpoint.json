@@ -19,114 +19,438 @@
     "node": "24.14.0",
     "reviewImage": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f"
   },
-  "sourceSha256": {
-    "packages/workflow-control/src/bootstrapAdapterBundle.ts": "ce57e27c4d79c08088863fc91fe8492a9a9f90c2ef30281c4257ece4303387d0",
-    "packages/workflow-control/src/beadsPortCapability.ts": "b4e8df14ffc3715e675be4a8e16718b0bccb423866261c038651a0e58ae35a3f",
-    "packages/workflow-control/src/workCancellation.ts": "95360e2d970da2126ed669b4dfff61f37460c8ec0c4548c97d6a828a162be486",
-    "packages/workflow-control/src/stateMachine.ts": "be4776b2a63906500927f7101e261da786cbb53b03e2d60b6c9f4ff77795fadc",
-    "packages/workflow-control/src/waitRecovery.ts": "6c86c9274adefcfe50e2a01d46d3469f4ef7404033353306de25b8b68cb457a9",
-    "packages/workflow-control/src/specialistLauncher.ts": "76e2353de24c385c9275f33fcdd55987e166a6491c46a4e4ccc4a1a223f16b16",
-    "packages/workflow-control/src/featureEvaluation.ts": "cf7bdb0110fe0a1d94a09dadb33a8e062b30f579fe7a9905bf20e9f5ad5b2069",
-    "packages/workflow-control/src/repairChildPortCapability.ts": "827652d05508e5a2018862e725ba6a60f44c064d229884e04e5b63e0b70baf45",
-    "packages/workflow-control/src/continuationJournal.ts": "fb37eb1fea7ce855f2f760420ea231cbd10093b325892c6ddcae5bd67bfc62c6",
-    "packages/workflow-control/src/supervisedReviewCli.ts": "a47a2484df52f99f0699999d7b08bc777ba90c4bc75d782c763fde2cd7f4896e",
-    "packages/workflow-control/src/mcpServer.ts": "21b90c48dcc579bc141e88ef3aa026b331a64ecf64a36312a184846ee7cd1633",
-    "packages/workflow-control/src/specialistInput.ts": "d5d556caa9f4cdaab5500f7d101b96c61bd50b288ffa38442c1a64a45cc8a889",
-    "packages/workflow-control/src/governedOperations.ts": "754650b394e7b64a70c37a50dc53aaa5456948043a16e73de97b3ae56240beff",
-    "packages/workflow-control/src/artifacts.ts": "3a8a054fbb791bf4e66657c3d2e16ad33ae76f812a85465ae97fdd0226d99dcd",
-    "packages/workflow-control/src/contracts.ts": "360a1c9bf53a4ceac2be4413dec1492eff1ca1a7e282699aaa17bb3153d6a0dc",
-    "packages/workflow-control/src/planning.ts": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da",
-    "packages/workflow-control/src/phaseJobs.ts": "01cee704b97806247ccd364615ad1618335aa53e2769e1be39d6cbc1e442e67b",
-    "packages/workflow-control/src/storage.ts": "9f9872e55cf692d0cab5f43c14770a558b09a40bb0726a9d64b93581cb5a8168",
-    "packages/workflow-control/src/deliveryPortCapability.ts": "a51690938c77bb5bbe61f45de42d4ecf15f2e6bc2f0d636492a7fc1362c971e7",
-    "packages/workflow-control/src/orchestrator.ts": "9941c960a629546c61a4d985bb73d193ebdfc1fc70dc3c3afa06cfe8dd9af336",
-    "packages/workflow-control/src/lifecycle.ts": "85a663a4c8d7b5d32ab8d4b63f3565a57be86dea9940b588056fee7565862352",
-    "packages/workflow-control/src/cli.ts": "97abb9b0c2ac2866784a2acaeca087588b693dc8b7fed65339315e27729b6781",
-    "packages/workflow-control/src/deliveryBrokers.ts": "1b33665123be6fd27e343f5f5edac4e0db3749f1fa2cb99171fd067fa68c0a01",
-    "packages/workflow-control/src/documentApproval.ts": "a2a1425e59eb586cf165618c39bf55596c5348cfc6f1d0a4010f5b587a4eff91",
-    "packages/workflow-control/src/supervisedReview.ts": "114bb347eb1d8bcd41fc89b889fc6b74d8ce0c95511ab9baa7aec166f5123412",
-    "packages/workflow-control/src/authorization.ts": "a5d356638e60389aa990edd2958054e2e5a4a39763a009bca8032cd4fdcb6354",
-    "packages/workflow-control/src/phaseRuntime.ts": "57e93aa558c25dbf451bf187292bfb0051b0961ff2287c978e745fb2e4ef38aa",
-    "packages/workflow-control/src/specialistOutputManifest.ts": "d5e60d07a59dd6e5d497085b3e227819b42642ab86ae5105c39b122e61d7844e",
-    "packages/workflow-control/src/secureEvidence.ts": "bf282915a4c93b3400448627cb08b8d1005ff89aea0e26788a3134ac11d7d01f",
-    "packages/workflow-control/src/featureDeliveryContracts.ts": "1247b470734a9eacd6a07d9a55b794042ae220d8be0a1fb518af281478483696",
-    "packages/workflow-control/src/trustedGovernedComposition.ts": "f7c09eba2bfb7e23d9a5dbd191a1532341977f0fdcbfe9898ab207f6cd3951a0",
-    "packages/workflow-control/src/continuationProcess.ts": "4878f66a38b139e3ff1aea26fee9dc46caf83bc2f2bf17e20a7c65f9f7e74f1e",
-    "packages/workflow-control/src/continuationNotifications.ts": "9f3d70b63dd3ee740b3f9c75e9cd68733f9b260cfddfce568a000a976e670819",
-    "packages/workflow-control/src/githubDeliveryPort.ts": "40fe10763402f069f0e824cf97b6fc03f131e9a4f678412d1e1c91461b8589fe",
-    "packages/workflow-control/src/preapprovalMaterial.ts": "3bae6ba1d08c276f64ccfcfb81d620a7317ce7e23184e92180a8863ff3945bf7",
-    "packages/workflow-control/src/specialistContainerLifecycle.ts": "dc76634d57a9a4cd7edc8cef5b9b748af7feaf8b81d8d84e60949d98f02b15f9",
-    "packages/workflow-control/src/repairLoops.ts": "90cfdf6a6da4d0281f2c4079be96e9fe8ffa6595cbfa5158189588dbe0843462",
-    "packages/workflow-control/src/finalization.ts": "75801c38df7392bd841de3ca9025d89a425aa4cb7c2c2d83a67393a6bdf7e647",
-    "packages/workflow-control/src/cancellation.ts": "141a6e56fc9381e29fa21e3878d1b4eb308d2d39f9d21e388251e0deda546b57",
-    "packages/workflow-control/src/bootstrapJournal.ts": "250631b03e3c36ded997ce4109e17da004c6aa6753bd9efb6a398657721564a0",
-    "packages/workflow-control/src/reviewProxy.ts": "070145d1e2618a1e6fa9a073b47f8d4666318d225de5103cf74f6f610ca0f369",
-    "packages/workflow-control/src/reconciliation.ts": "7ce3803231334ce16d3497f6af189965f0413b7f913f31d0eff9f6959f2c539e",
-    "packages/workflow-control/src/index.ts": "b591ecffe8c6723a44be7e4761aacbd45d90eecb638320cc98fd0f1853349e4e",
-    "packages/workflow-control/src/featureDeliveryBroker.ts": "4e17157badcf541ba6f989be529891acd2f03dc7b4a56bb8443318c2d49e5a24",
-    "packages/workflow-control/src/governedPersistence.ts": "ae61f2e94adaa9723d7eb47ec76e98d358072d202e90b315552ae2ca2a892687",
-    "packages/workflow-control/src/specialistTerminalResult.ts": "d577785d65c12c7ed971a1f9cb4287bf317792e0cff32629e5ad9990308c9194",
-    "packages/workflow-control/src/bootstrapAdapterRuntime.ts": "7cdac671e9ca4e6d2ec30fc353e0827ef84f0b93fdd732aa9fe624d662052b1c",
-    "packages/workflow-control/src/bootstrapPolicy.ts": "972597b467d354e2eb02cdd31732483c35e5c42eddf41cc6f75a8ac9d9ecacf9",
-    "packages/workflow-control/src/integrationGate.ts": "f2d040c6a5925fe15ac13a90147db2ecbbe3a78e564651a6a6fcb24bebd6a40a",
-    "packages/workflow-control/src/planningDocuments.ts": "90f6f554e0396c9f825a2293b6a31e395c24b42229301d0137eac73ec269056a",
-    "packages/workflow-control/src/featureDeliveryApproval.ts": "c7cae96f744e1cd10a2459ed3dc2d5609203b2ba1b5ab18d678b3c3c1ebcd857",
-    "packages/workflow-control/src/continuationWorker.ts": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d",
-    "packages/workflow-control/src/bootstrap.ts": "28a14eb8234e3245ca77171d4f0f62ad769ac0ee11ffcbc025b44571f347851e",
-    "packages/workflow-control/src/gitDeliveryPort.ts": "64c544af58998dee450d8c5d3678b1066b66434b0f29c28471af681a8212143f",
-    "packages/workflow-control/test/githubDeliveryPort.test.ts": "19c8048f006b7561a0622603876fd5fb806e406447e82cac0968e3bd7a2849e0",
-    "packages/workflow-control/test/recoveryCancellation.test.ts": "faba8182886fe453ba12d708469c8165f62edd78bb1d9d873333e2d97e594c15",
-    "packages/workflow-control/test/specialistLauncher.test.ts": "f02af254f27ce5164adf37bd4e9657fe01e1258748a791df73bf98278f7346f8",
-    "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts": "baac54fb29b9bb4fa6d086552875b07dc3d26e11fd853eb0b95fa540e45c0d56",
-    "packages/workflow-control/test/isolation.integration.test.ts": "5b91189102240bcd8982a93aaf75b7f6ade78dddf33d34c401d98e3d26f19e58",
-    "packages/workflow-control/test/gitDeliveryPort.test.ts": "ba0e6e66764a200dbf3959e6a614b143ac534ef210d83e744d1922939b09cf80",
-    "packages/workflow-control/test/continuationFixture.ts": "d8f678ce6d9d87d115fb11685853d719a0913a420af4cf7b4a0ac7de8e6da41f",
-    "packages/workflow-control/test/schedulerDockerFixture.ts": "34f6ae071b884a5b106dd9b3d84d040cd2f4b4a1fa61387a9aba2878995d8371",
-    "packages/workflow-control/test/supervisedReview.test.ts": "646539f5a701d395bcd437e6ca196972ee9b791772f798999bf9badfd45f0e90",
-    "packages/workflow-control/test/continuationProcess.test.ts": "b708d4f396e16ebedb652d302615cf4b3e63cf81c83725a7f0603def49eaa191",
-    "packages/workflow-control/test/bootstrapAdapters.test.ts": "4dab22f341b8ef3f28af2ff4753566813115243ca9993e51a20a8379ee3866b2",
-    "packages/workflow-control/test/mcpServer.test.ts": "256dcc92b91143f11c67e5e1c721a657311f7f1503e7c22d74f419e4c115aae0",
-    "packages/workflow-control/test/artifacts.test.ts": "35e4c11f31eece75ac808b3e57aa1a88f20a93b52306bef4fd903ddb631b676e",
-    "packages/workflow-control/test/featureEvaluation.test.ts": "c8a74e5916f87bdb8cb633bca3a6d3fcdbce9463136b93459dc8a75186ef5e30",
-    "packages/workflow-control/test/reviewProxyStreams.test.ts": "46dd4ab2850391c5c87e32d0f61c337a661b17b690002052b2fe7a5514b1e0e0",
-    "packages/workflow-control/test/featureDeliveryContracts.test.ts": "ef04b90caaeea50b91f5b191c29bbdaf283312827c537db9bbc4e2b0adb55458",
-    "packages/workflow-control/test/supervisedReviewLifecycle.test.ts": "3d6af70f8541c0acf707effff2de12b520c0f353b415fe898969846337bbf904",
-    "packages/workflow-control/test/prePushIsolation.test.ts": "bf99d84160dd008142428c4eaa7b3581fb3e1971b7d2249090b121509fb5f366",
-    "packages/workflow-control/test/specialistOutputManifest.test.ts": "64af54f389845e1fa02464e17fddf29dfbe85f900dbfc8c44074c16b43fcacf0",
-    "packages/workflow-control/test/documentApproval.test.ts": "78fd2942ed56a09630fc5bbb0ccbb4eb183fc383bdce116480d35b2d296535a7",
-    "packages/workflow-control/test/activeSpecialistSettlement.integration.test.ts": "d252c8f44bb97fc14b97b6094a200f78699de2a9deaa9e526ee6002818d3cd89",
-    "packages/workflow-control/test/integrationGate.test.ts": "5fa4b83d4ff641ea53309be170804bd910a464b014bca24173d8c0864dab0e25",
-    "packages/workflow-control/test/phaseRuntime.test.ts": "03208a7d11597035bcc6f8c1ef1b5ec564a12adf730c68863921bf84c4b9cf2b",
-    "packages/workflow-control/test/stateMachine.test.ts": "688f4fb7935146ddba79d78e127cd68c432ed44de77a986b94d06a098f36e744",
-    "packages/workflow-control/test/supervisedReviewCapabilities.integration.test.ts": "f01bca7e4d367f2af3a6fde6dde452f01a2e793de0da66d11a23bb18cc6bda10",
-    "packages/workflow-control/test/documentFixture.ts": "49b44d9563aaed9d6cc4548093531b8c270c6465be6635d9f822f52c36b51cd9",
-    "packages/workflow-control/test/schedulerCompletionContention.test.ts": "9969cb09118a03b9ed4fd21ed7f31e61c4c521d2ebd7dd81af961e21e70bd071",
-    "packages/workflow-control/test/featureDeliveryBroker.test.ts": "91cd34fcd142677f8886d88ff41c34d104bb911b85581d6e4e88ad96aeb4ad9f",
-    "packages/workflow-control/test/secureEvidence.test.ts": "833600fa4a42fab8a26e3ec0d3e1d7453ab3d254837f95f290532e6175018323",
-    "packages/workflow-control/test/planningDocuments.test.ts": "f48a57ef4a524bb2cc2f7db69e6c17c5691872e067f4ff7a18ad3e5f2285c0f9",
-    "packages/workflow-control/test/governedPersistence.test.ts": "5d326fd42528ff0168744b22d80165b5335dec72b3d55260c4b01c7b67a21723",
-    "packages/workflow-control/test/phaseJobs.test.ts": "fc92a4d391a05fa6b34371e207bd0e932a24bc2dc791d444e07c9bfb2d5dcba6",
-    "packages/workflow-control/test/reviewProxy.test.ts": "8471b4464169e56f5ad278f7e07c9ec213907a52eb8857bdc0946fb0ad8ce2b0",
-    "packages/workflow-control/test/governedOperations.test.ts": "9d18ce93fe5c569ea48715c41bc5027d31d304938d82a641a6a02ad9ca62350a",
-    "packages/workflow-control/test/authorization.test.ts": "c0be8c3b6bb081bf4ac42408b2cfa09ecfbc354681f76347314efa9e15aa54bf",
-    "packages/workflow-control/test/supervisedReview.integration.test.ts": "da254056e690919e7a56b36957566719c8d96d07c718ebc5cf3de78291725d31",
-    "packages/workflow-control/test/storage.test.ts": "250356f5ca92dd5c71e6b3818e66c4d1d9ece5b7f705fe182e5e601dd83acb28",
-    "packages/workflow-control/test/featureDeliveryApproval.test.ts": "fb79c6bed6444cc67493c3ce6eb977941d97f7c9ca633e45e069897eb3127380",
-    "packages/workflow-control/test/bootstrapPolicy.test.ts": "22c2761a5dd75111321f6c931417c9ee1d8df87ad6df9db31f483b17ee501090",
-    "packages/workflow-control/test/preapprovalMaterial.test.ts": "3dd79d3ddbcca546d365bb39f1f3a7cae4300103b28e5bc0f093bdf7613704c5",
-    "packages/workflow-control/test/planning.test.ts": "89e34986d58915ed9a96956669003aeed9a5a01a13a5d41b4f4bfda008fc485e",
-    "packages/workflow-control/test/waitRecovery.test.ts": "bfd634b25f7293c1617718a9a32a62ad18b913a4fe27e18994256939ff2da5c9",
-    "packages/workflow-control/test/orchestrator.test.ts": "4ea31379660a1074c84d3fc1ce9c9c66618fb68533ababcff83cd44f40293e8d",
-    "packages/workflow-control/test/activeSpecialistSettlement.test.ts": "783c154f68918e940b067ea32960e17015c6e70b30acfad3e6b363ee4cba9946",
-    "packages/workflow-control/test/cancellationWork.test.ts": "f0b643d640a1d95d921904901e32fd8d1e09aa5120beb12cd160bfc9d07ac2c6",
-    "packages/workflow-control/test/bootstrap.test.ts": "84e28660375053f873728ff765e91ff3f4ac17921bd1e82fd2224af820ad9d7d",
-    "packages/workflow-control/test/continuationWorker.test.ts": "42d4ec75d1977001cb58de30e6b04e9d39828e0d29c31df5dfb979b270530db2",
-    "packages/workflow-control/test/specialistContainerLifecycle.test.ts": "3f0d37317ab0d84ddd9e285d79503a084dcec97fd3b9b6a904f509ff48ecaff9",
-    "packages/workflow-control/test/deliveryBrokers.test.ts": "8693fe5a6dbcee79bef94db259b320d6791acb9466a89b0c23ab2ae84555ad71",
-    "packages/workflow-control/test/continuationNotifications.test.ts": "ba0fa11a1011ddbb19956d53179bf388b6e2db95e79477d53ec836766fa43a3a",
-    "packages/workflow-control/test/lifecycle.test.ts": "2db6ae224178fef49103b02f0a928adb203b2412431915f3011ce8a4f0bdf4b3",
-    "packages/workflow-control/test/contracts.test.ts": "a29b5b2d7bdd92b8549927df84d97989e8923d8d79c7e14217ed29509ac335f9",
-    "packages/workflow-control/test/finalization.test.ts": "0e2736879bd26dc3c109091f4dc828f06de5e0d1de67de07f0dd00d95b394fac",
-    "packages/workflow-control/test/repairLoops.test.ts": "5e053f1cd95f5637fcb0cc9396b5f6634a12d0979dbef755b86d6c95e658b896"
-  }
+  "sourceSha256": [
+    {
+      "path": "packages/workflow-control/src/bootstrapAdapterBundle.ts",
+      "sha256": "ce57e27c4d79c08088863fc91fe8492a9a9f90c2ef30281c4257ece4303387d0"
+    },
+    {
+      "path": "packages/workflow-control/src/beadsPortCapability.ts",
+      "sha256": "b4e8df14ffc3715e675be4a8e16718b0bccb423866261c038651a0e58ae35a3f"
+    },
+    {
+      "path": "packages/workflow-control/src/workCancellation.ts",
+      "sha256": "95360e2d970da2126ed669b4dfff61f37460c8ec0c4548c97d6a828a162be486"
+    },
+    {
+      "path": "packages/workflow-control/src/stateMachine.ts",
+      "sha256": "be4776b2a63906500927f7101e261da786cbb53b03e2d60b6c9f4ff77795fadc"
+    },
+    {
+      "path": "packages/workflow-control/src/waitRecovery.ts",
+      "sha256": "6c86c9274adefcfe50e2a01d46d3469f4ef7404033353306de25b8b68cb457a9"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "sha256": "76e2353de24c385c9275f33fcdd55987e166a6491c46a4e4ccc4a1a223f16b16"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "sha256": "cf7bdb0110fe0a1d94a09dadb33a8e062b30f579fe7a9905bf20e9f5ad5b2069"
+    },
+    {
+      "path": "packages/workflow-control/src/repairChildPortCapability.ts",
+      "sha256": "827652d05508e5a2018862e725ba6a60f44c064d229884e04e5b63e0b70baf45"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "sha256": "fb37eb1fea7ce855f2f760420ea231cbd10093b325892c6ddcae5bd67bfc62c6"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReviewCli.ts",
+      "sha256": "a47a2484df52f99f0699999d7b08bc777ba90c4bc75d782c763fde2cd7f4896e"
+    },
+    {
+      "path": "packages/workflow-control/src/mcpServer.ts",
+      "sha256": "21b90c48dcc579bc141e88ef3aa026b331a64ecf64a36312a184846ee7cd1633"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistInput.ts",
+      "sha256": "d5d556caa9f4cdaab5500f7d101b96c61bd50b288ffa38442c1a64a45cc8a889"
+    },
+    {
+      "path": "packages/workflow-control/src/governedOperations.ts",
+      "sha256": "754650b394e7b64a70c37a50dc53aaa5456948043a16e73de97b3ae56240beff"
+    },
+    {
+      "path": "packages/workflow-control/src/artifacts.ts",
+      "sha256": "3a8a054fbb791bf4e66657c3d2e16ad33ae76f812a85465ae97fdd0226d99dcd"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "sha256": "360a1c9bf53a4ceac2be4413dec1492eff1ca1a7e282699aaa17bb3153d6a0dc"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "sha256": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "sha256": "01cee704b97806247ccd364615ad1618335aa53e2769e1be39d6cbc1e442e67b"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "sha256": "9f9872e55cf692d0cab5f43c14770a558b09a40bb0726a9d64b93581cb5a8168"
+    },
+    {
+      "path": "packages/workflow-control/src/deliveryPortCapability.ts",
+      "sha256": "a51690938c77bb5bbe61f45de42d4ecf15f2e6bc2f0d636492a7fc1362c971e7"
+    },
+    {
+      "path": "packages/workflow-control/src/orchestrator.ts",
+      "sha256": "9941c960a629546c61a4d985bb73d193ebdfc1fc70dc3c3afa06cfe8dd9af336"
+    },
+    {
+      "path": "packages/workflow-control/src/lifecycle.ts",
+      "sha256": "85a663a4c8d7b5d32ab8d4b63f3565a57be86dea9940b588056fee7565862352"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "sha256": "97abb9b0c2ac2866784a2acaeca087588b693dc8b7fed65339315e27729b6781"
+    },
+    {
+      "path": "packages/workflow-control/src/deliveryBrokers.ts",
+      "sha256": "1b33665123be6fd27e343f5f5edac4e0db3749f1fa2cb99171fd067fa68c0a01"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "sha256": "a2a1425e59eb586cf165618c39bf55596c5348cfc6f1d0a4010f5b587a4eff91"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReview.ts",
+      "sha256": "114bb347eb1d8bcd41fc89b889fc6b74d8ce0c95511ab9baa7aec166f5123412"
+    },
+    {
+      "path": "packages/workflow-control/src/authorization.ts",
+      "sha256": "a5d356638e60389aa990edd2958054e2e5a4a39763a009bca8032cd4fdcb6354"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "sha256": "57e93aa558c25dbf451bf187292bfb0051b0961ff2287c978e745fb2e4ef38aa"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistOutputManifest.ts",
+      "sha256": "d5e60d07a59dd6e5d497085b3e227819b42642ab86ae5105c39b122e61d7844e"
+    },
+    {
+      "path": "packages/workflow-control/src/secureEvidence.ts",
+      "sha256": "bf282915a4c93b3400448627cb08b8d1005ff89aea0e26788a3134ac11d7d01f"
+    },
+    {
+      "path": "packages/workflow-control/src/featureDeliveryContracts.ts",
+      "sha256": "1247b470734a9eacd6a07d9a55b794042ae220d8be0a1fb518af281478483696"
+    },
+    {
+      "path": "packages/workflow-control/src/trustedGovernedComposition.ts",
+      "sha256": "f7c09eba2bfb7e23d9a5dbd191a1532341977f0fdcbfe9898ab207f6cd3951a0"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationProcess.ts",
+      "sha256": "4878f66a38b139e3ff1aea26fee9dc46caf83bc2f2bf17e20a7c65f9f7e74f1e"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationNotifications.ts",
+      "sha256": "9f3d70b63dd3ee740b3f9c75e9cd68733f9b260cfddfce568a000a976e670819"
+    },
+    {
+      "path": "packages/workflow-control/src/githubDeliveryPort.ts",
+      "sha256": "40fe10763402f069f0e824cf97b6fc03f131e9a4f678412d1e1c91461b8589fe"
+    },
+    {
+      "path": "packages/workflow-control/src/preapprovalMaterial.ts",
+      "sha256": "3bae6ba1d08c276f64ccfcfb81d620a7317ce7e23184e92180a8863ff3945bf7"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistContainerLifecycle.ts",
+      "sha256": "dc76634d57a9a4cd7edc8cef5b9b748af7feaf8b81d8d84e60949d98f02b15f9"
+    },
+    {
+      "path": "packages/workflow-control/src/repairLoops.ts",
+      "sha256": "90cfdf6a6da4d0281f2c4079be96e9fe8ffa6595cbfa5158189588dbe0843462"
+    },
+    {
+      "path": "packages/workflow-control/src/finalization.ts",
+      "sha256": "75801c38df7392bd841de3ca9025d89a425aa4cb7c2c2d83a67393a6bdf7e647"
+    },
+    {
+      "path": "packages/workflow-control/src/cancellation.ts",
+      "sha256": "141a6e56fc9381e29fa21e3878d1b4eb308d2d39f9d21e388251e0deda546b57"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapJournal.ts",
+      "sha256": "250631b03e3c36ded997ce4109e17da004c6aa6753bd9efb6a398657721564a0"
+    },
+    {
+      "path": "packages/workflow-control/src/reviewProxy.ts",
+      "sha256": "070145d1e2618a1e6fa9a073b47f8d4666318d225de5103cf74f6f610ca0f369"
+    },
+    {
+      "path": "packages/workflow-control/src/reconciliation.ts",
+      "sha256": "7ce3803231334ce16d3497f6af189965f0413b7f913f31d0eff9f6959f2c539e"
+    },
+    {
+      "path": "packages/workflow-control/src/index.ts",
+      "sha256": "b591ecffe8c6723a44be7e4761aacbd45d90eecb638320cc98fd0f1853349e4e"
+    },
+    {
+      "path": "packages/workflow-control/src/featureDeliveryBroker.ts",
+      "sha256": "4e17157badcf541ba6f989be529891acd2f03dc7b4a56bb8443318c2d49e5a24"
+    },
+    {
+      "path": "packages/workflow-control/src/governedPersistence.ts",
+      "sha256": "ae61f2e94adaa9723d7eb47ec76e98d358072d202e90b315552ae2ca2a892687"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistTerminalResult.ts",
+      "sha256": "d577785d65c12c7ed971a1f9cb4287bf317792e0cff32629e5ad9990308c9194"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapAdapterRuntime.ts",
+      "sha256": "7cdac671e9ca4e6d2ec30fc353e0827ef84f0b93fdd732aa9fe624d662052b1c"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapPolicy.ts",
+      "sha256": "972597b467d354e2eb02cdd31732483c35e5c42eddf41cc6f75a8ac9d9ecacf9"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "sha256": "f2d040c6a5925fe15ac13a90147db2ecbbe3a78e564651a6a6fcb24bebd6a40a"
+    },
+    {
+      "path": "packages/workflow-control/src/planningDocuments.ts",
+      "sha256": "90f6f554e0396c9f825a2293b6a31e395c24b42229301d0137eac73ec269056a"
+    },
+    {
+      "path": "packages/workflow-control/src/featureDeliveryApproval.ts",
+      "sha256": "c7cae96f744e1cd10a2459ed3dc2d5609203b2ba1b5ab18d678b3c3c1ebcd857"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "sha256": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrap.ts",
+      "sha256": "28a14eb8234e3245ca77171d4f0f62ad769ac0ee11ffcbc025b44571f347851e"
+    },
+    {
+      "path": "packages/workflow-control/src/gitDeliveryPort.ts",
+      "sha256": "64c544af58998dee450d8c5d3678b1066b66434b0f29c28471af681a8212143f"
+    },
+    {
+      "path": "packages/workflow-control/test/githubDeliveryPort.test.ts",
+      "sha256": "19c8048f006b7561a0622603876fd5fb806e406447e82cac0968e3bd7a2849e0"
+    },
+    {
+      "path": "packages/workflow-control/test/recoveryCancellation.test.ts",
+      "sha256": "faba8182886fe453ba12d708469c8165f62edd78bb1d9d873333e2d97e594c15"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistLauncher.test.ts",
+      "sha256": "f02af254f27ce5164adf37bd4e9657fe01e1258748a791df73bf98278f7346f8"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts",
+      "sha256": "baac54fb29b9bb4fa6d086552875b07dc3d26e11fd853eb0b95fa540e45c0d56"
+    },
+    {
+      "path": "packages/workflow-control/test/isolation.integration.test.ts",
+      "sha256": "5b91189102240bcd8982a93aaf75b7f6ade78dddf33d34c401d98e3d26f19e58"
+    },
+    {
+      "path": "packages/workflow-control/test/gitDeliveryPort.test.ts",
+      "sha256": "ba0e6e66764a200dbf3959e6a614b143ac534ef210d83e744d1922939b09cf80"
+    },
+    {
+      "path": "packages/workflow-control/test/continuationFixture.ts",
+      "sha256": "d8f678ce6d9d87d115fb11685853d719a0913a420af4cf7b4a0ac7de8e6da41f"
+    },
+    {
+      "path": "packages/workflow-control/test/schedulerDockerFixture.ts",
+      "sha256": "34f6ae071b884a5b106dd9b3d84d040cd2f4b4a1fa61387a9aba2878995d8371"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.test.ts",
+      "sha256": "646539f5a701d395bcd437e6ca196972ee9b791772f798999bf9badfd45f0e90"
+    },
+    {
+      "path": "packages/workflow-control/test/continuationProcess.test.ts",
+      "sha256": "b708d4f396e16ebedb652d302615cf4b3e63cf81c83725a7f0603def49eaa191"
+    },
+    {
+      "path": "packages/workflow-control/test/bootstrapAdapters.test.ts",
+      "sha256": "4dab22f341b8ef3f28af2ff4753566813115243ca9993e51a20a8379ee3866b2"
+    },
+    {
+      "path": "packages/workflow-control/test/mcpServer.test.ts",
+      "sha256": "256dcc92b91143f11c67e5e1c721a657311f7f1503e7c22d74f419e4c115aae0"
+    },
+    {
+      "path": "packages/workflow-control/test/artifacts.test.ts",
+      "sha256": "35e4c11f31eece75ac808b3e57aa1a88f20a93b52306bef4fd903ddb631b676e"
+    },
+    {
+      "path": "packages/workflow-control/test/featureEvaluation.test.ts",
+      "sha256": "c8a74e5916f87bdb8cb633bca3a6d3fcdbce9463136b93459dc8a75186ef5e30"
+    },
+    {
+      "path": "packages/workflow-control/test/reviewProxyStreams.test.ts",
+      "sha256": "46dd4ab2850391c5c87e32d0f61c337a661b17b690002052b2fe7a5514b1e0e0"
+    },
+    {
+      "path": "packages/workflow-control/test/featureDeliveryContracts.test.ts",
+      "sha256": "ef04b90caaeea50b91f5b191c29bbdaf283312827c537db9bbc4e2b0adb55458"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReviewLifecycle.test.ts",
+      "sha256": "3d6af70f8541c0acf707effff2de12b520c0f353b415fe898969846337bbf904"
+    },
+    {
+      "path": "packages/workflow-control/test/prePushIsolation.test.ts",
+      "sha256": "bf99d84160dd008142428c4eaa7b3581fb3e1971b7d2249090b121509fb5f366"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistOutputManifest.test.ts",
+      "sha256": "64af54f389845e1fa02464e17fddf29dfbe85f900dbfc8c44074c16b43fcacf0"
+    },
+    {
+      "path": "packages/workflow-control/test/documentApproval.test.ts",
+      "sha256": "78fd2942ed56a09630fc5bbb0ccbb4eb183fc383bdce116480d35b2d296535a7"
+    },
+    {
+      "path": "packages/workflow-control/test/activeSpecialistSettlement.integration.test.ts",
+      "sha256": "d252c8f44bb97fc14b97b6094a200f78699de2a9deaa9e526ee6002818d3cd89"
+    },
+    {
+      "path": "packages/workflow-control/test/integrationGate.test.ts",
+      "sha256": "5fa4b83d4ff641ea53309be170804bd910a464b014bca24173d8c0864dab0e25"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "sha256": "03208a7d11597035bcc6f8c1ef1b5ec564a12adf730c68863921bf84c4b9cf2b"
+    },
+    {
+      "path": "packages/workflow-control/test/stateMachine.test.ts",
+      "sha256": "688f4fb7935146ddba79d78e127cd68c432ed44de77a986b94d06a098f36e744"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReviewCapabilities.integration.test.ts",
+      "sha256": "f01bca7e4d367f2af3a6fde6dde452f01a2e793de0da66d11a23bb18cc6bda10"
+    },
+    {
+      "path": "packages/workflow-control/test/documentFixture.ts",
+      "sha256": "49b44d9563aaed9d6cc4548093531b8c270c6465be6635d9f822f52c36b51cd9"
+    },
+    {
+      "path": "packages/workflow-control/test/schedulerCompletionContention.test.ts",
+      "sha256": "9969cb09118a03b9ed4fd21ed7f31e61c4c521d2ebd7dd81af961e21e70bd071"
+    },
+    {
+      "path": "packages/workflow-control/test/featureDeliveryBroker.test.ts",
+      "sha256": "91cd34fcd142677f8886d88ff41c34d104bb911b85581d6e4e88ad96aeb4ad9f"
+    },
+    {
+      "path": "packages/workflow-control/test/secureEvidence.test.ts",
+      "sha256": "833600fa4a42fab8a26e3ec0d3e1d7453ab3d254837f95f290532e6175018323"
+    },
+    {
+      "path": "packages/workflow-control/test/planningDocuments.test.ts",
+      "sha256": "f48a57ef4a524bb2cc2f7db69e6c17c5691872e067f4ff7a18ad3e5f2285c0f9"
+    },
+    {
+      "path": "packages/workflow-control/test/governedPersistence.test.ts",
+      "sha256": "5d326fd42528ff0168744b22d80165b5335dec72b3d55260c4b01c7b67a21723"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseJobs.test.ts",
+      "sha256": "fc92a4d391a05fa6b34371e207bd0e932a24bc2dc791d444e07c9bfb2d5dcba6"
+    },
+    {
+      "path": "packages/workflow-control/test/reviewProxy.test.ts",
+      "sha256": "8471b4464169e56f5ad278f7e07c9ec213907a52eb8857bdc0946fb0ad8ce2b0"
+    },
+    {
+      "path": "packages/workflow-control/test/governedOperations.test.ts",
+      "sha256": "9d18ce93fe5c569ea48715c41bc5027d31d304938d82a641a6a02ad9ca62350a"
+    },
+    {
+      "path": "packages/workflow-control/test/authorization.test.ts",
+      "sha256": "c0be8c3b6bb081bf4ac42408b2cfa09ecfbc354681f76347314efa9e15aa54bf"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.integration.test.ts",
+      "sha256": "da254056e690919e7a56b36957566719c8d96d07c718ebc5cf3de78291725d31"
+    },
+    {
+      "path": "packages/workflow-control/test/storage.test.ts",
+      "sha256": "250356f5ca92dd5c71e6b3818e66c4d1d9ece5b7f705fe182e5e601dd83acb28"
+    },
+    {
+      "path": "packages/workflow-control/test/featureDeliveryApproval.test.ts",
+      "sha256": "fb79c6bed6444cc67493c3ce6eb977941d97f7c9ca633e45e069897eb3127380"
+    },
+    {
+      "path": "packages/workflow-control/test/bootstrapPolicy.test.ts",
+      "sha256": "22c2761a5dd75111321f6c931417c9ee1d8df87ad6df9db31f483b17ee501090"
+    },
+    {
+      "path": "packages/workflow-control/test/preapprovalMaterial.test.ts",
+      "sha256": "3dd79d3ddbcca546d365bb39f1f3a7cae4300103b28e5bc0f093bdf7613704c5"
+    },
+    {
+      "path": "packages/workflow-control/test/planning.test.ts",
+      "sha256": "89e34986d58915ed9a96956669003aeed9a5a01a13a5d41b4f4bfda008fc485e"
+    },
+    {
+      "path": "packages/workflow-control/test/waitRecovery.test.ts",
+      "sha256": "bfd634b25f7293c1617718a9a32a62ad18b913a4fe27e18994256939ff2da5c9"
+    },
+    {
+      "path": "packages/workflow-control/test/orchestrator.test.ts",
+      "sha256": "4ea31379660a1074c84d3fc1ce9c9c66618fb68533ababcff83cd44f40293e8d"
+    },
+    {
+      "path": "packages/workflow-control/test/activeSpecialistSettlement.test.ts",
+      "sha256": "783c154f68918e940b067ea32960e17015c6e70b30acfad3e6b363ee4cba9946"
+    },
+    {
+      "path": "packages/workflow-control/test/cancellationWork.test.ts",
+      "sha256": "f0b643d640a1d95d921904901e32fd8d1e09aa5120beb12cd160bfc9d07ac2c6"
+    },
+    {
+      "path": "packages/workflow-control/test/bootstrap.test.ts",
+      "sha256": "84e28660375053f873728ff765e91ff3f4ac17921bd1e82fd2224af820ad9d7d"
+    },
+    {
+      "path": "packages/workflow-control/test/continuationWorker.test.ts",
+      "sha256": "42d4ec75d1977001cb58de30e6b04e9d39828e0d29c31df5dfb979b270530db2"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistContainerLifecycle.test.ts",
+      "sha256": "3f0d37317ab0d84ddd9e285d79503a084dcec97fd3b9b6a904f509ff48ecaff9"
+    },
+    {
+      "path": "packages/workflow-control/test/deliveryBrokers.test.ts",
+      "sha256": "8693fe5a6dbcee79bef94db259b320d6791acb9466a89b0c23ab2ae84555ad71"
+    },
+    {
+      "path": "packages/workflow-control/test/continuationNotifications.test.ts",
+      "sha256": "ba0fa11a1011ddbb19956d53179bf388b6e2db95e79477d53ec836766fa43a3a"
+    },
+    {
+      "path": "packages/workflow-control/test/lifecycle.test.ts",
+      "sha256": "2db6ae224178fef49103b02f0a928adb203b2412431915f3011ce8a4f0bdf4b3"
+    },
+    {
+      "path": "packages/workflow-control/test/contracts.test.ts",
+      "sha256": "a29b5b2d7bdd92b8549927df84d97989e8923d8d79c7e14217ed29509ac335f9"
+    },
+    {
+      "path": "packages/workflow-control/test/finalization.test.ts",
+      "sha256": "0e2736879bd26dc3c109091f4dc828f06de5e0d1de67de07f0dd00d95b394fac"
+    },
+    {
+      "path": "packages/workflow-control/test/repairLoops.test.ts",
+      "sha256": "5e053f1cd95f5637fcb0cc9396b5f6634a12d0979dbef755b86d6c95e658b896"
+    }
+  ]
 }

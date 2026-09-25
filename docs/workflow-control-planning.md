@@ -38,7 +38,13 @@ before the immutable execution contract is created. Each task must map to a spec
 verification document. Object publication alone grants no execution authority.
 
 After contract/run creation, `WorkflowStore.recordPlanningDocumentPublication` verifies and records
-the source receipt. The distinct critic and owner approval APIs still apply. Runtime consumers call
+the source receipt. Publication verifies the real Git common directory, canonical workspace hash,
+approved repository remote and source commit ancestry. Bootstrap callers pass the exact approved
+`sourcePolicy` when using its authorized remote and source worktree. Normal callers use the approved
+GitHub repository remote. A source revision records provenance; normative bytes are bound separately
+by the manifest and may be published before a subsequent code commit.
+
+The distinct critic and owner approval APIs still apply. Runtime consumers call
 `verifyPlanningDocuments`, which resolves the persisted source/manifest, records a durable attempt,
 checks exact bytes and fails closed. The operator command is:
 
@@ -61,6 +67,18 @@ attempt unless its recorded run lease has been superseded. Unfenced approval/ope
 a bounded lifetime and cannot settle after it expires. Recovery invalidates authority; restoring the
 old bytes never reactivates it. The caller must still use existing role and ownership controls.
 
-Known limitations: publication provenance/current accepted task workspace resolution and bootstrap
-terminalization after lost approval are still under review. The manifest's source revision does not
-by itself prove a repository observation. The documented API does not remove those acceptance gaps.
+Execution resolves each accepted task ref from the delivery, repair and imported-lineage ledgers
+against registered worktrees in that same repository. Taskless boundaries check every accepted task
+workspace. Missing, ambiguous or foreign worktrees fail closed; they do not silently reuse the original
+publication folder. Legacy receipts without source identity cannot authorize new execution.
+
+Snapshot staging and validation occur within durable verification attempts. The launcher compares
+the full supplied packet/envelope with the persisted scheduler input before staging or capability
+issuance. Credential and repair-child effect dispatch recheck approval and leases within the writer
+transaction that initiates the operation. Cleanup/revocation remain possible after approval loss.
+
+`BootstrapCoordinator.createForCleanup` verifies historical policy, contract and approval identity,
+then exposes only cancellation for an already-attested bootstrap. Its execution adapters throw.
+It retains secure evidence and still honors live leases. This does not turn a historical approval
+into current execution authority. The implementation and retained tests still require independent
+acceptance; this API guide is not approval to launch a managed pilot.

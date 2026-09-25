@@ -53,43 +53,47 @@ export async function runPhaseRuntimeCli(
   runtime.start();
 }
 
+function validateDocumentsCommand(path: string, runId: string, taskId: string): string {
+  if (!existsSync(resolve(path)))
+    return JSON.stringify({ passed: false, reason: 'document_database_missing' });
+  let validationStore: WorkflowStore | undefined;
+  try {
+    validationStore = new WorkflowStore(resolve(path));
+    const binding = validationStore.verifyPlanningDocuments({
+      runId,
+      taskId: taskId,
+      ownerId: 'operator-validation',
+      boundary: 'operator.validate',
+    });
+    return JSON.stringify({ passed: true, runId, taskId: taskId, binding });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const reasons = new Set([
+      'document_run_missing',
+      'document_manifest_required',
+      'document_publication_missing',
+      'document_task_unknown',
+      'document_approval_required',
+      'document_verification_unresolved',
+      'document_approval_changed',
+      'document_attempt_stale',
+      'planning_documents_changed',
+    ]);
+    return JSON.stringify({
+      passed: false,
+      reason: reasons.has(message) ? message : 'document_validation_failed',
+    });
+  } finally {
+    validationStore?.close();
+  }
+}
+
 export function runCli(args: readonly string[]): string {
   const [command, path, runId] = args;
   if (command === undefined || path === undefined) usage();
   if (command === 'validate-documents') {
     if (!runId || !args[3] || args.length !== 4) usage();
-    if (!existsSync(resolve(path)))
-      return JSON.stringify({ passed: false, reason: 'document_database_missing' });
-    let validationStore: WorkflowStore | undefined;
-    try {
-      validationStore = new WorkflowStore(resolve(path));
-      const binding = validationStore.verifyPlanningDocuments({
-        runId,
-        taskId: args[3],
-        ownerId: 'operator-validation',
-        boundary: 'operator.validate',
-      });
-      return JSON.stringify({ passed: true, runId, taskId: args[3], binding });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      const reasons = new Set([
-        'document_run_missing',
-        'document_manifest_required',
-        'document_publication_missing',
-        'document_task_unknown',
-        'document_approval_required',
-        'document_verification_unresolved',
-        'document_approval_changed',
-        'document_attempt_stale',
-        'planning_documents_changed',
-      ]);
-      return JSON.stringify({
-        passed: false,
-        reason: reasons.has(message) ? message : 'document_validation_failed',
-      });
-    } finally {
-      validationStore?.close();
-    }
+    return validateDocumentsCommand(path, runId, args[3]);
   }
   const store = new WorkflowStore(resolve(path));
   try {

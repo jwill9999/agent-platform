@@ -233,6 +233,36 @@ export class BootstrapJournal {
       throw new Error('stored bootstrap policy or approval changed');
     return row;
   }
+  /** Historical identity for cancellation only; never confers execution authority. */
+  assertStoredForCleanup(runId: string, policy: BootstrapPolicy) {
+    const contract = this.contract(runId);
+    const row = this.database
+      .prepare('SELECT * FROM bootstrap_artifacts WHERE run_id=?')
+      .get(runId) as
+      | {
+          policy_json: string;
+          approval_id: string;
+          contract_digest: string;
+          status: string;
+          attestation_digest: string | null;
+          head_sha: string | null;
+        }
+      | undefined;
+    if (
+      !row ||
+      row.policy_json !== bootstrapJson(policy) ||
+      row.contract_digest !== bootstrapDigest(contract) ||
+      contract.policyDigest !== bootstrapDigest(policy) ||
+      !this.database
+        .prepare(
+          `SELECT 1 FROM plan_approvals WHERE id=? AND run_id=?
+          AND material_digest=? AND policy_digest=?`,
+        )
+        .get(row.approval_id, runId, deriveContractMaterialDigest(contract), contract.policyDigest)
+    )
+      throw new Error('stored bootstrap cleanup identity changed');
+    return row;
+  }
   assertFence(runId: string, policy: BootstrapPolicy, fence: DeliveryFence, nowMs: number): void {
     for (const [type, id, epoch] of [
       ['workspace', this.contract(runId).workspaceId, fence.workspaceLeaseEpoch],

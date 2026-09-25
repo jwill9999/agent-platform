@@ -35,7 +35,7 @@ import {
 
 const roots: string[] = [];
 const hash = (character: string) => `sha256:${character.repeat(64)}`;
-const workspaceId = hash('a');
+let workspaceId = hash('a');
 const policyDigest = hash('b');
 const contract: ExecutionContract = {
   featureId: 'governed-persistence',
@@ -109,6 +109,7 @@ async function setup() {
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
   const publishDocuments = await documentFixture(contract, root);
+  workspaceId = contract.workspaceId;
   const contractId = store.createContract(contract, 1000);
   return { store, database, contractId, publishDocuments };
 }

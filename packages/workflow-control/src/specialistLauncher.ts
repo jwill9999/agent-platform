@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { cp, lstat, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { promisify } from 'node:util';
+import { promisify, isDeepStrictEqual } from 'node:util';
 
 import type { TaskPacket } from './contracts.js';
 import {
@@ -149,9 +149,7 @@ function assertPrivateMounts(mounts: readonly string[], stagingRoot: string): vo
   }
 }
 
-export async function buildDockerSpecialistLaunch(
-  request: SpecialistLaunchRequest,
-): Promise<DockerSpecialistLaunch> {
+function prepareLaunchEnvironment(request: SpecialistLaunchRequest) {
   for (const path of [
     request.workspaceRoot,
     request.codexHome,
@@ -184,6 +182,13 @@ export async function buildDockerSpecialistLaunch(
     );
   }
 
+  return { containerUser, environment };
+}
+
+export async function buildDockerSpecialistLaunch(
+  request: SpecialistLaunchRequest,
+): Promise<DockerSpecialistLaunch> {
+  const { containerUser, environment } = prepareLaunchEnvironment(request);
   const [workspaceRoot, codexHome, authFile, promptFile, configFile] = await Promise.all([
     realpath(request.workspaceRoot),
     realpath(request.codexHome),
@@ -460,6 +465,7 @@ export class RevocableSpecialistCredentialBroker {
     stagingRoot: string,
     executionId: string,
     generation: string,
+    nowMs = Date.now(),
   ): Promise<SpecialistCredentialLease> {
     const leaseId = this.leaseId(executionId);
     this.#store.bindSchedulerCredentialGeneration(
@@ -471,7 +477,12 @@ export class RevocableSpecialistCredentialBroker {
       workflowCredentialJournalCapability,
     );
     try {
-      const lease = await this.#issue(stagingRoot, executionId, leaseId, generation);
+      const lease = await this.#store.dispatchSchedulerCredentialIssue(
+        executionId,
+        () => this.#issue(stagingRoot, executionId, leaseId, generation),
+        workflowCredentialJournalCapability,
+        nowMs,
+      );
       if (lease.leaseId !== leaseId)
         throw new Error('credential broker changed the durable lease id');
       if (lease.generation !== generation)
@@ -657,7 +668,12 @@ export class DockerIsolatedSpecialistLauncher {
     reservation: DockerSpecialistReservation,
     envelope?: SpecialistInputEnvelope,
   ): Promise<unknown> {
-    const launched = this.#launch(packet, reservation, envelope);
+    const copiedEnvelope = envelope === undefined ? undefined : structuredClone(envelope);
+    const launched = this.#launch(
+      copiedEnvelope?.task ?? structuredClone(packet),
+      { ...reservation },
+      copiedEnvelope,
+    );
     const settlement = launched.then(
       () => undefined,
       () => undefined,
@@ -678,6 +694,17 @@ export class DockerIsolatedSpecialistLauncher {
     let output: SpecialistExecutionResult | undefined;
     let launchError: unknown;
     try {
+      const persisted = this.#options.store.getSchedulerExecution(reservation.id);
+      if (
+        !persisted ||
+        persisted.status !== 'active' ||
+        persisted.runId !== packet.runId ||
+        persisted.taskId !== packet.taskId ||
+        persisted.role !== reservation.role ||
+        persisted.deadlineMs !== reservation.deadlineMs ||
+        !isDeepStrictEqual(persisted.packet, envelope ?? packet)
+      )
+        throw new Error('specialist input differs from durable scheduler input');
       this.#assertCanStart(reservation);
       const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
       const workspace = await prepareSpecialistWorkspace(
@@ -702,6 +729,7 @@ export class DockerIsolatedSpecialistLauncher {
         stagingRoot,
         reservation.id,
         credentialBrokerGeneration,
+        this.#clock(),
       );
       await writeFile(promptFile, `${JSON.stringify(envelope ?? packet)}\n`, { mode: 0o600 });
       const launch = await buildDockerSpecialistLaunch({

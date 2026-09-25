@@ -1,5 +1,7 @@
+import Database from 'better-sqlite3';
 import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -25,7 +27,7 @@ import { createProductionBeadsDoltPort } from '../src/reconciliation.js';
 
 const roots: string[] = [];
 const policyDigest = `sha256:${'a'.repeat(64)}`;
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const headSha = '1'.repeat(40);
 const contract: ExecutionContract = {
   featureId: 'feature-evaluation',
@@ -95,6 +97,7 @@ async function setup() {
   roots.push(root);
   const store = new WorkflowStore(join(root, 'workflow.sqlite'));
   const publishDocuments = await documentFixture(contract, root);
+  workspaceId = contract.workspaceId;
   const contractId = store.createContract(contract, 100);
   store.createRun(contractId, 'feature_evaluation', 'run-evaluation');
   publishDocuments(store, 'run-evaluation', true);
@@ -550,6 +553,120 @@ describe('DurableRepairChildBroker', () => {
     expect(port.mutate).not.toHaveBeenCalled();
   });
 
+  it('rechecks changed planning documents immediately before repair child mutation', async () => {
+    const port = new MemoryRepairPort();
+    const { store, fence, request } = await repairSetup(port);
+    const document = contract.planningDocuments!.files[0]!;
+    let altered = false;
+    const broker = DurableRepairChildBroker.createForTest({
+      store,
+      contract,
+      port,
+      clock: () => 2000,
+      fault(boundary) {
+        if (boundary === 'before_mutation') {
+          altered = true;
+          writeFileSync(
+            join(roots.at(-1)!, 'document-source', document.path),
+            'changed after precheck',
+          );
+        }
+      },
+    });
+    await expect(broker.execute(request, fence)).rejects.toThrow('planning_documents_changed');
+    expect(altered).toBe(true);
+    expect(port.mutate).not.toHaveBeenCalled();
+    expect(store.getRepairChildIntent(request.id)?.status).toBe('prepared');
+  });
+
+  it.each(
+    ['child', 'ref'].flatMap((blockedRead) =>
+      ['invalidate', 'takeover'].map((fault) => ({ blockedRead, fault })),
+    ),
+  )(
+    'rechecks $fault authority after suspended $blockedRead observation in the official repair port',
+    async ({ blockedRead, fault }) => {
+      const { store, fence, request } = await repairSetup();
+      let child: OfficialRepairChildSnapshot | null = null;
+      let childReads = 0;
+      let refReads = 0;
+      let childWrites = 0;
+      let refWrites = 0;
+      let release!: () => void;
+      let entered!: () => void;
+      const suspended = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const resume = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const port = OfficialRepairChildPort.createForTest(roots.at(-1)!, {
+        async readChild() {
+          if (++childReads === 2 && blockedRead === 'child') {
+            entered();
+            await resume;
+          }
+          return child;
+        },
+        async createChild() {
+          childWrites++;
+          child = {
+            id: request.id,
+            issueType: 'task',
+            status: 'open',
+            specId: `docs/tasks/${request.id}.md`,
+            parentEpicId: request.parentEpicId,
+            blockingDependencies: [request.dependsOn],
+            assignedRole: request.assignedRole,
+            allowedPaths: request.allowedPaths,
+            allowedOperations: request.allowedOperations,
+            findingDigest: request.findingDigest,
+            remainingRetryBudget: request.remainingRetryBudget,
+          };
+        },
+        async readTaskRef() {
+          if (++refReads === 2 && blockedRead === 'ref') {
+            entered();
+            await resume;
+          }
+          return null;
+        },
+        async createTaskRefCas() {
+          refWrites++;
+        },
+      });
+      const broker = DurableRepairChildBroker.createForTest({
+        store,
+        contract,
+        port,
+        clock: () => 2000,
+      });
+      const running = broker.execute(request, fence);
+      const rejected = expect(running).rejects.toThrow(
+        fault === 'invalidate' ? 'document_approval_required' : 'document_lease_stale',
+      );
+      await suspended;
+      const peer = new Database(join(roots.at(-1)!, 'workflow.sqlite'));
+      if (fault === 'takeover')
+        peer.exec(
+          "UPDATE leases SET owner_id='replacement',epoch=epoch+1 WHERE resource_type='run'",
+        );
+      else {
+        peer
+          .prepare(
+            "UPDATE plan_approvals SET status='invalidated',invalidated_at_ms=2000,invalidation_reason='test-revocation' WHERE run_id='run-evaluation'",
+          )
+          .run();
+      }
+      peer.close();
+      release();
+      await rejected;
+      expect(childWrites).toBe(blockedRead === 'child' ? 0 : 1);
+      expect(refWrites).toBe(0);
+      expect(store.getRepairChildIntent(request.id)?.status).toBe('prepared');
+    },
+  );
+
   it('reconciles a crash after external mutation without duplicating the effect', async () => {
     const port = new MemoryRepairPort();
     let crash = true;
@@ -750,9 +867,13 @@ describe('OfficialRepairChildPort', () => {
       };
     try {
       expect(Object.isFrozen(port)).toBe(true);
-      await expect(port.mutate(repairRequest())).rejects.toThrow('injected ref failure');
+      await expect(port.mutate(repairRequest(), (effect) => effect())).rejects.toThrow(
+        'injected ref failure',
+      );
       expect(child).not.toBeNull();
-      await expect(port.mutate(repairRequest())).resolves.toMatchObject({ refSha: headSha });
+      await expect(port.mutate(repairRequest(), (effect) => effect())).resolves.toMatchObject({
+        refSha: headSha,
+      });
       await expect(port.observe(repairRequest())).resolves.toMatchObject({ kind: 'expected' });
       expect(redirected).toBe(false);
     } finally {
@@ -795,7 +916,9 @@ describe('OfficialRepairChildPort', () => {
       },
     };
     const port = OfficialRepairChildPort.createForTest(root, client);
-    await expect(port.mutate(request)).rejects.toThrow('create-only ref CAS failed');
+    await expect(port.mutate(request, (effect) => effect())).rejects.toThrow(
+      'create-only ref CAS failed',
+    );
     expect(refSha).toBe('2'.repeat(40));
     await expect(port.observe(request)).resolves.toMatchObject({ kind: 'conflict' });
   });

@@ -228,7 +228,7 @@ async function fixture(changePolicy?: (policy: BootstrapPolicy) => void) {
   };
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
-  const publishDocuments = await documentFixture(contract, root, source);
+  const publishDocuments = await documentFixture(contract, root, source, policy);
   store.createRun(
     store.createContract(executionContractSchema.parse(contract)),
     'approved',
@@ -498,6 +498,29 @@ describe('approved bootstrap task artifact production composition', () => {
     expect(pushes).toBe(0);
     successor.close();
     coordinator.close();
+  });
+  it('reopens cancellation after approval invalidation without allowing execution', async () => {
+    const f = await fixture();
+    const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
+    const evidence = await coordinator.commitAndPush();
+    coordinator.close();
+    const db = new Database(f.database);
+    db.prepare("UPDATE plan_approvals SET status='invalidated' WHERE run_id=?").run(
+      'bootstrap-run',
+    );
+    db.close();
+    writeFileSync(join(f.source, 'fixture-spec.md'), 'changed after approval');
+    const cleanup = BootstrapCoordinator.createForCleanup(f.database, 'bootstrap-run', f.policy);
+    expect(() => cleanup.adopt()).toThrow('cleanup cannot execute');
+    await expect(cleanup.commitAndPush()).rejects.toThrow('cleanup cannot execute');
+    await expect(cleanup.terminalize('fixture-owner')).rejects.toThrow('lease is held');
+    const expired = new Database(f.database);
+    expired.prepare('UPDATE leases SET expires_at_ms=0').run();
+    expired.close();
+    const result = await cleanup.terminalize('fixture-owner');
+    expect(result.status).toBe('cancelled');
+    expect(result.retainedEvidence[0]?.digest).toBe(evidence.digest);
+    cleanup.close();
   });
   it('crosses real adapter subprocesses, commits only source checkout, attests and cancels with fenced leases', async () => {
     const f = await fixture((policy) => {

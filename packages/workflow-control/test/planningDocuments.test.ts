@@ -1,8 +1,17 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+  chmod,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { ContentAddressedArtifactStore } from '../src/artifacts.js';
 import {
   canonicalPlanningDocuments,
@@ -105,4 +114,48 @@ it('binds manifest identity and per-task coverage while preserving legacy contra
   const changed = structuredClone(bound);
   changed.planningDocuments.files[0].digest = `sha256:${createHash('sha256').update('changed').digest('hex')}`;
   expect(deriveContractMaterialDigest(changed)).not.toBe(deriveContractMaterialDigest(bound));
+});
+
+it('retries a partial object write without publishing a manifest as authority', async () => {
+  const input = await fixture();
+  const put = input.artifacts.put.bind(input.artifacts);
+  let writes = 0;
+  const spy = vi.spyOn(input.artifacts, 'put').mockImplementation(async (bytes) => {
+    if (++writes === 2) throw new Error('injected_object_failure');
+    return put(bytes);
+  });
+  await expect(publishPlanningDocumentObjects(input)).rejects.toThrow('injected_object_failure');
+  spy.mockRestore();
+  const manifest = await publishPlanningDocumentObjects(input);
+  for (const file of manifest.files)
+    expect(await input.artifacts.get(file.digest)).toEqual(
+      await readFile(join(input.sourceRoot, file.path)),
+    );
+});
+
+it.each(['path', 'kind', 'taskIds', 'sizeBytes', 'digest', 'set'])(
+  'changes the manifest digest when %s changes',
+  async (dimension) => {
+    const manifest = await publishPlanningDocumentObjects(await fixture());
+    const changed = structuredClone(manifest);
+    const file = changed.files[0]!;
+    if (dimension === 'path') file.path = 'renamed.md';
+    if (dimension === 'kind') file.kind = 'design';
+    if (dimension === 'taskIds') file.taskIds = ['other-task'];
+    if (dimension === 'sizeBytes') file.sizeBytes++;
+    if (dimension === 'digest') file.digest = `sha256:${'f'.repeat(64)}`;
+    if (dimension === 'set') changed.files.pop();
+    expect(planningDocumentsDigest(changed)).not.toBe(planningDocumentsDigest(manifest));
+  },
+);
+
+it.skipIf(process.getuid?.() === 0)('rejects an unreadable regular normative file', async () => {
+  const input = await fixture();
+  const path = join(input.sourceRoot, 'spec.md');
+  await chmod(path, 0);
+  try {
+    await expect(publishPlanningDocumentObjects(input)).rejects.toThrow('staging failed');
+  } finally {
+    await chmod(path, 0o600);
+  }
 });

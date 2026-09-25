@@ -504,6 +504,35 @@ describe('Beads-authoritative scheduling', () => {
     store.close();
   });
 
+  it('rejects substituted scheduler input before credentials or container dispatch', async () => {
+    const { store, orchestrator, launcher, credentialBroker, transport } =
+      await setup('scheduling');
+    const workspaceLeaseEpoch = orchestrator.acquireWorkspace(1000, 1000);
+    const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 1000, 1000);
+    const packet = orchestrator.createTaskPacket({
+      runId: 'run-schedule',
+      taskId: 'schedule-feature.1',
+      evidence,
+    });
+    const originalLaunch = launcher.launch.bind(launcher);
+    const issue = vi.spyOn(credentialBroker, 'issue');
+    vi.spyOn(launcher, 'launch').mockImplementation((input, reservation) =>
+      originalLaunch({ ...input, objective: 'substituted instructions' }, reservation),
+    );
+    await expect(
+      orchestrator.launchTask({
+        packet,
+        workspaceLeaseEpoch,
+        runLeaseEpoch,
+        claimTransitionId: 'substituted-claim',
+        deadlineMs: 2000,
+      }),
+    ).rejects.toThrow('specialist input differs from durable scheduler input');
+    expect(issue).not.toHaveBeenCalled();
+    expect(transport.calls.some((call) => ['create', 'start'].includes(call[0]!))).toBe(false);
+    store.close();
+  });
+
   it('launches bounded packets through the isolated launcher and releases capacity', async () => {
     const { store, orchestrator } = await setup('scheduling');
     const workspaceLeaseEpoch = orchestrator.acquireWorkspace(1000, 1000);
@@ -628,7 +657,7 @@ describe('Beads-authoritative scheduling', () => {
       observe: async () => (active ? 'active' : 'revoked'),
       conformance: async () => 'test-generation',
     });
-    const issuing = broker.issue(stagingRoot, executionId, 'test-generation');
+    const issuing = broker.issue(stagingRoot, executionId, 'test-generation', 1000);
     await broker.revoke(executionId);
     releaseIssue();
     await expect(issuing).rejects.toThrow();
@@ -699,7 +728,9 @@ if (command === 'conformance') {
     createExecution(successfulId, 'mutating');
     const stagingRoot = await mkdtemp(join(tmpdir(), 'workflow-command-broker-'));
     roots.push(stagingRoot);
-    await expect(broker.issue(stagingRoot, successfulId, 'generation-A')).resolves.toMatchObject({
+    await expect(
+      broker.issue(stagingRoot, successfulId, 'generation-A', 1000),
+    ).resolves.toMatchObject({
       leaseId: `specialist:${successfulId}`,
       generation: 'generation-A',
     });
@@ -708,14 +739,14 @@ if (command === 'conformance') {
 
     const wrongLeaseId = '99999999-9999-4999-8999-999999999999';
     createExecution(wrongLeaseId, 'read_only');
-    await expect(broker.issue(stagingRoot, wrongLeaseId, 'generation-A')).rejects.toThrow(
+    await expect(broker.issue(stagingRoot, wrongLeaseId, 'generation-A', 1000)).rejects.toThrow(
       'requested lease id',
     );
     expect(first.store.getSchedulerExecution(wrongLeaseId)?.credentialStatus).toBe('revoked');
 
     const wrongRevokeLeaseId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
     createExecution(wrongRevokeLeaseId, 'read_only');
-    await broker.issue(stagingRoot, wrongRevokeLeaseId, 'generation-A');
+    await broker.issue(stagingRoot, wrongRevokeLeaseId, 'generation-A', 1000);
     await expect(broker.revoke(wrongRevokeLeaseId)).rejects.toThrow('generation-pinned revocation');
     expect(first.store.getSchedulerExecution(wrongRevokeLeaseId)?.credentialStatus).toBe(
       'revoking',
@@ -723,7 +754,7 @@ if (command === 'conformance') {
 
     const wrongStatusGenerationId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
     createExecution(wrongStatusGenerationId, 'read_only');
-    await broker.issue(stagingRoot, wrongStatusGenerationId, 'generation-A');
+    await broker.issue(stagingRoot, wrongStatusGenerationId, 'generation-A', 1000);
     await expect(broker.revoke(wrongStatusGenerationId)).rejects.toThrow(
       'generation-pinned lease status',
     );
@@ -771,7 +802,7 @@ if (command === 'conformance') {
     const executor: SpecialistProcessExecutor = async (_executable, args) => {
       if (args[0] === 'rm') {
         cancelled = true;
-        clock = 1005;
+        clock = 2000;
         rejectStart?.(new Error('container removed'));
         signalCleanup();
         if (!settles) await cleanupAllowed;
@@ -787,8 +818,8 @@ if (command === 'conformance') {
       executor,
       clock: () => clock,
     });
-    const workspaceLeaseEpoch = orchestrator.acquireWorkspace(1000, 1000);
-    const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 1000, 1000);
+    const workspaceLeaseEpoch = orchestrator.acquireWorkspace(5000, 1000);
+    const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 5000, 1000);
     const packet = orchestrator.createTaskPacket({
       runId: 'run-schedule',
       taskId: 'schedule-feature.1',
@@ -804,15 +835,15 @@ if (command === 'conformance') {
         workspaceLeaseEpoch,
         runLeaseEpoch,
         claimTransitionId: 'claim-timeout-transition',
-        deadlineMs: 1005,
+        deadlineMs: 2000,
       });
       const rejected = expect(launched).rejects.toThrow('timed out');
       await started;
       const [execution] = store.listActiveSchedulerExecutions(contract.workspaceId);
       expect(execution).toBeDefined();
       expect(cancelled).toBe(false);
-      clock = 1005;
-      await vi.advanceTimersByTimeAsync(5);
+      clock = 2000;
+      await vi.advanceTimersByTimeAsync(1000);
       if (!settles) {
         await cleanupStarted;
         // The fixture holds removal pending. Expire cancel's bounded wait, then the
@@ -839,7 +870,7 @@ if (command === 'conformance') {
             id: execution!.id,
             role: packet.assignedRole,
             mode: 'mutating',
-            deadlineMs: 1005,
+            deadlineMs: 2000,
             cancelled: true,
           }),
         ).resolves.toBe(true);

@@ -21,7 +21,7 @@ import {
 
 const roots: string[] = [];
 const policyDigest = `sha256:${'a'.repeat(64)}`;
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const taskHeadSha = '1'.repeat(40);
 const integratedHeadSha = '2'.repeat(40);
 const originOperationId = `sha256:${'c'.repeat(64)}`;
@@ -139,6 +139,8 @@ async function setup(authenticateOverride?: FeatureDeliveryIdentityClient['authe
   roots.push(root);
   const store = new WorkflowStore(join(root, 'workflow.sqlite'));
   const publishDocuments = await documentFixture(executionContract, root);
+  workspaceId = executionContract.workspaceId;
+  contract.workspaceId = workspaceId;
   executionContractDigest = `sha256:${createHash('sha256').update(JSON.stringify(executionContract)).digest('hex')}`;
   contract.executionContractDigest = executionContractDigest;
   const contractId = store.createContract(executionContract);

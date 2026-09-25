@@ -7,15 +7,18 @@ Branch: `task/approved-document-binding`; target: `feature/harness-backlog-revie
 
 Current evidence and remaining acceptance scope:
 [implementation checkpoint](docs/reviews/approved-document-binding-implementation.md).
-Docker is healthy after the owner restart. Full Linux regression: 744 passed, 14 optional skips.
-Separate actual-container document suite: 15 passed. Build/lint pass. First independent code review
-requires changes; partial repairs and two-connection dispatch tests pass. Remaining source/workspace
-binding, bootstrap terminalization and exhaustive negative/recovery coverage block acceptance.
-Follow-up isolated review also requires changes; six findings are listed in the checkpoint report. Draft PR273 includes the approved planning package and
-supersedes the closed planning PR272. No merge, staging or pilot launch.
+Docker is healthy. Owner explicitly authorized completing all six findings. Repairs now cover
+trusted source/current worktree resolution, durable snapshot denial, persisted packet identity,
+terminal result replay and cleanup-only bootstrap. Independent rounds3/4 surfaced additional
+initial-import and asynchronous repair-effect gaps; those are repaired with composed regressions.
+Full Linux regression: 857 passed/17 optional skipped. Four real Docker launcher/coordinator scenarios
+pass; combined enabled suites pass110. Final independent recheck is pending. Native material tests
+include unreadable-file denial. Monorepo typecheck, workflow lint and dependency-cycle checks pass.
+Sonar refactors address the preceding head's findings; new-head hosted gates remain required.
 
-Next: finish independent findings and remaining DB-T01–11 evidence, re-review, then hosted gates.
-Existing implementation authorization remains valid. Beads `.16` stays in progress and `.13` blocked.
+Continue authorized work through final exact-snapshot critique and hosted checks; do not stop merely
+because a checkpoint passes. Draft PR273 remains unmerged targeting feature/harness-backlog-review.
+No staging or pilot authority. Beads .16 remains in progress; owner integration is required to close.
 
 ---
 

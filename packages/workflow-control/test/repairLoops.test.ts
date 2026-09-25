@@ -21,7 +21,7 @@ import { workflowRepairMutationCapability } from '../src/storage.js';
 
 const roots: string[] = [];
 const policyDigest = `sha256:${'a'.repeat(64)}`;
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const failureHead = 'a'.repeat(40);
 const repairedHead = 'b'.repeat(40);
 const otherHead = 'c'.repeat(40);
@@ -109,6 +109,7 @@ async function setup(overrides?: Partial<ExecutionContract['retryPolicy']>) {
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
   const publishDocuments = await documentFixture(effectiveContract, root);
+  workspaceId = effectiveContract.workspaceId;
   const contractId = store.createContract(effectiveContract);
   const run = store.createRun(contractId, 'repair', 'run-repair');
   publishDocuments(store, 'run-repair', true);

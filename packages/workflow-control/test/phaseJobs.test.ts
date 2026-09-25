@@ -595,14 +595,23 @@ describe('cancellation queue fencing', () => {
 });
 
 describe('approved documents at queue boundaries', () => {
-  it.each(['enqueue', 'claim', 'start'] as const)(
-    'rejects changed requirements before %s without starting work',
-    async (boundary) => {
+  it.each(
+    ['enqueue', 'claim', 'start'].flatMap((boundary) =>
+      ['changed', 'deleted', 'artifact'].map((fault) => ({ boundary, fault })),
+    ),
+  )(
+    'rejects $fault requirements before $boundary without starting work',
+    async ({ boundary, fault }) => {
       const f = await fixture();
       let job: PhaseJob | undefined;
       if (boundary !== 'enqueue') f.consume();
       if (boundary === 'start') job = f.phases.claim('supervisor', 60000, f.now)!;
-      await writeFile(join(f.root, 'source', 'fixture-spec.md'), 'changed requirements');
+      if (fault === 'deleted') await rm(join(f.root, 'source', 'fixture-spec.md'));
+      else if (fault === 'artifact') {
+        const file = f.store.getExecutionContract('run')!.planningDocuments!.files[0]!;
+        const hash = file.digest.slice(7);
+        await writeFile(join(f.root, 'artifacts', hash.slice(0, 2), hash), 'changed object');
+      } else await writeFile(join(f.root, 'source', 'fixture-spec.md'), 'changed requirements');
       if (boundary === 'enqueue') {
         expect(() => f.consume()).toThrow('planning_documents_changed');
         expect(f.phases.list()).toHaveLength(0);

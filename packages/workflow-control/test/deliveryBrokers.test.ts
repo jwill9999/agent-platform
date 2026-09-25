@@ -19,7 +19,7 @@ import { workflowDeliveryMutationCapability } from '../src/storage.js';
 
 const roots: string[] = [];
 const policyDigest = `sha256:${'a'.repeat(64)}`;
-const workspaceId = `sha256:${'b'.repeat(64)}`;
+let workspaceId = `sha256:${'b'.repeat(64)}`;
 const parentSha = '1'.repeat(40);
 const headSha = '2'.repeat(40);
 
@@ -119,6 +119,7 @@ async function setup(input?: {
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
   const publishDocuments = await documentFixture(contract, root);
+  workspaceId = contract.workspaceId;
   const contractId = store.createContract(contract, 1000);
   const run = store.createRunForTest(contractId, input?.state ?? 'implementing', 'run-delivery');
   publishDocuments(store, 'run-delivery', true);
@@ -536,6 +537,7 @@ describe('DurableDeliveryBroker', () => {
       status: 'committed',
     });
 
+    const ownedWorkspaceId = workspaceId;
     const unpublished = await setup({ state: 'pipeline' });
     unpublished.port.forcedObservation = {
       kind: 'expected',
@@ -545,6 +547,7 @@ describe('DurableDeliveryBroker', () => {
       'current published',
     );
 
+    workspaceId = ownedWorkspaceId;
     const ownedDatabase = new Database(owned.database);
     ownedDatabase.prepare("UPDATE runs SET state = 'pipeline' WHERE id = ?").run(owned.run.id);
     owned.port.forcedObservation = {

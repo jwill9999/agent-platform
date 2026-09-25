@@ -1,0 +1,116 @@
+
+ RUN  v2.1.9 <worktree>/packages/workflow-control
+
+ ✓ test/activeSpecialistSettlement.integration.test.ts (4 tests) 7123ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > runs public publication/approval/coordinator/launcher/result/restart and rejects changed fixture-spec.md 2065ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > runs public publication/approval/coordinator/launcher/result/restart and rejects changed fixture-tests.md 1838ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > confirms durable success settlement and independent daemon absence 1401ms
+   ✓ active launcher with real offline Docker and fixture credential protocol > confirms durable cancel settlement and independent daemon absence 1170ms
+ ✓ test/documentApproval.test.ts (106 tests) 39310ms
+   ✓ verifies unchanged journal and objects on repeated boundaries without new approval 713ms
+   ✓ validates persisted task material through the operator command and returns safe blocked reasons 506ms
+   ✓ invalidates matching-length changed bytes and never restores the old approval 324ms
+   ✓ survives failed invalidation, restart and restored bytes with unresolved authority quarantined 330ms
+   ✓ quarantines actual process death at before-read, including restored bytes 419ms
+   ✓ quarantines actual process death at failed-invalidation, including restored bytes 394ms
+   ✓ prevents a second process from accepting a pending attempt and fences the old verifier after takeover 391ms
+   ✓ fails closed before checking bytes if attempt persistence fails; rejects missing objects and stale fences 322ms
+   ✓ keeps snapshot tamper denial durable when settlement fails: false 620ms
+   ✓ keeps snapshot tamper denial durable when settlement fails: true 603ms
+   ✓ rejects wrong task, approval, source and packet identities before creating a snapshot 526ms
+   ✓ rejects publication from an unrelated same-byte repository and unknown source revision 396ms
+   ✓ returns bounded publication errors without repository paths or remote credentials 403ms
+   ✓ checks accepted task worktree bytes instead of publication bytes 455ms
+   ✓ checks accepted run worktree bytes instead of publication bytes 466ms
+   ✓ checks accepted import worktree bytes instead of publication bytes 513ms
+   ✓ rejects 'changed' material before 'transition.prepare' can persist authority 327ms
+   ✓ rejects 'deleted' material before 'transition.prepare' can persist authority 330ms
+   ✓ rejects 'artifact' material before 'transition.prepare' can persist authority 352ms
+   ✓ rejects 'changed' material before 'scheduler.reserve' can persist authority 535ms
+   ✓ rejects 'deleted' material before 'scheduler.reserve' can persist authority 428ms
+   ✓ rejects 'artifact' material before 'scheduler.reserve' can persist authority 390ms
+   ✓ rejects 'changed' material before 'repair.dispatch' can persist authority 386ms
+   ✓ rejects 'deleted' material before 'repair.dispatch' can persist authority 372ms
+   ✓ rejects 'artifact' material before 'repair.dispatch' can persist authority 367ms
+   ✓ rejects 'changed' material before 'delivery.prepare' can persist authority 379ms
+   ✓ rejects 'deleted' material before 'delivery.prepare' can persist authority 436ms
+   ✓ rejects 'artifact' material before 'delivery.prepare' can persist authority 458ms
+   ✓ rejects 'changed' material before 'delivery.ready' can persist authority 424ms
+   ✓ rejects 'deleted' material before 'delivery.ready' can persist authority 361ms
+   ✓ rejects 'artifact' material before 'delivery.ready' can persist authority 445ms
+   ✓ rejects 'changed' material before 'delivery.contract' can persist authority 370ms
+   ✓ rejects 'deleted' material before 'delivery.contract' can persist authority 388ms
+   ✓ rejects 'artifact' material before 'delivery.contract' can persist authority 370ms
+   ✓ rejects 'changed' material before 'evaluation.record' can persist authority 420ms
+   ✓ rejects 'deleted' material before 'evaluation.record' can persist authority 361ms
+   ✓ rejects 'artifact' material before 'evaluation.record' can persist authority 357ms
+   ✓ rejects 'changed' material before 'evaluation.accept' can persist authority 357ms
+   ✓ rejects 'deleted' material before 'evaluation.accept' can persist authority 359ms
+   ✓ rejects 'artifact' material before 'evaluation.accept' can persist authority 337ms
+   ✓ rejects 'changed' material before 'repair.child_prepare' can persist authority 332ms
+   ✓ rejects 'deleted' material before 'repair.child_prepare' can persist authority 330ms
+   ✓ rejects 'artifact' material before 'repair.child_prepare' can persist authority 329ms
+   ✓ rejects 'changed' material before 'finalization.record' can persist authority 335ms
+   ✓ rejects 'deleted' material before 'finalization.record' can persist authority 329ms
+   ✓ rejects 'artifact' material before 'finalization.record' can persist authority 328ms
+   ✓ rejects 'changed' material before 'finalization.close' can persist authority 335ms
+   ✓ rejects 'deleted' material before 'finalization.close' can persist authority 331ms
+   ✓ rejects 'artifact' material before 'finalization.close' can persist authority 322ms
+   ✓ rejects 'changed' material before 'approval.resume' can persist authority 333ms
+   ✓ rejects 'deleted' material before 'approval.resume' can persist authority 331ms
+   ✓ rejects 'artifact' material before 'approval.resume' can persist authority 384ms
+   ✓ rejects 'changed' material before 'approval.notification' can persist authority 321ms
+   ✓ rejects 'deleted' material before 'approval.notification' can persist authority 325ms
+   ✓ rejects 'artifact' material before 'approval.notification' can persist authority 334ms
+   ✓ rejects 'changed' material before 'lineage.import' can persist authority 329ms
+   ✓ rejects 'deleted' material before 'lineage.import' can persist authority 333ms
+   ✓ rejects 'artifact' material before 'lineage.import' can persist authority 354ms
+   ✓ rejects 'changed' material before 'feature.approval' can persist authority 347ms
+   ✓ rejects 'deleted' material before 'feature.approval' can persist authority 336ms
+   ✓ rejects 'artifact' material before 'feature.approval' can persist authority 328ms
+   ✓ denies 'changed' material at persisted operation boundary 'transition.commit' 349ms
+   ✓ denies 'deleted' material at persisted operation boundary 'transition.commit' 337ms
+   ✓ denies 'artifact' material at persisted operation boundary 'transition.commit' 326ms
+   ✓ denies 'changed' material at persisted operation boundary 'scheduler.result' 372ms
+   ✓ denies 'deleted' material at persisted operation boundary 'scheduler.result' 349ms
+   ✓ denies 'artifact' material at persisted operation boundary 'scheduler.result' 353ms
+   ✓ denies 'changed' material at persisted operation boundary 'repair.accept' 361ms
+   ✓ denies 'deleted' material at persisted operation boundary 'repair.accept' 400ms
+   ✓ denies 'artifact' material at persisted operation boundary 'repair.accept' 325ms
+   ✓ denies 'changed' material at persisted operation boundary 'delivery.commit' 341ms
+   ✓ denies 'deleted' material at persisted operation boundary 'delivery.commit' 336ms
+   ✓ denies 'artifact' material at persisted operation boundary 'delivery.commit' 323ms
+   ✓ denies 'changed' material at persisted operation boundary 'delivery.merge_observation' 327ms
+   ✓ denies 'deleted' material at persisted operation boundary 'delivery.merge_observation' 335ms
+   ✓ denies 'artifact' material at persisted operation boundary 'delivery.merge_observation' 330ms
+   ✓ denies 'changed' material at persisted operation boundary 'delivery.mutate' 322ms
+   ✓ denies 'deleted' material at persisted operation boundary 'delivery.mutate' 326ms
+   ✓ denies 'artifact' material at persisted operation boundary 'delivery.mutate' 324ms
+   ✓ denies 'changed' material at persisted operation boundary 'repair.child_commit' 328ms
+   ✓ denies 'deleted' material at persisted operation boundary 'repair.child_commit' 322ms
+   ✓ denies 'artifact' material at persisted operation boundary 'repair.child_commit' 363ms
+   ✓ denies 'changed' material at persisted operation boundary 'repair.child_effect' 352ms
+   ✓ denies 'deleted' material at persisted operation boundary 'repair.child_effect' 335ms
+   ✓ denies 'artifact' material at persisted operation boundary 'repair.child_effect' 330ms
+   ✓ denies 'changed' material at persisted operation boundary 'repair.child_dispatch' 326ms
+   ✓ denies 'deleted' material at persisted operation boundary 'repair.child_dispatch' 325ms
+   ✓ denies 'artifact' material at persisted operation boundary 'repair.child_dispatch' 352ms
+   ✓ denies notification accepted after document changes 325ms
+   ✓ denies notification resume_pending after document changes 330ms
+   ✓ denies delegate result acceptance after document changes 325ms
+   ✓ cannot authorize partial object or receipt publication and retries publication idempotently 580ms
+   ✓ rejects incoming lineage whose worktree changed before the ledger exists 450ms
+   ✓ does not allow approval creation to revive a run whose documents were invalidated 326ms
+   ✓ consumes the approved snapshot in a real read-only container then rejects changed spec.md after restart 800ms
+   ✓ consumes the approved snapshot in a real read-only container then rejects changed tests.md after restart 765ms
+   ✓ rechecks lease ownership at settlement and leaves a durable pending attempt after takeover 335ms
+   ✓ reopens unchanged publication and approval without requiring another owner decision 393ms
+   ✓ keeps legacy cleanup available while a separately reviewed replacement gets fresh authority 348ms
+   ✓ invalidates sibling runs sharing a publication and requires a new immutable contract 324ms
+   ✓ quarantines sibling runs while an invalidation attempt is unresolved 335ms
+
+ Test Files  2 passed (2)
+      Tests  110 passed (110)
+   Start at  02:40:37
+   Duration  39.83s (transform 277ms, setup 0ms, collect 560ms, tests 46.43s, environment 0ms, prepare 93ms)
+

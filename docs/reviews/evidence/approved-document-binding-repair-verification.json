@@ -1,0 +1,1180 @@
+{
+  "status": "repairs-tested-independent-recheck-pending",
+  "baseCommit": "adda5c89e9d2782b3027f22903a125b176ec94ad",
+  "identity": "Exact uncommitted source and compiled hashes; reviewer snapshot separately binds supplied files.",
+  "results": {
+    "linux": [
+      "Test Files  46 passed | 5 skipped (51)",
+      "Tests  857 passed | 17 skipped (874)",
+      "Duration  35.92s (transform 1.42s, setup 0ms, collect 7.79s, tests 119.13s, environment 8ms, prepare 2.59s)"
+    ],
+    "connected": [
+      "Test Files  2 passed (2)",
+      "Tests  110 passed (110)",
+      "Duration  39.83s (transform 277ms, setup 0ms, collect 560ms, tests 46.43s, environment 0ms, prepare 93ms)"
+    ],
+    "lint": "passed",
+    "composed": [
+      "Test Files  1 passed (1)",
+      "Tests  4 passed (4)",
+      "Duration  7.38s (transform 193ms, setup 0ms, collect 252ms, tests 6.92s, environment 0ms, prepare 56ms)"
+    ],
+    "races": [
+      "Test Files  2 passed (2)",
+      "Tests  69 passed (69)",
+      "Duration  31.23s (transform 413ms, setup 0ms, collect 616ms, tests 51.88s, environment 0ms, prepare 95ms)"
+    ],
+    "native-paths": [
+      "Test Files  2 passed (2)",
+      "Tests  116 passed | 2 skipped (118)",
+      "Duration  37.66s (transform 323ms, setup 0ms, collect 458ms, tests 37.14s, environment 0ms, prepare 122ms)"
+    ],
+    "monorepoTypecheck": "passed",
+    "dependencyCycles": "passed; 77 existing unresolved-import warnings",
+    "independentRound4": "correction_required; import source and per-effect repair guards now repaired, recheck pending",
+    "directMarkdownAndRelativeLinks": "passed",
+    "redactionFixtureFollowup": "Passed 1 targeted test after replacing a fake credential literal with per-run disposable values; no production source changed."
+  },
+  "environment": {
+    "node": "24.14.0",
+    "pnpm": "9.15.4",
+    "linuxImage": "sha256:3d5e81bf543747896c5526b63998685da4b142416b21fdf99112cce12bdabf28",
+    "reviewImage": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f"
+  },
+  "commands": {
+    "linux": "Linux disposable suite: tsc -p tsconfig.json && vitest run",
+    "connected": "WORKFLOW_DOCUMENT_DOCKER=1 WORKFLOW_DOCKER_LIFECYCLE=1 pnpm --filter @agent-platform/workflow-control exec vitest run test/documentApproval.test.ts test/activeSpecialistSettlement.integration.test.ts",
+    "typecheck": "pnpm --filter @agent-platform/workflow-control typecheck; additional noEmit check of real launcher integration test",
+    "lint": "pnpm --filter @agent-platform/workflow-control lint"
+  },
+  "boundaries": {
+    "real": [
+      "Git repositories/worktrees",
+      "SQLite and independent connections/processes",
+      "content addressed artifacts",
+      "SIGKILL crash and SIGSTOP competing-owner probe",
+      "actual Docker launcher success/cancel",
+      "read-only snapshot mount and offline consumer",
+      "public coordinator packet/restart",
+      "Full public coordinator.launchTask through actual Docker launcher, result acceptance, artifact retention and coordinator/store reopen"
+    ],
+    "fixtures": [
+      "owner and critic evidence in disposable journals",
+      "external GitHub/Beads adapters",
+      "revocable credential service protocol",
+      "deterministic codex executable; no live model"
+    ],
+    "notRun": [
+      "managed orchestration pilot",
+      "staging packaged macOS VM",
+      "hosted checks on new unpublished head"
+    ]
+  },
+  "mounts": {
+    "approvedDocuments": "bind /run/approved-documents readonly",
+    "workspace": "separate disposable writable workspace",
+    "network": "none for deterministic document/launcher probes"
+  },
+  "sourceSha256": [
+    {
+      "path": "packages/workflow-control/src/artifacts.ts",
+      "sha256": "3a8a054fbb791bf4e66657c3d2e16ad33ae76f812a85465ae97fdd0226d99dcd"
+    },
+    {
+      "path": "packages/workflow-control/src/authorization.ts",
+      "sha256": "a5d356638e60389aa990edd2958054e2e5a4a39763a009bca8032cd4fdcb6354"
+    },
+    {
+      "path": "packages/workflow-control/src/beadsPortCapability.ts",
+      "sha256": "b4e8df14ffc3715e675be4a8e16718b0bccb423866261c038651a0e58ae35a3f"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrap.ts",
+      "sha256": "5382e45bf0b80b02e34d3ec66ca236c6399963d5c1d541c07e4557599161ab71"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapAdapterBundle.ts",
+      "sha256": "ce57e27c4d79c08088863fc91fe8492a9a9f90c2ef30281c4257ece4303387d0"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapAdapterRuntime.ts",
+      "sha256": "7cdac671e9ca4e6d2ec30fc353e0827ef84f0b93fdd732aa9fe624d662052b1c"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapJournal.ts",
+      "sha256": "2833c3a48bb3db7b646e6d36089414508be6789ab25b0f75466379338ab4fa4a"
+    },
+    {
+      "path": "packages/workflow-control/src/bootstrapPolicy.ts",
+      "sha256": "972597b467d354e2eb02cdd31732483c35e5c42eddf41cc6f75a8ac9d9ecacf9"
+    },
+    {
+      "path": "packages/workflow-control/src/cancellation.ts",
+      "sha256": "141a6e56fc9381e29fa21e3878d1b4eb308d2d39f9d21e388251e0deda546b57"
+    },
+    {
+      "path": "packages/workflow-control/src/cli.ts",
+      "sha256": "acb0442ce9364df00e5edaf0cafa3ebbb0fbc4d07d2fecb603f67ef7b14c14e8"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationJournal.ts",
+      "sha256": "d1dd08b12280ae167ad61ea3a53e17cf4e54826a507978f774e664d81c9544de"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationNotifications.ts",
+      "sha256": "9f3d70b63dd3ee740b3f9c75e9cd68733f9b260cfddfce568a000a976e670819"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationProcess.ts",
+      "sha256": "4878f66a38b139e3ff1aea26fee9dc46caf83bc2f2bf17e20a7c65f9f7e74f1e"
+    },
+    {
+      "path": "packages/workflow-control/src/continuationWorker.ts",
+      "sha256": "922b5059994abaa1b694f356b4442ed6f7c92987daf0c2fffa829db6f855231d"
+    },
+    {
+      "path": "packages/workflow-control/src/contracts.ts",
+      "sha256": "061911165daf440a30851a87ebd5744a28c311f6d84584b740d8411cd9a095cf"
+    },
+    {
+      "path": "packages/workflow-control/src/deliveryBrokers.ts",
+      "sha256": "1b33665123be6fd27e343f5f5edac4e0db3749f1fa2cb99171fd067fa68c0a01"
+    },
+    {
+      "path": "packages/workflow-control/src/deliveryPortCapability.ts",
+      "sha256": "a51690938c77bb5bbe61f45de42d4ecf15f2e6bc2f0d636492a7fc1362c971e7"
+    },
+    {
+      "path": "packages/workflow-control/src/documentApproval.ts",
+      "sha256": "56eaf69728dd742326c73ee31ab5cbb5a3847b45cb948ed4a3bfa71869d8910a"
+    },
+    {
+      "path": "packages/workflow-control/src/documentSources.ts",
+      "sha256": "b5fc07ce64924688d833889bf954d326aeca5237179ece569223b847ec8fcdf2"
+    },
+    {
+      "path": "packages/workflow-control/src/featureDeliveryApproval.ts",
+      "sha256": "c7cae96f744e1cd10a2459ed3dc2d5609203b2ba1b5ab18d678b3c3c1ebcd857"
+    },
+    {
+      "path": "packages/workflow-control/src/featureDeliveryBroker.ts",
+      "sha256": "4e17157badcf541ba6f989be529891acd2f03dc7b4a56bb8443318c2d49e5a24"
+    },
+    {
+      "path": "packages/workflow-control/src/featureDeliveryContracts.ts",
+      "sha256": "1247b470734a9eacd6a07d9a55b794042ae220d8be0a1fb518af281478483696"
+    },
+    {
+      "path": "packages/workflow-control/src/featureEvaluation.ts",
+      "sha256": "de38328c817380c36372a310a584bff0076a8c805d458e72f34c0f6aee973d63"
+    },
+    {
+      "path": "packages/workflow-control/src/finalization.ts",
+      "sha256": "75801c38df7392bd841de3ca9025d89a425aa4cb7c2c2d83a67393a6bdf7e647"
+    },
+    {
+      "path": "packages/workflow-control/src/gitDeliveryPort.ts",
+      "sha256": "64c544af58998dee450d8c5d3678b1066b66434b0f29c28471af681a8212143f"
+    },
+    {
+      "path": "packages/workflow-control/src/githubDeliveryPort.ts",
+      "sha256": "40fe10763402f069f0e824cf97b6fc03f131e9a4f678412d1e1c91461b8589fe"
+    },
+    {
+      "path": "packages/workflow-control/src/governedOperations.ts",
+      "sha256": "754650b394e7b64a70c37a50dc53aaa5456948043a16e73de97b3ae56240beff"
+    },
+    {
+      "path": "packages/workflow-control/src/governedPersistence.ts",
+      "sha256": "ae61f2e94adaa9723d7eb47ec76e98d358072d202e90b315552ae2ca2a892687"
+    },
+    {
+      "path": "packages/workflow-control/src/index.ts",
+      "sha256": "b591ecffe8c6723a44be7e4761aacbd45d90eecb638320cc98fd0f1853349e4e"
+    },
+    {
+      "path": "packages/workflow-control/src/integrationGate.ts",
+      "sha256": "f2d040c6a5925fe15ac13a90147db2ecbbe3a78e564651a6a6fcb24bebd6a40a"
+    },
+    {
+      "path": "packages/workflow-control/src/lifecycle.ts",
+      "sha256": "85a663a4c8d7b5d32ab8d4b63f3565a57be86dea9940b588056fee7565862352"
+    },
+    {
+      "path": "packages/workflow-control/src/mcpServer.ts",
+      "sha256": "21b90c48dcc579bc141e88ef3aa026b331a64ecf64a36312a184846ee7cd1633"
+    },
+    {
+      "path": "packages/workflow-control/src/orchestrator.ts",
+      "sha256": "9941c960a629546c61a4d985bb73d193ebdfc1fc70dc3c3afa06cfe8dd9af336"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseJobs.ts",
+      "sha256": "01cee704b97806247ccd364615ad1618335aa53e2769e1be39d6cbc1e442e67b"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "sha256": "57e93aa558c25dbf451bf187292bfb0051b0961ff2287c978e745fb2e4ef38aa"
+    },
+    {
+      "path": "packages/workflow-control/src/planning.ts",
+      "sha256": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da"
+    },
+    {
+      "path": "packages/workflow-control/src/planningDocuments.ts",
+      "sha256": "177c35dc65468da81d3016dae6a6b69acacedb39abf3a22d9a5b0f9ca3f759ea"
+    },
+    {
+      "path": "packages/workflow-control/src/preapprovalMaterial.ts",
+      "sha256": "3bae6ba1d08c276f64ccfcfb81d620a7317ce7e23184e92180a8863ff3945bf7"
+    },
+    {
+      "path": "packages/workflow-control/src/reconciliation.ts",
+      "sha256": "7ce3803231334ce16d3497f6af189965f0413b7f913f31d0eff9f6959f2c539e"
+    },
+    {
+      "path": "packages/workflow-control/src/repairChildPortCapability.ts",
+      "sha256": "827652d05508e5a2018862e725ba6a60f44c064d229884e04e5b63e0b70baf45"
+    },
+    {
+      "path": "packages/workflow-control/src/repairLoops.ts",
+      "sha256": "90cfdf6a6da4d0281f2c4079be96e9fe8ffa6595cbfa5158189588dbe0843462"
+    },
+    {
+      "path": "packages/workflow-control/src/reviewProxy.ts",
+      "sha256": "070145d1e2618a1e6fa9a073b47f8d4666318d225de5103cf74f6f610ca0f369"
+    },
+    {
+      "path": "packages/workflow-control/src/secureEvidence.ts",
+      "sha256": "bf282915a4c93b3400448627cb08b8d1005ff89aea0e26788a3134ac11d7d01f"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistContainerLifecycle.ts",
+      "sha256": "dc76634d57a9a4cd7edc8cef5b9b748af7feaf8b81d8d84e60949d98f02b15f9"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistInput.ts",
+      "sha256": "d5d556caa9f4cdaab5500f7d101b96c61bd50b288ffa38442c1a64a45cc8a889"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "sha256": "f78f1e07b657ad382083c5fa22f5675cfd6d9767e4557905c6e4c18634218af0"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistOutputManifest.ts",
+      "sha256": "d5e60d07a59dd6e5d497085b3e227819b42642ab86ae5105c39b122e61d7844e"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistTerminalResult.ts",
+      "sha256": "d577785d65c12c7ed971a1f9cb4287bf317792e0cff32629e5ad9990308c9194"
+    },
+    {
+      "path": "packages/workflow-control/src/stateMachine.ts",
+      "sha256": "be4776b2a63906500927f7101e261da786cbb53b03e2d60b6c9f4ff77795fadc"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "sha256": "d9fba7343ba48d84d4eedc713b048f0e1159f6c81c0c684a55ea210c97d75db8"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReview.ts",
+      "sha256": "114bb347eb1d8bcd41fc89b889fc6b74d8ce0c95511ab9baa7aec166f5123412"
+    },
+    {
+      "path": "packages/workflow-control/src/supervisedReviewCli.ts",
+      "sha256": "a47a2484df52f99f0699999d7b08bc777ba90c4bc75d782c763fde2cd7f4896e"
+    },
+    {
+      "path": "packages/workflow-control/src/trustedGovernedComposition.ts",
+      "sha256": "f7c09eba2bfb7e23d9a5dbd191a1532341977f0fdcbfe9898ab207f6cd3951a0"
+    },
+    {
+      "path": "packages/workflow-control/src/waitRecovery.ts",
+      "sha256": "6c86c9274adefcfe50e2a01d46d3469f4ef7404033353306de25b8b68cb457a9"
+    },
+    {
+      "path": "packages/workflow-control/src/workCancellation.ts",
+      "sha256": "95360e2d970da2126ed669b4dfff61f37460c8ec0c4548c97d6a828a162be486"
+    }
+  ],
+  "compiledSha256": [
+    {
+      "path": "packages/workflow-control/dist/artifacts.d.ts",
+      "sha256": "7ff41d6d9df8cf183aea20807643cd631b7f0d972bf52dc50463d69e260d4574"
+    },
+    {
+      "path": "packages/workflow-control/dist/artifacts.d.ts.map",
+      "sha256": "673fdf57dd453b82248f894656e914dbca25ced6ff00686cc2528209c3961777"
+    },
+    {
+      "path": "packages/workflow-control/dist/artifacts.js",
+      "sha256": "9e910dbe0a6d5f46baa7e403f53294f039581a7f7df0c505a2c8b6ed3823a9ac"
+    },
+    {
+      "path": "packages/workflow-control/dist/authorization.d.ts",
+      "sha256": "7a399e2459dff5af4ea04c6ca998c5f57d204a3a134518e51e7bf7f23674da61"
+    },
+    {
+      "path": "packages/workflow-control/dist/authorization.d.ts.map",
+      "sha256": "8fc838431d0f26a38a16cdac8833c6cb74cac0273ba6570c949f4b952f22b147"
+    },
+    {
+      "path": "packages/workflow-control/dist/authorization.js",
+      "sha256": "72b57e24606cfaab69da59d3263409655ac919e65ded4239d0693f998bdde07f"
+    },
+    {
+      "path": "packages/workflow-control/dist/beadsPortCapability.d.ts",
+      "sha256": "56360eca1f92fd95c8f883a764288d59417fe50c4d56d83672daa974419f7e52"
+    },
+    {
+      "path": "packages/workflow-control/dist/beadsPortCapability.d.ts.map",
+      "sha256": "f5573f767bf2167ed4dc608013696062f621be0a9bb2719a45ac6a3ab4dbe880"
+    },
+    {
+      "path": "packages/workflow-control/dist/beadsPortCapability.js",
+      "sha256": "f1bf3f30103d9ee115a5a25871c53c27483eaae50eb4f1d211856a0590c79db7"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrap.d.ts",
+      "sha256": "f32062556cc219de0ecf4f45870d5be739ffb06bccb45529a3c11d48a67eb184"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrap.d.ts.map",
+      "sha256": "48702a06a0b646bff217a6c8824339d1be37e5f7f3a77569459accbada41d34c"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrap.js",
+      "sha256": "2b2baff08c412d1d92be00c5a9b2bebceae9be00410916b9ba33c7f3cb09ca95"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapAdapterBundle.d.ts",
+      "sha256": "6c2d1c22eda10b95720ffc6ac8c190eb06c5def7cf826d3afc73b3c0dbb7c88b"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapAdapterBundle.d.ts.map",
+      "sha256": "03526c15d13f8e50ea33f589028b1c5f2c28153ebdf5c4a89135797e9ee0654c"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapAdapterBundle.js",
+      "sha256": "8146647e6b7d45cd44eea7a782718824121071f82a58c640cc75ff60cc1a1da8"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapAdapterRuntime.d.ts",
+      "sha256": "233e92a8eccac71cb188fb483ce2710b8b20dbd84d65a649cda9e4bb87341b5c"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapAdapterRuntime.d.ts.map",
+      "sha256": "31038e6d3319034b19731a1c520d7cc1f8086e5f4d1672e781ff568efc3facb4"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapAdapterRuntime.js",
+      "sha256": "31f0482a05d6c638611805aa748fe393c18abfbb99df4c7b70ffb73fd4bce3bc"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapJournal.d.ts",
+      "sha256": "8a7f481a56492ba4fc0bf29cb036d780a06ffe2777a6743b88ab46bb6d5c7bac"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapJournal.d.ts.map",
+      "sha256": "f5d5c1d6bd3f92752500436440ea389133de100df07022801f53b270dd2b8c0c"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapJournal.js",
+      "sha256": "7075a0bc820e2293f4101178d9e0d1e282ddd2f485010c3f7c4436a401dd44fb"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapPolicy.d.ts",
+      "sha256": "d8abffbd87bec138966937c4dd95b837ef3e9dab92c7cc87d7a814ed97ed833b"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapPolicy.d.ts.map",
+      "sha256": "826c36b355230c63ed0a8c1bda47710fc82862b3c86d798b88f135bcc22ac9a8"
+    },
+    {
+      "path": "packages/workflow-control/dist/bootstrapPolicy.js",
+      "sha256": "d2782717fe171db9daaae751819efd70240a23518bd9cc9636a2661c86235408"
+    },
+    {
+      "path": "packages/workflow-control/dist/cancellation.d.ts",
+      "sha256": "7cc8657049da616d96179c058695bfe1f837c3e83aa87deb1c7b120776b91574"
+    },
+    {
+      "path": "packages/workflow-control/dist/cancellation.d.ts.map",
+      "sha256": "791294f6bc9852c6d070df7c9d4dddc1a3e4333561cd63ae76cee9df1d5e721e"
+    },
+    {
+      "path": "packages/workflow-control/dist/cancellation.js",
+      "sha256": "ca86c226a5b2769e53616f68a34799be0fec1056849b272388f48411d8d6d670"
+    },
+    {
+      "path": "packages/workflow-control/dist/cli.d.ts",
+      "sha256": "8a66a087f8edd0b024b3668b66d77094ade6cfd16406b0dd568866f7e6f4615f"
+    },
+    {
+      "path": "packages/workflow-control/dist/cli.d.ts.map",
+      "sha256": "f7d6c8e11f564bd1510388dd2f09552a59a08a08ffd15245778a5e10fc44acf8"
+    },
+    {
+      "path": "packages/workflow-control/dist/cli.js",
+      "sha256": "a9d87c97a7ed6105314bfd3b4b75369e163cd576160c29fe1c72d4a058d7df4d"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationJournal.d.ts",
+      "sha256": "9ae4c3b1c577762dd38dc00f1ad692512f04e9bead83bcc7d5e7c9dc42efb56a"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationJournal.d.ts.map",
+      "sha256": "eeecc96fab802b369f80dd385b1baa22ea760aaa5a4ce16949a19ac7724ea10e"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationJournal.js",
+      "sha256": "ded7624de7195eadb99d360dc183a42715923e083dc44eba62c7d18218eeb55b"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationNotifications.d.ts",
+      "sha256": "1d9b8618127684370612580636e51842c04f8a2c2c4580fba48fb41b060d651f"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationNotifications.d.ts.map",
+      "sha256": "675714d1e21672cd757f53dba5df5df8e8bc82f9a5245b417115b727c44aa004"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationNotifications.js",
+      "sha256": "31224110ef14eb0dee1fc4df366c82646753e2bcab27975f244a258a3f5effcd"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationProcess.d.ts",
+      "sha256": "761b29db10da4a3966f423adcdd9505cab7459f8de99fabfbc6009979d2f1d48"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationProcess.d.ts.map",
+      "sha256": "f1f87752a6c06ab39bdd37a3b754e42dad4f9d97b680bc5c1fe8883d54f65174"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationProcess.js",
+      "sha256": "14c4621ca61230631cca492992ad1e79dae444dcdaf5cd030c48fe024ac37c25"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationWorker.d.ts",
+      "sha256": "9a45c3271e117da0e8b9041514e0dd2b2e2c30bafc67dc6c2efbf083a621cdee"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationWorker.d.ts.map",
+      "sha256": "f7618e00dc1ed88d74bc815514165192bbcff4bfd60769ec32d64c6aa86e5568"
+    },
+    {
+      "path": "packages/workflow-control/dist/continuationWorker.js",
+      "sha256": "b0ca059db72007cf0209640c9a0e7cf584ea972255c079e68de1d3d1cd489b17"
+    },
+    {
+      "path": "packages/workflow-control/dist/contracts.d.ts",
+      "sha256": "2af0ff13e0c59ed8e170f882daa717e8d7c4081a174bcb4890eceb4bb2568ef1"
+    },
+    {
+      "path": "packages/workflow-control/dist/contracts.d.ts.map",
+      "sha256": "ed28d2be3ce09006e5595a9bbd657a393e4addf37f2671b2b9e00084222e62a3"
+    },
+    {
+      "path": "packages/workflow-control/dist/contracts.js",
+      "sha256": "538a463f8900162d2240485e73a73d1fca8339e96d1214b5c189e03ed7abba9e"
+    },
+    {
+      "path": "packages/workflow-control/dist/deliveryBrokers.d.ts",
+      "sha256": "f418e58c4f939722174bb2f13618ed0514cd22d64a2264e491899c80d8cbdb38"
+    },
+    {
+      "path": "packages/workflow-control/dist/deliveryBrokers.d.ts.map",
+      "sha256": "70cb8eb5b303c5b1efee7751d01ec2c6752f2987e6504df26568ecd65ebe7374"
+    },
+    {
+      "path": "packages/workflow-control/dist/deliveryBrokers.js",
+      "sha256": "ee1f5e286269bba112e6403c4166dad998e98500ca52b93fa20e9e7a89377176"
+    },
+    {
+      "path": "packages/workflow-control/dist/deliveryPortCapability.d.ts",
+      "sha256": "29c51c14f6ad08d003c88fa6d660419bb67372d65aba385e872e2f0ebbb59fc9"
+    },
+    {
+      "path": "packages/workflow-control/dist/deliveryPortCapability.d.ts.map",
+      "sha256": "65353070ea756edf6affd141867f457e000e14439cce7c635bfaf2d4151c59b8"
+    },
+    {
+      "path": "packages/workflow-control/dist/deliveryPortCapability.js",
+      "sha256": "450532c5a1d4724b6102ee1633f057f6b5789e098adbe1dd94ab9ff9ab596936"
+    },
+    {
+      "path": "packages/workflow-control/dist/documentApproval.d.ts",
+      "sha256": "42e6f7b31d3a22ef14fdd8c29d0055cf22ded75d816a1d6d9c840f4ed45ca465"
+    },
+    {
+      "path": "packages/workflow-control/dist/documentApproval.d.ts.map",
+      "sha256": "e7f8059d68d8254024b6225034675c5592bead0b5b56f8f909586b5882f0fcdb"
+    },
+    {
+      "path": "packages/workflow-control/dist/documentApproval.js",
+      "sha256": "e462cbffbf4fef74a177c4bbe9966e0031e208ce86c1f3bccf601ad344066370"
+    },
+    {
+      "path": "packages/workflow-control/dist/documentSources.d.ts",
+      "sha256": "dec60600520a3996efdef94eeb697213d48db9e43c52412aeb92c9045bd77799"
+    },
+    {
+      "path": "packages/workflow-control/dist/documentSources.d.ts.map",
+      "sha256": "12f266c0764c98b6be748408cad76d13e4edaedfcf8cb814c4cef3480e75119b"
+    },
+    {
+      "path": "packages/workflow-control/dist/documentSources.js",
+      "sha256": "76902ed09fd2c7fffc270eb80acdfca7f215fd6a0e8e0d1e545bbabede83b5d2"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryApproval.d.ts",
+      "sha256": "b4e8928e37feffa6df56522ee4c6fc5e490cb079e2bf9bde8592871c727fba2e"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryApproval.d.ts.map",
+      "sha256": "3255de0e6f6d4f962cbbd8f97ff390838743076653e4475a925d87ce377861fc"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryApproval.js",
+      "sha256": "4979efee8509726f918699d43ffc43b737df89204f2569c86739a96fc8c165c2"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryBroker.d.ts",
+      "sha256": "fb407f4a7b28d549a3109df17dca763aa826db101917d939146d18d7d96602f2"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryBroker.d.ts.map",
+      "sha256": "c6013ef282f4b0f14c190f621894573431c816fff7165d2832bb549959f6b56f"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryBroker.js",
+      "sha256": "ce869f93387d661a6cad722d22632f808231e16e539447df1a94303f4613526f"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryContracts.d.ts",
+      "sha256": "ec6ab5a5c06ba4e1ce25f455bb42317238faf4e4382f8384e1fbfa5cd5dcc827"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryContracts.d.ts.map",
+      "sha256": "ccd490ee926cc3b402b8b16460645a66ed36a5dd3ce781b61530d4987c6efcf4"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureDeliveryContracts.js",
+      "sha256": "6cc61f954647f95d7ddd2448b1b06919e45c4e04b853a36c45b67b04a4dfbf6b"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureEvaluation.d.ts",
+      "sha256": "427caf89582dc95f734087895123ded922af7d982d355e388c41aded5a1df2fb"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureEvaluation.d.ts.map",
+      "sha256": "c45db62ea2be32ef9eaba06885f6712a2814f4e5aecd1135d3d277e80a2cbb0f"
+    },
+    {
+      "path": "packages/workflow-control/dist/featureEvaluation.js",
+      "sha256": "40bc703f7e52aa2d23ab107624f90345979a75003ea4d399130de1e47b4dc32c"
+    },
+    {
+      "path": "packages/workflow-control/dist/finalization.d.ts",
+      "sha256": "34f98d515ebc59338d14f7728cbdc53a022b4d25d0e90fb255f2f020eba165dd"
+    },
+    {
+      "path": "packages/workflow-control/dist/finalization.d.ts.map",
+      "sha256": "0b80b962e51d0de72155b19de808ced222ecf83fc2b3423a7eb72b5bbd02e1ad"
+    },
+    {
+      "path": "packages/workflow-control/dist/finalization.js",
+      "sha256": "4dae0de1264bb277c869d999f36ca5b0745e8f45684d11569a2d581b671f0f37"
+    },
+    {
+      "path": "packages/workflow-control/dist/gitDeliveryPort.d.ts",
+      "sha256": "25679cd6d796cc15e3bd9a1574c8c99badc3ae7cd71e96b26dbf030a9124bc11"
+    },
+    {
+      "path": "packages/workflow-control/dist/gitDeliveryPort.d.ts.map",
+      "sha256": "5bf00ec72d4a51f53d2576984acb252858646a809612a6587274a5bdcbbd5231"
+    },
+    {
+      "path": "packages/workflow-control/dist/gitDeliveryPort.js",
+      "sha256": "935aa06c6853a37eb0afe31c78cccb469eb697ce3466038337c707c968689995"
+    },
+    {
+      "path": "packages/workflow-control/dist/githubDeliveryPort.d.ts",
+      "sha256": "dce97aecda39853bd2df645fc4957e060656b150811cf607b133308f612c0dc9"
+    },
+    {
+      "path": "packages/workflow-control/dist/githubDeliveryPort.d.ts.map",
+      "sha256": "1f67557c1b4c002ad1ae554b80df545079ab9dcc657cc9b4e024c467806e026c"
+    },
+    {
+      "path": "packages/workflow-control/dist/githubDeliveryPort.js",
+      "sha256": "9e4593c093948a7b532ca3c0706e782d089911cef9303e06bf188d5d6d32cf2b"
+    },
+    {
+      "path": "packages/workflow-control/dist/governedOperations.d.ts",
+      "sha256": "8513cf4e3bc3695d93d5b755b9c74962a4e5544a1b2a44a7786956fa17ccc307"
+    },
+    {
+      "path": "packages/workflow-control/dist/governedOperations.d.ts.map",
+      "sha256": "3132029a6664c148e78da8cbfb01f6459ba268af6b14541d34b7cef56c781040"
+    },
+    {
+      "path": "packages/workflow-control/dist/governedOperations.js",
+      "sha256": "2eef80bcef3fed1687a48a2c29be05d407497c22c07851a17eb1b0c8e31ffad4"
+    },
+    {
+      "path": "packages/workflow-control/dist/governedPersistence.d.ts",
+      "sha256": "6b3deccfc15aa2d7df45da76b1e021fc5a7c29035abea5cc6ef2845782c5caf1"
+    },
+    {
+      "path": "packages/workflow-control/dist/governedPersistence.d.ts.map",
+      "sha256": "7f90e9dd3177178ed69d198e06a9b07bb45b0a9f584c7a681fd8700f08744df5"
+    },
+    {
+      "path": "packages/workflow-control/dist/governedPersistence.js",
+      "sha256": "14125b6bb1152f0c5e81c54910330e7bb7cb8382444df59889b79c8cb3a660e9"
+    },
+    {
+      "path": "packages/workflow-control/dist/index.d.ts",
+      "sha256": "ca6a8c4a62085cdd12eab28451f65812372c435964616679113ee830f6dfdf41"
+    },
+    {
+      "path": "packages/workflow-control/dist/index.d.ts.map",
+      "sha256": "063df1653a6467db828e0d00c73f881ab3d3395cac3b43dd51258e204a0b7947"
+    },
+    {
+      "path": "packages/workflow-control/dist/index.js",
+      "sha256": "65d83d86516392720de8db9b1833e9dbbe6c810735f63e7fddee1f772053a094"
+    },
+    {
+      "path": "packages/workflow-control/dist/integrationGate.d.ts",
+      "sha256": "be6d1d0845ca97eff056400080da1d778687ace8a420a43961524c1ce9771ba1"
+    },
+    {
+      "path": "packages/workflow-control/dist/integrationGate.d.ts.map",
+      "sha256": "bd4b18156c7973ff6a3b2d1e2917964124e5dd18dba83f048129e94b6251462b"
+    },
+    {
+      "path": "packages/workflow-control/dist/integrationGate.js",
+      "sha256": "c52d4b29379d9760e6b5ed5d7b0326a99c04b4e9d62a3ff5168af09259fd5ef9"
+    },
+    {
+      "path": "packages/workflow-control/dist/lifecycle.d.ts",
+      "sha256": "a2e3bf42868254d979b7e722cf2e70f45a4e16f6850053eeb419769bb1e6d613"
+    },
+    {
+      "path": "packages/workflow-control/dist/lifecycle.d.ts.map",
+      "sha256": "e12fdbcb125ca6e8a783001c1c1504cc2140d7530b92365611c225c1b4480ee1"
+    },
+    {
+      "path": "packages/workflow-control/dist/lifecycle.js",
+      "sha256": "f1411c4527a4fe8e8f803a1ad6077c331a825f1dc48eb80c63597fb2a95282b1"
+    },
+    {
+      "path": "packages/workflow-control/dist/mcpServer.d.ts",
+      "sha256": "66469ca8f4dbd0f0af8b489200c6de7156550e544aa51a1354880e29e0eca368"
+    },
+    {
+      "path": "packages/workflow-control/dist/mcpServer.d.ts.map",
+      "sha256": "7b5abc70f64632368e5980d82e3110fd1f4f33c5e9ff6467ae5c54a3b299948f"
+    },
+    {
+      "path": "packages/workflow-control/dist/mcpServer.js",
+      "sha256": "832e27de1b22f382a77fc4203cb7d7ae399a5342cb05693d460caceee06aa27a"
+    },
+    {
+      "path": "packages/workflow-control/dist/orchestrator.d.ts",
+      "sha256": "d0cebf0421a902b96ecff30accc2085106c9c02fc6ae26b746e0594a409c45ce"
+    },
+    {
+      "path": "packages/workflow-control/dist/orchestrator.d.ts.map",
+      "sha256": "e826c95118796002bcb41da1e278cca593c4d3069db2c88c5ad112dce2d6e4c4"
+    },
+    {
+      "path": "packages/workflow-control/dist/orchestrator.js",
+      "sha256": "4ead46e0266489047e055e1d7fe7fa32f509df8b5c92446598196d6e8454aefa"
+    },
+    {
+      "path": "packages/workflow-control/dist/phaseJobs.d.ts",
+      "sha256": "5aabd672a88c8ad34519749d5f9d1e470a2145cd4fd6718f0c9abede62d6a500"
+    },
+    {
+      "path": "packages/workflow-control/dist/phaseJobs.d.ts.map",
+      "sha256": "4176835db17e88289868d4cf099766b6565d6265a5cd83b0eac622e4f82de26f"
+    },
+    {
+      "path": "packages/workflow-control/dist/phaseJobs.js",
+      "sha256": "28781aba01780d59b80d19031c3175b3452e3231dc40dd0e569bdb7ffc0de328"
+    },
+    {
+      "path": "packages/workflow-control/dist/phaseRuntime.d.ts",
+      "sha256": "9a6bda0f93c9a1f3c81189725e2313632cc21d7b507a1d7d90dd4d7da192d43a"
+    },
+    {
+      "path": "packages/workflow-control/dist/phaseRuntime.d.ts.map",
+      "sha256": "952c8e3d87fb22d8d2f8ef97ad33a93e439225ffedc8ebd03360ca64bb36aa35"
+    },
+    {
+      "path": "packages/workflow-control/dist/phaseRuntime.js",
+      "sha256": "c2e15a20bd3654a8c58f16ad697395122eb54f8b291ee6da89ffd3534f28451d"
+    },
+    {
+      "path": "packages/workflow-control/dist/planning.d.ts",
+      "sha256": "aab0f93a1e0b63fa143f0c264054b29edabf294aa027c8cf19f16242247d8981"
+    },
+    {
+      "path": "packages/workflow-control/dist/planning.d.ts.map",
+      "sha256": "0843632c50350e5fc3c07c18b50305f9c1675dd969f4c76134161803f3288090"
+    },
+    {
+      "path": "packages/workflow-control/dist/planning.js",
+      "sha256": "2e72cd0ce7fc3161cda1de1a9c9faed020ec05f1a4a176b9cb4cb2930a5fd005"
+    },
+    {
+      "path": "packages/workflow-control/dist/planningDocuments.d.ts",
+      "sha256": "a55d3e2f6e128a90946e14d6c9b35ceafaa90521fdd78774b2dd5ec4591cc19c"
+    },
+    {
+      "path": "packages/workflow-control/dist/planningDocuments.d.ts.map",
+      "sha256": "4ae16f669a525337cf5e408ad79c534ab81576c000c58bed10aef1a5eb74f64b"
+    },
+    {
+      "path": "packages/workflow-control/dist/planningDocuments.js",
+      "sha256": "d5e4e099765c164d3a28e31ac013cebf1c7159fd446fe5955e39cd981909dda3"
+    },
+    {
+      "path": "packages/workflow-control/dist/preapprovalMaterial.d.ts",
+      "sha256": "36e242099eba0314825fc8e76b6b2b301a65c62506ccaaaa1cbd508dfb278bdf"
+    },
+    {
+      "path": "packages/workflow-control/dist/preapprovalMaterial.d.ts.map",
+      "sha256": "372de179049da108c0f5ed616fb17e7a1c57427b7c66b43bd64f33ada4ffc3e9"
+    },
+    {
+      "path": "packages/workflow-control/dist/preapprovalMaterial.js",
+      "sha256": "729ccd0c71df4039eb14fcf8f73f205fd2d3a56c03fe18ac1e692009cab37203"
+    },
+    {
+      "path": "packages/workflow-control/dist/reconciliation.d.ts",
+      "sha256": "b7565cfc4d3d54078feba8e1efc5f048937eecd93194ea882a00c07b8d8b50c1"
+    },
+    {
+      "path": "packages/workflow-control/dist/reconciliation.d.ts.map",
+      "sha256": "fcd7671f79394fd9fc8573b66a7d3ff4424c25a9313d1ff54ae61b93426d0a13"
+    },
+    {
+      "path": "packages/workflow-control/dist/reconciliation.js",
+      "sha256": "3a64859f53228cad50fad0ac71e5a23e71b87543efc401dc7a3a4c9328566ffc"
+    },
+    {
+      "path": "packages/workflow-control/dist/repairChildPortCapability.d.ts",
+      "sha256": "5564e714a7bf62bbcba1aa76c185cf7e9e08987cd7fbafd9c8d6d241b346675e"
+    },
+    {
+      "path": "packages/workflow-control/dist/repairChildPortCapability.d.ts.map",
+      "sha256": "84eda313850aa74c8f963e84ab678a9dcdfde98e17d5f5d712f23caa4759c33b"
+    },
+    {
+      "path": "packages/workflow-control/dist/repairChildPortCapability.js",
+      "sha256": "c2d6f93aaa3cbe41971062147c62c6465d0ecf56580ce8cc0edd87f458de0f52"
+    },
+    {
+      "path": "packages/workflow-control/dist/repairLoops.d.ts",
+      "sha256": "05d2e7562d5deac7f139aef834bcb936abb6f8edcfc7ff306bd5095a9624fbc7"
+    },
+    {
+      "path": "packages/workflow-control/dist/repairLoops.d.ts.map",
+      "sha256": "db8eeb3950456cf8d5c4976bd1e68f26409b0aaa746b41112449660611d00942"
+    },
+    {
+      "path": "packages/workflow-control/dist/repairLoops.js",
+      "sha256": "441661727802aa9b04a92e5cd5205a194ed830b63d946ef3fab0d158c43ed26e"
+    },
+    {
+      "path": "packages/workflow-control/dist/reviewProxy.d.ts",
+      "sha256": "794f0328282dacaedf3abcdd487e1bfd5dda81e5a6ed0e55894027a18ede73d7"
+    },
+    {
+      "path": "packages/workflow-control/dist/reviewProxy.d.ts.map",
+      "sha256": "8d3a2284e7f6679a8f01b9fe632afc95588dee528f0bc13eeecf9dee3ac7b797"
+    },
+    {
+      "path": "packages/workflow-control/dist/reviewProxy.js",
+      "sha256": "cd8f7b04ed3743c3d08538a1364459c1ee5f98d92e6c163c75eab401bd12068f"
+    },
+    {
+      "path": "packages/workflow-control/dist/secureEvidence.d.ts",
+      "sha256": "c69040052503acb44b9d519c508143af0c95b402448e36bc532b79aead4b278d"
+    },
+    {
+      "path": "packages/workflow-control/dist/secureEvidence.d.ts.map",
+      "sha256": "91099447104e825e9699c8e840d0e3fd2cbbf4cbe01552eb687e510264f131cc"
+    },
+    {
+      "path": "packages/workflow-control/dist/secureEvidence.js",
+      "sha256": "14562d69661c85005d11860c1324267d261f8aad15f4b2384989fdacc4dee8fa"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistContainerLifecycle.d.ts",
+      "sha256": "97efb1429ae12354f1d790db25cb1138d07f4deb9f3eabf030f911ce20a9a283"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistContainerLifecycle.d.ts.map",
+      "sha256": "9d276ee899b11d1daac36925006a9577990a3a68f30a4e3c19523d72ced4a081"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistContainerLifecycle.js",
+      "sha256": "f58cbc3f014efc1d47a45954544a1c0fc199bbea051a705bcc96b3550169d80b"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistInput.d.ts",
+      "sha256": "b26fd2a4c80a2ff9fe39ff5c663840388f503da770b064741fb2ee35cdf807d0"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistInput.d.ts.map",
+      "sha256": "eec307131e0e79a7bd564bbd2a183013d929b18551d30f0f91b20684d4ab2c9b"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistInput.js",
+      "sha256": "5f2bc8c7a5d2023426b4886ee1dc7672e76e1ce8db000e6ce9bff7e37bb9f16d"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistLauncher.d.ts",
+      "sha256": "e3477f073db5191db4a6e868801a3c3029fb1d5a4261e1793f26f71f4103ad5e"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistLauncher.d.ts.map",
+      "sha256": "a1e097137d910535e9d8ed19ba6890ff92cf9cb7ddefcafe38ea42904b534b09"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistLauncher.js",
+      "sha256": "f32ef13d61a0c0568c9dce5ede9577d1f53a7fb0ccd7fab274359958d078ef74"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistOutputManifest.d.ts",
+      "sha256": "1ed48a7828ce227e23c6ddac522de83b91aa1717ebd1344089b0b5e07c71330d"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistOutputManifest.d.ts.map",
+      "sha256": "6b1053810940ff47280689bb7237c392a56083ba52a181b456812d5a7b9c4679"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistOutputManifest.js",
+      "sha256": "8e5bd141bbf287fa08569405d09da764485ade193245ec8de790665aafd98451"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistTerminalResult.d.ts",
+      "sha256": "dc44200cbd4fa39530d4d963e01c2e4bcfa28629c034fbbe2f6c04bbb0022de0"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistTerminalResult.d.ts.map",
+      "sha256": "213b897bd949589d6d52150349c0547e9267c57b435c5402f3725d7d50630cb4"
+    },
+    {
+      "path": "packages/workflow-control/dist/specialistTerminalResult.js",
+      "sha256": "9b73c69ece72a37c19748d71a9c66e885680a962284e3f29e8748a872fdb7b74"
+    },
+    {
+      "path": "packages/workflow-control/dist/stateMachine.d.ts",
+      "sha256": "3c38da2c25b3e41d51de68439266bb6f65e9a9502313fccd3805418ae29638a5"
+    },
+    {
+      "path": "packages/workflow-control/dist/stateMachine.d.ts.map",
+      "sha256": "dfb2126723ec91f8f7ae2b3e3612cac4a83d80161decf56e433ab21a3e5b4ae4"
+    },
+    {
+      "path": "packages/workflow-control/dist/stateMachine.js",
+      "sha256": "34e0dd45837d93b62b9174421dbaf84c40b9424927e2fa85cba43b87c434cd26"
+    },
+    {
+      "path": "packages/workflow-control/dist/storage.d.ts",
+      "sha256": "4afe08483fbcc4d218da5c2a10605bd01b0cae2001405fa2027bf45287ab6791"
+    },
+    {
+      "path": "packages/workflow-control/dist/storage.d.ts.map",
+      "sha256": "3698dca13eea99a2578cd41ce651827bd92bb6a60cb6406780ec84071cb60cd1"
+    },
+    {
+      "path": "packages/workflow-control/dist/storage.js",
+      "sha256": "db37bdbaab50cb07b4f2adff197a84a1949e42f3b996e94e60014bcc22262dab"
+    },
+    {
+      "path": "packages/workflow-control/dist/supervisedReview.d.ts",
+      "sha256": "f50934794abcd977ea58c225fc90bec118b25c4d2b4fb14e18c97b0ca6196f1f"
+    },
+    {
+      "path": "packages/workflow-control/dist/supervisedReview.d.ts.map",
+      "sha256": "1c76f48803b7b5601f58b7965f5a15ce8582d7f8c7023f7af78ac79285b9b1d4"
+    },
+    {
+      "path": "packages/workflow-control/dist/supervisedReview.js",
+      "sha256": "585f166de7bbaddc5c22c17bbe441094825638e9a0aed73785e80a8878df4dba"
+    },
+    {
+      "path": "packages/workflow-control/dist/supervisedReviewCli.d.ts",
+      "sha256": "cdd14cbde6e097fb673dafab88f1f4e2b44c3074015ae3c0c3176633f71cce71"
+    },
+    {
+      "path": "packages/workflow-control/dist/supervisedReviewCli.d.ts.map",
+      "sha256": "29d48d6643baca1520ba1fd9b91e5365fcf259c1833f35349e207c7714534c6f"
+    },
+    {
+      "path": "packages/workflow-control/dist/supervisedReviewCli.js",
+      "sha256": "de26cbad9e73e0bcf24e4ae0afd197bd0606f22e558748516f4ceba799ebde79"
+    },
+    {
+      "path": "packages/workflow-control/dist/trustedGovernedComposition.d.ts",
+      "sha256": "ae0a8cdcb6885c7d3ffca20ed92cb9fcc10893648bcfff4b78a09153b915f48e"
+    },
+    {
+      "path": "packages/workflow-control/dist/trustedGovernedComposition.d.ts.map",
+      "sha256": "3d97ea9e83f91c98944258948e45b8755e99bcb070dacebd535e470933289348"
+    },
+    {
+      "path": "packages/workflow-control/dist/trustedGovernedComposition.js",
+      "sha256": "188d6d06846d3f57a27803da4ed77ace544463fe3d159ca9b50cab35dcb02fa1"
+    },
+    {
+      "path": "packages/workflow-control/dist/waitRecovery.d.ts",
+      "sha256": "932bafc1f47131d09915b3e43d6ce16da7ba0ff0373e1d91e266ed1f6a66787a"
+    },
+    {
+      "path": "packages/workflow-control/dist/waitRecovery.d.ts.map",
+      "sha256": "d0c48bffb438d0aaf783255bdf7de9c7559b54317548b18642d17bfbc00b1d27"
+    },
+    {
+      "path": "packages/workflow-control/dist/waitRecovery.js",
+      "sha256": "727b04d3213e1c064ab2192d80263aa576284372b89e739f5f164eff2267293c"
+    },
+    {
+      "path": "packages/workflow-control/dist/workCancellation.d.ts",
+      "sha256": "23c5bf5e09aefd487500aa73980063f3d13ba2fb72f0c1652ed3d9200bd1c41f"
+    },
+    {
+      "path": "packages/workflow-control/dist/workCancellation.d.ts.map",
+      "sha256": "3d7da8d058730d185d4d4401316947a7c76dcecb6e33bdae0c113cb05830f7b4"
+    },
+    {
+      "path": "packages/workflow-control/dist/workCancellation.js",
+      "sha256": "042d91f9776625ac9061196a59ef9f70534e033eef694b39b73d1a3e0e541617"
+    }
+  ],
+  "testSha256": [
+    {
+      "path": "packages/workflow-control/test/activeSpecialistSettlement.integration.test.ts",
+      "sha256": "70b02ac9ab4cc71945505d9f8b3bec35ec1ec3f9cd35f467e872054b828232f1"
+    },
+    {
+      "path": "packages/workflow-control/test/activeSpecialistSettlement.test.ts",
+      "sha256": "e4cbf169704fca51e260f8290b3c3151208d55e0d27ac8760c9dea9dcd422bd4"
+    },
+    {
+      "path": "packages/workflow-control/test/artifacts.test.ts",
+      "sha256": "35e4c11f31eece75ac808b3e57aa1a88f20a93b52306bef4fd903ddb631b676e"
+    },
+    {
+      "path": "packages/workflow-control/test/authorization.test.ts",
+      "sha256": "c0be8c3b6bb081bf4ac42408b2cfa09ecfbc354681f76347314efa9e15aa54bf"
+    },
+    {
+      "path": "packages/workflow-control/test/bootstrap.test.ts",
+      "sha256": "5e42196be7da2ae61a11d88091c1f3acfe898b0ee8b7bb6648f350d98d14c9b3"
+    },
+    {
+      "path": "packages/workflow-control/test/bootstrapAdapters.test.ts",
+      "sha256": "4dab22f341b8ef3f28af2ff4753566813115243ca9993e51a20a8379ee3866b2"
+    },
+    {
+      "path": "packages/workflow-control/test/bootstrapPolicy.test.ts",
+      "sha256": "22c2761a5dd75111321f6c931417c9ee1d8df87ad6df9db31f483b17ee501090"
+    },
+    {
+      "path": "packages/workflow-control/test/cancellationWork.test.ts",
+      "sha256": "f0b643d640a1d95d921904901e32fd8d1e09aa5120beb12cd160bfc9d07ac2c6"
+    },
+    {
+      "path": "packages/workflow-control/test/continuationFixture.ts",
+      "sha256": "789db21322a004e4c0eea335b9993be71efb6c88abe5a95c2e8f24a01d98bf51"
+    },
+    {
+      "path": "packages/workflow-control/test/continuationNotifications.test.ts",
+      "sha256": "ba0fa11a1011ddbb19956d53179bf388b6e2db95e79477d53ec836766fa43a3a"
+    },
+    {
+      "path": "packages/workflow-control/test/continuationProcess.test.ts",
+      "sha256": "b708d4f396e16ebedb652d302615cf4b3e63cf81c83725a7f0603def49eaa191"
+    },
+    {
+      "path": "packages/workflow-control/test/continuationWorker.test.ts",
+      "sha256": "42d4ec75d1977001cb58de30e6b04e9d39828e0d29c31df5dfb979b270530db2"
+    },
+    {
+      "path": "packages/workflow-control/test/contracts.test.ts",
+      "sha256": "a29b5b2d7bdd92b8549927df84d97989e8923d8d79c7e14217ed29509ac335f9"
+    },
+    {
+      "path": "packages/workflow-control/test/deliveryBrokers.test.ts",
+      "sha256": "3018b704995efafa0a8cbd9125862d1299648b54745790787fc8e585a9d48d84"
+    },
+    {
+      "path": "packages/workflow-control/test/documentApproval.test.ts",
+      "sha256": "7513cf9041c6ce9a0dd2d567c95b90855ce089dd9c4493f7f838ba1375185723"
+    },
+    {
+      "path": "packages/workflow-control/test/documentFixture.ts",
+      "sha256": "218df06f54df0653116166dbe1f2da776af399658989b051ca167d67bc960b13"
+    },
+    {
+      "path": "packages/workflow-control/test/featureDeliveryApproval.test.ts",
+      "sha256": "ea532569e77e08a12044b92973546842dc439ca5680f394bf0ef7885b7fe45cf"
+    },
+    {
+      "path": "packages/workflow-control/test/featureDeliveryBroker.test.ts",
+      "sha256": "3924345942cc36c6636f894d7457b182c456dbff9a5f5bc410c4940c3909be17"
+    },
+    {
+      "path": "packages/workflow-control/test/featureDeliveryContracts.test.ts",
+      "sha256": "ef04b90caaeea50b91f5b191c29bbdaf283312827c537db9bbc4e2b0adb55458"
+    },
+    {
+      "path": "packages/workflow-control/test/featureEvaluation.test.ts",
+      "sha256": "4cfbaaf440cce934f16cab31f4d501600f6d61ad80210fbed85fb7ff970e2efb"
+    },
+    {
+      "path": "packages/workflow-control/test/finalization.test.ts",
+      "sha256": "11f61453a59c5f8912d87e7ad71ced4f31075b97030dea1a8283ee963009c0ff"
+    },
+    {
+      "path": "packages/workflow-control/test/gitDeliveryPort.test.ts",
+      "sha256": "ba0e6e66764a200dbf3959e6a614b143ac534ef210d83e744d1922939b09cf80"
+    },
+    {
+      "path": "packages/workflow-control/test/githubDeliveryPort.test.ts",
+      "sha256": "19c8048f006b7561a0622603876fd5fb806e406447e82cac0968e3bd7a2849e0"
+    },
+    {
+      "path": "packages/workflow-control/test/governedOperations.test.ts",
+      "sha256": "9d18ce93fe5c569ea48715c41bc5027d31d304938d82a641a6a02ad9ca62350a"
+    },
+    {
+      "path": "packages/workflow-control/test/governedPersistence.test.ts",
+      "sha256": "8343b5a5561d240df95d28a422ee717658195170a32d8689768e50d9d0913aa5"
+    },
+    {
+      "path": "packages/workflow-control/test/integrationGate.test.ts",
+      "sha256": "5fa4b83d4ff641ea53309be170804bd910a464b014bca24173d8c0864dab0e25"
+    },
+    {
+      "path": "packages/workflow-control/test/isolation.integration.test.ts",
+      "sha256": "5b91189102240bcd8982a93aaf75b7f6ade78dddf33d34c401d98e3d26f19e58"
+    },
+    {
+      "path": "packages/workflow-control/test/lifecycle.test.ts",
+      "sha256": "2db6ae224178fef49103b02f0a928adb203b2412431915f3011ce8a4f0bdf4b3"
+    },
+    {
+      "path": "packages/workflow-control/test/mcpServer.test.ts",
+      "sha256": "256dcc92b91143f11c67e5e1c721a657311f7f1503e7c22d74f419e4c115aae0"
+    },
+    {
+      "path": "packages/workflow-control/test/orchestrator.test.ts",
+      "sha256": "cb19ac224654c8ebcb219ca0085f01b2a7b428c9db113ac98bf9af07bd3e0992"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseJobs.test.ts",
+      "sha256": "3d0b46f24200484537d656b30b6c51a12fb4d42591faa8074c57ea2fc5bf1a21"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "sha256": "cb5056670cd7ae230ae4d6000df729877f839ec776520703fb1ccf7930af049e"
+    },
+    {
+      "path": "packages/workflow-control/test/planning.test.ts",
+      "sha256": "89e34986d58915ed9a96956669003aeed9a5a01a13a5d41b4f4bfda008fc485e"
+    },
+    {
+      "path": "packages/workflow-control/test/planningDocuments.test.ts",
+      "sha256": "d65c584a6d1188984cda3d188b1251dcc648e749c88e37c321dd86cfc8de5c0e"
+    },
+    {
+      "path": "packages/workflow-control/test/prePushIsolation.test.ts",
+      "sha256": "bf99d84160dd008142428c4eaa7b3581fb3e1971b7d2249090b121509fb5f366"
+    },
+    {
+      "path": "packages/workflow-control/test/preapprovalMaterial.test.ts",
+      "sha256": "3dd79d3ddbcca546d365bb39f1f3a7cae4300103b28e5bc0f093bdf7613704c5"
+    },
+    {
+      "path": "packages/workflow-control/test/recoveryCancellation.test.ts",
+      "sha256": "4cc31e07600d129f8a5da936445defbdb0ab828ed703e0603470d43f305b3978"
+    },
+    {
+      "path": "packages/workflow-control/test/repairLoops.test.ts",
+      "sha256": "6441903c371d7e1fcbc29e78232cd03515f22310e23c8ba6dfb74cb81e647e19"
+    },
+    {
+      "path": "packages/workflow-control/test/reviewProxy.test.ts",
+      "sha256": "8471b4464169e56f5ad278f7e07c9ec213907a52eb8857bdc0946fb0ad8ce2b0"
+    },
+    {
+      "path": "packages/workflow-control/test/reviewProxyStreams.test.ts",
+      "sha256": "46dd4ab2850391c5c87e32d0f61c337a661b17b690002052b2fe7a5514b1e0e0"
+    },
+    {
+      "path": "packages/workflow-control/test/schedulerCompletionContention.test.ts",
+      "sha256": "5b87a72415d54cd3909a23a45de6d0527b8c08fca44cbe6b738b94eff530ca16"
+    },
+    {
+      "path": "packages/workflow-control/test/schedulerDockerFixture.ts",
+      "sha256": "34f6ae071b884a5b106dd9b3d84d040cd2f4b4a1fa61387a9aba2878995d8371"
+    },
+    {
+      "path": "packages/workflow-control/test/secureEvidence.test.ts",
+      "sha256": "833600fa4a42fab8a26e3ec0d3e1d7453ab3d254837f95f290532e6175018323"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistContainerLifecycle.integration.test.ts",
+      "sha256": "baac54fb29b9bb4fa6d086552875b07dc3d26e11fd853eb0b95fa540e45c0d56"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistContainerLifecycle.test.ts",
+      "sha256": "3f0d37317ab0d84ddd9e285d79503a084dcec97fd3b9b6a904f509ff48ecaff9"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistLauncher.test.ts",
+      "sha256": "f02af254f27ce5164adf37bd4e9657fe01e1258748a791df73bf98278f7346f8"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistOutputManifest.test.ts",
+      "sha256": "64af54f389845e1fa02464e17fddf29dfbe85f900dbfc8c44074c16b43fcacf0"
+    },
+    {
+      "path": "packages/workflow-control/test/stateMachine.test.ts",
+      "sha256": "688f4fb7935146ddba79d78e127cd68c432ed44de77a986b94d06a098f36e744"
+    },
+    {
+      "path": "packages/workflow-control/test/storage.test.ts",
+      "sha256": "250356f5ca92dd5c71e6b3818e66c4d1d9ece5b7f705fe182e5e601dd83acb28"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.integration.test.ts",
+      "sha256": "da254056e690919e7a56b36957566719c8d96d07c718ebc5cf3de78291725d31"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReview.test.ts",
+      "sha256": "646539f5a701d395bcd437e6ca196972ee9b791772f798999bf9badfd45f0e90"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReviewCapabilities.integration.test.ts",
+      "sha256": "f01bca7e4d367f2af3a6fde6dde452f01a2e793de0da66d11a23bb18cc6bda10"
+    },
+    {
+      "path": "packages/workflow-control/test/supervisedReviewLifecycle.test.ts",
+      "sha256": "3d6af70f8541c0acf707effff2de12b520c0f353b415fe898969846337bbf904"
+    },
+    {
+      "path": "packages/workflow-control/test/waitRecovery.test.ts",
+      "sha256": "037eb3768395affef59757a61a5f3a988d8845f56263e16a353421378130b302"
+    }
+  ]
+}

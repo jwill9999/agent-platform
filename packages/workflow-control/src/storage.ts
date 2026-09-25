@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import {
   assertDocumentAuthority,
   assertDocumentApprovalCandidate,
@@ -578,6 +579,16 @@ function transitionFromRow(row: TransitionRow): TransitionRecord {
   };
 }
 
+function assertSchedulerTerminalReplay(
+  execution: SchedulerExecutionRecord,
+  input: { status: SchedulerExecutionStatus; result: unknown },
+): void {
+  if (execution.status !== input.status)
+    throw new Error('scheduler terminal replay status changed');
+  if (!isDeepStrictEqual(execution.result, input.result))
+    throw new Error('scheduler terminal replay result changed');
+}
+
 function schedulerExecutionFromRow(row: SchedulerExecutionRow): SchedulerExecutionRecord {
   return {
     id: row.id,
@@ -734,6 +745,7 @@ export class WorkflowStore {
   recordPlanningDocumentPublication(input: {
     runId: string;
     sourceRoot: string;
+    sourcePolicy?: unknown;
     nowMs?: number;
   }): void {
     recordPlanningDocumentPublication(this.#database, input);
@@ -792,7 +804,11 @@ export class WorkflowStore {
     return id;
   }
 
-  createRun(contractId: string, state: WorkflowState = 'approved', id = randomUUID()): RunRecord {
+  createRun(
+    contractId: string,
+    state: WorkflowState = 'approved',
+    id: string = randomUUID(),
+  ): RunRecord {
     if (state === 'pipeline') {
       throw new Error('pipeline runs must be entered through exact lineage import');
     }
@@ -803,7 +819,7 @@ export class WorkflowStore {
   createRunForTest(
     contractId: string,
     state: WorkflowState = 'approved',
-    id = randomUUID(),
+    id: string = randomUUID(),
   ): RunRecord {
     if (process.env.NODE_ENV !== 'test') throw new Error('test run fixture is unavailable');
     return this.#createRunFixture(contractId, state, id);
@@ -1604,6 +1620,7 @@ export class WorkflowStore {
       runId: request.targetRunId,
       taskId: request.targetTaskId,
       boundary: 'lineage.import',
+      additionalSourceRef: request.ref,
       ownerId: input.ownerId,
       runLeaseEpoch: request.runLeaseEpoch,
       nowMs: input.nowMs,
@@ -3711,6 +3728,51 @@ export class WorkflowStore {
     return updated.changes === 1;
   }
 
+  dispatchSchedulerCredentialIssue<T>(
+    id: string,
+    dispatch: () => T,
+    capability: typeof workflowCredentialJournalCapability,
+    nowMs = Date.now(),
+  ): T {
+    if (capability !== workflowCredentialJournalCapability)
+      throw new Error('credential journal capability required');
+    const started = performance.now();
+    const execution = this.getSchedulerExecution(id);
+    if (!execution || execution.status !== 'active')
+      throw new Error('credential execution is not active');
+    const assertDocuments = this.#documentAuthority({
+      runId: execution.runId,
+      taskId: execution.taskId,
+      ownerId: execution.ownerId,
+      runLeaseEpoch: execution.runLeaseEpoch,
+      boundary: 'credential.issue',
+      nowMs,
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        const dispatchTime = nowMs + Math.max(0, Math.floor(performance.now() - started));
+        for (const [kind, resourceId, epoch] of [
+          ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
+          ['run', execution.runId, execution.runLeaseEpoch],
+          ['task', execution.taskId, execution.taskLeaseEpoch],
+        ] as const)
+          this.#assertResourceLease(kind, resourceId, execution.ownerId, epoch, dispatchTime);
+        const current = this.getSchedulerExecution(id);
+        if (
+          current?.status !== 'active' ||
+          current.deadlineMs <= dispatchTime ||
+          current.ownerId !== execution.ownerId ||
+          current.credentialStatus !== 'issuing'
+        )
+          throw new Error('credential execution authority changed');
+        const value = dispatch();
+        void Promise.resolve(value).catch(() => undefined);
+        return { value };
+      })
+      .immediate().value;
+  }
+
   finishSchedulerExecution(input: {
     id: string;
     status: Exclude<SchedulerExecutionStatus, 'active'>;
@@ -3745,8 +3807,7 @@ export class WorkflowStore {
         const execution = this.getSchedulerExecution(input.id);
         if (execution === undefined) throw new Error('scheduler execution not found');
         if (execution.status !== 'active') {
-          if (execution.status !== input.status)
-            throw new Error('scheduler terminal replay status changed');
+          assertSchedulerTerminalReplay(execution, input);
           if (execution.status === 'completed' && input.callback !== undefined) {
             this.#recordSchedulerTerminalCallback(input, nowMs);
           }
@@ -7362,6 +7423,85 @@ export class WorkflowStore {
       input.nowMs,
     );
     return intent;
+  }
+
+  dispatchRepairChildMutation<T>(
+    input: {
+      id: string;
+      ownerId: string;
+      workspaceLeaseEpoch: number;
+      runLeaseEpoch: number;
+      taskLeaseEpoch: number;
+      nowMs: number;
+    },
+    dispatch: (intent: RepairChildIntentRecord) => T,
+    capability?: symbol,
+  ): T {
+    if (capability !== workflowEvaluationMutationCapability) {
+      throw new Error('repair-child intent requires the internal evaluator capability');
+    }
+    const intent = this.getRepairChildIntent(input.id);
+    if (intent === undefined) throw new Error('repair-child intent not found');
+    const started = performance.now();
+    const assertDocuments = this.#documentAuthority({
+      runId: intent.runId,
+      taskId: intent.chainTipTaskId,
+      boundary: 'repair.child_effect',
+      ownerId: input.ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: input.nowMs,
+    });
+    return this.#database
+      .transaction(() => {
+        assertDocuments();
+        input = {
+          ...input,
+          nowMs: input.nowMs + Math.max(0, Math.floor(performance.now() - started)),
+        };
+        const current = this.getRepairChildIntent(input.id);
+        if (
+          !current ||
+          current.status !== 'prepared' ||
+          current.sequence !== this.countRepairChildIntents(current.runId)
+        )
+          throw new Error('repair-child dispatch position changed');
+        if (this.getRun(current.runId)?.state !== 'repair_planning') {
+          throw new Error('repair children require the repair_planning state');
+        }
+        if (
+          current.ownerId !== input.ownerId ||
+          current.workspaceLeaseEpoch !== input.workspaceLeaseEpoch ||
+          current.runLeaseEpoch !== input.runLeaseEpoch ||
+          current.taskLeaseEpoch !== input.taskLeaseEpoch
+        ) {
+          throw new Error('repair-child fencing token changed');
+        }
+        this.#assertResourceLease(
+          'workspace',
+          current.workspaceId,
+          input.ownerId,
+          input.workspaceLeaseEpoch,
+          input.nowMs,
+        );
+        this.#assertResourceLease(
+          'run',
+          current.runId,
+          input.ownerId,
+          input.runLeaseEpoch,
+          input.nowMs,
+        );
+        this.#assertResourceLease(
+          'task',
+          current.chainTipTaskId,
+          input.ownerId,
+          input.taskLeaseEpoch,
+          input.nowMs,
+        );
+        const value = dispatch(current);
+        void Promise.resolve(value).catch(() => undefined);
+        return { value };
+      })
+      .immediate().value;
   }
 
   adoptPreparedRepairChildIntent(
