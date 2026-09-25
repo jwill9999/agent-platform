@@ -24,6 +24,12 @@ This entry supersedes earlier status statements below.
 - Beads task `agent-platform-pilot-zero.16` can close after the verified owner integration.
   Broader skill qualification and pilot acceptance remain separate.
 
+## Saved reference context
+
+The owner supplied [The Anatomy of an Agent Harness](docs/planning/harness-modernization/agent-harness-article-reference.md).
+Its source link, summary and assessment prompts are saved for future discussion; no implementation
+or pilot work resumed as part of saving this reference.
+
 ## Resume here
 
 Use `/Users/letuscode/projects/agent-platform-workflow-evaluation`; this handoff is saved on

@@ -40,3 +40,8 @@ Modernization tasks F0–F3 contain expanded assessment specifications. The [orc
 The [SDK assessment critic review](reviews/sdk-assessment-critic-review.md) records the owner-authorized supervised review, corrections and passing recheck. The assessment is ready for owner review; compatibility experiments and implementation remain unapproved.
 
 The [current-runtime evidence baseline proposal](current-runtime-baseline-plan.md) defines the next planning step before framework experiments. It maps existing test boundaries and proposes a sequential model-to-tool journey; implementation awaits owner review.
+
+## External reference context
+
+[The Anatomy of an Agent Harness — reference note](agent-harness-article-reference.md) records the
+owner-supplied LangChain article, a short summary and questions for future assessment.
