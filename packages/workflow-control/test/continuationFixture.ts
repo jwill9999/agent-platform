@@ -1,3 +1,5 @@
+import { documentFixture } from './documentFixture.js';
+import { deriveContractMaterialDigest } from '../src/planning.js';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -75,8 +77,11 @@ export async function continuationFixture(
     },
     escalationPolicy: [],
   };
+  const publishDocuments = await documentFixture(contract, root, join(root, 'source'));
+  const materialDigest = deriveContractMaterialDigest(contract);
   const contractId = store.createContract(contract, nowMs);
   store.createRunForTest(contractId, 'task_review', 'run');
+  publishDocuments(store, 'run');
   const workspaceLeaseEpoch = store.acquireLease(
     'workspace',
     digest,
@@ -97,7 +102,7 @@ export async function continuationFixture(
     workspaceLeaseEpoch,
     runLeaseEpoch,
     taskLeaseEpoch,
-    materialDigest: digest,
+    materialDigest,
     headSha: 'a'.repeat(40),
     inputProducerIdentity: 'orchestrator',
     input: { task: 'fixture' },
@@ -123,7 +128,7 @@ export async function continuationFixture(
     attemptNumber: 1,
     contractVersion: 1 as const,
     policyDigest: digest,
-    materialDigest: digest,
+    materialDigest,
     workspaceLeaseEpoch,
     parentRunLeaseEpoch: runLeaseEpoch,
     taskLeaseEpoch,

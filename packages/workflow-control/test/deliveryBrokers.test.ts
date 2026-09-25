@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -117,8 +118,10 @@ async function setup(input?: {
   roots.push(root);
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(contract, root);
   const contractId = store.createContract(contract, 1000);
   const run = store.createRunForTest(contractId, input?.state ?? 'implementing', 'run-delivery');
+  publishDocuments(store, 'run-delivery', true);
   const ownerId = 'delivery-owner';
   const fence = {
     ownerId,
@@ -661,7 +664,7 @@ describe('DurableDeliveryBroker', () => {
     const times = [1000, 1000, 2001];
     const { broker, fence, port } = await setup({ clock: () => times.shift() ?? 2001 });
 
-    await expect(broker.execute(createRefRequest(), fence)).rejects.toThrow('stale or expired');
+    await expect(broker.execute(createRefRequest(), fence)).rejects.toThrow('document_lease_stale');
     expect(port.mutationCount).toBe(0);
   });
 

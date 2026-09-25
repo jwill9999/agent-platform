@@ -392,6 +392,13 @@ export class BootstrapCoordinator {
       startTimeMs: Math.floor(Date.now() - process.uptime() * 1000),
       executableDigest: `sha256:${createHash('sha256').update(readFileSync(process.execPath)).digest('hex')}`,
     };
+    this.#store.verifyPlanningDocuments({
+      runId: this.runId,
+      taskId: policy.taskId,
+      boundary: 'bootstrap.capability',
+      ownerId: fence.ownerId,
+      runLeaseEpoch: fence.runLeaseEpoch,
+    });
     const handle = capabilities.issue({
       workspaceId: contract.workspaceId,
       runId: this.runId,

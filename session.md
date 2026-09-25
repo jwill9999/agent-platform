@@ -1,4 +1,24 @@
-# Current session: document-approval binding plan
+# Current session: approved-document binding implementation
+
+Owner authorized implementation of `agent-platform-pilot-zero.16`; approval is recorded against the
+reviewed planning material. This is supervised direct delivery, not managed orchestration.
+Worktree: `/Users/letuscode/projects/agent-platform-workflow-evaluation`.
+Branch: `task/approved-document-binding`; target: `feature/harness-backlog-review`.
+
+Current evidence and remaining acceptance scope:
+[implementation checkpoint](docs/reviews/approved-document-binding-implementation.md).
+Build/lint pass; supported native subset 663 passed, 15 skipped. Full Linux regression, strengthened
+real container handoff and independent review are not complete. Docker operations stalled and the
+mount probe timed out; bounded infrastructure retries exhausted. Do not restart Docker or remove
+unrelated containers. Own `document-binding-linux-suite` cleanup is unverified after timeout.
+
+Next: restore Docker, finish validation CLI and coverage matrix/connected end-to-end proof, then
+restricted review and current-head hosted gates. No further scope approval is needed for this task.
+Do not merge or launch the pilot on this checkpoint. Beads remains in progress; `.13` stays blocked.
+
+---
+
+## Previous session: document-approval binding plan
 
 PR271 is merged into `feature/harness-backlog-review` at `5e5f7f2bf66ca07410a5c83689230b0c3e25f609`.
 The owner authorized planning and independent critique of `agent-platform-pilot-zero.16`.

@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -280,8 +281,11 @@ async function setup(options: { evaluate?: boolean; multipleEvidence?: boolean }
   roots.push(root);
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(contract, root);
+  featureDeliveryContract.executionContractDigest = digest(contract);
   const contractId = store.createContract(contract, 100);
   store.createRun(contractId, 'task_accepted', 'run-closeout');
+  publishDocuments(store, 'run-closeout', true);
   const ownerId = 'owner-1';
   const workspaceLeaseEpoch = store.acquireLease(
     'workspace',

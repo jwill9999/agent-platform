@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -235,8 +236,11 @@ async function setup(input?: {
   roots.push(root);
   const databasePath = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(databasePath);
+  const publishDocuments = await documentFixture(executionContract, root);
+  featureContract.executionContractDigest = digest(executionContract);
   const contractId = store.createContract(executionContract, 1000);
   const run = store.createRun(contractId, 'finalizing', 'run-feature-delivery');
+  publishDocuments(store, 'run-feature-delivery', true);
   const selectedContract = input?.contract ?? featureContract;
   if (input?.approval !== false) {
     store.createFeatureDeliveryApprovalForTest(
@@ -440,8 +444,11 @@ describe('DurableFeatureDeliveryBroker', () => {
     const root = await mkdtemp(join(tmpdir(), 'feature-delivery-e2e-'));
     roots.push(root);
     const store = new WorkflowStore(join(root, 'workflow.sqlite'));
+    const publishDocuments = await documentFixture(executionContract, root);
+    featureContract.executionContractDigest = digest(executionContract);
     const contractId = store.createContract(executionContract, 900);
     const run = store.createRun(contractId, 'delivery', 'run-feature-delivery-e2e');
+    publishDocuments(store, run.id, true);
     const ownerId = 'e2e-owner';
     const fence = {
       ownerId,

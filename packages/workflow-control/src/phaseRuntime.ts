@@ -286,7 +286,15 @@ export class StandalonePhaseRuntime {
       throw new Error('phase_role_authority_unavailable');
     if (!task.allowedOperations.includes('artifact.write'))
       throw new Error('phase_evidence_authority_unavailable');
+    const documentBinding = this.#store.verifyPlanningDocuments({
+      runId: action.runId,
+      taskId: action.taskId,
+      boundary: 'phase.packet',
+      expectedSourceRoot: this.#config.sourceRoot,
+      ownerId: this.#owner,
+    });
     const packet: TaskPacket = {
+      documentBinding,
       runId: action.runId,
       taskId: action.taskId,
       contractVersion: action.contractVersion,
@@ -394,6 +402,13 @@ export class StandalonePhaseRuntime {
     });
     let token: string | undefined;
     try {
+      this.#store.verifyPlanningDocuments({
+        runId: action.runId,
+        taskId: action.taskId,
+        boundary: 'phase.capability',
+        ownerId: this.#owner,
+        runLeaseEpoch: fences.run,
+      });
       const capability = this.#capabilities.issue({
         workspaceId: action.workspaceId,
         runId: action.runId,

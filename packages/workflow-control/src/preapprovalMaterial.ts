@@ -63,7 +63,7 @@ function removeStage(root: string): void {
   }
 }
 
-function validatePaths(paths: readonly string[]): string[] {
+export function validatePreapprovalPaths(paths: readonly string[]): string[] {
   if (paths.length === 0 || paths.length > maxFiles)
     throw new Error('preapproval material file count is invalid');
   const unique = new Set<string>();
@@ -182,7 +182,7 @@ export function stagePreapprovalMaterial(input: {
   paths: readonly string[];
   expectedManifestDigest?: string;
 }): PreapprovalMaterial {
-  const paths = validatePaths(input.paths);
+  const paths = validatePreapprovalPaths(input.paths);
   const sourceRoot = input.sourceRoot;
   let stagedSourceRoot: string | undefined;
   try {

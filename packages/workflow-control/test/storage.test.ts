@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -77,8 +78,10 @@ async function createStore(): Promise<{ store: WorkflowStore; input: PrepareTran
   const root = await mkdtemp(join(tmpdir(), 'workflow-store-'));
   roots.push(root);
   const store = new WorkflowStore(join(root, 'workflow.sqlite'));
+  const publishDocuments = await documentFixture(contract, root);
   const contractId = store.createContract(contract, 1000);
   const run = store.createRun(contractId, 'approved', 'run-1');
+  publishDocuments(store, 'run-1', true);
   const workspaceLease = store.acquireLease(
     'workspace',
     contract.workspaceId,
@@ -251,7 +254,7 @@ describe('WorkflowStore', () => {
       ),
     ).toThrow('already has a prepared transition');
     expect(() => store.commitTransition(input.id, 'other', input.leaseEpoch, {})).toThrow(
-      'fencing token',
+      'document_lease_stale',
     );
     const committed = store.commitTransition(
       input.id,
@@ -283,7 +286,7 @@ describe('WorkflowStore', () => {
     expect(recovery.epoch).toBeGreaterThan(input.leaseEpoch);
     expect(() =>
       store.commitTransition(input.id, input.leaseOwnerId, input.leaseEpoch, {}),
-    ).toThrow('fencing token');
+    ).toThrow('document_lease_stale');
     expect(
       store.adoptPreparedTransition(input.id, recovery.ownerId, recovery.epoch, 1100, {
         workspaceLeaseEpoch: recoveryWorkspace.epoch,
@@ -521,6 +524,8 @@ describe('JournaledMutationBroker recovery', () => {
     'brokers %s through the pinned official adapter',
     async (operation, before, after, call) => {
       const { store, input } = await createStore();
+      // This adapter test is not an expiry test; allow real document I/O under contention.
+      store.acquireLease('run', input.runId, input.leaseOwnerId, 60_000, 1000);
       const client = new FakeBeadsDoltClient();
       if (operation === 'beads.dolt_push') client.syncStatus = before;
       else client.issueStatus = before;

@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -93,8 +94,10 @@ async function setup() {
   const root = await mkdtemp(join(tmpdir(), 'feature-evaluation-'));
   roots.push(root);
   const store = new WorkflowStore(join(root, 'workflow.sqlite'));
+  const publishDocuments = await documentFixture(contract, root);
   const contractId = store.createContract(contract, 100);
   store.createRun(contractId, 'feature_evaluation', 'run-evaluation');
+  publishDocuments(store, 'run-evaluation', true);
   store.seedApprovedTaskHeadForTest({
     workspaceId,
     runId: 'run-evaluation',

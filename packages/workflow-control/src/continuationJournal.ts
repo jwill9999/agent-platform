@@ -1,3 +1,4 @@
+import { verifyDocumentBoundary } from './documentApproval.js';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 
@@ -374,6 +375,17 @@ export class ContinuationJournal {
     nowMs: number,
   ): void {
     const action = continuationActionSchema.parse(actionInput);
+    if (action.kind === 'execute_phase') {
+      const pending = this.get(id);
+      if (pending?.status !== 'consumed')
+        verifyDocumentBoundary(this.#database, {
+          runId: action.runId,
+          taskId: action.taskId,
+          boundary: 'phase.enqueue',
+          ownerId: executionId,
+          nowMs,
+        });
+    }
     this.#database
       .transaction(() => {
         const job = this.get(id);

@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -76,8 +77,10 @@ async function createStore(state: 'pipeline' | 'implementing') {
   roots.push(root);
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(contract, root);
   const contractId = store.createContract(contract, 100);
   store.createRunForTest(contractId, state, 'run-recovery');
+  publishDocuments(store, 'run-recovery', true);
   store.seedApprovedTaskHeadForTest({
     workspaceId,
     runId: 'run-recovery',

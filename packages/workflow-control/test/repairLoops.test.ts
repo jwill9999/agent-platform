@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
@@ -107,8 +108,10 @@ async function setup(overrides?: Partial<ExecutionContract['retryPolicy']>) {
   };
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(effectiveContract, root);
   const contractId = store.createContract(effectiveContract);
   const run = store.createRun(contractId, 'repair', 'run-repair');
+  publishDocuments(store, 'run-repair', true);
   const ownerId = 'repair-owner';
   const fence = {
     workspaceLeaseEpoch: store.acquireLease('workspace', workspaceId, ownerId, 1000, 1000).epoch,
@@ -424,7 +427,7 @@ describe('DurableRepairCoordinator', () => {
 
   it('rejects cross-run, cross-task, and wrong-producer evidence bindings', async () => {
     const { store, coordinator } = await setup();
-    const contractId = store.createContract(contract);
+    const contractId = store.createContract(store.getExecutionContract('run-repair'));
     store.createRun(contractId, 'repair', 'other-run');
     const crossRun = evidence('9');
     const crossTask = evidence('a');
@@ -865,7 +868,7 @@ describe('DurableRepairCoordinator', () => {
       'stale or expired workspace',
     );
     expect(() => coordinator.accept('dispatch-fenced', acceptedResult(verifierEvidence))).toThrow(
-      'stale or expired workspace',
+      'document_lease_stale',
     );
     expect(() =>
       coordinator.dispatch({
@@ -874,7 +877,7 @@ describe('DurableRepairCoordinator', () => {
         hypothesis: 'stale owner retry',
         change: { kind: 'hypothesis', value: 'stale owner retry' },
       }),
-    ).toThrow('stale or expired workspace');
+    ).toThrow('document_lease_stale');
 
     const current = DurableRepairCoordinator.createForTest({
       store,
@@ -907,7 +910,7 @@ describe('DurableRepairCoordinator', () => {
         hypothesis: 'expired repair',
         change: { kind: 'hypothesis', value: 'expired repair' },
       }),
-    ).toThrow('stale or expired workspace');
+    ).toThrow('document_lease_stale');
     store.close();
   });
 

@@ -62,6 +62,7 @@ export interface SpecialistLaunchRequest {
   codexHome: string;
   authFile: string;
   promptFile: string;
+  approvedDocumentsRoot?: string;
   egressNetwork: string;
   role: string;
   runId: string;
@@ -199,6 +200,12 @@ export async function buildDockerSpecialistLaunch(
     `${authFile}:/codex-home/auth.json:ro`,
     `${promptFile}:/run/specialist/prompt.txt:ro`,
   ];
+  if (request.approvedDocumentsRoot !== undefined) {
+    const approvedRoot = await realpath(request.approvedDocumentsRoot);
+    if (approvedRoot === workspaceRoot || isInside(approvedRoot, workspaceRoot))
+      throw new Error('approved documents must be outside the writable workspace');
+    mounts.push(`${approvedRoot}:/run/approved-documents:ro`);
+  }
   assertPrivateMounts(mounts, stagingRoot);
 
   const args = [
@@ -679,6 +686,18 @@ export class DockerIsolatedSpecialistLauncher {
       );
       stagingRoot = resolve(workspace.root, '..');
       const promptFile = join(stagingRoot, 'task-packet.json');
+      const approvedDocumentsRoot = join(stagingRoot, 'approved-documents');
+      this.#options.store.stageApprovedDocuments({
+        runId: packet.runId,
+        taskId: packet.taskId,
+        packet,
+        ownerId: authority.ownerId,
+        runLeaseEpoch: authority.runLeaseEpoch,
+        boundary: 'specialist.snapshot',
+        sourceRoot: this.#options.sourceRoot,
+        destination: approvedDocumentsRoot,
+        nowMs: this.#clock(),
+      });
       const credentialLease = await this.#options.credentialBroker.issue(
         stagingRoot,
         reservation.id,
@@ -691,6 +710,7 @@ export class DockerIsolatedSpecialistLauncher {
         codexHome: workspace.codexHome,
         authFile: credentialLease.authFile,
         promptFile,
+        approvedDocumentsRoot,
         egressNetwork: this.#options.egressNetwork,
         role: reservation.role,
         runId: packet.runId,
@@ -874,6 +894,17 @@ export class DockerIsolatedSpecialistLauncher {
       throw new Error('specialist launch was cancelled before container start');
     if (this.#clock() >= reservation.deadlineMs)
       throw new Error('specialist reservation timed out');
+    const authority = this.#authority(reservation.id);
+    const execution = this.#options.store.getSchedulerExecution(reservation.id)!;
+    this.#options.store.verifyPlanningDocuments({
+      runId: execution.runId,
+      taskId: execution.taskId,
+      ownerId: authority.ownerId,
+      runLeaseEpoch: authority.runLeaseEpoch,
+      boundary: 'specialist.lifecycle',
+      expectedSourceRoot: this.#options.sourceRoot,
+      nowMs: this.#clock(),
+    });
   }
 
   async #inspectOwned(

@@ -400,3 +400,12 @@ export {
   type SupervisedReviewRequest,
   type PreparedSupervisedReview,
 } from './supervisedReview.js';
+
+export {
+  planningDocumentSchema,
+  planningDocumentsSchema,
+  canonicalPlanningDocuments,
+  planningDocumentsDigest,
+  publishPlanningDocumentObjects,
+  type PlanningDocuments,
+} from './planningDocuments.js';

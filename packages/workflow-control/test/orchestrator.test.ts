@@ -1,3 +1,5 @@
+import { deriveContractMaterialDigest } from '../src/planning.js';
+import { documentFixture } from './documentFixture.js';
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -124,8 +126,10 @@ async function setup(
     observe: async (leaseId) => (credentialTombstones.has(leaseId) ? 'revoked' : 'active'),
     conformance: async () => 'test-generation',
   });
+  const publishDocuments = await documentFixture(contract, root, sourceRoot);
   const contractId = store.createContract(contract);
   store.createRun(contractId, state, 'run-schedule');
+  publishDocuments(store, 'run-schedule', true);
   store.recordEvidence({
     ...evidence[0]!,
     producer: 'planner',
@@ -916,6 +920,11 @@ if (command === 'conformance') {
     const runLeaseEpoch = orchestrator.acquireRun('run-schedule', 1000, 1000);
     const contractId = store.createContract(contract);
     store.createRun(contractId, 'implementing', 'other-active-run');
+    store.seedLineageApprovalForTest({
+      runId: 'other-active-run',
+      materialDigest: deriveContractMaterialDigest(contract),
+      nowMs: 0,
+    });
     const otherRunLease = store.acquireLease('run', 'other-active-run', 'owner-1', 1000, 1000);
     const otherTaskLease = store.acquireLease('task', 'schedule-feature.2', 'owner-1', 1000, 1000);
     store.createSchedulerExecution({

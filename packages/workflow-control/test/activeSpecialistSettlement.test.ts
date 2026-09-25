@@ -24,7 +24,7 @@ async function setup(deadlineMs = 301000) {
   const fixture = await continuationFixture(1000);
   let now = 1000;
   const sourceRoot = join(fixture.root, 'source');
-  await mkdir(sourceRoot);
+  await mkdir(sourceRoot, { recursive: true });
   await writeFile(join(sourceRoot, 'safe.txt'), 'original');
   const original = fixture.store.getSchedulerExecution('child')!;
   const execution = fixture.store.createSchedulerExecution({
@@ -36,7 +36,16 @@ async function setup(deadlineMs = 301000) {
     nowMs: now,
   });
   const reservation = { id: executionId, role: 'code_reviewer', deadlineMs: execution.deadlineMs };
+  const documentBinding = fixture.store.verifyPlanningDocuments({
+    runId: 'run',
+    taskId: 'task',
+    ownerId: 'owner',
+    runLeaseEpoch: 1,
+    boundary: 'fixture.packet',
+    nowMs: now,
+  });
   const packet: TaskPacket = {
+    documentBinding,
     runId: 'run',
     taskId: 'task',
     contractVersion: 1,

@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  canonicalPlanningDocuments,
+  planningDocumentsSchema,
+  planningDocumentsDigest,
+} from './planningDocuments.js';
 
 export const EXECUTION_CONTRACT_VERSION = 1 as const;
 
@@ -96,6 +101,7 @@ export const taskContractSchema = z
 export const executionContractSchema = z
   .object({
     featureId: identifierSchema,
+    planningDocuments: planningDocumentsSchema.transform(canonicalPlanningDocuments).optional(),
     contractVersion: z.literal(EXECUTION_CONTRACT_VERSION),
     policyDigest: digestSchema,
     workspaceId: digestSchema,
@@ -141,6 +147,32 @@ export const executionContractSchema = z
   .strict()
   .superRefine((contract, context) => {
     const taskIds = new Set(contract.tasks.map((task) => task.id));
+    const documents = contract.planningDocuments;
+    if (documents !== undefined) {
+      if (
+        documents.workspaceId !== contract.workspaceId ||
+        documents.repository !== contract.authority.github.repository
+      )
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'planning document identity mismatch',
+        });
+      if (documents.files.some((file) => file.taskIds.some((id) => !taskIds.has(id))))
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'planning document references unknown task',
+        });
+      for (const taskId of taskIds) {
+        for (const kind of ['specification', 'verification']) {
+          if (!documents.files.some((file) => file.kind === kind && file.taskIds.includes(taskId)))
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'planning document task coverage missing',
+            });
+        }
+      }
+    }
+
     const allowedContractPaths = contract.constraints.allowedPaths;
     if (taskIds.size !== contract.tasks.length) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: 'task ids must be unique' });
@@ -205,6 +237,15 @@ export const taskPacketSchema = z
   .object({
     runId: identifierSchema,
     taskId: identifierSchema,
+    documentBinding: z
+      .object({
+        approvalId: identifierSchema,
+        snapshotPath: z.literal('/run/approved-documents'),
+        materialDigest: digestSchema,
+        manifestDigest: digestSchema,
+      })
+      .strict()
+      .optional(),
     contractVersion: z.literal(EXECUTION_CONTRACT_VERSION),
     policyDigest: digestSchema,
     assignedRole: workflowRoleSchema,
@@ -281,6 +322,11 @@ export function assertTaskPacketWithinContract(
 ): void {
   const contract = executionContractSchema.parse(contractInput);
   const packet = taskPacketSchema.parse(packetInput);
+  if (
+    contract.planningDocuments &&
+    packet.documentBinding?.manifestDigest !== planningDocumentsDigest(contract.planningDocuments)
+  )
+    throw new Error('task packet document binding mismatch');
   const task = contract.tasks.find((candidate) => candidate.id === packet.taskId);
   if (task === undefined) throw new Error('task packet references an unknown task');
   if (packet.contractVersion !== contract.contractVersion) throw new Error('stale task packet');

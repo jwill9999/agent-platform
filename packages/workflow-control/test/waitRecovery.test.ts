@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -118,8 +119,10 @@ describe('PipelineWaitRecoveryDriver', () => {
     roots.push(root);
     const database = join(root, 'workflow.sqlite');
     let store = new WorkflowStore(database);
+    const publishDocuments = await documentFixture(contract, root);
     const contractId = store.createContract(contract, 100);
     store.createRunForTest(contractId, 'pipeline', 'run-wait');
+    publishDocuments(store, 'run-wait', true);
     const raw = new Database(database);
     const request = JSON.stringify({
       id: repairTaskId,

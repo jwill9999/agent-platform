@@ -1,3 +1,4 @@
+import { verifyDocumentBoundary } from './documentApproval.js';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 
@@ -254,6 +255,14 @@ export class BootstrapJournal {
     fence: DeliveryFence,
     operation: () => T,
   ): T {
+    verifyDocumentBoundary(this.database, {
+      runId,
+      taskId: policy.taskId,
+      boundary: 'bootstrap.mutate',
+      expectedSourceRoot: policy.sourceRoot,
+      ownerId: fence.ownerId,
+      runLeaseEpoch: fence.runLeaseEpoch,
+    });
     return this.database
       .transaction(() => {
         this.assertStored(runId, policy);
@@ -317,6 +326,15 @@ export class BootstrapJournal {
     nowMs: number,
     assertObserved: () => void,
   ): void {
+    verifyDocumentBoundary(this.database, {
+      runId,
+      taskId: policy.taskId,
+      boundary: 'bootstrap.advance',
+      ownerId: fence.ownerId,
+      runLeaseEpoch: fence.runLeaseEpoch,
+      expectedSourceRoot: policy.sourceRoot,
+      nowMs,
+    });
     this.database
       .transaction(() => {
         const { contract, approvalId } = this.assertApproved(runId, policy);

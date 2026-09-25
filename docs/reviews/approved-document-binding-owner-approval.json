@@ -1,0 +1,12 @@
+{
+  "kind": "supervised-owner-scope-approval",
+  "taskId": "agent-platform-pilot-zero.16",
+  "ownerStatement": "I approve the scope",
+  "approvedPlanningCommit": "e4fac80",
+  "contractMaterialDigest": "sha256:0ec6f078ef119f50b0a8d0e032204897d9e39884209583be480597f4428069a1",
+  "criticReview": "docs/planning/approved-document-binding/critic-review.final.json",
+  "documentManifest": "docs/planning/approved-document-binding/evidence-manifest.json",
+  "mode": "supervised direct implementation as specified in approved plan",
+  "delivery": "task branch and feature-targeted PR; no merge, staging or pilot authorization",
+  "runtimeApprovalCreated": false
+}

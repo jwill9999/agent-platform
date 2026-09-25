@@ -385,7 +385,13 @@ describe('standalone phase runtime production orchestration with fixture launche
         expect(await replacement.runOnce()).toBe(true);
         expect(await replacement.runOnce()).toBe(false);
         const secondPrompt = f.prompts[1]!;
-        expect(secondPrompt.task).toEqual(firstPrompt.task);
+        expect(secondPrompt.task).toEqual({
+          ...firstPrompt.task,
+          documentBinding: {
+            ...firstPrompt.task.documentBinding,
+            approvalId: 'fixture:repair-child',
+          },
+        });
         expect(secondPrompt.binding.headSha).toBe(headSha);
         expect(secondPrompt.binding.ownerDigest).toBe(digestGovernedValue(owner));
         expect(digestGovernedValue(secondPrompt)).not.toBe(digestGovernedValue(firstPrompt));

@@ -1,3 +1,4 @@
+import { documentFixture } from './documentFixture.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -218,11 +219,13 @@ async function fixture(changePolicy?: (policy: BootstrapPolicy) => void) {
   };
   const database = join(root, 'workflow.sqlite');
   const store = new WorkflowStore(database);
+  const publishDocuments = await documentFixture(contract, root, source);
   store.createRun(
     store.createContract(executionContractSchema.parse(contract)),
     'approved',
     'bootstrap-run',
   );
+  publishDocuments(store, 'bootstrap-run');
   const recorder = new JournaledArtifactRecorder(
     new ContentAddressedArtifactStore(join(root, 'artifacts')),
     store,

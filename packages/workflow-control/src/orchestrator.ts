@@ -198,6 +198,13 @@ export class WorkflowOrchestrator {
     evidence: EvidenceReference[];
   }): TaskPacket {
     this.#store.assertRunUsesContract(input.runId, this.#contract);
+    const documentBinding = this.#store.verifyPlanningDocuments({
+      runId: input.runId,
+      taskId: input.taskId,
+      boundary: 'packet.create',
+      ownerId: this.#ownerId,
+      nowMs: this.#clock(),
+    });
     if (
       input.evidence.length === 0 ||
       input.evidence.some(
@@ -224,6 +231,7 @@ export class WorkflowOrchestrator {
     const packet: TaskPacket = {
       runId: input.runId,
       taskId: task.id,
+      documentBinding,
       contractVersion: this.#contract.contractVersion,
       policyDigest: this.#contract.policyDigest,
       assignedRole: task.assignedRole,
@@ -249,6 +257,14 @@ export class WorkflowOrchestrator {
   }): Promise<unknown> {
     assertTaskPacketWithinContract(this.#contract, input.packet);
     this.#store.assertRunUsesContract(input.packet.runId, this.#contract);
+    this.#store.verifyPlanningDocuments({
+      runId: input.packet.runId,
+      taskId: input.packet.taskId,
+      boundary: 'task.handoff',
+      ownerId: this.#ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: this.#clock(),
+    });
     const run = this.#store.getRun(input.packet.runId);
     if (run?.state !== 'scheduling') {
       throw new Error('workflow run is not in the scheduling state');
@@ -517,6 +533,14 @@ export class WorkflowOrchestrator {
   }): Promise<AgentResult> {
     assertTaskPacketWithinContract(this.#contract, input.packet);
     this.#store.assertRunUsesContract(input.packet.runId, this.#contract);
+    this.#store.verifyPlanningDocuments({
+      runId: input.packet.runId,
+      taskId: input.packet.taskId,
+      boundary: 'task.handoff',
+      ownerId: this.#ownerId,
+      runLeaseEpoch: input.runLeaseEpoch,
+      nowMs: this.#clock(),
+    });
     const nowMs = this.#clock();
     this.#store.assertResourceLease(
       'workspace',
