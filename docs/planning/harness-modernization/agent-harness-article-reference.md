@@ -165,7 +165,13 @@ novelty alone is not a reason to adopt them. Create or refine Beads work only wh
 For each review, record the date, capability, current evidence, relevant source/version, existing
 Beads issue where applicable, candidate reuse option, expected benefit, integration risks and decision
 or reason for deferral. Distinguish implemented-and-proven, implemented-but-unverified, missing and not-required.
-Refresh only the relevant documentation and tests. Keep existing priorities and approval boundaries;
+Re-reference the relevant documentation and research at each review, including the saved articles,
+linked primary sources, release notes and newer work on the concepts under consideration. Treat our
+saved summaries as discovery aids, not permanently current evidence. Record access dates and applicable
+versions, identify changes or contradictions against the previous assessment, and distinguish research
+claims from behavior demonstrated in our platform. Update the reference links, conclusions and affected
+verification criteria when the evidence changes. Refresh the relevant tests rather than repeating
+unrelated checks. Keep existing priorities and approval boundaries;
 this direction does not authorize migration, installation or new implementation.
 
 Before selecting bespoke work, ask: can an available component close this gap sooner through an
