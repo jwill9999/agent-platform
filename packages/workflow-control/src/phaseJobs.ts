@@ -1,4 +1,4 @@
-import { verifyDocumentBoundary } from './documentApproval.js';
+import { verifyDocumentBoundary, assertDocumentAuthority } from './documentApproval.js';
 import { createHash } from 'node:crypto';
 
 import Database from 'better-sqlite3';
@@ -242,15 +242,34 @@ export class PhaseJobJournal {
       )
       .all(nowMs, runId ?? null, runId ?? null) as PhaseJob[];
     for (const job of jobs) {
+      let verified: ReturnType<typeof verifyDocumentBoundary>;
       try {
-        verifyDocumentBoundary(this.#database, {
+        verified = verifyDocumentBoundary(this.#database, {
           runId: job.run_id,
           taskId: this.action(job).taskId,
           boundary: 'phase.claim',
           ownerId: owner,
           nowMs,
         });
-      } catch {
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : '';
+        const code = (error as { code?: string })?.code;
+        if (
+          reason === 'document_verification_unresolved' ||
+          code === 'SQLITE_BUSY' ||
+          code === 'SQLITE_LOCKED'
+        )
+          continue;
+        if (
+          ![
+            'planning_documents_changed',
+            'document_approval_required',
+            'document_manifest_required',
+            'document_publication_missing',
+            'document_task_unknown',
+          ].includes(reason)
+        )
+          throw error;
         this.#database
           .prepare(
             `UPDATE phase_jobs SET status='blocked',failure_code='document_authority_unavailable'
@@ -261,6 +280,7 @@ export class PhaseJobJournal {
       }
       const claimed = this.#database
         .transaction(() => {
+          assertDocumentAuthority(this.#database, job.run_id, verified.approvalId);
           const current = this.get(job.id);
           if (
             !current ||
@@ -318,7 +338,7 @@ export class PhaseJobJournal {
   }
 
   start(job: PhaseJob, nowMs: number): PhaseJob {
-    verifyDocumentBoundary(this.#database, {
+    const verified = verifyDocumentBoundary(this.#database, {
       runId: job.run_id,
       taskId: this.action(job).taskId,
       boundary: 'phase.start',
@@ -327,6 +347,7 @@ export class PhaseJobJournal {
     });
     return this.#database
       .transaction(() => {
+        assertDocumentAuthority(this.#database, job.run_id, verified.approvalId);
         const current = this.get(job.id);
         if (current?.status !== 'claimed') throw new Error('phase job is not claimed');
         assertPhaseJobAuthority(this.#database, this.action(current));

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 
 import {
@@ -1440,3 +1440,88 @@ describe('governed SQLite persistence', () => {
     store.close();
   });
 });
+
+it.each(['invalidated', 'pending'] as const)(
+  'denies effect dispatch when a peer makes authority %s after byte verification',
+  async (mode) => {
+    const { store, contractId, database, publishDocuments } = await setup();
+    store.createRunForTest(contractId, 'pipeline', 'race');
+    publishDocuments(store, 'race', true);
+    const peer = new Database(database);
+    const fence = {
+      ownerId: 'owner',
+      workspaceLeaseEpoch: store.acquireLease('workspace', workspaceId, 'owner', 60000, 1000).epoch,
+      runLeaseEpoch: store.acquireLease('run', 'race', 'owner', 60000, 1000).epoch,
+      taskLeaseEpoch: store.acquireLease('task', 'task.1', 'owner', 60000, 1000).epoch,
+    };
+    const nonNotes = {
+      id: 'task.1',
+      status: 'in_progress',
+      description: 'same',
+      acceptanceCriteria: 'same',
+      owner: 'owner',
+      dependencies: [],
+    };
+    let mutations = 0;
+    const port = createProductionGovernedExternalPort({
+      readIssue: async () => ({ ...nonNotes, notes: 'old', revision: '1' }),
+      compareAndSwapNotes: async () => {
+        mutations++;
+        return { ...nonNotes, notes: 'new', revision: '2' };
+      },
+      observeThreads: async () => [],
+      replyToThread: async () => {
+        throw new Error('unused');
+      },
+      resolveThread: async () => {
+        throw new Error('unused');
+      },
+    });
+    const verify = store.verifyPlanningDocuments.bind(store);
+    const spy = vi.spyOn(store, 'verifyPlanningDocuments').mockImplementation((input) => {
+      const result = verify(input);
+      if (input.boundary === 'delivery.mutate') {
+        if (mode === 'invalidated')
+          peer.prepare("UPDATE plan_approvals SET status='invalidated' WHERE run_id='race'").run();
+        else
+          peer.exec(`INSERT INTO planning_document_attempts(id,run_id,task_id,approval_id,material_digest,manifest_digest,boundary,owner_id,run_lease_epoch,status,created_at_ms,deadline_ms)
+        SELECT 'peer-attempt',run_id,task_id,approval_id,material_digest,manifest_digest,'peer.verify','peer',run_lease_epoch,'pending',created_at_ms,deadline_ms
+        FROM planning_document_attempts WHERE run_id='race' ORDER BY rowid DESC LIMIT 1`);
+      }
+      return result;
+    });
+    try {
+      const broker = new GovernedOperationBroker(
+        createWorkflowStoreGovernedJournal(store, () => 1000),
+        port,
+      );
+      await expect(
+        broker.execute({
+          kind: 'beads.task_note_update',
+          workspaceId,
+          runId: 'race',
+          taskId: 'task.1',
+          actorRole: 'workflow_orchestrator',
+          contractVersion: 1,
+          policyDigest,
+          materialDigest: deriveContractMaterialDigest(contract),
+          ...fence,
+          expectedPriorNotesDigest: digestGovernedValue('old'),
+          expectedNonNotesDigest: digestGovernedValue(nonNotes),
+          replacementNotes: 'new',
+          replacementNotesDigest: digestGovernedValue('new'),
+        }),
+      ).rejects.toThrow(
+        mode === 'invalidated' ? 'document_approval_changed' : 'document_verification_unresolved',
+      );
+      expect(mutations).toBe(0);
+      expect(
+        peer.prepare("SELECT count(*) n FROM delivery_operations WHERE status='committed'").get(),
+      ).toEqual({ n: 0 });
+    } finally {
+      spy.mockRestore();
+      peer.close();
+      store.close();
+    }
+  },
+);

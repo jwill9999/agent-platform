@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -10,6 +10,20 @@ import { publishPlanningDocumentObjects } from '../src/planningDocuments.js';
 import { deriveContractMaterialDigest } from '../src/planning.js';
 import { executionContractSchema } from '../src/contracts.js';
 import { initializeDocumentApprovalSchema } from '../src/documentApproval.js';
+import { runCli } from '../src/cli.js';
+import { execFileSync } from 'node:child_process';
+import { WorkflowOrchestrator } from '../src/orchestrator.js';
+import { JournaledArtifactRecorder } from '../src/artifacts.js';
+import { LocalExactHeadIntegrationGate } from '../src/integrationGate.js';
+import {
+  OfficialBeadsDoltPort,
+  JournaledBeadsDoltBroker,
+  JournaledBeadsTaskCloser,
+} from '../src/reconciliation.js';
+import {
+  DockerIsolatedSpecialistLauncher,
+  RevocableSpecialistCredentialBroker,
+} from '../src/specialistLauncher.js';
 
 const roots: string[] = [];
 const stores: WorkflowStore[] = [];
@@ -19,13 +33,31 @@ afterEach(async () => {
   for (const d of databases.splice(0)) d.close();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
-async function setup() {
+async function setup(realGit = false) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'document-journal-')));
   roots.push(root);
   const sourceRoot = join(root, 'source');
   await mkdir(sourceRoot);
   await writeFile(join(sourceRoot, 'spec.md'), 'spec\n');
   await writeFile(join(sourceRoot, 'tests.md'), 'test\n');
+  let sourceRevision = 'a'.repeat(40);
+  if (realGit) {
+    const git = (args: string[]) =>
+      execFileSync('git', ['-C', sourceRoot, ...args], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Fixture',
+          GIT_AUTHOR_EMAIL: 'fixture@example.com',
+          GIT_COMMITTER_NAME: 'Fixture',
+          GIT_COMMITTER_EMAIL: 'fixture@example.com',
+        },
+      }).trim();
+    git(['init', '-q']);
+    git(['add', '.']);
+    git(['commit', '-qm', 'reviewed documents']);
+    sourceRevision = git(['rev-parse', 'HEAD']);
+  }
   const input = JSON.parse(
     await readFile(
       new URL('./fixtures/documentBindingLegacyContract.json', import.meta.url),
@@ -38,7 +70,7 @@ async function setup() {
     sourceRoot,
     workspaceId: input.workspaceId,
     repository: input.authority.github.repository,
-    sourceRevision: 'a'.repeat(40),
+    sourceRevision,
     documents: [
       { path: 'spec.md', kind: 'specification', taskIds: [taskId] },
       { path: 'tests.md', kind: 'verification', taskIds: [taskId] },
@@ -101,7 +133,52 @@ async function setup() {
     ownerId: 'owner',
     runLeaseEpoch: epoch,
   };
-  return { store, database, sourceRoot, path, boundary, contract, artifactStore };
+  return { store, database, sourceRoot, path, boundary, contract, artifactStore, evidence };
+}
+function coordinator(f: Awaited<ReturnType<typeof setup>>, store = f.store) {
+  // These outward adapters must never run during document validation or packet construction.
+  const unused = async (): Promise<never> => {
+    throw new Error('unexpected external effect');
+  };
+  const port = OfficialBeadsDoltPort.createForTest(f.sourceRoot, {
+    readIssue: unused,
+    claimIssue: unused,
+    closeIssue: unused,
+    readDoltSync: unused,
+    pushDolt: unused,
+  });
+  const closer = new JournaledBeadsTaskCloser(
+    JournaledBeadsDoltBroker.createForTest(store, port),
+    port,
+  );
+  const credentialBroker = RevocableSpecialistCredentialBroker.createForTest({
+    store,
+    issue: unused,
+    revoke: unused,
+    observe: unused,
+    conformance: unused,
+  });
+  const launcher = DockerIsolatedSpecialistLauncher.create({
+    store,
+    ownerId: 'owner',
+    sourceRoot: f.sourceRoot,
+    image: 'agent-platform-review:0.156.1-hardened',
+    credentialBroker,
+    egressNetwork: 'none',
+  });
+  const integrationGate = LocalExactHeadIntegrationGate.create({
+    workspaceRoot: f.sourceRoot,
+    artifacts: new JournaledArtifactRecorder(f.artifactStore, store),
+    checkCommands: {},
+  });
+  return new WorkflowOrchestrator({
+    store,
+    contract: f.contract,
+    closer,
+    launcher,
+    integrationGate,
+    ownerId: 'owner',
+  });
 }
 it('verifies unchanged journal and objects on repeated boundaries without new approval', async () => {
   const f = await setup();
@@ -113,6 +190,31 @@ it('verifies unchanged journal and objects on repeated boundaries without new ap
       .prepare("SELECT count(*) n FROM planning_document_attempts WHERE status='verified'")
       .get(),
   ).toEqual({ n: 3 });
+});
+
+it('validates persisted task material through the operator command and returns safe blocked reasons', async () => {
+  const f = await setup();
+  const args = ['validate-documents', f.path, 'run', f.boundary.taskId];
+  expect(JSON.parse(runCli(args))).toMatchObject({
+    passed: true,
+    binding: { approvalId: 'approval' },
+  });
+  await writeFile(join(f.sourceRoot, 'tests.md'), 'synthetic-secret-marker');
+  const denied = runCli(args);
+  expect(JSON.parse(denied)).toEqual({ passed: false, reason: 'planning_documents_changed' });
+  expect(denied).not.toContain(f.sourceRoot);
+  expect(denied).not.toContain('synthetic-secret-marker');
+  expect(JSON.parse(runCli(args))).toEqual({ passed: false, reason: 'document_approval_required' });
+  expect(
+    JSON.parse(
+      runCli([
+        'validate-documents',
+        join(f.sourceRoot, 'missing.sqlite'),
+        'run',
+        f.boundary.taskId,
+      ]),
+    ),
+  ).toEqual({ passed: false, reason: 'document_database_missing' });
 });
 it('invalidates matching-length changed bytes and never restores the old approval', async () => {
   const f = await setup();
@@ -149,7 +251,18 @@ it('survives failed invalidation, restart and restored bytes with unresolved aut
   expect(() => reopened.verifyPlanningDocuments(f.boundary)).toThrow(
     'document_verification_unresolved',
   );
-  reopened.recoverPlanningDocumentVerification(f.boundary);
+  expect(() => reopened.recoverPlanningDocumentVerification(f.boundary)).toThrow(
+    'document_attempt_owner_live',
+  );
+  f.database.exec(
+    "UPDATE leases SET expires_at_ms=0 WHERE resource_type='run' AND resource_id='run'",
+  );
+  const recoveryEpoch = reopened.acquireLease('run', 'run', 'recovery-owner', 60_000).epoch;
+  reopened.recoverPlanningDocumentVerification({
+    ...f.boundary,
+    ownerId: 'recovery-owner',
+    runLeaseEpoch: recoveryEpoch,
+  });
   expect(() => reopened.verifyPlanningDocuments(f.boundary)).toThrow('document_approval_required');
   expect(
     f.database
@@ -199,6 +312,14 @@ it('stages exact approved bytes with packet identity and rejects substituted aut
   const destination = join(f.path, '..', 'snapshot');
   f.store.stageApprovedDocuments({ ...f.boundary, packet, sourceRoot: f.sourceRoot, destination });
   expect(await readFile(join(destination, 'documents', 'spec.md'), 'utf8')).toBe('spec\n');
+  f.store.verifyApprovedDocumentSnapshot({ ...f.boundary, packet, destination });
+  await chmod(join(destination, 'documents', 'spec.md'), 0o600);
+  await writeFile(join(destination, 'documents', 'spec.md'), 'evil\n');
+  expect(() =>
+    f.store.verifyApprovedDocumentSnapshot({ ...f.boundary, packet, destination }),
+  ).toThrow('document_snapshot_binding_rejected');
+  await writeFile(join(destination, 'documents', 'spec.md'), 'spec\n');
+
   await writeFile(join(f.sourceRoot, 'spec.md'), 'edit\n');
   expect(await readFile(join(destination, 'documents', 'spec.md'), 'utf8')).toBe('spec\n');
   expect(() =>
@@ -271,23 +392,13 @@ it.runIf(process.env.WORKFLOW_DOCUMENT_DOCKER === '1')(
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const execute = promisify(execFile);
-    const f = await setup();
+    const f = await setup(true);
     const task = f.contract.tasks[0]!;
-    const documentBinding = f.store.verifyPlanningDocuments(f.boundary);
-    const packet = {
+    const packet = coordinator(f).createTaskPacket({
       runId: 'run',
       taskId: task.id,
-      contractVersion: f.contract.contractVersion,
-      policyDigest: f.contract.policyDigest,
-      assignedRole: task.assignedRole,
-      objective: f.contract.objective,
-      acceptanceCriteria: f.contract.acceptanceCriteria,
-      allowedPaths: task.allowedPaths,
-      allowedOperations: task.allowedOperations,
-      retryBudget: f.contract.retryPolicy,
-      evidence: [],
-      documentBinding,
-    };
+      evidence: f.evidence,
+    });
     const { prepareSpecialistWorkspace, buildDockerSpecialistLaunch } =
       await import('../src/specialistLauncher.js');
     const workspace = await prepareSpecialistWorkspace(f.sourceRoot, ['spec.md']);
@@ -327,6 +438,42 @@ it.runIf(process.env.WORKFLOW_DOCUMENT_DOCKER === '1')(
     const args = [...launch.args.slice(0, -3), 'node', '-e', probe];
     const result = await execute(launch.dockerBinary, args, { timeout: 60000, maxBuffer: 8192 });
     expect(result.stdout.trim()).toBe('approved snapshot readable; writes denied');
+    const retained = await new JournaledArtifactRecorder(f.artifactStore, f.store).record(
+      Buffer.from(result.stdout),
+      {
+        mediaType: 'text/plain',
+        kind: 'test',
+        producer: 'offline-consumer',
+        producerRole: 'test_runner',
+        workspaceId: f.contract.workspaceId,
+        runId: 'run',
+        taskId: task.id,
+        contractVersion: 1,
+        policyDigest: f.contract.policyDigest,
+      },
+    );
+    expect(await f.artifactStore.get(retained.digest)).toEqual(Buffer.from(result.stdout));
+    f.store.close();
+    stores.splice(stores.indexOf(f.store), 1);
+    const reopened = new WorkflowStore(f.path);
+    stores.push(reopened);
+    const resumed = coordinator(f, reopened).createTaskPacket({
+      runId: 'run',
+      taskId: task.id,
+      evidence: f.evidence,
+    });
+    expect(resumed.documentBinding).toEqual(packet.documentBinding);
+    await writeFile(join(f.sourceRoot, 'tests.md'), 'edit\n');
+    expect(() =>
+      coordinator(f, reopened).createTaskPacket({
+        runId: 'run',
+        taskId: task.id,
+        evidence: f.evidence,
+      }),
+    ).toThrow('planning_documents_changed');
+    expect(
+      f.database.prepare("SELECT count(*) n FROM plan_approvals WHERE status='active'").get(),
+    ).toEqual({ n: 0 });
   },
   65000,
 );

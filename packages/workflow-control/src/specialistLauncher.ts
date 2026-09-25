@@ -82,7 +82,7 @@ export async function prepareSpecialistWorkspace(
 ): Promise<SpecialistWorkspace> {
   if (allowedSourcePaths.length === 0) throw new Error('specialist source paths must not be empty');
   const canonicalSource = await realpath(sourceRoot);
-  const stagingParent = await mkdtemp(join(tmpdir(), 'workflow-specialist-'));
+  const stagingParent = await realpath(await mkdtemp(join(tmpdir(), 'workflow-specialist-')));
   try {
     return await populateSpecialistWorkspace(canonicalSource, allowedSourcePaths, stagingParent);
   } catch (error) {
@@ -739,6 +739,17 @@ export class DockerIsolatedSpecialistLauncher {
       let started: Promise<{ stdout: string; stderr: string }> | undefined;
       await this.#withContainerLock(reservation.id, () => {
         this.#assertCanStart(reservation);
+        this.#options.store.verifyApprovedDocumentSnapshot({
+          runId: packet.runId,
+          taskId: packet.taskId,
+          packet,
+          destination: approvedDocumentsRoot,
+          ownerId: authority.ownerId,
+          runLeaseEpoch: authority.runLeaseEpoch,
+          boundary: 'specialist.snapshot_start',
+          expectedSourceRoot: this.#options.sourceRoot,
+          nowMs: this.#clock(),
+        });
         // Revalidate fences immediately before dispatch without another asynchronous gap.
         this.#assertAuthority(authority);
         started = this.#docker(

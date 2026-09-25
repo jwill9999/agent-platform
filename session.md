@@ -7,14 +7,15 @@ Branch: `task/approved-document-binding`; target: `feature/harness-backlog-revie
 
 Current evidence and remaining acceptance scope:
 [implementation checkpoint](docs/reviews/approved-document-binding-implementation.md).
-Build/lint pass; supported native subset 663 passed, 15 skipped. Full Linux regression, strengthened
-real container handoff and independent review are not complete. Docker operations stalled and the
-mount probe timed out; bounded infrastructure retries exhausted. Do not restart Docker or remove
-unrelated containers. Own `document-binding-linux-suite` cleanup is unverified after timeout.
+Docker is healthy after the owner restart. Full Linux regression: 744 passed, 14 optional skips.
+Separate actual-container document suite: 15 passed. Build/lint pass. First independent code review
+requires changes; partial repairs and two-connection dispatch tests pass. Remaining source/workspace
+binding, bootstrap terminalization and exhaustive negative/recovery coverage block acceptance.
+Follow-up isolated review also requires changes; six findings are listed in the checkpoint report. Draft PR273 includes the approved planning package and
+supersedes the closed planning PR272. No merge, staging or pilot launch.
 
-Next: restore Docker, finish validation CLI and coverage matrix/connected end-to-end proof, then
-restricted review and current-head hosted gates. No further scope approval is needed for this task.
-Do not merge or launch the pilot on this checkpoint. Beads remains in progress; `.13` stays blocked.
+Next: finish independent findings and remaining DB-T01–11 evidence, re-review, then hosted gates.
+Existing implementation authorization remains valid. Beads `.16` stays in progress and `.13` blocked.
 
 ---
 

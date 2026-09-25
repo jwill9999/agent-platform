@@ -1,4 +1,4 @@
-import { verifyDocumentBoundary } from './documentApproval.js';
+import { verifyDocumentBoundary, assertDocumentAuthority } from './documentApproval.js';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 
@@ -255,7 +255,7 @@ export class BootstrapJournal {
     fence: DeliveryFence,
     operation: () => T,
   ): T {
-    verifyDocumentBoundary(this.database, {
+    const verified = verifyDocumentBoundary(this.database, {
       runId,
       taskId: policy.taskId,
       boundary: 'bootstrap.mutate',
@@ -265,6 +265,7 @@ export class BootstrapJournal {
     });
     return this.database
       .transaction(() => {
+        assertDocumentAuthority(this.database, runId, verified.approvalId);
         this.assertStored(runId, policy);
         this.assertFence(runId, policy, fence, Date.now());
         const run = this.database.prepare('SELECT state FROM runs WHERE id=?').get(runId) as {
@@ -326,7 +327,7 @@ export class BootstrapJournal {
     nowMs: number,
     assertObserved: () => void,
   ): void {
-    verifyDocumentBoundary(this.database, {
+    const verified = verifyDocumentBoundary(this.database, {
       runId,
       taskId: policy.taskId,
       boundary: 'bootstrap.advance',
@@ -337,6 +338,7 @@ export class BootstrapJournal {
     });
     this.database
       .transaction(() => {
+        assertDocumentAuthority(this.database, runId, verified.approvalId);
         const { contract, approvalId } = this.assertApproved(runId, policy);
         this.assertFence(runId, policy, fence, nowMs);
         assertObserved();

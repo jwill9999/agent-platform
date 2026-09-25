@@ -1,5 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { readFileSync, realpathSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import {
+  readFileSync,
+  realpathSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  readdirSync,
+  lstatSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { TaskPacket } from './contracts.js';
 import type Database from 'better-sqlite3';
@@ -7,6 +15,52 @@ import { executionContractSchema } from './contracts.js';
 import { deriveContractMaterialDigest } from './planning.js';
 import { planningDocumentsDigest, type PlanningDocuments } from './planningDocuments.js';
 import { stagePreapprovalMaterial } from './preapprovalMaterial.js';
+
+/** Recheck durable authority under the transaction that dispatches or adopts the effect. */
+export function assertDocumentAuthority(
+  database: Database.Database,
+  runId: string,
+  approvalId: string,
+): void {
+  const current = binding(database, runId);
+  if (
+    !database
+      .prepare(
+        "SELECT 1 FROM plan_approvals WHERE id=? AND run_id=? AND status='active' AND material_digest=? AND policy_digest=?",
+      )
+      .get(approvalId, runId, current.materialDigest, current.policyDigest)
+  )
+    throw new Error('document_approval_changed');
+  if (
+    database
+      .prepare(
+        "SELECT 1 FROM planning_document_attempts a JOIN runs r ON r.id=a.run_id WHERE r.contract_id=? AND a.status='pending'",
+      )
+      .get(current.contractId)
+  )
+    throw new Error('document_verification_unresolved');
+}
+
+export function assertDocumentApprovalCandidate(
+  database: Database.Database,
+  runId: string,
+  materialDigest: string,
+): void {
+  const current = binding(database, runId);
+  if (current.materialDigest !== materialDigest) throw new Error('document_approval_changed');
+  const unresolved = database
+    .prepare(
+      `SELECT a.status FROM planning_document_attempts a
+    JOIN runs r ON r.id=a.run_id WHERE r.contract_id=? AND a.status IN ('pending','invalidated','recovered') LIMIT 1`,
+    )
+    .get(current.contractId) as { status: string } | undefined;
+  if (unresolved)
+    throw new Error(
+      unresolved.status === 'pending'
+        ? 'document_verification_unresolved'
+        : 'document_new_contract_required',
+    );
+}
 
 /** Lives in the workflow journal; never an independently resettable sidecar marker. */
 export function initializeDocumentApprovalSchema(database: Database.Database): void {
@@ -32,6 +86,7 @@ export function initializeDocumentApprovalSchema(database: Database.Database): v
         status TEXT NOT NULL CHECK(status IN ('pending','verified','invalidated','recovered')),
         reason TEXT,
         created_at_ms INTEGER NOT NULL,
+        deadline_ms INTEGER NOT NULL,
         settled_at_ms INTEGER
       );
       CREATE UNIQUE INDEX IF NOT EXISTS planning_document_pending
@@ -39,6 +94,13 @@ export function initializeDocumentApprovalSchema(database: Database.Database): v
       INSERT OR IGNORE INTO schema_migrations(version,applied_at_ms)
         VALUES(17,unixepoch()*1000);
     `);
+      const columns = database.prepare('PRAGMA table_info(planning_document_attempts)').all() as {
+        name: string;
+      }[];
+      if (!columns.some((column) => column.name === 'deadline_ms'))
+        database.exec(
+          'ALTER TABLE planning_document_attempts ADD COLUMN deadline_ms INTEGER NOT NULL DEFAULT 0',
+        );
     })
     .immediate();
 }
@@ -249,6 +311,7 @@ function verifyBoundary(
   const approvalId = approvalCreation ? `candidate:${current.contractId}` : approval?.id;
   if (!approvalId) throw new Error('document_approval_required');
   const attemptId = randomUUID();
+  const deadline = now() + 30_000;
   database
     .transaction(() => {
       assertFence(database, input, now());
@@ -262,8 +325,8 @@ function verifyBoundary(
         throw new Error('document_verification_unresolved');
       database
         .prepare(
-          `INSERT INTO planning_document_attempts(id,run_id,task_id,approval_id,material_digest,manifest_digest,boundary,owner_id,run_lease_epoch,status,created_at_ms)
-      VALUES(?,?,?,?,?,?,?,?,?,'pending',?)`,
+          `INSERT INTO planning_document_attempts(id,run_id,task_id,approval_id,material_digest,manifest_digest,boundary,owner_id,run_lease_epoch,status,created_at_ms,deadline_ms)
+      VALUES(?,?,?,?,?,?,?,?,?,'pending',?,?)`,
         )
         .run(
           attemptId,
@@ -276,6 +339,7 @@ function verifyBoundary(
           input.ownerId,
           input.runLeaseEpoch ?? null,
           now(),
+          deadline,
         );
     })
     .immediate();
@@ -294,6 +358,7 @@ function verifyBoundary(
   database
     .transaction(() => {
       assertFence(database, input, now());
+      if (now() >= deadline) throw new Error('document_attempt_expired');
       if (
         !approvalCreation &&
         !database
@@ -338,10 +403,24 @@ export function recoverDocumentVerification(
   input: DocumentBoundary,
 ): void {
   if (database.inTransaction) throw new Error('document_recovery_requires_top_level');
+  if (input.runLeaseEpoch === undefined) throw new Error('document_recovery_fence_required');
   const current = binding(database, input.runId);
   database
     .transaction(() => {
       assertFence(database, input, input.nowMs ?? Date.now());
+      const pending = database
+        .prepare(
+          "SELECT run_lease_epoch,deadline_ms FROM planning_document_attempts WHERE run_id=? AND status='pending'",
+        )
+        .all(input.runId) as { run_lease_epoch: number | null; deadline_ms: number }[];
+      if (
+        pending.some(
+          (attempt) =>
+            attempt.deadline_ms > (input.nowMs ?? Date.now()) &&
+            (attempt.run_lease_epoch === null || input.runLeaseEpoch! <= attempt.run_lease_epoch),
+        )
+      )
+        throw new Error('document_attempt_owner_live');
       if (
         !database
           .prepare("SELECT 1 FROM planning_document_attempts WHERE run_id=? AND status='pending'")
@@ -411,5 +490,66 @@ export function stageApprovedDocuments(
   } catch {
     rmSync(input.destination, { recursive: true, force: true });
     throw new Error('document_snapshot_failed');
+  }
+}
+
+/** Recheck the actual mount source immediately before dispatch, not only the object store. */
+export function verifyApprovedDocumentSnapshot(
+  database: Database.Database,
+  input: DocumentBoundary & { packet: TaskPacket; destination: string },
+): void {
+  const verified = verifyDocumentBoundary(database, input);
+  const current = binding(database, input.runId);
+  try {
+    if (
+      realpathSync(input.destination) !== input.destination ||
+      !lstatSync(input.destination).isDirectory()
+    )
+      throw new Error('root');
+    if (
+      input.packet.runId !== input.runId ||
+      input.packet.taskId !== input.taskId ||
+      JSON.stringify(input.packet.documentBinding) !== JSON.stringify(verified)
+    )
+      throw new Error('packet');
+    const expected = new Map(
+      current.manifest.files.map((file) => [`documents/${file.path}`, file]),
+    );
+    const seen = new Set<string>();
+    const visit = (relative: string) => {
+      for (const name of readdirSync(join(input.destination, relative))) {
+        const path = relative ? `${relative}/${name}` : name;
+        const stat = lstatSync(join(input.destination, path));
+        if (stat.isDirectory()) {
+          if (![...expected.keys()].some((file) => file.startsWith(`${path}/`)))
+            throw new Error('directory');
+          visit(path);
+          continue;
+        }
+        if (!stat.isFile()) throw new Error('type');
+        if (path === 'binding.json') {
+          const wanted = {
+            runId: input.runId,
+            taskId: input.taskId,
+            ...verified,
+            manifest: current.manifest,
+          };
+          if (readFileSync(join(input.destination, path), 'utf8') !== JSON.stringify(wanted))
+            throw new Error('binding');
+        } else {
+          const file = expected.get(path);
+          if (!file || stat.size !== file.sizeBytes) throw new Error('file');
+          const bytes = readFileSync(join(input.destination, path));
+          if (`sha256:${createHash('sha256').update(bytes).digest('hex')}` !== file.digest)
+            throw new Error('bytes');
+        }
+        seen.add(path);
+      }
+    };
+    visit('');
+    if (!seen.has('binding.json') || [...expected.keys()].some((path) => !seen.has(path)))
+      throw new Error('missing');
+  } catch {
+    throw new Error('document_snapshot_binding_rejected');
   }
 }

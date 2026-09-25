@@ -1,16 +1,23 @@
 {
-  "status": "checkpoint-not-accepted",
-  "commands": {
-    "native": "pnpm --filter @agent-platform/workflow-control exec vitest run --exclude test/bootstrap*.test.ts --exclude test/gitDeliveryPort.test.ts -t ^(?!.*uses real Git ancestry)",
-    "nativeResult": {
-      "passed": 663,
-      "skipped": 15
+  "status": "changes-required-not-accepted",
+  "results": {
+    "linuxFullPackage": {
+      "passed": 744,
+      "skipped": 14
     },
-    "build": "passed",
-    "lint": "passed",
-    "dockerProductionMount": "timeout",
-    "linuxFullSuite": "incomplete",
-    "independentImplementationReview": "not-run"
+    "dockerConnectedDocumentSuite": {
+      "passed": 15,
+      "skipped": 0
+    },
+    "typescriptBuild": "passed",
+    "eslint": "passed",
+    "independentRound1": "changes_required",
+    "independentRound2": "changes_required",
+    "hostedChecks": "pending-new-head"
+  },
+  "environment": {
+    "node": "24.14.0",
+    "reviewImage": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f"
   },
   "sourceSha256": {
     "packages/workflow-control/src/bootstrapAdapterBundle.ts": "ce57e27c4d79c08088863fc91fe8492a9a9f90c2ef30281c4257ece4303387d0",
@@ -18,10 +25,10 @@
     "packages/workflow-control/src/workCancellation.ts": "95360e2d970da2126ed669b4dfff61f37460c8ec0c4548c97d6a828a162be486",
     "packages/workflow-control/src/stateMachine.ts": "be4776b2a63906500927f7101e261da786cbb53b03e2d60b6c9f4ff77795fadc",
     "packages/workflow-control/src/waitRecovery.ts": "6c86c9274adefcfe50e2a01d46d3469f4ef7404033353306de25b8b68cb457a9",
-    "packages/workflow-control/src/specialistLauncher.ts": "4cd1e2457fec96467f04fed785edaf6b259d2b9c910f916752cebd5a26e444f4",
+    "packages/workflow-control/src/specialistLauncher.ts": "76e2353de24c385c9275f33fcdd55987e166a6491c46a4e4ccc4a1a223f16b16",
     "packages/workflow-control/src/featureEvaluation.ts": "cf7bdb0110fe0a1d94a09dadb33a8e062b30f579fe7a9905bf20e9f5ad5b2069",
     "packages/workflow-control/src/repairChildPortCapability.ts": "827652d05508e5a2018862e725ba6a60f44c064d229884e04e5b63e0b70baf45",
-    "packages/workflow-control/src/continuationJournal.ts": "f0bef2a856d326f9a9acad7f7bb484576a8134d48ce51b8637d6ff11b5901b71",
+    "packages/workflow-control/src/continuationJournal.ts": "fb37eb1fea7ce855f2f760420ea231cbd10093b325892c6ddcae5bd67bfc62c6",
     "packages/workflow-control/src/supervisedReviewCli.ts": "a47a2484df52f99f0699999d7b08bc777ba90c4bc75d782c763fde2cd7f4896e",
     "packages/workflow-control/src/mcpServer.ts": "21b90c48dcc579bc141e88ef3aa026b331a64ecf64a36312a184846ee7cd1633",
     "packages/workflow-control/src/specialistInput.ts": "d5d556caa9f4cdaab5500f7d101b96c61bd50b288ffa38442c1a64a45cc8a889",
@@ -29,14 +36,14 @@
     "packages/workflow-control/src/artifacts.ts": "3a8a054fbb791bf4e66657c3d2e16ad33ae76f812a85465ae97fdd0226d99dcd",
     "packages/workflow-control/src/contracts.ts": "360a1c9bf53a4ceac2be4413dec1492eff1ca1a7e282699aaa17bb3153d6a0dc",
     "packages/workflow-control/src/planning.ts": "2e4732946ea10a76fcf758518ecd7019899ef04db1c90b4859b0615b2695d3da",
-    "packages/workflow-control/src/phaseJobs.ts": "2caa395a24eea2c161065822eff4b538f6baf02bc8c120a5e3d3b79a48c94044",
-    "packages/workflow-control/src/storage.ts": "5663fa27c89602c9561862cbd00ddbf5e7a73b765a8aed9e72a5ba0468cd17a5",
+    "packages/workflow-control/src/phaseJobs.ts": "01cee704b97806247ccd364615ad1618335aa53e2769e1be39d6cbc1e442e67b",
+    "packages/workflow-control/src/storage.ts": "9f9872e55cf692d0cab5f43c14770a558b09a40bb0726a9d64b93581cb5a8168",
     "packages/workflow-control/src/deliveryPortCapability.ts": "a51690938c77bb5bbe61f45de42d4ecf15f2e6bc2f0d636492a7fc1362c971e7",
     "packages/workflow-control/src/orchestrator.ts": "9941c960a629546c61a4d985bb73d193ebdfc1fc70dc3c3afa06cfe8dd9af336",
     "packages/workflow-control/src/lifecycle.ts": "85a663a4c8d7b5d32ab8d4b63f3565a57be86dea9940b588056fee7565862352",
-    "packages/workflow-control/src/cli.ts": "77966b8b8ac8a95614a1e39c9807a5e2f788298783639b3bd3296731869e4ed0",
+    "packages/workflow-control/src/cli.ts": "97abb9b0c2ac2866784a2acaeca087588b693dc8b7fed65339315e27729b6781",
     "packages/workflow-control/src/deliveryBrokers.ts": "1b33665123be6fd27e343f5f5edac4e0db3749f1fa2cb99171fd067fa68c0a01",
-    "packages/workflow-control/src/documentApproval.ts": "3f653db511485538ed89e924963cd8d537e732b3a3a8cb9937937b3167e5d92b",
+    "packages/workflow-control/src/documentApproval.ts": "a2a1425e59eb586cf165618c39bf55596c5348cfc6f1d0a4010f5b587a4eff91",
     "packages/workflow-control/src/supervisedReview.ts": "114bb347eb1d8bcd41fc89b889fc6b74d8ce0c95511ab9baa7aec166f5123412",
     "packages/workflow-control/src/authorization.ts": "a5d356638e60389aa990edd2958054e2e5a4a39763a009bca8032cd4fdcb6354",
     "packages/workflow-control/src/phaseRuntime.ts": "57e93aa558c25dbf451bf187292bfb0051b0961ff2287c978e745fb2e4ef38aa",
@@ -52,7 +59,7 @@
     "packages/workflow-control/src/repairLoops.ts": "90cfdf6a6da4d0281f2c4079be96e9fe8ffa6595cbfa5158189588dbe0843462",
     "packages/workflow-control/src/finalization.ts": "75801c38df7392bd841de3ca9025d89a425aa4cb7c2c2d83a67393a6bdf7e647",
     "packages/workflow-control/src/cancellation.ts": "141a6e56fc9381e29fa21e3878d1b4eb308d2d39f9d21e388251e0deda546b57",
-    "packages/workflow-control/src/bootstrapJournal.ts": "cee896a2f19d4906527b93383b461dd787ed8410f38aee7b0888ccb6b8310218",
+    "packages/workflow-control/src/bootstrapJournal.ts": "250631b03e3c36ded997ce4109e17da004c6aa6753bd9efb6a398657721564a0",
     "packages/workflow-control/src/reviewProxy.ts": "070145d1e2618a1e6fa9a073b47f8d4666318d225de5103cf74f6f610ca0f369",
     "packages/workflow-control/src/reconciliation.ts": "7ce3803231334ce16d3497f6af189965f0413b7f913f31d0eff9f6959f2c539e",
     "packages/workflow-control/src/index.ts": "b591ecffe8c6723a44be7e4761aacbd45d90eecb638320cc98fd0f1853349e4e",
@@ -86,7 +93,7 @@
     "packages/workflow-control/test/supervisedReviewLifecycle.test.ts": "3d6af70f8541c0acf707effff2de12b520c0f353b415fe898969846337bbf904",
     "packages/workflow-control/test/prePushIsolation.test.ts": "bf99d84160dd008142428c4eaa7b3581fb3e1971b7d2249090b121509fb5f366",
     "packages/workflow-control/test/specialistOutputManifest.test.ts": "64af54f389845e1fa02464e17fddf29dfbe85f900dbfc8c44074c16b43fcacf0",
-    "packages/workflow-control/test/documentApproval.test.ts": "886bb86573316ad5bd07c40061aeff3a1c28d3a4fc8060016d3cd931c32ac5e4",
+    "packages/workflow-control/test/documentApproval.test.ts": "78fd2942ed56a09630fc5bbb0ccbb4eb183fc383bdce116480d35b2d296535a7",
     "packages/workflow-control/test/activeSpecialistSettlement.integration.test.ts": "d252c8f44bb97fc14b97b6094a200f78699de2a9deaa9e526ee6002818d3cd89",
     "packages/workflow-control/test/integrationGate.test.ts": "5fa4b83d4ff641ea53309be170804bd910a464b014bca24173d8c0864dab0e25",
     "packages/workflow-control/test/phaseRuntime.test.ts": "03208a7d11597035bcc6f8c1ef1b5ec564a12adf730c68863921bf84c4b9cf2b",
@@ -97,7 +104,7 @@
     "packages/workflow-control/test/featureDeliveryBroker.test.ts": "91cd34fcd142677f8886d88ff41c34d104bb911b85581d6e4e88ad96aeb4ad9f",
     "packages/workflow-control/test/secureEvidence.test.ts": "833600fa4a42fab8a26e3ec0d3e1d7453ab3d254837f95f290532e6175018323",
     "packages/workflow-control/test/planningDocuments.test.ts": "f48a57ef4a524bb2cc2f7db69e6c17c5691872e067f4ff7a18ad3e5f2285c0f9",
-    "packages/workflow-control/test/governedPersistence.test.ts": "dc0f43481359459fdb1538e5f4bbdaadf48b6c1a827619ce6336fc6c0592a90f",
+    "packages/workflow-control/test/governedPersistence.test.ts": "5d326fd42528ff0168744b22d80165b5335dec72b3d55260c4b01c7b67a21723",
     "packages/workflow-control/test/phaseJobs.test.ts": "fc92a4d391a05fa6b34371e207bd0e932a24bc2dc791d444e07c9bfb2d5dcba6",
     "packages/workflow-control/test/reviewProxy.test.ts": "8471b4464169e56f5ad278f7e07c9ec213907a52eb8857bdc0946fb0ad8ce2b0",
     "packages/workflow-control/test/governedOperations.test.ts": "9d18ce93fe5c569ea48715c41bc5027d31d304938d82a641a6a02ad9ca62350a",
@@ -112,7 +119,7 @@
     "packages/workflow-control/test/orchestrator.test.ts": "4ea31379660a1074c84d3fc1ce9c9c66618fb68533ababcff83cd44f40293e8d",
     "packages/workflow-control/test/activeSpecialistSettlement.test.ts": "783c154f68918e940b067ea32960e17015c6e70b30acfad3e6b363ee4cba9946",
     "packages/workflow-control/test/cancellationWork.test.ts": "f0b643d640a1d95d921904901e32fd8d1e09aa5120beb12cd160bfc9d07ac2c6",
-    "packages/workflow-control/test/bootstrap.test.ts": "55db721acc2c234a2f901f34e635949ba2b05f7ff73d359c31133b7811350c00",
+    "packages/workflow-control/test/bootstrap.test.ts": "84e28660375053f873728ff765e91ff3f4ac17921bd1e82fd2224af820ad9d7d",
     "packages/workflow-control/test/continuationWorker.test.ts": "42d4ec75d1977001cb58de30e6b04e9d39828e0d29c31df5dfb979b270530db2",
     "packages/workflow-control/test/specialistContainerLifecycle.test.ts": "3f0d37317ab0d84ddd9e285d79503a084dcec97fd3b9b6a904f509ff48ecaff9",
     "packages/workflow-control/test/deliveryBrokers.test.ts": "8693fe5a6dbcee79bef94db259b320d6791acb9466a89b0c23ab2ae84555ad71",

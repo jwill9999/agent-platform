@@ -6,6 +6,52 @@ Task authority: Beads `agent-platform-pilot-zero.16`. Owner approved the exact p
 Delivery is supervised direct implementation, not a managed orchestration run or pilot.
 The frozen plan/spec/test documents remain unchanged; their original proposed-status text is historical.
 
+## Docker restart and independent review follow-up
+
+Docker recovered after the owner restarted Desktop. The stale Linux test container was absent.
+The current full Linux suite passes **744 tests, 14 optional skips** (46 files pass, 5 skipped).
+The separate real-container document suite passes **15 tests**, including the connected public
+orchestrator packet, actual read-only mount, recorded artifact evidence, store/coordinator reopen,
+and denial after test-plan tampering. These do not prove a managed live-model workflow or the full
+required negative matrix. TypeScript build and lint pass.
+
+The first independent isolated code review returned **changes required**. Its exact material manifest
+and results are retained in [round one](evidence/approved-document-binding-code-review-round1.json).
+Follow-up changes add in-transaction authority checks, terminal-status replay checks, actual snapshot
+verification before start, bounded attempt lifetime and fenced recovery, retryable live contention,
+and an operator validation command. A two-connection broker test confirms zero external mutations
+when a peer invalidates or quarantines authority after verification. Bootstrap fixtures now include
+normative documents in the initial Git tree instead of changing the reviewed candidate afterward.
+
+Remaining blockers include trusted publication/current task workspace binding, bootstrap
+terminalization after approval invalidation, and exhaustive authority/recovery test coverage.
+Several transaction paths still require the final audit; passing helper or regression tests do not
+resolve an independent finding. The follow-up [independent review](evidence/approved-document-binding-code-review-round2.json)
+returned changes required. Both reviews used the qualified isolated read-only container; neither
+is owner approval.
+The first review's commands were disabled as expected; its returned code-mode availability warning
+does not imply a tool ran. Findings came from the supplied immutable source snapshot.
+
+The earlier planning request was closed as superseded by the cumulative draft
+[implementation request](https://github.com/jwill9999/agent-platform/pull/273).
+Nothing was merged. Scope remains approved; this checkpoint must not be used to launch the pilot.
+
+## Remaining independent findings after the repair pass
+
+| Finding | Severity | Disposition |
+| --- | --- | --- |
+| Publication provenance and current accepted workspace | High | Open: fixed publication directory is insufficient proof of current task source |
+| Durable snapshot-tamper denial | High | Open: snapshot check runs after source verification settles; mismatch must invalidate durably |
+| Supplied packet versus durable scheduler input | High | Open: compare complete canonical packet/envelope before staging and dispatch |
+| Conflicting terminal result on replay | Medium | Open: status mismatch is denied, but same-status different result needs rejection |
+| Bootstrap terminalization after lost approval | Medium | Open: separate cancellation identity checks from active execution authorization |
+| Complete production-path negative evidence | High | Open: real launcher lifecycle, process crash and every authority consumer remain required |
+
+Two implementation/review passes have now surfaced unresolved problems, as anticipated by the
+plan's bounded-attempt rule. This report escalates them; no finding is waived or hidden by the
+passing regression suite. Next repair work remains within the existing task, followed by full
+regression and another exact-snapshot review. No completion or merge recommendation is issued.
+
 ## Implemented at this checkpoint
 
 Typed canonical document manifests participate in the contract material digest. Explicit publication
@@ -38,7 +84,7 @@ historical receipt reads and cleanup deliberately do not create new execution au
 synchronous governed commits reuse only the private in-transaction operation scope established by
 the immediately preceding durable guard; this requires explicit review, not a caller verification flag.
 
-## Verification actually executed
+## Earlier checkpoint verification (superseded by follow-up above)
 
 - Workflow-control TypeScript build: passed.
 - Workflow-control ESLint with zero warnings: passed.
@@ -65,13 +111,12 @@ Retained command/result summaries and source hashes are in
 
 This is the remaining scope of the existing Beads task, not a new backlog:
 
-1. Restore Docker responsiveness and remove only the disposable `document-binding-linux-suite`
-   container if it remains. Its forced-removal request timed out; cleanup is unverified.
-2. Finish the operator validation command and document the supported publication/validation API.
-   Audit trusted source/workspace resolution and fencing against the approved requirements.
+1. Resolve independent implementation findings; Docker responsiveness is restored.
+2. The operator command and API guide are present. Finish trusted source/workspace resolution
+   and fencing against the approved requirements.
 3. Complete the authority-entry tamper matrix, publication failure cases, legacy cleanup/replan proof,
    and connected real-Git/public-coordinator/SQLite/artifact/container/restart scenario.
-4. Run the current-source Linux full suite and real mount test; retain failures and actual outcomes.
+4. Linux regression and real mount tests pass; repeat after material repairs and retain their outcomes.
 5. Run the qualified isolated code reviewer; fix findings and re-review material revisions.
 6. Finish documentation checks and current-head hosted browser, desktop and Sonar regression gates.
    Only then recommend feature-branch merge. Staging and the live pilot remain separate.

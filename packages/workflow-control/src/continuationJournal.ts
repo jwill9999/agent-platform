@@ -1,4 +1,4 @@
-import { verifyDocumentBoundary } from './documentApproval.js';
+import { verifyDocumentBoundary, assertDocumentAuthority } from './documentApproval.js';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 
@@ -375,10 +375,11 @@ export class ContinuationJournal {
     nowMs: number,
   ): void {
     const action = continuationActionSchema.parse(actionInput);
+    let verified: ReturnType<typeof verifyDocumentBoundary> | undefined;
     if (action.kind === 'execute_phase') {
       const pending = this.get(id);
       if (pending?.status !== 'consumed')
-        verifyDocumentBoundary(this.#database, {
+        verified = verifyDocumentBoundary(this.#database, {
           runId: action.runId,
           taskId: action.taskId,
           boundary: 'phase.enqueue',
@@ -388,6 +389,8 @@ export class ContinuationJournal {
     }
     this.#database
       .transaction(() => {
+        if (action.kind === 'execute_phase' && verified)
+          assertDocumentAuthority(this.#database, action.runId, verified.approvalId);
         const job = this.get(id);
         if (job !== undefined && !runAcceptsWork(this.#database, job.run_id))
           throw new Error('continuation run is cancelled');

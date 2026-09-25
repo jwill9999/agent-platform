@@ -65,6 +65,15 @@ async function fixture(changePolicy?: (policy: BootstrapPolicy) => void) {
   git(canonical, ['init', '-q']);
   mkdirSync(join(canonical, 'packages/workflow-control'), { recursive: true });
   writeFileSync(join(canonical, 'packages/workflow-control/value.txt'), 'before\n');
+  // Normative inputs belong to the starting tree, outside the implementation diff.
+  writeFileSync(
+    join(canonical, 'fixture-spec.md'),
+    'Synthetic requirements for execution regression.\n',
+  );
+  writeFileSync(
+    join(canonical, 'fixture-tests.md'),
+    'Synthetic verification requirements for execution regression.\n',
+  );
   git(canonical, ['add', '.']);
   git(canonical, ['commit', '-qm', 'base']);
   const initial = git(canonical, ['rev-parse', 'HEAD']);
@@ -864,6 +873,13 @@ describe('approved bootstrap task artifact production composition', () => {
     const coordinator = BootstrapCoordinator.create(f.database, 'bootstrap-run', f.policy);
     coordinator.adopt();
     const store = new WorkflowStore(f.database);
+    const raw = new Database(f.database);
+    const lease = raw
+      .prepare(
+        "SELECT owner_id,epoch FROM leases WHERE resource_type='run' AND resource_id='bootstrap-run'",
+      )
+      .get() as { owner_id: string; epoch: number };
+    raw.close();
     expect(() =>
       store.prepareDeliveryOperation(
         {
@@ -887,9 +903,9 @@ describe('approved bootstrap task artifact production composition', () => {
           },
           contractVersion: 1,
           policyDigest: f.contract.policyDigest,
-          ownerId: 'invalid',
+          ownerId: lease.owner_id,
           workspaceLeaseEpoch: 1,
-          runLeaseEpoch: 1,
+          runLeaseEpoch: lease.epoch,
           taskLeaseEpoch: 1,
           nowMs: Date.now(),
         },
