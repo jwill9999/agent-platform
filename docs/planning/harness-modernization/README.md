@@ -54,3 +54,10 @@ Compare improving current code with adapter-based reuse before choosing bespoke 
 on concepts, services and features; verify language/version compatibility and behavioral guarantees
 before adoption. Record decisions and follow-up in existing assessment material and Beads.
 A twice-monthly research-only automation was subsequently approved; see session.md for its scope and joint-review gate. Migration remains unapproved.
+
+## Starting point for high-level gap analysis
+
+Before proposing backlog changes, compare the saved LangChain harness concepts against **existing
+and already-planned features** using the [initial comparison boundary](agent-harness-article-reference.md#initial-high-level-comparison--owner-clarification).
+Identify potentially major capability gaps for joint review only. Preserve the recently agreed
+features, epics, tasks and priorities; implementation design and detailed estimates are out of scope.

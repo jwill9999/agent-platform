@@ -60,6 +60,17 @@ No implementation, pilot, dependency changes or automatic Beads updates are auth
 Research/reference and handoff updates after PR273 remain on the task branch and still need to be
 preserved or integrated during future branch reconciliation; they were not part of that merged PR.
 
+## High-level comparison to prepare later
+
+Owner clarified that the recent feature/epic/task evaluation must remain unchanged. Documented future
+assessment: compare the saved LangChain harness guidance against existing **and planned** capabilities
+to establish an initial view of potentially major gaps. Keep this at feature/service outcome level,
+distinguish planned work and missing proof from unplanned gaps, and present it for joint review.
+No implementation details, backlog changes or reprioritization. See the
+[comparison boundary](docs/planning/harness-modernization/agent-harness-article-reference.md#initial-high-level-comparison--owner-clarification).
+This request records future assessment scope; it does not resume implementation or replace the
+outstanding readiness/pilot work below.
+
 ## Resume here
 
 Use `/Users/letuscode/projects/agent-platform-workflow-evaluation`; this handoff is saved on

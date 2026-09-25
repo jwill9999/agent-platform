@@ -179,3 +179,30 @@ this direction does not authorize migration, installation or new implementation.
 Before selecting bespoke work, ask: can an available component close this gap sooner through an
 adapter while preserving our guarantees? Validate any candidate against the same connected journeys
 as the current service. Beads remains authoritative for follow-up work and scheduling.
+
+## Initial high-level comparison — owner clarification
+
+The recently reviewed features, epics, tasks and priorities remain unchanged. Before considering
+any follow-up changes, use the saved LangChain harness article and Deep Agents concepts to prepare
+a high-level comparison against both existing capabilities and already-planned features.
+This comparison is a starting point for gap analysis within planning, not implementation design
+or a new backlog. It has not been performed by saving this note.
+
+Use capability categories such as execution/tools, workspace/isolation, context/memory/skills,
+planning/delegation, permissions/human oversight, recovery/continuation and visibility/evaluation.
+For each category, record:
+
+- The intended user or operational outcome.
+- Existing feature coverage, with a brief evidence reference and any uncertainty.
+- Planned coverage, linked to existing feature/epic/task records.
+- Any potentially major gap, distinguishing unplanned capability from planned-but-undelivered work
+  and implemented-but-unverified behavior.
+- Indicative significance and the question to resolve with the owner; no engineering estimate required.
+
+Stay at feature and service capability level. Exclude API designs, adapter implementations, package
+selection, code changes, task decomposition and detailed delivery estimates. Do not infer that every
+library capability is a requirement for our product. Flag unknowns rather than inventing deficiencies.
+
+Present the comparison for joint review before deciding whether any gap warrants later investigation.
+Do not create, reprioritize, replace or expand existing features, epics or tasks from this exercise.
+The separate recurring research can provide new evidence, but does not override the agreed plan.
