@@ -71,6 +71,30 @@ No implementation details, backlog changes or reprioritization. See the
 This request records future assessment scope; it does not resume implementation or replace the
 outstanding readiness/pilot work below.
 
+## Knowledge-lifecycle gap to address on return
+
+The owner requested recording this gap for later work, not implementing it now. Existing documentation
+and shared instructions map where information belongs, but do not yet provide a complete, consistent
+procedure for retrieving, promoting, archiving and superseding development knowledge.
+
+Proposed approach for joint review: extend the existing documentation skill with one authoritative
+knowledge-lifecycle guide; have planning and implementation reference it rather than duplicate rules.
+The procedure should define what an agent reads on resume; when session notes are shortened and
+archived intact; how lasting owner-approved decisions move into decisions.md or architectural decision
+records; how corrections, conflicts and superseded decisions retain provenance; and how preservation
+and reference integrity are verified. Consider bounded session size and automated link/size checks,
+but no limit or enforcement has been adopted yet.
+
+Distinguish development records (session handoff, Git documents, Beads and orchestration state) from
+Agent Platform's application working/candidate/long-term memory. Do not imply that saving a session
+note automatically populates application memory or that a new database is required. Relevant starting
+points: [documentation guide](docs/README.md), [documentation skill](.agents/skills/documentation/SKILL.md),
+[decision log](decisions.md), and [application memory model](docs/memory.md).
+
+On return, review this proposed boundary alongside existing outstanding work, check for an existing
+Beads owner before creating follow-up work, and agree sequencing. Existing epics, tasks and priorities
+remain unchanged. No skill edits, archive rotation or memory implementation occurred for this note.
+
 ## Resume here
 
 Use `/Users/letuscode/projects/agent-platform-workflow-evaluation`; this handoff is saved on
