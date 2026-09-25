@@ -48,6 +48,15 @@ from the integrated feature baseline, preserving this handoff.
 5. After the single-task result is accepted, prepare the separate two-dependent-task pilot to prove
    automatic progression, verification before the second task, and stopping on failure without manual nudges.
 
+## Feature branches and staging
+
+Leave existing feature branches intact during the pause. On return, prepare a separate staging
+integration assessment: inventory live branches, compare their changes and dependencies against
+staging, identify overlap and merge order, and define required combined and staging-specific checks
+(including packaged macOS VM coverage). Do not assume every branch must wait for the full pilot or
+that feature-branch green checks establish staging readiness. Present the scoped promotion plan to
+the owner before merging or deleting branches. No staging promotion is authorized now.
+
 The immediate next work is skill/runtime readiness and pilot planning, not launching the pilot.
 Broader permission, cancellation, retry and recovery coverage remains open. No new execution,
 merge or staging authorization is implied by this handoff. Temporary reviewer gateway/containers
