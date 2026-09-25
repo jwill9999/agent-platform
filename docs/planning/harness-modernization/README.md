@@ -53,4 +53,4 @@ and the [prebuilt-capability reference](agent-harness-article-reference.md#ongoi
 Compare improving current code with adapter-based reuse before choosing bespoke work. Focus first
 on concepts, services and features; verify language/version compatibility and behavioral guarantees
 before adoption. Record decisions and follow-up in existing assessment material and Beads.
-No calendar-based automation or migration is authorized by this checkpoint.
+A twice-monthly research-only automation was subsequently approved; see session.md for its scope and joint-review gate. Migration remains unapproved.

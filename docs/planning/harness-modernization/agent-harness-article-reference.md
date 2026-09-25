@@ -153,8 +153,10 @@ recovery, events, errors and operational dependencies as well as interface shape
 
 Revisit this comparison at each feature-planning/refinement cycle and after each significant pilot
 or delivery milestone. Reassess sooner when runtime evidence exposes a gap, a relevant library
-capability changes, or bespoke implementation effort increases. This is a recurring review
-checkpoint; no calendar interval or automated monitoring has been agreed.
+capability changes, or bespoke implementation effort increases. This review checkpoint is supplemented by the owner-approved research automation on the 1st and
+15th of each month. It compares LangChain/Deep Agents with Vercel AI SDK, explores at most two
+capabilities per run, and returns meaningful findings for joint review in this task. See session.md
+for reporting and approval boundaries. Cadence changes require owner agreement.
 
 Include discovery, not just reassessment of known gaps: scan relevant release notes and capability
 guides for new or evolving functionality, and consider user needs we have not yet identified.

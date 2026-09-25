@@ -21,7 +21,7 @@ This entry supersedes earlier status statements below.
 - Local Linux regression: 875 passed, 17 optional skipped. Enabled document/container suites:
   110 passed. Final two-file quality cleanup: 80 affected tests passed and separately reviewed.
   These suites overlap; 110 does not mean 110 real-container cases.
-- Beads task `agent-platform-pilot-zero.16` can close after the verified owner integration.
+- Beads task `agent-platform-pilot-zero.16` was closed after verified owner integration; Dolt sync succeeded.
   Broader skill qualification and pilot acceptance remain separate.
 
 ## Saved reference context
@@ -30,8 +30,35 @@ The owner supplied [The Anatomy of an Agent Harness](docs/planning/harness-moder
 Its source link, summary and assessment prompts are saved for future discussion. Owner direction:
 revisit partial feature/service gaps at refinement and pilot/delivery milestones, explicitly considering
 prebuilt capabilities behind clean-architecture adapters before bespoke work. The research index and
-reference note retain the review criteria; no calendar automation was requested. No implementation
+reference note retain the review criteria. The subsequent approved schedule is recorded below. No implementation
 or pilot work resumed as part of saving this reference.
+
+## Approved scheduled research and joint review
+
+The owner approved **Harness capability research review**, automation
+`harness-capability-research-review`, active on the 1st and 15th of each month at 09:00.
+Reports return to this Codex task. Scope is limited to LangChain/Deep Agents and Vercel AI SDK,
+with at most two capabilities explored in depth per review. Prioritize concepts, services, features
+and user value; assess TypeScript compatibility when needed for feasibility.
+
+Revisit primary documentation, linked research and release notes. Discover emerging capabilities
+as well as revisiting known gaps. Compare existing-code improvements with prebuilt components behind
+clean-architecture adapters, preserving permission, state, recovery and verification guarantees.
+The saved [reference note](docs/planning/harness-modernization/agent-harness-article-reference.md)
+contains Deep Agents building blocks, supporting links and evidence boundaries.
+
+Report meaningful changes with sources, relevance, benefits, risks and proposed dispositions.
+Quiet runs mean no meaningful report, not a claim that inaccessible research was checked; report
+access failures explicitly. Every findings report must flag **joint review required**. Together,
+the owner and agent decide accept for investigation/planning, defer with a revisit condition, or do
+not carry forward with a reason. Unanswered recommendations remain pending. Acceptance is not
+implementation, backlog mutation, merge or deployment authority. Recommend cadence changes based
+on the volume/value of findings, but change timing only with owner agreement.
+
+The scheduled research remains active during the pause; hands-on project work is paused.
+No implementation, pilot, dependency changes or automatic Beads updates are authorized by the schedule.
+Research/reference and handoff updates after PR273 remain on the task branch and still need to be
+preserved or integrated during future branch reconciliation; they were not part of that merged PR.
 
 ## Resume here
 
