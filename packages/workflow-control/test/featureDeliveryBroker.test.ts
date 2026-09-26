@@ -338,7 +338,7 @@ async function createRecoveryOrchestrator(input: {
     image: 'workflow-codex:test',
     credentialBroker,
     egressNetwork: 'workflow-model-egress',
-    containerUser: '501:20',
+    containerUser: `${process.getuid!()}:${process.getgid!()}`,
     executor: schedulerDockerFixture(async () => ({ stdout: '', stderr: '' })).executor,
     clock: () => input.nowMs,
   });

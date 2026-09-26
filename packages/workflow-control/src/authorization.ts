@@ -99,11 +99,15 @@ function pathIsWithin(path: string, roots: readonly string[]): boolean {
 function argumentsStayWithinPaths(value: unknown, roots: readonly string[]): boolean {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
+  if ('path' in record && typeof record.path !== 'string') return false;
+  if (
+    'paths' in record &&
+    (!Array.isArray(record.paths) || !record.paths.every((p) => typeof p === 'string'))
+  )
+    return false;
   const paths = [
     ...(typeof record.path === 'string' ? [record.path] : []),
-    ...(Array.isArray(record.paths) && record.paths.every((path) => typeof path === 'string')
-      ? (record.paths as string[])
-      : []),
+    ...(Array.isArray(record.paths) ? (record.paths as string[]) : []),
   ];
   return paths.length > 0 && paths.every((path) => pathIsWithin(path, roots));
 }
@@ -169,6 +173,7 @@ export class ProcessCapabilityBroker {
       tokenDigest: digest,
       claims: {
         ...claims,
+        process: { ...claims.process },
         operations: [...claims.operations],
         allowedPaths: [...claims.allowedPaths],
       },

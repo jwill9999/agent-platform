@@ -1,3 +1,20 @@
+# Current session: role enforcement repair — 26 September 2026
+
+Owner authorized auditing and technically enforcing every specialist role, separately from broker
+model access. Work is supervised under `.17` on `task/standalone-pilot-plan`, PR275 into
+`feature/harness-backlog-review`. No managed run, pilot, merge or staging promotion.
+
+[Role audit](docs/reviews/role-enforcement-qualification.md) and
+[scope addendum](docs/planning/standalone-pilot/role-enforcement-addendum.md) record the policy matrix,
+source/scratch/evidence isolation, generated MCP-free configuration, reduced grants and client limits.
+Read-only reviewers cannot edit source; testing uses separate writable locations. Source context is
+supplied to roles without shell access. Independent review findings were repaired, including strict
+path validation and immutable process identity. Real-container/client verification and final review
+are being retained before component sign-off. The complete `.17` prerequisite and `.13` pilot remain
+open; next broader work is unchanged R1–R3 and full host/startup/lifecycle qualification.
+
+---
+
 # Current session: local credential broker delivered — 26 September 2026
 
 Owner explicitly authorized creating the missing local broker with the existing Codex account.

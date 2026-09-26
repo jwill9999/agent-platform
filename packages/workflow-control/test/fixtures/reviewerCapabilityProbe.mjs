@@ -26,7 +26,11 @@ const calls = [
     name: 'exec',
     namespace: 'functions',
     input:
-      'await tools.apply_patch("*** Begin Patch\\n*** Add File: /workspace/unauthorized.txt\\n+changed\\n*** End Patch")',
+      'await tools.apply_patch(' +
+      JSON.stringify(
+        '*** Begin Patch\n*** Add File: /workspace/unauthorized.txt\n+changed\n*** End Patch',
+      ) +
+      ')',
   },
   {
     type: 'function_call',
@@ -103,7 +107,8 @@ const args = [
 const child = spawn('/usr/local/bin/codex', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 child.stdout.on('data', (d) => process.stderr.write(d));
 child.stderr.on('data', (d) => process.stderr.write(d));
-child.on('exit', () => {
+child.on('exit', (code, signal) => {
+  if (code !== 0 || signal) process.exitCode = 1;
   const inventories = events
     .flatMap((e) => e.input ?? [])
     .filter((i) => i.type === 'additional_tools')
@@ -122,4 +127,7 @@ child.on('exit', () => {
   server.closeAllConnections();
   server.close();
 });
-setTimeout(() => child.kill(), 20000).unref();
+setTimeout(() => {
+  process.exitCode = 1;
+  child.kill();
+}, 20000).unref();

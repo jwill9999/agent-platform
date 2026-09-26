@@ -50,3 +50,11 @@ Owner authorized preparing the bounded plan on 26 September, after PR274 merged.
 Planning branch: `task/standalone-pilot-plan`, from `feature/harness-backlog-review` at
 `a8586aa425fc4907ef7aa374ff2d283d6eb0a1cd`. Canonical Beads remains the main repository.
 The proposed execution contract is not persisted approval or authority to launch a pilot.
+
+## Authorized component refinements
+
+The owner subsequently authorized the [local broker addendum](../planning/standalone-pilot/broker-addendum.md)
+and the separate [role-enforcement addendum](../planning/standalone-pilot/role-enforcement-addendum.md).
+Their component evidence is retained in the [broker report](../reviews/local-credential-broker-qualification.md)
+and [role audit](../reviews/role-enforcement-qualification.md). These authorizations do not close R1–R4
+or launch the pilot; the initial proposal-only wording above is historical context for the original task.
