@@ -253,16 +253,3 @@ resume and inherited paths require a shared enforcement design. Independent isol
 identified a failed-invalidation/restart gap; the proposed durable attempt/recovery protocol and
 compound tests address it at design level. [Review record](approved-document-binding-plan.md) retains
 findings and exact snapshot evidence. No managed pilot, implementation or new execution approval.
-
-## Supplied handoff assessment reference — 26 September 2026
-
-[Orchestration handoff gap reference](orchestration-handoff-gap-reference.md) preserves an
-owner-supplied assessment of delivery, host execution, parallel progression, latency and possible
-A2A adapters. Its code/test claims await independent verification; timings are illustrative and
-proposals are not accepted scope. Use it during the high-level existing-versus-planned comparison.
-
-## Future reuse options — draft reference
-
-[Owner-supplied reusability analysis](orchestration-reusability-draft-reference.md) preserves discussion
-of packaging, configuration, onboarding and adapter boundaries for consideration after a stable
-implementation. It is not accepted scope and does not change the current assessment sequence.
