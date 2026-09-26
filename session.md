@@ -1,4 +1,26 @@
-# Current session: managed host provisioning gap confirmed — 26 September 2026
+# Current session: local credential broker delivered — 26 September 2026
+
+Owner explicitly authorized creating the missing local broker with the existing Codex account.
+Supervised bootstrap delivery on `task/standalone-pilot-plan`; PR275 targets
+`feature/harness-backlog-review`. Account credentials remain at the trusted gateway, workers receive
+opaque revocable leases. Durable tombstones, restart fencing, executable control adapter and optional
+runtime model gateway configuration are implemented. No managed pilot or staging changes.
+
+[Component report](docs/reviews/local-credential-broker-qualification.md) holds the design, setup,
+source hashes, tests and isolated reviews. Focused16/full Linux891 passed (17 optional skipped);
+real Codex turn and revoke/restart denials passed with the final gateway image. Typecheck/build/lint
+passed. Native full tests remain limited by the unaccepted Apple Git licence; Linux supplies the
+regression evidence. Do not treat this as a complete production launcher lifecycle or autonomous run.
+
+`.17` remains in progress and `.13` blocked: next qualify the complete launcher lifecycle/topology
+and continue R1 run discovery, R2 governed artifact import and R3 coordinator completion under the
+approved scope. The original proposed policy/contract hashes remain proposals, not installed authority.
+Review current PR hosted checks before owner integration. Preserve existing authorization; no repeated
+permission request merely to continue agreed work. Older entries below are historical checkpoints.
+
+---
+
+## Current session: managed host provisioning gap confirmed — 26 September 2026
 
 Owner authorized continuing .17 after the planning PR. Read-only canonical journal inspection found
 four cancelled runs and zero unexpired leases at that instant. Git fallback and Docker respond, but
@@ -17,7 +39,7 @@ PR275 holds the reviewed scope; .17 remains in progress and .13 blocked. No stag
 
 ---
 
-# Current session: standalone prerequisite scope reviewed — 26 September 2026
+## Current session: standalone prerequisite scope reviewed — 26 September 2026
 
 PR274 merged into feature/harness-backlog-review at a8586aa. Owner authorized preparation of .17's
 bounded repair plan. [Plan](docs/planning/standalone-pilot/plan.md),
@@ -36,7 +58,7 @@ Staging, A2A and packaging remain outside this work. Temporary reviewer containe
 
 ---
 
-# Current session: approved-document binding implementation
+## Current session: approved-document binding implementation
 
 Owner authorized implementation of `agent-platform-pilot-zero.16`; approval is recorded against the
 reviewed planning material. This is supervised direct delivery, not managed orchestration.

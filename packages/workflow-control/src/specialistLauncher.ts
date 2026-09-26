@@ -1,3 +1,8 @@
+import {
+  configureModelGateway,
+  modelGatewayConfigSchema,
+  type ModelGatewayConfig,
+} from './modelGatewayConfig.js';
 import { execFile } from 'node:child_process';
 import { cp, lstat, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -585,6 +590,7 @@ export class RevocableSpecialistCredentialBroker {
 }
 
 export interface DockerSpecialistLauncherOptions {
+  modelGateway?: ModelGatewayConfig;
   store: WorkflowStore;
   ownerId: string;
   sourceRoot: string;
@@ -617,6 +623,7 @@ export class DockerIsolatedSpecialistLauncher {
     if (!(options.credentialBroker instanceof RevocableSpecialistCredentialBroker)) {
       throw new Error('specialist launcher requires a revocable credential broker');
     }
+    if (options.modelGateway) modelGatewayConfigSchema.parse(options.modelGateway);
     this.#options = options;
     this.#clock = options.clock ?? Date.now;
   }
@@ -711,6 +718,8 @@ export class DockerIsolatedSpecialistLauncher {
         packet.allowedPaths,
       );
       stagingRoot = resolve(workspace.root, '..');
+      if (this.#options.modelGateway)
+        await configureModelGateway(workspace.codexHome, this.#options.modelGateway);
       const promptFile = join(stagingRoot, 'task-packet.json');
       const approvedDocumentsRoot = join(stagingRoot, 'approved-documents');
       this.#options.store.stageApprovedDocuments({

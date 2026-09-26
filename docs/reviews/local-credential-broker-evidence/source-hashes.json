@@ -1,0 +1,14 @@
+{
+  "packages/workflow-control/src/localCredentialGateway.ts": "cd4b494e55098d224a1bb66b6a54d3d562e5e3e9b2c04e7cecefc4f14e2ac3b2",
+  "packages/workflow-control/src/localCredentialLeases.ts": "6eeb909bd7490ecce821e666b5515859ad31bfb5974697fd788dd6ebbd483648",
+  "packages/workflow-control/src/localCredentialBrokerCli.ts": "7d86bec4c29595a9ef96c4f67bee7ea2c22a6100d12d5bac67188e4cc3b66a71",
+  "packages/workflow-control/src/modelGatewayConfig.ts": "7a74f00cc0db71e521c3cec0c45532dc559e3e00b894998370026de6d4485aba",
+  "packages/workflow-control/src/phaseRuntime.ts": "1a5017560756d8539c2fc252a7ddb7a5745bd9ad071b7229409d39c7e6b2a457",
+  "packages/workflow-control/src/specialistLauncher.ts": "9b4e6d72281c88e097100bfa2b91ec6f3060c97c6189c5b1e48d33ce235726a7",
+  "packages/workflow-control/src/reviewProxy.ts": "070145d1e2618a1e6fa9a073b47f8d4666318d225de5103cf74f6f610ca0f369",
+  "packages/workflow-control/test/localCredentialBroker.test.ts": "a04dd12e263984291308307cebc162519ce2b76821fe45b65c9866fc040bddc7",
+  "packages/workflow-control/test/localCredentialGateway.test.ts": "6342acd843765bb674aacf07b15ae66c42ba10444b2d86684aa2dee6f8d34faa",
+  "packages/workflow-control/credential-runtime/Dockerfile": "75d75cb53fb6786d6cf6443cd161a7cb6eace66df0f85c555dcc89bad5a76bed",
+  "docs/planning/standalone-pilot/broker-addendum.md": "f7395f5bd68fe796663f4c9f0f14b1d1736d8f37af4c22f31509c93f8cda3df3",
+  "docs/workflow-control-orchestrator.md": "5a97939629424eba5dace221e3100daa1c3471456da08d1c6cdadca7b6fa501a"
+}
