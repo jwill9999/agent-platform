@@ -95,6 +95,15 @@ On return, review this proposed boundary alongside existing outstanding work, ch
 Beads owner before creating follow-up work, and agree sequencing. Existing epics, tasks and priorities
 remain unchanged. No skill edits, archive rotation or memory implementation occurred for this note.
 
+## Additional orchestration reference — 26 September 2026
+
+Saved the owner's [handoff gap assessment](docs/reviews/orchestration-handoff-gap-reference.md)
+for context and linked it from the field evaluation. It concerns reliable A-to-B progression,
+host/transport availability, fan-out/fan-in, message/event/artifact boundaries and latency evidence.
+This is supplied analysis, not newly verified implementation evidence; proposed timings are illustrative.
+Revisit it in the high-level comparison against existing/planned features. No priorities changed,
+no proposed implementation accepted and no project work resumed beyond reference documentation.
+
 ## Resume here
 
 Use `/Users/letuscode/projects/agent-platform-workflow-evaluation`; this handoff is saved on
