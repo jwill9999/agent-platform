@@ -15,7 +15,7 @@ open; next broader work is unchanged R1–R3 and full host/startup/lifecycle qua
 
 ---
 
-# Current session: local credential broker delivered — 26 September 2026
+## Current session: local credential broker delivered — 26 September 2026
 
 Owner explicitly authorized creating the missing local broker with the existing Codex account.
 Supervised bootstrap delivery on `task/standalone-pilot-plan`; PR275 targets
