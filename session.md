@@ -104,6 +104,14 @@ This is supplied analysis, not newly verified implementation evidence; proposed 
 Revisit it in the high-level comparison against existing/planned features. No priorities changed,
 no proposed implementation accepted and no project work resumed beyond reference documentation.
 
+## Future reuse discussion reference — 26 September 2026
+
+Saved the owner's [orchestration reusability analysis](docs/reviews/orchestration-reusability-draft-reference.md)
+with the original attachment text preserved. It explores installable packaging, init/doctor onboarding,
+configuration, reusable core boundaries and execution adapters. All are draft discussion options for
+after stable implementation, not accepted designs or current work. No backlog, priority, dependency,
+publication or implementation changes. Revisit only through joint review when appropriate.
+
 ## Resume here
 
 Use `/Users/letuscode/projects/agent-platform-workflow-evaluation`; this handoff is saved on

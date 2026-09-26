@@ -260,3 +260,9 @@ findings and exact snapshot evidence. No managed pilot, implementation or new ex
 owner-supplied assessment of delivery, host execution, parallel progression, latency and possible
 A2A adapters. Its code/test claims await independent verification; timings are illustrative and
 proposals are not accepted scope. Use it during the high-level existing-versus-planned comparison.
+
+## Future reuse options — draft reference
+
+[Owner-supplied reusability analysis](orchestration-reusability-draft-reference.md) preserves discussion
+of packaging, configuration, onboarding and adapter boundaries for consideration after a stable
+implementation. It is not accepted scope and does not change the current assessment sequence.
