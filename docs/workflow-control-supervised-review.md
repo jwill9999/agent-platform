@@ -1,5 +1,11 @@
 # Isolated supervised review entry point
 
+> Current status, 26 September 2026: document binding `.16` was integrated through PR273;
+> see the [repair evidence](reviews/approved-document-binding-implementation.md).
+> References below to that task being unimplemented/open describe earlier review snapshots.
+> Standalone reviewer qualification is distinct from managed execution readiness; use the
+> [current readiness assessment](reviews/orchestration-readiness-refresh-2026-09-26.md).
+
 The trusted coordinator can prepare a standalone review without exposing the host repository or
 orchestration grants. The implementation is in `packages/workflow-control/src/supervisedReview.ts`.
 It stages approved evidence, hashes its contents and uses the existing plan_critic container launcher.

@@ -40,8 +40,9 @@ No paid benchmark, live specialist launch or fault injection is authorized by th
 
 Validated discoverable implementation skill hands off to orchestration or explicitly reports a permitted alternative/blocker; no silent direct implementation. Independent permitted review and declared integration checks pass; no runtime activation implied.
 
-All upstream tasks and any subsequently recorded required blockers must satisfy their declared
-completion conditions. Record exact evidence/source, review and checks; preserve findings and
+Assessment/skill prerequisites must satisfy their declared completion conditions. Runtime gaps
+identified by this assessment need linked proposals and explicit pilot-gate dependencies; they do
+not require out-of-scope runtime repair before the assessment can finish with a blocked verdict. Record exact evidence/source, review and checks; preserve findings and
 update the session handoff. Work must be committed and pushed. Follow the repository's intermediate
 versus segment-tip integration rules; do not close a segment tip until its required feature merge.
 

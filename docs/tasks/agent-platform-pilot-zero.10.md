@@ -40,8 +40,9 @@ No paid benchmark, live specialist launch or fault injection is authorized by th
 
 Skill is discoverable, references resolve and validation/review show correct start/resume/block outcomes without manual bypass or invented capabilities. Scope-bound source and evidence are pushed with required integration gates; runtime limitations remain visible.
 
-All upstream tasks and any subsequently recorded required blockers must satisfy their declared
-completion conditions. Record exact evidence/source, review and checks; preserve findings and
+Assessment/skill prerequisites must satisfy their declared completion conditions. Runtime gaps
+identified by this assessment need linked proposals and explicit pilot-gate dependencies; they do
+not require out-of-scope runtime repair before the assessment can finish with a blocked verdict. Record exact evidence/source, review and checks; preserve findings and
 update the session handoff. Work must be committed and pushed. Follow the repository's intermediate
 versus segment-tip integration rules; do not close a segment tip until its required feature merge.
 

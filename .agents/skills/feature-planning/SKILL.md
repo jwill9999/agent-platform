@@ -96,11 +96,12 @@ revision, with logs/artifacts and remaining gaps. Required failed or unexecuted 
 completion; green unit tests cannot substitute for required E2E evidence. Any proposed change to
 required coverage must be explicit and reviewed, never silently marked not applicable.
 
-The current contract digest covers parsed contract fields, not the contents of externally linked
-specifications or test plans. Do not claim those documents are bound merely because links exist.
-Require a content-addressed manifest and a supported approval/handoff verification mechanism before
-claiming exact-document runtime enforcement. Until that mechanism is qualified, record the gap as a
-blocking prerequisite for a managed implementation handoff; do not fabricate an approval binding.
+A contract digest alone does not bind externally linked document bytes. Require the supported
+content-addressed document manifest and verify its approval/handoff binding for the actual task.
+The document-binding mechanism was integrated in PR273; see the
+[implementation and verification report](../../../docs/reviews/approved-document-binding-implementation.md).
+That implementation does not establish that a particular plan has a valid approval. Missing, changed,
+or unverifiable material remains a blocker; never fabricate bindings or reuse stale approval.
 
 ## Validate, critique, publish and hand off
 

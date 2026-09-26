@@ -40,3 +40,24 @@ Modernization tasks F0–F3 contain expanded assessment specifications. The [orc
 The [SDK assessment critic review](reviews/sdk-assessment-critic-review.md) records the owner-authorized supervised review, corrections and passing recheck. The assessment is ready for owner review; compatibility experiments and implementation remain unapproved.
 
 The [current-runtime evidence baseline proposal](current-runtime-baseline-plan.md) defines the next planning step before framework experiments. It maps existing test boundaries and proposes a sequential model-to-tool journey; implementation awaits owner review.
+
+## External reference context
+
+[The Anatomy of an Agent Harness — reference note](agent-harness-article-reference.md) records the
+owner-supplied LangChain article, a short summary and questions for future assessment.
+
+## Recurring gap and reuse review
+
+At feature refinement and significant pilot/delivery milestones, revisit the partial gap analysis
+and the [prebuilt-capability reference](agent-harness-article-reference.md#ongoing-review-principle--owner-direction-25-september-2026).
+Compare improving current code with adapter-based reuse before choosing bespoke work. Focus first
+on concepts, services and features; verify language/version compatibility and behavioral guarantees
+before adoption. Record decisions and follow-up in existing assessment material and Beads.
+A twice-monthly research-only automation was subsequently approved; see session.md for its scope and joint-review gate. Migration remains unapproved.
+
+## Starting point for high-level gap analysis
+
+Before proposing backlog changes, compare the saved LangChain harness concepts against **existing
+and already-planned features** using the [initial comparison boundary](agent-harness-article-reference.md#initial-high-level-comparison--owner-clarification).
+Identify potentially major capability gaps for joint review only. Preserve the recently agreed
+features, epics, tasks and priorities; implementation design and detailed estimates are out of scope.
