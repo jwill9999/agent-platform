@@ -9,9 +9,12 @@ model access. Work is supervised under `.17` on `task/standalone-pilot-plan`, PR
 source/scratch/evidence isolation, generated MCP-free configuration, reduced grants and client limits.
 Read-only reviewers cannot edit source; testing uses separate writable locations. Source context is
 supplied to roles without shell access. Independent review findings were repaired, including strict
-path validation and immutable process identity. Real-container/client verification and final review
-are being retained before component sign-off. The complete `.17` prerequisite and `.13` pilot remain
-open; next broader work is unchanged R1–R3 and full host/startup/lifecycle qualification.
+path validation and immutable process identity. The role component passed 13 filesystem, 12 real-client
+and seven existing container checks; full
+Linux regression passed 901 tests (42 optional skipped). Independent role/evidence review and the
+narrow Sonar follow-up review report no remaining actionable blockers. Evidence is retained in the
+linked report. Hosted checks are still required on the final published head; keep PR275 draft until
+those complete. `.17` remains in progress and `.13` blocked; next broader work is unchanged R1–R3 and full host/startup/lifecycle qualification.
 
 ---
 

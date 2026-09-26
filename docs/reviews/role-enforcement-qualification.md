@@ -77,7 +77,68 @@ additional production-permissions case that does not chmod staging. Client probe
 real tools against deterministic local Responses data; no paid model or real worker credentials.
 They distinguish completed model turns, natural client exit, tool denials and actual filesystem effects.
 
-Independent critique identified staging-UID mismatch, probe exit handling, mutable process identity
-and invalid UTF-8 handling; regression coverage accompanies the corrections. Final results and
-follow-up review are pending and must be recorded before sign-off. The single-task orchestration
-pilot and broader .17 acceptance remain open.
+## Recorded outcomes
+
+- Full Linux package regression: **901 passed, 42 optional skipped**, 49 files passed/7 skipped.
+- Explicit real-container qualification: **13 filesystem/production-permission cases**, **12 actual
+  Codex client cases**, and **7 existing reviewer/network/lifecycle cases**, all passed. These opt-in
+  runs are separate from the default regression's skipped cases; skips are not presented as passes.
+- Monorepo TypeScript, package build and ESLint pass. Changed-file formatting and targeted Markdown
+  checks pass. The repository-wide local Markdown scan encounters old ignored Playwright result
+  directories under .agent-platform; those generated artifacts were preserved. Hosted Markdown
+  separately found the new session heading, which was corrected.
+- SonarQube MCP/IDE Problems tools were unavailable, so terminal checks are the local fallback gate.
+  Hosted PR275 checks remain separate and must be assessed before merge.
+
+[Final client evidence](role-enforcement-evidence/final-client-controls.json) retains exact delivered
+source entries, unique advertised tool definitions, direct/nested dispatch replies, filesystem effects,
+natural exit status, tested source hashes and generated configuration hashes for every case. All tested source
+hashes were read back against their delivered versions. A later probe-only String.raw formatting
+change is separately qualified below; the original twelve-case artifact remains bound to its tested
+source rather than having its hashes rewritten. The deterministic model proves evidence delivery
+and editing capability, not model comprehension. The supplied source byte digest and independent disk
+read prove patch-only work can receive and modify the existing file.
+
+[Filesystem evidence](role-enforcement-evidence/final-filesystem-controls.json) includes the distinct
+production-permissions case without chmod, effective zero capabilities/no-new-privileges, source and
+output mounts, immutable config and empty MCP catalogue. Logs retain the [client run](role-enforcement-evidence/client-tests.log),
+[filesystem run](role-enforcement-evidence/filesystem-tests.log), [package regression](role-enforcement-evidence/regression.log)
+and [existing container checks](role-enforcement-evidence/existing-container-tests.log).
+
+Independent reviews identified and prompted repairs for staging-UID mismatch, probe exit/drainage
+handling, mutable process identity, malformed UTF-8 and mixed-path validation, source context for
+patch-only workers, complete inventory assertions, and precise source-delivery evidence. Prior failed
+probes distinguished Docker's namespace restriction, scratch working-directory needs, a too-short
+20-second client timeout, and a newline assertion error; none was counted as qualification success.
+The delivered probe requires a natural zero exit, complete turn and all expected effects/denials.
+See retained plan review and reviews1–5. The final independent evidence review identified **no
+remaining actionable blockers for the bounded role-enforcement component**. It is review feedback,
+not owner approval or host/pilot qualification. The single-task pilot and broader .17 acceptance remain open.
+
+## Reproduce
+
+Build the reviewed `packages/workflow-control/review-runtime/Dockerfile`, pin the resulting image ID,
+and set WORKFLOW_ROLE_IMAGE to that digest before running:
+
+```sh
+pnpm --filter @agent-platform/workflow-control exec vitest run test/roleEnforcement.integration.test.ts test/roleTools.integration.test.ts
+```
+
+An unset image skips these opt-in cases. Do not use a default-suite pass as proof that they executed.
+The retained image/client/kernel describe the qualified environment; other architectures and versions
+need their own run. No source edits, implicit MCP connection or approval expansion is granted by the
+broker token. Startup supervision, full gateway topology and the managed single-task workflow remain
+separate prerequisites.
+
+## Hosted quality follow-up
+
+Hosted Sonar found an existing broker CLI complexity issue and a minor probe string-format issue.
+Argument parsing/validation was extracted without changing command behavior; the compiled broker
+protocol and gateway suite passed all 16 checks. The probe command now uses String.raw: retained
+[command equivalence](role-enforcement-evidence/command-equivalence.json) confirms identical command
+bytes, and the [actual-client follow-up](role-enforcement-evidence/format-followup-client.json) passed
+with a natural zero exit. [The exact diff](role-enforcement-evidence/quality-followup.patch) and
+[independent follow-up review](role-enforcement-evidence/review5.json) are retained. Enforcement source,
+role policy and generated role configuration did not change in this follow-up. Hosted reanalysis must
+confirm the issue dispositions on the published head before merge. The full Linux suite was repeated
+after these changes: [901 passed, 42 optional skipped](role-enforcement-evidence/regression-quality-followup.log).

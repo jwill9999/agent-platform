@@ -1,0 +1,19 @@
+
+ RUN  v2.1.9 <workspace>/packages/workflow-control
+
+ ✓ test/supervisedReview.integration.test.ts (1 test) 459ms
+   ✓ the pinned Codex runtime disables account apps and execution tools 458ms
+ ✓ test/specialistContainerLifecycle.integration.test.ts (3 tests) 13463ms
+   ✓ production specialist container lifecycle with offline network-none Node probes > observes successful exit and independently verifies daemon removal 763ms
+   ✓ production specialist container lifecycle with offline network-none Node probes > removes an executing container after killing the timed-out Docker client 12214ms
+   ✓ production specialist container lifecycle with offline network-none Node probes > removes an executing container after cancellation 441ms
+ ✓ test/supervisedReviewCapabilities.integration.test.ts (3 tests) 27894ms
+   ✓ captures client tool definitions and rejects injected patch, shell and delegation calls 16247ms
+   ✓ removes the real container and copied credentials after a model startup failure 10399ms
+   ✓ enforces read-only evidence, absent host grants and model-only network egress 1248ms
+
+ Test Files  3 passed (3)
+      Tests  7 passed (7)
+   Start at  17:05:17
+   Duration  28.49s (transform 435ms, setup 0ms, collect 1.06s, tests 41.82s, environment 0ms, prepare 138ms)
+

@@ -55,6 +55,35 @@ function createAdapter(configFile: string, rest: string[]) {
   return { adapter: output };
 }
 
+function parseBrokerArguments(command: string | undefined, rest: string[]) {
+  const values = new Map<string, string>();
+  for (let i = 0; i < rest.length; i += 2) {
+    const name = rest[i],
+      value = rest[i + 1];
+    if (!name || !value || values.has(name)) throw new Error('invalid broker arguments');
+    values.set(name, value);
+  }
+  const allowed: Record<string, string[]> = {
+    issue: ['--execution-id', '--lease-id', '--generation', '--output'],
+    revoke: ['--lease-id', '--generation'],
+    status: ['--lease-id', '--generation'],
+    conformance: ['--protocol', '--max-probe-ttl-seconds'],
+  };
+  if (
+    !command ||
+    values.size !== allowed[command]?.length ||
+    [...values.keys()].some((k) => !allowed[command]!.includes(k))
+  )
+    throw new Error('invalid broker command');
+  if (
+    command === 'conformance' &&
+    (values.get('--protocol') !== 'revoke-wins-v1' ||
+      values.get('--max-probe-ttl-seconds') !== '30')
+  )
+    throw new Error('unsupported conformance protocol');
+  return values;
+}
+
 export async function runLocalBrokerCli(args: string[]) {
   const [configFile, command, ...rest] = args;
   if (!configFile || !isAbsolute(configFile)) throw new Error('absolute trusted config required');
@@ -82,31 +111,7 @@ export async function runLocalBrokerCli(args: string[]) {
     process.once('SIGINT', stop);
     return;
   }
-  const values = new Map<string, string>();
-  for (let i = 0; i < rest.length; i += 2) {
-    const name = rest[i],
-      value = rest[i + 1];
-    if (!name || !value || values.has(name)) throw new Error('invalid broker arguments');
-    values.set(name, value);
-  }
-  const allowed: Record<string, string[]> = {
-    issue: ['--execution-id', '--lease-id', '--generation', '--output'],
-    revoke: ['--lease-id', '--generation'],
-    status: ['--lease-id', '--generation'],
-    conformance: ['--protocol', '--max-probe-ttl-seconds'],
-  };
-  if (
-    !command ||
-    values.size !== allowed[command]?.length ||
-    [...values.keys()].some((k) => !allowed[command]!.includes(k))
-  )
-    throw new Error('invalid broker command');
-  if (
-    command === 'conformance' &&
-    (values.get('--protocol') !== 'revoke-wins-v1' ||
-      values.get('--max-probe-ttl-seconds') !== '30')
-  )
-    throw new Error('unsupported conformance protocol');
+  const values = parseBrokerArguments(command, rest);
   const body =
     command === 'conformance'
       ? { operation: command }
