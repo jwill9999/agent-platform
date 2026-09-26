@@ -1,3 +1,26 @@
+# Current session: readiness assessment published for integration — 26 September 2026
+
+Owner authorized completing the bounded readiness task without further authorization. The
+[assessment](docs/reviews/orchestration-readiness-refresh-2026-09-26.md) now includes two isolated
+independent reviews, corrected skill guidance, a candidate P4 permission journey and explicit runtime
+prerequisites. Final review: no actionable findings in the supplied revised assessment/skills.
+Build and 88 focused fixture tests passed during the initial refresh. Skill validators and documentation
+checks passed after corrections. No runtime source changed; no managed pilot or staging promotion ran.
+
+Beads `.17` is a new proposed standalone execution prerequisite directly blocking `.13`: authoritative
+run discovery, implementation artifact import, required coordinator completion and selected-host
+feasibility. The report separates these from desktop resumption, which still fails conformance.
+`.12` and upstream assessment/skill tasks remain in progress pending their evidence dispositions and
+feature integration; this is not an assertion that the whole orchestration system is ready.
+
+Next: integrate this reviewed documentation segment into `feature/harness-backlog-review`, reconcile
+upstream completion evidence, then prepare the bounded `.17` execution-path plan. The exact first
+pilot contract remains `.13`; no A2A, packaging, memory-store or broader roadmap change is approved.
+Existing research references, twice-monthly joint review and knowledge-lifecycle follow-up remain below.
+The isolated review gateway and its two task-owned networks were removed after review.
+
+---
+
 # Current session: readiness refresh — 26 September 2026
 
 Owner approved resuming the existing skill/runtime readiness assessment. The

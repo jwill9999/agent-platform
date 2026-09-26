@@ -29,6 +29,11 @@ leases and ownership; never initialize a database merely because lookup failed.
 - Failed, ambiguous, or unavailable lookup: report unknown state; do not create a possible duplicate.
 - Completed or cancelled run: inspect its outcome; do not restart it or assume its grants apply anew.
 
+The current MCP status and preview tools require a known run ID; a null response for that ID does
+not establish absence of other matching runs. Until an authoritative task/workspace discovery route
+is verified, classify new-run discovery as unavailable/unknown and block creation. Record the actual
+lookup source and coverage rather than inferring absence from an unset environment variable.
+
 ## Verify the actual execution path
 
 Read [security](../../../docs/workflow-control-security.md) and

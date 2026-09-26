@@ -1,5 +1,64 @@
 # Orchestration readiness refresh — 26 September 2026
 
+## Completion of the bounded assessment
+
+The owner subsequently authorized completing this task without further authorization. The bounded
+assessment and independent evidence review are now published for feature integration; the live
+implementation pilot remains **blocked**. This section supersedes the initial-refresh status below.
+Delivery is supervised assessment, not managed orchestration. Beads `.12` remains in progress pending
+prerequisite dispositions and feature integration; no task closure or autonomous acceptance is claimed.
+
+A separately authorized isolated reviewer used the existing Codex account, immutable image and fixed
+model-only gateway. [First review](evidence/readiness-skill-review-2026-09-26.json) retains snapshot
+hashes and the complete response. It found four issues: stale binding guidance, assessment-versus-runtime
+closure ambiguity, missing authoritative run discovery, and a host-specific production Git check.
+The first two are corrected in the skills and task documentation. Discovery and executable feasibility
+are explicit requirements of the new [standalone readiness gate](../tasks/agent-platform-pilot-zero.17.md),
+which directly blocks `.13`. No matching existing repair was found in the canonical Beads inventory;
+the broader historical review/notification repair does not own these missing production capabilities.
+
+### Final independent outcome
+
+[Second review](evidence/readiness-skill-review-final-2026-09-26.json), snapshot
+`48c651d80e606f18e2457cdda70af6ed374845adf51bab6a33f6a53909dd371c`, returned no actionable
+findings in the revised bounded assessment and skills. It did not independently inspect the test logs
+or Beads read-back. The coordinator retains the [dependency read-back](evidence/readiness-pilot-dependencies-2026-09-26.json)
+and initial test output separately; those are not re-labelled as critic-verified evidence.
+Both skill validators, Markdown, local-link and diff checks pass. Whitespace and this result/disposition
+section were added after the second snapshot; the reviewed substantive guidance is unchanged.
+This is not a schema-conformant execution-contract approval or live pilot acceptance.
+
+### Candidate first task and required path
+
+Recommend a narrowly planned slice of [permission scope coverage](../tasks/agent-platform-harness-baseline-p4.md):
+a hard-denied/path-escape action stays denied after approval, with an independent backend no-effect
+assertion and one connected UI journey. This is a candidate, not an approved execution plan. `.13`
+must reconcile existing coverage and choose the exact remaining scenario, files and test environment.
+Required route: approved task → implementing (test artifacts) → task verification → independent task
+review → the selected feature evaluation/delivery/finalization coordinators. The current standalone
+implementing packet rejects import, and coordinator-dispatched completion rejects authority. These
+prevent claiming that this route is executable; status/preview or a review-only run cannot replace it.
+
+### Independent scenario assessment
+
+The critic reasoned through no-run, matching active run, failed lookup, missing entrypoint/import,
+stale approval, permitted direct assessment and predecessor failure. Its retained response gives
+safe decisions and limitations for all seven. This is independent procedural evaluation with no tools,
+not a live agent-to-agent progression test. Runtime behavior remains covered only by the stated
+fixtures and prior qualified reviewer probes; live workflow ownership remains unestablished.
+
+### Required pilot gates
+
+`.13` depends directly on `.12`, completed `.16`, and new open `.17`. The new gate retains run
+discovery, implementation import, required coordinator completion and selected-host feasibility as
+requirements. Desktop host conformance remains failed and is mandatory only if a desktop pilot is
+selected. A2A and reusable packaging remain reference options, not work introduced by this assessment.
+
+The current host's fixture Git workaround does not establish production feasibility:
+`StandalonePhaseRuntime.create` source verification still invokes `/usr/bin/git`. Verify the actual
+host path before launch. An unset database variable is not proof of no run or no broker grant.
+This review does not authorize opening an unknown live journal, issuing grants or launching a workflow.
+
 ## Boundary and verdict
 
 Owner authorized refreshing the existing readiness task against the merged feature branch.
