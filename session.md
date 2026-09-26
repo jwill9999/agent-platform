@@ -1,3 +1,18 @@
+# Current session: readiness refresh — 26 September 2026
+
+Owner approved resuming the existing skill/runtime readiness assessment. The
+[readiness refresh](docs/reviews/orchestration-readiness-refresh-2026-09-26.md) records current source,
+test evidence and blockers. Implementation/pilot/staging remain unapproved by this assessment.
+The feature branch includes the document-binding repair; standalone implementation import,
+coordinator completion and desktop host conformance still have explicit limitations. Existing
+Beads `.8`/`.12` own the assessment; `.13` remains blocked. Next is resolving the supported standalone
+path and scoped prerequisite proposals, not adding A2A or changing the agreed roadmap.
+
+Earlier records below preserve the pause and research decisions; this entry supersedes the paused
+assessment status only. No live managed run or paid critic/model call was launched.
+
+---
+
 # Current session: paused after feature integration — 25 September 2026
 
 The owner merged [Bind execution approval to reviewed document bytes](https://github.com/jwill9999/agent-platform/pull/273)
