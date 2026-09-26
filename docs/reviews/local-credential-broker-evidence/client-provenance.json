@@ -1,0 +1,95 @@
+{
+  "leaseId": "final-live-evidence",
+  "generation": "331f03e7-8fa6-4740-b154-585de08660d6",
+  "workerId": "57e4d89637b745b76e8e1d449b61f13de195d82830a041988c88b1745082dcc9",
+  "workerImage": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+  "state": {
+    "Status": "exited",
+    "Running": false,
+    "Paused": false,
+    "Restarting": false,
+    "OOMKilled": false,
+    "Dead": false,
+    "Pid": 0,
+    "ExitCode": 0,
+    "Error": "",
+    "StartedAt": "2026-09-26T15:04:55.129048084Z",
+    "FinishedAt": "2026-09-26T15:05:02.936164171Z"
+  },
+  "config": {
+    "User": "1000:1000",
+    "Env": [
+      "CODEX_HOME=/codex-home",
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "NODE_VERSION=24.21.0",
+      "YARN_VERSION=1.22.22"
+    ],
+    "Cmd": [
+      "sh",
+      "-c",
+      "cp /auth-input.json /codex-home/auth.json && cp /config-input.toml /codex-home/config.toml && codex exec --json --sandbox read-only --skip-git-repo-check -C /workspace 'Reply exactly FINAL_LEASE_VERIFIED. Do not use tools.'"
+    ]
+  },
+  "hostConfig": {
+    "ReadonlyRootfs": true,
+    "CapDrop": [
+      "ALL"
+    ],
+    "SecurityOpt": [
+      "no-new-privileges"
+    ],
+    "Tmpfs": {
+      "/codex-home": "rw,nosuid,uid=1000,gid=1000,size=64m",
+      "/tmp": "rw,nosuid,size=128m",
+      "/workspace": "rw,nosuid,uid=1000,gid=1000,size=16m"
+    },
+    "NetworkMode": "local-broker-qualified-internal"
+  },
+  "mounts": [
+    {
+      "Type": "bind",
+      "Source": "/var/folders/jv/rn38z0113bq0qgw2spbq3_0r0000gn/T/broker-docker-gasfjtr7/live-final-evidence.json",
+      "Destination": "/auth-input.json",
+      "Mode": "",
+      "RW": false,
+      "Propagation": "rprivate"
+    },
+    {
+      "Type": "bind",
+      "Source": "/var/folders/jv/rn38z0113bq0qgw2spbq3_0r0000gn/T/broker-docker-gasfjtr7/worker-config.toml",
+      "Destination": "/config-input.toml",
+      "Mode": "",
+      "RW": false,
+      "Propagation": "rprivate"
+    }
+  ],
+  "networks": {
+    "local-broker-qualified-internal": {
+      "IPAMConfig": null,
+      "Links": null,
+      "Aliases": null,
+      "DriverOpts": null,
+      "GwPriority": 0,
+      "NetworkID": "5e79f2075fadd2e5cc55eab3ea7e2ed0123a6f63797e2dd83bd08edb92426b78",
+      "EndpointID": "",
+      "Gateway": "",
+      "IPAddress": "",
+      "MacAddress": "",
+      "IPPrefixLen": 0,
+      "IPv6Gateway": "",
+      "GlobalIPv6Address": "",
+      "GlobalIPv6PrefixLen": 0,
+      "DNSNames": [
+        "local-broker-final-client",
+        "57e4d89637b7"
+      ]
+    }
+  },
+  "workerConfig": "model = \"gpt-6-astra\"\nmodel_provider = \"local_lease\"\napproval_policy = \"never\"\nsandbox_mode = \"read-only\"\nweb_search = \"disabled\"\n[agents]\nenabled=false\nmax_depth=0\n[features]\napps=false\nplugins=false\nshell_tool=false\nunified_exec=false\ncode_mode=false\ncode_mode_host=false\nmulti_agent=false\nmulti_agent_v2=false\n[model_providers.local_lease]\nname=\"Local lease compatibility\"\nwire_api=\"responses\"\nrequires_openai_auth=true\nsupports_websockets=false\nbase_url=\"http://model-gateway:8080\"\n",
+  "revocation": {
+    "leaseId": "final-live-evidence",
+    "generation": "331f03e7-8fa6-4740-b154-585de08660d6",
+    "status": "revoked"
+  },
+  "postRevocationHttpStatus": 403
+}

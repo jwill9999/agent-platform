@@ -1,0 +1,207 @@
+{
+  "id": "15b902feb94b38bd570e9655c0ae2b7a8e0218073953b6a441a19c498274101f",
+  "image": "sha256:5b3c70c64d83743aa3d5c3facae8c89060088c93e5a6e22e7a8ce2d84b002b34",
+  "user": "501:20",
+  "hostConfig": {
+    "ReadonlyRootfs": true,
+    "CapDrop": [
+      "ALL"
+    ],
+    "SecurityOpt": [
+      "no-new-privileges"
+    ],
+    "Tmpfs": {
+      "/tmp": "rw,noexec,nosuid,size=32m"
+    },
+    "PortBindings": {
+      "8081/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": ""
+        }
+      ]
+    },
+    "NetworkMode": "local-broker-qualified-internal"
+  },
+  "mounts": [
+    {
+      "Type": "bind",
+      "Source": "/var/folders/jv/rn38z0113bq0qgw2spbq3_0r0000gn/T/broker-docker-nvefc7ua/state",
+      "Destination": "/state",
+      "Mode": "",
+      "RW": true,
+      "Propagation": "rprivate"
+    },
+    {
+      "Type": "bind",
+      "Source": "/Users/letuscode/.codex/auth.json",
+      "Destination": "/secrets/account.json",
+      "Mode": "",
+      "RW": false,
+      "Propagation": "rprivate"
+    },
+    {
+      "Type": "bind",
+      "Source": "/var/folders/jv/rn38z0113bq0qgw2spbq3_0r0000gn/T/broker-docker-nvefc7ua/server.json",
+      "Destination": "/secrets/config.json",
+      "Mode": "",
+      "RW": false,
+      "Propagation": "rprivate"
+    },
+    {
+      "Type": "bind",
+      "Source": "/var/folders/jv/rn38z0113bq0qgw2spbq3_0r0000gn/T/broker-docker-nvefc7ua/key",
+      "Destination": "/secrets/key",
+      "Mode": "",
+      "RW": false,
+      "Propagation": "rprivate"
+    }
+  ],
+  "networks": {
+    "local-broker-qualified-internal": {
+      "IPAMConfig": null,
+      "Links": null,
+      "Aliases": [
+        "model-gateway"
+      ],
+      "DriverOpts": null,
+      "GwPriority": 0,
+      "NetworkID": "f8b61422acbe6331d8cda0df60ecd75420012cb06c2e604e7ee0ed49d27f101d",
+      "EndpointID": "18f383a56fa0abc2c2e1f114a9773eda376ea1f6f783cbf57e13146c3122ca4f",
+      "Gateway": "",
+      "IPAddress": "172.22.0.2",
+      "MacAddress": "2a:06:c1:2f:f3:da",
+      "IPPrefixLen": 16,
+      "IPv6Gateway": "",
+      "GlobalIPv6Address": "",
+      "GlobalIPv6PrefixLen": 0,
+      "DNSNames": [
+        "local-broker-qualified",
+        "model-gateway",
+        "15b902feb94b"
+      ]
+    },
+    "local-broker-qualified-outbound": {
+      "IPAMConfig": {},
+      "Links": null,
+      "Aliases": [],
+      "DriverOpts": {},
+      "GwPriority": 0,
+      "NetworkID": "3e6bb40085196d16aa553edefa27a36266a65533b81ce8f4ee1913e6097a1d89",
+      "EndpointID": "ff2736bb927708c37bd6024365cb96da16cd1236cf215fb1d325090e0629224e",
+      "Gateway": "172.23.0.1",
+      "IPAddress": "172.23.0.2",
+      "MacAddress": "2e:8b:ea:0d:77:ec",
+      "IPPrefixLen": 16,
+      "IPv6Gateway": "",
+      "GlobalIPv6Address": "",
+      "GlobalIPv6PrefixLen": 0,
+      "DNSNames": [
+        "local-broker-qualified",
+        "15b902feb94b"
+      ]
+    }
+  },
+  "networkInspections": [
+    {
+      "Name": "local-broker-qualified-internal",
+      "Id": "f8b61422acbe6331d8cda0df60ecd75420012cb06c2e604e7ee0ed49d27f101d",
+      "Created": "2026-09-26T15:12:00.89630092Z",
+      "Scope": "local",
+      "Driver": "bridge",
+      "EnableIPv4": true,
+      "EnableIPv6": false,
+      "IPAM": {
+        "Driver": "default",
+        "Options": {},
+        "Config": [
+          {
+            "Subnet": "172.22.0.0/16",
+            "Gateway": "172.22.0.1"
+          }
+        ]
+      },
+      "Internal": true,
+      "Attachable": false,
+      "Ingress": false,
+      "ConfigFrom": {
+        "Network": ""
+      },
+      "ConfigOnly": false,
+      "Options": {
+        "com.docker.network.enable_ipv4": "true",
+        "com.docker.network.enable_ipv6": "false"
+      },
+      "Labels": {},
+      "Containers": {
+        "15b902feb94b38bd570e9655c0ae2b7a8e0218073953b6a441a19c498274101f": {
+          "Name": "local-broker-qualified",
+          "EndpointID": "18f383a56fa0abc2c2e1f114a9773eda376ea1f6f783cbf57e13146c3122ca4f",
+          "MacAddress": "2a:06:c1:2f:f3:da",
+          "IPv4Address": "172.22.0.2/16",
+          "IPv6Address": ""
+        }
+      },
+      "Status": {
+        "IPAM": {
+          "Subnets": {
+            "172.22.0.0/16": {
+              "IPsInUse": 4,
+              "DynamicIPsAvailable": 65532
+            }
+          }
+        }
+      }
+    },
+    {
+      "Name": "local-broker-qualified-outbound",
+      "Id": "3e6bb40085196d16aa553edefa27a36266a65533b81ce8f4ee1913e6097a1d89",
+      "Created": "2026-09-26T15:12:00.935841628Z",
+      "Scope": "local",
+      "Driver": "bridge",
+      "EnableIPv4": true,
+      "EnableIPv6": false,
+      "IPAM": {
+        "Driver": "default",
+        "Options": {},
+        "Config": [
+          {
+            "Subnet": "172.23.0.0/16",
+            "Gateway": "172.23.0.1"
+          }
+        ]
+      },
+      "Internal": false,
+      "Attachable": false,
+      "Ingress": false,
+      "ConfigFrom": {
+        "Network": ""
+      },
+      "ConfigOnly": false,
+      "Options": {
+        "com.docker.network.enable_ipv4": "true",
+        "com.docker.network.enable_ipv6": "false"
+      },
+      "Labels": {},
+      "Containers": {
+        "15b902feb94b38bd570e9655c0ae2b7a8e0218073953b6a441a19c498274101f": {
+          "Name": "local-broker-qualified",
+          "EndpointID": "ff2736bb927708c37bd6024365cb96da16cd1236cf215fb1d325090e0629224e",
+          "MacAddress": "2e:8b:ea:0d:77:ec",
+          "IPv4Address": "172.23.0.2/16",
+          "IPv6Address": ""
+        }
+      },
+      "Status": {
+        "IPAM": {
+          "Subnets": {
+            "172.23.0.0/16": {
+              "IPsInUse": 4,
+              "DynamicIPsAvailable": 65532
+            }
+          }
+        }
+      }
+    }
+  ]
+}

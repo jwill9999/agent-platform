@@ -196,8 +196,9 @@ async function probe(script: string) {
       authFile,
       promptFile,
       egressNetwork: 'none',
-      containerUser: '1000:1000',
+      containerUser: `${process.getuid!()}:${process.getgid!()}`,
       role: 'feature_planner',
+      allowedOperations: ['workspace.read'],
       runId: 'offline-probe',
       extraEnvironment: { PATH: '/workspace:/usr/local/bin:/usr/bin:/bin' },
     });

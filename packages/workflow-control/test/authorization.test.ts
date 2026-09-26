@@ -33,6 +33,48 @@ function pathBoundArguments(operation: string): Record<string, unknown> {
 }
 
 describe('ProcessCapabilityBroker', () => {
+  it('snapshots the issued process identity rather than retaining caller-owned state', () => {
+    const broker = new ProcessCapabilityBroker(() => {});
+    const identity = { ...processIdentity };
+    const capability = broker.issue({ ...claims, process: identity });
+    identity.pid = 999;
+    const request = {
+      workspaceId: claims.workspaceId,
+      runId: claims.runId,
+      contractVersion: 1,
+      policyDigest: claims.policyDigest,
+      operation: 'workspace.read' as const,
+      normalizedArguments: { path: 'packages/workflow-control/src/index.ts' },
+      nowMs: now,
+    };
+    expect(broker.authorize(capability.token, identity, request)).toMatchObject({
+      allowed: false,
+      reason: 'process_identity_mismatch',
+    });
+    expect(broker.authorize(capability.token, processIdentity, request)).toMatchObject({
+      allowed: true,
+    });
+  });
+  it.each([
+    { path: 'packages/workflow-control/safe.ts', paths: ['outside/secret', 42] },
+    { path: 42, paths: ['packages/workflow-control/safe.ts'] },
+    { path: 'packages/workflow-control/safe.ts', paths: 'outside/secret' },
+    { path: 'packages/workflow-control/safe.ts', paths: ['outside/secret'] },
+  ])('rejects malformed or out-of-scope mixed path arguments %#', (normalizedArguments) => {
+    const broker = new ProcessCapabilityBroker(() => {});
+    const capability = broker.issue(claims);
+    expect(
+      broker.authorize(capability.token, processIdentity, {
+        workspaceId: claims.workspaceId,
+        runId: claims.runId,
+        contractVersion: 1,
+        policyDigest: claims.policyDigest,
+        operation: 'workspace.patch',
+        normalizedArguments,
+        nowMs: now,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'path_denied' });
+  });
   it('derives role from the process-bound session and audits allows', () => {
     const events: AuthorizationAuditEvent[] = [];
     const broker = new ProcessCapabilityBroker((event) => events.push(event));

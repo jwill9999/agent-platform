@@ -68,7 +68,8 @@ export async function prepareReviewSnapshot(
       }
     };
     await visit(staged.root, '');
-    if (manifest.length === 0) throw new Error('review evidence is empty');
+    if (manifest.length === 0)
+      throw new Error('review evidence is empty or contains only forbidden paths');
     await writeFile(
       join(staged.codexHome, 'config.toml'),
       'approval_policy = "never"\nsandbox_mode = "read-only"\nweb_search = "disabled"\n[agents]\nenabled = false\nmax_depth = 0\n[features]\napps = false\nbrowser_use = false\nbrowser_use_external = false\ncomputer_use = false\nin_app_browser = false\nbrowser_use_full_cdp_access = false\nplugins = false\nremote_plugin = false\nskill_search = false\nskill_mcp_dependency_install = false\nmulti_agent = false\nmulti_agent_v2 = false\ngoals = false\nimage_generation = false\nview_image = false\nsleep_tool = false\nshell_tool = false\nunified_exec = false\ncode_mode = false\ncode_mode_host = false\n',
@@ -146,8 +147,9 @@ export async function prepareSupervisedReview(
     let evidenceBytes = 0;
     const evidence = [];
     for (const item of snapshot.manifest) {
-      const content = await readFile(join(snapshot.root, item.path), 'utf8');
-      evidenceBytes += Buffer.byteLength(content);
+      const bytes = await readFile(join(snapshot.root, item.path));
+      evidenceBytes += bytes.length;
+      const content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
       if (content.includes('\0') || evidenceBytes > 2_000_000) {
         throw new Error('review evidence must be text within the input limit');
       }
@@ -167,19 +169,6 @@ export async function prepareSupervisedReview(
       }),
       { mode: 0o600 },
     );
-    if (request.proxyUrl) {
-      const configFile = join(snapshot.codexHome, 'config.toml');
-      const existing = await readFile(configFile, 'utf8');
-      await writeFile(
-        configFile,
-        'model_provider = "restricted_review"\n' +
-          existing +
-          '\n[model_providers.restricted_review]\nname = "Restricted account review"\nwire_api = "responses"\nrequires_openai_auth = true\nsupports_websockets = false\nbase_url = ' +
-          JSON.stringify(request.proxyUrl) +
-          '\n',
-        { mode: 0o600 },
-      );
-    }
     const executionId = randomUUID();
     const launch = await buildDockerSpecialistLaunch({
       image: request.image,
@@ -189,6 +178,8 @@ export async function prepareSupervisedReview(
       promptFile,
       egressNetwork: request.egressNetwork,
       role: 'plan_critic',
+      allowedOperations: ['workspace.read'],
+      modelConnection: request.proxyUrl ? { url: request.proxyUrl } : undefined,
       runId: `supervised-review-${executionId}`,
       executionId,
     });

@@ -1260,6 +1260,7 @@ it.runIf(process.env.WORKFLOW_DOCUMENT_DOCKER === '1').each(['spec.md', 'tests.m
       approvedDocumentsRoot: destination,
       egressNetwork: 'none',
       role: 'implementation_worker',
+      allowedOperations: ['workspace.read', 'workspace.patch', 'process.test', 'artifact.write'],
       runId: 'run',
       image: 'agent-platform-review:0.156.1-hardened',
       containerUser: `${process.getuid!()}:${process.getgid!()}`,

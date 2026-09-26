@@ -1,0 +1,290 @@
+[
+  {
+    "name": "feature_planner",
+    "role": "feature_planner",
+    "operations": [
+      "workspace.read",
+      "beads.read",
+      "github.read"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": false,
+      "artifact": false,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "plan_critic",
+    "role": "plan_critic",
+    "operations": [
+      "workspace.read",
+      "beads.read",
+      "github.read"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": false,
+      "artifact": false,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "repo_explorer",
+    "role": "repo_explorer",
+    "operations": [
+      "workspace.read",
+      "beads.read",
+      "github.read"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": false,
+      "artifact": false,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "implementation_worker",
+    "role": "implementation_worker",
+    "operations": [
+      "workspace.read",
+      "workspace.patch",
+      "process.test",
+      "artifact.write"
+    ],
+    "result": {
+      "read": "original",
+      "patch": true,
+      "scratch": true,
+      "artifact": true,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "code_reviewer",
+    "role": "code_reviewer",
+    "operations": [
+      "workspace.read",
+      "beads.read",
+      "git.read",
+      "github.read"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": false,
+      "artifact": false,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "test_runner",
+    "role": "test_runner",
+    "operations": [
+      "workspace.read",
+      "process.test",
+      "artifact.write",
+      "github.read"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": true,
+      "artifact": true,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "qa_evaluator",
+    "role": "qa_evaluator",
+    "operations": [
+      "workspace.read",
+      "process.test",
+      "artifact.write",
+      "github.read"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": true,
+      "artifact": true,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "feature_evaluator",
+    "role": "feature_evaluator",
+    "operations": [
+      "workspace.read",
+      "beads.read",
+      "git.read",
+      "github.read"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": false,
+      "artifact": false,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "implementation_read",
+    "role": "implementation_worker",
+    "operations": [
+      "workspace.read"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": false,
+      "artifact": false,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "implementation_patch",
+    "role": "implementation_worker",
+    "operations": [
+      "workspace.read",
+      "workspace.patch"
+    ],
+    "result": {
+      "read": "original",
+      "patch": true,
+      "scratch": false,
+      "artifact": false,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "implementation_test",
+    "role": "implementation_worker",
+    "operations": [
+      "workspace.read",
+      "process.test"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": true,
+      "artifact": false,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  },
+  {
+    "name": "implementation_artifact",
+    "role": "implementation_worker",
+    "operations": [
+      "workspace.read",
+      "artifact.write"
+    ],
+    "result": {
+      "read": "original",
+      "patch": false,
+      "scratch": false,
+      "artifact": true,
+      "configWrite": false,
+      "projectConfig": false,
+      "dockerSocket": false,
+      "home": "/codex-home",
+      "capEff": "0000000000000000",
+      "noNewPrivileges": "1",
+      "mcp": "[]"
+    },
+    "image": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+    "model": "none; real Docker/CLI offline probe"
+  }
+]

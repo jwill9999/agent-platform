@@ -1,3 +1,12 @@
+import { SPECIALIST_SECCOMP } from './specialistSeccomp.js';
+import {
+  specialistRoleProfile,
+  specialistRoleConfig,
+  specialistWorkingDirectory,
+  specialistSourceEvidence,
+  type SpecialistModelConnection,
+} from './specialistRoleProfile.js';
+import { modelGatewayConfigSchema, type ModelGatewayConfig } from './modelGatewayConfig.js';
 import { execFile } from 'node:child_process';
 import { cp, lstat, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -18,7 +27,7 @@ import {
   type SchedulerContainerRecord,
 } from './storage.js';
 
-const FORBIDDEN_NAMES = new Set(['.git', '.beads', '.ssh']);
+const FORBIDDEN_NAMES = new Set(['.git', '.beads', '.ssh', '.codex', '.agents']);
 const FORBIDDEN_ENVIRONMENT = /(?:TOKEN|SECRET|PASSWORD|KEY|CREDENTIAL|DOCKER|SSH|GITHUB|GH_)/iu;
 const FORBIDDEN_NETWORKS = new Set(['bridge', 'default', 'host']);
 
@@ -65,6 +74,8 @@ export interface SpecialistLaunchRequest {
   approvedDocumentsRoot?: string;
   egressNetwork: string;
   role: string;
+  allowedOperations: readonly string[];
+  modelConnection?: SpecialistModelConnection;
   runId: string;
   containerUser?: string;
   extraEnvironment?: Record<string, string>;
@@ -102,16 +113,25 @@ async function populateSpecialistWorkspace(
   await mkdir(codexHome, { recursive: true, mode: 0o700 });
   const filter = async (source: string): Promise<boolean> => {
     const name = basename(source);
-    if (FORBIDDEN_NAMES.has(name) || name === 'node_modules' || name === '.env') return false;
+    if (FORBIDDEN_NAMES.has(name) || name === 'node_modules' || name.startsWith('.env'))
+      return false;
     return !(await lstat(source)).isSymbolicLink();
   };
   for (const allowedPath of allowedSourcePaths) {
     if (
       isAbsolute(allowedPath) ||
       allowedPath.split('/').includes('..') ||
-      allowedPath.split('/').some((segment) => FORBIDDEN_NAMES.has(segment))
+      allowedPath
+        .split('/')
+        .some((segment) => FORBIDDEN_NAMES.has(segment) || segment.startsWith('.env'))
     ) {
       throw new Error(`specialist source path is forbidden: ${allowedPath}`);
+    }
+    let selected = canonicalSource;
+    for (const part of allowedPath.split('/')) {
+      selected = join(selected, part);
+      if ((await lstat(selected)).isSymbolicLink())
+        throw new Error('specialist source symlinks are forbidden');
     }
     const source = await realpath(resolve(canonicalSource, allowedPath));
     if (!isInside(source, canonicalSource)) {
@@ -167,8 +187,16 @@ function prepareLaunchEnvironment(request: SpecialistLaunchRequest) {
   if (!/^[1-9]\d*:\d+$/u.test(containerUser)) {
     throw new Error('specialist container user must use a non-root numeric uid and numeric gid');
   }
+  if (
+    Object.keys(request.extraEnvironment ?? {}).length &&
+    !(process.env.NODE_ENV === 'test' && request.egressNetwork === 'none')
+  )
+    throw new Error('forbidden credential variable or environment override');
   const environment = {
     CODEX_HOME: '/codex-home',
+    HOME: '/codex-home',
+    XDG_CONFIG_HOME: '/codex-home/config',
+    PATH: '/usr/local/bin:/usr/bin:/bin',
     WORKFLOW_RUN_ID: request.runId,
     WORKFLOW_ROLE: request.role,
     ...(request.extraEnvironment ?? {}),
@@ -185,9 +213,29 @@ function prepareLaunchEnvironment(request: SpecialistLaunchRequest) {
   return { containerUser, environment };
 }
 
+async function validateStagingOwner(containerUser: string, paths: readonly string[]) {
+  const uid = Number(containerUser.split(':')[0]);
+  for (const path of paths)
+    if ((await lstat(path)).uid !== uid)
+      throw new Error('specialist staging owner must match the non-root container uid');
+}
+
+async function prepareOutputDirectories(paths: readonly string[]) {
+  for (const path of paths) {
+    const existing = await lstat(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+      return undefined;
+    });
+    if (existing && (!existing.isDirectory() || existing.isSymbolicLink()))
+      throw new Error('specialist output directory must be private regular directory');
+    await mkdir(path, { recursive: true, mode: 0o700 });
+  }
+}
+
 export async function buildDockerSpecialistLaunch(
   request: SpecialistLaunchRequest,
 ): Promise<DockerSpecialistLaunch> {
+  const profile = specialistRoleProfile(request.role, request.allowedOperations);
   const { containerUser, environment } = prepareLaunchEnvironment(request);
   const [workspaceRoot, codexHome, authFile, promptFile, configFile] = await Promise.all([
     realpath(request.workspaceRoot),
@@ -197,9 +245,32 @@ export async function buildDockerSpecialistLaunch(
     realpath(join(request.codexHome, 'config.toml')),
   ]);
   const stagingRoot = await realpath(resolve(workspaceRoot, '..'));
-  const readOnlySource = request.role === 'feature_planner' || request.role === 'plan_critic';
+  assertPrivateMounts(
+    [workspaceRoot, codexHome, configFile, authFile, promptFile].map(
+      (path) => `${path}:/checked:ro`,
+    ),
+    stagingRoot,
+  );
+  await validateStagingOwner(containerUser, [
+    workspaceRoot,
+    codexHome,
+    authFile,
+    promptFile,
+    configFile,
+  ]);
+  const readOnlySource = !profile.patch;
+  const workingDirectory = specialistWorkingDirectory(profile);
+  const permitsWrites = profile.patch || profile.test || profile.artifacts;
+  await writeFile(configFile, specialistRoleConfig(profile, request.modelConnection), {
+    mode: 0o600,
+  });
+  const scratch = join(stagingRoot, 'scratch'),
+    evidence = join(stagingRoot, 'evidence');
+  await prepareOutputDirectories([scratch, evidence]);
   const mounts = [
     `${workspaceRoot}:/workspace:${readOnlySource ? 'ro' : 'rw'}`,
+    `${scratch}:/scratch:${profile.test ? 'rw' : 'ro'}`,
+    `${evidence}:/evidence:${profile.artifacts ? 'rw' : 'ro'}`,
     `${codexHome}:/codex-home:rw`,
     `${configFile}:/codex-home/config.toml:ro`,
     `${authFile}:/codex-home/auth.json:ro`,
@@ -213,6 +284,11 @@ export async function buildDockerSpecialistLaunch(
   }
   assertPrivateMounts(mounts, stagingRoot);
 
+  const seccompFile = join(stagingRoot, 'specialist-seccomp.json');
+  if (permitsWrites) {
+    // Never follow or replace an existing path, including a symlink outside private staging.
+    await writeFile(seccompFile, JSON.stringify(SPECIALIST_SECCOMP), { mode: 0o600, flag: 'wx' });
+  }
   const args = [
     'run',
     '--rm',
@@ -234,6 +310,7 @@ export async function buildDockerSpecialistLaunch(
     '--tmpfs',
     '/tmp:rw,nosuid,nodev,noexec,size=512m',
   ];
+  if (permitsWrites) args.push('--security-opt', `seccomp=${seccompFile}`);
   if (request.executionId !== undefined) {
     if (!/^[a-f0-9-]{36}$/u.test(request.executionId)) {
       throw new Error('specialist execution id must be a UUID');
@@ -244,11 +321,11 @@ export async function buildDockerSpecialistLaunch(
   for (const mount of mounts) args.push('--volume', mount);
   args.push(
     '--workdir',
-    '/workspace',
+    workingDirectory,
     request.image,
     'sh',
     '-c',
-    `exec codex exec --json --sandbox ${readOnlySource ? 'read-only' : 'workspace-write'} --skip-git-repo-check -C /workspace - < /run/specialist/prompt.txt`,
+    `exec codex exec --json --sandbox ${permitsWrites ? 'workspace-write' : 'read-only'} --skip-git-repo-check -C ${workingDirectory} - < /run/specialist/prompt.txt`,
   );
   // This proves generated Docker policy, not private staging provenance. Trusted composition
   // must supply dedicated staging roots; untrusted/model input must never choose host paths.
@@ -585,6 +662,7 @@ export class RevocableSpecialistCredentialBroker {
 }
 
 export interface DockerSpecialistLauncherOptions {
+  modelGateway?: ModelGatewayConfig;
   store: WorkflowStore;
   ownerId: string;
   sourceRoot: string;
@@ -617,6 +695,7 @@ export class DockerIsolatedSpecialistLauncher {
     if (!(options.credentialBroker instanceof RevocableSpecialistCredentialBroker)) {
       throw new Error('specialist launcher requires a revocable credential broker');
     }
+    if (options.modelGateway) modelGatewayConfigSchema.parse(options.modelGateway);
     this.#options = options;
     this.#clock = options.clock ?? Date.now;
   }
@@ -704,6 +783,7 @@ export class DockerIsolatedSpecialistLauncher {
         !isDeepStrictEqual(persisted.packet, envelope ?? packet)
       )
         throw new Error('specialist input differs from durable scheduler input');
+      const roleProfile = specialistRoleProfile(packet.assignedRole, packet.allowedOperations);
       this.#assertCanStart(reservation);
       const credentialBrokerGeneration = await this.#options.credentialBroker.assertConformant();
       const workspace = await prepareSpecialistWorkspace(
@@ -730,7 +810,12 @@ export class DockerIsolatedSpecialistLauncher {
         credentialBrokerGeneration,
         this.#clock(),
       );
-      await writeFile(promptFile, `${JSON.stringify(envelope ?? packet)}\n`, { mode: 0o600 });
+      const sourceEvidence = await specialistSourceEvidence(roleProfile, workspace.root);
+      await writeFile(
+        promptFile,
+        `${JSON.stringify({ input: envelope ?? packet, sourceEvidence, writableLocations: { scratch: roleProfile.test ? '/scratch' : null, evidence: roleProfile.artifacts ? '/evidence' : null } })}\n`,
+        { mode: 0o600 },
+      );
       const launch = await buildDockerSpecialistLaunch({
         image: this.#options.image,
         workspaceRoot: workspace.root,
@@ -740,6 +825,8 @@ export class DockerIsolatedSpecialistLauncher {
         approvedDocumentsRoot,
         egressNetwork: this.#options.egressNetwork,
         role: reservation.role,
+        allowedOperations: packet.allowedOperations,
+        modelConnection: this.#options.modelGateway,
         runId: packet.runId,
         containerUser: this.#options.containerUser,
         executionId: reservation.id,

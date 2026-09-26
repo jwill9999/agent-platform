@@ -47,6 +47,10 @@ integration('malicious specialist feasibility', () => {
         promptFile,
         egressNetwork: 'none',
         role,
+        allowedOperations:
+          role === 'implementation_worker'
+            ? ['workspace.read', 'workspace.patch']
+            : ['workspace.read'],
         runId: 'offline-review-probe',
         executionId,
         containerUser: `${process.getuid?.() || 1000}:${process.getgid?.() || 1000}`,

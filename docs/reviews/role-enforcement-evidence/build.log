@@ -1,0 +1,4 @@
+
+> @agent-platform/workflow-control@0.0.0 build <workspace>/packages/workflow-control
+> tsc -p tsconfig.json
+
