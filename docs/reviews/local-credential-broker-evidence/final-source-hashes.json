@@ -1,0 +1,53 @@
+{
+  "algorithm": "sha256",
+  "files": [
+    {
+      "path": "packages/workflow-control/src/localCredentialGateway.ts",
+      "sha256": "cd4b494e55098d224a1bb66b6a54d3d562e5e3e9b2c04e7cecefc4f14e2ac3b2"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialLeases.ts",
+      "sha256": "d2b83581565db9932c2da7814ff539851e3dee94fb7027ccc9e03cd5e3b71fcb"
+    },
+    {
+      "path": "packages/workflow-control/src/localCredentialBrokerCli.ts",
+      "sha256": "2358f146e97c082aa505f819a1816070ddad4c8649313a131a505bb8dbc67693"
+    },
+    {
+      "path": "packages/workflow-control/src/modelGatewayConfig.ts",
+      "sha256": "7a74f00cc0db71e521c3cec0c45532dc559e3e00b894998370026de6d4485aba"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "sha256": "1a5017560756d8539c2fc252a7ddb7a5745bd9ad071b7229409d39c7e6b2a457"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "sha256": "9b4e6d72281c88e097100bfa2b91ec6f3060c97c6189c5b1e48d33ce235726a7"
+    },
+    {
+      "path": "packages/workflow-control/src/reviewProxy.ts",
+      "sha256": "070145d1e2618a1e6fa9a073b47f8d4666318d225de5103cf74f6f610ca0f369"
+    },
+    {
+      "path": "packages/workflow-control/test/localCredentialBroker.test.ts",
+      "sha256": "a04dd12e263984291308307cebc162519ce2b76821fe45b65c9866fc040bddc7"
+    },
+    {
+      "path": "packages/workflow-control/test/localCredentialGateway.test.ts",
+      "sha256": "6342acd843765bb674aacf07b15ae66c42ba10444b2d86684aa2dee6f8d34faa"
+    },
+    {
+      "path": "packages/workflow-control/credential-runtime/Dockerfile",
+      "sha256": "49c8cc5439de23190c1bc62ae76b4b3156c5702950ead21c2fa3d116b49c49c4"
+    },
+    {
+      "path": "docs/planning/standalone-pilot/broker-addendum.md",
+      "sha256": "35535cf8227e21710aa758e6092b8a992b7de5083dcfeb2e57a190023d4116d6"
+    },
+    {
+      "path": "docs/workflow-control-orchestrator.md",
+      "sha256": "5a97939629424eba5dace221e3100daa1c3471456da08d1c6cdadca7b6fa501a"
+    }
+  ]
+}

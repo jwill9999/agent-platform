@@ -86,3 +86,21 @@ it('reads coordinator JSON from stdin and rejects oversized or malformed input',
   await expect(readReviewConfig(input('/arbitrary/config.json'))).rejects.toThrow();
   await expect(readReviewConfig(input('x'.repeat(1_000_001)))).rejects.toThrow('input limit');
 });
+
+it('rejects malformed UTF-8 rather than reviewing text different from the bound bytes', async () => {
+  const root = await source();
+  await writeFile(join(root, 'plan.md'), Buffer.from([0xc3, 0x28]));
+  const auth = join(root, 'auth.json');
+  await writeFile(auth, '{}');
+  await expect(
+    prepareSupervisedReview({
+      sourceRoot: root,
+      evidencePaths: ['plan.md'],
+      image: 'sha256:' + 'a'.repeat(64),
+      modelAuthFile: auth,
+      egressNetwork: 'review-egress',
+      proxyUrl: 'http://model-proxy:8080',
+      question: 'review',
+    }),
+  ).rejects.toThrow('encoded data');
+});

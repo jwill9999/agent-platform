@@ -1,4 +1,84 @@
-# Current session: approved-document binding implementation
+# Current session: role enforcement repair — 26 September 2026
+
+Owner authorized auditing and technically enforcing every specialist role, separately from broker
+model access. Work is supervised under `.17` on `task/standalone-pilot-plan`, PR275 into
+`feature/harness-backlog-review`. No managed run, pilot, merge or staging promotion.
+
+[Role audit](docs/reviews/role-enforcement-qualification.md) and
+[scope addendum](docs/planning/standalone-pilot/role-enforcement-addendum.md) record the policy matrix,
+source/scratch/evidence isolation, generated MCP-free configuration, reduced grants and client limits.
+Read-only reviewers cannot edit source; testing uses separate writable locations. Source context is
+supplied to roles without shell access. Independent review findings were repaired, including strict
+path validation and immutable process identity. The role component passed 13 filesystem, 12 real-client
+and seven existing container checks; full
+Linux regression passed 901 tests (42 optional skipped). Independent role/evidence review and the
+narrow Sonar follow-up review report no remaining actionable blockers. Evidence is retained in the
+linked report. Hosted checks are still required on the final published head; keep PR275 draft until
+those complete. `.17` remains in progress and `.13` blocked; next broader work is unchanged R1–R3 and full host/startup/lifecycle qualification.
+
+---
+
+## Current session: local credential broker delivered — 26 September 2026
+
+Owner explicitly authorized creating the missing local broker with the existing Codex account.
+Supervised bootstrap delivery on `task/standalone-pilot-plan`; PR275 targets
+`feature/harness-backlog-review`. Account credentials remain at the trusted gateway, workers receive
+opaque revocable leases. Durable tombstones, restart fencing, executable control adapter and optional
+runtime model gateway configuration are implemented. No managed pilot or staging changes.
+
+[Component report](docs/reviews/local-credential-broker-qualification.md) holds the design, setup,
+source hashes, tests and isolated reviews. Focused16/full Linux891 passed (17 optional skipped);
+real Codex turn and revoke/restart denials passed with the final gateway image. Typecheck/build/lint
+passed. Native full tests remain limited by the unaccepted Apple Git licence; Linux supplies the
+regression evidence. Do not treat this as a complete production launcher lifecycle or autonomous run.
+
+`.17` remains in progress and `.13` blocked: next qualify the complete launcher lifecycle/topology
+and continue R1 run discovery, R2 governed artifact import and R3 coordinator completion under the
+approved scope. The original proposed policy/contract hashes remain proposals, not installed authority.
+Review current PR hosted checks before owner integration. Preserve existing authorization; no repeated
+permission request merely to continue agreed work. Older entries below are historical checkpoints.
+
+---
+
+## Current session: managed host provisioning gap confirmed — 26 September 2026
+
+Owner authorized continuing .17 after the planning PR. Read-only canonical journal inspection found
+four cancelled runs and zero unexpired leases at that instant. Git fallback and Docker respond, but
+no managed runtime config or credential-broker candidate was found in the bounded inspected locations.
+See [host prerequisite assessment](docs/reviews/standalone-host-prerequisites.md) for exact evidence,
+limits and the required issue/revoke/status/conformance protocol.
+
+No runtime implementation or managed pilot launched. .17 R4's documented feasibility gate remains:
+identify/provision a conformant revocable broker and qualify the managed image/network/production
+startup. Next bounded work is the broker provision/design assessment, considering an opaque-lease
+model gateway with existing account credentials retained only by the trusted host. This is proposed,
+not implemented or provider-qualified. Preserve the owner's authorization; do not request it again
+merely to continue assessment. Do not copy shared auth and call that per-worker revocation.
+
+PR275 holds the reviewed scope; .17 remains in progress and .13 blocked. No staging changes.
+
+---
+
+## Current session: standalone prerequisite scope reviewed — 26 September 2026
+
+PR274 merged into feature/harness-backlog-review at a8586aa. Owner authorized preparation of .17's
+bounded repair plan. [Plan](docs/planning/standalone-pilot/plan.md),
+[13-scenario verification matrix](docs/testing/standalone-pilot-prerequisites.md) and proposed v1
+contract are published on task/standalone-pilot-plan, based on that feature revision.
+Three isolated critique rounds resolved all scope-design findings; see
+[review and evidence](docs/reviews/standalone-pilot-plan-review.md). Schema/manifest and documentation
+checks passed. No runtime implementation or live orchestration test has started.
+
+The scope covers run discovery/admission, journaled implementation imports, typed phase/coordinator
+completion and host feasibility. .17 remains in progress and directly blocks .13. Before implementation
+handoff, establish the managed credential broker/image provision path, bind actual policy/source and
+review the exact execution authority. Existing reviewer account access is not managed worker authority.
+The proposed policy hash identifies review material only and must not be used as an installed grant.
+Staging, A2A and packaging remain outside this work. Temporary reviewer containers/networks cleaned up.
+
+---
+
+## Current session: approved-document binding implementation
 
 Owner authorized implementation of `agent-platform-pilot-zero.16`; approval is recorded against the
 reviewed planning material. This is supervised direct delivery, not managed orchestration.

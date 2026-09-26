@@ -40,3 +40,21 @@ Prove the actual selected host commands and connected transition path, not just 
 Independent review must cover the proposed repairs and their evidence. Missing required checks keep
 this gate open. Close only after required integration and successful qualification, without claiming
 that this prerequisite test itself constitutes the separately approved single-task pilot.
+
+## Planning handoff
+
+Owner authorized preparing the bounded plan on 26 September, after PR274 merged. See
+[proposed repair plan](../planning/standalone-pilot/plan.md),
+[verification matrix](../testing/standalone-pilot-prerequisites.md), and
+[independent review](../reviews/standalone-pilot-plan-review.md).
+Planning branch: `task/standalone-pilot-plan`, from `feature/harness-backlog-review` at
+`a8586aa425fc4907ef7aa374ff2d283d6eb0a1cd`. Canonical Beads remains the main repository.
+The proposed execution contract is not persisted approval or authority to launch a pilot.
+
+## Authorized component refinements
+
+The owner subsequently authorized the [local broker addendum](../planning/standalone-pilot/broker-addendum.md)
+and the separate [role-enforcement addendum](../planning/standalone-pilot/role-enforcement-addendum.md).
+Their component evidence is retained in the [broker report](../reviews/local-credential-broker-qualification.md)
+and [role audit](../reviews/role-enforcement-qualification.md). These authorizations do not close R1–R4
+or launch the pilot; the initial proposal-only wording above is historical context for the original task.

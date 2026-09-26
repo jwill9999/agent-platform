@@ -1,3 +1,4 @@
+import { modelGatewayConfigSchema } from './modelGatewayConfig.js';
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, realpath, stat } from 'node:fs/promises';
@@ -37,6 +38,7 @@ export const phaseRuntimeConfigSchema = z
     runId: z.string().min(1),
     sourceRoot: absolute,
     credentialBrokerBinary: absolute,
+    modelGateway: modelGatewayConfigSchema.optional(),
     image: z
       .string()
       .regex(/^[^\s]+@sha256:[a-f0-9]{64}$/u, 'immutable specialist image digest required'),
@@ -186,6 +188,7 @@ export class StandalonePhaseRuntime {
           credentialBroker: broker,
           egressNetwork: config.egressNetwork,
           containerUser: config.containerUser,
+          modelGateway: config.modelGateway,
         }),
         verifySource: async (action, paths) => {
           const head = await execute('/usr/bin/git', ['-C', sourceRoot, 'rev-parse', 'HEAD'], {

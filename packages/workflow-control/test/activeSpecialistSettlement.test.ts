@@ -142,7 +142,7 @@ async function setup(
       image: 'offline-fixture',
       credentialBroker: broker,
       egressNetwork: 'none',
-      containerUser: '1000:1000',
+      containerUser: `${process.getuid!()}:${process.getgid!()}`,
       executor,
       clock: () => now,
     });

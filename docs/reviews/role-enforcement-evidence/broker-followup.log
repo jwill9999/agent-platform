@@ -1,0 +1,12 @@
+
+ RUN  v2.1.9 <workspace>/packages/workflow-control
+
+ ✓ test/localCredentialGateway.test.ts (7 tests) 230ms
+ ✓ test/localCredentialBroker.test.ts (9 tests) 1242ms
+   ✓ satisfies CLI protocol without returning a worker token on stdout 1150ms
+
+ Test Files  2 passed (2)
+      Tests  16 passed (16)
+   Start at  17:28:59
+   Duration  1.70s (transform 457ms, setup 0ms, collect 197ms, tests 1.47s, environment 0ms, prepare 134ms)
+

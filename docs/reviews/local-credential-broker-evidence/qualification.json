@@ -1,0 +1,31 @@
+{
+  "brokerImage": "sha256:9d1378f1a5dd1cc54f3fa4d06fa8470c54e50749ab669389b487bc9a07247727",
+  "workerImage": "sha256:e71bd7931f0cbfb4f5887ce5109f0b25095f3e8329b1656bf7ebed73efeb877f",
+  "readOnly": true,
+  "user": "501:20",
+  "capDrop": [
+    "ALL"
+  ],
+  "networks": [
+    "local-broker-qualified-internal",
+    "local-broker-qualified-outbound"
+  ],
+  "controlPublication": "127.0.0.1:55692",
+  "conformance": {
+    "protocol": "revoke-wins-v1",
+    "passed": true,
+    "cleanup": "broker_owned_ttl",
+    "generation": "a616646d-be98-4762-a08f-0bc15ca60b84",
+    "probeTtlSeconds": 30
+  },
+  "admittedModelsHttpStatus": 400,
+  "revokedHttpStatus": 403,
+  "restartOldGenerationStatus": "revoked",
+  "restartOldTokenHttpStatus": 403,
+  "generationRotated": true,
+  "accountMountOnlyInGateway": true,
+  "adapterThroughEmptyEnvironment": true,
+  "realClientTurnCompleted": true,
+  "realClientResult": "FINAL_LEASE_VERIFIED",
+  "realClientLeaseRevoked": true
+}

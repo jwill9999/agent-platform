@@ -129,13 +129,13 @@ async function setup(
       image: 'fixture@sha256:' + 'a'.repeat(64),
       credentialBroker: credentialBroker(store),
       egressNetwork: 'fixture-egress',
-      containerUser: '501:20',
+      containerUser: `${process.getuid!()}:${process.getgid!()}`,
       executor: (() => {
         const transport = schedulerDockerFixture(async (_binary, args, settings) => {
           expect(settings.env).toEqual({});
           launches.push([...args]);
           if (args[0] === 'create') {
-            const mount = args.find((arg) => arg.endsWith(':/workspace:rw'))!;
+            const mount = args.find((arg) => /:\/workspace:(?:ro|rw)$/u.test(arg))!;
             staging.push(dirname(mount.slice(0, -':/workspace:rw'.length)));
             const promptMount = args.find((arg) => arg.endsWith(':/run/specialist/prompt.txt:ro'))!;
             prompts.push(
@@ -145,7 +145,7 @@ async function setup(
                     promptMount.slice(0, -':/run/specialist/prompt.txt:ro'.length),
                     'utf8',
                   ),
-                ),
+                ).input,
               ),
             );
             return { stdout: 'fixture-container', stderr: '' };
@@ -190,7 +190,7 @@ async function setup(
     image: 'fixture@sha256:' + 'a'.repeat(64),
     credentialBrokerBinary: '/fixture/credentials',
     egressNetwork: 'fixture-egress',
-    containerUser: '501:20',
+    containerUser: `${process.getuid!()}:${process.getgid!()}`,
     leaseTtlMs: 5000,
   });
   const runtime = StandalonePhaseRuntime.createForTest({

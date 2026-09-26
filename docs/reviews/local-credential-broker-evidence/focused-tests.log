@@ -1,0 +1,12 @@
+
+ RUN  v2.1.9 /Users/letuscode/projects/agent-platform-workflow-evaluation/packages/workflow-control
+
+ ✓ test/localCredentialGateway.test.ts (7 tests) 174ms
+ ✓ test/localCredentialBroker.test.ts (9 tests) 1034ms
+   ✓ satisfies CLI protocol without returning a worker token on stdout 968ms
+
+ Test Files  2 passed (2)
+      Tests  16 passed (16)
+   Start at  16:05:00
+   Duration  1.35s (transform 300ms, setup 0ms, collect 112ms, tests 1.21s, environment 0ms, prepare 119ms)
+
