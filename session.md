@@ -1,3 +1,22 @@
+# Current session: standalone prerequisite scope reviewed — 26 September 2026
+
+PR274 merged into feature/harness-backlog-review at a8586aa. Owner authorized preparation of .17's
+bounded repair plan. [Plan](docs/planning/standalone-pilot/plan.md),
+[13-scenario verification matrix](docs/testing/standalone-pilot-prerequisites.md) and proposed v1
+contract are published on task/standalone-pilot-plan, based on that feature revision.
+Three isolated critique rounds resolved all scope-design findings; see
+[review and evidence](docs/reviews/standalone-pilot-plan-review.md). Schema/manifest and documentation
+checks passed. No runtime implementation or live orchestration test has started.
+
+The scope covers run discovery/admission, journaled implementation imports, typed phase/coordinator
+completion and host feasibility. .17 remains in progress and directly blocks .13. Before implementation
+handoff, establish the managed credential broker/image provision path, bind actual policy/source and
+review the exact execution authority. Existing reviewer account access is not managed worker authority.
+The proposed policy hash identifies review material only and must not be used as an installed grant.
+Staging, A2A and packaging remain outside this work. Temporary reviewer containers/networks cleaned up.
+
+---
+
 # Current session: approved-document binding implementation
 
 Owner authorized implementation of `agent-platform-pilot-zero.16`; approval is recorded against the

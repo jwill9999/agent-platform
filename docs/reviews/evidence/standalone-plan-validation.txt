@@ -1,0 +1,1 @@
+Contract schema and exact manifest bytes: PASS. Draft only; no persisted runtime approval.
