@@ -1,3 +1,22 @@
+# Current session: managed host provisioning gap confirmed — 26 September 2026
+
+Owner authorized continuing .17 after the planning PR. Read-only canonical journal inspection found
+four cancelled runs and zero unexpired leases at that instant. Git fallback and Docker respond, but
+no managed runtime config or credential-broker candidate was found in the bounded inspected locations.
+See [host prerequisite assessment](docs/reviews/standalone-host-prerequisites.md) for exact evidence,
+limits and the required issue/revoke/status/conformance protocol.
+
+No runtime implementation or managed pilot launched. .17 R4's documented feasibility gate remains:
+identify/provision a conformant revocable broker and qualify the managed image/network/production
+startup. Next bounded work is the broker provision/design assessment, considering an opaque-lease
+model gateway with existing account credentials retained only by the trusted host. This is proposed,
+not implemented or provider-qualified. Preserve the owner's authorization; do not request it again
+merely to continue assessment. Do not copy shared auth and call that per-worker revocation.
+
+PR275 holds the reviewed scope; .17 remains in progress and .13 blocked. No staging changes.
+
+---
+
 # Current session: standalone prerequisite scope reviewed — 26 September 2026
 
 PR274 merged into feature/harness-backlog-review at a8586aa. Owner authorized preparation of .17's
