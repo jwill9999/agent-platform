@@ -1,65 +1,242 @@
 {
   "image": "sha256:9d1378f1a5dd1cc54f3fa4d06fa8470c54e50749ab669389b487bc9a07247727",
   "compiledJavascriptMatchesLocalBuild": true,
-  "files": {
-    "artifacts.js": "9e910dbe0a6d5f46baa7e403f53294f039581a7f7df0c505a2c8b6ed3823a9ac",
-    "authorization.js": "72b57e24606cfaab69da59d3263409655ac919e65ded4239d0693f998bdde07f",
-    "beadsPortCapability.js": "f1bf3f30103d9ee115a5a25871c53c27483eaae50eb4f1d211856a0590c79db7",
-    "bootstrap.js": "5b367a1aa65db5a01e7bf4c150cdf478c4e3d77020baa8d9882498d575d7bcb0",
-    "bootstrapAdapterBundle.js": "8146647e6b7d45cd44eea7a782718824121071f82a58c640cc75ff60cc1a1da8",
-    "bootstrapAdapterRuntime.js": "31f0482a05d6c638611805aa748fe393c18abfbb99df4c7b70ffb73fd4bce3bc",
-    "bootstrapJournal.js": "d1ca055578b5a22406281fa927a48068f4b8ecfe52a45cc3afe3288b147a7aa9",
-    "bootstrapPolicy.js": "d2782717fe171db9daaae751819efd70240a23518bd9cc9636a2661c86235408",
-    "cancellation.js": "ca86c226a5b2769e53616f68a34799be0fec1056849b272388f48411d8d6d670",
-    "cli.js": "a9d87c97a7ed6105314bfd3b4b75369e163cd576160c29fe1c72d4a058d7df4d",
-    "continuationJournal.js": "ded7624de7195eadb99d360dc183a42715923e083dc44eba62c7d18218eeb55b",
-    "continuationNotifications.js": "31224110ef14eb0dee1fc4df366c82646753e2bcab27975f244a258a3f5effcd",
-    "continuationProcess.js": "14c4621ca61230631cca492992ad1e79dae444dcdaf5cd030c48fe024ac37c25",
-    "continuationWorker.js": "b0ca059db72007cf0209640c9a0e7cf584ea972255c079e68de1d3d1cd489b17",
-    "contracts.js": "538a463f8900162d2240485e73a73d1fca8339e96d1214b5c189e03ed7abba9e",
-    "deliveryBrokers.js": "161c3b5423a53eea7d39e40bb5beb16f1e42a131391c861d4fdba670308048df",
-    "deliveryPortCapability.js": "450532c5a1d4724b6102ee1633f057f6b5789e098adbe1dd94ab9ff9ab596936",
-    "documentApproval.js": "f915baa3caa7c686dc0990af3823ccf017499fd717fc529b3022448c3b63b4ee",
-    "documentSources.js": "dbf9172a3fbd512737e0dd851acb4079b35380a8778b3bbb86fe0d875df3c684",
-    "featureDeliveryApproval.js": "4979efee8509726f918699d43ffc43b737df89204f2569c86739a96fc8c165c2",
-    "featureDeliveryBroker.js": "ce869f93387d661a6cad722d22632f808231e16e539447df1a94303f4613526f",
-    "featureDeliveryContracts.js": "6cc61f954647f95d7ddd2448b1b06919e45c4e04b853a36c45b67b04a4dfbf6b",
-    "featureEvaluation.js": "40bc703f7e52aa2d23ab107624f90345979a75003ea4d399130de1e47b4dc32c",
-    "finalization.js": "4dae0de1264bb277c869d999f36ca5b0745e8f45684d11569a2d581b671f0f37",
-    "gitDeliveryPort.js": "44cd14272e91fbb434842e80c17c8d665c1338f1bb2ad50b260713e8926186fd",
-    "githubDeliveryPort.js": "9e4593c093948a7b532ca3c0706e782d089911cef9303e06bf188d5d6d32cf2b",
-    "governedOperations.js": "2eef80bcef3fed1687a48a2c29be05d407497c22c07851a17eb1b0c8e31ffad4",
-    "governedPersistence.js": "14125b6bb1152f0c5e81c54910330e7bb7cb8382444df59889b79c8cb3a660e9",
-    "index.js": "65d83d86516392720de8db9b1833e9dbbe6c810735f63e7fddee1f772053a094",
-    "integrationGate.js": "c52d4b29379d9760e6b5ed5d7b0326a99c04b4e9d62a3ff5168af09259fd5ef9",
-    "lifecycle.js": "f1411c4527a4fe8e8f803a1ad6077c331a825f1dc48eb80c63597fb2a95282b1",
-    "localCredentialBrokerCli.js": "4555eabacee12ce0d761c79bedb92a9c55ed84efd7e23541b6672633561fb7f3",
-    "localCredentialGateway.js": "31327e4f418d647ad3e5d4afb128d4d00b62c5d5e7966eb9f8b003eed2ad1e0e",
-    "localCredentialLeases.js": "3375a7946c715797c59bfef441a66e3bb976f6719941621bdc46cafb21ee5b42",
-    "mcpServer.js": "832e27de1b22f382a77fc4203cb7d7ae399a5342cb05693d460caceee06aa27a",
-    "modelGatewayConfig.js": "0066a4857f6fe00d018b738033094ae4cbddd25421130690ed26b836414fddfe",
-    "orchestrator.js": "4ead46e0266489047e055e1d7fe7fa32f509df8b5c92446598196d6e8454aefa",
-    "phaseJobs.js": "28781aba01780d59b80d19031c3175b3452e3231dc40dd0e569bdb7ffc0de328",
-    "phaseRuntime.js": "7059510e5f31d2fa5d0e617930c75181333fc4e1ee260732931a31ec3a4a83ba",
-    "planning.js": "2e72cd0ce7fc3161cda1de1a9c9faed020ec05f1a4a176b9cb4cb2930a5fd005",
-    "planningDocuments.js": "d5e4e099765c164d3a28e31ac013cebf1c7159fd446fe5955e39cd981909dda3",
-    "preapprovalMaterial.js": "729ccd0c71df4039eb14fcf8f73f205fd2d3a56c03fe18ac1e692009cab37203",
-    "reconciliation.js": "c63ff26d966e9af9c27e64197c0acfe68747bbd332f37e9b4efea6b917f8cc75",
-    "repairChildPortCapability.js": "c2d6f93aaa3cbe41971062147c62c6465d0ecf56580ce8cc0edd87f458de0f52",
-    "repairLoops.js": "441661727802aa9b04a92e5cd5205a194ed830b63d946ef3fab0d158c43ed26e",
-    "reviewProxy.js": "cd8f7b04ed3743c3d08538a1364459c1ee5f98d92e6c163c75eab401bd12068f",
-    "secureEvidence.js": "14562d69661c85005d11860c1324267d261f8aad15f4b2384989fdacc4dee8fa",
-    "specialistContainerLifecycle.js": "f58cbc3f014efc1d47a45954544a1c0fc199bbea051a705bcc96b3550169d80b",
-    "specialistInput.js": "5f2bc8c7a5d2023426b4886ee1dc7672e76e1ce8db000e6ce9bff7e37bb9f16d",
-    "specialistLauncher.js": "0c091ec02a3c4e50364c0c0c6d0d38687aed0f8263a376643ce1a6d90c22ad80",
-    "specialistOutputManifest.js": "8e5bd141bbf287fa08569405d09da764485ade193245ec8de790665aafd98451",
-    "specialistTerminalResult.js": "9b73c69ece72a37c19748d71a9c66e885680a962284e3f29e8748a872fdb7b74",
-    "stateMachine.js": "34e0dd45837d93b62b9174421dbaf84c40b9424927e2fa85cba43b87c434cd26",
-    "storage.js": "b6dcd9e564b6b1ddc4c001099007c9b96317892ccb7af7e13adcf16c359bc6a8",
-    "supervisedReview.js": "585f166de7bbaddc5c22c17bbe441094825638e9a0aed73785e80a8878df4dba",
-    "supervisedReviewCli.js": "de26cbad9e73e0bcf24e4ae0afd197bd0606f22e558748516f4ceba799ebde79",
-    "trustedGovernedComposition.js": "188d6d06846d3f57a27803da4ed77ace544463fe3d159ca9b50cab35dcb02fa1",
-    "waitRecovery.js": "727b04d3213e1c064ab2192d80263aa576284372b89e739f5f164eff2267293c",
-    "workCancellation.js": "042d91f9776625ac9061196a59ef9f70534e033eef694b39b73d1a3e0e541617"
-  }
+  "files": [
+    {
+      "path": "artifacts.js",
+      "sha256": "9e910dbe0a6d5f46baa7e403f53294f039581a7f7df0c505a2c8b6ed3823a9ac"
+    },
+    {
+      "path": "authorization.js",
+      "sha256": "72b57e24606cfaab69da59d3263409655ac919e65ded4239d0693f998bdde07f"
+    },
+    {
+      "path": "beadsPortCapability.js",
+      "sha256": "f1bf3f30103d9ee115a5a25871c53c27483eaae50eb4f1d211856a0590c79db7"
+    },
+    {
+      "path": "bootstrap.js",
+      "sha256": "5b367a1aa65db5a01e7bf4c150cdf478c4e3d77020baa8d9882498d575d7bcb0"
+    },
+    {
+      "path": "bootstrapAdapterBundle.js",
+      "sha256": "8146647e6b7d45cd44eea7a782718824121071f82a58c640cc75ff60cc1a1da8"
+    },
+    {
+      "path": "bootstrapAdapterRuntime.js",
+      "sha256": "31f0482a05d6c638611805aa748fe393c18abfbb99df4c7b70ffb73fd4bce3bc"
+    },
+    {
+      "path": "bootstrapJournal.js",
+      "sha256": "d1ca055578b5a22406281fa927a48068f4b8ecfe52a45cc3afe3288b147a7aa9"
+    },
+    {
+      "path": "bootstrapPolicy.js",
+      "sha256": "d2782717fe171db9daaae751819efd70240a23518bd9cc9636a2661c86235408"
+    },
+    {
+      "path": "cancellation.js",
+      "sha256": "ca86c226a5b2769e53616f68a34799be0fec1056849b272388f48411d8d6d670"
+    },
+    {
+      "path": "cli.js",
+      "sha256": "a9d87c97a7ed6105314bfd3b4b75369e163cd576160c29fe1c72d4a058d7df4d"
+    },
+    {
+      "path": "continuationJournal.js",
+      "sha256": "ded7624de7195eadb99d360dc183a42715923e083dc44eba62c7d18218eeb55b"
+    },
+    {
+      "path": "continuationNotifications.js",
+      "sha256": "31224110ef14eb0dee1fc4df366c82646753e2bcab27975f244a258a3f5effcd"
+    },
+    {
+      "path": "continuationProcess.js",
+      "sha256": "14c4621ca61230631cca492992ad1e79dae444dcdaf5cd030c48fe024ac37c25"
+    },
+    {
+      "path": "continuationWorker.js",
+      "sha256": "b0ca059db72007cf0209640c9a0e7cf584ea972255c079e68de1d3d1cd489b17"
+    },
+    {
+      "path": "contracts.js",
+      "sha256": "538a463f8900162d2240485e73a73d1fca8339e96d1214b5c189e03ed7abba9e"
+    },
+    {
+      "path": "deliveryBrokers.js",
+      "sha256": "161c3b5423a53eea7d39e40bb5beb16f1e42a131391c861d4fdba670308048df"
+    },
+    {
+      "path": "deliveryPortCapability.js",
+      "sha256": "450532c5a1d4724b6102ee1633f057f6b5789e098adbe1dd94ab9ff9ab596936"
+    },
+    {
+      "path": "documentApproval.js",
+      "sha256": "f915baa3caa7c686dc0990af3823ccf017499fd717fc529b3022448c3b63b4ee"
+    },
+    {
+      "path": "documentSources.js",
+      "sha256": "dbf9172a3fbd512737e0dd851acb4079b35380a8778b3bbb86fe0d875df3c684"
+    },
+    {
+      "path": "featureDeliveryApproval.js",
+      "sha256": "4979efee8509726f918699d43ffc43b737df89204f2569c86739a96fc8c165c2"
+    },
+    {
+      "path": "featureDeliveryBroker.js",
+      "sha256": "ce869f93387d661a6cad722d22632f808231e16e539447df1a94303f4613526f"
+    },
+    {
+      "path": "featureDeliveryContracts.js",
+      "sha256": "6cc61f954647f95d7ddd2448b1b06919e45c4e04b853a36c45b67b04a4dfbf6b"
+    },
+    {
+      "path": "featureEvaluation.js",
+      "sha256": "40bc703f7e52aa2d23ab107624f90345979a75003ea4d399130de1e47b4dc32c"
+    },
+    {
+      "path": "finalization.js",
+      "sha256": "4dae0de1264bb277c869d999f36ca5b0745e8f45684d11569a2d581b671f0f37"
+    },
+    {
+      "path": "gitDeliveryPort.js",
+      "sha256": "44cd14272e91fbb434842e80c17c8d665c1338f1bb2ad50b260713e8926186fd"
+    },
+    {
+      "path": "githubDeliveryPort.js",
+      "sha256": "9e4593c093948a7b532ca3c0706e782d089911cef9303e06bf188d5d6d32cf2b"
+    },
+    {
+      "path": "governedOperations.js",
+      "sha256": "2eef80bcef3fed1687a48a2c29be05d407497c22c07851a17eb1b0c8e31ffad4"
+    },
+    {
+      "path": "governedPersistence.js",
+      "sha256": "14125b6bb1152f0c5e81c54910330e7bb7cb8382444df59889b79c8cb3a660e9"
+    },
+    {
+      "path": "index.js",
+      "sha256": "65d83d86516392720de8db9b1833e9dbbe6c810735f63e7fddee1f772053a094"
+    },
+    {
+      "path": "integrationGate.js",
+      "sha256": "c52d4b29379d9760e6b5ed5d7b0326a99c04b4e9d62a3ff5168af09259fd5ef9"
+    },
+    {
+      "path": "lifecycle.js",
+      "sha256": "f1411c4527a4fe8e8f803a1ad6077c331a825f1dc48eb80c63597fb2a95282b1"
+    },
+    {
+      "path": "localCredentialBrokerCli.js",
+      "sha256": "4555eabacee12ce0d761c79bedb92a9c55ed84efd7e23541b6672633561fb7f3"
+    },
+    {
+      "path": "localCredentialGateway.js",
+      "sha256": "31327e4f418d647ad3e5d4afb128d4d00b62c5d5e7966eb9f8b003eed2ad1e0e"
+    },
+    {
+      "path": "localCredentialLeases.js",
+      "sha256": "3375a7946c715797c59bfef441a66e3bb976f6719941621bdc46cafb21ee5b42"
+    },
+    {
+      "path": "mcpServer.js",
+      "sha256": "832e27de1b22f382a77fc4203cb7d7ae399a5342cb05693d460caceee06aa27a"
+    },
+    {
+      "path": "modelGatewayConfig.js",
+      "sha256": "0066a4857f6fe00d018b738033094ae4cbddd25421130690ed26b836414fddfe"
+    },
+    {
+      "path": "orchestrator.js",
+      "sha256": "4ead46e0266489047e055e1d7fe7fa32f509df8b5c92446598196d6e8454aefa"
+    },
+    {
+      "path": "phaseJobs.js",
+      "sha256": "28781aba01780d59b80d19031c3175b3452e3231dc40dd0e569bdb7ffc0de328"
+    },
+    {
+      "path": "phaseRuntime.js",
+      "sha256": "7059510e5f31d2fa5d0e617930c75181333fc4e1ee260732931a31ec3a4a83ba"
+    },
+    {
+      "path": "planning.js",
+      "sha256": "2e72cd0ce7fc3161cda1de1a9c9faed020ec05f1a4a176b9cb4cb2930a5fd005"
+    },
+    {
+      "path": "planningDocuments.js",
+      "sha256": "d5e4e099765c164d3a28e31ac013cebf1c7159fd446fe5955e39cd981909dda3"
+    },
+    {
+      "path": "preapprovalMaterial.js",
+      "sha256": "729ccd0c71df4039eb14fcf8f73f205fd2d3a56c03fe18ac1e692009cab37203"
+    },
+    {
+      "path": "reconciliation.js",
+      "sha256": "c63ff26d966e9af9c27e64197c0acfe68747bbd332f37e9b4efea6b917f8cc75"
+    },
+    {
+      "path": "repairChildPortCapability.js",
+      "sha256": "c2d6f93aaa3cbe41971062147c62c6465d0ecf56580ce8cc0edd87f458de0f52"
+    },
+    {
+      "path": "repairLoops.js",
+      "sha256": "441661727802aa9b04a92e5cd5205a194ed830b63d946ef3fab0d158c43ed26e"
+    },
+    {
+      "path": "reviewProxy.js",
+      "sha256": "cd8f7b04ed3743c3d08538a1364459c1ee5f98d92e6c163c75eab401bd12068f"
+    },
+    {
+      "path": "secureEvidence.js",
+      "sha256": "14562d69661c85005d11860c1324267d261f8aad15f4b2384989fdacc4dee8fa"
+    },
+    {
+      "path": "specialistContainerLifecycle.js",
+      "sha256": "f58cbc3f014efc1d47a45954544a1c0fc199bbea051a705bcc96b3550169d80b"
+    },
+    {
+      "path": "specialistInput.js",
+      "sha256": "5f2bc8c7a5d2023426b4886ee1dc7672e76e1ce8db000e6ce9bff7e37bb9f16d"
+    },
+    {
+      "path": "specialistLauncher.js",
+      "sha256": "0c091ec02a3c4e50364c0c0c6d0d38687aed0f8263a376643ce1a6d90c22ad80"
+    },
+    {
+      "path": "specialistOutputManifest.js",
+      "sha256": "8e5bd141bbf287fa08569405d09da764485ade193245ec8de790665aafd98451"
+    },
+    {
+      "path": "specialistTerminalResult.js",
+      "sha256": "9b73c69ece72a37c19748d71a9c66e885680a962284e3f29e8748a872fdb7b74"
+    },
+    {
+      "path": "stateMachine.js",
+      "sha256": "34e0dd45837d93b62b9174421dbaf84c40b9424927e2fa85cba43b87c434cd26"
+    },
+    {
+      "path": "storage.js",
+      "sha256": "b6dcd9e564b6b1ddc4c001099007c9b96317892ccb7af7e13adcf16c359bc6a8"
+    },
+    {
+      "path": "supervisedReview.js",
+      "sha256": "585f166de7bbaddc5c22c17bbe441094825638e9a0aed73785e80a8878df4dba"
+    },
+    {
+      "path": "supervisedReviewCli.js",
+      "sha256": "de26cbad9e73e0bcf24e4ae0afd197bd0606f22e558748516f4ceba799ebde79"
+    },
+    {
+      "path": "trustedGovernedComposition.js",
+      "sha256": "188d6d06846d3f57a27803da4ed77ace544463fe3d159ca9b50cab35dcb02fa1"
+    },
+    {
+      "path": "waitRecovery.js",
+      "sha256": "727b04d3213e1c064ab2192d80263aa576284372b89e739f5f164eff2267293c"
+    },
+    {
+      "path": "workCancellation.js",
+      "sha256": "042d91f9776625ac9061196a59ef9f70534e033eef694b39b73d1a3e0e541617"
+    }
+  ]
 }

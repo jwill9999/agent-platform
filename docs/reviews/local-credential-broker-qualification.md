@@ -84,3 +84,14 @@ After restart, new work needs the new attested generation; old work cannot reuse
 This component is ready only to support subsequent host qualification. It does not complete run
 admission, implementation import, coordinator phase completion or SP-01–SP-13. `.17` remains in
 progress and `.13` remains blocked. The first single-task orchestration pilot has not run.
+
+## Hosted analysis follow-up
+
+SonarCloud identified SHA-256 file hashes as secrets because paths containing credential/auth were
+JSON keys. The evidence now separates `path` and `sha256` fields; digest values are unchanged.
+No account or lease secret was committed. The CLI adapter-generation helper was extracted to reduce
+complexity, the CLI entry uses top-level await, and minor optional-chain/Dockerfile findings were
+corrected. Independent source review5 found no blockers in these cleanup changes; it did not
+independently re-execute tests or verify equivalence to the prior snapshot. Retained cleanup logs
+show build/lint and the affected16 tests pass. Earlier image/client records identify the pre-cleanup
+snapshot; refreshed final qualification will be recorded separately after the rebuild.

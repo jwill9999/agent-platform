@@ -125,7 +125,7 @@ export class LocalCredentialLeases {
     const row = this.#db.prepare('SELECT * FROM credential_leases WHERE id = ?').get(id) as
       | Lease
       | undefined;
-    if (!row || row.generation !== generation) throw new Error('unknown credential lease');
+    if (row?.generation !== generation) throw new Error('unknown credential lease');
     return !row.revoked && row.generation === this.generation && row.expires_ms > this.#now()
       ? 'active'
       : 'revoked';

@@ -30,36 +30,38 @@ function privateFile(path: string): string {
   return readFileSync(path, 'utf8');
 }
 
+function createAdapter(configFile: string, rest: string[]) {
+  const output = rest[1];
+  if (
+    rest.length !== 2 ||
+    rest[0] !== '--output' ||
+    !output ||
+    !isAbsolute(output) ||
+    !output.endsWith('.mjs') ||
+    /[\r\n]/u.test(process.execPath)
+  )
+    throw new Error('absolute .mjs adapter output required');
+  const script =
+    '#!' +
+    process.execPath +
+    '\n' +
+    'import { runLocalBrokerCli } from ' +
+    JSON.stringify(import.meta.url) +
+    ';\n' +
+    'runLocalBrokerCli([' +
+    JSON.stringify(configFile) +
+    ', ...process.argv.slice(2)]).then(result => { if (result !== undefined) process.stdout.write(JSON.stringify(result) + "\\n"); }).catch(() => { process.stderr.write("local credential broker operation failed\\n"); process.exitCode = 1; });\n';
+  writeFileSync(output, script, { mode: 0o700, flag: 'wx' });
+  return { adapter: output };
+}
+
 export async function runLocalBrokerCli(args: string[]) {
   const [configFile, command, ...rest] = args;
   if (!configFile || !isAbsolute(configFile)) throw new Error('absolute trusted config required');
   const config = localBrokerConfigSchema.parse(JSON.parse(privateFile(configFile)));
   const key = privateFile(config.controlKeyFile).trim();
   if (!/^[a-f0-9]{64}$/u.test(key)) throw new Error('invalid control key');
-  if (command === 'create-adapter') {
-    const output = rest[1];
-    if (
-      rest.length !== 2 ||
-      rest[0] !== '--output' ||
-      !output ||
-      !isAbsolute(output) ||
-      !output.endsWith('.mjs') ||
-      /[\r\n]/u.test(process.execPath)
-    )
-      throw new Error('absolute .mjs adapter output required');
-    const script =
-      '#!' +
-      process.execPath +
-      '\n' +
-      'import { runLocalBrokerCli } from ' +
-      JSON.stringify(import.meta.url) +
-      ';\n' +
-      'runLocalBrokerCli([' +
-      JSON.stringify(configFile) +
-      ', ...process.argv.slice(2)]).then(result => { if (result !== undefined) process.stdout.write(JSON.stringify(result) + "\\n"); }).catch(() => { process.stderr.write("local credential broker operation failed\\n"); process.exitCode = 1; });\n';
-    writeFileSync(output, script, { mode: 0o700, flag: 'wx' });
-    return { adapter: output };
-  }
+  if (command === 'create-adapter') return createAdapter(configFile, rest);
   if (command === 'serve') {
     if (rest.length) throw new Error('unexpected serve arguments');
     privateFile(config.accountFile);
@@ -95,8 +97,7 @@ export async function runLocalBrokerCli(args: string[]) {
   };
   if (
     !command ||
-    !allowed[command] ||
-    values.size !== allowed[command].length ||
+    values.size !== allowed[command]?.length ||
     [...values.keys()].some((k) => !allowed[command]!.includes(k))
   )
     throw new Error('invalid broker command');
@@ -145,12 +146,11 @@ export async function runLocalBrokerCli(args: string[]) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  runLocalBrokerCli(process.argv.slice(2))
-    .then((result) => {
-      if (result !== undefined) process.stdout.write(JSON.stringify(result) + '\n');
-    })
-    .catch(() => {
-      process.stderr.write('local credential broker operation failed\n');
-      process.exitCode = 1;
-    });
+  try {
+    const result = await runLocalBrokerCli(process.argv.slice(2));
+    if (result !== undefined) process.stdout.write(JSON.stringify(result) + '\n');
+  } catch {
+    process.stderr.write('local credential broker operation failed\n');
+    process.exitCode = 1;
+  }
 }
