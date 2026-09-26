@@ -37,7 +37,7 @@ latency guarantee. This does not claim cost quotas or isolation from trusted hos
   checks are the fallback gate. Hosted PR checks are separate and must be checked before merge.
 - Real Codex client completed a model turn through the gateway with only opaque worker auth. Account
   and control secret were mounted only in the gateway. The final image qualification is retained in
-  [sanitized evidence](local-credential-broker-evidence/qualification.json).
+  [sanitized final evidence](local-credential-broker-evidence/final-qualification.json).
 - Revocation denied subsequent requests with HTTP403. Restart rotated generation, reported the old
   lease revoked and denied its token. Control adapter operated with an empty environment. The model
   catalogue's HTTP400 proves admission/transport only; the separate completed model turn establishes
@@ -93,5 +93,8 @@ No account or lease secret was committed. The CLI adapter-generation helper was 
 complexity, the CLI entry uses top-level await, and minor optional-chain/Dockerfile findings were
 corrected. Independent source review5 found no blockers in these cleanup changes; it did not
 independently re-execute tests or verify equivalence to the prior snapshot. Retained cleanup logs
-show build/lint and the affected16 tests pass. Earlier image/client records identify the pre-cleanup
-snapshot; refreshed final qualification will be recorded separately after the rebuild.
+show build/lint and the affected16 tests pass. Earlier image/client records identify the pre-cleanup snapshot. Refreshed `final-*` artifacts now
+record the final source and image: full Linux891/17 optional skipped again, real client turn,
+revocation403, restart generation fencing and another59-file compiled JavaScript match. These
+final repeated qualification observations were collected by the coordinator; review5 assessed source,
+while review4 assessed the prior qualification evidence. No complete launcher/pilot proof is implied.
