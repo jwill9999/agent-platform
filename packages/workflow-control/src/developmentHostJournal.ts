@@ -63,6 +63,25 @@ function migrateHostColumns(db: Database.Database): void {
     db.exec('ALTER TABLE development_host ADD COLUMN process_identity TEXT');
 }
 
+function migrateProbeColumns(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(development_probes)').all() as Array<{
+    name: string;
+  }>;
+  if (!columns.some((item) => item.name === 'container_id'))
+    db.exec('ALTER TABLE development_probes ADD COLUMN container_id TEXT');
+  for (const column of ['cancel', 'revoke'])
+    if (!columns.some((item) => item.name === column))
+      db.exec(`ALTER TABLE development_probes ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
+  if (!columns.some((item) => item.name === 'create_state')) {
+    db.exec(
+      "ALTER TABLE development_probes ADD COLUMN create_state TEXT NOT NULL DEFAULT 'not_dispatched'",
+    );
+    db.exec(
+      "UPDATE development_probes SET create_state=CASE WHEN container_id IS NULL THEN 'create_pending' ELSE 'acknowledged' END WHERE state='pending'",
+    );
+  }
+}
+
 /** Private operator journal. Never mounted into a worker or used as workflow/task authority. */
 export class DevelopmentHostJournal {
   readonly #db: Database.Database;
@@ -92,16 +111,7 @@ export class DevelopmentHostJournal {
           sequence INTEGER PRIMARY KEY AUTOINCREMENT,code TEXT NOT NULL,observed_at_ms INTEGER NOT NULL);
       `);
       migrateHostColumns(this.#db);
-      const columns = this.#db.prepare('PRAGMA table_info(development_probes)').all() as Array<{
-        name: string;
-      }>;
-      if (!columns.some((item) => item.name === 'container_id'))
-        this.#db.exec('ALTER TABLE development_probes ADD COLUMN container_id TEXT');
-      for (const column of ['cancel', 'revoke'])
-        if (!columns.some((item) => item.name === column))
-          this.#db.exec(
-            `ALTER TABLE development_probes ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`,
-          );
+      migrateProbeColumns(this.#db);
     }
   }
   close(): void {
@@ -224,26 +234,71 @@ export class DevelopmentHostJournal {
       .prepare("SELECT id,generation FROM development_probes WHERE state='pending'")
       .all() as Array<{ id: string; generation: string }>;
   }
+  probeContainer(id: string): { create_state: string; container_id: string | null } {
+    const row = this.#db
+      .prepare(
+        "SELECT create_state,container_id FROM development_probes WHERE id=? AND state='pending'",
+      )
+      .get(id) as { create_state: string; container_id: string | null } | undefined;
+    if (!row) throw new Error('probe_intent_missing');
+    return row;
+  }
+  beginProbeCreate(owner: DevelopmentHostState, id: string): void {
+    this.#db
+      .transaction(() => {
+        this.assertOwner(owner);
+        const result = this.#db
+          .prepare(
+            "UPDATE development_probes SET create_state='create_pending',container_id=NULL,cancel=0 WHERE id=? AND state='pending' AND create_state IN ('not_dispatched','removal_confirmed')",
+          )
+          .run(id);
+        if (result.changes !== 1) throw new Error('cleanup_pending');
+      })
+      .immediate();
+  }
+  confirmProbeRemoval(owner: DevelopmentHostState, id: string, containerId: string): void {
+    this.#db
+      .transaction(() => {
+        this.assertOwner(owner);
+        const result = this.#db
+          .prepare(
+            "UPDATE development_probes SET create_state='removal_confirmed' WHERE id=? AND state='pending' AND create_state='acknowledged' AND container_id=?",
+          )
+          .run(id, containerId);
+        if (result.changes !== 1) throw new Error('cleanup_pending');
+      })
+      .immediate();
+  }
   bindProbeContainer(owner: DevelopmentHostState, id: string, containerId: string): void {
     this.#db
       .transaction(() => {
         this.assertOwner(owner);
         if (!/^[a-f0-9]{64}$/u.test(containerId)) throw new Error('invalid_container_id');
-        this.#db
-          .prepare("UPDATE development_probes SET container_id=? WHERE id=? AND state='pending'")
+        const result = this.#db
+          .prepare(
+            "UPDATE development_probes SET container_id=?,create_state='acknowledged' WHERE id=? AND state='pending' AND create_state='create_pending' AND container_id IS NULL",
+          )
           .run(containerId, id);
+        if (result.changes !== 1) throw new Error('cleanup_pending');
       })
       .immediate();
   }
-  hasProbeContainer(id: string): boolean {
+  hasProbeContainer(id: string, probeId?: string): boolean {
     return !!this.#db
-      .prepare("SELECT 1 FROM development_probes WHERE container_id=? AND state='pending'")
-      .get(id);
+      .prepare(
+        "SELECT 1 FROM development_probes WHERE state='pending' AND (container_id=? OR (id=? AND create_state='create_pending'))",
+      )
+      .get(id, probeId ?? '');
   }
   confirmProbe(owner: DevelopmentHostState, id: string, step: 'cancel' | 'revoke'): void {
     this.#db
       .transaction(() => {
         this.assertOwner(owner);
+        if (
+          step === 'cancel' &&
+          !['not_dispatched', 'removal_confirmed'].includes(this.probeContainer(id).create_state)
+        )
+          throw new Error('cleanup_pending');
         this.#db
           .prepare(`UPDATE development_probes SET ${step}=1 WHERE id=? AND state='pending'`)
           .run(id);
@@ -262,6 +317,30 @@ export class DevelopmentHostJournal {
       })
       .immediate();
   }
+}
+
+/** Absence after an initiated create is not proof of cancellation. Exact acknowledged IDs
+ * can be removed/reobserved; unacknowledged requests remain pending across restart. */
+export async function settleDevelopmentProbeContainer(
+  journal: DevelopmentHostJournal,
+  owner: DevelopmentHostState,
+  id: string,
+  inspect: (knownId: string | null) => Promise<string | undefined>,
+  remove: (containerId: string) => Promise<void>,
+): Promise<void> {
+  const state = journal.probeContainer(id);
+  if (state.create_state === 'removal_confirmed' || state.create_state === 'not_dispatched') return;
+  const observed = await inspect(state.container_id);
+  if (!observed) {
+    if (state.create_state === 'create_pending') throw new Error('cleanup_pending');
+    journal.confirmProbeRemoval(owner, id, state.container_id!);
+    return;
+  }
+  if (state.create_state === 'create_pending') journal.bindProbeContainer(owner, id, observed);
+  else if (state.container_id !== observed) throw new Error('service_identity_mismatch');
+  await remove(observed);
+  if (await inspect(observed)) throw new Error('cleanup_pending');
+  journal.confirmProbeRemoval(owner, id, observed);
 }
 
 /** Both effects must be attempted even when the other fails; acknowledgements are owner fenced. */

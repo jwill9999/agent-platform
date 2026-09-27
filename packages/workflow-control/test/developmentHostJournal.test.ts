@@ -20,6 +20,7 @@ import {
   developmentOwnerAlive,
   developmentEffectiveCode,
   reconcileDevelopmentProbe,
+  settleDevelopmentProbeContainer,
 } from '../src/developmentHostJournal.js';
 import {
   classifyDevelopmentError,
@@ -363,4 +364,84 @@ it('persists readiness expiry so status and admission agree while the owner leas
   } finally {
     observer.close();
   }
+});
+
+it('retains uncertain probe creation across owner replacement and reconciles only the late exact container', async () => {
+  const { journal, path } = fixture();
+  const owner = journal.claim('one');
+  const id = journal.probeIntent(owner, 'generation');
+  journal.beginProbeCreate(owner, id);
+  const absent = async () => undefined;
+  const removed: string[] = [];
+  await expect(
+    reconcileDevelopmentProbe(
+      journal,
+      owner,
+      id,
+      () =>
+        settleDevelopmentProbeContainer(journal, owner, id, absent, async (value) => {
+          removed.push(value);
+        }),
+      async () => undefined,
+    ),
+  ).rejects.toThrow('cleanup_pending');
+  expect(removed).toEqual([]);
+  expect(() => journal.confirmProbe(owner, id, 'cancel')).toThrow('cleanup_pending');
+  journal.release(owner);
+  const reopened = new DevelopmentHostJournal(path);
+  try {
+    const next = reopened.claim('one');
+    expect(reopened.probeContainer(id)).toEqual({
+      create_state: 'create_pending',
+      container_id: null,
+    });
+    expect(() => reopened.bindProbeContainer(owner, id, 'a'.repeat(64))).toThrow(
+      'service_owner_lost',
+    );
+    let container: string | undefined = 'b'.repeat(64);
+    await reconcileDevelopmentProbe(
+      reopened,
+      next,
+      id,
+      () =>
+        settleDevelopmentProbeContainer(
+          reopened,
+          next,
+          id,
+          async () => container,
+          async (value) => {
+            removed.push(value);
+            container = undefined;
+          },
+        ),
+      async () => undefined,
+    );
+    expect(removed).toEqual(['b'.repeat(64)]);
+    expect(reopened.pendingProbes()).toEqual([]);
+    reopened.release(next);
+  } finally {
+    reopened.close();
+  }
+});
+
+it('requires confirmed removal before reusing a probe intent for the revoked-token check', async () => {
+  const { journal } = fixture();
+  const owner = journal.claim('one');
+  const id = journal.probeIntent(owner, 'generation');
+  journal.beginProbeCreate(owner, id);
+  expect(() => journal.beginProbeCreate(owner, id)).toThrow('cleanup_pending');
+  journal.bindProbeContainer(owner, id, 'a'.repeat(64));
+  await settleDevelopmentProbeContainer(
+    journal,
+    owner,
+    id,
+    async () => undefined,
+    async () => undefined,
+  );
+  journal.beginProbeCreate(owner, id);
+  expect(journal.probeContainer(id)).toEqual({
+    create_state: 'create_pending',
+    container_id: null,
+  });
+  expect(() => journal.confirmProbeRemoval(owner, id, 'a'.repeat(64))).toThrow('cleanup_pending');
 });

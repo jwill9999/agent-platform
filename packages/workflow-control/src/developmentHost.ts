@@ -12,6 +12,7 @@ import {
   assertDevelopmentAdmission,
   developmentOwnerAlive,
   developmentEffectiveCode,
+  settleDevelopmentProbeContainer,
 } from './developmentHostJournal.js';
 import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { specialistRoleProfile } from './specialistRoleProfile.js';
@@ -652,19 +653,26 @@ export class DevelopmentHost {
 
       return;
     }
-    this.#assertLabels(member?.Config?.Labels);
+    if (suffix !== 'internal') throw new Error('topology_invalid');
+    await this.#validateProbeMember(member);
+  }
+  async #validateProbeMember(member: DockerInspection): Promise<void> {
+    this.#assertLabels(member.Config?.Labels);
+    const probeId = member.Name?.slice(`/${this.#prefix}-probe-`.length);
+    assertBrokerHardening(member.HostConfig);
     if (
-      suffix !== 'internal' ||
-      Object.keys(member?.NetworkSettings?.Networks ?? {}).length !== 1 ||
-      !this.#journal.hasProbeContainer(member?.Id ?? '')
-    )
-      throw new Error('topology_invalid');
-    if (
-      !member?.Name?.startsWith(`/${this.#prefix}-probe-`) ||
+      !member.Name?.startsWith(`/${this.#prefix}-probe-`) ||
+      !this.#journal.hasProbeContainer(member.Id, probeId) ||
+      Object.keys(member.NetworkSettings?.Networks ?? {}).length !== 1 ||
+      !member.NetworkSettings?.Networks?.[`${this.#prefix}-internal`] ||
       member.Image !== (await inspect('image', this.#config.brokerImage))?.Id ||
       member.Config?.User !== this.#config.containerUser ||
       member.HostConfig?.Privileged ||
-      !member.HostConfig?.ReadonlyRootfs
+      !member.HostConfig?.ReadonlyRootfs ||
+      member.Mounts?.length !== 1 ||
+      member.Mounts[0]?.Destination !== '/probe' ||
+      member.Mounts[0]?.Source !== join(this.#directory, `probe-${probeId}`) ||
+      member.Mounts[0]?.RW
     )
       throw new Error('topology_invalid');
   }
@@ -679,14 +687,20 @@ export class DevelopmentHost {
       throw new Error('topology_invalid');
   }
   async #removeProbe(id: string, removeToken = true): Promise<void> {
-    const name = `${this.#prefix}-probe-${id}`;
-    const container = await inspect('container', name);
-    if (container) {
-      this.#assertLabels(container.Config?.Labels);
-      this.#guard();
-      await docker(['rm', '--force', container.Id]);
-      if (await inspect('container', container.Id)) throw new Error('cleanup_pending');
-    }
+    await settleDevelopmentProbeContainer(
+      this.#journal,
+      this.#owner,
+      id,
+      async (knownId) => {
+        const container = await inspect('container', knownId ?? `${this.#prefix}-probe-${id}`);
+        if (container) await this.#validateProbeMember(container);
+        return container?.Id;
+      },
+      async (containerId) => {
+        this.#guard();
+        await docker(['rm', '--force', containerId]);
+      },
+    );
     if (removeToken)
       await rm(join(this.#directory, `probe-${id}`), { force: true, recursive: true });
   }
@@ -734,6 +748,7 @@ export class DevelopmentHost {
         throw new Error('probe_mount_unavailable');
     }
     this.#guard();
+    this.#journal.beginProbeCreate(this.#owner, id);
     try {
       await docker(
         [

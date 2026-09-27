@@ -6,6 +6,11 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { expect, it } from 'vitest';
 import Database from 'better-sqlite3';
+import {
+  DevelopmentHostJournal,
+  reconcileDevelopmentProbe,
+  settleDevelopmentProbeContainer,
+} from '../src/developmentHostJournal.js';
 const execute = promisify(execFile);
 const supplied = process.env.WORKFLOW_DEVELOPMENT_CONFIG;
 const cli = fileURLToPath(new URL('../dist/cli.js', import.meta.url));
@@ -519,6 +524,93 @@ it.skipIf(!supplied).each(
       if (change === 'none') expect(check).not.toThrow();
       else expect(check).toThrow();
     } finally {
+      await execute('/usr/local/bin/docker', ['rm', '--force', name]).catch(() => undefined);
+      await rm(root, { recursive: true, force: true });
+    }
+  },
+  30000,
+);
+
+it.skipIf(!supplied)(
+  'retains a timed-out probe create across journal restart and removes its late real container',
+  async () => {
+    const root = await mkdtemp(join(homedir(), '.codex/lifecycle-delayed-probe-'));
+    const config = JSON.parse(await readFile(supplied!, 'utf8'));
+    const name = `lifecycle-delayed-probe-${Date.now()}`;
+    const path = join(root, 'journal.sqlite');
+    const tokenDirectory = join(root, 'probe');
+    await mkdir(tokenDirectory, { mode: 0o700 });
+    await writeFile(join(tokenDirectory, 'token.json'), 'disposable-dummy-token', { mode: 0o600 });
+    let journal = new DevelopmentHostJournal(path);
+    let owner = journal.claim('delayed-create');
+    const id = journal.probeIntent(owner, 'dummy-generation');
+    const inspectContainer = async (known: string | null) => {
+      try {
+        return JSON.parse(
+          (await execute('/usr/local/bin/docker', ['inspect', known ?? name])).stdout,
+        )[0].Id as string;
+      } catch (error) {
+        if ((error as { stderr?: string }).stderr?.includes('No such object')) return undefined;
+        throw error;
+      }
+    };
+    const cancel = async () => {
+      await settleDevelopmentProbeContainer(
+        journal,
+        owner,
+        id,
+        inspectContainer,
+        async (container) => {
+          await execute('/usr/local/bin/docker', ['rm', '--force', container]);
+        },
+      );
+      await rm(tokenDirectory, { recursive: true });
+    };
+    try {
+      journal.beginProbeCreate(owner, id);
+      // Inject the timeout window: dispatch is durable, Docker completion is delayed until after restart.
+      await expect(
+        reconcileDevelopmentProbe(journal, owner, id, cancel, async () => undefined),
+      ).rejects.toThrow('cleanup_pending');
+      expect(await readFile(join(tokenDirectory, 'token.json'), 'utf8')).toBe(
+        'disposable-dummy-token',
+      );
+      expect(journal.pendingProbes()).toHaveLength(1);
+      journal.release(owner);
+      journal.close();
+      journal = new DevelopmentHostJournal(path);
+      owner = journal.claim('delayed-create');
+      expect(journal.probeContainer(id).create_state).toBe('create_pending');
+      await expect(
+        reconcileDevelopmentProbe(journal, owner, id, cancel, async () => undefined),
+      ).rejects.toThrow('cleanup_pending');
+      const late = (
+        await execute('/usr/local/bin/docker', [
+          'create',
+          '--name',
+          name,
+          '--network',
+          'none',
+          '--read-only',
+          '--mount',
+          `type=bind,src=${tokenDirectory},dst=/probe,readonly`,
+          '--entrypoint',
+          'node',
+          config.brokerImage,
+          '-e',
+          'process.exit(0)',
+        ])
+      ).stdout.trim();
+      expect(await inspectContainer(null)).toBe(late);
+      await reconcileDevelopmentProbe(journal, owner, id, cancel, async () => undefined);
+      expect(journal.pendingProbes()).toEqual([]);
+      expect(await inspectContainer(late)).toBeUndefined();
+      await expect(readFile(join(tokenDirectory, 'token.json'))).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+    } finally {
+      journal.release(owner);
+      journal.close();
       await execute('/usr/local/bin/docker', ['rm', '--force', name]).catch(() => undefined);
       await rm(root, { recursive: true, force: true });
     }
