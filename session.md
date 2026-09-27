@@ -11,8 +11,9 @@ mode applies; no managed run, merge or staging promotion. The canonical journal 
 read-only (four cancelled runs, zero live leases); it was not migrated or given new execution authority.
 
 [Qualification report](docs/reviews/run-discovery-qualification.md) records fixes and verification.
-R1 implementation and 21 focused tests pass; final regression/re-review are pending. Continue those
-checks and address findings before publishing a merge recommendation. R2 governed worker artifact
+R1 source `f01f287` passes 26 focused and 996 Linux tests (63 optional skipped); final independent
+review has no actionable findings. [PR277](https://github.com/jwill9999/agent-platform/pull/277) is draft
+and pushed; finish current-head hosted checks before recommending merge. R2 governed worker artifact
 import and R3 coordinator completion remain next in the same task; `.13` pilot planning stays blocked.
 Do not confuse run admission with approval to execute or claim a successful managed task cycle.
 
@@ -20,8 +21,7 @@ Do not confuse run admission with approval to execute or claim a successful mana
 
 ## Previous paused handoff — 27 September 2026
 
-Owner requested a pause. Resume from this section; older checkpoints below are historical and do not
-supersede it. No further implementation, orchestration pilot, merge or staging promotion was started.
+Historical pause: this section is superseded by the resumed R1 checkpoint above. No further implementation, orchestration pilot, merge or staging promotion was started.
 
 ## Saved position and next action
 

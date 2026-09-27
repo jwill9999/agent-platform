@@ -3,7 +3,7 @@
 Beads: `agent-platform-pilot-zero.17`, requirement R1 and scenarios SP-01–SP-03.
 Source baseline: PR276 merge `87c5cc469736de6d1508ec52309b64da62c3d740`.
 Branch: `task/run-discovery-admission`; destination: `feature/harness-backlog-review`.
-Status: implemented; final regression and independent re-review pending. No live pilot or merge.
+Status: locally qualified at source `f01f287`; final hosted checks pending on [PR277](https://github.com/jwill9999/agent-platform/pull/277). No live pilot or merge.
 
 ## Behavior and authority boundary
 
@@ -55,14 +55,21 @@ schema handling, missing durable workspace binding and incomplete race/state evi
 addressed. [Review two](run-discovery-evidence/review-2.json) found the repair-child reverse-order race
 and lease schema validation gap; both now have enforcement and regression tests.
 
-[Focused execution](run-discovery-evidence/focused.txt): 21 tests passed, including two independent
+[Review three](run-discovery-evidence/review-3.json) found repair reservation state/fencing outside the
+transaction and omitted closeout leases. Both are corrected; separate-process cancellation and each
+lease takeover are covered before transaction acquisition, along with active/expired closeout scope.
+[Final review](run-discovery-evidence/review-4.json) reports no actionable findings; it saw focused
+evidence, while the complete Linux result below finished separately.
+
+[Focused execution](run-discovery-evidence/focused.txt): 26 tests passed, including two independent
 process races synchronized after both callers observed absence. Tests check actual SQLite records,
 read-only database bytes, MCP tool responses, malformed journals and rejected ownership. Disposable
-journals are used; no production run is started. The previous Linux full suite passed 986 tests with
-63 optional checks skipped before the last repair-child/lease correction; final regression is pending.
+journals are used; no production run is started. The [final Linux suite](run-discovery-evidence/linux-regression.txt) passed 996 tests with
+63 optional checks skipped after all corrections.
 Native full-suite failures included macOS path/timing limitations and earlier fixture conflicts;
 Linux is the full-suite qualification environment. Optional Docker/model suites are not claimed run.
 The application frontend is unchanged; these tests establish infrastructure behavior, not UI coverage.
 
-Build, package lint and monorepo typechecking passed during implementation. Re-run relevant checks
-after final corrections and retain final review before recommending this component for integration.
+Build and package lint passed after final corrections; monorepo typechecking passed before those
+corrections and the package build rechecked the changed TypeScript. Hosted verification remains a
+separate gate. Earlier native failures are not presented as a passing native full suite.
