@@ -5,6 +5,18 @@ export function specialistTerminalResult(value: unknown): AgentResult | undefine
   const direct = agentResultSchema.safeParse(value);
   if (direct.success) return direct.data;
   if (
+    typeof value === 'object' &&
+    value !== null &&
+    'terminal' in value &&
+    'executionDigest' in value &&
+    Object.keys(value).length === 2 &&
+    typeof value.executionDigest === 'string' &&
+    /^sha256:[a-f0-9]{64}$/u.test(value.executionDigest)
+  ) {
+    const bound = agentResultSchema.safeParse(value.terminal);
+    if (bound.success) return bound.data;
+  }
+  if (
     typeof value !== 'object' ||
     value === null ||
     !('events' in value) ||

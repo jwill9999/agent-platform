@@ -1,3 +1,4 @@
+import { deriveTransitionIdempotencyKey } from '../src/lifecycle.js';
 import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -628,4 +629,87 @@ describe('approved documents at queue boundaries', () => {
       ).toEqual({ n: 0 });
     },
   );
+});
+
+// Broker effects are fixture records here; connected coordinator qualification is separate.
+it('finishes a coordinator from committed proof and atomically queues one typed successor', async () => {
+  const f = await fixture('feature_evaluation');
+  f.consume();
+  const claim = f.phases.claim('owner', 60000, f.now)!;
+  const job = f.phases.start(claim, f.now),
+    action = f.phases.action(job);
+  const request = {
+    headSha: action.headSha,
+    contractVersion: action.contractVersion,
+    policyDigest: action.policyDigest,
+    requiredChecks: ['fixture-check'],
+  };
+  f.db
+    .prepare(
+      `INSERT INTO delivery_operations
+    (id,workspace_id,run_id,task_id,kind,actor_role,request_digest,request_json,status,owner_id,
+    workspace_lease_epoch,run_lease_epoch,task_lease_epoch,result_json,created_at_ms,updated_at_ms)
+    VALUES (?,?,?,?,?,'workflow_orchestrator',?,?,'committed','owner',1,1,1,?,?,?)`,
+    )
+    .run(
+      'checks',
+      action.workspaceId,
+      action.runId,
+      action.taskId,
+      'github.checks',
+      digestGovernedValue(request),
+      JSON.stringify(request),
+      JSON.stringify({ headSha: action.headSha, checks: { 'fixture-check': 'success' } }),
+      f.now,
+      f.now,
+    );
+  const id = 'pipeline-transition',
+    operation = 'internal.pipeline_verified';
+  f.store.prepareTransition({
+    id,
+    runId: action.runId,
+    from: 'pipeline',
+    to: 'delivery',
+    operation,
+    expectedRunVersion: action.runVersion,
+    idempotencyKey: deriveTransitionIdempotencyKey({
+      runId: action.runId,
+      transitionId: id,
+      operation,
+      expectedVersion: action.runVersion,
+    }),
+    actorRole: 'workflow_orchestrator',
+    contractVersion: action.contractVersion,
+    policyDigest: action.policyDigest,
+    leaseOwnerId: 'owner',
+    leaseEpoch: 1,
+    transitionContext: { workspaceLeaseEpoch: 1, taskLeaseEpoch: 1 },
+    expectedExternalState: { checks: 'passed' },
+    externalArguments: { taskId: action.taskId, checksOperationId: 'checks' },
+    nowMs: f.now,
+  });
+  f.store.commitTransition(id, 'owner', 1, { headSha: action.headSha }, f.now);
+  const proof = { kind: 'pipeline', checksOperationId: 'checks', transitionId: id };
+  expect(() =>
+    f.phases.completeCoordinator(
+      job,
+      { ...proof, checksOperationId: 'forged' },
+      { workspace: 1, run: 1, task: 1 },
+      f.now,
+    ),
+  ).toThrow();
+  expect(f.phases.get(job.id)?.status).toBe('started');
+  f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now);
+  f.phases.completeCoordinator(job, proof, { workspace: 1, run: 1, task: 1 }, f.now);
+  const jobs = f.phases.list();
+  expect(jobs).toHaveLength(2);
+  const next = jobs.find((candidate) => candidate.id !== job.id)!;
+  expect(next.callback_id).toBeNull();
+  expect(next.coordinator_receipt_id).toMatch(/^sha256:/u);
+  expect(f.phases.action(next)).toMatchObject({
+    phase: 'delivery',
+    runVersion: action.runVersion + 2,
+    headSha: action.headSha,
+  });
+  expect(f.phases.claim('owner', 60000, f.now)?.id).toBe(next.id);
 });

@@ -78,6 +78,8 @@ export const taskContractSchema = z
       .object({
         task_verification: z.literal('test_runner').optional(),
         task_review: z.literal('code_reviewer').optional(),
+        feature_evaluation: z.literal('feature_evaluator').optional(),
+        repair_planning: z.literal('feature_planner').optional(),
       })
       .strict()
       .optional(),
@@ -325,7 +327,7 @@ export function assertAgentResultAccepted(
 export function assertTaskPacketWithinContract(
   contractInput: unknown,
   packetInput: unknown,
-  phase?: 'task_verification' | 'task_review',
+  phase?: 'task_verification' | 'task_review' | 'feature_evaluation' | 'repair_planning',
 ): void {
   const contract = executionContractSchema.parse(contractInput);
   const packet = taskPacketSchema.parse(packetInput);

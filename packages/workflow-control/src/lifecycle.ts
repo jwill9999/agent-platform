@@ -243,7 +243,12 @@ export function assertContractRevisionIsNotAuthorityExpansion(
   }
   for (const task of next.tasks) {
     const prior = previous.tasks.find((candidate) => candidate.id === task.id);
-    for (const phase of ['task_verification', 'task_review'] as const) {
+    for (const phase of [
+      'task_verification',
+      'task_review',
+      'feature_evaluation',
+      'repair_planning',
+    ] as const) {
       if (
         task.phaseRoles?.[phase] !== undefined &&
         task.phaseRoles[phase] !== prior?.phaseRoles?.[phase]

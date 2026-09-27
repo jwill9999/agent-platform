@@ -1,5 +1,6 @@
+import { TrustedSourceGit } from '../src/sourceGit.js';
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -8,6 +9,7 @@ import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { InterruptionCleanupJournal } from '../src/executionInterruptions.js';
+import { SecureEvidenceVault } from '../src/secureEvidence.js';
 import { ContinuationJournal } from '../src/continuationJournal.js';
 import { runParentContinuation } from '../src/continuationProcess.js';
 import { executionContractSchema, type ExecutionContract } from '../src/contracts.js';
@@ -41,6 +43,8 @@ afterEach(async () => {
 async function setup(
   options: {
     roles?: boolean;
+    implementation?: boolean;
+    implementationContent?: string;
     delayMs?: number;
     result?: unknown;
     sourceFailure?: boolean;
@@ -58,12 +62,22 @@ async function setup(
     verifySource?: () => Promise<void>;
   } = {},
 ) {
-  const f = await continuationFixture(Date.now(), 'implementation_worker');
+  const f = await continuationFixture(
+    Date.now(),
+    options.implementation ? 'feature_planner' : 'implementation_worker',
+    terminalResult,
+    options.implementation,
+  );
   const db = new Database(f.database);
   const row = db.prepare('SELECT body_json FROM contracts').get() as { body_json: string };
   const contract: ExecutionContract = executionContractSchema.parse(JSON.parse(row.body_json));
   contract.authority.allowedActions.push('artifact.write', 'workspace.read', 'process.test');
   contract.tasks[0]!.allowedOperations.push('artifact.write', 'workspace.read', 'process.test');
+  if (options.implementation) {
+    contract.tasks[0]!.assignedRole = 'implementation_worker';
+    contract.authority.allowedActions.push('workspace.patch', 'git.commit');
+    contract.tasks[0]!.allowedOperations.push('workspace.patch', 'git.commit');
+  }
   if (options.roles !== false)
     contract.tasks[0]!.phaseRoles = {
       task_verification: 'test_runner',
@@ -74,7 +88,11 @@ async function setup(
   );
   const materialDigest = deriveContractMaterialDigest(contract);
   db.prepare('UPDATE plan_approvals SET material_digest = ?').run(materialDigest);
-  const initialState = options.review ? 'task_verification' : 'implementing';
+  const initialState = options.implementation
+    ? 'repair_planning'
+    : options.review
+      ? 'task_verification'
+      : 'implementing';
   db.prepare('UPDATE runs SET state = ?').run(initialState);
   const { callbackId, approvalIntent, ...original } = f.callback;
   void callbackId;
@@ -113,10 +131,10 @@ async function setup(
     Date.now(),
   );
   const journal = new PhaseJobJournal(f.database);
-  const sourceRoot = join(f.root, 'source');
+  const sourceRoot = await realpath(join(f.root, 'source'));
   const sourceFile = join(sourceRoot, 'packages/workflow-control/example.txt');
   await mkdir(dirname(sourceFile), { recursive: true });
-  await writeFile(sourceFile, 'source');
+  if (!options.implementation) await writeFile(sourceFile, 'source');
   const credentials = new Map<string, 'active' | 'revoked'>();
   const revocationSawInterruption: boolean[] = [];
   const brokerState = {
@@ -193,6 +211,11 @@ async function setup(
             return { stdout: 'fixture-container', stderr: '' };
           }
           if (args[0] === 'start') {
+            if (options.implementation)
+              await writeFile(
+                join(staging.at(-1)!, 'workspace/packages/workflow-control/example.txt'),
+                options.implementationContent ?? 'verified worker change',
+              );
             // Real child transport, with fixture terminal data; this is NOT real Docker/Codex conformance.
             return execute(
               process.execPath,
@@ -206,6 +229,9 @@ async function setup(
                     text: JSON.stringify(
                       options.result ?? {
                         ...terminalResult,
+                        changedFiles: options.implementation
+                          ? ['packages/workflow-control/example.txt']
+                          : [],
                         recommendedTransition:
                           prompts.at(-1)?.task.assignedRole === 'code_reviewer'
                             ? 'integrate'
@@ -229,11 +255,12 @@ async function setup(
   const config = readPhaseRuntimeConfig({
     runId: 'run',
     sourceRoot,
+    gitBinary: process.env.WORKFLOW_GIT_BINARY ?? '/usr/bin/git',
     image: 'fixture@sha256:' + 'a'.repeat(64),
     credentialBrokerBinary: '/fixture/credentials',
     egressNetwork: 'fixture-egress',
     containerUser: `${process.getuid!()}:${process.getgid!()}`,
-    leaseTtlMs: 5000,
+    leaseTtlMs: options.implementation ? 60000 : 5000,
   });
   const runtime = StandalonePhaseRuntime.createForTest({
     store: f.store,
@@ -281,6 +308,296 @@ async function setup(
 }
 
 describe('standalone phase runtime production orchestration with fixture launcher transport', () => {
+  it('reconciles a verified import under a new owner without relaunching the worker', async () => {
+    const f = await setup({ implementation: true });
+    const original = SecureEvidenceVault.prototype.recordSpecialistResult;
+    let held = false;
+    let release!: () => void;
+    let reached!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ready = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const spy = vi
+      .spyOn(SecureEvidenceVault.prototype, 'recordSpecialistResult')
+      .mockImplementation(async function (this: SecureEvidenceVault, input) {
+        const parsed = JSON.parse(Buffer.from(input.content).toString('utf8'));
+        if (parsed.terminal && !parsed.kind && !held) {
+          held = true;
+          reached();
+          await barrier;
+        }
+        return original.call(this, input);
+      });
+    const running = f.runtime.runOnce();
+    await ready;
+    f.db.prepare('UPDATE leases SET expires_at_ms=0').run();
+    f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
+    const replacement = StandalonePhaseRuntime.createForTest({
+      store: f.store,
+      journal: f.journal,
+      launcher: f.makeLauncher(f.store, 'replacement'),
+      config: f.config,
+      owner: 'replacement',
+      process: {
+        pid: process.pid,
+        startTimeMs: 2,
+        executableDigest: digestGovernedValue('replacement'),
+      },
+      verifySource: async (action) => {
+        const head = await execute(f.config.gitBinary, [
+          '-C',
+          f.config.sourceRoot,
+          'rev-parse',
+          'HEAD',
+        ]);
+        expect(head.stdout.trim()).toBe(action.headSha);
+      },
+    });
+    try {
+      await replacement.runOnce();
+      expect(f.store.getRun('run')?.state).toBe('task_verification');
+      expect(f.journal.list()[0]?.status).toBe('completed');
+      expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+      expect(f.db.prepare('SELECT owner_id FROM implementation_import_recoveries').get()).toEqual({
+        owner_id: 'replacement',
+      });
+    } finally {
+      release();
+      await running;
+      spy.mockRestore();
+      await replacement.close();
+    }
+  });
+  it.each(['admission', 'sync-admission', 'cleanup-only'])(
+    'does not resume import or commit callbacks when recovery is denied: %s',
+    async (denial) => {
+      const f = await setup({ implementation: true });
+      const original = SecureEvidenceVault.prototype.recordSpecialistResult;
+      let held = false;
+      let release!: () => void;
+      let reached!: () => void;
+      const barrier = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const ready = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      const spy = vi
+        .spyOn(SecureEvidenceVault.prototype, 'recordSpecialistResult')
+        .mockImplementation(async function (this: SecureEvidenceVault, input) {
+          const parsed = JSON.parse(Buffer.from(input.content).toString('utf8'));
+          if (parsed.terminal && !parsed.kind && !held) {
+            held = true;
+            reached();
+            await barrier;
+          }
+          return original.call(this, input);
+        });
+      const running = f.runtime.runOnce();
+      await ready;
+      f.db.prepare('UPDATE leases SET expires_at_ms=0').run();
+      f.db.prepare("UPDATE phase_jobs SET lease_until_ms=0 WHERE status='started'").run();
+      const replacement = StandalonePhaseRuntime.createForTest({
+        store: f.store,
+        journal: f.journal,
+        launcher: f.makeLauncher(f.store, 'replacement'),
+        config: f.config,
+        owner: 'replacement',
+        cleanupOnly: denial === 'cleanup-only',
+        admission: async () => {
+          if (denial === 'admission') throw new Error('not_ready');
+        },
+        assertAdmission: () => {
+          if (denial === 'sync-admission') throw new Error('not_ready');
+        },
+        process: {
+          pid: process.pid,
+          startTimeMs: 2,
+          executableDigest: digestGovernedValue('replacement'),
+        },
+        verifySource: async (action) => {
+          const head = await execute(f.config.gitBinary, [
+            '-C',
+            f.config.sourceRoot,
+            'rev-parse',
+            'HEAD',
+          ]);
+          expect(head.stdout.trim()).toBe(action.headSha);
+        },
+      });
+      try {
+        await replacement.runOnce();
+        expect(f.store.getRun('run')?.state).toBe('implementing');
+        expect(f.journal.list()[0]?.status).toBe('blocked');
+        expect(f.launches.filter((args) => args[0] === 'start')).toHaveLength(1);
+        expect(
+          f.db.prepare('SELECT COUNT(*) AS n FROM implementation_import_recoveries').get(),
+        ).toEqual({ n: 0 });
+        expect(f.db.prepare('SELECT COUNT(*) AS n FROM delegate_callbacks').get()).toEqual({
+          n: 1,
+        });
+      } finally {
+        release();
+        await running;
+        spy.mockRestore();
+        await replacement.close();
+      }
+    },
+  );
+  it('renews live import fences across synchronous work longer than the initial lease without extending execution deadline', async () => {
+    const f = await setup({ implementation: true });
+    const originalImport = WorkflowStore.prototype.importImplementation;
+    const originalGit = TrustedSourceGit.prototype.run;
+    let elapsed = 0;
+    const spy = vi
+      .spyOn(WorkflowStore.prototype, 'importImplementation')
+      .mockImplementation(function (this: WorkflowStore, input) {
+        const began = Date.now();
+        const deadline = this.getSchedulerExecution(input.authority.id)!.deadlineMs;
+        f.db.prepare('UPDATE leases SET expires_at_ms=?').run(began + 1000);
+        f.db
+          .prepare("UPDATE phase_jobs SET lease_until_ms=? WHERE status='started'")
+          .run(began + 1000);
+        const now = vi.spyOn(Date, 'now').mockImplementation(() => began + elapsed);
+        const git = vi.spyOn(TrustedSourceGit.prototype, 'run').mockImplementation(function (
+          this: TrustedSourceGit,
+          args,
+          bytes,
+          index,
+        ) {
+          elapsed += 80;
+          return originalGit.call(this, args, bytes, index);
+        });
+        try {
+          const receipt = originalImport.call(this, { ...input, renewLeaseTtlMs: 1000 });
+          expect(elapsed).toBeGreaterThan(1000);
+          expect(this.getSchedulerExecution(input.authority.id)!.deadlineMs).toBe(deadline);
+          return receipt;
+        } finally {
+          now.mockRestore();
+          git.mockRestore();
+        }
+      });
+    try {
+      expect(await f.runtime.runOnce()).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it.each(['before-files', 'before-ref'])(
+    'rechecks production import authority at mutation boundaries: %s',
+    async (boundary) => {
+      const f = await setup({ implementation: true });
+      const base = (
+        await execute(f.config.gitBinary, ['-C', f.config.sourceRoot, 'rev-parse', 'HEAD'])
+      ).stdout.trim();
+      const originalImport = WorkflowStore.prototype.importImplementation;
+      const originalGit = TrustedSourceGit.prototype.run;
+      const originalClean = TrustedSourceGit.prototype.assertClean;
+      let cleanCount = 0;
+      const importSpy = vi
+        .spyOn(WorkflowStore.prototype, 'importImplementation')
+        .mockImplementation(function (this: WorkflowStore, input) {
+          const deadline = this.getSchedulerExecution(input.authority.id)!.deadlineMs;
+          let expired = false;
+          const realNow = Date.now.bind(Date);
+          const now = vi
+            .spyOn(Date, 'now')
+            .mockImplementation(() => (expired ? deadline + 1 : realNow()));
+          const clean = vi
+            .spyOn(TrustedSourceGit.prototype, 'assertClean')
+            .mockImplementation(function (this: TrustedSourceGit, paths) {
+              originalClean.call(this, paths);
+              if (boundary === 'before-files' && ++cleanCount === 2) expired = true;
+            });
+          const git = vi.spyOn(TrustedSourceGit.prototype, 'run').mockImplementation(function (
+            this: TrustedSourceGit,
+            args,
+            bytes,
+            index,
+          ) {
+            const result = originalGit.call(this, args, bytes, index);
+            if (boundary === 'before-ref' && args[0] === 'read-tree' && index === undefined)
+              expired = true;
+            return result;
+          });
+          try {
+            return originalImport.call(this, input);
+          } finally {
+            now.mockRestore();
+            git.mockRestore();
+            clean.mockRestore();
+          }
+        });
+      try {
+        expect(await f.runtime.runOnce()).toBe(false);
+        expect(
+          (
+            await execute(f.config.gitBinary, ['-C', f.config.sourceRoot, 'rev-parse', 'HEAD'])
+          ).stdout.trim(),
+        ).toBe(base);
+        expect(f.db.prepare('SELECT current_sha FROM delivery_approved_heads').get()).toEqual({
+          current_sha: base,
+        });
+        expect(f.db.prepare('SELECT COUNT(*) AS n FROM delegate_callbacks').get()).toEqual({
+          n: 1,
+        });
+        expect(f.db.prepare('SELECT status FROM implementation_imports').get()).toEqual({
+          status: 'prepared',
+        });
+        if (boundary === 'before-files')
+          expect(
+            await readFile(
+              join(f.config.sourceRoot, 'packages/workflow-control/example.txt'),
+              'utf8',
+            ),
+          ).not.toBe('verified worker change');
+      } finally {
+        importSpy.mockRestore();
+      }
+    },
+  );
+  it('retains ordinary long code identifiers and string literals without entropy false positives', async () => {
+    const content =
+      'export const abcdefghijklmnopqrstuvwxyz = "https://example.test/abcdefghijklmnopqrstuvwxyz";';
+    const f = await setup({ implementation: true, implementationContent: content });
+    expect(await f.runtime.runOnce()).toBe(true);
+    expect(
+      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+    ).toBe(content);
+  }, 15000);
+  it('rejects source containing a secret assignment before importing', async () => {
+    const f = await setup({
+      implementation: true,
+      implementationContent: 'const api_key = "abcdef1234567890secretvalue";',
+    });
+    expect(await f.runtime.runOnce()).toBe(false);
+    expect(
+      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+    ).toBe('fixture source');
+    expect(f.db.prepare('SELECT COUNT(*) AS count FROM implementation_imports').get()).toEqual({
+      count: 0,
+    });
+  }, 15000);
+  it('imports actual worker bytes and commits a changed-head callback before verification', async () => {
+    const f = await setup({ implementation: true });
+    expect(await f.runtime.runOnce()).toBe(true);
+    expect(f.store.getRun('run')?.state).toBe('task_verification');
+    expect(
+      await readFile(join(f.config.sourceRoot, 'packages/workflow-control/example.txt'), 'utf8'),
+    ).toBe('verified worker change');
+    const imported = f.db
+      .prepare('SELECT base_head,result_head,status FROM implementation_imports')
+      .get() as { base_head: string; result_head: string; status: string };
+    expect(imported.status).toBe('verified');
+    expect(imported.result_head).not.toBe(imported.base_head);
+    expect(
+      f.db.prepare('SELECT current_sha,import_execution_id FROM delivery_approved_heads').get(),
+    ).toEqual({ current_sha: imported.result_head, import_execution_id: expect.any(String) });
+  });
   it.each([
     [
       'failed criterion',

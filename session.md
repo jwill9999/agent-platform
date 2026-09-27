@@ -1,4 +1,31 @@
-# Resumed: R1 run discovery — 27 September 2026
+# R2/R3 implementation checkpoint — 27 September 2026
+
+PR277 is merged into `feature/harness-backlog-review` at `b7be3d6`.
+The owner authorized completing R2 governed import and R3 coordinator completion under
+`agent-platform-pilot-zero.17`. Active checkout is
+`/Users/letuscode/projects/agent-platform-workflow-evaluation`, branch
+`task/artifact-import-coordinator`; delivery remains a reviewable PR to the feature branch.
+Supervised prerequisite mode applies. No pilot, merge or staging promotion is authorized here.
+
+The [draft qualification report](docs/reviews/artifact-import-coordinator-qualification.md)
+records changes, executed checks and remaining gaps. R2 has a real-container controlled-transport
+import pass, but concurrent host edits remain an unresolved high-severity finding. A broker-owned
+isolated import workspace is recommended; the owner decision is pending. Git deadline/ref-lock
+repairs passed focused tests and narrow independent review, with commit-dispatch versus publication
+deadline semantics explicitly retained as a limitation. R3 receipt/dispatch composition is a
+compiling draft, not a completed coordinator journey. Repair, feature evaluation, delivery/finalization
+and recovery coverage remain outstanding. Build/lint/type checks pass; the fresh full suite is running.
+Do not mark either requirement complete or the branch merge-ready. Beads `.17` stays in progress;
+`.13` and the live pilot remain blocked. The earlier pilot-delivery question does not block current
+fixture qualification. Notion alignment is still separately deferred.
+
+Resume from the report and live Beads. Preserve the pending workspace ownership decision, resolve
+that boundary before redesigning import, then complete R2/R3 and their independent/connected checks.
+The historical entries below retain their original evidence and may describe superseded statuses.
+
+---
+
+## Historical: R1 run discovery — 27 September 2026
 
 PR276 is verified merged into `feature/harness-backlog-review` at `87c5cc4`; its final nine executed
 checks passed, with Sourcery and staging VM skipped. The Notion publishing and iMessage policy

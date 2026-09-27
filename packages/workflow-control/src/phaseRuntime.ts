@@ -1,3 +1,8 @@
+import {
+  StandaloneCoordinators,
+  standaloneCoordinatorConfigSchema,
+} from './standaloneCoordinators.js';
+import { TrustedSourceGit } from './sourceGit.js';
 import { withinCleanupDeadline } from './executionInterruptions.js';
 import { modelGatewayConfigSchema } from './modelGatewayConfig.js';
 import { execFile } from 'node:child_process';
@@ -21,7 +26,12 @@ import {
   type TaskPacket,
 } from './contracts.js';
 import { digestGovernedValue, type DelegateCallback } from './governedOperations.js';
-import { PhaseJobJournal, type PhaseJob, type ExecutePhaseAction } from './phaseJobs.js';
+import {
+  PhaseJobJournal,
+  PHASE_JOB_DISPATCH,
+  type PhaseJob,
+  type ExecutePhaseAction,
+} from './phaseJobs.js';
 import { SecureEvidenceVault, type EvidenceCapability } from './secureEvidence.js';
 import {
   DockerIsolatedSpecialistLauncher,
@@ -29,6 +39,8 @@ import {
   type DockerSpecialistReservation,
 } from './specialistLauncher.js';
 import { specialistTerminalResult } from './specialistTerminalResult.js';
+import { implementationOutputSchema } from './implementationOutput.js';
+import { assertBootstrapExecutablePin } from './bootstrapAdapterRuntime.js';
 import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { WorkflowStore } from './storage.js';
 
@@ -39,8 +51,13 @@ export const phaseRuntimeConfigSchema = z
     runId: z.string().min(1),
     sourceRoot: absolute,
     gitBinary: absolute.default('/usr/bin/git'),
+    gitBinaryDigest: z
+      .string()
+      .regex(/^sha256:[a-f0-9]{64}$/u)
+      .optional(),
     credentialBrokerBinary: absolute,
     modelGateway: modelGatewayConfigSchema.optional(),
+    coordinators: standaloneCoordinatorConfigSchema.optional(),
     image: z
       .string()
       .regex(/^(?:[^\s]+@)?sha256:[a-f0-9]{64}$/u, 'immutable specialist image digest required'),
@@ -81,7 +98,7 @@ function phaseTerminalStatus(
   if (
     terminal.status === 'blocked' ||
     terminal.recommendedTransition === 'escalate' ||
-    terminal.changedFiles.length > 0 ||
+    (phase !== 'implementing' && terminal.changedFiles.length > 0) ||
     terminal.remainingRisks.length > 0
   ) {
     return 'blocked';
@@ -120,6 +137,8 @@ export class StandalonePhaseRuntime {
   #reservation: DockerSpecialistReservation | undefined;
   #fatalAdmission = false;
   readonly #onFatal?: () => void;
+  readonly #cleanupOnly: boolean;
+  readonly #coordinators?: StandaloneCoordinators;
   readonly #cleanup = new Map<string, Promise<void>>();
 
   private constructor(input: {
@@ -133,6 +152,8 @@ export class StandalonePhaseRuntime {
     admission?: () => Promise<void>;
     assertAdmission?: () => void;
     onFatal?: () => void;
+    cleanupOnly?: boolean;
+    database?: string;
   }) {
     if (!(input.launcher instanceof DockerIsolatedSpecialistLauncher))
       throw new Error('isolated specialist launcher required');
@@ -142,15 +163,33 @@ export class StandalonePhaseRuntime {
     this.#config = input.config;
     this.#owner = input.owner;
     this.#onFatal = input.onFatal;
+    this.#cleanupOnly = input.cleanupOnly ?? false;
     this.#process = input.process;
     this.#verifySource = input.verifySource;
     this.#admission = input.admission ?? (async () => undefined);
     this.#assertAdmission = input.assertAdmission ?? (() => undefined);
     this.#contract = input.store.getExecutionContract(input.config.runId);
+    if (input.config.coordinators && !this.#cleanupOnly) {
+      if (!input.database || !input.config.gitBinaryDigest)
+        throw new Error('coordinator_production_binding_missing');
+      this.#coordinators = new StandaloneCoordinators({
+        database: input.database,
+        store: input.store,
+        contract: this.#contract,
+        config: input.config.coordinators,
+        sourceRoot: input.config.sourceRoot,
+        gitPin: { path: input.config.gitBinary, digest: input.config.gitBinaryDigest },
+        launcher: input.launcher,
+        owner: input.owner,
+      });
+    }
     this.#vault = new SecureEvidenceVault({
       store: input.store,
       contract: this.#contract,
       capabilityBroker: this.#capabilities,
+      // JSON escaping can expand the bounded 16 MiB UTF-8 file payload sixfold.
+      maxBytes: 110 * 1024 * 1024,
+      maxRunBytes: 220 * 1024 * 1024,
     });
   }
 
@@ -163,6 +202,17 @@ export class StandalonePhaseRuntime {
     assertAdmission?: () => void,
   ): Promise<StandalonePhaseRuntime> {
     const config = readPhaseRuntimeConfig(configInput);
+    const gitPin = cleanupOnly
+      ? undefined
+      : {
+          path: await realpath(config.gitBinary),
+          digest:
+            config.gitBinaryDigest ??
+            `sha256:${createHash('sha256')
+              .update(await readFile(config.gitBinary))
+              .digest('hex')}`,
+        };
+    if (gitPin) assertBootstrapExecutablePin(gitPin);
     if (!(await stat(config.credentialBrokerBinary).catch(() => undefined))?.isFile())
       throw new Error('standalone_credential_broker_unavailable');
     const sourceRoot = cleanupOnly ? config.sourceRoot : await realpath(config.sourceRoot);
@@ -195,9 +245,15 @@ export class StandalonePhaseRuntime {
       };
       const owner = `phase-runtime:${randomUUID()}`;
       return new StandalonePhaseRuntime({
+        database,
         store,
         journal,
-        config,
+        config: {
+          ...config,
+          sourceRoot,
+          gitBinary: gitPin?.path ?? config.gitBinary,
+          gitBinaryDigest: gitPin?.digest,
+        },
         owner,
         process: processIdentity,
         admission,
@@ -213,18 +269,12 @@ export class StandalonePhaseRuntime {
           containerUser: config.containerUser,
           modelGateway: config.modelGateway,
         }),
+        cleanupOnly,
         verifySource: async (action, paths) => {
-          await realpath(sourceRoot);
-          const head = await execute(config.gitBinary, ['-C', sourceRoot, 'rev-parse', 'HEAD'], {
-            env: {},
-            timeout: 10_000,
-          });
-          const dirty = await execute(
-            config.gitBinary,
-            ['-C', sourceRoot, 'status', '--porcelain', '--untracked-files=all', '--', ...paths],
-            { env: {}, timeout: 10_000 },
-          );
-          if (head.stdout.trim() !== action.headSha || dirty.stdout.trim() !== '')
+          if (!gitPin) throw new Error('cleanup_only_runtime');
+          const repository = new TrustedSourceGit(sourceRoot, gitPin.path, gitPin.digest);
+          repository.assertClean(paths);
+          if (repository.run(['rev-parse', 'HEAD']).toString().trim() !== action.headSha)
             throw new Error('phase_source_head_or_tree_stale');
         },
       });
@@ -246,6 +296,8 @@ export class StandalonePhaseRuntime {
     admission?: () => Promise<void>;
     assertAdmission?: () => void;
     onFatal?: () => void;
+    cleanupOnly?: boolean;
+    database?: string;
   }): StandalonePhaseRuntime {
     if (process.env.NODE_ENV !== 'test') throw new Error('test phase runtime unavailable');
     return new StandalonePhaseRuntime(input);
@@ -348,6 +400,7 @@ export class StandalonePhaseRuntime {
     if (this.#closing !== undefined) return this.#closing;
     if (this.#timer !== undefined) clearInterval(this.#timer);
     this.#timer = undefined;
+    this.#coordinators?.abort();
     this.#closing = (async () => {
       try {
         let cancellationError: unknown;
@@ -372,6 +425,7 @@ export class StandalonePhaseRuntime {
         }
         if (cancellationError !== undefined) throw cancellationError;
       } finally {
+        this.#coordinators?.close();
         this.#journal.close();
         this.#store.close();
       }
@@ -398,11 +452,15 @@ export class StandalonePhaseRuntime {
   }
 
   #packet(action: ExecutePhaseAction): TaskPacket {
-    if (action.phase === 'implementing') throw new Error('phase_artifact_import_unavailable');
-    if (action.phase !== 'task_verification' && action.phase !== 'task_review')
+    if (
+      action.phase !== 'implementing' &&
+      action.phase !== 'task_verification' &&
+      action.phase !== 'task_review'
+    )
       throw new Error('phase_executor_unavailable');
     const task = this.#contract.tasks.find((item) => item.id === action.taskId);
-    const role = task?.phaseRoles?.[action.phase];
+    const role =
+      action.phase === 'implementing' ? task?.assignedRole : task?.phaseRoles?.[action.phase];
     if (task === undefined || role === undefined)
       throw new Error('phase_role_authority_unavailable');
     if (!task.allowedOperations.includes('artifact.write'))
@@ -435,7 +493,16 @@ export class StandalonePhaseRuntime {
       (role === 'test_runner' && !packet.allowedOperations.includes('process.test'))
     )
       throw new Error('phase_operation_authority_unavailable');
-    assertTaskPacketWithinContract(this.#contract, packet, action.phase);
+    if (
+      action.phase === 'implementing' &&
+      (role !== 'implementation_worker' || !packet.allowedOperations.includes('workspace.patch'))
+    )
+      throw new Error('phase_patch_authority_unavailable');
+    assertTaskPacketWithinContract(
+      this.#contract,
+      packet,
+      action.phase === 'implementing' ? undefined : action.phase,
+    );
     return packet;
   }
 
@@ -466,6 +533,24 @@ export class StandalonePhaseRuntime {
     } catch (error) {
       this.#journal.releaseClaim(claim, Date.now());
       throw error;
+    }
+    if (PHASE_JOB_DISPATCH[action.phase].endsWith('_coordinator')) {
+      if (!this.#coordinators) {
+        this.#journal.block(claim, 'phase_coordinator_configuration_missing', Date.now());
+        return false;
+      }
+      try {
+        await this.#verifySource(action, []);
+        const job = this.#journal.start(claim, Date.now());
+        return await this.#runCoordinator(job, action, fences);
+      } catch {
+        this.#journal.block(
+          this.#journal.get(claim.id)!,
+          'phase_coordinator_reconciliation_required',
+          Date.now(),
+        );
+        return false;
+      }
     }
     let packet: TaskPacket;
     try {
@@ -511,7 +596,7 @@ export class StandalonePhaseRuntime {
       binding: {
         executionDigest: digestGovernedValue(reservation.id),
         ownerDigest: digestGovernedValue(this.#owner),
-        callbackId: action.callbackId,
+        callbackId: action.callbackId ?? action.coordinatorReceiptId!,
         headSha: action.headSha,
         runVersion: action.runVersion,
         phaseLeaseEpoch: job.lease_epoch,
@@ -570,7 +655,7 @@ export class StandalonePhaseRuntime {
         runId: action.runId,
         taskId: action.taskId,
         role: packet.assignedRole,
-        mode: 'read_only',
+        mode: action.phase === 'implementing' ? 'mutating' : 'read_only',
         deadlineMs,
         ownerId: this.#owner,
         workspaceLeaseEpoch: fences.workspace,
@@ -616,64 +701,57 @@ export class StandalonePhaseRuntime {
       const terminal = specialistTerminalResult(raw);
       if (terminal === undefined) throw new Error('invalid_specialist_terminal_result');
       await this.#verifySource(action, packet.allowedPaths);
-      // Keep the structured answer only, with trusted execution identity to avoid cross-role digest aliasing.
-      const result = {
-        executionDigest: digestGovernedValue(reservation.id),
-        events: [
-          {
-            type: 'item.completed',
-            item: { type: 'agent_message', text: JSON.stringify(terminal) },
+      let resultHead = action.headSha;
+      if (action.phase === 'implementing') {
+        const output = implementationOutputSchema.parse(
+          typeof raw === 'object' && raw !== null && 'implementationOutput' in raw
+            ? raw.implementationOutput
+            : undefined,
+        );
+        const artifactBytes = Buffer.from(JSON.stringify(output));
+        const artifact = await this.#vault.recordSpecialistResult({
+          executionId: reservation.id,
+          content: artifactBytes,
+          headSha: action.headSha,
+          capability: evidenceCapability,
+        });
+        if (artifact.reference.digest !== digestGovernedValue(output))
+          throw new Error('phase_implementation_evidence_redacted');
+        const persisted = await this.#vault.read({
+          digest: artifact.reference.digest,
+          runId: action.runId,
+          taskId: action.taskId,
+          capability: evidenceCapability,
+        });
+        const imported = this.#store.importImplementation({
+          authority: {
+            id: reservation.id,
+            ownerId: this.#owner,
+            workspaceLeaseEpoch: fences.workspace,
+            runLeaseEpoch: fences.run,
+            taskLeaseEpoch: fences.task,
           },
-        ],
-      };
-      const resultEvidence = await this.#vault.recordSpecialistResult({
-        executionId: reservation.id,
-        content: Buffer.from(JSON.stringify(result)),
-        headSha: action.headSha,
-        capability: evidenceCapability,
-      });
-      if (resultEvidence.reference.digest !== digestGovernedValue(result))
-        throw new Error('phase_result_evidence_redacted');
-      const terminalStatus = phaseTerminalStatus(terminal, packet, action.phase);
-      const identity = {
-        kind: 'workflow.delegate_callback' as const,
-        workspaceId: action.workspaceId,
-        parentRunId: action.runId,
-        parentTaskId: action.taskId,
-        parentState: action.phase,
-        parentRunVersion: action.runVersion,
-        delegationId: reservation.id,
-        delegateAgentId: this.#launcher.processIdentity(reservation),
-        delegateRole: packet.assignedRole,
-        attemptNumber: 1,
-        contractVersion: action.contractVersion,
-        policyDigest: action.policyDigest,
-        materialDigest: action.materialDigest,
-        workspaceLeaseEpoch: fences.workspace,
-        parentRunLeaseEpoch: fences.run,
-        taskLeaseEpoch: fences.task,
-        headSha: action.headSha,
-        inputProducerIdentity: this.#owner,
-        resultProducerIdentity: this.#launcher.processIdentity(reservation),
-        inputArtifactDigest: inputEvidence.reference.digest,
-        terminalStatus,
-        resultArtifactDigest: resultEvidence.reference.digest,
-      };
-      const callback: DelegateCallback = { ...identity, callbackId: digestGovernedValue(identity) };
-      this.#store.finishSchedulerExecution({
-        id: reservation.id,
-        status: 'completed',
-        ownerId: this.#owner,
-        workspaceLeaseEpoch: fences.workspace,
-        runLeaseEpoch: fences.run,
-        taskLeaseEpoch: fences.task,
-        result,
-        callback,
-      });
-      this.#journal.complete(
+          sourceRoot: this.#config.sourceRoot,
+          gitBinary: this.#config.gitBinary,
+          gitBinaryDigest: this.#config.gitBinaryDigest,
+          artifact: persisted,
+          artifactDigest: artifact.reference.digest,
+          renewLeaseTtlMs: Math.min(this.#config.leaseTtlMs, 60000),
+        });
+        resultHead = imported.resultHead;
+        await this.#verifySource({ ...action, headSha: resultHead }, packet.allowedPaths);
+      }
+      await this.#completeSpecialist(
         job,
-        { executionId: reservation.id, evidenceDigest: resultEvidence.reference.digest },
-        Date.now(),
+        action,
+        packet,
+        fences,
+        reservation.id,
+        terminal,
+        resultHead,
+        inputEvidence.reference.digest,
+        evidenceCapability,
+        this.#owner,
       );
       return true;
     } catch (error) {
@@ -687,6 +765,139 @@ export class StandalonePhaseRuntime {
       this.#reservation = undefined;
       if (token !== undefined) this.#capabilities.revoke(token);
     }
+  }
+
+  async #runCoordinator(
+    job: PhaseJob,
+    action: ExecutePhaseAction,
+    fences: ResourceFences,
+  ): Promise<boolean> {
+    if (this.#cleanupOnly || this.#fatalAdmission || !this.#coordinators)
+      throw new Error('coordinator_admission_unavailable');
+    await this.#admission();
+    const assertAuthority = () => {
+      this.#assertAdmission();
+      if (this.#closing || this.#fatalAdmission)
+        throw new Error('coordinator_admission_unavailable');
+      for (const [kind, id, epoch] of [
+        ['workspace', action.workspaceId, fences.workspace],
+        ['run', action.runId, fences.run],
+        ['task', action.taskId, fences.task],
+      ] as const)
+        this.#store.assertResourceLease(kind, id, this.#owner, epoch, Date.now());
+      const current = this.#journal.get(job.id);
+      if (
+        current?.status !== 'started' ||
+        current.lease_owner !== this.#owner ||
+        current.lease_epoch !== job.lease_epoch ||
+        current.lease_until_ms <= Date.now()
+      )
+        throw new Error('coordinator_phase_lease_stale');
+      this.#store.verifyPlanningDocuments({
+        runId: action.runId,
+        taskId: action.taskId,
+        boundary: 'phase.coordinator',
+        ownerId: this.#owner,
+        runLeaseEpoch: fences.run,
+        expectedSourceRoot: this.#config.sourceRoot,
+      });
+      this.#assertAdmission();
+    };
+    const heartbeat = setInterval(
+      () => {
+        try {
+          assertAuthority();
+          this.#journal.renew(job, this.#config.leaseTtlMs, Date.now());
+          this.#fences(action);
+        } catch {
+          /* Every effect and completion repeats authority checks. */
+        }
+      },
+      Math.floor(this.#config.leaseTtlMs / 3),
+    );
+    try {
+      const proof = await this.#coordinators.execute(
+        job,
+        action,
+        {
+          ownerId: this.#owner,
+          workspaceLeaseEpoch: fences.workspace,
+          runLeaseEpoch: fences.run,
+          taskLeaseEpoch: fences.task,
+        },
+        assertAuthority,
+      );
+      this.#journal.completeCoordinator(job, proof, fences, Date.now());
+      return true;
+    } finally {
+      clearInterval(heartbeat);
+    }
+  }
+
+  async #completeSpecialist(
+    job: PhaseJob,
+    action: ExecutePhaseAction,
+    packet: TaskPacket,
+    fences: ResourceFences,
+    executionId: string,
+    terminal: AgentResult,
+    resultHead: string,
+    inputDigest: string,
+    evidenceCapability: EvidenceCapability,
+    inputProducer: string,
+  ): Promise<boolean> {
+    // Keep the structured answer only, with trusted execution identity to avoid cross-role digest aliasing.
+    const result = { executionDigest: digestGovernedValue(executionId), terminal };
+    const resultEvidence = await this.#vault.recordSpecialistResult({
+      executionId: executionId,
+      content: Buffer.from(JSON.stringify(result)),
+      headSha: resultHead,
+      capability: evidenceCapability,
+    });
+    if (resultEvidence.reference.digest !== digestGovernedValue(result))
+      throw new Error('phase_result_evidence_redacted');
+    const terminalStatus = phaseTerminalStatus(terminal, packet, action.phase);
+    const identity = {
+      kind: 'workflow.delegate_callback' as const,
+      workspaceId: action.workspaceId,
+      parentRunId: action.runId,
+      parentTaskId: action.taskId,
+      parentState: action.phase,
+      parentRunVersion: action.runVersion,
+      delegationId: executionId,
+      delegateAgentId: this.#store.getSchedulerExecution(executionId)!.processIdentity,
+      delegateRole: packet.assignedRole,
+      attemptNumber: this.#store.getSchedulerExecution(executionId)!.attemptNumber,
+      contractVersion: action.contractVersion,
+      policyDigest: action.policyDigest,
+      materialDigest: action.materialDigest,
+      workspaceLeaseEpoch: fences.workspace,
+      parentRunLeaseEpoch: fences.run,
+      taskLeaseEpoch: fences.task,
+      headSha: resultHead,
+      inputProducerIdentity: inputProducer,
+      resultProducerIdentity: this.#store.getSchedulerExecution(executionId)!.processIdentity,
+      inputArtifactDigest: inputDigest,
+      terminalStatus,
+      resultArtifactDigest: resultEvidence.reference.digest,
+    };
+    const callback: DelegateCallback = { ...identity, callbackId: digestGovernedValue(identity) };
+    this.#store.finishSchedulerExecution({
+      id: executionId,
+      status: 'completed',
+      ownerId: this.#owner,
+      workspaceLeaseEpoch: fences.workspace,
+      runLeaseEpoch: fences.run,
+      taskLeaseEpoch: fences.task,
+      result,
+      callback,
+    });
+    this.#journal.complete(
+      job,
+      { executionId: executionId, evidenceDigest: resultEvidence.reference.digest },
+      Date.now(),
+    );
+    return true;
   }
 
   async #failExecution(
@@ -801,6 +1012,15 @@ export class StandalonePhaseRuntime {
       Math.floor(this.#config.leaseTtlMs / 3),
     );
     try {
+      const action = this.#journal.action(job);
+      if (PHASE_JOB_DISPATCH[action.phase].endsWith('_coordinator')) {
+        try {
+          await this.#runCoordinator(job, action, this.#fences(action));
+        } catch {
+          this.#journal.block(job, 'phase_coordinator_reconciliation_required', Date.now());
+        }
+        return;
+      }
       const execution = this.#store.getSchedulerExecution(job.execution_id!);
       if (execution?.status === 'completed') {
         this.#journal.complete(
@@ -808,6 +1028,14 @@ export class StandalonePhaseRuntime {
           { executionId: execution.id, evidenceDigest: digestGovernedValue(execution.result) },
           Date.now(),
         );
+        return;
+      }
+      if (execution && this.#store.getImplementationImport(execution.id)) {
+        try {
+          await this.#recoverImport(job);
+        } catch {
+          this.#journal.block(job, 'implementation_import_reconciliation_required', Date.now());
+        }
         return;
       }
       if (execution) {
@@ -839,6 +1067,90 @@ export class StandalonePhaseRuntime {
       } else this.#journal.block(job, 'phase_restart_requires_new_authorized_attempt', Date.now());
     } finally {
       clearInterval(heartbeat);
+    }
+  }
+
+  async #recoverImport(job: PhaseJob): Promise<void> {
+    if (this.#cleanupOnly) throw new Error('cleanup_only_runtime');
+    if (this.#fatalAdmission) throw new Error('journal_unavailable');
+    await this.#admission();
+    this.#assertAdmission();
+    if (this.#closing) throw new Error('phase_runtime_closing');
+    // A recovery may observe a prepared or applied head; pin Git before any import mutation.
+    new TrustedSourceGit(
+      this.#config.sourceRoot,
+      this.#config.gitBinary,
+      this.#config.gitBinaryDigest,
+    );
+    const action = this.#journal.action(job);
+    const fences = this.#fences(action);
+    const authority = {
+      id: job.execution_id!,
+      ownerId: this.#owner,
+      workspaceLeaseEpoch: fences.workspace,
+      runLeaseEpoch: fences.run,
+      taskLeaseEpoch: fences.task,
+    };
+    const execution = this.#store.adoptImplementationImport({
+      authority,
+      phaseLeaseEpoch: job.lease_epoch,
+      sourceRoot: this.#config.sourceRoot,
+    });
+    const packet = specialistInputEnvelopeSchema.parse(execution.packet);
+    const capability = this.#capabilities.issue({
+      workspaceId: action.workspaceId,
+      runId: action.runId,
+      role: 'workflow_orchestrator',
+      contractVersion: action.contractVersion,
+      policyDigest: action.policyDigest,
+      operations: ['workspace.read', 'artifact.write'],
+      allowedPaths: packet.task.allowedPaths,
+      expiresAtMs: execution.deadlineMs,
+      process: this.#process,
+    });
+    const evidenceCapability = { token: capability.token, observedProcess: this.#process };
+    try {
+      const intent = this.#store.getImplementationImport(execution.id)!;
+      const bytes = await this.#vault.read({
+        digest: intent.artifactDigest,
+        runId: action.runId,
+        taskId: action.taskId,
+        capability: evidenceCapability,
+      });
+      const output = implementationOutputSchema.parse(
+        JSON.parse(Buffer.from(bytes).toString('utf8')),
+      );
+      this.#assertAdmission();
+      const imported = this.#store.importImplementation({
+        authority,
+        sourceRoot: this.#config.sourceRoot,
+        gitBinary: this.#config.gitBinary,
+        gitBinaryDigest: this.#config.gitBinaryDigest,
+        artifact: bytes,
+        artifactDigest: intent.artifactDigest,
+        renewLeaseTtlMs: Math.min(this.#config.leaseTtlMs, 60000),
+      });
+      await this.#verifySource(
+        { ...action, headSha: imported.resultHead },
+        packet.task.allowedPaths,
+      );
+      const inputDigest = digestGovernedValue(packet);
+      const input = this.#store.getSecureEvidence(inputDigest, action.runId, action.taskId);
+      if (!input) throw new Error('implementation recovery input evidence missing');
+      await this.#completeSpecialist(
+        job,
+        action,
+        packet.task,
+        fences,
+        execution.id,
+        output.terminal,
+        imported.resultHead,
+        inputDigest,
+        evidenceCapability,
+        input.producer,
+      );
+    } finally {
+      this.#capabilities.revoke(capability.token);
     }
   }
 }

@@ -22,7 +22,7 @@ import {
 
 export const continuationSignal = new EventEmitter();
 
-export const continuationActionSchema = z.discriminatedUnion('kind', [
+export const continuationActionSchema = z.union([
   z.object({ kind: z.literal('blocked'), reason: z.string().min(1) }).strict(),
   z.object({ kind: z.literal('approval_required'), eventId: z.string().min(1) }).strict(),
   executePhaseActionSchema,

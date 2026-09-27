@@ -1,3 +1,5 @@
+import { coordinatorProofSchema, verifyCoordinatorProof } from './coordinatorReceipts.js';
+import { digestGovernedValue } from './governedOperations.js';
 import {
   initializeInterruptionSchema,
   assertExecutionNotInterrupted,
@@ -49,7 +51,8 @@ const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 export const executePhaseActionSchema = z
   .object({
     kind: z.literal('execute_phase'),
-    callbackId: digest,
+    callbackId: digest.optional(),
+    coordinatorReceiptId: digest.optional(),
     workspaceId: digest,
     runId: z.string().min(1),
     taskId: z.string().min(1),
@@ -60,7 +63,11 @@ export const executePhaseActionSchema = z
     headSha: z.string().regex(/^[a-f0-9]{40,64}$/u),
     phase: phaseJobPhaseSchema,
   })
-  .strict();
+  .strict()
+  .refine(
+    (action) => (action.callbackId === undefined) !== (action.coordinatorReceiptId === undefined),
+    'phase requires exactly one authoritative origin',
+  );
 export type ExecutePhaseAction = z.infer<typeof executePhaseActionSchema>;
 
 export function phaseActionForCallback(input: unknown): ExecutePhaseAction {
@@ -82,16 +89,39 @@ export function phaseActionForCallback(input: unknown): ExecutePhaseAction {
 
 export function initializePhaseJobSchema(database: Database.Database): void {
   initializeInterruptionSchema(database);
-  database.exec(`CREATE TABLE IF NOT EXISTS phase_jobs (
-    id TEXT PRIMARY KEY, continuation_id TEXT NOT NULL UNIQUE REFERENCES continuation_jobs(id),
-    callback_id TEXT NOT NULL UNIQUE REFERENCES delegate_callbacks(callback_id),
-    run_id TEXT NOT NULL REFERENCES runs(id), action_json TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending'
-      CHECK(status IN ('pending', 'claimed', 'started', 'completed', 'blocked')),
-    lease_owner TEXT, lease_epoch INTEGER NOT NULL DEFAULT 0, lease_until_ms INTEGER NOT NULL DEFAULT 0,
-    execution_id TEXT UNIQUE, created_at_ms INTEGER NOT NULL, started_at_ms INTEGER,
-    completed_at_ms INTEGER, result_json TEXT, failure_code TEXT
-  );`);
+  database.exec(`CREATE TABLE IF NOT EXISTS coordinator_receipts (
+    id TEXT PRIMARY KEY, phase_job_id TEXT NOT NULL UNIQUE,
+    run_id TEXT NOT NULL REFERENCES runs(id), receipt_json TEXT NOT NULL,
+    created_at_ms INTEGER NOT NULL
+  )`);
+  const legacy = database.prepare('PRAGMA table_info(phase_jobs)').all() as Array<{ name: string }>;
+  const migrate =
+    legacy.length > 0 && !legacy.some((column) => column.name === 'coordinator_receipt_id');
+  database
+    .transaction(() => {
+      if (migrate) database.exec('ALTER TABLE phase_jobs RENAME TO phase_jobs_legacy');
+      database.exec(`CREATE TABLE IF NOT EXISTS phase_jobs (
+      id TEXT PRIMARY KEY, continuation_id TEXT NOT NULL REFERENCES continuation_jobs(id),
+      callback_id TEXT UNIQUE REFERENCES delegate_callbacks(callback_id),
+      coordinator_receipt_id TEXT UNIQUE REFERENCES coordinator_receipts(id),
+      run_id TEXT NOT NULL REFERENCES runs(id), action_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending'
+        CHECK(status IN ('pending', 'claimed', 'started', 'completed', 'blocked')),
+      lease_owner TEXT, lease_epoch INTEGER NOT NULL DEFAULT 0, lease_until_ms INTEGER NOT NULL DEFAULT 0,
+      execution_id TEXT UNIQUE, created_at_ms INTEGER NOT NULL, started_at_ms INTEGER,
+      completed_at_ms INTEGER, result_json TEXT, failure_code TEXT,
+      CHECK((callback_id IS NOT NULL AND coordinator_receipt_id IS NULL) OR
+            (callback_id IS NULL AND coordinator_receipt_id IS NOT NULL))
+    )`);
+      if (migrate)
+        database.exec(`INSERT INTO phase_jobs
+      (id,continuation_id,callback_id,run_id,action_json,status,lease_owner,lease_epoch,lease_until_ms,
+       execution_id,created_at_ms,started_at_ms,completed_at_ms,result_json,failure_code)
+      SELECT id,continuation_id,callback_id,run_id,action_json,status,lease_owner,lease_epoch,lease_until_ms,
+       execution_id,created_at_ms,started_at_ms,completed_at_ms,result_json,failure_code FROM phase_jobs_legacy;
+      DROP TABLE phase_jobs_legacy`);
+    })
+    .immediate();
 }
 
 /** Revalidate before enqueue/claim/start. An accepted callback is not continuing authority. */
@@ -100,15 +130,27 @@ export function assertPhaseJobAuthority(
   action: ExecutePhaseAction,
 ): void {
   if (!runAcceptsWork(database, action.runId)) throw new Error('phase run is cancelled');
-  const record = database
-    .prepare('SELECT callback_json FROM delegate_callbacks WHERE callback_id = ?')
-    .get(action.callbackId) as { callback_json: string } | undefined;
-  if (
-    record === undefined ||
-    JSON.stringify(phaseActionForCallback(JSON.parse(record.callback_json))) !==
-      JSON.stringify(action)
-  )
-    throw new Error('phase callback binding rejected');
+  if (action.coordinatorReceiptId !== undefined) {
+    const origin = database
+      .prepare('SELECT receipt_json FROM coordinator_receipts WHERE id=? AND run_id=?')
+      .get(action.coordinatorReceiptId, action.runId) as { receipt_json: string } | undefined;
+    if (
+      !origin ||
+      JSON.stringify(actionForCoordinatorReceipt(JSON.parse(origin.receipt_json))) !==
+        JSON.stringify(action)
+    )
+      throw new Error('phase coordinator origin rejected');
+  } else {
+    const record = database
+      .prepare('SELECT callback_json FROM delegate_callbacks WHERE callback_id = ?')
+      .get(action.callbackId!) as { callback_json: string } | undefined;
+    if (
+      !record ||
+      JSON.stringify(phaseActionForCallback(JSON.parse(record.callback_json))) !==
+        JSON.stringify(action)
+    )
+      throw new Error('phase callback binding rejected');
+  }
   const parent = database
     .prepare(
       `SELECT r.state, r.version, c.body_json FROM runs r
@@ -195,10 +237,57 @@ export function enqueuePhaseJob(
   });
 }
 
+const coordinatorReceiptSchema = z
+  .object({
+    jobId: z.string().min(1),
+    executionId: z.string().min(1),
+    action: executePhaseActionSchema,
+    owner: z.string().min(1),
+    phaseEpoch: z.number().int().positive(),
+    fences: z
+      .object({
+        workspace: z.number().int().positive(),
+        run: z.number().int().positive(),
+        task: z.number().int().positive(),
+      })
+      .strict(),
+    proof: coordinatorProofSchema,
+    outcome: z
+      .object({
+        state: z.enum([
+          'feature_evaluation',
+          'implementing',
+          'delivery',
+          'repair_planning',
+          'finalizing',
+          'closed',
+        ]),
+        version: z.number().int().positive(),
+        headSha: z.string().regex(/^[a-f0-9]{40,64}$/u),
+      })
+      .strict(),
+  })
+  .strict();
+function actionForCoordinatorReceipt(raw: unknown): ExecutePhaseAction {
+  const receipt = coordinatorReceiptSchema.parse(raw);
+  if (receipt.outcome.state === 'closed') throw new Error('closed coordinator has no successor');
+  const binding = { ...receipt.action };
+  delete binding.callbackId;
+  delete binding.coordinatorReceiptId;
+  return executePhaseActionSchema.parse({
+    ...binding,
+    coordinatorReceiptId: digestGovernedValue(receipt),
+    phase: receipt.outcome.state,
+    runVersion: receipt.outcome.version,
+    headSha: receipt.outcome.headSha,
+  });
+}
+
 export interface PhaseJob {
   id: string;
   continuation_id: string;
-  callback_id: string;
+  callback_id: string | null;
+  coordinator_receipt_id: string | null;
   run_id: string;
   action_json: string;
   status: 'pending' | 'claimed' | 'started' | 'completed' | 'blocked';
@@ -358,7 +447,9 @@ export class PhaseJobJournal {
         const current = this.get(job.id);
         if (current?.status !== 'claimed') throw new Error('phase job is not claimed');
         assertPhaseJobAuthority(this.#database, this.action(current));
-        const hash = current.callback_id.slice('sha256:'.length);
+        const hash = (current.callback_id ?? current.coordinator_receipt_id!).slice(
+          'sha256:'.length,
+        );
         // Stable UUIDv8 namespace for the credential broker and Docker container identity.
         const executionId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-8${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
         this.#update(
@@ -383,7 +474,8 @@ export class PhaseJobJournal {
           .prepare(
             `SELECT * FROM phase_jobs WHERE status = 'started' AND lease_until_ms <= ? AND (? IS NULL OR run_id = ?)
             AND (EXISTS (SELECT 1 FROM runs r WHERE r.id=phase_jobs.run_id AND r.state NOT IN ('cancelled','closed'))
-              OR EXISTS (SELECT 1 FROM execution_interruptions i WHERE i.execution_id=phase_jobs.execution_id))
+              OR EXISTS (SELECT 1 FROM execution_interruptions i WHERE i.execution_id=phase_jobs.execution_id)
+              OR json_extract(action_json,'$.phase')='finalizing')
             AND NOT EXISTS (SELECT 1 FROM execution_interruptions i WHERE i.execution_id=phase_jobs.execution_id
               AND (i.state='exhausted' OR (i.state='pending' AND i.next_attempt_ms>?)))
             ORDER BY created_at_ms, id LIMIT 1`,
@@ -465,6 +557,15 @@ export class PhaseJobJournal {
         if (callbacks.length !== 1)
           throw new Error('phase completion lacks committed result callback');
         const callback = delegateCallbackSchema.parse(JSON.parse(callbacks[0]!.callback_json));
+        if (dispatch === 'implementation_worker') {
+          const imported = this.#database
+            .prepare(
+              `SELECT 1 FROM implementation_imports WHERE
+            execution_id=? AND base_head=? AND result_head=? AND status='verified'`,
+            )
+            .get(value.executionId, action.headSha, callback.headSha);
+          if (!imported) throw new Error('phase completion lacks verified implementation import');
+        }
         if (
           callback.workspaceId !== action.workspaceId ||
           callback.parentRunId !== action.runId ||
@@ -506,6 +607,131 @@ export class PhaseJobJournal {
           nowMs,
         );
         this.#event(job, 'phase_completed', value.executionId, value, nowMs);
+      })
+      .immediate();
+  }
+
+  /** Atomically records verified coordinator effects, finishes this job and queues its successor.
+   * Recovery re-observes the same broker records. No workflow transition is performed here.
+   */
+  completeCoordinator(
+    job: PhaseJob,
+    proofInput: unknown,
+    fences: { workspace: number; run: number; task: number },
+    nowMs = Date.now(),
+  ): void {
+    const action = this.action(job);
+    const previous = this.get(job.id);
+    if (
+      previous?.status === 'completed' &&
+      previous.result_json &&
+      previous.lease_owner === job.lease_owner &&
+      previous.lease_epoch === job.lease_epoch
+    ) {
+      const receipt = coordinatorReceiptSchema.parse(JSON.parse(previous.result_json));
+      if (
+        JSON.stringify(receipt.proof) !== JSON.stringify(coordinatorProofSchema.parse(proofInput))
+      )
+        throw new Error('coordinator completion replay conflict');
+      return;
+    }
+    const documents = verifyDocumentBoundary(this.#database, {
+      runId: action.runId,
+      taskId: action.taskId,
+      boundary: 'phase.coordinator_complete',
+      ownerId: job.lease_owner ?? '',
+      nowMs,
+    });
+    this.#database
+      .transaction(() => {
+        assertDocumentAuthority(this.#database, action.runId, documents.approvalId);
+        const current = this.get(job.id);
+        if (current?.status !== 'started' || current.execution_id !== job.execution_id)
+          throw new Error('coordinator execution mismatch');
+        for (const [kind, resource, epoch] of [
+          ['workspace', action.workspaceId, fences.workspace],
+          ['run', action.runId, fences.run],
+          ['task', action.taskId, fences.task],
+        ] as const) {
+          if (
+            !this.#database
+              .prepare(
+                `SELECT 1 FROM leases WHERE resource_type=? AND resource_id=?
+          AND owner_id=? AND epoch=? AND expires_at_ms>?`,
+              )
+              .get(kind, resource, job.lease_owner, epoch, nowMs)
+          )
+            throw new Error('coordinator resource fence rejected');
+        }
+        const currentContract = this.#database
+          .prepare(
+            `SELECT c.body_json FROM contracts c JOIN runs r ON r.contract_id=c.id WHERE r.id=?`,
+          )
+          .get(action.runId) as { body_json: string };
+        if (
+          deriveContractMaterialDigest(
+            executionContractSchema.parse(JSON.parse(currentContract.body_json)),
+          ) !== action.materialDigest ||
+          !this.#database
+            .prepare(
+              `SELECT 1 FROM plan_approvals WHERE run_id=? AND status='active' AND material_digest=?
+          AND contract_version=? AND policy_digest=?`,
+            )
+            .get(action.runId, action.materialDigest, action.contractVersion, action.policyDigest)
+        )
+          throw new Error('coordinator approved material changed');
+        const outcome = verifyCoordinatorProof(this.#database, action, proofInput);
+        const receipt = coordinatorReceiptSchema.parse({
+          jobId: job.id,
+          executionId: job.execution_id,
+          action,
+          owner: job.lease_owner,
+          phaseEpoch: job.lease_epoch,
+          fences,
+          proof: proofInput,
+          outcome,
+        });
+        const id = digestGovernedValue(receipt);
+        this.#database
+          .prepare(
+            `INSERT INTO coordinator_receipts (id,phase_job_id,run_id,receipt_json,created_at_ms)
+        VALUES (?,?,?,?,?)`,
+          )
+          .run(id, job.id, action.runId, JSON.stringify(receipt), nowMs);
+        this.#update(
+          job,
+          "status='completed',result_json=?,completed_at_ms=?,lease_until_ms=0",
+          [JSON.stringify(receipt), nowMs],
+          nowMs,
+        );
+        if (outcome.state !== 'closed') {
+          const next = actionForCoordinatorReceipt(receipt);
+          assertPhaseJobAuthority(this.#database, next);
+          this.#database
+            .prepare(
+              `INSERT INTO phase_jobs (id,continuation_id,coordinator_receipt_id,run_id,action_json,created_at_ms)
+          VALUES (?,?,?,?,?,?)`,
+            )
+            .run(`phase:${id}`, job.continuation_id, id, action.runId, JSON.stringify(next), nowMs);
+          this.#event(
+            job,
+            'phase_queued',
+            id,
+            {
+              phaseJobId: `phase:${id}`,
+              phase: next.phase,
+              dispatch: PHASE_JOB_DISPATCH[next.phase],
+            },
+            nowMs,
+          );
+        }
+        this.#event(
+          job,
+          'phase_completed',
+          id,
+          { receiptId: id, executionId: job.execution_id },
+          nowMs,
+        );
       })
       .immediate();
   }

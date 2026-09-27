@@ -1,3 +1,4 @@
+import { TrustedSourceGit } from './sourceGit.js';
 import { execFile } from 'node:child_process';
 import { realpath } from 'node:fs/promises';
 import { promisify } from 'node:util';
@@ -35,6 +36,7 @@ export class LocalExactHeadIntegrationGate {
     artifacts: JournaledArtifactRecorder;
     checkCommands: Readonly<Record<string, readonly [string, ...string[]]>>;
     executor?: GateCommandExecutor;
+    gitPin?: { path: string; digest: string };
   }) {
     if (!(input.artifacts instanceof JournaledArtifactRecorder)) {
       throw new Error('exact-head gate requires the journaled artifact recorder');
@@ -42,10 +44,22 @@ export class LocalExactHeadIntegrationGate {
     this.#workspaceRoot = input.workspaceRoot;
     this.#artifacts = input.artifacts;
     this.#checkCommands = input.checkCommands;
-    this.#executor = input.executor ?? defaultExecutor;
+    const trustedGit = input.gitPin
+      ? new TrustedSourceGit(input.workspaceRoot, input.gitPin.path, input.gitPin.digest)
+      : undefined;
+    this.#executor =
+      input.executor ??
+      (async (executable, args, options) => {
+        if (executable === 'git' && trustedGit) {
+          trustedGit.assertSafeIndex();
+          return { stdout: trustedGit.run([...args]).toString('utf8'), stderr: '' };
+        }
+        return defaultExecutor(executable, args, options);
+      });
   }
 
   static create(input: {
+    gitPin?: { path: string; digest: string };
     workspaceRoot: string;
     artifacts: JournaledArtifactRecorder;
     checkCommands: Readonly<Record<string, readonly [string, ...string[]]>>;

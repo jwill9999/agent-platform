@@ -1,0 +1,75 @@
+{
+  "kind": "supervised-review-evidence",
+  "executionId": "962c8ee9-02cf-4034-b92a-1f6156dd5700",
+  "materialDigest": "28c5c63fcbafcb6406cf220aebffe12baa38f26587b6ecab0a1df0bc7655a0f5",
+  "manifest": [
+    {
+      "path": "docs/planning/standalone-pilot/plan.md",
+      "digest": "7b9b0cbce9edfbd8b51fb9defb789ba08cca5f55dfefc9d7ccdeb8e6478d8101"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationImport.ts",
+      "digest": "1c91fed995d7a15aaa59cf3e26918445b8842f1cecef99880062f6e96b3b3150"
+    },
+    {
+      "path": "packages/workflow-control/src/implementationOutput.ts",
+      "digest": "6ea5b7667f31db3607924d0f6aa81814eed9aa2853c835f6b8f90439fa3d29c0"
+    },
+    {
+      "path": "packages/workflow-control/src/phaseRuntime.ts",
+      "digest": "ab02a2fec227b795f8d546e3bceef0a1ea76b18b87ae23ce32b81590c8dfddf5"
+    },
+    {
+      "path": "packages/workflow-control/src/secureEvidence.ts",
+      "digest": "3b0b0be3b09931f1de2b90c85a60ec8612cbd84c4a6e45ab741312dd6076212e"
+    },
+    {
+      "path": "packages/workflow-control/src/sourceGit.ts",
+      "digest": "08eae129de92a9dfe68497ec33fac1d1397d00411b92d0915f6e8372e5b2af3b"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistLauncher.ts",
+      "digest": "c636134945b197507d89dd596afd1786fab53db47546b055d720f60f4c2d9806"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistOutputManifest.ts",
+      "digest": "64c9dd79ff56ef6215ac1dfa0fd9826d959b7596eda189cf9f8248ff158dc204"
+    },
+    {
+      "path": "packages/workflow-control/src/specialistTerminalResult.ts",
+      "digest": "14b1ce372f1e1223935ddb8455c7f7a8a25c89c80e8bc06d72c547d27384553f"
+    },
+    {
+      "path": "packages/workflow-control/src/storage.ts",
+      "digest": "c51575518e12d3d7e19bd157242a4bc80677984bf6f4499a8fb142e1b4658a43"
+    },
+    {
+      "path": "packages/workflow-control/test/fixtures/implementationResponses.mjs",
+      "digest": "fd1aad01402a91994bc19bb8a472cb5b89fcac619b36b3457836c8881b4d1c4b"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.integration.test.ts",
+      "digest": "31f50083db1826d13bab312f4a45c7338a7fbbb0f04e0075d4b9f13da20dafed"
+    },
+    {
+      "path": "packages/workflow-control/test/implementationImport.test.ts",
+      "digest": "6960467ec0da25ac124d9c2c94126b409759c2802099c15a5df58f7302e967e4"
+    },
+    {
+      "path": "packages/workflow-control/test/phaseRuntime.test.ts",
+      "digest": "6b2a1bb968b22a39da0d76340fe1e6845b43246492a225982b9f7cedb125c793"
+    },
+    {
+      "path": "packages/workflow-control/test/sourceGit.test.ts",
+      "digest": "9a32c9109d34a226ca83500e895a92e3cffc6bcb733e03ecf794465d348ed606"
+    },
+    {
+      "path": "packages/workflow-control/test/specialistLauncher.test.ts",
+      "digest": "333a0e8a83fd7b9df05e0bcf613f9103330b6ab4613a773f6c6ba1769908e003"
+    }
+  ],
+  "formalApproval": false,
+  "findings": [
+    "- **High \u2014 Concurrent path replacement can redirect import writes outside the workspace.**  \n  **Evidence:** `packages/workflow-control/src/implementationImport.ts`, `ImportWorkspace.apply()` and `path()`.  \n  Files are checked before the apply loop, but modifications later use `writeFileSync(..., { flag: 'w' })`, which follows symlinks. Parent validation also precedes another authority check. A concurrent writer can replace a file or ancestor between validation and mutation; the subsequent digest check detects failure only after unintended bytes have been written. SQLite fencing does not exclude filesystem writers.  \n  **Correction:** Use filesystem operations anchored to validated directory handles, reject symlinks when opening destinations, and verify opened-file identity before mutation. Establish exclusion against competing workspace writers.  \n  **Missing evidence:** Tests replacing a destination or ancestor between validation and the actual write.\n\n- **Medium \u2014 Synchronous import can exhaust its own leases and strand partially applied changes.**  \n  **Evidence:** `packages/workflow-control/src/phaseRuntime.ts`, heartbeat interval; `packages/workflow-control/src/implementationImport.ts`, synchronous preparation/application loops.  \n  Authority checks now stop expired mutations, but the heartbeat cannot execute while synchronous Git, filesystem and database operations occupy the event loop. If a valid import exceeds the remaining lease duration, it can fail after writing some files; replay then rejects the dirty workspace as uncertain partial application.  \n  **Correction:** Allow lease renewal between bounded import steps, with fresh fencing checks after resumption, or safely renew within synchronous checkpoints before expiry.  \n  **Missing evidence:** A production-store test demonstrating successful import lasting beyond the initial lease TTL. The supplied expiration tests demonstrate rejection, not sustained progress.\n\nThese findings concern R2 only. Supplied test descriptions are not evidence of complete qualification."
+  ]
+}

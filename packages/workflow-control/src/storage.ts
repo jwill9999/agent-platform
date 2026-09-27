@@ -1,4 +1,10 @@
 import { queryRunInventory } from './runDiscovery.js';
+import {
+  initializeImplementationImports,
+  importImplementationOutput,
+} from './implementationImport.js';
+import { assertTaskPacketWithinContract } from './contracts.js';
+import { specialistInputEnvelopeSchema } from './specialistInput.js';
 import { lstatSync } from 'node:fs';
 import {
   InterruptionCleanupJournal,
@@ -755,6 +761,16 @@ export class WorkflowStore {
     );
     initializeBootstrapSchema(this.#database);
     initializeDocumentApprovalSchema(this.#database);
+    initializeImplementationImports(this.#database);
+    for (const table of ['delivery_approved_heads', 'repair_approved_heads']) {
+      const columns = this.#database.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+        name: string;
+      }>;
+      if (!columns.some((column) => column.name === 'import_execution_id'))
+        this.#database.exec(
+          `ALTER TABLE ${table} ADD COLUMN import_execution_id TEXT REFERENCES implementation_imports(execution_id)`,
+        );
+    }
   }
 
   close(): void {
@@ -1404,6 +1420,23 @@ export class WorkflowStore {
           throw new Error('delegate callback lacks immutable scheduler authorization');
         }
         this.#assertDelegateTerminalResult(execution, callback);
+        const imported =
+          callback.delegateRole === 'implementation_worker'
+            ? (this.#database
+                .prepare(
+                  "SELECT base_head,result_head FROM implementation_imports WHERE execution_id=? AND status='verified'",
+                )
+                .get(execution.id) as { base_head: string; result_head: string } | undefined)
+            : undefined;
+        const phaseInput = specialistInputEnvelopeSchema.safeParse(execution.packet);
+        if (
+          callback.delegateRole === 'implementation_worker' &&
+          phaseInput.success &&
+          (!imported || imported.base_head !== phaseInput.data.binding.headSha)
+        )
+          throw new Error('delegate callback lacks verified input-to-result import');
+        if (imported && imported.result_head !== callback.headSha)
+          throw new Error('delegate callback import result head mismatch');
         const approval = this.#database
           .prepare(
             `SELECT 1 FROM plan_approvals WHERE run_id = ? AND status = 'active'
@@ -1422,11 +1455,13 @@ export class WorkflowStore {
             digest: callback.inputArtifactDigest,
             producer: callback.inputProducerIdentity,
             role: 'workflow_orchestrator',
+            headSha: imported?.base_head ?? callback.headSha,
           },
           {
             digest: callback.resultArtifactDigest,
             producer: callback.resultProducerIdentity,
             role: callback.delegateRole,
+            headSha: callback.headSha,
           },
         ];
         for (const evidence of evidenceBindings) {
@@ -1445,7 +1480,7 @@ export class WorkflowStore {
               evidence.role,
               callback.contractVersion,
               callback.policyDigest,
-              callback.headSha,
+              evidence.headSha,
             );
           if (found === undefined) throw new Error('delegate callback evidence binding is stale');
         }
@@ -3856,6 +3891,327 @@ export class WorkflowStore {
     const execution = this.getSchedulerExecution(id);
     if (!execution || !runAcceptsWork(this.#database, execution.runId))
       throw new Error('specialist run is cancelled or closed');
+  }
+
+  importImplementation(input: {
+    authority: SchedulerContainerAuthority;
+    sourceRoot: string;
+    gitBinary: string;
+    gitBinaryDigest?: string;
+    renewLeaseTtlMs?: number;
+    artifact: Uint8Array;
+    artifactDigest: string;
+  }) {
+    if (
+      input.renewLeaseTtlMs !== undefined &&
+      (!Number.isInteger(input.renewLeaseTtlMs) ||
+        input.renewLeaseTtlMs < 300 ||
+        input.renewLeaseTtlMs > 60000)
+    )
+      throw new Error('invalid import lease renewal bound');
+    let assertDocuments: () => void;
+    return importImplementationOutput({
+      database: this.#database,
+      sourceRoot: input.sourceRoot,
+      gitBinary: input.gitBinary,
+      gitBinaryDigest: input.gitBinaryDigest,
+      artifact: input.artifact,
+      artifactDigest: input.artifactDigest,
+      authority: input.authority,
+      mutationDeadline: () => {
+        const execution = this.getSchedulerExecution(input.authority.id)!;
+        const phase = this.#database
+          .prepare('SELECT lease_until_ms FROM phase_jobs WHERE execution_id=?')
+          .get(execution.id) as { lease_until_ms: number };
+        const deadlines = [
+          ['workspace', execution.workspaceId],
+          ['run', execution.runId],
+          ['task', execution.taskId],
+        ].map(
+          ([kind, id]) =>
+            (
+              this.#database
+                .prepare('SELECT expires_at_ms FROM leases WHERE resource_type=? AND resource_id=?')
+                .get(kind, id) as { expires_at_ms: number }
+            ).expires_at_ms,
+        );
+        return Math.min(execution.deadlineMs, phase.lease_until_ms, ...deadlines);
+      },
+      beforeTransaction: () => {
+        const execution = this.getSchedulerExecution(input.authority.id);
+        if (!execution) throw new Error('implementation execution missing');
+        assertDocuments = this.#documentAuthority({
+          runId: execution.runId,
+          taskId: execution.taskId,
+          ownerId: input.authority.ownerId,
+          runLeaseEpoch: input.authority.runLeaseEpoch,
+          expectedSourceRoot: input.sourceRoot,
+          boundary: 'implementation.import',
+        });
+      },
+      commitApprovedHead: (output, head) => {
+        const execution = this.getSchedulerExecution(output.executionId)!;
+        let changed = 0;
+        for (const table of ['delivery_approved_heads', 'repair_approved_heads']) {
+          changed += this.#database
+            .prepare(
+              `UPDATE ${table} SET current_sha=?, published_sha=NULL,
+            import_execution_id=?,updated_at_ms=? WHERE workspace_id=? AND run_id=? AND task_id=?
+            AND ref=? AND (current_sha=? OR (current_sha=? AND import_execution_id=?))`,
+            )
+            .run(
+              head,
+              execution.id,
+              Date.now(),
+              execution.workspaceId,
+              execution.runId,
+              execution.taskId,
+              `refs/heads/task/${execution.taskId}`,
+              output.input.binding.headSha,
+              head,
+              execution.id,
+            ).changes;
+        }
+        if (changed !== 1) throw new Error('implementation import approved head CAS rejected');
+      },
+      assertAuthority: (output) => {
+        const now = Date.now();
+        const execution = this.getSchedulerExecution(input.authority.id);
+        if (
+          !execution ||
+          execution.id !== output.executionId ||
+          execution.status !== 'active' ||
+          execution.mode !== 'mutating' ||
+          execution.role !== 'implementation_worker' ||
+          execution.credentialStatus !== 'revoked' ||
+          execution.deadlineMs <= now ||
+          execution.attemptNumber !== output.attempt ||
+          !isDeepStrictEqual(execution.packet, output.input) ||
+          execution.ownerId !== input.authority.ownerId ||
+          execution.workspaceLeaseEpoch !== input.authority.workspaceLeaseEpoch ||
+          execution.runLeaseEpoch !== input.authority.runLeaseEpoch ||
+          execution.taskLeaseEpoch !== input.authority.taskLeaseEpoch ||
+          this.getSchedulerContainer(execution.id)?.status !== 'removal_confirmed'
+        )
+          throw new Error('implementation import execution authority rejected');
+        const evidence = this.#database
+          .prepare(
+            `SELECT b.content FROM secure_evidence e JOIN secure_evidence_blobs b ON b.digest=e.digest
+          WHERE e.digest=? AND e.workspace_id=? AND e.run_id=? AND e.task_id=?
+          AND e.contract_version=? AND e.policy_digest=? AND e.head_sha=?
+          AND e.producer=? AND e.producer_role='implementation_worker'
+          AND e.kind='artifact' AND e.deleted_at_ms IS NULL AND e.redaction_count=0`,
+          )
+          .get(
+            input.artifactDigest,
+            execution.workspaceId,
+            execution.runId,
+            execution.taskId,
+            output.input.task.contractVersion,
+            output.input.task.policyDigest,
+            output.input.binding.headSha,
+            execution.processIdentity,
+          ) as { content: Buffer } | undefined;
+        if (!evidence || !Buffer.from(evidence.content).equals(Buffer.from(input.artifact)))
+          throw new Error('implementation import lacks execution-bound retained evidence');
+        this.assertSchedulerAcceptsWork(execution.id);
+        for (const [kind, resourceId, epoch] of [
+          ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
+          ['run', execution.runId, execution.runLeaseEpoch],
+          ['task', execution.taskId, execution.taskLeaseEpoch],
+        ] as const)
+          this.#assertResourceLease(kind, resourceId, execution.ownerId, epoch, now);
+        const run = this.getRun(execution.runId);
+        if (run?.state !== 'implementing' || run.version !== output.input.binding.runVersion)
+          throw new Error('implementation import phase changed');
+        const contract = this.getExecutionContract(execution.runId);
+        assertTaskPacketWithinContract(contract, output.input.task);
+        const task = contract.tasks.find((item) => item.id === execution.taskId);
+        if (
+          !output.input.task.allowedOperations.includes('workspace.patch') ||
+          !contract.authority.allowedActions.includes('git.commit') ||
+          !task?.allowedOperations.includes('git.commit')
+        )
+          throw new Error('implementation import patch authority missing');
+        assertDocuments();
+        if (
+          output.files.some((file) =>
+            contract.planningDocuments!.files.some((document) => document.path === file.path),
+          )
+        )
+          throw new Error('implementation output alters approved planning material');
+        const approved = this.#database
+          .prepare(
+            `SELECT current_sha,import_execution_id FROM delivery_approved_heads
+          WHERE workspace_id=? AND run_id=? AND task_id=? AND ref=? UNION ALL
+          SELECT current_sha,import_execution_id FROM repair_approved_heads
+          WHERE workspace_id=? AND run_id=? AND task_id=? AND ref=?`,
+          )
+          .all(
+            execution.workspaceId,
+            execution.runId,
+            execution.taskId,
+            `refs/heads/task/${execution.taskId}`,
+            execution.workspaceId,
+            execution.runId,
+            execution.taskId,
+            `refs/heads/task/${execution.taskId}`,
+          ) as Array<{ current_sha: string; import_execution_id: string | null }>;
+        if (
+          approved.length !== 1 ||
+          (approved[0]!.current_sha !== output.input.binding.headSha &&
+            approved[0]!.import_execution_id !== execution.id)
+        )
+          throw new Error('implementation import base lacks broker authority');
+        const recovery = this.#database
+          .prepare(
+            `SELECT phase_lease_epoch FROM implementation_import_recoveries
+          WHERE execution_id=? AND owner_id=? AND workspace_lease_epoch=? AND run_lease_epoch=? AND task_lease_epoch=?`,
+          )
+          .get(
+            execution.id,
+            execution.ownerId,
+            execution.workspaceLeaseEpoch,
+            execution.runLeaseEpoch,
+            execution.taskLeaseEpoch,
+          ) as { phase_lease_epoch: number } | undefined;
+        const phase = this.#database
+          .prepare(
+            `SELECT 1 FROM phase_jobs WHERE execution_id=? AND
+          status='started' AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
+          )
+          .get(
+            execution.id,
+            execution.ownerId,
+            recovery?.phase_lease_epoch ?? output.input.binding.phaseLeaseEpoch,
+            now,
+          );
+        if (!phase) throw new Error('implementation import phase lease changed');
+        // Synchronous Git/file steps prevent the event-loop heartbeat from running. Renew only
+        // still-live, same-owner fences after full authority validation; never extend execution deadline.
+        if (input.renewLeaseTtlMs !== undefined) {
+          const renewalNow = Date.now();
+          const until = Math.min(execution.deadlineMs, renewalNow + input.renewLeaseTtlMs);
+          if (until <= renewalNow) throw new Error('implementation deadline elapsed');
+          for (const [kind, resourceId, epoch] of [
+            ['workspace', execution.workspaceId, execution.workspaceLeaseEpoch],
+            ['run', execution.runId, execution.runLeaseEpoch],
+            ['task', execution.taskId, execution.taskLeaseEpoch],
+          ] as const) {
+            const changed = this.#database
+              .prepare(
+                `UPDATE leases SET expires_at_ms=?
+              WHERE resource_type=? AND resource_id=? AND owner_id=? AND epoch=? AND expires_at_ms>?`,
+              )
+              .run(until, kind, resourceId, execution.ownerId, epoch, renewalNow).changes;
+            if (changed !== 1) throw new Error('implementation lease expired before renewal');
+          }
+          const changed = this.#database
+            .prepare(
+              `UPDATE phase_jobs SET lease_until_ms=?
+            WHERE execution_id=? AND status='started' AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
+            )
+            .run(
+              until,
+              execution.id,
+              execution.ownerId,
+              recovery?.phase_lease_epoch ?? output.input.binding.phaseLeaseEpoch,
+              renewalNow,
+            ).changes;
+          if (changed !== 1) throw new Error('implementation phase lease expired before renewal');
+        }
+      },
+    });
+  }
+
+  getImplementationImport(
+    executionId: string,
+  ): { artifactDigest: string; status: string } | undefined {
+    return this.#database
+      .prepare(
+        'SELECT artifact_digest AS artifactDigest,status FROM implementation_imports WHERE execution_id=?',
+      )
+      .get(executionId) as { artifactDigest: string; status: string } | undefined;
+  }
+
+  adoptImplementationImport(input: {
+    authority: SchedulerContainerAuthority;
+    phaseLeaseEpoch: number;
+    sourceRoot: string;
+  }): SchedulerExecutionRecord {
+    const original = this.getSchedulerExecution(input.authority.id);
+    if (!original) throw new Error('implementation recovery execution missing');
+    const documents = this.#documentAuthority({
+      runId: original.runId,
+      taskId: original.taskId,
+      ownerId: input.authority.ownerId,
+      runLeaseEpoch: input.authority.runLeaseEpoch,
+      expectedSourceRoot: input.sourceRoot,
+      boundary: 'implementation.recovery',
+    });
+    return this.#database
+      .transaction(() => {
+        documents();
+        const now = Date.now();
+        const current = this.getSchedulerExecution(original.id)!;
+        const packet = specialistInputEnvelopeSchema.parse(current.packet);
+        this.assertSchedulerAcceptsWork(current.id);
+        if (
+          !this.getImplementationImport(current.id) ||
+          current.status !== 'active' ||
+          current.role !== 'implementation_worker' ||
+          current.mode !== 'mutating' ||
+          current.credentialStatus !== 'revoked' ||
+          current.deadlineMs <= now ||
+          this.getSchedulerContainer(current.id)?.status !== 'removal_confirmed' ||
+          input.phaseLeaseEpoch <= packet.binding.phaseLeaseEpoch
+        )
+          throw new Error('implementation recovery is not a settled import intent');
+        const phase = this.#database
+          .prepare(
+            `SELECT 1 FROM phase_jobs WHERE execution_id=? AND status='started'
+        AND lease_owner=? AND lease_epoch=? AND lease_until_ms>?`,
+          )
+          .get(current.id, input.authority.ownerId, input.phaseLeaseEpoch, now);
+        if (!phase) throw new Error('implementation recovery phase lease rejected');
+        for (const [kind, id, epoch] of [
+          ['workspace', current.workspaceId, input.authority.workspaceLeaseEpoch],
+          ['run', current.runId, input.authority.runLeaseEpoch],
+          ['task', current.taskId, input.authority.taskLeaseEpoch],
+        ] as const)
+          this.#assertResourceLease(kind, id, input.authority.ownerId, epoch, now);
+        this.#database
+          .prepare(
+            `UPDATE scheduler_executions SET owner_id=?,workspace_lease_epoch=?,
+        run_lease_epoch=?,task_lease_epoch=?,updated_at_ms=? WHERE id=? AND status='active'`,
+          )
+          .run(
+            input.authority.ownerId,
+            input.authority.workspaceLeaseEpoch,
+            input.authority.runLeaseEpoch,
+            input.authority.taskLeaseEpoch,
+            now,
+            current.id,
+          );
+        this.#database
+          .prepare(
+            `INSERT INTO implementation_import_recoveries VALUES(?,?,?,?,?,?,?)
+        ON CONFLICT(execution_id) DO UPDATE SET owner_id=excluded.owner_id,
+        phase_lease_epoch=excluded.phase_lease_epoch,workspace_lease_epoch=excluded.workspace_lease_epoch,
+        run_lease_epoch=excluded.run_lease_epoch,task_lease_epoch=excluded.task_lease_epoch,updated_at_ms=excluded.updated_at_ms`,
+          )
+          .run(
+            current.id,
+            input.authority.ownerId,
+            input.phaseLeaseEpoch,
+            input.authority.workspaceLeaseEpoch,
+            input.authority.runLeaseEpoch,
+            input.authority.taskLeaseEpoch,
+            now,
+          );
+        return this.getSchedulerExecution(current.id)!;
+      })
+      .immediate();
   }
 
   /** Reserve only effect initiation; cleanup remains permitted after cancellation. */
